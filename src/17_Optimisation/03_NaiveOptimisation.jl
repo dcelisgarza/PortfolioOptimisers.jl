@@ -491,15 +491,14 @@ Run the inverse volatility portfolio optimisation.
 # Algorithm
 
  1. Set every [`TimeDependent`](@ref) field of `iv` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Replace `rd` with its returns in excess of the benchmark when `iv.brt` is `true`, with `returns_result_picker`.
- 3. Fit the prior `pr` with `iv.pe` on `rd`.
- 4. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
- 5. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
- 6. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
- 7. Divide `w` by its sum.
- 8. Resolve the weight bounds `wb` over the reduced assets.
- 9. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
-10. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
+ 2. Fit the prior `pr` with `iv.pe` on `rd` under `iv.brt`, so that it reads the returns in excess of the benchmark when `iv.brt` is `true`. `rd` keeps its raw returns.
+ 3. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
+ 4. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
+ 5. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
+ 6. Divide `w` by its sum.
+ 7. Resolve the weight bounds `wb` over the reduced assets.
+ 8. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
+ 9. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -510,8 +509,7 @@ Run the inverse volatility portfolio optimisation.
 """
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); kwargs...)
     iv = reset_time_dependent_estimator(iv)
-    rd = returns_result_picker(rd, iv.brt)
-    pr = prior(iv.pe, rd)
+    pr = prior(iv.pe, rd; brt = iv.brt)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
     Tf = float_if_integer(eltype(pr.X))

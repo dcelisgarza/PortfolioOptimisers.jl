@@ -382,13 +382,15 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         end
 
         @testset "other ReturnsResult constructors thread Z" begin
-            # returns_result_picker folds B into X; it must not lose Z on the way.
+            # The online step of a prior under brt folds X - B in a rebuilt ReturnsResult;
+            # it must not lose Z on the way.
             rdb = ReturnsResult(; nx = ["A", "B"], X = rand(rng, 4, 2), nb = ["bm"],
                                 B = rand(rng, 4), pnl = matrix_panel(nz, rand(rng, 2, 2)))
-            rp = returns_result_picker(rdb, true)
+            rp = PortfolioOptimisers.prior_step_returns(rdb, true)
             @test panel_feature_matrix(rp.pnl)[2] == panel_feature_matrix(rdb.pnl)[2]
             @test panel_feature_matrix(rp.pnl)[1] == panel_feature_matrix(rdb.pnl)[1]
-            @test isnothing(returns_result_picker(rdb, false).B) == false
+            @test rp.X == rdb.X .- rdb.B && rp.B === rdb.B
+            @test PortfolioOptimisers.prior_step_returns(rdb, false) === rdb
 
             # AssetSelectorResult subselects through port_opt_view, so it is carried for free.
             rds = ReturnsResult(; nx = ["A", "B", "C"], X = rand(rng, 5, 3),

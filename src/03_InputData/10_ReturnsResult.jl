@@ -646,28 +646,43 @@ Fold generation needs only an observation count, from [`cv_nobs`](@ref), and a t
 """
 const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 """
-    returns_result_picker(rd::ReturnsResult, brt::Bool) -> ReturnsResult
+    benchmark_relative_returns(rd::ReturnsResult, brt::Bool) -> Option{<:MatNum}
 
-Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
+Return the asset returns that a reader of `rd` fits on, in excess of the benchmark when `brt` is `true`.
 
-The function reads the benchmark field `B` of `rd` and the flag `brt`, which asks for benchmark tracking. When `brt` is `true`, it returns a new `ReturnsResult` in the Excess Frame, whose asset returns are the excess returns over the benchmark. Otherwise it returns `rd`.
-
-The pick drops no field. In the Excess Frame the benchmark is its own excess return, ``\\tilde{b}_{t} = b_{t} - b_{t}``. This is zero where `B` is finite and `NaN` where `B` has a gap. So a second pick subtracts zero and changes no value, and the inner optimiser of a meta-optimiser and `optimise(opt)` with no returns after an online step can pick again without a second subtraction of the benchmark.
+Every reader of the returns that takes `brt` calls this function at the point of use: the prior, the factor regression of an exposure constraint or of a factor risk contribution, an uncertainty set with a prior of its own, and a clustering, phylogeny or centrality estimator that reads the data. The function returns a matrix and never builds a [`ReturnsResult`](@ref), so `rd` keeps its raw `X` and its `B`, and every other reader sees the returns data as the caller gave it.
 
 `brt = true` on returns that carry no benchmark is a refusal and not a pass-through, because no excess return exists without a benchmark.
 
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{x}_{t,\\,i} &= \\begin{cases}
+x_{t,\\,i} - b_{t} & \\text{a vector benchmark}\\,,\\\\
+x_{t,\\,i} - b_{t,\\,i} & \\text{a matrix benchmark}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{x}_{t,\\,i}``: Excess return of asset ``i`` at observation ``t``.
+  - ``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``, `rd.X`.
+  - ``b_{t}``, ``b_{t,\\,i}``: Benchmark return at observation ``t``, `rd.B`. A vector benchmark has one value for each observation, and a matrix benchmark has one value for each observation and asset.
+
+A gap in the benchmark gives a `NaN` excess return.
+
 # Algorithm
 
- 1. `brt` is `false`. Return `rd`.
- 2. `brt` is `true` and `rd` holds no returns, because its `X` field is `nothing`. Return `rd`, because there is nothing to pick.
+ 1. `brt` is `false`. Return `rd.X`.
+ 2. `brt` is `true` and `rd` holds no returns, because its `X` field is `nothing`. Return `nothing`, because there is nothing to subtract from.
  3. `brt` is `true` and `rd` carries no benchmark, because its `B` field is `nothing`. Throw an `ArgumentError`.
- 4. Subtract the benchmark from the asset returns, which gives `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes the benchmark value of each observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
- 5. Subtract the benchmark from itself, which gives `B = rd.B - rd.B`.
- 6. Rebuild the [`ReturnsResult`](@ref) from `X` and `B`. The fields `nx`, `nf`, `F`, `nb`, `ne`, `E`, `ts`, `iv`, `ivpa` and `pnl` pass through. The function does not modify `rd`.
+ 4. Subtract the benchmark from the asset returns. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`. A matrix benchmark subtracts elementwise, `rd.X - rd.B`. The function does not modify `rd`.
 
 # Arguments
 
-  - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the factor and benchmark returns. When it carries a benchmark, it also holds `X`.
+  - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the benchmark returns. When it carries a benchmark, it also holds `X`.
   - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them.
 
 # Validation
@@ -677,92 +692,46 @@ The pick drops no field. In the Excess Frame the benchmark is its own excess ret
 
 # Returns
 
-  - `rd::ReturnsResult`:
-
-      + If `brt` is `true` and `rd` carries a benchmark, a new `ReturnsResult` in the Excess Frame. It holds the excess returns in `X`, the benchmark names in `nb`, and `rd.B - rd.B` in `B`, so a second call changes no value.
-      + Otherwise, `rd` itself.
+  - `X::Option{<:MatNum}`: The excess returns when `brt` is `true`, a new matrix. Otherwise `rd.X` itself, which is `nothing` when `rd` holds no returns.
 
 # Examples
 
 ```jldoctest
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.10 0.20; 0.30 0.40], nb = [\"BM\"],
-                          B = [0.01; 0.02])
-ReturnsResult
-    nx ┼ Vector{String}: ["A", "B"]
-     X ┼ 2×2 Matrix{Float64}
-    nf ┼ nothing
-     F ┼ nothing
-    nb ┼ Vector{String}: ["BM"]
-     B ┼ Vector{Float64}: [0.01, 0.02]
-    ne ┼ nothing
-     E ┼ nothing
-    ts ┼ nothing
-    iv ┼ nothing
-  ivpa ┼ nothing
-   pnl ┴ nothing
+                          B = [0.01; 0.02]);
 
-julia> rd2 = returns_result_picker(rd, false)  # no change when brt is false
-ReturnsResult
-    nx ┼ Vector{String}: ["A", "B"]
-     X ┼ 2×2 Matrix{Float64}
-    nf ┼ nothing
-     F ┼ nothing
-    nb ┼ Vector{String}: ["BM"]
-     B ┼ Vector{Float64}: [0.01, 0.02]
-    ne ┼ nothing
-     E ┼ nothing
-    ts ┼ nothing
-    iv ┼ nothing
-  ivpa ┼ nothing
-   pnl ┴ nothing
-
-julia> rd === rd2
+julia> benchmark_relative_returns(rd, false) === rd.X  # no change when brt is false
 true
 
-julia> rd3 = returns_result_picker(rd, true)
-ReturnsResult
-    nx ┼ Vector{String}: ["A", "B"]
-     X ┼ 2×2 Matrix{Float64}
-    nf ┼ nothing
-     F ┼ nothing
-    nb ┼ Vector{String}: ["BM"]
-     B ┼ Vector{Float64}: [0.0, 0.0]
-    ne ┼ nothing
-     E ┼ nothing
-    ts ┼ nothing
-    iv ┼ nothing
-  ivpa ┼ nothing
-   pnl ┴ nothing
-
-julia> rd.X .- rd.B == rd3.X
+julia> benchmark_relative_returns(rd, true) == rd.X .- rd.B
 true
 
-julia> returns_result_picker(rd3, true).X == rd3.X  # a second pick subtracts zero
-true
+julia> rd.B  # rd keeps its benchmark
+2-element Vector{Float64}:
+ 0.01
+ 0.02
 ```
 
 # Related
 
   - [`ReturnsResult`](@ref)
-  - [`port_opt_view`](@ref)
+  - [`prior`](@ref)
+  - [`returns_matrix_picker`](@ref)
 """
-function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                 Nothing}, brt::Bool)
+function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                      Nothing}, brt::Bool)
     @argcheck(!brt || isnothing(rd.X),
               ArgumentError("brt = true asks for the returns in excess of a benchmark, and this ReturnsResult carries no benchmark: its `B` is `nothing`, so no excess return exists. Pass returns data that carries `nb` and `B`, or set `brt = false` to optimise over the asset returns as they are."))
-    return rd
+    return rd.X
 end
-function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
-                                                 <:VecNum_MatNum}, brt::Bool)
+function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
+                                                      <:VecNum_MatNum}, brt::Bool)
     return if !brt
-        rd
+        rd.X
+    elseif isa(rd.B, VecNum)
+        rd.X .- rd.B
     else
-        X = isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
-        # The benchmark in the Excess Frame is its own excess return, so a second pick
-        # subtracts zero and no field is dropped.
-        ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
-                      B = rd.B - rd.B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv,
-                      ivpa = rd.ivpa, pnl = rd.pnl)
+        rd.X - rd.B
     end
 end
 """
@@ -859,5 +828,5 @@ function assert_asset_panel_supplied(::Nothing)
     return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the ReturnsResult, and the ReturnsResult holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
 end
 
-export ReturnsResult, returns_result_picker
+export ReturnsResult, benchmark_relative_returns
 public AbstractReturnsResult

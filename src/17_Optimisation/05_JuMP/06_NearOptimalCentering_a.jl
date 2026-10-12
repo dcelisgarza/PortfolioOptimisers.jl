@@ -673,7 +673,7 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     w_opt_retcode = OptimisationSuccess()
     w_max_retcode = OptimisationSuccess()
     unconstrained = isa(noc.alg, UnconstrainedNearOptimalCentering)
-    r = ucs_risk_measure(noc.r, rd)
+    r = ucs_risk_measure(noc.r, rd; brt = noc.opt.brt)
     attrs = processed_jump_optimiser_attributes(noc.opt, rd; kwargs...)
     # The corner solves below run the head's own `opt`, `r` and anchor weights against
     # `rd`, so the head is reduced before any of them, and before the optimiser is

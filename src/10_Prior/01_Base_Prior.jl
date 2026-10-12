@@ -378,7 +378,7 @@ Groups the two result types that hold an asset returns matrix `X` and a feature 
 """
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
-    prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+    prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false, kwargs...)
 
 Compute prior information from asset and/or factor returns using a prior estimator.
 
@@ -390,7 +390,8 @@ This method is the entry point every caller uses, and it is written once here. W
 
  1. Check that `rd` carries asset returns, so that the estimator is not handed a `nothing` for `X`.
  2. When `pe` requires factor returns — when [`needs_factor_returns`](@ref) answers `true`, which walks the tree to a factor leaf under an outer estimator whose factor argument is optional — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the leaf's own signature one call later.
- 3. Call the estimator's returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne` and `rd.E` as keyword arguments alongside `kwargs`, and return the prior result it produces. A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
+ 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`. It is `rd.X`, or `rd.X - rd.B` when `brt` is `true`.
+ 4. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne` and `rd.E` as keyword arguments alongside `kwargs`, and return the prior result it produces. A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no `ReturnsResult`, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
@@ -398,11 +399,13 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 
   - $(arg_dict[:pe])
   - `rd`: Asset and/or factor returns result.
+  - $(arg_dict[:brt_read])
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Validation
 
   - `!isnothing(rd.X)`.
+  - The rules of [`benchmark_relative_returns`](@ref).
   - `!isnothing(rd.F)`, when `needs_factor_returns(pe) === true`.
 
 # Returns
@@ -418,11 +421,11 @@ The Asset Panel travels as the third positional argument for the same reason `rd
   - [`LowOrderPrior`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
-    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, ne = rd.ne, E = rd.E,
-                 kwargs..., dims = 1)
+    return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; iv = rd.iv,
+                 ivpa = rd.ivpa, ne = rd.ne, E = rd.E, kwargs..., dims = 1)
 end
 """
     prior_regression_remedy
@@ -736,17 +739,21 @@ Two results can supply asset returns: the prior result and the raw returns resul
 # Algorithm
 
  1. Check that `x_src` names one of the two results, with [`assert_source_selector`](@ref).
- 2. Return `pr.X` when there is no returns result, or when `x_src` is `:prior`. Return `rd.X` otherwise.
+ 2. Return `pr.X` when there is no returns result, or when `x_src` is `:prior`. Otherwise return the returns of `rd` that [`benchmark_relative_returns`](@ref) reads under `brt`: `rd.X`, or `rd.X - rd.B` when `brt` is `true`.
+
+`pr.X` is already in the frame that the prior was fitted in, so `brt` acts on `rd` alone.
 
 # Arguments
 
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Consulted only when `x_src` is `:data`.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
 
 # Validation
 
   - `x_src in (:prior, :data)`.
+  - The rules of [`benchmark_relative_returns`](@ref), when `x_src` is `:data`.
 
 # Returns
 
@@ -759,9 +766,10 @@ Two results can supply asset returns: the prior result and the raw returns resul
   - [`phylogeny_matrix`](@ref)
   - [`centrality_vector`](@ref)
 """
-function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Symbol)
+function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Symbol,
+                               brt::Bool = false)
     assert_source_selector(x_src, :x_src)
-    return isnothing(rd) || x_src == :prior ? pr.X : rd.X
+    return isnothing(rd) || x_src == :prior ? pr.X : benchmark_relative_returns(rd, brt)
 end
 """
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
@@ -781,6 +789,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments passed to the clustering estimator.
 
 # Returns
@@ -797,8 +806,8 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 """
 function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
                     rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                    kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                    brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return clusterise(cle, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -820,6 +829,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -836,8 +846,8 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`phylogeny_matrix`](@ref)
 """
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                          x_src::Symbol = :prior, kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                          x_src::Symbol = :prior, brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return phylogeny_matrix(pl, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -858,6 +868,7 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
@@ -874,8 +885,8 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 """
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing,
-                               x_src::Symbol = :prior, kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                               x_src::Symbol = :prior, brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return phylogeny_constraints(plc, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -896,6 +907,7 @@ Compute the centrality vector for a centrality estimator and prior result.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -912,8 +924,8 @@ Compute the centrality vector for a centrality estimator and prior result.
 """
 function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                           brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return centrality_vector(cte, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -936,6 +948,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -953,8 +966,8 @@ Compute the centrality vector for a network or clustering estimator and centrali
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                           brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return centrality_vector(pl, ct, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -1021,6 +1034,7 @@ The estimator method picks between the results itself, where the network-and-alg
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments.
 
 # Returns
@@ -1037,8 +1051,8 @@ The estimator method picks between the results itself, where the network-and-alg
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
                             rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                            kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                            brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return average_centrality(cte, w, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -1061,6 +1075,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
 
 # Returns
@@ -1079,8 +1094,8 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 """
 function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
                          rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                         kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                         brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return asset_phylogeny(pl, w, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """
@@ -1101,6 +1116,7 @@ Compute centrality constraints from asset returns in a prior result using a cent
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
   - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read]) Read only when `x_src` is `:data`.
   - `kwargs...`: Additional keyword arguments passed to the estimator. `strict` is read by the asset-returns variant, which reports a dropped zero centrality vector through it.
 
 # Returns
@@ -1116,8 +1132,8 @@ Compute centrality constraints from asset returns in a prior result using a cent
 """
 function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing,
-                                x_src::Symbol = :prior, kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
+                                x_src::Symbol = :prior, brt::Bool = false, kwargs...)
+    X = returns_matrix_picker(pr, rd, x_src, brt)
     return centrality_constraints(ccs, X; pr = pr, rd = rd, kwargs..., dims = 1)
 end
 """

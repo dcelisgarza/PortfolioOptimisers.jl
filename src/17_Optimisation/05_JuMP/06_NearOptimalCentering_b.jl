@@ -177,8 +177,9 @@ function assemble_near_optimal_centering_model!(::UnconstrainedNearOptimalCenter
                                                 setup::NearOptimalSetup, rd::ReturnsResult)
     (; r, opt) = setup
     set_non_fixed_fees!(model, opt.fees)
-    set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd)
-    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd)
+    set_risk_and_scalarise!(model, r, noc, opt, opt.pe, nothing, opt.fees; rd = rd,
+                            brt = opt.brt)
+    set_return_constraints!(model, opt.ret, MinimumRisk(), opt.pe; rd = rd, brt = opt.brt)
     assert_frontier_sweep_cap(model)
     return nothing
 end

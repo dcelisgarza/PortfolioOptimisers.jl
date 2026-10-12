@@ -699,18 +699,17 @@ Run the stacking optimisation.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `st` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Pick the returns `rd` that `st.brt` selects, with [`returns_result_picker`](@ref).
- 3. Fit the prior `pr` with `st.pe`, and take the element type `Tf` of the weights, fees and bounds from `pr.X` with [`float_if_integer`](@ref).
- 4. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk` with [`investable_fees_view`](@ref).
- 5. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the returns of the synthetic assets pay.
- 6. Reduce `pr`, `st` and `rd` to the assets of `imsk` with [`investable_reduction`](@ref), giving `rdr`. `X` is the returns matrix of the reduced `pr`.
- 7. Solve each inner optimiser of `st.opti` on `rdr` under `st.ex`, giving the inner results `resi`. Write the weights of result ``k`` to column ``k`` of `wi`.
- 8. Build the returns of the synthetic assets, `rdo`, with [`predict_outer_returns`](@ref) under `st.cv`.
- 9. Solve `st.opto` on `rdo`, giving the outer result `reso`.
-10. Resolve the weight bounds `wb` from `st.wb` and `st.sets`.
-11. Apply the Combination Weight `st.scale` to `reso.w` with [`combination_weights`](@ref).
-12. Combine the coefficients with `wi`, and finalise the weights under `wb` and `st.wf` with [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
-13. Return a [`StackingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe through `imsk`.
+ 2. Fit the prior `pr` with `st.pe` on `rd` under `st.brt`, and take the element type `Tf` of the weights, fees and bounds from `pr.X` with [`float_if_integer`](@ref). `rd` keeps its raw returns, and the inner and outer optimisers apply their own `brt`.
+ 3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk` with [`investable_fees_view`](@ref).
+ 4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the returns of the synthetic assets pay.
+ 5. Reduce `pr`, `st` and `rd` to the assets of `imsk` with [`investable_reduction`](@ref), giving `rdr`. `X` is the returns matrix of the reduced `pr`.
+ 6. Solve each inner optimiser of `st.opti` on `rdr` under `st.ex`, giving the inner results `resi`. Write the weights of result ``k`` to column ``k`` of `wi`.
+ 7. Build the returns of the synthetic assets, `rdo`, with [`predict_outer_returns`](@ref) under `st.cv`.
+ 8. Solve `st.opto` on `rdo`, giving the outer result `reso`.
+ 9. Resolve the weight bounds `wb` from `st.wb` and `st.sets`.
+10. Apply the Combination Weight `st.scale` to `reso.w` with [`combination_weights`](@ref).
+11. Combine the coefficients with `wi`, and finalise the weights under `wb` and `st.wf` with [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
+12. Return a [`StackingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe through `imsk`.
 
 # Arguments
 
@@ -735,8 +734,7 @@ Run the stacking optimisation.
 function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     st = reset_time_dependent_estimator(st)
-    rd = returns_result_picker(rd, st.brt)
-    pr = prior(st.pe, rd)
+    pr = prior(st.pe, rd; brt = st.brt)
     # A weight and a fee are fractions, so integer returns take a floating point type.
     Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.

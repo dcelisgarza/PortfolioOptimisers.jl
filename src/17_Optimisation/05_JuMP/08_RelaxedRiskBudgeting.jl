@@ -622,7 +622,8 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rd::ReturnsResult)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, pr,
                                                            rrb.rba.flag, rrb.wi;
-                                                           hedge = rrb.rba.hedge)
+                                                           hedge = rrb.rba.hedge,
+                                                           brt = rrb.opt.brt)
     w1 = shared_get(model, :w1)
     rkb = if isnothing(b2)
         sigma_f = Matrix(LinearAlgebra.Symmetric(rr.L \ pr.sigma * b1))

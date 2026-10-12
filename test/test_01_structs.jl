@@ -204,36 +204,33 @@
         @test_throws ArgumentError PO.port_opt_view(PredictionReturnsResult(; nx = nx,
                                                                             X = Bv), 1)
 
-        # returns_result_picker moves the returns to the Excess Frame and drops no field
-        # (ADR 0204): the benchmark becomes its own excess return, zero, so a second pick
-        # subtracts zero and changes no value.
-        r1 = returns_result_picker(rdv, true)
-        @test r1.X == X .- Bv
-        @test r1.nb == rdv.nb && r1.B == zero(Bv)
-        @test r1.iv === iv && r1.ivpa == 2.0
-        r11 = returns_result_picker(r1, true)
-        @test r11.X == r1.X && r11.B == r1.B && r11.nb == r1.nb
-        r2 = returns_result_picker(rd, true)
-        @test r2.X == X - Bm && r2.B == zero(Bm) && r2.nb == rd.nb
-        @test r2.ts === ts && r2.F === F && r2.nx === nx
-        @test returns_result_picker(rd, false) === rd
-        # A gap of the benchmark stays a gap in the Excess Frame.
+        # benchmark_relative_returns gives the matrix a reader fits on and builds no
+        # ReturnsResult (ADR 0204): `rd` keeps its raw `X` and its `B`.
+        x1 = benchmark_relative_returns(rdv, true)
+        @test x1 == X .- Bv
+        @test rdv.X === X && rdv.B === Bv
+        x2 = benchmark_relative_returns(rd, true)
+        @test x2 == X - Bm
+        @test rd.X === X && rd.B === Bm
+        @test benchmark_relative_returns(rd, false) === rd.X
+        @test benchmark_relative_returns(rdv, false) === rdv.X
+        # A gap of the benchmark gives a gap of the excess return, and only there.
         Bg = copy(Bv)
         Bg[2] = NaN
-        rg = returns_result_picker(ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = Bg),
-                                   true)
-        @test isnan(rg.B[2]) && iszero(rg.B[[1; 3:end]])
+        xg = benchmark_relative_returns(ReturnsResult(; nx = nx, X = X, nb = ["BM"],
+                                                      B = Bg), true)
+        @test all(isnan, xg[2, :]) && xg[[1; 3:end], :] == (X .- Bv)[[1; 3:end], :]
         # brt = true on returns with no benchmark is a refusal, not a pass-through.
         rn = ReturnsResult(; nx = nx, X = X)
-        @test returns_result_picker(rn, false) === rn
-        @test_throws ArgumentError returns_result_picker(rn, true)
-        # Returns data with no returns holds nothing to pick.
+        @test benchmark_relative_returns(rn, false) === rn.X
+        @test_throws ArgumentError benchmark_relative_returns(rn, true)
+        # Returns data with no returns holds nothing to subtract from.
         re = ReturnsResult()
-        @test returns_result_picker(re, true) === re
-        @test_throws MethodError returns_result_picker(rd, 1)
-        @test_throws MethodError returns_result_picker(rn, :any)
-        @test_throws MethodError returns_result_picker(ReturnsResult(; nb = ["BM"], B = Bv),
-                                                       true)
+        @test isnothing(benchmark_relative_returns(re, true))
+        @test_throws MethodError benchmark_relative_returns(rd, 1)
+        @test_throws MethodError benchmark_relative_returns(rn, :any)
+        @test_throws MethodError benchmark_relative_returns(ReturnsResult(; nb = ["BM"],
+                                                                          B = Bv), true)
 
         # asset_panel reads rd first, then a ReturnsResult in the pr slot, else it throws.
         pv = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0; 1.0 2.0 3.0]

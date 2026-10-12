@@ -85,9 +85,10 @@ assets is what keeps the JuMP families cheap.
         @test seen == 1:n
     end
 
-    @testset "A benchmark-relative walk steps in the Excess Frame (#1645)" begin
-        # With `brt = true` every fold fits `X - B`. The step picks before it folds, so the
-        # online walk reaches the batch weights fold for fold (ADR 0204).
+    @testset "A benchmark-relative walk fits X - B at every fold (#1645, #1651)" begin
+        # With `brt = true` every fold fits `X - B`. The step folds `X - B` into the prior
+        # and keeps the raw rows, so the online walk reaches the batch weights fold for fold
+        # (ADR 0204).
         Bv = randn(StableRNG(1645), T) ./ 100
         rdb = ReturnsResult(; nx = nx, X = X, ts = ts, nb = ["BM"], B = Bv)
         for opt in (MeanRisk(;

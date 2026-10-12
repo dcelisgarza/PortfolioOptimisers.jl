@@ -1136,13 +1136,15 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
                                   mtx_sqrt = r.mtx_sqrt)
 end
 """
-    ucs_risk_measure(r, rd::ReturnsResult)
+    ucs_risk_measure(r, rd::ReturnsResult; brt::Bool = false)
 
 Fit the uncertainty set of an [`UncertaintySetVariance`](@ref) on the returns data `rd`, so that the set becomes an [`AbstractUncertaintySetResult`](@ref).
 
 [`near_optimal_centering_setup`](@ref) calls it once, so that the risk targets of the barrier, the sub-problem solves and the model of [`NearOptimalCentering`](@ref) read one fitted set. The functor of a measure with a fitted set gives [`ucs_variance`](@ref), so the targets agree with the risk expression of the model.
 
 Three inputs return unchanged. A measure of another type returns unchanged. A set that is already a result passes through [`sigma_ucs`](@ref) unchanged. An estimator that reads a prior result, one for which [`reads_prior_result`](@ref) is `true`, returns unchanged too. Such an estimator is an [`AbstractPriorUncertaintySetEstimator`](@ref), or an estimator of returns data with `pe = nothing`. It is fitted on the prior of the optimisation, and no prior exists when this method runs, so each solve fits it later from its own prior. A vector of measures is fitted element by element.
+
+The set reads the returns of `rd` that [`benchmark_relative_returns`](@ref) gives under `brt`, so a [`NearOptimalCentering`](@ref) that optimises in excess of its benchmark fits the set on `X - B`, as its prior is fitted.
 
 # Related
 
@@ -1151,7 +1153,7 @@ Three inputs return unchanged. A measure of another type returns unchanged. A se
   - [`reads_prior_result`](@ref)
   - [`near_optimal_centering_setup`](@ref)
 """
-function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
+function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult; brt::Bool = false)
     # The pre-fit runs before any prior exists. An estimator that is calibrated on the
     # optimisation's own prior result has nothing to fit here, so it passes through unchanged
     # and each corner solve fits it inside its own builder, from the prior that solve was
@@ -1159,15 +1161,16 @@ function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
     return if reads_prior_result(r.ucs)
         r
     else
-        UncertaintySetVariance(; settings = r.settings, ucs = sigma_ucs(r.ucs, rd),
-                               sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
+        UncertaintySetVariance(; settings = r.settings,
+                               ucs = sigma_ucs(r.ucs, rd; brt = brt), sigma = r.sigma,
+                               mtx_sqrt = r.mtx_sqrt)
     end
 end
-function ucs_risk_measure(r::Any, ::ReturnsResult)
+function ucs_risk_measure(r::Any, ::ReturnsResult; brt::Bool = false)
     return r
 end
-function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult)
-    return ucs_risk_measure.(rs, Ref(rd))
+function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult; brt::Bool = false)
+    return ucs_risk_measure.(rs, Ref(rd); brt = brt)
 end
 function port_opt_view(r::UncertaintySetVariance, i, args...)
     ucs = port_opt_view(r.ucs, i)

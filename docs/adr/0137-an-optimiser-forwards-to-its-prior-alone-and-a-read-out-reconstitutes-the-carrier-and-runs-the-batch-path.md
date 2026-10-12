@@ -290,16 +290,18 @@ carriers already pins it, and a later step with another `ivpa` is refused by nam
   That the carry refits through the plain method at all is
   [#1639](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1639).
 
-## Amendment (2026-10-12, #1645 and #1646)
+## Amendment (2026-10-12, #1645, #1646 and #1651)
 
-- **The step picks before it folds.** The batch path runs `returns_result_picker(rd, brt)` before
-  the prior, and the step folded the raw `rd`. So with `brt = true` the prior folded `X` while every
-  member above it read `X - B`, and online weights differed from batch weights with no error
+- **The prior folds `X - B` under `brt`, and the context keeps the raw rows.** The batch prior
+  reads `X - B` under `brt = true`, and the step folded the raw `rd`. So the prior folded `X`, and
+  online weights differed from batch weights with no error
   ([#1645](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1645)). `fold_returns` now
-  picks first, so the prior and the Fold Context hold the Excess Frame. The identity "the rebuilt
-  `ReturnsResult` equals `rd[1:t]` field by field" holds after the pick under the optimiser's `brt`.
-  The pick keeps `nb` and carries `B - B`, so the second pick at the read-out subtracts zero
-  (ADR 0204).
+  gives the prior `prior_step_returns(rd, brt)`, which holds `X - B` in `X`, and the Fold Context
+  keeps the raw rows beside the buffer of the prior
+  ([#1651](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1651)). So `returns_result`
+  rebuilds the raw `rd`, and the identity "the rebuilt `ReturnsResult` equals `rd[1:t]` field by
+  field" holds under every value of `brt`. Each reader above the prior subtracts the benchmark
+  itself under `brt`, as in batch (ADR 0204).
 - **The head of an online portfolio selection carries `iv`.** Its rows buffer is now a
   `ReturnsBufferState` that owns the returns, so it records the surface beside the rows, and
   `step_active_mask` no longer refuses `iv`. The step of a covariance estimator in

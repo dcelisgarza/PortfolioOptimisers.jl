@@ -567,18 +567,17 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `hec` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Pick the returns `rd` that `opt.brt` selects, with [`returns_result_picker`](@ref).
- 3. Fit the prior `pr` with `opt.pe`.
- 4. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
- 5. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
- 6. Reduce `pr`, `hec` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`, and `N` its number of assets.
- 7. Cluster the assets with `opt.cle`, giving `clr`, and cut its dendrogram into `clr.k` clusters, giving `cls`, the asset indices of each cluster.
- 8. Compute the shares `w` and the cluster risks `rkcl` with [`herc_risk`](@ref).
- 9. Build the nodes `nd` of the dendrogram with [`to_tree`](@ref). The cut does the first `N - clr.k` merges in the order of their heights, as `Clustering.cutree` does, so the other `clr.k - 1` merges are the nodes above the cut.
-10. For each node above the cut, read the assets `ln` and `rn` of its two branches, and the clusters `lc` and `rc` inside them.
-11. Form the split factor `alpha` from the risks of `lc` and `rc`. Multiply `w[ln]` by `alpha` and `w[rn]` by `1 - alpha`.
-12. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
-13. Return a [`HierarchicalEqualRiskContributionResult`](@ref). Its [`HierarchicalResult`](@ref) expands `w` back onto the full asset universe through `imsk`.
+ 2. Fit the prior `pr` with `opt.pe` on `rd` under `opt.brt`, so that it reads the returns in excess of the benchmark when `opt.brt` is `true`. `rd` keeps its raw returns, and the clustering reads `opt.brt` too.
+ 3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
+ 4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
+ 5. Reduce `pr`, `hec` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`, and `N` its number of assets.
+ 6. Cluster the assets with `opt.cle`, giving `clr`, and cut its dendrogram into `clr.k` clusters, giving `cls`, the asset indices of each cluster.
+ 7. Compute the shares `w` and the cluster risks `rkcl` with [`herc_risk`](@ref).
+ 8. Build the nodes `nd` of the dendrogram with [`to_tree`](@ref). The cut does the first `N - clr.k` merges in the order of their heights, as `Clustering.cutree` does, so the other `clr.k - 1` merges are the nodes above the cut.
+ 9. For each node above the cut, read the assets `ln` and `rn` of its two branches, and the clusters `lc` and `rc` inside them.
+10. Form the split factor `alpha` from the risks of `lc` and `rc`. Multiply `w[ln]` by `alpha` and `w[rn]` by `1 - alpha`.
+11. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
+12. Return a [`HierarchicalEqualRiskContributionResult`](@ref). Its [`HierarchicalResult`](@ref) expands `w` back onto the full asset universe through `imsk`.
 
 # Related
 
@@ -590,8 +589,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
                    kwargs...)
     hec = reset_time_dependent_estimator(hec)
-    rd = returns_result_picker(rd, hec.opt.brt)
-    pr = prior(hec.opt.pe, rd)
+    pr = prior(hec.opt.pe, rd; brt = hec.opt.brt)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -619,7 +617,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     X = pr.X
     N = size(X, 2)
     clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     branchorder = branchorder, x_src = hec.opt.x_src)
+                     branchorder = branchorder, x_src = hec.opt.x_src, brt = hec.opt.brt)
     assert_clustering_universe(clr, N)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

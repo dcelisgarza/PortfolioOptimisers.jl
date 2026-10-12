@@ -366,7 +366,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds the observations of a [`ReturnsResult`](@ref) into a [`ReturnsBufferState`](@ref).
 
-The step of the state itself. The optimiser decides once which columns the state owns. `own_returns` is `true` only for a head that holds no prior, and a state whose prior keeps the rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence. `own_exogenous` is `false` when the prior's tree reads the Exogenous Series. The prior's buffer then records every column of the series and its names, so this state keeps neither `E` nor `ne`, and the buffer pins the names.
+The step of the state itself. The optimiser decides once which columns the state owns. `own_returns` is `true` for a head that holds no prior, and for an optimiser whose prior folds the returns in excess of the benchmark, because its buffer then holds no raw row. A state whose prior keeps the raw rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence. `own_exogenous` is `false` when the prior's tree reads the Exogenous Series. The prior's buffer then records every column of the series and its names, so this state keeps neither `E` nor `ne`, and the buffer pins the names.
 
 A head that holds no prior keeps the active mask of a time-varying panel and nothing else of that panel. The estimation mask and the Panel Fields do not reach the state, and no such head reads them. An optimiser with a prior refuses returns data that holds a part its route cannot record, in [`fold_prior`](@ref). The implied volatilities and `ivpa` travel with the returns, so the buffer that holds the rows records them: the prior's buffer, or the state's own `X` for a head that holds no prior.
 
@@ -384,7 +384,7 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
 
   - `state`: The state to fold into.
   - `rd`: The returns data of one or more observations, `observations × assets`.
-  - `own_returns`: Whether the state keeps the returns. It is `true` for a head that holds no prior, and `false` otherwise.
+  - `own_returns`: Whether the state keeps the returns. It is `true` for a head that holds no prior, and for an optimiser whose prior folds the returns in excess of the benchmark under `brt`. It is `false` otherwise.
   - `own_factors`: Whether the state keeps the factor column. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads `F`, and `false` otherwise.
   - `own_exogenous`: Whether the state keeps the Exogenous Series and its names. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads the series, and `false` otherwise.
 
@@ -493,7 +493,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
 # Algorithm
 
  1. Read `n` with [`context_count`](@ref), and refuse a state whose count differs from the count of `rows`.
- 2. Copy the valid rows of `rows` into `X`.
+ 2. Copy the valid rows of the state's own returns into `X` when the state keeps them, and the valid rows of `rows` otherwise. The state keeps them for a head that holds no prior, where `rows` is the same buffer, and for an optimiser whose prior folds the returns in excess of the benchmark.
  3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it with [`buffer_asset_panel`](@ref). Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
  4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise. Take `ne` and `E` from the state when the state keeps the series, and from [`exogenous_buffer_kwargs`](@ref) of `rows` otherwise.
  5. Take `iv` and `ivpa` from [`implied_volatility_buffer_kwargs`](@ref) of `rows`, which records them beside the returns.
@@ -528,7 +528,9 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
     @argcheck(iszero(n) || n == rows.n,
               DimensionMismatch("the fold context and the returns buffer are appended to together, so they hold one number of observations, but the context holds $n and the returns buffer holds $(rows.n)."))
-    X = Matrix(sample_buffer(rows))
+    # A context that keeps the returns holds the raw rows. Under `brt` the buffer of the
+    # prior holds the excess returns, and the rebuilt returns data is raw.
+    X = Matrix(sample_buffer(isnothing(state.X) ? rows : state.X))
     pnl = something(buffer_asset_panel(rows), Some(state.pnl))
     F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
     ex = isnothing(state.E) ? exogenous_buffer_kwargs(rows) : (; ne = state.ne, E = state.E)

@@ -546,8 +546,7 @@ end
     mr = MeanRisk(; opt = opt)
     res1 = optimise(mr, rd)
 
-    rdb = returns_result_picker(rd, true)
-    prb = prior(EmpiricalPrior(), rdb)
+    prb = prior(EmpiricalPrior(), benchmark_relative_returns(rd, true))
     opt = JuMPOptimiser(; pe = prb, slv = slv, brt = true)
     mr = MeanRisk(; opt = opt)
     res2 = optimise(mr, rd)
@@ -561,6 +560,77 @@ end
                     0.1844158171814443, 0.052745229082914055, 0.023728773389230906,
                     0.005354628032118466, 0.010563552176813158, 0.04042806167670747,
                     0.02919805117977965, 0.015023246357866301], rtol = 1e-6)
+end
+
+@testset "brt = true subtracts the benchmark in every reader of the returns (#1651)" begin
+    # Each reader takes `brt` and reads `X - B` at the point of use, so an optimiser over
+    # `rd` with `brt = true` equals the same optimiser with `brt = false` over returns data
+    # whose `X` is the excess return. Before #1651 the uncertainty sets and the refitted
+    # loadings of the JuMP heads read the raw `X`.
+    Fm = randn(StableRNG(16510), size(rd.X, 1), 3) ./ 100
+    nf = ["f1", "f2", "f3"]
+    rdf = ReturnsResult(; nx = rd.nx, X = rd.X, nf = nf, F = Fm, nb = rd.nb, B = rd.B,
+                        ts = rd.ts)
+    rdx = ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, true), nf = nf,
+                        F = Fm, ts = rd.ts)
+    jo(brt) = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = brt)
+    ho(brt) = HierarchicalOptimiser(; pe = EmpiricalPrior(), brt = brt, x_src = :data)
+    usv = UncertaintySetVariance(; ucs = DeltaUncertaintySet(; pe = EmpiricalPrior()))
+    cases = (brt -> MeanRisk(; obj = MaximumRatio(),
+                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                 brt = brt,
+                                                 ret = ArithmeticReturn(;
+                                                                        ucs = NormalUncertaintySet(;
+                                                                                                   pe = EmpiricalPrior(),
+                                                                                                   rng = StableRNG(1651),
+                                                                                                   alg = BoxUncertaintySetAlgorithm())))),
+             brt -> MeanRisk(; r = usv, opt = jo(brt)),
+             brt -> NearOptimalCentering(; r = usv, opt = jo(brt)),
+             brt -> RiskBudgeting(;
+                                  rba = FactorRiskBudgeting(;
+                                                            re = DimensionReductionRegression()),
+                                  opt = jo(brt)),
+             brt -> HierarchicalRiskParity(; opt = ho(brt)),
+             brt -> HierarchicalEqualRiskContribution(; opt = ho(brt)),
+             brt -> SchurComplementHierarchicalRiskParity(; opt = ho(brt)),
+             brt -> InverseVolatility(; brt = brt),
+             brt -> SubsetResampling(; opt = MeanRisk(; opt = jo(brt)), seed = 3,
+                                     n_subsets = 3, subset_size = 5))
+    for mk in cases
+        w1 = optimise(mk(true), rdf).w
+        @test isapprox(w1, optimise(mk(false), rdx).w; atol = 1e-9)
+        # The benchmark moves the weights, so the test above reads the subtraction.
+        @test !isapprox(w1, optimise(mk(false), rdf).w; atol = 1e-3)
+        # The returns data keeps its raw `X` and its `B`.
+        @test rdf.X === rd.X && rdf.B === rd.B
+    end
+
+    # A factor space that refits its loadings regresses `X - B` on the factors.
+    sets_f = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => nf))
+    ece = ExposureConstraintEstimator(;
+                                      lce = LinearConstraintEstimator(; val = "f1 <= 0.3"),
+                                      space = FactorSpace(;
+                                                          re = DimensionReductionRegression()))
+    lc1 = linear_constraints(ece, sets_f; rd = rdf, brt = true)
+    @test lc1.ineq.A == linear_constraints(ece, sets_f; rd = rdx).ineq.A
+    @test lc1.ineq.A != linear_constraints(ece, sets_f; rd = rdf).ineq.A
+
+    # The `brt` of a meta-optimiser changes its own prior and clustering, and reaches no
+    # inner or outer optimiser. The outer problem reads the raw returns of the
+    # sub-portfolios, in the path without folds and in the cross-validated path.
+    for cv in (nothing, OptimisationCrossValidation(; cv = KFold(; n = 5))),
+        mk in (brt -> Stacking(; brt = brt, cv = cv,
+                               opti = [MeanRisk(; opt = jo(false)), InverseVolatility()],
+                               opto = MeanRisk(; opt = jo(false))),
+               brt -> SubsetResampling(; brt = brt, opt = MeanRisk(; opt = jo(false)), seed = 3,
+                                       n_subsets = 3, subset_size = 5))
+
+        @test isapprox(optimise(mk(true), rdf).w, optimise(mk(false), rdf).w; atol = 1e-9)
+    end
+    # The outer returns of the path without folds add the benchmark back to the prior.
+    prb = prior(EmpiricalPrior(), rdf; brt = true)
+    @test isapprox(PortfolioOptimisers.outer_returns_source(prb, rdf, true), rdf.X)
+    @test PortfolioOptimisers.outer_returns_source(prb, rdf, false) === prb
 end
 
 @testset "The MIP quantile gain tail counts its own exceedances (#351)" begin

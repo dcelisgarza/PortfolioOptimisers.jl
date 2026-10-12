@@ -351,22 +351,21 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `hrp` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Pick the returns `rd` that `opt.brt` selects, with [`returns_result_picker`](@ref).
- 3. Fit the prior `pr` with `opt.pe`.
- 4. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
- 5. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
- 6. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
- 7. Cluster the assets with `opt.cle`, giving `clr`. The call passes no `branchorder`, so the leaf order `clr.res.order` keeps the default optimal order, because a different order changes the allocation.
- 8. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
- 9. Compute the risk of each asset held alone, `rku`, with [`unitary_expected_risks`](@ref).
-10. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`.
-11. Set every entry of `w` to one, and set `items` to the one part `clr.res.order`.
-12. Replace each part in `items` that holds more than one asset by its two halves. Stop when `items` is empty.
-13. For each pair of halves `lc` and `rc`, write their naive risk parity weights into the two columns of `wu`, and compute their risks `lrisk` and `rrisk` with [`expected_risk`](@ref).
-14. Form the split factor `alpha`, and clamp it with [`split_factor_weight_constraints`](@ref).
-15. Multiply `w[lc]` by `alpha` and `w[rc]` by `1 - alpha`, then go back to step 12.
-16. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
-17. Return a [`HierarchicalRiskParityResult`](@ref). Its [`HierarchicalResult`](@ref) expands `w` back onto the full asset universe through `imsk`.
+ 2. Fit the prior `pr` with `opt.pe` on `rd` under `opt.brt`, so that it reads the returns in excess of the benchmark when `opt.brt` is `true`. `rd` keeps its raw returns, and the clustering reads `opt.brt` too.
+ 3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
+ 4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
+ 5. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
+ 6. Cluster the assets with `opt.cle`, giving `clr`. The call passes no `branchorder`, so the leaf order `clr.res.order` keeps the default optimal order, because a different order changes the allocation.
+ 7. Resolve the risk measure `r` against `pr` and `opt.slv`, with [`factory`](@ref).
+ 8. Compute the risk of each asset held alone, `rku`, with [`unitary_expected_risks`](@ref).
+ 9. Resolve the weight bounds `wb` from `opt.wb` and `opt.sets`.
+10. Set every entry of `w` to one, and set `items` to the one part `clr.res.order`.
+11. Replace each part in `items` that holds more than one asset by its two halves. Stop when `items` is empty.
+12. For each pair of halves `lc` and `rc`, write their naive risk parity weights into the two columns of `wu`, and compute their risks `lrisk` and `rrisk` with [`expected_risk`](@ref).
+13. Form the split factor `alpha`, and clamp it with [`split_factor_weight_constraints`](@ref).
+14. Multiply `w[lc]` by `alpha` and `w[rc]` by `1 - alpha`, then go back to step 12.
+15. Divide `w` by its sum, and apply the weight finaliser `opt.wf` with [`finalise_weight_bounds`](@ref), giving `retcode` and the final `w`.
+16. Return a [`HierarchicalRiskParityResult`](@ref). Its [`HierarchicalResult`](@ref) expands `w` back onto the full asset universe through `imsk`.
 
 # Related
 
@@ -377,8 +376,7 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
-    rd = returns_result_picker(rd, hrp.opt.brt)
-    pr = prior(hrp.opt.pe, rd)
+    pr = prior(hrp.opt.pe, rd; brt = hrp.opt.brt)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -407,7 +405,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = hrp.opt.x_src)
+                     x_src = hrp.opt.x_src, brt = hrp.opt.brt)
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
@@ -542,8 +540,7 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
-    rd = returns_result_picker(rd, hrp.opt.brt)
-    pr = prior(hrp.opt.pe, rd)
+    pr = prior(hrp.opt.pe, rd; brt = hrp.opt.brt)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -572,7 +569,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = hrp.opt.x_src)
+                     x_src = hrp.opt.x_src, brt = hrp.opt.brt)
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)

@@ -41,7 +41,7 @@ To implement a new sub-portfolio enumeration, subtype `SubPortfolioUniverse` and
 
 # Examples
 
-An enumeration that splits the assets into two halves. The fold-less prediction then returns the net return of each half's equal-weight portfolio. It reads the rule of the panel collapse off the `pcol` field of its second argument, which here is a named tuple in place of a meta-optimiser.
+An enumeration that splits the assets into two halves. The fold-less prediction then returns the net return of each half's equal-weight portfolio. It reads the rule of the panel collapse off the `pcol` field of its second argument, and the `brt` field of the meta-optimiser off the same argument, which here is a named tuple in place of a meta-optimiser.
 
 ```jldoctest
 julia> struct Halves <: PortfolioOptimisers.SubPortfolioUniverse
@@ -80,7 +80,8 @@ julia> W = [0.5 0.0; 0.5 0.0; 0.0 0.5; 0.0 0.5];
 
 julia> pr = prior(EmpiricalPrior(), rd);
 
-julia> PortfolioOptimisers.predict_outer_returns(nothing, (; pcol = RenormaliseActive()),
+julia> PortfolioOptimisers.predict_outer_returns(nothing,
+                                                 (; pcol = RenormaliseActive(), brt = false),
                                                  Halves(4), rd, pr, nothing, W, res).X
 2×2 Matrix{Float64}:
  0.375  -0.0625
@@ -1077,6 +1078,54 @@ function sub_portfolio_predictions(::Type{T}, opti, u::SubPortfolioUniverse,
     return predictions
 end
 """
+    outer_returns_source(pr::AbstractPriorResult, rd::ReturnsResult, brt::Bool)
+
+Return the returns on which the outer problem of a meta-optimiser scores its sub-portfolios, in the raw frame of `rd`.
+
+The outer problem reads the raw returns of the sub-portfolios, as a cross-validated prediction reads them, and the outer optimiser applies its own `brt`. The returns of the Prior Result are in the frame that the prior was fitted in. Under `brt` that frame is the excess over the benchmark, so this function adds the benchmark back.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathbf{S} &= \\begin{cases}
+\\mathbf{X}_{\\mathcal{P}} & \\text{brt is false}\\,,\\\\
+\\mathbf{X}_{\\mathcal{P}} + \\mathbf{B} & \\text{brt is true}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{S}``: Returns that the sub-portfolios are scored on, `observations × assets`.
+  - ``\\mathbf{X}_{\\mathcal{P}}``: Returns of the Prior Result, `pr.X`.
+  - ``\\mathbf{B}``: Benchmark returns of `rd`. A vector benchmark adds the same value to each asset of an observation.
+
+# Arguments
+
+  - `pr`: The Prior Result of the meta-optimiser.
+  - `rd`: The returns data of the meta-optimiser, on the observations of `pr`.
+  - `brt`: The `brt` field of the meta-optimiser.
+
+# Returns
+
+  - `pr` when `brt` is `false`, and the matrix ``\\mathbf{S}`` otherwise.
+
+# Related
+
+  - [`predict_outer_returns`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+"""
+function outer_returns_source(pr::AbstractPriorResult, rd::ReturnsResult, brt::Bool)
+    return if !brt
+        pr
+    elseif isa(rd.B, VecNum)
+        pr.X .+ rd.B
+    else
+        pr.X + rd.B
+    end
+end
+"""
     predict_outer_returns(cv::Option{<:OptimisationCrossValidation}, opt,
                           u::SubPortfolioUniverse, rd::ReturnsResult,
                           pr::AbstractPriorResult, fees::Option{<:Fees}, wi::MatNum,
@@ -1125,8 +1174,9 @@ With Fees, [`calc_net_returns`](@ref) subtracts the fee of sub-portfolio ``k`` f
 Without folds:
 
  1. View `rd` onto the observations the Prior Result answers on with [`outer_prior_rows`](@ref). Prepare the returns data of the outer problem from it with [`prepare_outer_rd`](@ref) under the rule `opt.pcol`, giving `nb`, `B`, `iv`, `ivpa`, `pnl` and the buffer `X`.
- 2. For each inner result `res` in `resi`, write its net returns with [`calc_net_returns`](@ref) to column `i` of `X`, on the Prior Result and Fees viewed onto sub-portfolio `i`.
- 3. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`.
+ 2. Take the returns that the sub-portfolios are scored on with [`outer_returns_source`](@ref) under `opt.brt`, giving `src`. It is the Prior Result, or the returns of the Prior Result with the benchmark added back when `opt.brt` is `true`.
+ 3. For each inner result `res` in `resi`, write its net returns with [`calc_net_returns`](@ref) to column `i` of `X`, on `src` and Fees viewed onto sub-portfolio `i`.
+ 4. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`.
 
 With cross-validation:
 
@@ -1137,7 +1187,7 @@ With cross-validation:
 # Arguments
 
   - `cv`: The cross-validation scheme of the meta-optimiser.
-  - `opt`: The meta-optimiser. Every method reads its `pcol` field, the rule of the panel collapse, and the cross-validated methods also read its `opti` and `ex` fields.
+  - `opt`: The meta-optimiser. Every method reads its `pcol` field, the rule of the panel collapse. The method without folds also reads its `brt` field, and the cross-validated methods read its `opti` and `ex` fields.
   - `u`: Sub-portfolio enumeration.
   - `rd`: Returns data.
   - `pr`: Prior Result over the whole universe.
@@ -1164,8 +1214,9 @@ function predict_outer_returns(::Option{<:OptimisationCrossValidation}, opt,
                                resi::VecOpt)
     rd = outer_prior_rows(rd, pr)
     nb, B, iv, ivpa, pnl, X = prepare_outer_rd(rd, wi, opt.pcol)
+    src = outer_returns_source(pr, rd, opt.brt)
     for (i, res) in enumerate(resi)
-        X[:, i] = calc_net_returns(res, sub_portfolio_view(u, pr, i),
+        X[:, i] = calc_net_returns(res, sub_portfolio_view(u, src, i),
                                    sub_portfolio_view(u, fees, i))
     end
     return ReturnsResult(; nx = ["_$i" for i in 1:size(wi, 2)], X = X, nf = rd.nf, F = rd.F,

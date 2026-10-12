@@ -356,7 +356,7 @@ Where:
 
 A price is never negative, so the conversion refuses a negative price. A zero price ``p_{t,\\,i} = 0`` gives ``x_{t,\\,i} = -1`` on the simple branch and ``x_{t,\\,i} = -\\infty`` on the log branch. On both branches it gives ``x_{t+1,\\,i} = \\infty``.
 
-The conversion applies the same rule to a benchmark ``B``, and carries the benchmark returns ``b_{t,\\,i}`` **beside** the asset returns. It does not subtract them. [`returns_result_picker`](@ref) forms the excess return ``\\tilde{x}_{t,\\,i} = x_{t,\\,i} - b_{t,\\,i}``, and only when the optimisation tracks the benchmark.
+The conversion applies the same rule to a benchmark ``B``, and carries the benchmark returns ``b_{t,\\,i}`` **beside** the asset returns. It does not subtract them. [`benchmark_relative_returns`](@ref) forms the excess return ``\\tilde{x}_{t,\\,i} = x_{t,\\,i} - b_{t,\\,i}``, and only when the optimisation tracks the benchmark.
 
 # Algorithm
 
@@ -450,7 +450,7 @@ ReturnsResult
   - [`returns_universe_masks`](@ref)
   - [`attach_universe_masks`](@ref)
   - [`listing_span_view`](@ref)
-  - [`returns_result_picker`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
+  - [`benchmark_relative_returns`](@ref): subtracts the carried benchmark, and only when the optimisation tracks it.
 """
 function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
                            padding::Bool = false,

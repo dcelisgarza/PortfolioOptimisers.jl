@@ -663,8 +663,7 @@ end
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     sr = reset_time_dependent_estimator(sr)
-    rd = returns_result_picker(rd, sr.brt)
-    pr = prior(sr.pe, rd)
+    pr = prior(sr.pe, rd; brt = sr.brt)
     # A weight and a fee are fractions, so integer returns take a floating point type.
     Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -722,16 +721,15 @@ A `SubsetResampling` with a fallback goes through the generic [`optimise`](@ref)
 
  1. Refuse an [`Online`](@ref) in the tree of `sr` with [`assert_batch_entry`](@ref).
  2. Reset the schedules of `sr` with [`reset_time_dependent_estimator`](@ref).
- 3. Pick the returns data that `sr.brt` selects with [`returns_result_picker`](@ref), giving `rd`.
- 4. Fit the prior `sr.pe` on `rd` with [`prior`](@ref), giving `pr`, and read its investable mask with [`investable_mask`](@ref), giving `imsk`.
- 5. Resolve the fees on the full asset universe with [`fees_constraints`](@ref), and put them on the investable universe with [`investable_fees_view`](@ref), giving `fees`.
- 6. Reduce `pr`, `sr` and `rd` to the investable universe with [`investable_reduction`](@ref), giving `rdr`. `N` is the number of investable assets.
- 7. Resolve `subset_size` and `n_subsets` on `pr` with [`get_subset_size`](@ref) and [`get_n_subsets`](@ref).
- 8. Draw the subsets with [`sample_unique_assets`](@ref), giving `asset_idx`. When `binomial(N, subset_size)` is at most `max_comb`, the subsets are distinct. Otherwise the function draws each subset alone, and two subsets can be equal.
- 9. For each column of `asset_idx`, view `sr.opt` and `rdr` on the subset with [`port_opt_view`](@ref) and optimise the view, giving `ress`. The loop runs on the executor `sr.ex`.
-10. Build the weight bounds `wb` over the ``N`` assets with [`weight_bounds_constraints`](@ref).
-11. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`.
-12. Return a [`SubsetResamplingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe.
+ 3. Fit the prior `sr.pe` on `rd` under `sr.brt` with [`prior`](@ref), giving `pr`, and read its investable mask with [`investable_mask`](@ref), giving `imsk`. `rd` keeps its raw returns, and the subset optimisers apply their own `brt`.
+ 4. Resolve the fees on the full asset universe with [`fees_constraints`](@ref), and put them on the investable universe with [`investable_fees_view`](@ref), giving `fees`.
+ 5. Reduce `pr`, `sr` and `rd` to the investable universe with [`investable_reduction`](@ref), giving `rdr`. `N` is the number of investable assets.
+ 6. Resolve `subset_size` and `n_subsets` on `pr` with [`get_subset_size`](@ref) and [`get_n_subsets`](@ref).
+ 7. Draw the subsets with [`sample_unique_assets`](@ref), giving `asset_idx`. When `binomial(N, subset_size)` is at most `max_comb`, the subsets are distinct. Otherwise the function draws each subset alone, and two subsets can be equal.
+ 8. For each column of `asset_idx`, view `sr.opt` and `rdr` on the subset with [`port_opt_view`](@ref) and optimise the view, giving `ress`. The loop runs on the executor `sr.ex`.
+ 9. Build the weight bounds `wb` over the ``N`` assets with [`weight_bounds_constraints`](@ref).
+10. Average and finalise the subset weights with [`subset_resampling_finaliser`](@ref), giving `retcode` and `w`.
+11. Return a [`SubsetResamplingResult`](@ref). Its keyword constructor expands `w` onto the full asset universe.
 
 # Arguments
 

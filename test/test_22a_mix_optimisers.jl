@@ -260,7 +260,7 @@ end
 
 @testset "No meta-optimiser fold captures a boxed returns result" begin
     #=
-    `NestedClustered`, `Stacking` and `SubsetResampling` assign `rd` twice before their
+    `NestedClustered`, `Stacking` and `SubsetResampling` once assigned `rd` twice before their
     `@floop` — the benchmark-relative picker, then the investable reduction — and a variable
     that is reassigned and then captured by the fold's closure is boxed. FLoops reports a
     boxed capture as a correctness and performance problem, once per process, so a test file

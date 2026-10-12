@@ -138,10 +138,10 @@ end
         @test isapprox(optimise(o).w, optimise(MeanRisk(; opt = jopt), b).w; atol = 1e-5)
     end
 
-    @testset "A benchmark-relative step picks before it folds (#1645)" begin
-        # With `brt = true` the batch path fits `X - B`. The step picks first, so the prior
-        # and the Fold Context hold the Excess Frame, and the pick at the read-out subtracts
-        # a zero benchmark (ADR 0204).
+    @testset "A benchmark-relative step folds X - B into the prior (#1645, #1651)" begin
+        # With `brt = true` the batch prior fits `X - B`. The step folds `X - B` into the
+        # prior, and the Fold Context keeps the raw rows, so the read-out rebuilds the raw
+        # returns data and each reader subtracts the benchmark itself (ADR 0204).
         t = 80
         jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
         jbrt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)
@@ -156,14 +156,14 @@ end
         for r in (rdf, rdv), opt in fams
             b = rows(r, 1:t)
             o = step(opt, r, t)
-            # The context gives back the picked rows, field by field.
-            @test same_fields(po.returns_result(o), po.returns_result_picker(b, true))
+            # The context gives back the raw rows, field by field.
+            @test same_fields(po.returns_result(o), b)
             solved = isa(opt, po.JuMPOptimisationEstimator) ||
                      isa(opt, NestedClustered) ||
                      isa(opt, SubsetResampling)
             @test isapprox(optimise(o).w, optimise(opt, b).w; atol = solved ? 1e-5 : 1e-10)
         end
-        # The pick is what the step honours: the weights differ from those over `X`.
+        # The subtraction is what the step honours: the weights differ from those over `X`.
         o = step(InverseVolatility(; brt = true), rdv, t)
         @test !isapprox(optimise(o).w, optimise(InverseVolatility(), rows(rdv, 1:t)).w;
                         atol = 1e-6)

@@ -1412,7 +1412,7 @@ function cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNu
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, rdb = rdb, Xu = Xu)
 end
 """
-    prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
+    prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; brt::Bool = false, kwargs...) -> LowOrderPrior
 
 Fit a Cross-Sectional Factor Prior from a [`ReturnsResult`](@ref).
 
@@ -1421,17 +1421,20 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Algorithm
 
  1. Check that `rd` carries asset returns.
- 2. Call the returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
+ 2. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 3. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and a time-varying Asset Panel in `rd.pnl`.
+  - $(arg_dict[:brt_read])
   - `kwargs...`: Additional keyword arguments passed to the returns-matrix method.
 
 # Validation
 
   - `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - The rules of [`benchmark_relative_returns`](@ref).
   - `rd.pnl` is not `nothing`. Raises an [`IsNothingError`](@ref).
   - The rules of the returns-matrix method.
 
@@ -1445,13 +1448,14 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
   - [`prior`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
+function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; brt::Bool = false,
+               kwargs...)
     @argcheck(!isnothing(rd.X),
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
-    return prior(pe, rd.X, rd.F, rd.pnl; ne = rd.ne, E = rd.E, iv = rd.iv, ivpa = rd.ivpa,
-                 ts = rd.ts, kwargs..., dims = 1)
+    return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; ne = rd.ne,
+                 E = rd.E, iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, kwargs..., dims = 1)
 end
 function refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
     return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))

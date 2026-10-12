@@ -67,9 +67,10 @@ processing happens exactly once per `optimise` call.
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              kwargs...)
-    rd = returns_result_picker(rd, opt.brt)
+    # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns takes
+    # `opt.brt` and subtracts the benchmark itself, at the point of use.
     assert_universe_axis_order(opt.sets, rd)
-    pr = prior(opt.pe, rd)
+    pr = prior(opt.pe, rd; brt = opt.brt)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -94,9 +95,10 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
-                              rr = pr.rr, rd = rd)
+                              rr = pr.rr, rd = rd, brt = opt.brt)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 x_src = opt.x_src, strict = opt.strict, kwargs...)
+                                 x_src = opt.x_src, brt = opt.brt, strict = opt.strict,
+                                 kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
@@ -135,7 +137,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
     plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                x_src = opt.x_src, kwargs...)
+                                x_src = opt.x_src, brt = opt.brt, kwargs...)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,
@@ -335,6 +337,7 @@ fees: unconstrained [`NearOptimalCentering`](@ref) did exactly that while it inl
   - `fees`: Fees result passed to risk builders.
   - $(arg_dict[:b1_opt])
   - `rd`: Returns result forwarded as a keyword argument to risk builders.
+  - $(arg_dict[:brt_read]) Forwarded with `rd` to the risk builders, where an uncertainty set with a prior of its own reads it.
 
 # Returns
 
@@ -357,8 +360,9 @@ function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, optimiser, opt, pr, pl
     return nothing
 end
 function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl,
-                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; rd)
-    set_risk_constraints!(model, r, optimiser, pr, pl, fees, b1; rd = rd)
+                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; rd,
+                                 brt::Bool = false)
+    set_risk_constraints!(model, r, optimiser, pr, pl, fees, b1; rd = rd, brt = brt)
     scalarise_risk_expression!(model, opt.sca)
     return nothing
 end
@@ -470,8 +474,9 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_linf_regularisation!(model,
                              resolve_calibration_slot(opt.linf, :linf, pr, pr.w, opt.slv))
     set_non_fixed_fees!(model, fees)
-    set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
-    set_return_constraints!(model, ret, obj, pr; rd = rd)
+    set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd,
+                            brt = opt.brt)
+    set_return_constraints!(model, ret, obj, pr; rd = rd, brt = opt.brt)
     # After the return constraints, so a `MaximumRatio` has chosen its form, and before
     # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
     mark_risk_minimised!(model, obj)

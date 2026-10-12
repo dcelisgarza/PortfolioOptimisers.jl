@@ -893,8 +893,7 @@ end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     nco = reset_time_dependent_estimator(nco)
-    rd = returns_result_picker(rd, nco.brt)
-    pr = prior(nco.pe, rd)
+    pr = prior(nco.pe, rd; brt = nco.brt)
     # A weight and a fee are fractions, so integer returns take a floating point type.
     Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -921,7 +920,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
     X = pr.X
     clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa,
-                     branchorder = branchorder, x_src = nco.x_src)
+                     branchorder = branchorder, x_src = nco.x_src, brt = nco.brt)
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
@@ -964,21 +963,20 @@ The `# Mathematical definition` of [`NestedClustered`](@ref) states the weights 
 # Algorithm
 
  1. Replace the schedules in the fields of `nco` with their static defaults, through [`reset_time_dependent_estimator`](@ref).
- 2. Select the returns of `rd` with [`returns_result_picker`](@ref) and `nco.brt`, giving `rd`.
- 3. Fit the prior of `nco.pe` to `rd`, giving `pr`.
- 4. Take the element type of the weights, the fees and the weight bounds from `pr.X` with [`float_if_integer`](@ref), giving `Tf`. Integer returns take a floating point type, because a weight and a fee are fractions.
- 5. Read the investable mask of `pr` with [`investable_mask`](@ref), giving `imsk`.
- 6. Resolve the fees of `nco.fees` over the universe of the caller with [`fees_constraints`](@ref), and place them on the investable assets with [`investable_fees_view`](@ref), giving `fees`.
- 7. Remove the liquidation charges from `fees` with [`strip_liquidation_charges`](@ref), giving `cfees`. The result charges a forced exit one time, and no cluster holds an asset that exits.
- 8. Reduce `pr`, `nco` and `rd` to the investable assets with [`investable_reduction`](@ref), giving `pr`, `nco` and `rdr`.
- 9. Cluster the assets with [`clusterise`](@ref), giving `clr`, and check with [`assert_clustering_universe`](@ref) that `clr` covers every asset. Collect the assets of each cluster, giving `cls`.
-10. For each cluster `k`, view `nco.opti` and `rdr` onto the assets `cls[k]` with [`port_opt_view`](@ref), and optimise, giving `resi[k]`. Write its weights into column `k` of `wi`, which is zero outside the cluster.
-11. Predict the returns of the synthetic assets with [`predict_outer_returns`](@ref), `cfees` and a [`ClusterUniverse`](@ref), giving `rdo`. Without `nco.cv` these are the returns of the cluster portfolios over the observations of `pr`. With `nco.cv` they are the out-of-sample predictions of the folds.
-12. Rebuild the asset sets of `nco.opto` over the names of the synthetic assets with [`_update_asset_sets`](@ref).
-13. Optimise `nco.opto` over `rdo`, giving `reso`.
-14. Resolve the weight bounds of `nco.wb` over the investable assets with [`weight_bounds_constraints`](@ref), giving `wb`.
-15. Combine `wi` and `reso.w` and finalise them with `nco.wf` under `wb`, through [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
-16. Build the [`NestedClusteredResult`](@ref). Its keyword constructor expands `w` to the full asset universe.
+ 2. Fit the prior of `nco.pe` to `rd` under `nco.brt`, giving `pr`. It reads the returns in excess of the benchmark when `nco.brt` is `true`. `rd` keeps its raw returns, and the clustering reads `nco.brt` too. The inner and outer optimisers apply their own `brt`.
+ 3. Take the element type of the weights, the fees and the weight bounds from `pr.X` with [`float_if_integer`](@ref), giving `Tf`. Integer returns take a floating point type, because a weight and a fee are fractions.
+ 4. Read the investable mask of `pr` with [`investable_mask`](@ref), giving `imsk`.
+ 5. Resolve the fees of `nco.fees` over the universe of the caller with [`fees_constraints`](@ref), and place them on the investable assets with [`investable_fees_view`](@ref), giving `fees`.
+ 6. Remove the liquidation charges from `fees` with [`strip_liquidation_charges`](@ref), giving `cfees`. The result charges a forced exit one time, and no cluster holds an asset that exits.
+ 7. Reduce `pr`, `nco` and `rd` to the investable assets with [`investable_reduction`](@ref), giving `pr`, `nco` and `rdr`.
+ 8. Cluster the assets with [`clusterise`](@ref), giving `clr`, and check with [`assert_clustering_universe`](@ref) that `clr` covers every asset. Collect the assets of each cluster, giving `cls`.
+ 9. For each cluster `k`, view `nco.opti` and `rdr` onto the assets `cls[k]` with [`port_opt_view`](@ref), and optimise, giving `resi[k]`. Write its weights into column `k` of `wi`, which is zero outside the cluster.
+10. Predict the returns of the synthetic assets with [`predict_outer_returns`](@ref), `cfees` and a [`ClusterUniverse`](@ref), giving `rdo`. Without `nco.cv` these are the returns of the cluster portfolios over the observations of `pr`. With `nco.cv` they are the out-of-sample predictions of the folds.
+11. Rebuild the asset sets of `nco.opto` over the names of the synthetic assets with [`_update_asset_sets`](@ref).
+12. Optimise `nco.opto` over `rdo`, giving `reso`.
+13. Resolve the weight bounds of `nco.wb` over the investable assets with [`weight_bounds_constraints`](@ref), giving `wb`.
+14. Combine `wi` and `reso.w` and finalise them with `nco.wf` under `wb`, through [`outer_optimisation_finaliser`](@ref), giving `retcode` and `w`.
+15. Build the [`NestedClusteredResult`](@ref). Its keyword constructor expands `w` to the full asset universe.
 
 # Arguments
 

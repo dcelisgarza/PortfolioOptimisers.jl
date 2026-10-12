@@ -207,9 +207,10 @@ that it was dropped.
 - **Drop a field only when it has no meaning on the new axis.** An asset-indexed field after a
   collapse to synthetic assets with no collapse rule is an example. State the reason in a comment
   or in the docstring at the site.
-- **Transform a field rather than drop it.** `returns_result_picker` moves the data to the Excess
-  Frame: `X - B` for the returns, and `B - B` for the benchmark, which is its own excess return.
-  The pick then stays idempotent with no field dropped.
+- **Subtract at the point of use rather than rebuild.** A flag that changes the returns a reader
+  fits on, such as `brt`, never rebuilds the `ReturnsResult`. Each reader takes the flag as an
+  argument and reads `benchmark_relative_returns(rd, brt)`, a matrix, so `rd` keeps its raw `X`
+  and `B`, and no reader subtracts twice. A reader that a change adds takes `brt` too.
 - **Refuse by name where a field cannot travel.** A fold that holds numbers alone refuses `iv` with
   an error that names it. A silent drop is never correct.
 - **Refuse a flag that needs a field the data does not carry.** `brt = true` on returns with no `B`

@@ -48,9 +48,49 @@ function step_active_mask(rd::ReturnsResult)
     return pnl.amsk
 end
 """
-    fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    fold_prior(pe::AbstractPriorResult, rd::ReturnsResult)
-    fold_prior(pe::TimeDependent, rd::ReturnsResult)
+    prior_step_returns(rd::ReturnsResult, brt::Bool)
+
+Returns the observations that the prior of an optimiser folds in its online step.
+
+The step of a prior reads a [`ReturnsResult`](@ref), and under `brt` the batch fit of the prior reads the returns in excess of the benchmark. So the function gives the prior a `ReturnsResult` that holds `X - B` in its `X` and every other field of `rd` unchanged. The prior is the one reader of this `ReturnsResult`. The Fold Context records `rd` itself, with its raw `X`, so `optimise(opt)` with no returns rebuilds the raw returns data.
+
+# Algorithm
+
+ 1. `brt` is `false`. Return `rd`.
+ 2. Otherwise read the excess returns with [`benchmark_relative_returns`](@ref), giving `X`, and return a `ReturnsResult` with `X` in place of `rd.X`.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:brt_read])
+
+# Validation
+
+  - The rules of [`benchmark_relative_returns`](@ref).
+
+# Returns
+
+  - `rd::ReturnsResult`: The observations that the prior folds.
+
+# Related
+
+  - [`fold_prior`](@ref)
+  - [`fold_returns`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+"""
+function prior_step_returns(rd::ReturnsResult, brt::Bool)
+    return if !brt
+        rd
+    else
+        ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, true), nf = rd.nf,
+                      F = rd.F, nb = rd.nb, B = rd.B, ne = rd.ne, E = rd.E, ts = rd.ts,
+                      iv = rd.iv, ivpa = rd.ivpa, pnl = rd.pnl)
+    end
+end
+"""
+    fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false)
+    fold_prior(pe::AbstractPriorResult, rd::ReturnsResult; brt::Bool = false)
+    fold_prior(pe::TimeDependent, rd::ReturnsResult; brt::Bool = false)
 
 Forwards the observations of `rd` to the prior, in the arity of the prior's own step.
 
@@ -58,18 +98,23 @@ This is the one forward that the step of an optimiser makes. An optimiser forwar
 
 A prior that is already an [`AbstractPriorResult`](@ref) has no state to fold into. It is batch configuration, and an optimiser that holds one runs `optimise(opt, rd)`. This function also refuses a [`TimeDependent`](@ref) schedule on the prior. A schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot take them over.
 
+The prior folds the returns that its batch fit reads. Under `brt` these are the returns in excess of the benchmark, as [`prior`](@ref) reads them under `brt`, so [`prior_step_returns`](@ref) gives the prior the observations of `rd` with `X - B` in place of `X`.
+
 # Algorithm
 
- 1. Fold `rd` into `pe` with [`partial_fit!`](@ref) over the `ReturnsResult`, which refuses by route what the prior cannot honour.
+ 1. Take the observations that the prior folds with [`prior_step_returns`](@ref) under `brt`, giving `rdp`.
+ 2. Fold `rdp` into `pe` with [`partial_fit!`](@ref) over the `ReturnsResult`, which refuses by route what the prior cannot honour.
 
 # Arguments
 
   - `pe`: The prior that the optimiser holds.
   - `rd`: The returns data to fold, `observations × assets`.
+  - $(arg_dict[:brt_read])
 
 # Validation
 
   - `pe` is an [`AbstractPriorEstimator`](@ref). An `ArgumentError` is thrown for a prior result or a schedule.
+  - The rules of [`benchmark_relative_returns`](@ref).
   - Everything [`partial_fit!`](@ref) of the prior over `rd` refuses.
 
 # Returns
@@ -84,13 +129,13 @@ A prior that is already an [`AbstractPriorResult`](@ref) has no state to fold in
   - [`prior`](@ref)
   - [`assert_online_entry`](@ref): refuses a schedule on the prior before the warm-up of the fold loop.
 """
-function fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    return partial_fit!(pe, rd)
+function fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false)
+    return partial_fit!(pe, prior_step_returns(rd, brt))
 end
-function fold_prior(pe::AbstractPriorResult, ::ReturnsResult)
+function fold_prior(pe::AbstractPriorResult, ::ReturnsResult; brt::Bool = false)
     return throw(ArgumentError("`pe` holds a fitted `$(typeof(pe))`, which has no state to fold an observation into: a prior result is batch configuration. Hand the optimiser the prior estimator to take the online step, or run `optimise(opt, rd)`."))
 end
-function fold_prior(pe::TimeDependent, ::ReturnsResult)
+function fold_prior(pe::TimeDependent, ::ReturnsResult; brt::Bool = false)
     return throw(ArgumentError("`pe` holds a `TimeDependent` schedule of priors, and the online step cannot fold into a schedule: it swaps the estimator that carries the state, and a member that never saw the folded rows cannot be handed them. No loop resolves a schedule before stepping — a schedule reaches stateless fields only. Hold one prior in `pe`, and schedule a field that carries no state."))
 end
 """
@@ -139,18 +184,17 @@ Takes the step of an optimiser that holds a prior and a fold context. It forward
 
 The prior folds first, because the context takes its cap from the buffer of the prior. The `max_history` of an [`Online`](@ref) wrapper caps the rows of the prior, and the context must drop the same rows at the same step, so the [`ReturnsResult`](@ref) that `optimise(opt)` with no returns rebuilds matches the rows of the prior.
 
-The step picks first. [`returns_result_picker`](@ref) under `opt.brt` gives the returns that the batch path fits, so the prior and the context fold the Excess Frame when `brt` is `true`. The pick that `optimise(opt)` with no returns runs then subtracts a zero benchmark and changes no value, and `optimise(opt)` with no returns equals `optimise(opt, rd[1:t])` under `brt` too.
+Under `opt.brt` the prior folds the returns in excess of the benchmark, which its batch fit reads, and the context keeps the raw returns beside them. So the `ReturnsResult` that `optimise(opt)` with no returns rebuilds holds the raw `X` and `B`, as the batch path reads them, and `optimise(opt)` with no returns equals `optimise(opt, rd[1:t])` under `brt` too.
 
 One place holds `F`. The context keeps the factor column only when the tree of the prior never reads it, that is, when [`needs_factor_returns`](@ref) answers `false`. Otherwise the buffer of the prior records it, and `optimise(opt)` with no returns reads it back through [`prior_returns_buffer`](@ref), as it reads the returns. One place holds the Exogenous Series on the same terms. The context keeps it only when [`reads_exogenous_series`](@ref) answers `false`, and the buffer of the prior records it otherwise.
 
 # Algorithm
 
- 1. Pick the returns that `opt.brt` selects with [`returns_result_picker`](@ref), giving `rd`.
- 2. Fold `rd` into `opt.pe` with [`fold_prior`](@ref), giving the folded prior `pe`.
- 3. Read the buffer `rows` of `pe` with [`prior_returns_buffer`](@ref).
- 4. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`, and `own_exogenous` to `true` when `reads_exogenous_series(pe)` is `false`.
- 5. Fold `rd` into `opt.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context never keeps the returns.
- 6. Rebuild `opt` with `pe` and `cache`.
+ 1. Fold `rd` into `opt.pe` with [`fold_prior`](@ref) under `opt.brt`, giving the folded prior `pe`.
+ 2. Read the buffer `rows` of `pe` with [`prior_returns_buffer`](@ref).
+ 3. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`, and `own_exogenous` to `true` when `reads_exogenous_series(pe)` is `false`.
+ 4. Fold `rd` into `opt.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context keeps the raw returns when `opt.brt` is `true`, because the buffer of the prior then holds the excess returns. Otherwise it keeps no returns.
+ 5. Rebuild `opt` with `pe` and `cache`.
 
 # Arguments
 
@@ -159,7 +203,7 @@ One place holds `F`. The context keeps the factor column only when the tree of t
 
 # Validation
 
-  - Everything [`returns_result_picker`](@ref), [`fold_prior`](@ref) and [`fold_context`](@ref) refuse.
+  - Everything [`fold_prior`](@ref) and [`fold_context`](@ref) refuse.
 
 # Returns
 
@@ -174,11 +218,12 @@ One place holds `F`. The context keeps the factor column only when the tree of t
   - [`reads_exogenous_series`](@ref)
 """
 function fold_returns(opt, rd::ReturnsResult)
-    rd = returns_result_picker(rd, opt.brt)
-    pe = fold_prior(opt.pe, rd)
+    pe = fold_prior(opt.pe, rd; brt = opt.brt)
     rows = prior_returns_buffer(pe)
     own_factors = needs_factor_returns(pe) === false
-    cache = fold_context(opt.cache, rd, rows.max_history, false, own_factors,
+    # Under `brt` the buffer of the prior holds `X - B`, so the context keeps the raw rows,
+    # and `optimise(opt)` with no returns rebuilds the returns data the caller gave.
+    cache = fold_context(opt.cache, rd, rows.max_history, opt.brt, own_factors,
                          !reads_exogenous_series(pe))
     return rebuild_estimator(opt, (; pe = pe, cache = cache))
 end
@@ -197,7 +242,7 @@ The online step of an optimiser has two functions. `partial_fit!(opt, rd)` folds
 
 The step takes a `ReturnsResult`, as `optimise(opt, rd)` does. `rd` holds one observation or a block of them, and the step unpacks it into the arity of the prior's step. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds, and a hierarchical head to its [`HierarchicalOptimiser`](@ref). The optimiser that holds the prior and the context takes the step. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly, so each takes its own step. [`EqualWeighted`](@ref), [`RandomWeighted`](@ref) and [`BestConstantRebalancedPortfolio`](@ref) hold no prior but read the observations, so their context keeps the rows itself. [`PreviousWeights`](@ref) reads no observation, so its step returns it unchanged and it carries no context.
 
-After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `ReturnsResult` that `optimise(opt)` with no returns rebuilds equals `rd[1:t]` field by field, after the pick of [`returns_result_picker`](@ref) under the optimiser's `brt`. The weights of a family that solves no programme agree to rounding, and the weights of a JuMP family agree to the tolerance of its solver.
+After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `ReturnsResult` that `optimise(opt)` with no returns rebuilds equals `rd[1:t]` field by field, under every value of the optimiser's `brt`. The weights of a family that solves no programme agree to rounding, and the weights of a JuMP family agree to the tolerance of its solver.
 
 # Algorithm
 
@@ -549,7 +594,7 @@ end
 
 Rebuilds the [`ReturnsResult`](@ref) of the observations that an optimiser has folded.
 
-This is the step of `optimise(opt)` with no returns that rebuilds the returns data. The rows come from the buffer of the prior, or from the context of a head that holds no prior. Every other column and the pinned context come from the [`ReturnsBufferState`](@ref) of the optimiser. The factor column comes from the context when the tree of the prior never reads it, and from the buffer of the prior otherwise. The result is a new `ReturnsResult`, equal field by field to the one that a batch fit over the same observations reads.
+This is the step of `optimise(opt)` with no returns that rebuilds the returns data. The rows come from the context when it keeps them: in a head that holds no prior, and in an optimiser whose prior folds the returns in excess of the benchmark under `brt`. Otherwise they come from the buffer of the prior. Every other column and the pinned context come from the [`ReturnsBufferState`](@ref) of the optimiser. The factor column comes from the context when the tree of the prior never reads it, and from the buffer of the prior otherwise. The result is a new `ReturnsResult`, equal field by field to the one that a batch fit over the same observations reads.
 
 # Arguments
 

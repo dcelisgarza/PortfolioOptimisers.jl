@@ -1,5 +1,5 @@
 ```@meta
-Description = "Returns result, public API of PortfolioOptimisers.jl: AbstractReturnsResult, ReturnsResult, asset_panel, port_opt_view, returns_result_picker."
+Description = "Returns result, public API of PortfolioOptimisers.jl: AbstractReturnsResult, ReturnsResult, asset_panel, port_opt_view, benchmark_relative_returns."
 ```
 
 # Returns result
@@ -22,5 +22,5 @@ ReturnsResult
 ```@docs
 PortfolioOptimisers.asset_panel(::Nothing, ::Any, ::ReturnsResult, ::Any)
 port_opt_view(::ReturnsResult, ::Any)
-returns_result_picker
+benchmark_relative_returns
 ```

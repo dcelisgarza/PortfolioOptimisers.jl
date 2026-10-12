@@ -398,7 +398,8 @@ function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum_Pr)
 end
 """
     resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
-                              pr::Option{<:AbstractPriorResult} = nothing)
+                              pr::Option{<:AbstractPriorResult} = nothing;
+                              brt::Bool = false)
 
 Pick the factor loadings that a factor attribution decomposes against, from the three arguments `re`, `pr` and `rd` that can supply them.
 
@@ -413,17 +414,19 @@ The order of precedence is fixed. A precomputed result is an answer that the cal
  1. When `re` is an `AbstractLoadingsRegressionResult`, return `re`.
  2. When `pr` is a prior result and `pr.rr` is not `nothing`, return `pr.rr`.
  3. Check that `rd.X` and `rd.F` are present.
- 4. Fit and return `regression(re, rd)`.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`. Fit and return `regression(re, X, rd.F)`.
 
 # Arguments
 
   - `re::RegE_Reg`: Regression result or estimator.
   - `rd::ReturnsResult`: Returns result carrying `X` and `F`.
   - `pr::Option{<:AbstractPriorResult}`: Prior result, or `nothing` when the caller passed a bare matrix.
+  - $(arg_dict[:brt_read]) Read only when the function fits `re`.
 
 # Validation
 
   - When none of the three arms applies, throws an [`IsNothingError`](@ref) naming all three.
+  - The rules of [`benchmark_relative_returns`](@ref), when the function fits `re`.
 
 # Returns
 
@@ -436,7 +439,8 @@ The order of precedence is fixed. A precomputed result is an answer that the cal
   - [`regression`](@ref)
 """
 function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
-                                   pr::Option{<:AbstractPriorResult} = nothing)
+                                   pr::Option{<:AbstractPriorResult} = nothing;
+                                   brt::Bool = false)
     if isa(re, AbstractLoadingsRegressionResult)
         return re
     end
@@ -445,7 +449,7 @@ function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
     end
     @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
               IsNothingError("a factor decomposition needs loadings, and none of the three arguments `re`, `pr` and `rd` holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
-    return regression(re, rd)
+    return regression(re, benchmark_relative_returns(rd, brt), rd.F)
 end
 # The prior route of the value-level `expected_risk`. A non-investable asset carries `NaN`
 # in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so the figure is `NaN`

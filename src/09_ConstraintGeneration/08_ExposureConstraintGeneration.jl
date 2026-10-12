@@ -19,7 +19,7 @@ In order to implement a new basis which will work seamlessly with the library, s
 
 ## Basis resolution
 
-  - `PortfolioOptimisers.constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd) -> (basis, key)`: The change of basis the rows project through, and the key their names resolve against.
+  - `PortfolioOptimisers.constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd; brt::Bool = false) -> (basis, key)`: The change of basis the rows project through, and the key their names resolve against.
 
 There is no fallback. Every check the basis needs is made here, so that the assembly loop after it can assume a consistent basis, and a space that checks nothing states so rather than omitting the method.
 
@@ -29,6 +29,7 @@ There is no fallback. Every check the basis needs is made here, so that the asse
   - `sets`: The declared universe the names resolve against.
   - `rr`: The prior's loadings, or `nothing`.
   - `rd`: Returns the space may refit from, or `nothing`.
+  - $(arg_dict[:brt_read]) A space that refits from `rd` reads it, and every other space accepts it and ignores it.
 
 ### Returns
 
@@ -313,7 +314,7 @@ function port_opt_view(ece::ExposureConstraintEstimator, i,
 end
 """
     factor_space_regression(re::Option{<:RegE_Reg}, rr::Option{<:AbstractLoadingsRegressionResult},
-                            rd::Option{<:ReturnsResult})
+                            rd::Option{<:ReturnsResult}; brt::Bool = false)
         -> Option{<:AbstractLoadingsRegressionResult}
 
 Apply [`resolve_factor_regression`](@ref)'s precedence to the three sources a [`FactorSpace`](@ref) can read its loadings from, and return `nothing` when none of them holds any.
@@ -327,7 +328,7 @@ Returning `nothing` rather than throwing is deliberate: the diagnosis for "no ba
  1. Return `re` when it is a precomputed [`Regression`](@ref). The caller has stated the basis, and no data is needed.
  2. Otherwise return `rr` when the prior carries one. This is what a `re === nothing` always resolves to, and it is the behaviour of every [`FactorSpace`](@ref) written before the field existed.
  3. Otherwise return `nothing` when `re` is `nothing` too. No source holds a basis, and [`constraint_space_basis`](@ref) writes the diagnosis.
- 4. Otherwise `re` is an estimator. Raise when `rd` is `nothing`, and return `resolve_factor_regression(re, rd)` when it is not, which refits the loadings from the returns.
+ 4. Otherwise `re` is an estimator. Raise when `rd` is `nothing`, and return `resolve_factor_regression(re, rd; brt = brt)` when it is not, which refits the loadings from the returns, in excess of the benchmark when `brt` is `true`.
 
 Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re = StepwiseRegression())` is **a factor mandate on a prior that carries no loadings**, which previously threw.
 
@@ -336,6 +337,7 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
   - `re::Option{<:RegE_Reg}`: The space's stated basis source, or `nothing` to read `rr`.
   - `rr::Option{<:AbstractLoadingsRegressionResult}`: The prior's loadings, or `nothing`.
   - `rd::Option{<:ReturnsResult}`: Returns to refit from, or `nothing` on the standalone route.
+  - $(arg_dict[:brt_read]) Read only on the refit of step 4.
 
 # Validation
 
@@ -353,7 +355,7 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
 """
 function factor_space_regression(re::Option{<:RegE_Reg},
                                  rr::Option{<:AbstractLoadingsRegressionResult},
-                                 rd::Option{<:ReturnsResult})
+                                 rd::Option{<:ReturnsResult}; brt::Bool = false)
     if isa(re, AbstractLoadingsRegressionResult)
         return re
     end
@@ -365,10 +367,11 @@ function factor_space_regression(re::Option{<:RegE_Reg},
     end
     @argcheck(!isnothing(rd),
               IsNothingError("a `FactorSpace` whose `re` is a regression *estimator* ($(nameof(typeof(re)))) must fit the loadings from returns, and this route carries none. `linear_constraints(ece, sets; rr = ...)` is the standalone entry point: it receives the loadings directly and never the data they would be fitted from.\nEither state the basis outright, `FactorSpace(; re = Regression(; M = ...))`, or pass the loadings as `rr` and leave `re === nothing`, or generate the constraint through a `JuMPOptimiser` or a `Pipeline` step, where the returns are in scope and the refit happens per fold."))
-    return resolve_factor_regression(re, rd)
+    return resolve_factor_regression(re, rd; brt = brt)
 end
 """
-    constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd)
+    constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd;
+                           brt::Bool = false)
         -> (basis, key)
 
 Resolve the basis a re-based constraint projects through, and the key its names resolve against, throwing if either is unusable.
@@ -379,7 +382,7 @@ Every check a space needs before a single row is assembled lives here, so the as
 
 # Algorithm
 
- 1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three sources `space.re`, `rr` and `rd`.
+ 1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three sources `space.re`, `rr` and `rd`, under `brt`.
  2. Raise when `rr` is `nothing`. No source holds a basis, and no row can be assembled.
  3. Check the declared factor axis with [`factor_universe`](@ref), against `size(rr.M, 2)`. The call raises and returns no value the assembly reads.
  4. Return `rr` and the factor axis key [`factor_axis_key`](@ref) reads off `rr`, which is the key the row's names resolve against.
@@ -390,6 +393,7 @@ Every check a space needs before a single row is assembled lives here, so the as
   - `sets`: The declared universe, which must carry the factor axis `rr` names, under `sets.tfkey` or `sets.cfkey`.
   - `rr`: The prior's loadings, or `nothing`.
   - `rd`: Returns the space may refit from, or `nothing` on the standalone route.
+  - $(arg_dict[:brt_read]) Read only when the space refits its loadings from `rd`.
 
 # Validation
 
@@ -413,8 +417,8 @@ The names are looked up on the factor axis, but the *basis* comes from the prior
 """
 function constraint_space_basis(space::FactorSpace, sets::UniverseSets,
                                 rr::Option{<:AbstractLoadingsRegressionResult},
-                                rd::Option{<:ReturnsResult} = nothing)
-    rr = factor_space_regression(space.re, rr, rd)
+                                rd::Option{<:ReturnsResult} = nothing; brt::Bool = false)
+    rr = factor_space_regression(space.re, rr, rd; brt = brt)
     @argcheck(!isnothing(rr),
               IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a source for them, and none of the three sources holds any: the space states none (`space.re === nothing`) and the prior carries none (`rr === nothing`). Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure.\nState the basis on the space instead, `FactorSpace(; re = Regression(; M = ...))` to pin it or `FactorSpace(; re = StepwiseRegression())` to refit it from the returns. $prior_regression_remedy"))
     key = factor_axis_key(sets, rr)
@@ -532,7 +536,7 @@ end
                        datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       rd::Option{<:ReturnsResult} = nothing)
+                       rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
 
 Generate the asset-space constraint a re-based one is equivalent to.
 
@@ -549,6 +553,7 @@ Validates the space's basis once via [`constraint_space_basis`](@ref), then re-b
   - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
   - `rr`: The loadings, when the caller holds them and the space states none.
   - `rd`: Returns the space may refit from. `nothing` on this route.
+  - $(arg_dict[:brt_read]) Read only when the space refits its loadings from `rd`.
 
 # Returns
 
@@ -565,8 +570,8 @@ function linear_constraints(lcs::ExposureConstraintEstimator, sets::UniverseSets
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
                             rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                            rd::Option{<:ReturnsResult} = nothing)
-    basis, key = constraint_space_basis(lcs.space, sets, rr, rd)
+                            rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
+    basis, key = constraint_space_basis(lcs.space, sets, rr, rd; brt = brt)
     return rebase_linear_constraints(lcs.lce, sets, basis, key; datatype = datatype,
                                      strict = strict, bl_flag = bl_flag)
 end
@@ -574,7 +579,7 @@ end
     linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets; datatype::DataType = Float64,
                        strict::Bool = false, bl_flag::Bool = false,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       rd::Option{<:ReturnsResult} = nothing)
+                       rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
 
 Broadcast over a vector that may mix re-based and asset-space constraints, forwarding the loadings and the returns to each. The narrower `VecLcE` method still wins for a vector that holds only [`LinearConstraintEstimator`](@ref)s.
 
@@ -589,6 +594,7 @@ Each element resolves its own basis, so a vector may mix a space that reads the 
   - `bl_flag`: If `true`, enables Black-Litterman-style group expansion.
   - `rr`: The loadings, forwarded to every element.
   - `rd`: Returns an element's space may refit from, forwarded to every element.
+  - $(arg_dict[:brt_read]) Forwarded to every element with `rd`.
 
 # Returns
 
@@ -603,9 +609,10 @@ function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
                             rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                            rd::Option{<:ReturnsResult} = nothing)
+                            rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
+                               bl_flag = bl_flag, rr = rr, rd = rd, brt = brt)
+            for lc in lcs]
 end
 
 export FactorSpace, ExposureConstraintEstimator

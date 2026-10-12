@@ -21,5 +21,6 @@ rebuild_asset_panel
 rebuild_fold_rates
 rebuild_returns_result
 sub_portfolio_predictions
+outer_returns_source
 predict_outer_returns
 ```

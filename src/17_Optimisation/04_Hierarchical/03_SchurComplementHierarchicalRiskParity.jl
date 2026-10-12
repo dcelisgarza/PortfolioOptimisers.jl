@@ -1266,8 +1266,7 @@ Fit a Schur complement allocation with one bundle.
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
-    rd = returns_result_picker(rd, sh.opt.brt)
-    pr = prior(sh.opt.pe, rd)
+    pr = prior(sh.opt.pe, rd; brt = sh.opt.brt)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The result holds the
@@ -1293,7 +1292,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = sh.opt.x_src)
+                     x_src = sh.opt.x_src, brt = sh.opt.brt)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
@@ -1339,8 +1338,7 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
-    rd = returns_result_picker(rd, sh.opt.brt)
-    pr = prior(sh.opt.pe, rd)
+    pr = prior(sh.opt.pe, rd; brt = sh.opt.brt)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The result holds the
@@ -1366,7 +1364,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
     clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = sh.opt.x_src)
+                     x_src = sh.opt.x_src, brt = sh.opt.brt)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),

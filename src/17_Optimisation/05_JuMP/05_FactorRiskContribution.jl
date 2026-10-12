@@ -339,7 +339,8 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
                                   flag = frc.flag, fb = view_child(frc.fb, i, X))
 end
 """
-    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false)
+    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false,
+                                              brt = false)
 
 Add factor risk contribution constraints to the JuMP model.
 
@@ -362,6 +363,7 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
   - `flag`: Whether to add the off-factor weight block.
   - `wi`: Optional initial factor weights.
   - `hedge`: Whether to add the hedge rows. Read only when `flag` is `true`, and then `pr` must carry `sigma`.
+  - $(arg_dict[:brt_read]) Read only when the loadings are refitted from `rd`.
 
 # Returns
 
@@ -377,8 +379,8 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
                                                    rd::ReturnsResult,
                                                    pr::Option{<:AbstractPriorResult},
                                                    flag::Bool, wi::Option{<:VecNum};
-                                                   hedge::Bool = false)
-    rr = resolve_factor_regression(re, rd, pr)
+                                                   hedge::Bool = false, brt::Bool = false)
+    rr = resolve_factor_regression(re, rd, pr; brt = brt)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)
     Nf = size(b1, 2)
@@ -417,7 +419,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
-                                                           frc.flag, frc.wi)
+                                                           frc.flag, frc.wi;
+                                                           brt = frc.opt.brt)
     # The risk builders read the basis of the whole decision vector, so a variance under
     # `flag = true` prices the off-factor weights too (#1350).
     b = isnothing(b2) ? b1 : hcat(b1, b2)

@@ -140,7 +140,7 @@ Its asset returns are in the investor's base currency, with or without Currency 
 Code that builds a `ReturnsResult` from another one carries every field, and drops one only when the field has no meaning on the new axis. See ADR 0204.
 
 **Excess Frame**
-The coordinates of a `ReturnsResult` after the benchmark pick of an optimiser with `brt = true`: the asset returns are `X - B`, and the benchmark is its own excess return `B - B`, zero where `B` is finite. A second pick subtracts zero, so the frame is a fixed point of the pick. Returns with no benchmark have no Excess Frame, and the pick refuses them. See ADR 0204.
+The asset returns that a reader of an optimiser with `brt = true` fits on: `X - B`, which `benchmark_relative_returns` gives as a matrix at the point of use. The readers are the prior, a factor regression, an uncertainty set with a prior of its own, and a clustering, phylogeny or centrality estimator that reads the data. The `ReturnsResult` stays raw: it keeps `X` and `B`, each reader subtracts once, and an inner optimiser, a fallback and the outer problem of a meta-optimiser apply their own `brt`. Returns with no benchmark have no Excess Frame, and the readers refuse them. See ADR 0204.
 *Avoid*: relative returns, which can also mean a ratio to the benchmark.
 
 **PricesResult**
