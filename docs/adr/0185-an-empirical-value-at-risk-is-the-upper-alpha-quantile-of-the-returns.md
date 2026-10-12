@@ -48,7 +48,16 @@ the position moved also at a non-integer `αT`.
    of `min{k : W_k ≥ α W_T}`. Where the two differ, `W_{k*-1} = α W_T` and the boundary entry
    takes zero weight, so the value of every CVaR, CVaR range and CDaR is unchanged. The `var`
    that each kernel reads is then the Value at Risk of the same level, and
-   `CVaR = VaR + Σ w_t (ℓ_t - VaR)^+ / (α W_T)`.
+   `CVaR = VaR + Σ w_t (ℓ_t - VaR)^+ / (α W_T)`. The kernels read no slack. Where `α W_T`
+   rounds below an integer, for example `0.29 * 100 = 28.999999999999996`, a kernel splits the
+   tail one position before the Value at Risk. The objective of Rockafellar and Uryasev has a
+   slope of order `ε` between the two positions, so the two splits give the same CVaR to
+   rounding.
+6. **The tail view of entropy pooling may take the other end of the interval.**
+   `ep_var_multiplier` reads `min{k : W_k ≥ α W_T}` on the losses sorted in descending order,
+   the right end of the interval of minimisers. It is the point at which the sequential CVaR view
+   reads its bound, not a reported Value at Risk. Each minimiser gives a bound that is tight at
+   the posterior, so the view does not change.
 
 ## Why Equation 7.50
 

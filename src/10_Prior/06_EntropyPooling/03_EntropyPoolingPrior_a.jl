@@ -1481,17 +1481,19 @@ end
 """
     ep_var_multiplier(x::VecNum, w::VecNum, alpha::Number)
 
-Find the value at risk of a loss series under observation probabilities, as the minimiser of the primal of the conditional value at risk.
+Find the largest minimiser of the primal of the conditional value at risk of a loss series under observation probabilities.
 
 # Mathematical definition
 
-The conditional value at risk is the minimum over ``\\eta`` of ``\\eta + \\dfrac{1}{\\alpha} \\sum_{j=1}^{T} w_{j} (x_{j} - \\eta)^{+}``, a convex piecewise-linear function whose kinks sit at the losses. Its minimiser is the loss at which the tail mass first reaches ``\\alpha``:
+The conditional value at risk is the minimum over ``\\eta`` of ``\\eta + \\dfrac{1}{\\alpha} \\sum_{j=1}^{T} w_{j} (x_{j} - \\eta)^{+}``, a convex piecewise-linear function whose kinks sit at the losses. Its largest minimiser is the loss at which the tail mass first reaches ``\\alpha``:
 
 ```math
 \\eta^{\\star} = x_{(s)}\\,, \\quad s = \\min\\left\\{k : \\sum_{i=1}^{k} w_{(i)} \\geq \\alpha\\right\\}\\,,
 ```
 
 with the losses sorted in descending order, ``x_{(1)} \\geq x_{(2)} \\geq \\ldots``.
+
+Where the tail mass of a loss reaches ``\\alpha`` exactly, the minimisers form an interval. [`ValueatRisk`](@ref) takes its smallest point, so there the two differ by one loss. Every minimiser gives the same conditional value at risk, and a bound read at any of them is tight at `w`.
 
 Where:
 
@@ -1508,7 +1510,7 @@ Where:
 
 # Returns
 
-  - `eta::Number`: The value at risk, one of the losses of `x`.
+  - `eta::Number`: The largest minimiser, one of the losses of `x`.
 
 # Related
 

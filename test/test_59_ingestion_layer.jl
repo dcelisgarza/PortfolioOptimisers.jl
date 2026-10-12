@@ -1247,6 +1247,11 @@ using Dates, Statistics
         RB = (1 .+ RL) .* (1 .+ RS[:, 1]) .- 1
         @test log.(1 .+ RL) .- log.(1 .+ rc[2:end, 1]) .+ logr(values(I))[:, 1] ≈
               log.(1 .+ RB) .- log.(1 .+ rb[2:end])
+        # With simple returns the remainder is the cross term of the asset and a term of the
+        # currency alone, as the docstring states it.
+        @test RB .- rb[2:end] .- (RL .- rc[2:end, 1]) .- simple(values(I))[:, 1] ≈
+              RL .* RS[:, 1] .+
+              (rb[2:end] .- rc[2:end, 1]) .* (RS[:, 1] .- rb[2:end]) ./ (1 .+ rb[2:end])
         # It converts as one more level series.
         rd = prices_to_returns(PricesResult(; X = Xp, E = I); ret_method = :log)
         @test rd.E ≈ logr(values(I))

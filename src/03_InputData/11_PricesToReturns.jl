@@ -580,7 +580,7 @@ With log returns the split of an asset return in the base currency is exact. An 
 \\end{align}
 ```
 
-and the local excess return plus the log return of the index is the base-currency excess return. With simple returns the split is not exact. The difference holds the cross term ``R^{L} R^{S}`` of each asset, and terms that depend on the currency alone and are of second order in the rates. No series with one column per currency can hold the cross term. Under the local returns a [`CrossSectionalFactorPrior`](@ref) derives, the term stays in the local return. Under a Panel Field of local returns the caller names, it is out of the model.
+and the local excess return plus the log return of the index is the base-currency excess return. With simple returns the split is not exact. The base-currency excess return less the local excess return and the return of the index is ``R^{L} R^{S} + (r_{b} - r_{c})(R^{S} - r_{b}) / (1 + r_{b})``. The first term is the cross term of each asset. The second term depends on the currency alone, and it is the product of the difference of the two cash rates with the exchange-rate return less the base cash rate. No series with one column per currency can hold the cross term. Under the local returns a [`CrossSectionalFactorPrior`](@ref) derives, the term stays in the local return. Under a Panel Field of local returns the caller names, it is out of the model.
 
 The index of the base currency itself is constant, so its return is zero, and a Currency Factor of it would have no variance. Give the base currency to the `base` of [`CurrencyExposure`](@ref) instead: it then takes no factor and needs no index, and an asset of the base currency carries a zero exposure on every Currency Factor.
 

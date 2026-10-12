@@ -419,5 +419,17 @@ end
             @test !(pr.rr.M[:, k] ≈ descriptor(de, rd)[end, :])
             @test pr.rr.fx[:, k - 5] == rd.E[(end - size(pr.rr.fx, 1) + 1):end, 4]
         end
+        # Under `lx` the second stage still derives its returns from the first stage, because
+        # the named field is net of the member's own factor too. The field here is the local
+        # returns times 1.5, so a member that read it would give a beta 1.5 times larger.
+        loc = PortfolioOptimisers.panel_field_values(rd, "local")
+        pf = Any[f for f in rd.pnl.pf]
+        push!(pf, NumericPanelField(; name = "scaled", vals = 1.5 .* loc))
+        pnl = AssetPanel(; pf = identity.(pf), amsk = rd.pnl.amsk, emsk = rd.pnl.emsk)
+        rds = ReturnsResult(; nx = rd.nx, X = rd.X, ne = rd.ne, E = rd.E, pnl = pnl)
+        pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = vcat(fs, [fx]),
+                                             lx = "scaled"), rds)
+        @test pr.rr.M[:, end] ≈ ml rtol = 1e-12
+        @test !(pr.rr.M[:, end] ≈ 1.5 .* ml)
     end
 end
