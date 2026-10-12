@@ -491,7 +491,7 @@ The method builds a new state rather than writing into the arrays of the old one
 # Algorithm
 
  1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
- 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
+ 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref).
  3. Build the state of the block alone, with [`comoment_block`](@ref).
  4. Merge it into the state the estimator carries, unless the estimator carries none.
  5. Rebind `cache` with `Accessors.@reset`, and return the estimator.
@@ -501,7 +501,7 @@ The method builds a new state rather than writing into the arrays of the old one
   - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
   - `X`: Block of observations (observations × assets).
   - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe that `coskewness(ske)` with no data already reduces to. A fold loop passes it to every member that the outer estimator folds, so refusing the keyword would refuse the outer estimator.
+  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
 
 # Validation
 
@@ -546,7 +546,7 @@ function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing
                       dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
-    X = dims_oriented(dims, X)
+    X = inactive_as_nonfinite(dims_oriented(dims, X), dims_oriented(dims, active_mask))
     n, mu, M2, M3, _ = comoment_block(X)
     state = CoskewnessPartialFitState(n, mu, M2, M3)
     if !isnothing(ske.cache)
@@ -564,14 +564,14 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
 
 # Algorithm
 
- 1. Reshape `x` to a block of one row.
- 2. Forward to the block method of [`partial_fit!`](@ref).
+ 1. Write `NaN` in each cell of `x` that `active_mask` turns off, with [`inactive_as_nonfinite`](@ref).
+ 2. Reshape `x` to a block of one row, and forward it to the block method of [`partial_fit!`](@ref).
 
 # Arguments
 
   - `ske`: Coskewness estimator with a [`FullMoment`](@ref) moment algorithm.
   - `x`: One observation, whose entries are the assets.
-  - `active_mask`: The active mask of the Asset Panel at this observation, one entry per asset, or `nothing`. Accepted and ignored, as the block method does.
+  - `active_mask`: The active mask of the Asset Panel at this observation, one entry per asset, or `nothing`. An inactive cell reads as a non-finite return, as in the block method.
 
 # Returns
 
@@ -585,7 +585,7 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
 function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
                                       <:Option{<:CoskewnessPartialFitState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
-    return partial_fit!(ske, reshape(x, 1, length(x)))
+    return partial_fit!(ske, reshape(inactive_as_nonfinite(x, active_mask), 1, length(x)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -655,7 +655,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
 # Algorithm
 
  1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
- 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`.
+ 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref).
  3. Build the state of the block alone, with [`comoment_block`](@ref), and square its pairwise deviation product for the fourth accumulator.
  4. Merge it into the state the estimator carries, unless the estimator carries none.
  5. Rebind `cache` with `Accessors.@reset`, and return the estimator.
@@ -665,7 +665,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
   - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
   - `X`: Block of observations (observations × assets).
   - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. Accepted and ignored, on the rule the plain first order states: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe that `cokurtosis(kte)` with no data already reduces to. A fold loop passes it to every member that the outer estimator folds, so refusing the keyword would refuse the outer estimator.
+  - `active_mask`: The active mask of the Asset Panel, of the shape of `X`, or `nothing`. A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
 
 # Validation
 
@@ -708,7 +708,7 @@ function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing
                       dims::Int = 1,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
-    X = dims_oriented(dims, X)
+    X = inactive_as_nonfinite(dims_oriented(dims, X), dims_oriented(dims, active_mask))
     n, mu, M2, M3, z = comoment_block(X)
     state = CokurtosisPartialFitState(n, mu, M2, M3, transpose(z) * z)
     if !isnothing(kte.cache)
@@ -726,14 +726,14 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
 
 # Algorithm
 
- 1. Reshape `x` to a block of one row.
- 2. Forward to the block method of [`partial_fit!`](@ref).
+ 1. Write `NaN` in each cell of `x` that `active_mask` turns off, with [`inactive_as_nonfinite`](@ref).
+ 2. Reshape `x` to a block of one row, and forward it to the block method of [`partial_fit!`](@ref).
 
 # Arguments
 
   - `kte`: Cokurtosis estimator with a [`FullMoment`](@ref) moment algorithm.
   - `x`: One observation, whose entries are the assets.
-  - `active_mask`: The active mask of the Asset Panel at this observation, one entry per asset, or `nothing`. Accepted and ignored, as the block method does.
+  - `active_mask`: The active mask of the Asset Panel at this observation, one entry per asset, or `nothing`. An inactive cell reads as a non-finite return, as in the block method.
 
 # Returns
 
@@ -747,7 +747,7 @@ The single-observation arm of the [`partial_fit!`](@ref) interface. The entries 
 function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing,
                                       <:Option{<:CokurtosisPartialFitState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
-    return partial_fit!(kte, reshape(x, 1, length(x)))
+    return partial_fit!(kte, reshape(inactive_as_nonfinite(x, active_mask), 1, length(x)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

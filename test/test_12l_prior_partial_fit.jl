@@ -937,6 +937,59 @@ end
                                                           ce = Covariance(; cvg = cvg)),
                                            rd(tv)))
     end
+    @testset "A plain estimator reads an inactive cell as a gap in every form (#1648)" begin
+        # Asset 3 is inactive where its returns are finite. Asset 2 is a non-finite gap.
+        A = copy(M)
+        A[1:12, 3] .= false
+        tv = AssetPanel(; amsk = A, emsk = copy(A))
+        Xc = X[:, [1, 4]]
+        Ac = trues(T, N)
+        # The panel form, the keyword mask through the panel method, and the fold give one
+        # Coverage Universe. The keyword form refuses the gap, as it refuses a NaN.
+        for (est, f) in
+            ((SimpleExpectedReturns(), Statistics.mean), (SimpleVariance(), Statistics.var),
+             (Covariance(), Statistics.cov))
+            b = f(est, X, tv)
+            @test isnan(vec(b)[3]) && isfinite(vec(b)[1])
+            @test isequal(f(est, X, nothing; active_mask = A), b)
+            @test_throws IsNonFiniteError f(est, X[:, [1, 3, 4]];
+                                            active_mask = A[:, [1, 3, 4]])
+            @test isapprox(f(est, Xc; active_mask = Ac[:, [1, 4]]), f(est, Xc))
+            @test_throws DimensionMismatch f(est, Xc; active_mask = Ac)
+            o = f(partial_fit!(est, X; active_mask = A))
+            @test isapprox(vec(o), vec(b); rtol = 1e-12, nans = true)
+        end
+        # The third and the fourth order fold, and the panel form, read the mask too.
+        ske = Coskewness()
+        sb = coskewness(ske, X, tv)
+        so = coskewness(partial_fit!(ske, X; active_mask = A))
+        @test isapprox(so[1], sb[1]; rtol = 1e-12, nans = true)
+        @test isapprox(so[2], sb[2]; rtol = 1e-12, nans = true)
+        @test isapprox(cokurtosis(partial_fit!(Cokurtosis(), X; active_mask = A)),
+                       cokurtosis(Cokurtosis(), X, tv); rtol = 1e-12, nans = true)
+        @test_throws IsNonFiniteError coskewness(ske, X[:, [1, 3, 4]];
+                                                 active_mask = A[:, [1, 3, 4]])
+        @test_throws IsNonFiniteError cokurtosis(Cokurtosis(), X[:, [1, 3, 4]];
+                                                 active_mask = A[:, [1, 3, 4]])
+        # The batch fit, the carry and the refit of the default priors agree, and so does the
+        # matrix form that gives the masks as keywords.
+        for est in (EmpiricalPrior(), HighOrderPriorEstimator())
+            b = prior(est, rd(tv))
+            @test isnan(b.mu[3]) && isnan(b.mu[2]) && isfinite(b.mu[1])
+            c = prior(steps(est, rd(tv)))
+            @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
+            @test isapprox(c.sigma, b.sigma; rtol = 1e-12, nans = true)
+            k = prior(est, X; active_mask = A)
+            @test isequal(k.mu, b.mu) && isequal(k.sigma, b.sigma)
+        end
+        b = prior(EmpiricalPrior(), rd(tv))
+        r = prior(steps(online(EmpiricalPrior()), rd(tv)))
+        @test isequal(r.mu, b.mu) && isequal(r.sigma, b.sigma)
+        h = prior(steps(HighOrderPriorEstimator(), rd(tv)))
+        hb = prior(HighOrderPriorEstimator(), rd(tv))
+        @test isapprox(h.sk, hb.sk; rtol = 1e-12, nans = true)
+        @test isapprox(h.kt, hb.kt; rtol = 1e-12, nans = true)
+    end
     @testset "The fold refuses what no state records" begin
         @test_throws IsNothingError partial_fit!(online(EmpiricalPrior()),
                                                  ReturnsResult(; nf = ["F1"],

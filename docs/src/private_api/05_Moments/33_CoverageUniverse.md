@@ -8,10 +8,13 @@ The coverage universe of a fit is the set of assets whose returns are finite, an
 
 Every moment function takes the asset panel as its third positional argument. Its panel method does this reduction and expansion. An estimator that reads the active mask itself replaces that method, and takes the whole window.
 
+A matrix call can give the active mask as the `active_mask` keyword, with no panel. The panel method reads that mask as it reads the mask of a panel, so both calls reach the same coverage universe.
+
 ## The universe and the reduction
 
 ```@docs
 PortfolioOptimisers.coverage_mask
+PortfolioOptimisers.coverage_mask_source
 PortfolioOptimisers.coverage_sentinel
 PortfolioOptimisers.coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})
 PortfolioOptimisers.coverage_reduction(rd::AbstractReturnsResult)
@@ -36,8 +39,11 @@ PortfolioOptimisers.expand_idiosyncratic_covariance
 
 ## The check for missing returns
 
+An ordinary estimator reads a cell that the active mask turns off as a missing return. Its matrix method refuses such a sample, and its incremental fit writes `NaN` in that cell.
+
 ```@docs
 PortfolioOptimisers.assert_finite_sample
+PortfolioOptimisers.inactive_as_nonfinite
 ```
 
 ## The panel method of `variance_series`

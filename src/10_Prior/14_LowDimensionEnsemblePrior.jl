@@ -204,7 +204,7 @@ function fit_min_rows(::LowDimensionEnsemblePrior)
     return 3
 end
 """
-    prior(pe::LowDimensionEnsemblePrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::LowDimensionEnsemblePrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
 Computes the low-dimension ensemble prior of the rows, with the forecast return as `mu` and the aggregated predictive covariance as `sigma`.
 
@@ -213,7 +213,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
 # Algorithm
 
  1. Orient `X` to observations by assets, giving `Xf`.
- 2. Reduce `Xf` to its Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk` and the reduced returns `X` of `T` rows and `N` assets.
+ 2. Reduce `Xf` to its Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk` and the reduced returns `X` of `T` rows and `N` assets. The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
  3. Check that `T >= 3`.
  4. Form the price relatives `P = 1 + X`. Split them into the targets `Y`, every row but the first, the regressors `Z`, every row but the last, and the last row `z`.
  5. Clip the subsystem size to `N`, giving `s`.
@@ -235,6 +235,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
   - `F`: Factor returns matrix, ignored.
   - `pnl`: Asset Panel, whose active mask enters the Coverage Universe.
   - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Ignored.
 
 # Validation
@@ -258,9 +259,10 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
   - $(ref_dict[:xi2023oldem])
 """
 function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = nothing,
-               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     Xf = dims_oriented(dims, X)
-    cmsk, X = coverage_reduction(Xf, pnl)
+    cmsk, X = coverage_reduction(Xf, pnl; active_mask = dims_oriented(dims, active_mask))
     T, N = size(X)
     @argcheck(T >= 3,
               ArgumentError("the low-dimension ensemble needs at least three observations, got $T: two regression pairs are the fewest whose regressor covariance exists"))

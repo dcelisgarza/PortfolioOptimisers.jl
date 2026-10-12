@@ -543,8 +543,9 @@ using Statistics
 
     @testset "The plain arms take the active mask, and a folded frame is repaired on its block (#874)" begin
         # A fold loop hands every member a host folds the Asset Panel's active mask. A plain
-        # co-moment carries no per-cell count for it to gate, so it accepts the keyword and
-        # ignores it, as the plain first order does; refusing it refused the host.
+        # co-moment accepts the keyword, as the plain first order does; refusing it refused
+        # the host. An all-active mask leaves the fold as it is, and an inactive cell reads as
+        # a non-finite return (#1648).
         amsk = trues(size(X))
         @test cokurtosis(partial_fit!(Cokurtosis(), X; active_mask = amsk)) ==
               cokurtosis(partial_fit!(Cokurtosis(), X))

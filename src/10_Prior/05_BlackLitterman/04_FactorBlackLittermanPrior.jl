@@ -354,7 +354,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
- 3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves.
+ 3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves. The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
  4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one.
  5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to `imsk` with [`coverage_regression`](@ref), giving the regression result `rr` and the reconstructed returns `posterior_X`.
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(Xi, 1)` observations, giving `blp`. The axis is `:tfkey`, so no view row is ever dropped for a departed asset and no ledger is kept.
@@ -376,6 +376,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
   - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
 # Validation
@@ -401,7 +402,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
-               kwargs...)
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     X, F = dims_oriented(dims, X, F)
     # The views land on the *factor* distribution, so they resolve against the declared factor
     # axis — not against `xkey`, which names the assets this estimator projects onto. Only the
@@ -425,7 +426,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # Unreduced, `X`'s `NaN` column reaches the regression, where `StepwiseRegression`
     # selects *zero* factors and raises `BoundsError … at index [1:T, [0]]` — an error that
     # names neither the asset that left nor the reason it mattered.
-    imsk, Xi = coverage_reduction(X, pnl; dims = 1)
+    imsk, Xi = coverage_reduction(X, pnl; dims = 1,
+                                  active_mask = dims_oriented(dims, active_mask))
     # Factor prior.
     f_prior = prior(pe.pe, F; strict = strict)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma

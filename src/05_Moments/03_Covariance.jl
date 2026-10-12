@@ -595,7 +595,7 @@ The `cvg` field of the estimator is passed as the third argument, so the arm is 
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `mean`: A precomputed centre, or `nothing`.
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms ignore it.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms refuse an inactive cell, as they refuse a non-finite return.
   - `kwargs...`: Additional keyword arguments passed to the centring estimator and the inner covariance estimator.
 
 # Returns
@@ -613,7 +613,7 @@ function coverage_covariance end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which resolves the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref) and delegates, and which is the body the verb has always had.
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which resolves the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref) and delegates, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -624,6 +624,7 @@ function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment}, :
                              X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...) where {F}
+    assert_finite_sample(X, active_mask)
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     return f(cel, X; dims = dims, mean = mu, kwargs...)
 end
@@ -707,7 +708,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero and delegates with a zero centre, and which is the body the verb has always had.
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero and delegates with a zero centre, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -718,6 +719,7 @@ function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment}, :
                              X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...) where {F}
+    assert_finite_sample(X, active_mask)
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
     return f(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
@@ -1178,7 +1180,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref), and the active mask is ignored.
+`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -1187,8 +1189,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`CovarianceState`](@ref)
 """
 function partial_fit!(state::CovarianceState, x::VecNum, ::Nothing,
-                      ::Option{<:AbstractVector{<:Bool}})
-    return partial_fit!(state, x)
+                      active_mask::Option{<:AbstractVector{<:Bool}})
+    return partial_fit!(state, inactive_as_nonfinite(x, active_mask))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

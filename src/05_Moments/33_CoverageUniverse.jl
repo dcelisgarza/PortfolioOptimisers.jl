@@ -3,10 +3,13 @@
     coverage_mask(X::MatNum, pnl::AssetPanel{<:Any, Nothing, Nothing};
                   dims::Int = 1) -> Option{BitVector}
     coverage_mask(X::MatNum, pnl::AssetPanel; dims::Int = 1) -> Option{BitVector}
+    coverage_mask(X::MatNum, amsk::AbstractMatrix{<:Bool}; dims::Int = 1) -> Option{BitVector}
 
 Derive the Coverage Universe of one fit, the mask that is `true` at each asset a plain moment estimator can fit.
 
 An asset is in the Coverage Universe when its return is finite, and the active mask of the panel is `true`, at every row of the window. The method does not read the estimation mask. That mask names the assets of a cross-sectional estimate, and a moment is not a cross-sectional estimate. A static panel carries no mask, so there the rule is finiteness alone, as it is with no panel.
+
+The active mask can come without a panel, as the `active_mask` keyword of a matrix call does. The last method takes that mask, `observations × assets`, and the panel method reads its own mask through it. [`coverage_mask_source`](@ref) chooses between the keyword and the panel.
 
 When every asset is covered, the method returns `nothing`, not a mask of every `true`. The caller then skips the slice and the expansion, as the `nothing` of [`investable_mask`](@ref) lets the optimiser skip its reduction and its expansion.
 
@@ -43,12 +46,13 @@ Where:
 
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
+  - `amsk`: The active mask of the window, `observations × assets` whatever `dims` says.
   - $(arg_dict[:dims])
 
 # Validation
 
   - $(val_dict[:dims])
-  - The asset axis of `pnl.amsk` must be the asset axis of the oriented `X`.
+  - The asset axis of the active mask must be the asset axis of the oriented `X`.
   - At least one asset must be covered.
 
 # Returns
@@ -58,6 +62,7 @@ Where:
 # Related
 
   - [`coverage_reduction`](@ref)
+  - [`coverage_mask_source`](@ref)
   - [`expand_moment`](@ref)
   - [`investable_mask`](@ref)
   - [`AssetPanel`](@ref)
@@ -78,10 +83,13 @@ function coverage_mask(X::MatNum, ::Union{Nothing, <:AssetPanel{<:Any, Nothing, 
     return coverage_sentinel(cmsk)
 end
 function coverage_mask(X::MatNum, pnl::AssetPanel; dims::Int = 1)::Option{BitVector}
+    return coverage_mask(X, pnl.amsk; dims = dims)
+end
+function coverage_mask(X::MatNum, amsk::AbstractMatrix{<:Bool};
+                       dims::Int = 1)::Option{BitVector}
     Xo = dims_oriented(dims, X)
-    amsk = pnl.amsk
     @argcheck(size(Xo, 2) == size(amsk, 2),
-              DimensionMismatch("the returns matrix and the active mask of the Asset Panel describe the same assets, so their asset axes must be the same length, got $(size(Xo, 2)) columns of X against $(size(amsk, 2)) of pnl.amsk"))
+              DimensionMismatch("the returns matrix and the active mask describe the same assets, so their asset axes must be the same length, got $(size(Xo, 2)) columns of X against $(size(amsk, 2)) of the active mask"))
     cmsk = trues(size(Xo, 2))
     for i in axes(Xo, 2)
         for t in axes(Xo, 1)
@@ -102,7 +110,8 @@ function coverage_mask(X::MatNum, pnl::AssetPanel; dims::Int = 1)::Option{BitVec
     return coverage_sentinel(cmsk)
 end
 """
-    coverage_mask(X::MatNum, iv::MatNum, pnl::Option{<:AssetPanel};
+    coverage_mask(X::MatNum, iv::MatNum,
+                  pnl::Union{Nothing, <:AssetPanel, <:AbstractMatrix{<:Bool}};
                   dims::Int = 1) -> Option{BitVector}
 
 Derive the Coverage Universe of one [`ImpliedVolatility`](@ref) fit, which reads an implied volatility surface beside its returns.
@@ -140,14 +149,14 @@ Where:
 
   - $(arg_dict[:X])
   - `iv`: Implied volatility surface `observations × assets`.
-  - $(arg_dict[:pnl_moment])
+  - `pnl`: The Asset Panel, its active mask alone, `observations × assets`, or `nothing`. [`coverage_mask_source`](@ref) gives it.
   - $(arg_dict[:dims])
 
 # Validation
 
   - $(val_dict[:dims])
   - The asset axis of the oriented `iv` must be the asset axis of the oriented `X`.
-  - The asset axis of `pnl.amsk` must be the asset axis of the oriented `X`.
+  - The asset axis of the active mask must be the asset axis of the oriented `X`.
   - At least one asset must be covered.
 
 # Returns
@@ -161,7 +170,8 @@ Where:
   - [`coverage_sentinel`](@ref)
   - [`expand_moment`](@ref)
 """
-function coverage_mask(X::MatNum, iv::MatNum, pnl::Option{<:AssetPanel};
+function coverage_mask(X::MatNum, iv::MatNum,
+                       pnl::Union{Nothing, <:AssetPanel, <:AbstractMatrix{<:Bool}};
                        dims::Int = 1)::Option{BitVector}
     Xo, ivo = dims_oriented(dims, X, iv)
     @argcheck(size(ivo, 2) == size(Xo, 2),
@@ -181,6 +191,39 @@ function coverage_mask(X::MatNum, iv::MatNum, pnl::Option{<:AssetPanel};
     end
     return coverage_sentinel(imsk,
                              "no asset is in the Coverage Universe of this window: every asset carries a non-finite return, an inactive row of the Asset Panel, or a non-finite implied volatility, at some observation. Check that the window holds at least one asset that is listed and quoted throughout it, and whose implied volatility series is complete over it.")
+end
+"""
+    coverage_mask_source(pnl::Option{<:AssetPanel}, active_mask::Nothing, dims::Int)
+    coverage_mask_source(pnl::Option{<:AssetPanel}, active_mask::AbstractMatrix{<:Bool},
+                         dims::Int)
+
+Choose the active mask that one fit reads to derive its Coverage Universe.
+
+A caller gives the active mask in one of two forms. An Asset Panel holds it, `observations × assets` whatever `dims` says. A matrix call gives it as the `active_mask` keyword, of the shape of `X`. Both forms state the same thing, so a plain moment estimator must reach the same Coverage Universe from each. The keyword takes the place of the mask of the panel when the caller gives both, as it does on the route of a mask-aware estimator in [`coverage_panel_moment`](@ref), where the keyword comes after the mask of the panel.
+
+# Arguments
+
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:cvg_active_mask])
+  - $(arg_dict[:dims])
+
+# Returns
+
+  - `pnl`, when `active_mask` is `nothing`.
+  - `amsk::AbstractMatrix{<:Bool}`: `active_mask` turned to `observations × assets`, otherwise.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`coverage_reduction`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function coverage_mask_source(pnl::Option{<:AssetPanel}, ::Nothing, ::Int)
+    return pnl
+end
+function coverage_mask_source(::Option{<:AssetPanel}, active_mask::AbstractMatrix{<:Bool},
+                              dims::Int)
+    return dims_oriented(dims, active_mask)
 end
 """
     coverage_sentinel(cmsk::BitVector) -> Option{BitVector}
@@ -223,16 +266,19 @@ function coverage_sentinel(cmsk::BitVector, msg::AbstractString)::Option{BitVect
     return all(cmsk) ? nothing : cmsk
 end
 """
-    coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel};
-                       dims::Int = 1) -> Tuple{Option{BitVector}, MatNum}
+    coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
+        -> Tuple{Option{BitVector}, MatNum}
 
 Reduce a returns matrix to its Coverage Universe, and return the mask beside the clean block.
 
 The reduction keeps the orientation of the caller. The plain moment verb that receives the block sees a matrix of the same shape as a sample with no Asset Panel, and its own `dims` still describes it. The `nothing` sentinel returns `X` itself, so a complete window allocates nothing.
 
+The active mask of the fit is `active_mask` when the caller gives one, and the active mask of `pnl` otherwise. A matrix call of a prior gives its masks as keywords, so this is how such a call reaches the Coverage Universe that the same call with an Asset Panel reaches. Every column of the clean block is active at every row, so the caller does not pass the mask on to the plain estimator.
+
 # Algorithm
 
- 1. Derive the Coverage Universe with [`coverage_mask`](@ref).
+ 1. Choose the active mask with [`coverage_mask_source`](@ref), and derive the Coverage Universe with [`coverage_mask`](@ref).
  2. Return `(nothing, X)` on the sentinel.
  3. Slice the asset axis of `X` otherwise: its columns when `dims = 1`, and its rows when `dims = 2`.
 
@@ -241,6 +287,7 @@ The reduction keeps the orientation of the caller. The plain moment verb that re
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
 
 # Validation
 
@@ -253,10 +300,12 @@ The reduction keeps the orientation of the caller. The plain moment verb that re
 # Related
 
   - [`coverage_mask`](@ref)
+  - [`coverage_mask_source`](@ref)
   - [`expand_moment`](@ref)
 """
-function coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1)
-    cmsk = coverage_mask(X, pnl; dims = dims)
+function coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1,
+                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
+    cmsk = coverage_mask(X, coverage_mask_source(pnl, active_mask, dims); dims = dims)
     return if isnothing(cmsk)
         cmsk, X
     elseif isone(dims)
@@ -826,6 +875,83 @@ function assert_finite_sample(X::ArrNum, name::AbstractString = "X")::Nothing
     return nothing
 end
 """
+    assert_finite_sample(X::ArrNum, active_mask::Nothing) -> nothing
+    assert_finite_sample(X::ArrNum, active_mask::AbstractArray{<:Bool}) -> nothing
+
+Refuse a gapped sample in a plain moment estimator that takes the active mask as a keyword.
+
+A cell is a gap when its return is non-finite or when the active mask is `false` there. That is the rule of the Coverage Universe, which [`coverage_mask`](@ref) applies to each cell. So a plain estimator reads an inactive cell as a non-finite return, and refuses it with the same error. The Asset Panel method of the verb reduces the same sample to its Coverage Universe and expands, and the fold writes `NaN` in each gap with [`inactive_as_nonfinite`](@ref). So the three forms of one plain estimator agree on every cell.
+
+# Arguments
+
+  - $(arg_dict[:X])
+  - `active_mask`: The active mask of `X`, of the shape of `X`, or `nothing`.
+
+# Validation
+
+  - Every entry of `X` must be finite.
+  - `active_mask` must have the size of `X`, and be `true` at every entry.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`inactive_as_nonfinite`](@ref)
+  - [`IsNonFiniteError`](@ref)
+"""
+function assert_finite_sample(X::ArrNum, ::Nothing)::Nothing
+    return assert_finite_sample(X)
+end
+function assert_finite_sample(X::ArrNum, active_mask::AbstractArray{<:Bool})::Nothing
+    @argcheck(size(active_mask) == size(X),
+              DimensionMismatch("the active mask names one cell of the sample at each entry, so it must have the size of X, got $(size(active_mask)) for the active mask against $(size(X)) for X"))
+    assert_finite_sample(X)
+    @argcheck(all(active_mask),
+              IsNonFiniteError("a plain moment estimator reads a cell that the active mask turns off as a non-finite return, and it has no correct answer for a gapped sample, so it refuses one: all(active_mask) must hold, and got $(count(!, active_mask)) inactive entries, the first at $(findfirst(!, active_mask)). Give the mask to the Asset Panel method of the verb, which reduces to the Coverage Universe and expands, or use a mask-aware estimator."))
+    return nothing
+end
+"""
+    inactive_as_nonfinite(x::ArrNum, active_mask::Nothing) -> ArrNum
+    inactive_as_nonfinite(x::ArrNum, active_mask::AbstractArray{<:Bool}) -> ArrNum
+
+Write `NaN` in each cell of a sample that the active mask turns off, for the fold of a plain moment estimator.
+
+A plain fold has one observation count for every asset, so it cannot skip one cell of an observation. It reads a non-finite return as it reads any return, and the `NaN` stays in the running moments of that asset from then on. The asset then carries `NaN` in the answer, as the Asset Panel method gives for an asset that leaves the Coverage Universe. An inactive cell is a gap by the same rule, so this method writes `NaN` there before the fold reads it. A plain fold then answers each asset as the Asset Panel method answers the same rows.
+
+# Arguments
+
+  - `x`: One observation, or a block of observations.
+  - `active_mask`: The active mask of `x`, of the shape of `x`, or `nothing`.
+
+# Validation
+
+  - `active_mask` must have the size of `x`.
+  - The type that [`float_if_integer`](@ref) gives for the element type of `x` must hold `NaN`. A `Rational` raises an `ArgumentError`.
+
+# Returns
+
+  - `x` itself when `active_mask` is `nothing`, and otherwise a copy of `x` that carries `NaN` at each inactive cell. The copy takes the type of the data through [`float_if_integer`](@ref).
+
+# Related
+
+  - [`assert_finite_sample`](@ref)
+  - [`coverage_mask`](@ref)
+  - [`coverage_nan_frame`](@ref)
+"""
+function inactive_as_nonfinite(x::ArrNum, ::Nothing)
+    return x
+end
+function inactive_as_nonfinite(x::ArrNum, active_mask::AbstractArray{<:Bool})
+    @argcheck(size(active_mask) == size(x),
+              DimensionMismatch("the active mask names one cell of the sample at each entry, so it must have the size of the sample, got $(size(active_mask)) for the active mask against $(size(x)) for the sample"))
+    xg = coverage_nan_frame(similar(x, float_if_integer(eltype(x))))
+    xg .= ifelse.(active_mask, x, xg)
+    return xg
+end
+"""
     panel_moment_masks(pnl::Nothing) -> Tuple{Nothing, Nothing}
     panel_moment_masks(pnl::AssetPanel) -> Tuple
 
@@ -907,10 +1033,12 @@ A plain estimator needs no method of its own and no declaration. A mask-aware es
 
 The rule has the cost that [`coverage_mask`](@ref) states. One non-finite return, or one inactive row, in the window puts the asset outside the Coverage Universe of that fit, and its entries of the result are `NaN`.
 
+A matrix call of a prior gives the active mask as the `active_mask` keyword, with no panel. The method reads that mask as it reads the mask of a panel, so the two calls reach one Coverage Universe.
+
 # Algorithm
 
- 1. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref).
- 2. Call the plain estimator on the clean block, with the caller's `dims` and keywords.
+ 1. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref), which reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
+ 2. Call the plain estimator on the clean block, with the caller's `dims` and the other keywords. Every column of the block is active at every row, so the method does not pass `active_mask` on.
  3. Expand the result with [`expand_moment`](@ref).
 
 # Arguments
@@ -922,6 +1050,7 @@ The rule has the cost that [`coverage_mask`](@ref) states. One non-finite return
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Validation
@@ -942,8 +1071,9 @@ The rule has the cost that [`coverage_mask`](@ref) states. One non-finite return
   - [`AssetPanel`](@ref)
 """
 function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum,
-                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                        pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(Statistics.cov(ce, Xc; dims = dims, kwargs...), cmsk)
 end
 """
@@ -958,8 +1088,9 @@ The correlation root of the Asset Panel methods of the moment verbs. It is the r
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum,
-                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                        pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(Statistics.cor(ce, Xc; dims = dims, kwargs...), cmsk)
 end
 """
@@ -974,8 +1105,9 @@ The variance root of the Asset Panel methods of the moment verbs. It is the redu
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.var(ce::AbstractCovarianceEstimator, X::MatNum,
-                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                        pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(Statistics.var(ce, Xc; dims = dims, kwargs...), cmsk, dims)
 end
 """
@@ -990,8 +1122,9 @@ The standard deviation root of the Asset Panel methods of the moment verbs. It i
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.std(ce::AbstractCovarianceEstimator, X::MatNum,
-                        pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                        pnl::Option{<:AssetPanel}; dims::Int = 1,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(Statistics.std(ce, Xc; dims = dims, kwargs...), cmsk, dims)
 end
 """
@@ -1006,8 +1139,9 @@ The expected returns root of the Asset Panel methods of the moment verbs. It is 
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum,
-                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                         pnl::Option{<:AssetPanel}; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(Statistics.mean(me, Xc; dims = dims, kwargs...), cmsk, dims)
 end
 """
@@ -1023,8 +1157,9 @@ The coskewness root of the Asset Panel methods of the moment verbs. It is the re
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function coskewness(ske::CoskewnessEstimator, X::MatNum, pnl::Option{<:AssetPanel};
-                    dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                    dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(coskewness(ske, Xc; dims = dims, kwargs...), cmsk)
 end
 """
@@ -1040,8 +1175,9 @@ The cokurtosis root of the Asset Panel methods of the moment verbs. It is the re
   - [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function cokurtosis(kte::CokurtosisEstimator, X::MatNum, pnl::Option{<:AssetPanel};
-                    dims::Int = 1, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                    dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                    kwargs...)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand_moment(cokurtosis(kte, Xc; dims = dims, kwargs...), cmsk, Val(:kt))
 end
 """
@@ -1134,7 +1270,7 @@ function coverage_panel_moment end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_panel_moment`](@ref), the Coverage Universe route. It reduces the window with [`coverage_reduction`](@ref), fits the plain estimator on the clean block, and frames the result with `expand`.
+`Nothing` method of [`coverage_panel_moment`](@ref), the Coverage Universe route. It reduces the window with [`coverage_reduction`](@ref), fits the plain estimator on the clean block, and frames the result with `expand`. The reduction reads the `active_mask` keyword in the place of the active mask of `pnl` when the caller gives one, and the clean block is active at every row, so the keyword stops here.
 
 # Related
 
@@ -1142,8 +1278,10 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`coverage_reduction`](@ref)
 """
 function coverage_panel_moment(f::F, est, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel},
-                               expand::E; dims::Int = 1, kwargs...) where {F, E}
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+                               expand::E; dims::Int = 1,
+                               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                               kwargs...) where {F, E}
+    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
     return expand(f(est, Xc; dims = dims, kwargs...), cmsk)
 end
 """

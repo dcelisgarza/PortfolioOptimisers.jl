@@ -855,10 +855,14 @@ end
 """
     Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
                    dims::Int = 1, mean = nothing, iv::MatNum,
-                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> MatNum
+                   ivpa::Option{<:Num_VecNum} = nothing,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                   kwargs...) -> MatNum
     Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
                    dims::Int = 1, mean = nothing, iv::MatNum,
-                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> MatNum
+                   ivpa::Option{<:Num_VecNum} = nothing,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                   kwargs...) -> MatNum
 
 Fit an implied volatility estimate on the Coverage Universe, and expand it to the full asset universe.
 
@@ -869,7 +873,7 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
 # Algorithm
 
  1. Check `dims`, and orient `X` and `iv` to `observations × assets`.
- 2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref).
+ 2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref). It reads `active_mask` in the place of the active mask of `pnl` when the caller gives one, through [`coverage_mask_source`](@ref).
  3. Slice `X`, `iv` and `ivpa` onto it.
  4. Call the two-argument method on the clean block.
  5. Expand the matrix with [`expand_moment`](@ref).
@@ -883,6 +887,7 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
   - $(arg_dict[:omean])
   - `iv`: Implied volatility surface `observations × assets`.
   - `ivpa`: Implied volatility premium adjustment.
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Additional keyword arguments passed to the two-argument method.
 
 # Validation
@@ -903,10 +908,12 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
 """
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, mean = nothing, iv::MatNum,
-                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        ivpa::Option{<:Num_VecNum} = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    src = coverage_mask_source(pnl, active_mask, dims)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
-    cmsk = coverage_mask(X, iv, pnl; dims = 1)
+    cmsk = coverage_mask(X, iv, src; dims = 1)
     Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
     sigma = Statistics.cov(ce, Xc; dims = 1, mean = mean, iv = ivc,
                            ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
@@ -914,10 +921,12 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
 end
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
                         dims::Int = 1, mean = nothing, iv::MatNum,
-                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        ivpa::Option{<:Num_VecNum} = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    src = coverage_mask_source(pnl, active_mask, dims)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
-    cmsk = coverage_mask(X, iv, pnl; dims = 1)
+    cmsk = coverage_mask(X, iv, src; dims = 1)
     Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
     rho = Statistics.cor(ce, Xc; dims = 1, mean = mean, iv = ivc,
                          ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)

@@ -393,3 +393,41 @@ A mean and a variance have no pairs, so the rule binds on a covariance and a cor
 The third and fourth co-moments keep the refusal of the block rule for an undetermined triple or
 quadruple. The table row "The block repair" of *Considered options* records the choice of that
 date.
+
+## Amendment (2026-10-12, #1648)
+
+**A plain moment estimator reads an inactive cell as a non-finite return, in every form.** The
+rule of the Coverage Universe is the per-cell rule `valid = isfinite(X) & active_mask`. The panel
+form applied it, but the two other forms of a plain estimator did not.
+[#1648](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1648) measured the gap: on a
+40×4 sample whose third asset is inactive for 12 rows where its returns are finite, `mean(me, X,
+pnl)` and `prior(EmpiricalPrior(), rd)` answered `NaN` for that asset. `mean(me, X; active_mask)`,
+`partial_fit!(me, X; active_mask)`, the carry route and the `Online` refit route answered a finite
+mean over every row. So the batch fit of a prior and its two online routes disagreed.
+
+The issue offered two rules. The second, a panel form that reads the mask as the keyword form did,
+would break the per-cell rule above and the oracle. The first keeps one rule, so it is the
+decision. Each form now gives the answer that it already gave for a non-finite return:
+
+- **The panel form, and the panel form with mask keywords.** `coverage_reduction` takes an
+  `active_mask` keyword, and `coverage_mask_source` reads it in the place of the mask of the panel.
+  The root of each moment verb, the Coverage Universe route of `coverage_panel_moment`, the panel
+  methods of `ImpliedVolatility` and `PriceLevelExpectedReturns`, `FactorPrior`,
+  `FactorBlackLittermanPrior` and `LowDimensionEnsemblePrior` pass it there, and do not pass it on
+  to the plain fit, whose block is active at every row. So `prior(pe, X; active_mask = A)`, the
+  call of the refit route, reaches the Coverage Universe of `prior(pe, rd)`. The keyword takes the
+  place of the mask of the panel when a caller gives both, as it already did on the route of a
+  mask-aware estimator.
+- **The keyword form.** Each plain arm that takes `active_mask`, of `SimpleExpectedReturns`,
+  `SimpleVariance`, `Covariance`, `Coskewness` and `Cokurtosis`, refuses an inactive cell through
+  `assert_finite_sample(X, active_mask)`, with the `IsNonFiniteError` that it gives for a `NaN`.
+  It ignored the mask before.
+- **The fold.** A plain state carries one count for every asset, so it cannot skip one cell.
+  `inactive_as_nonfinite` writes `NaN` in an inactive cell before the plain fold reads it, and the
+  `NaN` stays in the running moments of that asset, as a non-finite return already did. Over an
+  expanding window this is the reduce-and-expand: an asset with one inactive row in `[1..t]` is
+  outside the Coverage Universe of every fit that holds the row.
+
+The carry route of `EmpiricalPrior()` and `HighOrderPriorEstimator()` now equals the batch fit to
+the rounding of the recursion, and the refit route equals it exactly. Under a Coverage Policy
+nothing changes.

@@ -1334,8 +1334,8 @@ A folding statistic reads the active mask, so this method replaces the reduce-an
 
 # Algorithm
 
- 1. For a windowed statistic, reduce `X` to the Coverage Universe of the panel, compute the expected return there, and expand it with `NaN` to the whole universe.
- 2. For a folding statistic, read the active mask of the panel with [`panel_moment_masks`](@ref), and orient it as `X` is oriented.
+ 1. For a windowed statistic, reduce `X` to the Coverage Universe of the panel, compute the expected return there, and expand it with `NaN` to the whole universe. The reduction reads `active_mask` in the place of the active mask of the panel when the caller gives one.
+ 2. For a folding statistic, take `active_mask` when the caller gives one. Otherwise read the active mask of the panel with [`panel_moment_masks`](@ref), and orient it as `X` is oriented.
  3. Compute the expected return of `X` under that mask.
 
 # Arguments
@@ -1344,6 +1344,7 @@ A folding statistic reads the active mask, so this method replaces the reduce-an
   - $(arg_dict[:X])
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
   - $(arg_dict[:ignkwargs])
 
 # Returns
@@ -1357,14 +1358,21 @@ A folding statistic reads the active mask, so this method replaces the reduce-an
   - [`Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref)
 """
 function Statistics.mean(me::PriceLevelExpectedReturns, X::MatNum,
-                         pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+                         pnl::Option{<:AssetPanel}; dims::Int = 1,
+                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     if !folds(me.alg)
-        cmsk, Xc = coverage_reduction(X, pnl; dims = dims)
+        cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
         return expand_moment(Statistics.mean(me, Xc; dims = dims, kwargs...), cmsk, dims)
     end
     # A panel's masks are `observations × assets` whatever `dims` says, and the mask-aware
-    # verb reads a mask shaped as `X` is, so a transposed sample takes a transposed mask.
-    amsk, _ = dims_oriented(dims, panel_moment_masks(pnl)...)
+    # verb reads a mask shaped as `X` is, so a transposed sample takes a transposed mask. A
+    # mask the caller gives as a keyword is shaped as `X` already, and it takes the place of
+    # the panel's (see [`coverage_mask_source`](@ref)).
+    amsk = if isnothing(active_mask)
+        first(dims_oriented(dims, panel_moment_masks(pnl)...))
+    else
+        active_mask
+    end
     return Statistics.mean(me, X; dims = dims, active_mask = amsk, kwargs...)
 end
 """

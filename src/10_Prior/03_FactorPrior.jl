@@ -523,7 +523,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
- 3. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`. The regression is `pe.re` viewed to the Coverage Universe with [`coverage_regression`](@ref).
+ 3. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref). The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`. The regression is `pe.re` viewed to the Coverage Universe with [`coverage_regression`](@ref).
  4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
  5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
  6. Take the rows `r` that `f_prior.X` carries: the last `size(f_prior.X, 1)` observations. A Scenario Cap of `pe.pe` keeps the last rows of `F` alone, and the asset side keeps the same rows, so the two blocks describe the same observations. With no cap, `r` is every observation. The moments of steps 2 to 4 are fitted over every observation, so the cut changes no moment.
@@ -539,6 +539,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - $(arg_dict[:dims])
   - $(arg_dict[:strict])
   - $(arg_dict[:ts]) It has one entry for each observation of `X`, and the loadings result records the entries of the rows the prior result carries, or `nothing`. The method that takes a [`ReturnsResult`](@ref) passes `rd.ts`.
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
 # Validation
@@ -561,7 +562,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
 """
 function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, ts::Option{<:VecDate} = nothing,
-               kwargs...)
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     X, F = dims_oriented(dims, X, F)
     T = size(X, 1)
     @argcheck(isnothing(ts) || length(ts) == T,
@@ -571,7 +572,8 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
     # `chol` is the factorisation of the block, not of the frame. Every block the result
     # carries is expanded at the end, the regression result included, because a Prior Result
     # has no mask field and every block it carries lives on the full asset universe.
-    cmsk, Xc = coverage_reduction(X, pnl; dims = 1)
+    cmsk, Xc = coverage_reduction(X, pnl; dims = 1,
+                                  active_mask = dims_oriented(dims, active_mask))
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
     f_prior = prior(pe.pe, F; strict = strict)
