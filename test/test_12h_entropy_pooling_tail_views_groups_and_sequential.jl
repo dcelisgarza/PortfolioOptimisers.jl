@@ -275,28 +275,76 @@ end
                               "AAPL <= $(m * r.rlvar)")
         return epc, tvs
     end
+    # The grid of each half, built again, and whether the row of each of its points is finite.
+    # The two halves centre their grids on different points: the upper bound on the point the
+    # posterior attains, the lower bound on the dual variable of the prior. So they need not
+    # keep the same points. Where a point overflows sits on a knife edge that moves with the
+    # host (#1635), so each half is checked against its own grid, never against a count.
+    grid(kappa, m, op) = begin
+        r = PO.ep_rlvar(x, ep_sw0, ep_a, kappa)
+        alg = GridRelativisticValueatRiskView()
+        t, z = PO.ep_rlvar_grid(x, ep_sw0 ./ sum(ep_sw0), ep_a, kappa, op, m * r.rlvar, r.z,
+                                r.rlvar, alg.pct, alg.K; iters = alg.iters, tol = alg.tol,
+                                tilt_iters = alg.tilt_iters)
+        rows = [PO.ep_rlvar_grid_row(x, m * r.rlvar, t[k], z[k], ep_a, kappa)
+                for k in eachindex(t)]
+        return t, z, [all(isfinite, c) && isfinite(b) for (c, b) in rows], last.(rows)
+    end
     # Nothing overflows here, so the grid keeps every point it built.
     _, tvs = add(0.7, 0.75, :leq)
     @test length(only(tvs).z) == GridRelativisticValueatRiskView().K
-    # Here six of the eleven points overflow. The five that remain carry finite rows.
+    # The upper-bound half keeps exactly the points of its grid whose row is finite and whose
+    # bound is positive, and each kept row is finite.
     _, tvs = add(0.9, 0.75, :leq)
     tv = only(tvs)
-    @test length(tv.z) == length(tv.t) < GridRelativisticValueatRiskView().K
+    t, z, fin, bd = grid(0.9, 0.75, :leq)
+    keep = findall(k -> fin[k] && bd[k] > 0, eachindex(z))
+    @test tv.z == z[keep]
+    @test tv.t == t[keep]
     for k in eachindex(tv.z)
         c, b = PO.ep_rlvar_grid_row(x, tv.rhs, tv.t[k], tv.z[k], ep_a, 0.9)
         @test all(isfinite, c)
         @test isfinite(b)
     end
-    # The lower-bound block writes its rows straight into the constraint set, and it drops
-    # the same points.
+    # The lower-bound half sits at a dual variable near zero, where some points overflow on
+    # every host measured. It writes the rows of the points it keeps straight into the
+    # constraint set, so it writes one row per finite point of its grid.
     epc, _ = add(0.9, 0.75, :geq)
     lhs, rhs = epc[:ineq]
-    @test size(lhs, 1) == length(rhs) == length(tv.z)
+    _, _, fin, _ = grid(0.9, 0.75, :geq)
+    @test 0 < count(fin) < GridRelativisticValueatRiskView().K
+    @test size(lhs, 1) == length(rhs) == count(fin)
     @test all(isfinite, lhs)
     @test all(isfinite, rhs)
     # Every point overflows here, and the raise names `kappa` rather than leaving JuMP to
     # refuse a `NaN` coefficient.
     @test_throws ArgumentError add(0.9, 0.5, :leq)
+end
+
+@testset "the grid guard drops a row that is not finite, and an upper bound at or below zero" begin
+    # The guard on rows that are not finite by construction, so no knife edge decides which
+    # point it drops (#1635). Point 2 has an infinite coefficient, point 3 a `NaN` bound, and
+    # point 4 a bound below zero, which only an upper bound refuses.
+    row(g) = (g == 2 ? [1.0, Inf] : [1.0, float(g)], g == 3 ? NaN : g == 4 ? -1.0 : 1.0)
+    msg = () -> "no usable grid point"
+    epc = Dict{Any, Any}()
+    @test PO.ep_add_grid_tail_view!(epc, collect(1:5), :leq, row, msg) == [1, 5]
+    @test !haskey(epc, :ineq)
+    epc = Dict{Any, Any}()
+    @test PO.ep_add_grid_tail_view!(epc, collect(1:5), :geq, row, msg) == [1, 4, 5]
+    # The rows of points 1, 4 and 5, negated into the `<=` sense, each scaled to unit norm.
+    lhs, rhs = epc[:ineq]
+    @test size(lhs) == (3, 2)
+    @test all(<(0), lhs[:, 1])
+    @test lhs[:, 2] ./ lhs[:, 1] ≈ [1.0, 4.0, 5.0]
+    @test rhs ./ lhs[:, 1] ≈ [1.0, -1.0, 1.0]
+    epc = Dict{Any, Any}()
+    @test PO.ep_add_grid_tail_view!(epc, collect(1:5), :eq, row, msg) == [1, 5]
+    @test size(epc[:ineq][1], 1) == 3
+    @test_throws ArgumentError(msg()) PO.ep_add_grid_tail_view!(Dict{Any, Any}(), [2, 3],
+                                                                :geq, row, msg)
+    @test_throws ArgumentError(msg()) PO.ep_add_grid_tail_view!(Dict{Any, Any}(), [2, 3, 4],
+                                                                :leq, row, msg)
 end
 
 @testset "one row is made tight by an exponential tilt" begin

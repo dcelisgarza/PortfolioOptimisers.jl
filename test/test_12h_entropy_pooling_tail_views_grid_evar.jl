@@ -113,7 +113,30 @@ end
 
 @testset "grid EVaR expresses the operators the conic formulation cannot" begin
     tgt = ep_spevar * 0.9
-    pr = prior(EntropyPoolingPrior(; sets = sets, opt = ep_mopt,
+    # The upper bound reaches the outer approximation of Pajarito. On the developer host it
+    # finds its incumbent at the second iteration, then gets the same integral solution back
+    # while its bound wanders about 1.5% below, and it ran 48 minutes without closing the
+    # default gap of 1e-5 (#1635). The test claims feasibility alone: a selector row holds at
+    # one grid point, so every feasible posterior meets the bound. A gap of 5% stops the solve
+    # at the third iteration, and the claim still holds.
+    gap_mopt = JuMPEntropyPooling(;
+                                  slv = Solver(; name = :ep_mip_gap,
+                                               solver = optimizer_with_attributes(Pajarito.Optimizer,
+                                                                                  "verbose" =>
+                                                                                      false,
+                                                                                  "tol_rel_gap" =>
+                                                                                      0.05,
+                                                                                  "oa_solver" =>
+                                                                                      optimizer_with_attributes(HiGHS.Optimizer,
+                                                                                                                JuMP.MOI.Silent() =>
+                                                                                                                    true),
+                                                                                  "conic_solver" =>
+                                                                                      optimizer_with_attributes(Clarabel.Optimizer,
+                                                                                                                "verbose" =>
+                                                                                                                    false)),
+                                               check_sol = (; allow_local = true,
+                                                            allow_almost = true)))
+    pr = prior(EntropyPoolingPrior(; sets = sets, opt = gap_mopt,
                                    evar_views = EntropicValueatRiskView(;
                                                                         views = LinearConstraintEstimator(;
                                                                                                           val = "AAPL <= $tgt"))),
