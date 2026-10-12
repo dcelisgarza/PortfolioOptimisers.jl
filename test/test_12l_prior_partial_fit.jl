@@ -840,10 +840,46 @@ end
         m = message(() -> partial_fit!(HighOrderPriorEstimator(), rd(masks)))
         @test occursin("the carry of `EmpiricalPrior`", m)
     end
+    @testset "The buffer records the implied volatilities beside the returns (#1632)" begin
+        # The regression needs more than two windows of 20 rows, so the block is longer
+        # than the shared fixture. Its returns are complete, so the gap of `ivg` in column
+        # 2 is the surface's own.
+        Xc = randn(rng, 3 * T, N) ./ 100
+        ivm = 0.15 .+ 0.1 .* rand(rng, 3 * T, N)
+        r = ReturnsResult(; nx = nx, X = Xc, iv = ivm, ivpa = 1.1)
+        ivg = copy(ivm)
+        ivg[3:5, 2] .= NaN
+        rg = ReturnsResult(; nx = nx, X = Xc, iv = ivg, ivpa = 1.1)
+        all_steps(est, r) = foldl((e, i) -> partial_fit!(e, rows(r, i:i)), 1:(3 * T);
+                                  init = est)
+        for ce in (ImpliedVolatility(; ppy = 252),
+                   ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium()))
+            pb = prior(EmpiricalPrior(; ce = ce), r)
+            # The refit gives the batch answer, and so does the carry on a complete surface.
+            # The read-out reads a view of the buffer and the batch fit reads a matrix, so
+            # the moments can differ in the last bit.
+            @test isapprox(prior(all_steps(online(EmpiricalPrior(; ce = ce)), r)).sigma,
+                           pb.sigma; rtol = 1e-12)
+            @test isapprox(prior(all_steps(EmpiricalPrior(; ce = ce), r)).sigma, pb.sigma;
+                           rtol = 1e-12)
+            # A gap in the surface drops the asset from the Coverage Universe of the batch
+            # fit. The refit reads the same panel method. The carry refits through the
+            # plain method, which refuses the gap by name.
+            pg = prior(EmpiricalPrior(; ce = ce), rg)
+            @test all(isnan, view(pg.sigma, 2, :))
+            @test isapprox(prior(all_steps(online(EmpiricalPrior(; ce = ce)), rg)).sigma,
+                           pg.sigma; rtol = 1e-12, nans = true)
+            m = message(() -> prior(all_steps(EmpiricalPrior(; ce = ce), rg)))
+            @test occursin("all(isfinite, iv) must hold", m)
+        end
+        # The carry fold of a Cross-Sectional Factor Prior has no slot for the surface.
+        cs = CrossSectionalFactorPrior(; lambda = 1,
+                                       factors = ["market" => ConstantExposure()])
+        m = message(() -> partial_fit!(cs, rd(full; iv = fill(0.2, T, N), ivpa = 1.0)))
+        @test occursin("the carry fold of a Cross-Sectional Factor Prior takes no implied volatilities",
+                       m)
+    end
     @testset "The fold refuses what no state records" begin
-        @test_throws ArgumentError partial_fit!(online(EmpiricalPrior()),
-                                                rd(nothing; iv = fill(0.2, T, N),
-                                                   ivpa = 1.0))
         @test_throws IsNothingError partial_fit!(online(EmpiricalPrior()),
                                                  ReturnsResult(; nf = ["F1"],
                                                                F = randn(rng, T, 1)))

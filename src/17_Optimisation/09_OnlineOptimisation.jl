@@ -9,7 +9,7 @@ The estimation mask does not travel these folds. The exact folds of the moment l
 
 # Algorithm
 
- 1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
+ 1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref), and `rd` with implied volatilities.
  2. Return `nothing` when `rd` holds no panel, or when its panel is static.
  3. Refuse a time-varying panel that holds a Panel Field.
  4. Refuse a time-varying panel whose estimation mask differs from its active mask.
@@ -22,6 +22,7 @@ The estimation mask does not travel these folds. The exact folds of the moment l
 # Validation
 
   - The rules of [`assert_prior_fold_returns`](@ref).
+  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise. These folds hold numbers alone and keep no implied volatilities, so a step that carried them would fold an estimate that reads them without them.
   - A time-varying `rd.pnl` holds no Panel Field. An `ArgumentError` is thrown otherwise.
   - A time-varying `rd.pnl` has an estimation mask equal to its active mask. An `ArgumentError` is thrown otherwise.
 
@@ -37,6 +38,8 @@ The estimation mask does not travel these folds. The exact folds of the moment l
 """
 function step_active_mask(rd::ReturnsResult)
     assert_prior_fold_returns(rd)
+    @argcheck(isnothing(rd.iv),
+              ArgumentError("this online step takes no implied-volatility surface: the exact fold of a covariance estimator or of an online portfolio selection keeps numbers alone, so a step carrying `iv` would fold an estimate that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch. An optimiser's prior records `iv` on its own step."))
     pnl = rd.pnl
     if isnothing(pnl) || panel_is_static(pnl)
         return nothing

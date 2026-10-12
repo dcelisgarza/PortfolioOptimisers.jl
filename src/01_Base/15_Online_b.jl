@@ -1,4 +1,276 @@
 """
+    online_wrapper_path(est)
+    online_wrapper_path(::Online)
+    online_wrapper_path(::TimeDependent)
+
+Names the first field of an estimator tree that holds an [`Online`](@ref) declaration, or answers `nothing`.
+
+[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk is the walk of [`online_entry_state`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
+
+# Algorithm
+
+ 1. Answer `""` when `est` is an [`Online`](@ref).
+ 2. Walk the fields of [`estimator_fields`](@ref) in order, and answer the name of the first field that holds a wrapper.
+ 3. For a field that holds no wrapper, find the path in the field with this function, and answer it with the field name and a dot before it.
+ 4. Answer `nothing` when no field gives a path.
+
+# Arguments
+
+  - `est`: The estimator, or any value a field holds.
+
+# Returns
+
+  - `path::Option{<:String}`: The dotted path of the first wrapper found, `""` when `est` is itself one, or `nothing`.
+
+# Related
+
+  - [`assert_batch_entry`](@ref)
+  - [`online_entry_state`](@ref)
+  - [`estimator_fields`](@ref)
+  - [`update_online_estimator`](@ref)
+"""
+function online_wrapper_path(est::Union{<:AbstractEstimator,
+                                        <:StatsBase.CovarianceEstimator})
+    for f in estimator_fields(est)
+        v = getfield(est, f)
+        if isa(v, Online)
+            return string(f)
+        end
+        path = online_wrapper_path(v)
+        if !isnothing(path)
+            return string(f, ".", path)
+        end
+    end
+    return nothing
+end
+function online_wrapper_path(::Online)
+    return ""
+end
+function online_wrapper_path(::Any)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the window rule of a windowed moment estimator, the rule that says which observations its window keeps on the online step.
+
+A windowed estimator, such as [`WindowedCovariance`](@ref), fits its inner estimator on a window of observations. In a batch fit every rule keeps the same window, the last `window` observations. The rules differ when the estimator receives its observations one block at a time.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. The windowed estimators hold it in their `rule` field, and the methods that fold them dispatch on its type. A new rule needs its own fold methods for the five windowed estimators.
+
+# Related
+
+  - [`RollingWindow`](@ref)
+  - [`SeedWindow`](@ref)
+  - [`WindowedExpectedReturns`](@ref)
+  - [`WindowedCovariance`](@ref)
+  - [`WindowedVariance`](@ref)
+  - [`WindowedCoskewness`](@ref)
+  - [`WindowedCokurtosis`](@ref)
+"""
+abstract type AbstractWindowRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the last observations of the window at every fit, so the window rolls with each new observation. This is the default rule.
+
+The estimator does not fold. On the online step, a prior that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), refits it over the carried rows at each read, and the window of each refit ends at the last row. So the call with no data after any stream of blocks equals the batch fit over every row received.
+
+# Constructors
+
+    RollingWindow() -> RollingWindow
+
+# Examples
+
+```jldoctest
+julia> RollingWindow()
+RollingWindow()
+```
+
+# Related
+
+  - [`AbstractWindowRule`](@ref)
+  - [`SeedWindow`](@ref)
+"""
+struct RollingWindow <: AbstractWindowRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the last observations of the window at the first fit alone. After the first fit, the inner estimator folds every new observation, and no observation leaves the estimate.
+
+In a batch fit the rule keeps the same window as [`RollingWindow`](@ref). On the online step the estimator folds. Its first fold cuts the first block to the window, folds the rows that remain into the inner estimator, and returns the estimator with `window = nothing`, so each later fold passes every row. The call with no data after a stream of blocks then gives the fit over the window of the first block, continued by the fold of every later row, and it equals no batch fit.
+
+The rule needs an inner estimator that folds exactly, such as [`ExpWeightedCovariance`](@ref), and a prior that folds, such as the carry of [`EmpiricalPrior`](@ref). [`Online`](@ref) refuses it, because the wrapper refits its estimator at each step, and a refit has no first fit to remember.
+
+# Constructors
+
+    SeedWindow() -> SeedWindow
+
+# Examples
+
+```jldoctest
+julia> SeedWindow()
+SeedWindow()
+```
+
+# Related
+
+  - [`AbstractWindowRule`](@ref)
+  - [`RollingWindow`](@ref)
+  - [`seed_window_path`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+struct SeedWindow <: AbstractWindowRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Choice Rule of an estimator, the rule that says how a choice that a fit makes over its whole sample behaves on the online step.
+
+Some fits make a choice that reads every observation, such as the dropped member of a Factor Family in [`CrossSectionalFactorPrior`](@ref), the factor set of each asset in [`StepwiseRegression`](@ref), or the components of [`DimensionReductionRegression`](@ref). In a batch fit every rule makes the same choice. The rules differ when the estimator receives its observations one block at a time.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. An estimator that makes such a choice holds the rule in its `choice` field. The step of its online fold dispatches on the type of the rule. A new rule needs its own method of that step for each estimator that holds it.
+
+# Related
+
+  - [`BatchChoice`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+"""
+abstract type AbstractChoiceRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Makes the choice again over every observation at each fit. This is the default rule.
+
+On the online step a refit reads every row of its buffer, so the choice can move from one step to the next, and the call with no data after any stream of blocks equals the batch fit over the same rows. On the carry fold of a [`CrossSectionalFactorPrior`](@ref), a step that moves the dropped member of a Factor Family solves no observation of full rank again. The raw factor returns of such an observation do not depend on the dropped member, so the step selects the columns that the new member keeps, and folds the factor prior again over them.
+
+# Constructors
+
+    BatchChoice() -> BatchChoice
+
+# Examples
+
+```jldoctest
+julia> BatchChoice()
+BatchChoice()
+```
+
+# Related
+
+  - [`AbstractChoiceRule`](@ref)
+  - [`PinnedChoice`](@ref)
+"""
+struct BatchChoice <: AbstractChoiceRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Keeps the choice of the first fit. After the first fit, every later fit reads the same choice.
+
+In a batch fit the rule makes the same choice as [`BatchChoice`](@ref). On the online step the rule holds no state. After the first step whose rows the fit accepts, the step writes the choice into the configuration of the estimator that it returns, for example the name of the dropped member of each Factor Family into the `families` of a [`CrossSectionalFactorPrior`](@ref), the factor set of each asset into `included` of a [`StepwiseRegression`](@ref), or the components into `proj` of a [`DimensionReductionRegression`](@ref). Each later step then reads that choice. The call with no data after a stream of blocks equals the batch fit over the same rows under the choice of the first fit, which differs from a batch fit when the choice of the whole sample moves.
+
+# Constructors
+
+    PinnedChoice() -> PinnedChoice
+
+# Examples
+
+```jldoctest
+julia> PinnedChoice()
+PinnedChoice()
+```
+
+# Related
+
+  - [`AbstractChoiceRule`](@ref)
+  - [`BatchChoice`](@ref)
+"""
+struct PinnedChoice <: AbstractChoiceRule end
+"""
+    seed_window_path(est)
+    seed_window_path(::Any)
+
+Names the first field of an estimator tree that holds a windowed estimator under [`SeedWindow`](@ref), or answers `nothing`.
+
+The constructor of [`Online`](@ref) uses this walk to refuse a seed window, because the wrapper refits its estimator at each step. The walk is the walk of [`online_wrapper_path`](@ref), and the answer is the dotted path from the root to the `rule` field, such as `"ce.rule"` for the covariance member of a prior. A windowed estimator under a seed window answers `"rule"` through its own method. A value that is not an estimator answers `nothing`.
+
+# Algorithm
+
+ 1. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
+ 2. Answer the first path found, with the field name and a dot before it.
+ 3. Answer `nothing` when no field gives a path.
+
+# Arguments
+
+  - `est`: The estimator, or any value a field holds.
+
+# Returns
+
+  - `path::Option{<:String}`: The dotted path of the first seed window found, or `nothing`.
+
+# Related
+
+  - [`SeedWindow`](@ref)
+  - [`Online`](@ref)
+  - [`online_wrapper_path`](@ref)
+  - [`estimator_fields`](@ref)
+"""
+function seed_window_path(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
+    for f in estimator_fields(est)
+        path = seed_window_path(getfield(est, f))
+        if !isnothing(path)
+            return string(f, ".", path)
+        end
+    end
+    return nothing
+end
+function seed_window_path(::Any)
+    return nothing
+end
+"""
+    assert_batch_entry(est, entry::AbstractString)
+
+Refuses an estimator that holds an [`Online`](@ref) at the entry of a batch fit, with an error that names the path of the wrapper.
+
+A wrapper is a declaration that the online arm of the fold loop resolves at its warm-up. A batch fit runs no warm-up. A batch fit is a plain [`optimise`](@ref), or a fold of a scheme that is not an Online Scheme. So the wrapper would reach `prior(pe, X)` unresolved and get a `MethodError` that names the whole type. The refusal names the dotted path that [`online_wrapper_path`](@ref) finds, and the two exits. One exit is an Online Scheme, such as [`OnlineIndexWalkForward`](@ref). The other exit is the estimator without the wrapper. Each caller passes an optimiser, which is never a wrapper, so the path at this entry is never the empty path.
+
+# Algorithm
+
+ 1. Find the path of the first wrapper in `est` with [`online_wrapper_path`](@ref).
+ 2. Refuse `est` when the path is not `nothing`, and name the path and the entry function.
+
+# Arguments
+
+  - `est`: The estimator handed to the entry function.
+  - `entry`: The name of the entry function, as the message reads it.
+
+# Validation
+
+  - No field in the tree of `est` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`online_wrapper_path`](@ref)
+  - [`assert_online_entry`](@ref)
+  - [`optimise`](@ref)
+  - [`fold_loop`](@ref)
+"""
+function assert_batch_entry(est, entry::AbstractString)
+    path = online_wrapper_path(est)
+    @argcheck(isnothing(path),
+              ArgumentError("`$(typeof(est).name.name)` enters $(entry) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Run the estimator through an Online Scheme — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
+    return nothing
+end
+"""
     supports_partial_fit(est) -> Bool
 
 Answers whether [`partial_fit!`](@ref) folds this estimator.
@@ -123,4 +395,6 @@ In order to implement a new programme set, subtype `AbstractProgrammeAllocationS
 """
 abstract type AbstractProgrammeAllocationSet <: AbstractAllocationSet end
 
+export RollingWindow, SeedWindow, BatchChoice, PinnedChoice
+public AbstractWindowRule, AbstractChoiceRule
 public AbstractProgrammeAllocationSet, risk_constraint_solver, supports_partial_fit

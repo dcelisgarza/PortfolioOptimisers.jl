@@ -18,6 +18,7 @@ PortfolioOptimisers.sample_buffer
 PortfolioOptimisers.sample_buffer_kwargs
 PortfolioOptimisers.factor_buffer
 PortfolioOptimisers.exogenous_buffer_kwargs
+PortfolioOptimisers.implied_volatility_buffer_kwargs
 PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})
 PortfolioOptimisers.assert_sample_buffer(::PortfolioOptimisers.Online)
 PortfolioOptimisers.sample_buffer_seed
@@ -41,7 +42,4 @@ PortfolioOptimisers.online_fields
 PortfolioOptimisers.update_online_estimator
 PortfolioOptimisers.estimator_fields
 PortfolioOptimisers.online_entry_state
-PortfolioOptimisers.online_wrapper_path
-PortfolioOptimisers.seed_window_path
-PortfolioOptimisers.assert_batch_entry
 ```

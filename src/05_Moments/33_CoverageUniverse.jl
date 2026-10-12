@@ -791,17 +791,20 @@ function expand_moment(kt::MatNum, cmsk::BitVector, ::Val{:kt})
     return frame
 end
 """
-    assert_finite_sample(X::ArrNum) -> nothing
+    assert_finite_sample(X::ArrNum, name::AbstractString = "X") -> nothing
 
 Refuse a non-finite sample in a plain moment estimator, and name the two ways out.
 
 A plain moment estimator has no correct value for an asset whose window has a gap. So it refuses the whole sample, and does not return a number that looks like an estimate. The message names the two paths that a caller has. The caller can fit through a prior, which reduces the sample to the Coverage Universe and expands the result. Or the caller can use a mask-aware estimator, which takes the whole window and writes its own frame.
+
+A second per-asset series beside the returns follows the same rule. [`ImpliedVolatility`](@ref) refuses a gap in its implied volatility surface through this function, because its panel method excludes such an asset from the Coverage Universe, and a plain call that read past the gap would answer for it.
 
 This is [`assert_all_finite`](@ref) with a message for this refusal. The message of [`assert_all_finite`](@ref) names the count and the position of the non-finite entries alone. It tells a caller what is wrong, and not what to do.
 
 # Arguments
 
   - $(arg_dict[:X])
+  - `name`: The name of the sample in the message.
 
 # Validation
 
@@ -817,9 +820,9 @@ This is [`assert_all_finite`](@ref) with a message for this refusal. The message
   - [`coverage_reduction`](@ref)
   - [`IsNonFiniteError`](@ref)
 """
-function assert_finite_sample(X::ArrNum)::Nothing
+function assert_finite_sample(X::ArrNum, name::AbstractString = "X")::Nothing
     @argcheck(all(isfinite, X),
-              IsNonFiniteError("a plain moment estimator has no correct answer for a gapped sample, so it refuses one: all(isfinite, X) must hold, and got $(count(!isfinite, X)) non-finite entries, the first at $(findfirst(!isfinite, X)). Fit through a prior, which reduces to the Coverage Universe and expands, or use a mask-aware estimator, which reads the active mask of an Asset Panel."))
+              IsNonFiniteError("a plain moment estimator has no correct answer for a gapped sample, so it refuses one: all(isfinite, $name) must hold, and got $(count(!isfinite, X)) non-finite entries, the first at $(findfirst(!isfinite, X)). Fit through a prior, which reduces to the Coverage Universe and expands, or use a mask-aware estimator, which reads the active mask of an Asset Panel."))
     return nothing
 end
 """

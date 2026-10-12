@@ -252,3 +252,38 @@ as it answers the batch fold.
 An Online Portfolio Selection head has no carrier to rebuild, so its fallback cannot take this
 route. [ADR 0155](0155-an-online-portfolio-selection-head-is-a-naive-optimiser-whose-batch-verb-is-a-causal-pass-and-whose-read-out-is-its-own-recursion.md)
 carries the amendment that steps it.
+
+## Amendment (2026-10-12, #1632)
+
+**An implied-volatility surface travels the step, in the buffer that holds the returns**
+([#1632](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1632)). The refusal of `iv`
+above is withdrawn for every optimiser. `iv` holds one value for each observation and asset, as the
+returns and the masks do, so `SampleBufferState` records it beside them, under the same offset, count
+and cap. `ivpa` has no observation axis, so the first append pins it, as `vcat` of two returns
+carriers already pins it, and a later step with another `ivpa` is refused by name.
+
+- **No statistic of the regression folds.** The regression of `ImpliedVolatility` reads windows
+  that end at the last observation, so a new row moves every window. The oracle has no online fit of
+  its implied covariance either: its online step raises `TypeError` for it. So the read-out refits the
+  regression over the rows of the buffer, and the online answer equals the batch answer over the same
+  rows.
+- **One place holds it.** The buffer that holds the returns holds the surface: the prior's buffer on
+  the refit, the carried buffer of `EmpiricalPrior` on its carry, and the Fold Context's own `X` for a
+  head with no prior. No predicate and no ownership flag are needed, because the surface goes where
+  the returns go. The call with no data of a refit gives `iv` and `ivpa` to the batch verb. The carry
+  of `EmpiricalPrior` gives them to a member that it refits, and a member that folds never reads them.
+  `returns_result` gives them back, so the clustering and every other member above the prior read the
+  surface as they read it in batch.
+- **Two folds still refuse it, by name.** The carry fold of `CrossSectionalFactorPrior` computes its
+  Descriptors from carried panel rows that hold no surface, so a Descriptor that reads `rd.iv` would
+  differ from batch. It refuses `iv` and names the refit route of `Online`, which records it. The
+  exact folds that keep numbers alone, the step of a covariance estimator in
+  `covariance_forecast_evaluation` and the step of an online portfolio selection, refuse it in
+  `step_active_mask`.
+- **A gap in the surface.** The panel method of `ImpliedVolatility` excludes an asset whose surface
+  has a gap from the Coverage Universe, and the refit calls that method, so it gives the batch answer
+  for a gapped surface too. The carry of `EmpiricalPrior` refits a member through its plain method,
+  which reads no panel. That plain method now refuses a gap in `iv` as it refuses a gap in `X`, so the
+  carry fails by name where it would have answered for an asset that the batch fit does not price.
+  That the carry refits through the plain method at all is
+  [#1639](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1639).

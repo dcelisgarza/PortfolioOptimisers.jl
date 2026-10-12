@@ -432,16 +432,16 @@ end
     buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::Nothing; kwargs...)
     buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel; kwargs...)
 
-Runs the batch verb of a prior over the rows of its sample buffer, with the masks as keywords or inside the rebuilt Asset Panel, and with the Exogenous Series that the buffer records.
+Runs the batch verb of a prior over the rows of its sample buffer, with the masks as keywords or inside the rebuilt Asset Panel, and with the Exogenous Series and the implied volatilities that the buffer records.
 
-This is the call with no data of the refit route. A buffer that records no Panel Field gives its masks as the keywords that [`sample_buffer_kwargs`](@ref) reads, as a matrix call of the batch verb takes them. A buffer that records Panel Fields gives the panel that [`sample_buffer_panel`](@ref) rebuilds as the third positional argument, as `prior(pe, rd)` gives `rd.pnl`. That panel holds both masks, so the call gives no mask keyword. A buffer that records the Exogenous Series gives `ne` and `E` as the keywords that [`exogenous_buffer_kwargs`](@ref) reads, as `prior(pe, rd)` gives `rd.ne` and `rd.E`.
+This is the call with no data of the refit route. A buffer that records no Panel Field gives its masks as the keywords that [`sample_buffer_kwargs`](@ref) reads, as a matrix call of the batch verb takes them. A buffer that records Panel Fields gives the panel that [`sample_buffer_panel`](@ref) rebuilds as the third positional argument, as `prior(pe, rd)` gives `rd.pnl`. That panel holds both masks, so the call gives no mask keyword. A buffer that records the Exogenous Series gives `ne` and `E` as the keywords that [`exogenous_buffer_kwargs`](@ref) reads, as `prior(pe, rd)` gives `rd.ne` and `rd.E`. A buffer that records implied volatilities gives `iv` and the pinned `ivpa` as the keywords that [`implied_volatility_buffer_kwargs`](@ref) reads, as `prior(pe, rd)` gives `rd.iv` and `rd.ivpa`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., series..., kwargs...)` over the rows of the buffer.
- 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; series..., kwargs...)` over the rows of the buffer.
+ 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., series..., vols..., kwargs...)` over the rows of the buffer.
+ 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; series..., vols..., kwargs...)` over the rows of the buffer.
 
 # Arguments
 
@@ -460,18 +460,20 @@ The method that Julia selects is the algorithm.
   - [`sample_buffer_panel`](@ref)
   - [`sample_buffer_kwargs`](@ref)
   - [`exogenous_buffer_kwargs`](@ref)
+  - [`implied_volatility_buffer_kwargs`](@ref)
   - [`SampleBufferState`](@ref)
 """
 function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, ::Nothing;
                       kwargs...)
     return prior(pe, sample_buffer(state), factor_buffer(state);
                  sample_buffer_kwargs(state)..., exogenous_buffer_kwargs(state)...,
-                 kwargs...)
+                 implied_volatility_buffer_kwargs(state)..., kwargs...)
 end
 function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel;
                       kwargs...)
     return prior(pe, sample_buffer(state), factor_buffer(state), pnl;
-                 exogenous_buffer_kwargs(state)..., kwargs...)
+                 exogenous_buffer_kwargs(state)...,
+                 implied_volatility_buffer_kwargs(state)..., kwargs...)
 end
 """
     needs_factor_returns(pe::AbstractHiLoOrderPriorEstimator_F) -> true
@@ -1008,10 +1010,10 @@ The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this func
 
 # Algorithm
 
- 1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
+ 1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref).
  2. Apply the answer of [`needs_factor_returns`](@ref) to `rd.F` with [`fold_factor_argument`](@ref).
  3. Read the buffer out of `pe.cache` with [`assert_sample_buffer`](@ref).
- 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref), and the Exogenous Series of `rd` with [`exogenous_step_kwargs`](@ref). Fold `rd.X`, the factor returns and those keywords into the buffer through the block method of [`partial_fit!`](@ref).
+ 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref), and the Exogenous Series of `rd` with [`exogenous_step_kwargs`](@ref). Fold `rd.X`, the factor returns, those keywords, and `rd.iv` and `rd.ivpa` into the buffer through the block method of [`partial_fit!`](@ref).
  5. Rebuild the prior with its `cache` set to the new buffer, and return it.
 
 # Arguments
@@ -1042,7 +1044,8 @@ function refit_prior_fold(pe::AbstractPriorEstimator, rd::ReturnsResult)
     assert_prior_fold_returns(rd)
     F = fold_factor_argument(needs_factor_returns(pe), pe, rd.F)
     state = partial_fit!(assert_sample_buffer(pe), rd.X, F;
-                         refit_step_kwargs(pe, rd.pnl)..., exogenous_step_kwargs(pe, rd)...)
+                         refit_step_kwargs(pe, rd.pnl)..., exogenous_step_kwargs(pe, rd)...,
+                         iv = rd.iv, ivpa = rd.ivpa)
     return rebuild_estimator(pe, (; cache = state))
 end
 """
@@ -1050,7 +1053,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses returns data that the fold of a prior cannot take.
 
-Each form of [`partial_fit!`](@ref) of a prior over a [`ReturnsResult`](@ref) calls it first, and so does [`step_active_mask`](@ref). A fold records the returns, the factor returns, the masks and the Panel Fields. An implied-volatility surface has no slot in any state. A fold that took it would fold a covariance that reads the surface without it, and it would read out an answer that a batch fit does not give.
+Each form of [`partial_fit!`](@ref) of a prior over a [`ReturnsResult`](@ref) calls it first, and so does [`step_active_mask`](@ref). A fold records the returns beside every other part of the step, so a step without returns has no rows to record. The implied volatilities have a slot in the [`SampleBufferState`](@ref) beside the returns, so this check takes them. The carry fold of a [`CrossSectionalFactorPrior`](@ref) has no such slot, and it refuses them itself.
 
 # Arguments
 
@@ -1059,7 +1062,6 @@ Each form of [`partial_fit!`](@ref) of a prior over a [`ReturnsResult`](@ref) ca
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -1072,8 +1074,6 @@ Each form of [`partial_fit!`](@ref) of a prior over a [`ReturnsResult`](@ref) ca
 """
 function assert_prior_fold_returns(rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    @argcheck(isnothing(rd.iv),
-              ArgumentError("the online step takes no implied-volatility surface: a prior's `partial_fit!` folds the returns and the factors alone, so a step carrying `iv` would fold a covariance that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch."))
     return nothing
 end
 """
@@ -1318,10 +1318,10 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
 
 # Algorithm
 
- 1. Orient a matrix `X` to `observations × assets` with `dims_oriented`, transposing it when `dims == 2`.
+ 1. Orient a matrix `X` and a matrix `iv` to `observations × assets` with `dims_oriented`, transposing them when `dims == 2`.
  2. Under the horizon method, take `log1p` of the observations, giving `xl` or `Xl`.
  3. Fold `pe.me` and `pe.ce` through [`fold_member`](@ref), on the observations of step 2 under the horizon method and on the observations as they are otherwise.
- 4. Append the arithmetic observations to the carry state through [`fold_carry`](@ref), and return the estimator with its members and its `cache` field rebound.
+ 4. Append the arithmetic observations, with `iv` and `ivpa`, to the carry state through [`fold_carry`](@ref), and return the estimator with its members and its `cache` field rebound. No member that folds reads `iv`, and a member that does not fold reads it from the carried buffer at the call with no data.
 
 # Arguments
 
@@ -1329,6 +1329,8 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
   - `X`: Observations to fold. A matrix holds one observation per row when `dims == 1`, and one per column when `dims == 2`. A vector is one observation across the assets.
   - `F`: The factor observations beside `X`, or `nothing`. The fold drops them, as the batch verb does.
   - $(arg_dict[:dims])
+  - `iv`: The implied volatilities of the observations, oriented as `X` is, or `nothing`. The carry state records them.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`. The carry state pins it.
   - `kwargs...`: Additional keyword arguments, forwarded to the two members and to the carry state.
 
 # Validation
@@ -1350,35 +1352,45 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
 """
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
-                      ::Option{<:VecNum_MatNum} = nothing; kwargs...)
+                      ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
+                      ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = Accessors.@reset pe.me = fold_member(pe.me, x; kwargs...)
     pe = Accessors.@reset pe.ce = fold_member(pe.ce, x; kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; kwargs...)
+    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
+                                                  kwargs...)
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
-                      ::Option{<:VecNum_MatNum} = nothing; dims::Int = 1, kwargs...)
-    X = dims_oriented(dims, X)
+                      ::Option{<:VecNum_MatNum} = nothing; dims::Int = 1,
+                      iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
+                      kwargs...)
+    X, iv = dims_oriented(dims, X, iv)
     pe = Accessors.@reset pe.me = fold_member(pe.me, X; dims = 1, kwargs...)
     pe = Accessors.@reset pe.ce = fold_member(pe.ce, X; dims = 1, kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, kwargs...)
+    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
+                                                  ivpa = ivpa, kwargs...)
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
-                      ::Option{<:VecNum_MatNum} = nothing; kwargs...)
+                      ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
+                      ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     xl = log1p.(x)
     pe = Accessors.@reset pe.me = fold_member(pe.me, xl; kwargs...)
     pe = Accessors.@reset pe.ce = fold_member(pe.ce, xl; kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; kwargs...)
+    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
+                                                  kwargs...)
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
-                      ::Option{<:VecNum_MatNum} = nothing; dims::Int = 1, kwargs...)
-    X = dims_oriented(dims, X)
+                      ::Option{<:VecNum_MatNum} = nothing; dims::Int = 1,
+                      iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
+                      kwargs...)
+    X, iv = dims_oriented(dims, X, iv)
     Xl = log1p.(X)
     pe = Accessors.@reset pe.me = fold_member(pe.me, Xl; dims = 1, kwargs...)
     pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xl; dims = 1, kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, kwargs...)
+    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
+                                                  ivpa = ivpa, kwargs...)
 end
 """
     partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
@@ -1390,9 +1402,9 @@ This is the carry form of the fold of every prior, [`partial_fit!`](@ref) over a
 
 # Algorithm
 
- 1. Refuse `rd` without returns, and `rd` with an implied-volatility surface, with [`assert_prior_fold_returns`](@ref).
+ 1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref).
  2. Refuse the Panel Fields and an estimation mask that differs from the active mask with [`assert_carry_step_panel`](@ref).
- 3. Fold `rd.X` with the active mask that [`step_active_kwargs`](@ref) reads through the matrix form of the carry.
+ 3. Fold `rd.X` with the active mask that [`step_active_kwargs`](@ref) reads, and with `rd.iv` and `rd.ivpa`, through the matrix form of the carry. The carried buffer records the implied volatilities, and the call with no data gives them to a member that it refits.
 
 # Arguments
 
@@ -1419,7 +1431,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, rd::ReturnsResult)
     assert_prior_fold_returns(rd)
     assert_carry_step_panel(pe, rd.pnl)
-    return partial_fit!(pe, rd.X; step_active_kwargs(rd.pnl)...)
+    return partial_fit!(pe, rd.X; step_active_kwargs(rd.pnl)..., iv = rd.iv, ivpa = rd.ivpa)
 end
 """
     assert_carry_step_panel(pe::EmpiricalPrior, pnl::Nothing) -> nothing
@@ -1546,7 +1558,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
  1. Read the carry state with [`partial_fit_cache`](@ref), giving `state`.
  2. Resolve the fill limit against the coverage floor of the members with [`resolve_fill_limit`](@ref), as the batch method does, giving `fill_limit`.
  3. Read the carried rows with [`sample_buffer`](@ref), giving `X`. Under the horizon method, take `log1p` of the rows, giving `Xl`.
- 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method.
+ 4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.iv` and `rd.ivpa` to both members. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
  5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
  6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
  7. Fill `Xs` with [`scenario_fill`](@ref), and return a [`LowOrderPrior`](@ref) whose `ens` [`scenario_ens`](@ref) reads from the rows before the cut.
@@ -1581,11 +1593,12 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     state = partial_fit_cache(pe)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     X = sample_buffer(state)
-    mu = vec(read_member(Statistics.mean, pe.me, X; kwargs...))
+    vols = implied_volatility_buffer_kwargs(returns_buffer(state))
+    mu = vec(read_member(Statistics.mean, pe.me, X; vols..., kwargs...))
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
     shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, X; shared = shared, kwargs...)
+    sigma = read_member(Statistics.cov, pe.ce, X; shared = shared, vols..., kwargs...)
     # Materialised, not viewed: the buffer's backing matrix is written and reallocated by the
     # next fold, and a Result holding a view of it would change under its holder.
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
@@ -1602,11 +1615,12 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     # The arms were folded on the log-returns, so a member that did not fold is refitted on
     # them too. The carried rows are the arithmetic ones the caller handed in.
     Xl = log1p.(X)
-    mu = vec(read_member(Statistics.mean, pe.me, Xl; kwargs...))
+    vols = implied_volatility_buffer_kwargs(returns_buffer(state))
+    mu = vec(read_member(Statistics.mean, pe.me, Xl; vols..., kwargs...))
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
     shared = isa(pe.ce, AbstractCovarianceEstimator) ? (; strict = strict) : (;)
-    sigma = read_member(Statistics.cov, pe.ce, Xl; shared = shared, kwargs...)
+    sigma = read_member(Statistics.cov, pe.ce, Xl; shared = shared, vols..., kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
     return LowOrderPrior(;

@@ -1176,7 +1176,7 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 
 # Algorithm
 
- 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), and a panel that is absent or static. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
+ 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), implied volatilities, and a panel that is absent or static. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
  2. Append the rows of the step and their series to the carried panel rows with [`cross_sectional_window_append`](@ref).
  3. Compute the neutralised exposures, the observed factors and the derived series of the new observations with [`cross_sectional_fold_rows`](@ref), and append the rows after the warm-up to the histories with [`cross_sectional_fold_histories`](@ref), and their Descriptor scores with [`cross_sectional_carry_scores`](@ref). Append the returns, both masks and the series to the buffer `buf`. Keep the panel rows and their derived series that [`cross_sectional_carry_rows`](@ref) names.
  4. Before the first fit, fit every observation with [`cross_sectional_fold_refit`](@ref) once `lag + 2` observations follow the warm-up, as the batch fit needs.
@@ -1192,6 +1192,7 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 # Validation
 
   - The rules of [`assert_prior_fold_returns`](@ref).
+  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise. The carried panel rows hold no implied volatilities, and the refit route of [`Online`](@ref) records them.
   - `rd.pnl` is a time-varying Asset Panel. An `ArgumentError` is thrown otherwise.
   - The rules of [`exogenous_step_kwargs`](@ref) and of the block method of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref): a prior that reads the Exogenous Series gets it at every step, under the names of the first step.
   - The rules of every verb the algorithm names.
@@ -1209,6 +1210,8 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
                                     st::CrossSectionalCarryState, rd::ReturnsResult)
     assert_prior_fold_returns(rd)
+    @argcheck(isnothing(rd.iv),
+              ArgumentError("the carry fold of a Cross-Sectional Factor Prior takes no implied volatilities: its Descriptors read the carried panel rows, which hold no slot for `iv`, so a Descriptor that reads `rd.iv` would give an answer that a batch fit does not give. Wrap the prior in `Online` to take the refit route, which records `iv`, or drop `iv` from `rd`."))
     pnl = rd.pnl
     @argcheck(!isnothing(pnl) && !panel_is_static(pnl),
               ArgumentError("a Cross-Sectional Factor Prior reads its Factor Exposures off a time-varying Asset Panel, and the step carries $(isnothing(pnl) ? "no panel" : "a static panel"). Fold a ReturnsResult whose `pnl` is the one asset_panel returns."))

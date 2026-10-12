@@ -1540,7 +1540,8 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
     end
     (; BW, Ms, nf, fam, rw) = cross_sectional_exposure_stage(pe, sample_buffer(state),
                                                              nothing, pnl;
-                                                             exogenous_buffer_kwargs(state)...)
+                                                             exogenous_buffer_kwargs(state)...,
+                                                             implied_volatility_buffer_kwargs(state)...)
     if length(rw) - pe.lag < 2
         return nothing
     end

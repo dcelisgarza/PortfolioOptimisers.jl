@@ -269,6 +269,61 @@ end
         end
     end
 
+    @testset "An implied-volatility surface travels the step with the returns (#1632)" begin
+        # The regression of `ImpliedVolatility` reads windows that end at the last
+        # observation, so a new row moves every window and nothing of it folds. The buffer
+        # that holds the returns records `iv` beside them and pins `ivpa`, and the read-out
+        # refits the regression over the rows of the buffer.
+        ivm = 0.15 .+ 0.1 .* rand(rng, T, N)
+        ivv = collect(range(0.9, 1.3; length = N))
+        rdi = ReturnsResult(; nx = nx, X = X, ts = ts, iv = ivm, ivpa = 1.1)
+        rdiv = ReturnsResult(; nx = nx, X = X, ts = ts, iv = ivm, ivpa = ivv)
+        ivr = ImpliedVolatility(; ppy = 252)
+        ivp = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
+        hopt(pe) = HierarchicalOptimiser(; pe = pe)
+        for r in (rdi, rdiv), t in (61, 80), ce in (ivr, ivp)
+            b = rows(r, 1:t)
+            carry = EmpiricalPrior(; ce = ce)
+            refit = po.Online(EmpiricalPrior(; ce = ce))
+            for opt in (InverseVolatility(; pe = carry),
+                        po.update_online_estimator(InverseVolatility(; pe = refit)),
+                        HierarchicalRiskParity(; opt = hopt(carry)),
+                        po.update_online_estimator(HierarchicalRiskParity(; opt = hopt(refit))))
+                o = step(opt, r, t)
+                # The context gives the surface back, on the carry and on the refit.
+                @test same_fields(po.returns_result(o), b)
+                # The read-out reads a view of the buffer and the batch fit reads a
+                # matrix, so the weights can differ in the last bit.
+                @test isapprox(optimise(o).w, optimise(opt, b).w; rtol = 1e-12)
+            end
+        end
+        # A head with no prior keeps the rows, and the surface with them.
+        o = step(EqualWeighted(), rdiv, 40)
+        @test same_fields(po.returns_result(o), rows(rdiv, 1:40))
+        # A cap drops the rows of `iv` with the rows of `X`.
+        opt = po.update_online_estimator(InverseVolatility(;
+                                                           pe = po.Online(EmpiricalPrior(;
+                                                                                         ce = ivr);
+                                                                          max_history = 70)))
+        o = step(opt, rdi, 110)
+        @test po.returns_result(o).iv == ivm[41:110, :]
+        @test isapprox(optimise(o).w,
+                       optimise(InverseVolatility(; pe = EmpiricalPrior(; ce = ivr)),
+                                rows(rdi, 41:110)).w; rtol = 1e-12)
+        # The first step pins `ivpa`, and fixes whether the steps carry `iv`.
+        o = step(InverseVolatility(; pe = EmpiricalPrior(; ce = ivp)), rdi, 10)
+        r11 = rows(rdi, 11:11)
+        @test_throws ArgumentError partial_fit!(o,
+                                                ReturnsResult(; nx = nx, X = r11.X,
+                                                              ts = r11.ts, iv = r11.iv,
+                                                              ivpa = 2.0))
+        @test_throws ArgumentError partial_fit!(o,
+                                                ReturnsResult(; nx = nx, X = r11.X,
+                                                              ts = r11.ts))
+        # A fold that keeps numbers alone takes no surface.
+        @test_throws ArgumentError po.step_active_mask(r11)
+    end
+
     @testset "What the step refuses, by name" begin
         r1 = rows(rd, 1:1)
         opt = MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))
@@ -289,11 +344,6 @@ end
         # And it still answers the fold-less entry it always had.
         @test optimise(InverseVolatility(; pe = pr)).w ==
               optimise(InverseVolatility(; pe = pr), rd).w
-        # An implied-volatility surface does not travel the step.
-        @test_throws ArgumentError partial_fit!(opt,
-                                                ReturnsResult(; nx = nx, X = X[1:1, :],
-                                                              iv = fill(0.2, 1, N),
-                                                              ivpa = 1.0))
         # A time-varying Panel Field, and an estimation mask narrower than the active one.
         tv = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(1, N))],
                         amsk = trues(1, N), emsk = trues(1, N))
@@ -437,7 +487,8 @@ end
         @test isempty(po.returns_result(o).pnl.pf)
         o = partial_fit!(EqualWeighted(),
                          ReturnsResult(; nx = nx, X = X, iv = fill(0.2, T, N), ivpa = 1.0))
-        @test isnothing(po.returns_result(o).iv) && isnothing(po.returns_result(o).ivpa)
+        # The surface travels with the rows, and the first step pins `ivpa` (#1632).
+        @test po.returns_result(o).iv == fill(0.2, T, N) && po.returns_result(o).ivpa == 1.0
         # The rows and the context must count the same observations.
         @test_throws DimensionMismatch po.returns_result(fold_head(rdn, 1:3),
                                                          fold_head(rdn, 1:4).X)

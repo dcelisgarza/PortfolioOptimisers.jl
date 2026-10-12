@@ -1,8 +1,19 @@
 ```@meta
-Description = "Online (b), public API of PortfolioOptimisers.jl: supports_partial_fit, AbstractAllocationSet, AbstractProgrammeAllocationSet."
+Description = "Online (b), public API of PortfolioOptimisers.jl: AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, supports_partial_fit, …"
 ```
 
 # Online (b)
+
+A window rule says which observations the window of a windowed moment estimator keeps on the online step. A Choice Rule says how a choice that a fit makes over its whole sample behaves on the online step.
+
+```@docs
+PortfolioOptimisers.AbstractWindowRule
+RollingWindow
+SeedWindow
+PortfolioOptimisers.AbstractChoiceRule
+BatchChoice
+PinnedChoice
+```
 
 A family that folds states it through `supports_partial_fit`, and an outer estimator asks each of its members before it folds them.
 

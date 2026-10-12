@@ -13,7 +13,9 @@ The buffer holds the Panel Fields of a time-varying [`AssetPanel`](@ref) on the 
 
 The buffer holds the Exogenous Series on the same terms, for a prior whose estimator tree reads it. [`reads_exogenous_series`](@ref) answers whether a tree reads it. An observed factor reads its return from the series by name, so for such a prior the series is sample and not fold context. `E` is a backing matrix of `capacity × series`, and `ne` holds the name of each column. The buffer keeps every column, not only the columns that the tree names, so the Fold Context keeps no copy. The same `off` and `n` index `E` and `X`. So `E` means the Exogenous Series on the whole online step, as it does on a [`ReturnsResult`](@ref).
 
-The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series. A later fold that disagrees is refused with an error that names the disagreement, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
+The buffer holds the implied volatilities on the same terms as the masks, for every estimator. A row of `iv` belongs to the asset observation of the same row, so `iv` is a backing matrix of the shape of `X`, and [`ImpliedVolatility`](@ref) reads it beside the returns. Its regression reads windows that end at the last observation, so a new row moves every window, and no statistic of the regression folds. The call with no data refits it over the rows of the buffer. `ivpa` is one adjustment for each asset or one for all, so it has no observation axis, and the first append pins it.
+
+The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series, whether it records implied volatilities and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series and the adjustment `ivpa`. A later fold that disagrees is refused with an error that names the disagreement, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
 
 An estimator whose `cache` holds this buffer is a refit. It has no recursion of its own, and its call with no data runs the batch verb over the rows of the buffer. [`Online`](@ref) seeds the buffer, and a wrapped estimator takes this route also when its statistic has an exact update. A fold-and-carry prior keeps its observations in one of these buffers too, inside a [`PriorCarryState`](@ref). That prior folds its moments exactly. It keeps the rows because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, and its buffer has no cap. `max_history` is the window of a refit. A capped buffer holds the last `max_history` observations, and the call with no data gives the batch fit over them.
 
@@ -34,11 +36,13 @@ $(DocStringExtensions.FIELDS)
         F::Option{<:MatNum} = nothing,
         ne::Option{<:VecStr} = nothing,
         E::Option{<:MatNum} = nothing,
+        iv::Option{<:MatNum} = nothing,
+        ivpa::Option{<:Num_VecNum} = nothing,
         P::Option{<:AbstractVector} = nothing,
         max_history::Option{<:Integer} = nothing
     ) -> SampleBufferState
 
-Keywords correspond to the struct's fields. The default is the empty seed that [`Online`](@ref) builds. It carries the cap and no observations. The first append replaces every backing matrix, so the width, the element type, the masks, the factor rows, the Exogenous Series and the Panel Fields come from the observations of that append.
+Keywords correspond to the struct's fields. The default is the empty seed that [`Online`](@ref) builds. It carries the cap and no observations. The first append replaces every backing matrix, so the width, the element type, the masks, the factor rows, the Exogenous Series, the implied volatilities and the Panel Fields come from the observations of that append.
 
 ## Validation
 
@@ -47,7 +51,7 @@ Keywords correspond to the struct's fields. The default is the empty seed that [
   - `off + n <= size(X, 1)`. A `DimensionMismatch` is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
   - `n <= max_history` when `max_history` is not `nothing`. A `DimensionMismatch` is thrown otherwise.
-  - `A` and `M`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - `A`, `M` and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
   - `F`, when it is not `nothing`, has as many rows as `X`. A `DimensionMismatch` is thrown otherwise.
   - The rules of [`assert_buffer_series_shape`](@ref) hold for `ne` and `E`.
   - `P`, when it is not `nothing`, holds time-varying Panel Fields over `n` observations and the assets of `X`. The rules of [`assert_buffer_panel_shape`](@ref) apply.
@@ -61,6 +65,8 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
   - `M`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `F`: Copied unchanged, because the selection indexes assets and this backing describes factors.
   - `ne`, `E`: Copied unchanged, because the selection indexes assets and the Exogenous Series belongs to no asset.
+  - `iv`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `ivpa`: Sliced to the selected indices when it is a vector, and kept when it is one number or `nothing`.
   - `P`: Each Panel Field viewed over the selected assets with [`panel_fields_view`](@ref).
 
 A buffer that holds no observations views to the empty seed with the same cap.
@@ -78,6 +84,8 @@ PortfolioOptimisers.SampleBufferState
             F ┼ nothing
            ne ┼ nothing
             E ┼ nothing
+           iv ┼ nothing
+         ivpa ┼ nothing
             P ┼ nothing
   max_history ┴ Int64: 2
 ```
@@ -98,6 +106,7 @@ PortfolioOptimisers.SampleBufferState
   - [`reads_exogenous_series`](@ref)
   - [`sample_buffer_panel`](@ref)
   - [`exogenous_buffer_kwargs`](@ref)
+  - [`implied_volatility_buffer_kwargs`](@ref)
 """
 @concrete struct SampleBufferState <: AbstractPartialFitState
     """
@@ -133,6 +142,14 @@ PortfolioOptimisers.SampleBufferState
     """
     E
     """
+    Backing matrix of the implied volatilities, `capacity × assets`, or `nothing` when the fold carries none. The same `off` and `n` index it and `X`.
+    """
+    iv
+    """
+    The implied volatility risk premium adjustment, one number or one entry per asset, or `nothing`. The first append pins it.
+    """
+    ivpa
+    """
     The Panel Fields of the observations, or `nothing` when the fold carries none. Each is a time-varying Panel Field over the valid region alone, so `n` and the cap index it and `off` does not. The first append that carries them fixes their names and their kinds.
     """
     P
@@ -146,15 +163,16 @@ function SampleBufferState(; n::Integer = 0, off::Integer = 0,
                            A::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            M::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            F::Option{<:MatNum} = nothing, ne::Option{<:VecStr} = nothing,
-                           E::Option{<:MatNum} = nothing,
+                           E::Option{<:MatNum} = nothing, iv::Option{<:MatNum} = nothing,
+                           ivpa::Option{<:Num_VecNum} = nothing,
                            P::Option{<:AbstractVector} = nothing,
                            max_history::Option{<:Integer} = nothing)::SampleBufferState
     assert_sample_buffer_state(n, off, X, max_history)
-    assert_buffer_mask_shape(X, A, M)
+    assert_buffer_mask_shape(X, A, M, iv)
     assert_buffer_factor_shape(X, F)
     assert_buffer_series_shape(X, ne, E)
     assert_buffer_panel_shape(X, n, P)
-    return SampleBufferState(n, off, X, A, M, F, ne, E, P, max_history)
+    return SampleBufferState(n, off, X, A, M, F, ne, E, iv, ivpa, P, max_history)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -208,24 +226,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a per-observation mask whose shape is not the shape of the observations it belongs to.
+Refuses a per-observation mask, or a matrix of implied volatilities, whose shape is not the shape of the observations it belongs to.
 
-A mask that a buffer holds matches its observations cell for cell, and a mask that a fold receives matches its block cell for cell. So one rule covers both. A mask is absent, or it has the shape of the matrix beside it. The batch verbs run the same check on their own arguments.
+A mask that a buffer holds matches its observations cell for cell, and a mask that a fold receives matches its block cell for cell. So one rule covers both. A mask is absent, or it has the shape of the matrix beside it. The implied volatilities follow the same rule, because each cell belongs to the asset observation of the same cell. The batch verbs run the same check on their own arguments.
 
 # Algorithm
 
  1. Skip a mask that is `nothing`. With no policy, both masks are `nothing`.
- 2. Refuse a mask whose size is not `size(X)`, and name the mask.
+ 2. Refuse a mask whose size is not `size(X)`, and name the mask. Apply the same rule to `iv`.
 
 # Arguments
 
   - `X`: The observations the masks belong to.
   - `A`: The active mask, or `nothing`.
   - `M`: The estimation mask, or `nothing`.
+  - `iv`: The implied volatilities, or `nothing`.
 
 # Validation
 
-  - `A` and `M`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - `A`, `M` and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
 
 # Returns
 
@@ -238,7 +257,12 @@ A mask that a buffer holds matches its observations cell for cell, and a mask th
   - [`CoveragePolicy`](@ref)
 """
 function assert_buffer_mask_shape(X::AbstractMatrix, A::Option{<:AbstractMatrix{<:Bool}},
-                                  M::Option{<:AbstractMatrix{<:Bool}})
+                                  M::Option{<:AbstractMatrix{<:Bool}},
+                                  iv::Option{<:AbstractMatrix} = nothing)
+    if !isnothing(iv)
+        @argcheck(size(iv) == size(X),
+                  DimensionMismatch("size(X) ($(size(X))) must match size(iv) ($(size(iv)))"))
+    end
     if !isnothing(A)
         @argcheck(size(A) == size(X),
                   DimensionMismatch("size(X) ($(size(X))) must match size(active_mask) ($(size(A)))"))
@@ -494,6 +518,36 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Reads the implied volatilities a sample buffer holds, and the pinned adjustment, as the keywords a batch verb takes.
+
+This is the fifth function that reads the buffer out. The call with no data of a refit splats these keywords into the batch verb, as `prior(pe, rd)` passes `rd.iv` and `rd.ivpa`, and the Fold Context reads them back into the `ReturnsResult` that it rebuilds. Each row of `iv` belongs to the row of [`sample_buffer`](@ref) of the same index, because the same `off` and `n` index the two backings. A buffer that records neither gives an empty set of keywords.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `kwargs::NamedTuple`: `iv`, a view of the valid region of the implied volatilities or `nothing`, and `ivpa`, or an empty `NamedTuple`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`sample_buffer`](@ref)
+  - [`exogenous_buffer_kwargs`](@ref)
+  - [`ImpliedVolatility`](@ref)
+"""
+function implied_volatility_buffer_kwargs(state::SampleBufferState)
+    return if isnothing(state.iv) && isnothing(state.ivpa)
+        (;)
+    else
+        (; iv = buffer_rows_view(state.iv, (state.off + 1):(state.off + state.n)),
+         ivpa = state.ivpa)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Returns the sample buffer an estimator carries, and refuses an estimator that carries none.
 
 The buffering arm of [`partial_fit!`](@ref) reads its state through this function. So an estimator that was never wrapped in [`Online`](@ref) gets a message that names the wrapper, not a `MethodError`. An estimator with no `cache` field gets the same message. An unresolved [`Online`](@ref) has a method of its own, because it does not lack a buffer. It lacks the warm-up that seeds one.
@@ -563,7 +617,7 @@ A carry calls this function inside its own [`partial_fit!`](@ref) method. The ca
   - $(arg_dict[:X])
   - `F`: Factor observations to fold, oriented as `X` is, or `nothing`.
   - $(arg_dict[:dims])
-  - `kwargs...`: The `active_mask`, the `estimation_mask` and the Exogenous Series `ne` and `E` of the fold, forwarded to [`partial_fit!`](@ref).
+  - `kwargs...`: The `active_mask`, the `estimation_mask`, the Exogenous Series `ne` and `E`, and the implied volatilities `iv` and `ivpa` of the fold, forwarded to [`partial_fit!`](@ref).
 
 # Returns
 
@@ -590,21 +644,21 @@ Folds every observation of a block into a [`SampleBufferState`](@ref).
 
 This is the block arm of the [`partial_fit!`](@ref) interface, and all of the fold of the buffer. The single-observation arm reshapes its argument and calls this arm. A cap truncates the incoming rows before the copy, so the fold never copies the whole of a block longer than the cap. [`reserve_sample_buffer`](@ref) grows the backing matrices, and its docstring states why an append costs amortised `O(1)`.
 
-The masks, the factor rows, the Exogenous Series and the Panel Fields stay with their rows through each step: the orientation, the truncation, the growth and the copy. The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series. [`assert_buffer_presence_agreement`](@ref) refuses a later fold that disagrees. A buffer that knows the activity of some of its rows and not of others answers neither question. A buffer with factor rows for some observations and not for others describes no regression. A buffer that holds no observations has nothing to disagree with, so the fold seeds it again from the block.
+The masks, the factor rows, the Exogenous Series, the implied volatilities and the Panel Fields stay with their rows through each step: the orientation, the truncation, the growth and the copy. The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series, whether it records implied volatilities and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series and the adjustment `ivpa`. [`assert_buffer_presence_agreement`](@ref) refuses a later fold that disagrees. A buffer that knows the activity of some of its rows and not of others answers neither question. A buffer with factor rows for some observations and not for others describes no regression. A buffer that holds no observations has nothing to disagree with, so the fold seeds it again from the block.
 
 The Panel Fields are observations first whatever `dims` is, as the Panel Fields of an [`AssetPanel`](@ref) always are. They keep the rows of the buffer that the cap keeps, and [`panel_fields_append`](@ref) joins them to the rows of the block.
 
 # Algorithm
 
- 1. Orient `X`, the masks, `F` and `E` to `observations × assets`, `observations × factors` and `observations × series`. Transpose them when `dims == 2`.
- 2. Refuse a mask that does not have the shape of the block, a factor block whose row count is not the row count of the block, and a series that [`assert_buffer_series_shape`](@ref) refuses.
+ 1. Orient `X`, the masks, `iv`, `F` and `E` to `observations × assets`, `observations × factors` and `observations × series`. Transpose them when `dims == 2`.
+ 2. Refuse a mask or an `iv` that does not have the shape of the block, a factor block whose row count is not the row count of the block, and a series that [`assert_buffer_series_shape`](@ref) refuses.
  3. Return the state unchanged when the block is empty.
  4. Refuse Panel Fields that do not make a time-varying Asset Panel with the masks of the block, over the observations and the assets of the block.
- 5. When a cap is set, truncate the incoming rows, their masks, their factor rows, their series and their Panel Fields to the last `max_history` of them.
- 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref) and return it. The seed fixes the width, the element type, the masks, the factor rows, the series with its names, and the Panel Fields.
- 7. Refuse a block whose width is not the fixed width. Refuse masks, factor rows, a series or Panel Fields that are absent where the buffer records them or present where it does not, factor rows of a different width, and a series under other names with [`assert_buffer_series_names`](@ref).
+ 5. When a cap is set, truncate the incoming rows, their masks, their implied volatilities, their factor rows, their series and their Panel Fields to the last `max_history` of them.
+ 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref), seed `iv` with [`seed_buffer_array`](@ref), pin `ivpa`, and return it. The seed fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the series with its names, and the Panel Fields.
+ 7. Refuse a block whose width is not the fixed width. Refuse masks, implied volatilities, factor rows, a series or Panel Fields that are absent where the buffer records them or present where it does not, factor rows of a different width, a series under other names with [`assert_buffer_series_names`](@ref), and an `ivpa` that is not the pinned one with [`assert_pinned_value`](@ref).
  8. Make room for the block with [`reserve_sample_buffer`](@ref), which drops the rows that the cap pushes out and grows the backing matrices.
- 9. Copy the block, its masks, its factor rows and its series after the valid region. Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
+ 9. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region. Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
 
 # Arguments
 
@@ -616,17 +670,20 @@ The Panel Fields are observations first whatever `dims` is, as the Panel Fields 
   - $(arg_dict[:pf_estimation_mask])
   - `ne`: The names of the Exogenous Series of the block, or `nothing`.
   - `E`: The Exogenous Series of the block, oriented as `X` is, or `nothing`.
+  - `iv`: The implied volatilities of the block, oriented as `X` is, or `nothing`.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
   - `panel_fields`: The time-varying Panel Fields of the block, observations first, or `nothing`.
 
 # Validation
 
   - $(val_dict[:dims])
   - `X` has the width the first append fixed. A `DimensionMismatch` is thrown otherwise.
-  - `active_mask` and `estimation_mask`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - `active_mask`, `estimation_mask` and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
+  - `ivpa` equals the adjustment that the first append pinned. An `ArgumentError` is thrown otherwise.
   - `F`, when it is not `nothing`, has as many rows as `X`, and the width that the first append with factor rows fixed. A `DimensionMismatch` is thrown otherwise.
   - `ne` and `E` obey the rules of [`assert_buffer_series_shape`](@ref), and `ne` equals the names that the first append with a series fixed. An `ArgumentError` is thrown otherwise.
   - `panel_fields`, when it is not `nothing`, obeys the rules of [`assert_buffer_panel_block`](@ref), and it holds the Panel Fields that the first append with Panel Fields fixed, as `vcat` of two Asset Panels states them.
-  - A buffer that holds observations receives the masks that it records, and it receives factor rows, a series and Panel Fields if and only if it records them. An `ArgumentError` is thrown otherwise.
+  - A buffer that holds observations receives the masks that it records, and it receives implied volatilities, factor rows, a series and Panel Fields if and only if it records them. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -647,9 +704,10 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
+                      iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
                       panel_fields::Option{<:AbstractVector} = nothing)
-    Xo, Ao, Mo, Fo, Eo = dims_oriented(dims, X, active_mask, estimation_mask, F, E)
-    assert_buffer_mask_shape(Xo, Ao, Mo)
+    Xo, Ao, Mo, Fo, Eo, Vo = dims_oriented(dims, X, active_mask, estimation_mask, F, E, iv)
+    assert_buffer_mask_shape(Xo, Ao, Mo, Vo)
     assert_buffer_factor_shape(Xo, Fo)
     assert_buffer_series_shape(Xo, ne, Eo)
     t = size(Xo, 1)
@@ -666,11 +724,14 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
         Mo = buffer_rows_view(Mo, rows)
         Fo = buffer_rows_view(Fo, rows)
         Eo = buffer_rows_view(Eo, rows)
+        Vo = buffer_rows_view(Vo, rows)
         Po = panel_fields_view(Po, rows, :)
         t = w
     end
     if iszero(state.n)
-        return seed_sample_buffer(state, Xo, Ao, Mo, Fo, ne, Eo, Po)
+        state = seed_sample_buffer(state, Xo, Ao, Mo, Fo, ne, Eo, Po)
+        state = Accessors.@reset state.iv = seed_buffer_array(Vo)
+        return Accessors.@reset state.ivpa = ivpa
     end
     N = size(Xo, 2)
     B = state.X
@@ -680,9 +741,11 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
     assert_buffer_presence_agreement(state.M, Mo, "estimation_mask")
     assert_buffer_presence_agreement(state.F, Fo, "factor returns")
     assert_buffer_presence_agreement(state.E, Eo, "Exogenous Series")
+    assert_buffer_presence_agreement(state.iv, Vo, "implied volatilities")
     assert_buffer_presence_agreement(state.P, Po, "Panel Fields")
     assert_buffer_factor_width(state.F, Fo)
     assert_buffer_series_names(state.ne, ne)
+    assert_pinned_value(state.ivpa, ivpa, :ivpa)
     state = reserve_sample_buffer(state, t)
     rows = (state.off + state.n + 1):(state.off + state.n + t)
     copyto!(view(state.X, rows, :), Xo)
@@ -690,6 +753,7 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
     copy_buffer_rows!(state.M, rows, Mo)
     copy_buffer_rows!(state.F, rows, Fo)
     copy_buffer_rows!(state.E, rows, Eo)
+    copy_buffer_rows!(state.iv, rows, Vo)
     state = Accessors.@reset state.P = panel_fields_append(state.P, Po, state.n + t)
     return Accessors.@reset state.n = state.n + t
 end
@@ -963,6 +1027,7 @@ function reserve_sample_buffer(state::SampleBufferState, t::Integer)
     state = Accessors.@reset state.M = compact_buffer_array(state.M, off, n, newcap)
     state = Accessors.@reset state.F = compact_buffer_array(state.F, off, n, newcap)
     state = Accessors.@reset state.E = compact_buffer_array(state.E, off, n, newcap)
+    state = Accessors.@reset state.iv = compact_buffer_array(state.iv, off, n, newcap)
     return Accessors.@reset state.off = 0
 end
 """
@@ -1009,7 +1074,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds one observation into a [`SampleBufferState`](@ref).
 
-This is the single-observation arm of the [`partial_fit!`](@ref) interface. It reshapes the observation into a one-row block with no copy, and it folds the block through the block arm. It reshapes the masks, the factor observation and the observation of the Exogenous Series in the same way, so one observation with a policy, with factors or with a series folds through the code of the block.
+This is the single-observation arm of the [`partial_fit!`](@ref) interface. It reshapes the observation into a one-row block with no copy, and it folds the block through the block arm. It reshapes the masks, the factor observation, the observation of the Exogenous Series and the implied volatilities in the same way, so one observation with a policy, with factors, with a series or with implied volatilities folds through the code of the block.
 
 # Arguments
 
@@ -1020,6 +1085,8 @@ This is the single-observation arm of the [`partial_fit!`](@ref) interface. It r
   - `estimation_mask`: The estimation mask of the observation, one entry per asset, or `nothing`.
   - `ne`: The names of the Exogenous Series, or `nothing`.
   - `E`: The observation of the Exogenous Series, one entry per series, or `nothing`.
+  - `iv`: The implied volatilities of the observation, one entry per asset, or `nothing`.
+  - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
 
 # Validation
 
@@ -1040,11 +1107,12 @@ This is the single-observation arm of the [`partial_fit!`](@ref) interface. It r
 function partial_fit!(state::SampleBufferState, x::VecNum, f::Option{<:VecNum} = nothing;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing,
                       estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
-                      ne::Option{<:VecStr} = nothing, E::Option{<:VecNum} = nothing)
+                      ne::Option{<:VecStr} = nothing, E::Option{<:VecNum} = nothing,
+                      iv::Option{<:VecNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing)
     return partial_fit!(state, observation_row(x), observation_row(f);
                         active_mask = observation_row(active_mask),
                         estimation_mask = observation_row(estimation_mask), ne = ne,
-                        E = observation_row(E))
+                        E = observation_row(E), iv = observation_row(iv), ivpa = ivpa)
 end
 """
     observation_row(m::Nothing) -> Nothing
@@ -1132,9 +1200,11 @@ function merge_states(a::SampleBufferState, b::SampleBufferState)
     assert_buffer_presence_agreement(a.M, b.M, "estimation_mask")
     assert_buffer_presence_agreement(a.F, b.F, "factor returns")
     assert_buffer_presence_agreement(a.E, b.E, "Exogenous Series")
+    assert_buffer_presence_agreement(a.iv, b.iv, "implied volatilities")
     assert_buffer_presence_agreement(a.P, b.P, "Panel Fields")
     assert_buffer_factor_width(a.F, b.F)
     assert_buffer_series_names(a.ne, b.ne)
+    assert_pinned_value(a.ivpa, b.ivpa, :ivpa)
     ra = (a.off + 1):(a.off + a.n)
     rb = (b.off + 1):(b.off + b.n)
     X = vcat(Xa, Xb)
@@ -1142,6 +1212,7 @@ function merge_states(a::SampleBufferState, b::SampleBufferState)
     M = merge_buffer_array(buffer_rows_view(a.M, ra), buffer_rows_view(b.M, rb))
     F = merge_buffer_array(buffer_rows_view(a.F, ra), buffer_rows_view(b.F, rb))
     E = merge_buffer_array(buffer_rows_view(a.E, ra), buffer_rows_view(b.E, rb))
+    V = merge_buffer_array(buffer_rows_view(a.iv, ra), buffer_rows_view(b.iv, rb))
     t = size(X, 1)
     if !isnothing(w) && t > w
         rows = (t - w + 1):t
@@ -1150,9 +1221,11 @@ function merge_states(a::SampleBufferState, b::SampleBufferState)
         M = trim_merged_array(M, rows)
         F = trim_merged_array(F, rows)
         E = trim_merged_array(E, rows)
+        V = trim_merged_array(V, rows)
         t = w
     end
-    return SampleBufferState(t, 0, X, A, M, F, a.ne, E, panel_fields_append(a.P, b.P, t), w)
+    return SampleBufferState(t, 0, X, A, M, F, a.ne, E, V, a.ivpa,
+                             panel_fields_append(a.P, b.P, t), w)
 end
 """
     merge_buffer_array(Ma::Nothing, Mb::Nothing) -> Nothing
@@ -1234,7 +1307,8 @@ This is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, wh
 function Base.copy(x::SampleBufferState)
     return SampleBufferState(x.n, x.off, copy(x.X), copy_buffer_array(x.A),
                              copy_buffer_array(x.M), copy_buffer_array(x.F), x.ne,
-                             copy_buffer_array(x.E), x.P, x.max_history)
+                             copy_buffer_array(x.E), copy_buffer_array(x.iv),
+                             copy_column(x.ivpa), x.P, x.max_history)
 end
 """
     copy_buffer_array(M::Nothing) -> Nothing
@@ -1268,12 +1342,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices a [`SampleBufferState`](@ref) to the selected assets.
 
-A buffer holds its observations verbatim, so the slice of the buffer is the buffer of the sliced universe, column for column. The observation axis does not change. The masks are per cell, so they slice on the asset axis by the same indices. The factor rows and the Exogenous Series are copied and not sliced, because the selection indexes assets, a factor and a series belong to no asset, and a fit over a subset of the universe reads the same factors and the same series. The Panel Fields are viewed over the selected assets and not copied, because nothing writes into the arrays of a panel. A tensor Panel Field keeps its whole label axis, because the buffer holds no asset names to find the square case with. The slice copies by index and does not take a `view`. A later [`partial_fit!`](@ref) on the viewed estimator writes into its backing matrices, and with a view it would change the buffer of the original estimator. A buffer that holds no observations has no width to slice, so its view is the empty seed with the same cap.
+A buffer holds its observations verbatim, so the slice of the buffer is the buffer of the sliced universe, column for column. The observation axis does not change. The masks and the implied volatilities are per cell, so they slice on the asset axis by the same indices, and a vector `ivpa` slices with them. The factor rows and the Exogenous Series are copied and not sliced, because the selection indexes assets, a factor and a series belong to no asset, and a fit over a subset of the universe reads the same factors and the same series. The Panel Fields are viewed over the selected assets and not copied, because nothing writes into the arrays of a panel. A tensor Panel Field keeps its whole label axis, because the buffer holds no asset names to find the square case with. The slice copies by index and does not take a `view`. A later [`partial_fit!`](@ref) on the viewed estimator writes into its backing matrices, and with a view it would change the buffer of the original estimator. A buffer that holds no observations has no width to slice, so its view is the empty seed with the same cap.
 
 # Algorithm
 
  1. Return the empty seed with the same cap when the buffer holds no observations.
- 2. Copy the columns `i` of `X` and of each mask, copy `F` and `E` whole, and view each Panel Field over the columns `i`.
+ 2. Copy the columns `i` of `X`, of each mask and of `iv`, view a vector `ivpa` over the entries `i`, copy `F` and `E` whole, and view each Panel Field over the columns `i`.
 
 # Arguments
 
@@ -1297,25 +1371,26 @@ function port_opt_view(x::SampleBufferState, i, args...)
     end
     return SampleBufferState(x.n, x.off, x.X[:, i], slice_buffer_mask(x.A, i),
                              slice_buffer_mask(x.M, i), copy_buffer_array(x.F), x.ne,
-                             copy_buffer_array(x.E), panel_fields_view(x.P, :, i),
-                             x.max_history)
+                             copy_buffer_array(x.E), slice_buffer_mask(x.iv, i),
+                             nothing_scalar_array_view(x.ivpa, i),
+                             panel_fields_view(x.P, :, i), x.max_history)
 end
 """
     slice_buffer_mask(M::Nothing, i) -> Nothing
-    slice_buffer_mask(M::AbstractMatrix{<:Bool}, i) -> AbstractMatrix{<:Bool}
+    slice_buffer_mask(M::AbstractMatrix, i) -> AbstractMatrix
 
-Slices one backing mask of a buffer to the selected assets, and passes a mask that is not there through.
+Slices one backing matrix of a buffer that has an asset axis to the selected assets, and passes a matrix that is not there through.
 
-This is the mask part of [`port_opt_view`](@ref) for this state, so the slice is one line for each field. It copies by index, for the reason that the method states.
+This is the per-asset part of [`port_opt_view`](@ref) for this state, so the slice is one line for each field. It slices the two masks and the implied volatilities. It copies by index, for the reason that the method states.
 
 # Arguments
 
-  - `M`: The backing mask to slice, or `nothing`.
+  - `M`: The backing mask or implied volatilities to slice, or `nothing`.
   - `i`: Index or indices of the assets to keep.
 
 # Returns
 
-  - `M`: The mask over the selected assets, or `nothing`.
+  - `M`: The matrix over the selected assets, or `nothing`.
 
 # Related
 
@@ -1325,7 +1400,7 @@ This is the mask part of [`port_opt_view`](@ref) for this state, so the slice is
 function slice_buffer_mask(::Nothing, ::Any)
     return nothing
 end
-function slice_buffer_mask(M::AbstractMatrix{<:Bool}, i)
+function slice_buffer_mask(M::AbstractMatrix, i)
     return M[:, i]
 end
 """
@@ -1726,278 +1801,5 @@ end
 function online_entry_state(::Any)
     return nothing
 end
-"""
-    online_wrapper_path(est)
-    online_wrapper_path(::Online)
-    online_wrapper_path(::TimeDependent)
 
-Names the first field of an estimator tree that holds an [`Online`](@ref) declaration, or answers `nothing`.
-
-[`assert_batch_entry`](@ref) uses this walk. Only the warm-up of the online arm of the fold loop resolves a wrapper, with [`update_online_estimator`](@ref). Without the check, a batch fit that reaches a wrapper gets a `MethodError` at `prior(pe, X)`, not a refusal. The walk is the walk of [`online_entry_state`](@ref), and the answer is the dotted path from the root. It is `"pe"` for a wrapped prior on a naive optimiser, and `"opt.pe"` for a wrapped prior under a JuMP head. The walk does not enter a field that holds a wrapper, because the warm-up resolves the wrappers below it. A wrapper at the root answers `""`, the empty path. A [`TimeDependent`](@ref) schedule answers `nothing`, because its constructor refuses a wrapper among its entries. A value that is not an estimator also answers `nothing`.
-
-# Algorithm
-
- 1. Answer `""` when `est` is an [`Online`](@ref).
- 2. Walk the fields of [`estimator_fields`](@ref) in order, and answer the name of the first field that holds a wrapper.
- 3. For a field that holds no wrapper, find the path in the field with this function, and answer it with the field name and a dot before it.
- 4. Answer `nothing` when no field gives a path.
-
-# Arguments
-
-  - `est`: The estimator, or any value a field holds.
-
-# Returns
-
-  - `path::Option{<:String}`: The dotted path of the first wrapper found, `""` when `est` is itself one, or `nothing`.
-
-# Related
-
-  - [`assert_batch_entry`](@ref)
-  - [`online_entry_state`](@ref)
-  - [`estimator_fields`](@ref)
-  - [`update_online_estimator`](@ref)
-"""
-function online_wrapper_path(est::Union{<:AbstractEstimator,
-                                        <:StatsBase.CovarianceEstimator})
-    for f in estimator_fields(est)
-        v = getfield(est, f)
-        if isa(v, Online)
-            return string(f)
-        end
-        path = online_wrapper_path(v)
-        if !isnothing(path)
-            return string(f, ".", path)
-        end
-    end
-    return nothing
-end
-function online_wrapper_path(::Online)
-    return ""
-end
-function online_wrapper_path(::Any)
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for the window rule of a windowed moment estimator, the rule that says which observations its window keeps on the online step.
-
-A windowed estimator, such as [`WindowedCovariance`](@ref), fits its inner estimator on a window of observations. In a batch fit every rule keeps the same window, the last `window` observations. The rules differ when the estimator receives its observations one block at a time.
-
-# Interfaces
-
-A rule is a marker for dispatch, and it holds no data. The windowed estimators hold it in their `rule` field, and the methods that fold them dispatch on its type. A new rule needs its own fold methods for the five windowed estimators.
-
-# Related
-
-  - [`RollingWindow`](@ref)
-  - [`SeedWindow`](@ref)
-  - [`WindowedExpectedReturns`](@ref)
-  - [`WindowedCovariance`](@ref)
-  - [`WindowedVariance`](@ref)
-  - [`WindowedCoskewness`](@ref)
-  - [`WindowedCokurtosis`](@ref)
-"""
-abstract type AbstractWindowRule <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Keeps the last observations of the window at every fit, so the window rolls with each new observation. This is the default rule.
-
-The estimator does not fold. On the online step, a prior that carries the observations, such as the carry of [`EmpiricalPrior`](@ref), refits it over the carried rows at each read, and the window of each refit ends at the last row. So the call with no data after any stream of blocks equals the batch fit over every row received.
-
-# Constructors
-
-    RollingWindow() -> RollingWindow
-
-# Examples
-
-```jldoctest
-julia> RollingWindow()
-RollingWindow()
-```
-
-# Related
-
-  - [`AbstractWindowRule`](@ref)
-  - [`SeedWindow`](@ref)
-"""
-struct RollingWindow <: AbstractWindowRule end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Keeps the last observations of the window at the first fit alone. After the first fit, the inner estimator folds every new observation, and no observation leaves the estimate.
-
-In a batch fit the rule keeps the same window as [`RollingWindow`](@ref). On the online step the estimator folds. Its first fold cuts the first block to the window, folds the rows that remain into the inner estimator, and returns the estimator with `window = nothing`, so each later fold passes every row. The call with no data after a stream of blocks then gives the fit over the window of the first block, continued by the fold of every later row, and it equals no batch fit.
-
-The rule needs an inner estimator that folds exactly, such as [`ExpWeightedCovariance`](@ref), and a prior that folds, such as the carry of [`EmpiricalPrior`](@ref). [`Online`](@ref) refuses it, because the wrapper refits its estimator at each step, and a refit has no first fit to remember.
-
-# Constructors
-
-    SeedWindow() -> SeedWindow
-
-# Examples
-
-```jldoctest
-julia> SeedWindow()
-SeedWindow()
-```
-
-# Related
-
-  - [`AbstractWindowRule`](@ref)
-  - [`RollingWindow`](@ref)
-  - [`seed_window_path`](@ref)
-  - [`partial_fit!`](@ref)
-"""
-struct SeedWindow <: AbstractWindowRule end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Abstract supertype for the Choice Rule of an estimator, the rule that says how a choice that a fit makes over its whole sample behaves on the online step.
-
-Some fits make a choice that reads every observation, such as the dropped member of a Factor Family in [`CrossSectionalFactorPrior`](@ref), the factor set of each asset in [`StepwiseRegression`](@ref), or the components of [`DimensionReductionRegression`](@ref). In a batch fit every rule makes the same choice. The rules differ when the estimator receives its observations one block at a time.
-
-# Interfaces
-
-A rule is a marker for dispatch, and it holds no data. An estimator that makes such a choice holds the rule in its `choice` field. The step of its online fold dispatches on the type of the rule. A new rule needs its own method of that step for each estimator that holds it.
-
-# Related
-
-  - [`BatchChoice`](@ref)
-  - [`PinnedChoice`](@ref)
-  - [`CrossSectionalFactorPrior`](@ref)
-  - [`StepwiseRegression`](@ref)
-  - [`DimensionReductionRegression`](@ref)
-"""
-abstract type AbstractChoiceRule <: AbstractAlgorithm end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Makes the choice again over every observation at each fit. This is the default rule.
-
-On the online step a refit reads every row of its buffer, so the choice can move from one step to the next, and the call with no data after any stream of blocks equals the batch fit over the same rows. On the carry fold of a [`CrossSectionalFactorPrior`](@ref), a step that moves the dropped member of a Factor Family solves no observation of full rank again. The raw factor returns of such an observation do not depend on the dropped member, so the step selects the columns that the new member keeps, and folds the factor prior again over them.
-
-# Constructors
-
-    BatchChoice() -> BatchChoice
-
-# Examples
-
-```jldoctest
-julia> BatchChoice()
-BatchChoice()
-```
-
-# Related
-
-  - [`AbstractChoiceRule`](@ref)
-  - [`PinnedChoice`](@ref)
-"""
-struct BatchChoice <: AbstractChoiceRule end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Keeps the choice of the first fit. After the first fit, every later fit reads the same choice.
-
-In a batch fit the rule makes the same choice as [`BatchChoice`](@ref). On the online step the rule holds no state. After the first step whose rows the fit accepts, the step writes the choice into the configuration of the estimator that it returns, for example the name of the dropped member of each Factor Family into the `families` of a [`CrossSectionalFactorPrior`](@ref), the factor set of each asset into `included` of a [`StepwiseRegression`](@ref), or the components into `proj` of a [`DimensionReductionRegression`](@ref). Each later step then reads that choice. The call with no data after a stream of blocks equals the batch fit over the same rows under the choice of the first fit, which differs from a batch fit when the choice of the whole sample moves.
-
-# Constructors
-
-    PinnedChoice() -> PinnedChoice
-
-# Examples
-
-```jldoctest
-julia> PinnedChoice()
-PinnedChoice()
-```
-
-# Related
-
-  - [`AbstractChoiceRule`](@ref)
-  - [`BatchChoice`](@ref)
-"""
-struct PinnedChoice <: AbstractChoiceRule end
-"""
-    seed_window_path(est)
-    seed_window_path(::Any)
-
-Names the first field of an estimator tree that holds a windowed estimator under [`SeedWindow`](@ref), or answers `nothing`.
-
-The constructor of [`Online`](@ref) uses this walk to refuse a seed window, because the wrapper refits its estimator at each step. The walk is the walk of [`online_wrapper_path`](@ref), and the answer is the dotted path from the root to the `rule` field, such as `"ce.rule"` for the covariance member of a prior. A windowed estimator under a seed window answers `"rule"` through its own method. A value that is not an estimator answers `nothing`.
-
-# Algorithm
-
- 1. Walk the fields of [`estimator_fields`](@ref) in order, and find the path in each field with this function.
- 2. Answer the first path found, with the field name and a dot before it.
- 3. Answer `nothing` when no field gives a path.
-
-# Arguments
-
-  - `est`: The estimator, or any value a field holds.
-
-# Returns
-
-  - `path::Option{<:String}`: The dotted path of the first seed window found, or `nothing`.
-
-# Related
-
-  - [`SeedWindow`](@ref)
-  - [`Online`](@ref)
-  - [`online_wrapper_path`](@ref)
-  - [`estimator_fields`](@ref)
-"""
-function seed_window_path(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
-    for f in estimator_fields(est)
-        path = seed_window_path(getfield(est, f))
-        if !isnothing(path)
-            return string(f, ".", path)
-        end
-    end
-    return nothing
-end
-function seed_window_path(::Any)
-    return nothing
-end
-"""
-    assert_batch_entry(est, entry::AbstractString)
-
-Refuses an estimator that holds an [`Online`](@ref) at the entry of a batch fit, with an error that names the path of the wrapper.
-
-A wrapper is a declaration that the online arm of the fold loop resolves at its warm-up. A batch fit runs no warm-up. A batch fit is a plain [`optimise`](@ref), or a fold of a scheme that is not an Online Scheme. So the wrapper would reach `prior(pe, X)` unresolved and get a `MethodError` that names the whole type. The refusal names the dotted path that [`online_wrapper_path`](@ref) finds, and the two exits. One exit is an Online Scheme, such as [`OnlineIndexWalkForward`](@ref). The other exit is the estimator without the wrapper. Each caller passes an optimiser, which is never a wrapper, so the path at this entry is never the empty path.
-
-# Algorithm
-
- 1. Find the path of the first wrapper in `est` with [`online_wrapper_path`](@ref).
- 2. Refuse `est` when the path is not `nothing`, and name the path and the entry function.
-
-# Arguments
-
-  - `est`: The estimator handed to the entry function.
-  - `entry`: The name of the entry function, as the message reads it.
-
-# Validation
-
-  - No field in the tree of `est` holds an [`Online`](@ref). An `ArgumentError` naming the field is thrown otherwise.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`online_wrapper_path`](@ref)
-  - [`assert_online_entry`](@ref)
-  - [`optimise`](@ref)
-  - [`fold_loop`](@ref)
-"""
-function assert_batch_entry(est, entry::AbstractString)
-    path = online_wrapper_path(est)
-    @argcheck(isnothing(path),
-              ArgumentError("`$(typeof(est).name.name)` enters $(entry) holding an `Online` at `$(path)`, and a batch fit cannot resolve it: `Online` declares the sample buffer the fold loop's online arm seeds at its warm-up and folds the wrapped estimator's rows into, and nothing else seeds one, so the wrapper would reach the batch verb unresolved. Run the estimator through an Online Scheme — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — or set `$(path)` to the estimator it wraps and let the batch fit refit it from its rows."))
-    return nothing
-end
-
-export Online, RollingWindow, SeedWindow, BatchChoice, PinnedChoice
-public AbstractWindowRule, AbstractChoiceRule
+export Online

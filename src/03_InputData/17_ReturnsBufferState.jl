@@ -368,7 +368,7 @@ Folds the observations of a [`ReturnsResult`](@ref) into a [`ReturnsBufferState`
 
 The step of the state itself. The optimiser decides once which columns the state owns. `own_returns` is `true` only for a head that holds no prior, and a state whose prior keeps the rows appends no `X` and no mask. `own_factors` is `false` when the prior's tree reads `F`. The prior's buffer then records the factor column, and its own first-append rule refuses a column that comes and goes, so this state does not keep `F` and does not check its presence. `own_exogenous` is `false` when the prior's tree reads the Exogenous Series. The prior's buffer then records every column of the series and its names, so this state keeps neither `E` nor `ne`, and the buffer pins the names.
 
-A head that holds no prior keeps the active mask of a time-varying panel and nothing else of that panel. The estimation mask, the Panel Fields and the implied volatility do not reach the state, and no such head reads them. An optimiser with a prior refuses returns data that holds any of them, in [`fold_prior`](@ref).
+A head that holds no prior keeps the active mask of a time-varying panel and nothing else of that panel. The estimation mask and the Panel Fields do not reach the state, and no such head reads them. An optimiser with a prior refuses returns data that holds a part its route cannot record, in [`fold_prior`](@ref). The implied volatilities and `ivpa` travel with the returns, so the buffer that holds the rows records them: the prior's buffer, or the state's own `X` for a head that holds no prior.
 
 # Algorithm
 
@@ -376,7 +376,7 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
  2. Read `n`, the number of observations the state holds, and `pnl`, which is the panel when it is static and `nothing` when it is time-varying.
  3. On the first step, when `n` is zero and no names are pinned, pin `nx`, `nf`, `nb` and `pnl`, and pin `ne` when the state owns the series.
  4. On every later step, refuse an `rd` whose names or static panel differ from the pinned ones, and an `rd` that adds or drops a column the state owns.
- 5. When the state owns the rows, append `X` with [`fold_column_masked`](@ref), with the active mask of a time-varying panel.
+ 5. When the state owns the rows, append `X` with [`fold_column_masked`](@ref), with the active mask of a time-varying panel, and with `rd.iv` and `rd.ivpa`.
  6. When the state owns the factor column, append `F` with [`fold_column`](@ref). When it owns the series, append `E` with [`fold_column`](@ref).
  7. Append `B` and `ts` with [`fold_column`](@ref), and return the new state.
 
@@ -437,7 +437,7 @@ function partial_fit!(state::ReturnsBufferState, rd::ReturnsResult;
     end
     X = if own_returns
         amsk = static ? nothing : rd.pnl.amsk
-        fold_column_masked(state.X, rd.X, amsk, state.max_history)
+        fold_column_masked(state.X, rd, amsk, state.max_history)
     else
         state.X
     end
@@ -452,19 +452,19 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Appends a block of returns to the buffer that a head with no prior owns, with the active mask of its panel.
+Appends a block of returns to the buffer that a head with no prior owns, with the active mask of its panel and the implied volatilities of the block.
 
-The form of [`fold_column`](@ref) for the one column that carries a mask. The buffer records the active mask of a time-varying panel with the rows, so `optimise(opt)` with no data can rebuild the panel from it. A static panel gives no mask.
+The form of [`fold_column`](@ref) for the one column that carries a mask. The buffer records the active mask of a time-varying panel with the rows, so `optimise(opt)` with no data can rebuild the panel from it. A static panel gives no mask. The buffer records the implied volatilities with the rows, and pins `ivpa`, so `optimise(opt)` with no data gives them back.
 
 # Algorithm
 
  1. Seed a [`SampleBufferState`](@ref) with the cap when `buffer` is `nothing`.
- 2. Append `X` to the buffer with [`partial_fit!`](@ref), with `amsk` as its active mask.
+ 2. Append `rd.X` to the buffer with [`partial_fit!`](@ref), with `amsk` as its active mask, and with `rd.iv` and `rd.ivpa`.
 
 # Arguments
 
   - `buffer`: The returns buffer, or `nothing` before the first step.
-  - `X`: The block to append.
+  - `rd`: The returns data of the block. The function reads `X`, `iv` and `ivpa`.
   - `amsk`: The active mask of the block, or `nothing`.
   - `max_history`: The cap of the state.
 
@@ -477,11 +477,11 @@ The form of [`fold_column`](@ref) for the one column that carries a mask. The bu
   - [`ReturnsBufferState`](@ref)
   - [`fold_column`](@ref)
 """
-function fold_column_masked(buffer::Option{<:SampleBufferState}, X::MatNum,
+function fold_column_masked(buffer::Option{<:SampleBufferState}, rd::ReturnsResult,
                             amsk::Option{<:AbstractMatrix{<:Bool}},
                             max_history::Option{<:Integer})
     buffer = isnothing(buffer) ? SampleBufferState(; max_history = max_history) : buffer
-    return partial_fit!(buffer, X; active_mask = amsk)
+    return partial_fit!(buffer, rd.X; active_mask = amsk, iv = rd.iv, ivpa = rd.ivpa)
 end
 """
     returns_result(state::ReturnsBufferState, rows::SampleBufferState)
@@ -496,7 +496,8 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
  2. Copy the valid rows of `rows` into `X`.
  3. When `rows` records an active mask, rebuild a time-varying [`AssetPanel`](@ref) from it. Its estimation mask is the one that `rows` records or, when `rows` records none, a copy of the active mask. The step of a refit prior records both masks, and the carry of [`EmpiricalPrior`](@ref) and a head with no prior record the active mask alone. Its Panel Fields are the ones that `rows` records, which it records for a prior that reads them, and none otherwise. When `rows` records no active mask, take the static panel that the state pinned, or `nothing`.
  4. Take `F` from the state when the state keeps the factor column, and from [`factor_buffer`](@ref) of `rows` otherwise. Take `ne` and `E` from the state when the state keeps the series, and from [`exogenous_buffer_kwargs`](@ref) of `rows` otherwise.
- 5. Copy `B` and `ts` from the state, and build the `ReturnsResult`.
+ 5. Take `iv` and `ivpa` from [`implied_volatility_buffer_kwargs`](@ref) of `rows`, which records them beside the returns.
+ 6. Copy `B` and `ts` from the state, and build the `ReturnsResult`.
 
 # Arguments
 
@@ -509,7 +510,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
 
 # Returns
 
-  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with the parts that the route of the prior recorded: both masks and the Panel Fields for a refit prior that reads them, both masks and no Panel Field on the carry fold of a [`CrossSectionalFactorPrior`](@ref), and the active mask alone on the carry of another prior or with no prior. `iv` and `ivpa` come back as `nothing`. An optimiser with a prior refuses a step that carries a part its route cannot record, and a head with no prior reads none of them.
+  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with one exception. A time-varying panel comes back with the parts that the route of the prior recorded: both masks and the Panel Fields for a refit prior that reads them, both masks and no Panel Field on the carry fold of a [`CrossSectionalFactorPrior`](@ref), and the active mask alone on the carry of another prior or with no prior. An optimiser with a prior refuses a step that carries a part its route cannot record, and a head with no prior reads none of them. A capped buffer gives back the `iv` of the rows that it keeps, as it gives back `X`.
 
 # Related
 
@@ -520,6 +521,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
   - [`sample_buffer_kwargs`](@ref)
   - [`factor_buffer`](@ref)
   - [`exogenous_buffer_kwargs`](@ref)
+  - [`implied_volatility_buffer_kwargs`](@ref)
 """
 function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
@@ -536,10 +538,13 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     end
     F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
     ex = isnothing(state.E) ? exogenous_buffer_kwargs(rows) : (; ne = state.ne, E = state.E)
+    vols = implied_volatility_buffer_kwargs(rows)
     return ReturnsResult(; nx = state.nx, X = X, nf = state.nf, F = F, nb = state.nb,
                          B = column_matrix(state.B), ne = get(ex, :ne, nothing),
                          E = column_matrix(get(ex, :E, nothing)),
-                         ts = column_matrix(state.ts), pnl = pnl)
+                         ts = column_matrix(state.ts),
+                         iv = column_matrix(get(vols, :iv, nothing)),
+                         ivpa = copy_column(get(vols, :ivpa, nothing)), pnl = pnl)
 end
 """
     column_matrix(buffer::Nothing)
