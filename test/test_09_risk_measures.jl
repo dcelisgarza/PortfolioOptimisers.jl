@@ -794,3 +794,1779 @@
         @test isapprox(rw(x), sort(-x; rev = true)[2]; rtol = 1e-5)
     end
 end
+
+# Verifies the `risk_input_kind` trait that replaced the `expected_risk` routing unions
+# (ADR 0006). Two guards:
+#   1. Equivalence — every measure that used to live in a routing union now declares the
+#      matching kind, so the trait-based routing reproduces the old union-based routing.
+#   2. Completeness — every concrete `AbstractBaseRiskMeasure` either declares a kind or is
+#      a composite handled by an explicit `expected_risk` method, so a future measure added
+#      without a kind fails here rather than at runtime.
+using InteractiveUtils: InteractiveUtils
+const PO = PortfolioOptimisers
+
+# Snapshot of the OLD routing-union membership (pre-trait); the differential baseline.
+# `ValueatRisk` and `ValueatRiskRange` split by formulation: `alg` selects the estimand, so
+# the MIP branch scores a net return series and the parametric branch reads the prior's
+# moments against the weights. Both branches are named, each in its own list. They are named
+# by a CONCRETE type: `typeintersect` on two `alg`-bounded `UnionAll`s is a type with an
+# uninhabited parameter rather than `Union{}`, so inference over a bound would report both
+# kinds for either branch.
+const _VAR_MIP = typeof(ValueatRisk(; alg = MIPValueatRisk()))
+const _VAR_RANGE_MIP = typeof(ValueatRiskRange(; alg = MIPValueatRisk()))
+const _VAR_DIST = typeof(ValueatRisk(; alg = DistributionValueatRisk()))
+const _VAR_RANGE_DIST = typeof(ValueatRiskRange(; alg = DistributionValueatRisk()))
+
+const _OLD_NETRETURNS = Any[WorstRealisation, _VAR_MIP, _VAR_RANGE_MIP,
+                            ConditionalValueatRisk,
+                            DistributionallyRobustConditionalValueatRisk,
+                            DistributionallyRobustConditionalValueatRiskRange,
+                            EntropicValueatRisk, EntropicValueatRiskRange,
+                            RelativisticValueatRisk, RelativisticValueatRiskRange,
+                            DrawdownatRisk, MaximumDrawdown, AverageDrawdown,
+                            ConditionalDrawdownatRisk,
+                            DistributionallyRobustConditionalDrawdownatRisk, UlcerIndex,
+                            EntropicDrawdownatRisk, RelativisticDrawdownatRisk,
+                            RelativeDrawdownatRisk, RelativeMaximumDrawdown,
+                            RelativeAverageDrawdown, RelativeConditionalDrawdownatRisk,
+                            RelativeUlcerIndex, RelativeEntropicDrawdownatRisk,
+                            RelativeRelativisticDrawdownatRisk, Range,
+                            ConditionalValueatRiskRange, OrderedWeightsArray,
+                            OrderedWeightsArrayRange, BrownianDistanceVariance, MeanReturn,
+                            PowerNormValueatRisk, PowerNormValueatRiskRange,
+                            PowerNormDrawdownatRisk, RelativePowerNormDrawdownatRisk]
+const _OLD_WEIGHTSRETURNSFEES = Any[LowOrderMoment, HighOrderMoment, TrackingRiskMeasure,
+                                    RiskTrackingRiskMeasure, Kurtosis, ThirdCentralMoment,
+                                    Skewness, MedianAbsoluteDeviation, VarianceSkewKurtosis,
+                                    _VAR_DIST, _VAR_RANGE_DIST]
+const _OLD_WEIGHTS = Any[StandardDeviation, NegativeSkewness, TurnoverRiskMeasure, Variance,
+                         UncertaintySetVariance, EqualRisk]
+
+# Composite / return-like measures handled by explicit `expected_risk` methods — they
+# orchestrate other measures and intentionally declare no input kind.
+const _EXPLICIT = Set{Any}([RiskRatio, NonOptimisationRiskRatio, MeanReturnRiskRatio,
+                            ExpectedReturn, ExpectedReturnRiskRatio,
+                            RiskTrackingRiskMeasure])
+
+# The declared kind as a *type* — instance-free, since each method returns a singleton.
+# Undeclared types hit the erroring default (inferred `Union{}`).
+function declared_kind(@nospecialize(T))
+    return reduce(typejoin, Base.return_types(PO.risk_input_kind, (T,)); init = Union{})
+end
+
+function all_concrete(@nospecialize(T))
+    acc = Any[]
+    for S in InteractiveUtils.subtypes(T)
+        isabstracttype(S) ? append!(acc, all_concrete(S)) : push!(acc, S)
+    end
+    return acc
+end
+
+@testset "risk_input_kind — equivalence with old routing unions" begin
+    # The three kinds partition the measures; no type may be classified two ways.
+    @test allunique(vcat(_OLD_NETRETURNS, _OLD_WEIGHTSRETURNSFEES, _OLD_WEIGHTS))
+    for T in _OLD_NETRETURNS
+        @test declared_kind(T) === PO.NetReturnsInput
+    end
+    for T in _OLD_WEIGHTSRETURNSFEES
+        @test declared_kind(T) === PO.WeightsReturnsFeesInput
+    end
+    for T in _OLD_WEIGHTS
+        @test declared_kind(T) === PO.WeightsInput
+    end
+end
+
+# Every kind a type can answer. A measure whose formulation selects the estimand answers
+# more than one, and each must still be a concrete kind: an undeclared type infers
+# `Union{}` from the erroring default and fails here.
+function declared_kinds(@nospecialize(T))
+    return unique(Base.return_types(PO.risk_input_kind, (T,)))
+end
+
+@testset "risk_input_kind — every concrete measure is classified" begin
+    for T in all_concrete(PO.AbstractBaseRiskMeasure)
+        if T in _EXPLICIT
+            continue
+        end
+        ks = declared_kinds(T)
+        @test !isempty(ks) && all(k -> isconcretetype(k) && k <: PO.RiskInputKind, ks)
+    end
+end
+
+# ── ADR 0007: the precomputed-returns contract ────────────────────────────────────────────
+# `expected_risk_from_returns(r, x)` evaluates a measure on an already-reduced net-return
+# series. It is gated by `supports_precomputed_returns` so that an ineligible measure — a
+# `WeightsInput` measure (whose `r(w)` shares the `r(::VecNum)` signature and would otherwise
+# silently score the series as weights), a moment measure with a per-asset `mu` (whose target
+# `dot(w, mu)` needs the absent weights), or a variance-carrying composite — throws an
+# explanatory error rather than returning nonsense or hitting a raw `MethodError`.
+const _x_series = [sinpi(2i / 64) * 0.1 + cospi(i / 32) * 0.03 for i in 1:64]
+
+@testset "precomputed-returns contract — eligibility & differential" begin
+    g = PO.expected_risk_from_returns
+    # Eligible: NetReturnsInput measures, the weight-independent-target moment family, and
+    # ratio composites whose constituents are themselves eligible.
+    eligible = Any[ConditionalValueatRisk(), MaximumDrawdown(), ValueatRisk(),
+                   WorstRealisation(), Range(), MeanReturn(), LowOrderMoment(),
+                   HighOrderMoment(), Skewness(), Kurtosis(), MedianAbsoluteDeviation(),
+                   ThirdCentralMoment(), LowOrderMoment(; mu = 0.01),
+                   MedianAbsoluteDeviation(; mu = PO.MeanCentering()),
+                   RiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown()),
+                   MeanReturnRiskRatio(; rk = ConditionalValueatRisk()),
+                   TrackingRiskMeasure(; tr = ReturnsTracking(; w = _x_series .* 0.5))]
+    for r in eligible
+        @test PO.supports_precomputed_returns(r)
+        v = g(r, _x_series)
+        @test v isa Number && isfinite(v)
+    end
+
+    # A `ReturnsTracking` measure is dispatched on the *second* type parameter, because
+    # `settings` is the first. The declarations and the single-vector functor must bind on a
+    # concrete instance, not only on the `UnionAll` the completeness test below inspects.
+    let r = TrackingRiskMeasure(; tr = ReturnsTracking(; w = _x_series .* 0.5))
+        @test g(r, _x_series) ≈ r([1], reshape(_x_series, :, 1))
+        @test g(r, _x_series) > 0
+    end
+
+    # Differential oracle: for the moment family the single-vector form equals the one-asset
+    # `(w, X, fees)` form — the same oracle the entropy-pooling tests use (ADR 0007).
+    for r in (LowOrderMoment(), HighOrderMoment(), Skewness(), Kurtosis(),
+              MedianAbsoluteDeviation(), ThirdCentralMoment(), LowOrderMoment(; mu = 0.01))
+        @test g(r, _x_series) ≈ r([1], reshape(_x_series, :, 1))
+    end
+
+    # Ineligible: the gate throws the explanatory `ArgumentError` — no silent wrong answer,
+    # no raw `MethodError`. The default `RiskRatio` is ineligible via its
+    # weights-only `Variance` constituent.
+    mu2 = [0.1, 0.2]
+    ineligible = Any[EqualRisk(), TurnoverRiskMeasure(; w = fill(inv(64), 64)),
+                     StandardDeviation(; sigma = [1.0 0.0; 0.0 1.0]),
+                     Variance(; sigma = [1.0 0.0; 0.0 1.0]), NegativeSkewness(),
+                     VarianceSkewKurtosis(), RiskRatio(), LowOrderMoment(; mu = mu2),
+                     HighOrderMoment(; mu = mu2), Skewness(; mu = mu2),
+                     Kurtosis(; mu = mu2), MedianAbsoluteDeviation(; mu = mu2),
+                     ThirdCentralMoment(; mu = mu2),
+                     TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5]))]
+    for r in ineligible
+        @test !PO.supports_precomputed_returns(r)
+        @test_throws ArgumentError g(r, _x_series)
+    end
+
+    # The `WeightsTracking` functor is the second half of the same dispatch: a direct call
+    # explains the refusal instead of raising a bare `MethodError`.
+    @test_throws ArgumentError TrackingRiskMeasure(;
+                                                   tr = WeightsTracking(; w = [0.5, 0.5]))(_x_series)
+end
+
+@testset "precomputed-returns contract — completeness" begin
+    # EVERY concrete measure resolves `supports_precomputed_returns` to a `Bool` — a future
+    # measure that fails to inherit an eligibility (e.g. via a missing `risk_input_kind`)
+    # trips here rather than at runtime.
+    #
+    # The `_EXPLICIT` composites are NOT skipped here, and that is the whole point of the
+    # loop being separate from the classification loop above. They are exempt from declaring
+    # a *kind*, because an explicit `expected_risk` method routes each of them. They are not
+    # exempt from resolving the *predicate*: `assert_scoreable` and
+    # `expected_risk_from_returns` call it on whatever measure the user names, so a
+    # composite that answers nothing raises the trait's internal "is not defined for" error
+    # in a seam where the user needs a statement about their measure instead. #587 is that
+    # defect: `ExpectedReturn` and `ExpectedReturnRiskRatio` reached `ScoreSelector` that
+    # way, and the skip that used to stand here is why nothing caught it.
+    for T in all_concrete(PO.AbstractBaseRiskMeasure)
+        rt = reduce(typejoin, Base.return_types(PO.supports_precomputed_returns, (T,));
+                    init = Union{})
+        # `Bool <: rt` holds when the predicate resolves — `Bool`, or `Any` for a moment
+        # UnionAll whose `mu` field is abstractly typed. It fails only on `Union{}`: an
+        # undeclared measure whose `risk_input_kind` throws.
+        @test Bool <: rt
+    end
+end
+
+@testset "precomputed-returns contract — the composites that refuse a bare series" begin
+    # #587. Three composites answered the predicate with the trait's internal "is not
+    # defined for" error, because the skip above meant nothing asked them.
+    #
+    #   - A `PrRM` reads the prior result and contracts the expected returns it states with
+    #     the weights. A bare series carries neither.
+    #   - A `RiskTrackingRiskMeasure` tracks a benchmark held as a WEIGHT vector, so both of
+    #     its functors need `w` as well.
+    #
+    # Each now answers `false`, and both seams that consult it then speak about the measure
+    # the user named rather than about the trait.
+    g = PO.expected_risk_from_returns
+    for r in (ExpectedReturn(), ExpectedReturnRiskRatio(),
+              RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = [0.5, 0.5])))
+        @test !PO.supports_precomputed_returns(r)
+        @test_throws ArgumentError g(r, _x_series)
+        # The preselection seam is where the internal error used to reach the user.
+        @test_throws ArgumentError ScoreSelector(; score = r,
+                                                 rule = ThresholdRule(; lo = 0.0))
+    end
+end
+
+@testset "the base-file selectors refuse a both-`nothing` call" begin
+    # #595. `solver_selector` documented "Returns `nothing` if neither is available", and
+    # the both-`nothing` method throws instead. The docstring now states the refusal, and
+    # these two assertions hold it there. `sel` never reaches the solver refusal: a
+    # both-`nothing` call routes on the operand types to `nothing_scalar_array_selector`.
+    @test_throws ArgumentError PO.solver_selector(nothing, nothing)
+    @test_throws ArgumentError PO.risk_measure_nothing_scalar_array_view(nothing, nothing,
+                                                                         1)
+    @test isnothing(PO.sel(nothing, nothing))
+    @test isnothing(PO.nothing_scalar_array_selector(nothing, nothing))
+end
+
+# ── #773: the weight path is the picker for a scorer ──────────────────────────────────────
+# Decision #772. A `VecNum` weight is one target vector and weighs every observation; a
+# `MatNum` weight is a weight path, one row of weights per observation, which is what a fold
+# scored under a Weight Drift held. `expected_risk`'s weight-taking family gains its `MatNum`
+# mirror, and the three input kinds answer a path separately: a `NetReturnsInput` measure
+# computes, and the two weight-reading kinds refuse by name.
+const _path_X = [0.01 0.02; -0.02 0.01; 0.03 -0.01; 0.005 0.02]
+const _path_w = [0.6, 0.4]
+
+@testset "the weight path is the picker, and two kinds refuse it (#773)" begin
+    wd = SelfFinancingDrift()
+    U = PO.weight_path(wd, _path_w, _path_X)
+    Uc = PO.weight_path(nothing, _path_w, _path_X)
+    fees = Fees(; l = 0.001, fl = 0.002)
+    @test U[1, :] == _path_w
+    @test all(row == _path_w for row in eachrow(Uc))
+
+    # A `NetReturnsInput` measure computes, and its answer is the measure over the series
+    # the path produces. The kernel is untouched: `calc_net_returns` is what reads the type.
+    rn = ConditionalValueatRisk()
+    @test PO.risk_input_kind(rn) === PO.NetReturnsInput()
+    @test expected_risk(rn, U, _path_X, fees) == rn(calc_net_returns(U, _path_X, fees))
+    @test expected_risk(rn, U, _path_X) == rn(calc_net_returns(U, _path_X))
+    # A drifted path moves the number, and a constant path reproduces the target reading.
+    @test expected_risk(rn, U, _path_X, fees) != expected_risk(rn, _path_w, _path_X, fees)
+    @test isapprox(expected_risk(rn, Uc, _path_X, fees),
+                   expected_risk(rn, _path_w, _path_X, fees))
+
+    # The prior route resolves the measure and the matrix once, then reads the path.
+    rd = ReturnsResult(; nx = ["A", "B"], X = _path_X)
+    rnr, Xr = PO.resolve_risk_inputs(rn, rd)
+    @test expected_risk(rn, U, rd, fees) == expected_risk(rnr, U, Xr, fees)
+
+    # A vector of measures scalarises over the path, `scale` is its combination weight, and
+    # the vector's own prior route resolves once, exactly as the `VecNum` family does.
+    rns = [ConditionalValueatRisk(), ConditionalValueatRisk(; alpha = 0.3)]
+    @test expected_risk(rns, U, _path_X, fees) ==
+          sum(expected_risk(r, U, _path_X, fees) * r.settings.scale for r in rns)
+    rnsr, Xsr = PO.resolve_risk_inputs(rns, rd)
+    @test expected_risk(rns, U, rd, fees) == expected_risk(rnsr, U, Xsr, fees)
+    @test expected_risk(rns, U, _path_X, fees; sca = MaxScalariser()) !=
+          expected_risk(rns, U, _path_X, fees)
+
+    # The three ratio composites decompose onto the path as they do onto a vector.
+    rr = RiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown())
+    @test expected_risk(rr, U, _path_X, fees) ==
+          expected_risk(rr.r1, U, _path_X, fees) / expected_risk(rr.r2, U, _path_X, fees)
+    nrr = NonOptimisationRiskRatio(; r1 = ConditionalValueatRisk(), r2 = MaximumDrawdown())
+    @test expected_risk(nrr, U, _path_X, fees) ==
+          expected_risk(nrr.r1, U, _path_X, fees; sca = nrr.sca1) /
+          expected_risk(nrr.r2, U, _path_X, fees; sca = nrr.sca2)
+    mrr = MeanReturnRiskRatio(; rk = ConditionalValueatRisk())
+    @test expected_risk(mrr, U, _path_X, fees) ==
+          (expected_risk(mrr.rt, U, _path_X, fees) - mrr.rf) /
+          expected_risk(mrr.rk, U, _path_X, fees; sca = mrr.sca)
+
+    # `WeightsReturnsFeesInput` refuses a path by name. Its kernel reads `w` as one
+    # cross-section, and a path gives one number per observation, which is a different
+    # quantity rather than a wider input.
+    rw = MedianAbsoluteDeviation()
+    @test PO.risk_input_kind(rw) === PO.WeightsReturnsFeesInput()
+    @test_throws ArgumentError expected_risk(rw, U, _path_X, fees)
+    msg = try
+        expected_risk(rw, U, _path_X, fees)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("MedianAbsoluteDeviation", msg)
+    @test occursin("WeightsReturnsFeesInput", msg)
+    # It still scores the target weights it does take.
+    @test expected_risk(rw, _path_w, _path_X, fees) == rw(_path_w, _path_X, fees)
+
+    # `WeightsInput` refuses on the same terms.
+    rv = Variance(; sigma = [1.0 0.2; 0.2 1.0])
+    @test PO.risk_input_kind(rv) === PO.WeightsInput()
+    @test_throws ArgumentError expected_risk(rv, U, _path_X, fees)
+    msg = try
+        expected_risk(rv, U, _path_X, fees)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("Variance", msg)
+    @test occursin("WeightsInput", msg)
+    @test expected_risk(rv, _path_w, _path_X, fees) == rv(_path_w)
+
+    # A refusal is taken by the kind and not by the argument count, so the no-fee call and
+    # the prior route are refused too.
+    @test_throws ArgumentError expected_risk(rw, U, _path_X)
+    @test_throws ArgumentError expected_risk(rv, U, rd)
+end
+
+# The two kinds that read a return series refuse a `nothing` carrier by name (#1240). The
+# call that lands here is the documented `expected_risk(r, res)` on a result that carries no
+# carrier of its own, where the fallback to `res.pr` yields `nothing`. Before this the kind
+# singleton reached no method and the caller met a `MethodError` naming neither the measure
+# nor the missing argument. `WeightsInput` reads no series, so it still answers.
+@testset "a `nothing` carrier is refused by name, and only by the two series kinds (#1240)" begin
+    rn = ConditionalValueatRisk()
+    rw = MedianAbsoluteDeviation()
+    rv = Variance(; sigma = [1.0 0.0; 0.0 1.0])
+    U = PO.weight_path(nothing, _path_w, _path_X)
+    @test PO.risk_input_kind(rn) === PO.NetReturnsInput()
+    @test PO.risk_input_kind(rw) === PO.WeightsReturnsFeesInput()
+    @test PO.risk_input_kind(rv) === PO.WeightsInput()
+
+    # Both series kinds refuse a carrier-free single target, at either arity.
+    for r in (rn, rw)
+        @test_throws IsNothingError expected_risk(r, _path_w)
+        @test_throws IsNothingError expected_risk(r, _path_w, nothing)
+        @test_throws IsNothingError expected_risk(r, _path_w, nothing, nothing)
+    end
+
+    # A weight path reaches the new refusal for `NetReturnsInput` alone. The other two
+    # kinds refuse **any** path by name already (#773), and that refusal is the more
+    # fundamental one, so a carrier-free path keeps it rather than naming the carrier.
+    @test_throws IsNothingError expected_risk(rn, U)
+    @test_throws IsNothingError expected_risk(rn, U, nothing, nothing)
+    @test_throws ArgumentError expected_risk(rw, U)
+    @test_throws ArgumentError expected_risk(rv, U)
+    for r in (rw, rv)
+        msg = try
+            expected_risk(r, U)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("weight path", msg)
+    end
+
+    # The message names the measure and states the ways out.
+    msg = try
+        expected_risk(rn, _path_w)
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("ConditionalValueatRisk", msg)
+    @test occursin("expected_risk(r, res, X)", msg)
+    @test occursin("expected_risk(r, res, pr)", msg)
+
+    # A vector of measures is scalarised through the same door, so it refuses too.
+    @test_throws IsNothingError expected_risk([rn], _path_w, nothing, nothing)
+
+    # `WeightsInput` reads no series, so a carrier-free call answers as it always has.
+    @test expected_risk(rv, _path_w) == rv(_path_w)
+    @test expected_risk(rv, _path_w, nothing, nothing) == rv(_path_w)
+
+    # Handing a carrier in answers, which is the way out the message names.
+    @test expected_risk(rn, _path_w, _path_X) == rn(calc_net_returns(_path_w, _path_X))
+end
+
+# The drawdown series builders used to seed their running peak by mutating the caller's
+# vector -- `pushfirst!(x, 0)`, compute, `popfirst!(x)`. That worked only because every
+# caller handed them a freshly allocated `Vector` from `calc_net_returns`. Any other
+# `AbstractVector` (a column view, a range) raised a `MethodError`, and an exception thrown
+# between the two calls would have left the caller's vector one element longer than it
+# started. The peak is now carried in a scalar, so `x` is read and never written.
+@testset "Drawdown series are pure" begin
+    using Test, PortfolioOptimisers, Random
+
+    PO = PortfolioOptimisers
+    Random.seed!(987654321)
+
+    # the previous, mutating implementations, kept here as the behavioural reference
+    function ref_absolute(x)
+        x = copy(x)
+        pushfirst!(x, zero(eltype(x)))
+        cs = cumsum(x)
+        peak = typemin(eltype(x))
+        dd = similar(cs)
+        for (idx, i) in pairs(cs)
+            peak = ifelse(i > peak, i, peak)
+            dd[idx] = i - peak
+        end
+        popfirst!(dd)
+        return dd
+    end
+    function ref_relative(x)
+        x = copy(x)
+        pushfirst!(x, zero(eltype(x)))
+        cs = cumprod(x .+ one(eltype(x)))
+        peak = typemin(eltype(x))
+        dd = similar(cs)
+        for (idx, i) in pairs(cs)
+            peak = ifelse(i > peak, i, peak)
+            dd[idx] = i / peak - one(peak)
+        end
+        popfirst!(dd)
+        return dd
+    end
+
+    @testset "identical to the previous implementation" begin
+        for _ in 1:200
+            x = 0.05 .* randn(rand(1:50))
+            @test PO.absolute_drawdown_vec(x) ≈ ref_absolute(x)
+            @test PO.relative_drawdown_vec(x) ≈ ref_relative(x)
+        end
+    end
+
+    @testset "the input is not written" begin
+        x = 0.05 .* randn(40)
+        before = copy(x)
+        PO.absolute_drawdown_vec(x)
+        PO.relative_drawdown_vec(x)
+        MaximumDrawdown()(x)
+        @test x == before
+        @test length(x) == 40
+    end
+
+    @testset "any AbstractVector works" begin
+        X = 0.05 .* randn(30, 3)
+        col = view(X, :, 2)
+        @test PO.absolute_drawdown_vec(col) ≈ PO.absolute_drawdown_vec(X[:, 2])
+        @test PO.relative_drawdown_vec(col) ≈ PO.relative_drawdown_vec(X[:, 2])
+        @test MaximumDrawdown()(col) ≈ MaximumDrawdown()(X[:, 2])
+
+        # a range is immutable; the old implementation could not take one at all
+        r = 0.01:0.01:0.05
+        @test PO.absolute_drawdown_vec(r) == zeros(5)   # monotone rise, no drawdown
+        @test length(PO.relative_drawdown_vec(r)) == 5
+    end
+
+    @testset "the peak starts at the initial portfolio value" begin
+        # a first observation below zero is already a drawdown, not the reference point
+        @test PO.absolute_drawdown_vec([-0.1, 0.0]) ≈ [-0.1, -0.1]
+        @test PO.relative_drawdown_vec([-0.1, 0.0]) ≈ [-0.1, -0.1]
+
+        # and the drawdown series is never positive
+        x = 0.05 .* randn(100)
+        @test all(<=(0), PO.absolute_drawdown_vec(x))
+        @test all(<=(0), PO.relative_drawdown_vec(x))
+    end
+
+    # `drawdowns` used to re-inline the two array builders and drop their `init`, so its
+    # running peak started at the first observation. The JuMP path reads
+    # `absolute_drawdown_arr` and the reporting path reads `drawdowns`, so the constraint
+    # and the reported series disagreed on a portfolio that is under water at t = 1.
+    @testset "the exported drawdowns agrees with the array builders" begin
+        @test drawdowns([-0.1, 0.0]) ≈ [-0.1, -0.1]
+        @test drawdowns([-0.1, 0.0], true) ≈ [-0.1, -0.1]
+        @test all(<=(0), drawdowns(0.05 .* randn(100)))
+        @test all(<=(0), drawdowns(0.05 .* randn(100), true))
+
+        for _ in 1:50
+            X = 0.05 .* randn(rand(2:40), rand(1:5))
+            for dims in (1, 2)
+                @test drawdowns(X; dims = dims) ≈ PO.absolute_drawdown_arr(X; dims = dims)
+                @test drawdowns(X, true; dims = dims) ≈
+                      PO.relative_drawdown_arr(X; dims = dims)
+            end
+            cXa = PO.absolute_cumulative_returns(X; dims = 1)
+            cXr = PO.relative_cumulative_returns(X; dims = 1)
+            @test drawdowns(cXa; cX = true) ≈ PO.absolute_drawdown_arr(cXa; cX = true)
+            @test drawdowns(cXr, true; cX = true) ≈ PO.relative_drawdown_arr(cXr; cX = true)
+        end
+
+        # column by column, the array builder is the vector builder
+        X = 0.05 .* randn(30, 4)
+        for j in axes(X, 2)
+            @test drawdowns(X)[:, j] ≈ PO.absolute_drawdown_vec(X[:, j])
+            @test drawdowns(X, true)[:, j] ≈ PO.relative_drawdown_vec(X[:, j])
+        end
+    end
+end
+
+# The drawdown half of `src/14_NetReturnsDrawdowns.jl`, swept under issue #547. The
+# running-peak convention, the `cX` short circuit and the `dims` axis are checked with
+# numbers rather than read off the source.
+@testset "The drawdown conventions" begin
+    using Test, PortfolioOptimisers
+
+    PO = PortfolioOptimisers
+
+    @testset "the running peak starts at the initial capital" begin
+        # A series under water from the first period reports a drawdown there. Were the
+        # peak seeded at the first observation, both answers would open at `0.0`.
+        @test drawdowns([-0.1, 0.05]) ≈ [-0.1, -0.05]
+        @test drawdowns([-0.1, 0.05]) != zeros(2)
+        @test PO.absolute_drawdown_arr([-0.1, 0.05]) ≈ [-0.1, -0.05]
+
+        # the compound path is seeded at one and gives the matching relative answer
+        @test drawdowns([-0.1, 0.05], true) ≈ [-0.09999999999999998, -0.05499999999999994]
+        @test PO.relative_drawdown_arr([-0.1, 0.05]) ≈ drawdowns([-0.1, 0.05], true)
+
+        # and the two agree to first order on a small return
+        small = [-1e-6, 5e-7]
+        @test maximum(abs, drawdowns(small) - drawdowns(small, true)) < 1e-12
+    end
+
+    @testset "cX = true skips the cumulation" begin
+        x = [0.01, -0.02, 0.03, -0.015]
+        @test drawdowns(PO.absolute_cumulative_returns(x); cX = true) == drawdowns(x)
+        @test drawdowns(PO.relative_cumulative_returns(x), true; cX = true) ==
+              drawdowns(x, true)
+
+        # feeding the raw series with `cX = true` is a different answer, so the flag is read
+        @test drawdowns(x; cX = true) != drawdowns(x)
+    end
+
+    @testset "dims = 2 transposes the answer of dims = 1" begin
+        # A `dims` bug hides on a square matrix, so the fixture is 3x2.
+        M = [0.1 -0.2; 0.0 0.0; 0.05 0.05]
+        @test drawdowns(M; dims = 2) == permutedims(drawdowns(permutedims(M); dims = 1))
+        @test drawdowns(M, true; dims = 2) ==
+              permutedims(drawdowns(permutedims(M), true; dims = 1))
+        @test cumulative_returns(M; dims = 2) ==
+              permutedims(cumulative_returns(permutedims(M); dims = 1))
+        @test cumulative_returns(M, true; dims = 2) ==
+              permutedims(cumulative_returns(permutedims(M), true; dims = 1))
+
+        # and the two axes genuinely disagree on this fixture
+        @test drawdowns(M; dims = 1) != drawdowns(M; dims = 2)
+        @test drawdowns(M; dims = 1) ≈ [0.0 -0.2; 0.0 -0.2; 0.0 -0.15]
+        @test drawdowns(M; dims = 2) ≈ [0.0 -0.2; 0.0 0.0; 0.0 0.0]
+    end
+
+    @testset "cumulative_returns names the helper each branch reaches" begin
+        x = [0.01, -0.02, 0.03, -0.015]
+        @test cumulative_returns(x) == PO.absolute_cumulative_returns(x)
+        @test cumulative_returns(x, true) == PO.relative_cumulative_returns(x)
+        @test PO.absolute_cumulative_returns(x) == cumsum(x)
+        @test PO.relative_cumulative_returns(x) == cumprod(1 .+ x)
+    end
+end
+
+#=
+Unit tests for the `scalarise` reduction combinator and its slot-wise helpers.
+These are the shared reducers behind `hrp_scalarised_risk`,
+`herc_intra_cluster_weights`, `herc_cluster_risk` and `near_optimal_centering_risks`; testing them
+directly means the four reduction rules (sum, max, min, log-sum-exp) are checked
+without needing an optimiser, prior, or solver.
+=#
+const PO = PortfolioOptimisers
+
+@testset "scalarise scalars" begin
+    xs = [1.0, 3.0, 2.0]
+    @test PO.scalarise(identity, SumScalariser(), xs) == 6.0
+    @test PO.scalarise(identity, MaxScalariser(), xs) == 3.0
+    @test PO.scalarise(identity, MinScalariser(), xs) == 1.0
+    gamma = 2.0
+    lse = PO.scalarise(identity, LogSumExpScalariser(; gamma = gamma), xs)
+    @test isapprox(lse, log(sum(exp.(gamma * xs))) / gamma)
+    # Single element: every scalariser is the identity.
+    for sca in (SumScalariser(), MaxScalariser(), MinScalariser(),
+                LogSumExpScalariser(; gamma = gamma))
+        @test isapprox(PO.scalarise(identity, sca, [4.2]), 4.2)
+    end
+end
+@testset "scalarise arrays" begin
+    xs = [1.0, 2.0]
+    @test PO.scalarise(x -> [x, 2 * x], SumScalariser(), xs) == [3.0, 6.0]
+    @test PO.scalarise(x -> [x, 3.0 - x], MaxScalariser(), xs) == [2.0, 2.0]
+    @test PO.scalarise(x -> [x, 3.0 - x], MinScalariser(), xs) == [1.0, 1.0]
+    gamma = 1.5
+    lse = PO.scalarise(x -> [x, 3.0 - x], LogSumExpScalariser(; gamma = gamma), xs)
+    @test isapprox(lse,
+                   [log(sum(exp.(gamma * [1.0, 2.0]))) / gamma,
+                    log(sum(exp.(gamma * [2.0, 1.0]))) / gamma])
+end
+@testset "scalarise tuples with mixed slots" begin
+    # The NearOptimalCentering frontier shape: (scalar, vector, scalar).
+    xs = [1.0, 2.0]
+    f = x -> (x, [x, 3.0 - x], -x)
+    s = PO.scalarise(f, SumScalariser(), xs)
+    @test s[1] == 3.0 && s[2] == [3.0, 3.0] && s[3] == -3.0
+    m = PO.scalarise(f, MaxScalariser(), xs)
+    @test m[1] == 2.0 && m[2] == [2.0, 2.0] && m[3] == -1.0
+    gamma = 2.0
+    l = PO.scalarise(f, LogSumExpScalariser(; gamma = gamma), xs)
+    @test isapprox(l[1], log(sum(exp.(gamma * xs))) / gamma)
+    @test isapprox(l[2],
+                   [log(sum(exp.(gamma * [1.0, 2.0]))) / gamma,
+                    log(sum(exp.(gamma * [2.0, 1.0]))) / gamma])
+    @test isapprox(l[3], log(sum(exp.(-gamma * xs))) / gamma)
+end
+@testset "scalarise keyed max/min" begin
+    # `by` switches max/min from slot-wise to winner-take-all: the whole f
+    # result with the extremal key is returned, as used by HRP (by = sum on the
+    # (lrisk, rrisk) pair) and HERC's inner max/min (by = first on (key, value)).
+    xs = [1.0, 3.0, 2.0]
+    @test PO.scalarise(x -> (x, 10.0 * x), MaxScalariser(), xs; by = first) == (3.0, 30.0)
+    @test PO.scalarise(x -> (x, 10.0 * x), MinScalariser(), xs; by = first) == (1.0, 10.0)
+    @test PO.scalarise(x -> (x, 2.0 * x), MaxScalariser(), xs; by = sum) == (3.0, 6.0)
+    # All keys tie: the earliest element wins.
+    @test PO.scalarise(x -> (x, 10.0 - x), MaxScalariser(), xs; by = sum) == (1.0, 9.0)
+    @test PO.scalarise(x -> (x, 10.0 - x), MinScalariser(), xs; by = sum) == (1.0, 9.0)
+    # `by` is accepted and ignored by the accumulating scalarisers.
+    @test PO.scalarise(identity, SumScalariser(), xs; by = sum) == 6.0
+    gamma = 2.0
+    @test isapprox(PO.scalarise(identity, LogSumExpScalariser(; gamma = gamma), xs;
+                                by = sum), log(sum(exp.(gamma * xs))) / gamma)
+end
+@testset "scalarise helpers" begin
+    @test PO.scalarise_combine(+, 1.0, 2.0) == 3.0
+    @test PO.scalarise_combine(max, [1.0, 4.0], [2.0, 3.0]) == [2.0, 4.0]
+    @test PO.scalarise_combine(+, (1.0, [1.0, 2.0]), (2.0, [3.0, 4.0])) == (3.0, [4.0, 6.0])
+    @test PO.scalarise_map(x -> 2 * x, (1.0, [1.0, 2.0])) == (2.0, [2.0, 4.0])
+    @test isapprox(PO.scalarise_logsumexp([1.0, 2.0]), log(exp(1.0) + exp(2.0)))
+    @test isapprox(PO.scalarise_logsumexp([[1.0, 2.0], [2.0, 1.0]]),
+                   [log(exp(1.0) + exp(2.0)), log(exp(2.0) + exp(1.0))])
+    t = PO.scalarise_logsumexp([(1.0, [1.0, 2.0]), (2.0, [2.0, 1.0])])
+    @test isapprox(t[1], log(exp(1.0) + exp(2.0)))
+    @test isapprox(t[2], [log(exp(1.0) + exp(2.0)), log(exp(2.0) + exp(1.0))])
+end
+
+# The tracking risk measures of `src/16_RiskMeasures/16_TrackingRiskMeasure.jl`, checked
+# against the closed forms their docstrings state: the five norms of `TrackingRiskMeasure`,
+# the two modes of `RiskTrackingRiskMeasure`, the two modes of `RiskTrackingError` in an
+# optimisation, and every propagation method of the three types.
+using Clarabel, JuMP, Statistics
+
+# Observation weights that resolve against the returns matrix. It lives at top level because
+# `@testset` expands to a function body, which cannot hold a `struct`.
+struct TrackedDecayWeights <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::TrackedDecayWeights,
+                                                     X::PortfolioOptimisers.MatNum;
+                                                     dims::Int = 1, kwargs...)
+    return aweights(collect(range(1.0, 2.0; length = size(X, dims))))
+end
+
+@testset "Tracking risk measures" begin
+    rng = StableRNG(1049)
+    T, N = 60, 4
+    X = 0.01 .* randn(rng, T, N) .+ 0.001
+    w = [0.4, 0.3, 0.2, 0.1]
+    wb = fill(0.25, N)
+    pr = prior(EmpiricalPrior(), X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    fees = Fees(; l = 0.002)
+
+    @testset "TrackingRiskMeasure states the five norms" begin
+        d = X * w - X * wb
+        for (alg, val) in ((L2Norm(), norm(d, 2) / sqrt(T - 1)),
+                           (L2Norm(; ddof = 0), norm(d, 2) / sqrt(T)),
+                           (SquaredL2Norm(), norm(d, 2)^2 / (T - 1)), (L1Norm(), norm(d, 1) / T),
+                           (LpNorm(), norm(d, 3) / cbrt(T - 1)),
+                           (LpNorm(; p = 4), norm(d, 4) / (T - 1)^(1 / 4)), (LInfNorm(), norm(d, Inf)))
+            rr = TrackingRiskMeasure(; tr = ReturnsTracking(; w = X * wb), alg = alg)
+            rw = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb), alg = alg)
+            @test isapprox(rr(w, X), val; rtol = 1e-12)
+            @test isapprox(rw(w, X), val; rtol = 1e-12)
+            @test isapprox(expected_risk(rw, w, X), val; rtol = 1e-12)
+            # A return series tracks a return series; a weight benchmark refuses one.
+            @test isapprox(rr(X * w), val; rtol = 1e-12)
+            @test_throws ArgumentError rw(X * w)
+        end
+        # With d = 0 the L2 and L1 forms are Cajas's Equations 9.16 and 9.17.
+        rt = WeightsTracking(; w = wb)
+        @test isapprox(TrackingRiskMeasure(; tr = rt, alg = L2Norm(; ddof = 0))(w, X),
+                       norm(X * wb - X * w, 2) / sqrt(T); rtol = 1e-12)
+        @test isapprox(TrackingRiskMeasure(; tr = rt, alg = L1Norm())(w, X),
+                       sum(abs, X * wb - X * w) / T; rtol = 1e-12)
+    end
+
+    @testset "TrackingRiskMeasure charges each fee on its own series" begin
+        # `Fees(; l)` charges `l` times the long weight sum in every period.
+        fb = Fees(; l = 0.001)
+        r = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb, fees = fb))
+        x = X * w .- 0.002
+        b = X * wb .- 0.001
+        @test isapprox(r(w, X, fees), norm(x - b) / sqrt(T - 1); rtol = 1e-12)
+        @test isapprox(r(w, X), norm(X * w - b) / sqrt(T - 1); rtol = 1e-12)
+    end
+
+    @testset "RiskTrackingRiskMeasure states the two modes" begin
+        sd = factory(StandardDeviation(), pr)
+        cvar = ConditionalValueatRisk()
+        ri = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = sd)
+        rd = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = cvar,
+                                     alg = DependentVariableTracking())
+        # The independent standard deviation is Cajas's Equation 9.18.
+        @test isapprox(ri(w, X), sqrt(dot(w - wb, pr.sigma, w - wb)); rtol = 1e-12)
+        @test isapprox(expected_risk(ri, w, X), ri(w, X); rtol = 1e-14)
+        @test isapprox(rd(w, X),
+                       abs(expected_risk(cvar, w, X) - expected_risk(cvar, wb, X));
+                       rtol = 1e-12)
+        @test iszero(ri(wb, X))
+        @test iszero(rd(wb, X))
+    end
+
+    @testset "the independent functor charges the fee of the portfolio" begin
+        # The model tracks the series `X(w - wb) - F(w)`, and the functor reads the same
+        # series (#1316). Before the fix the functor charged `F(w - wb)`, zero at `wb`.
+        cvar = ConditionalValueatRisk()
+        x = X * (w - wb) .- 0.002 * sum(w)
+        r = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = cvar)
+        @test isapprox(r(w, X, fees), cvar(x); rtol = 1e-14)
+        @test isapprox(r(wb, X, fees), 0.002; rtol = 1e-12)
+        # Without a fee the two series are equal.
+        @test r(w, X) == expected_risk(cvar, w - wb, X)
+        sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv, fees = fees)))
+        @test isa(sol.retcode, OptimisationSuccess)
+        @test isapprox(sol.w, wb; atol = 1e-6)
+        @test isapprox(JuMP.value(sol.model[:risk]), 0.002; rtol = 1e-6)
+        @test isapprox(expected_risk(r, sol.w, X, fees), JuMP.value(sol.model[:risk]);
+                       rtol = 1e-6)
+        # A measure that reads the weights alone reads no fee.
+        rs = factory(RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb),
+                                             r = StandardDeviation()), pr)
+        @test rs(w, X, fees) == rs(w, X)
+        # The dependent functor charges each weight vector its own fee, as the model does.
+        rd = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = cvar,
+                                     alg = DependentVariableTracking())
+        @test isapprox(rd(w, X, fees),
+                       abs(expected_risk(cvar, w, X, fees) -
+                           expected_risk(cvar, wb, X, fees)); rtol = 1e-12)
+    end
+
+    @testset "every tracked measure reads the series of the weight difference" begin
+        cvar = ConditionalValueatRisk()
+        wd = w - wb
+        x = X * wd .- 0.002 * sum(w)
+        wb2 = [0.1, 0.2, 0.3, 0.4]
+        track(ri; b = wb, alg = IndependentVariableTracking()) = RiskTrackingRiskMeasure(;
+                                                                                         tr = WeightsTracking(;
+                                                                                                              w = b),
+                                                                                         r = ri,
+                                                                                         alg = alg)
+        # A moment measure takes its target from the weight difference, net of the fee of the
+        # portfolio, as the model does (#1320).
+        lom = factory(LowOrderMoment(), pr)
+        tgt = dot(wd, pr.mu) - 0.002 * sum(w)
+        @test isapprox(track(lom)(w, X, fees), mean(max.(tgt .- x, 0)); rtol = 1e-12)
+        @test isapprox(track(LowOrderMoment())(w, X, fees), mean(max.(mean(x) .- x, 0));
+                       rtol = 1e-12)
+        @test isapprox(track(MedianAbsoluteDeviation())(w, X, fees),
+                       MedianAbsoluteDeviation()(x); rtol = 1e-12)
+        # Observation weights that resolve against the data resolve first.
+        ow = aweights(collect(range(1.0, 2.0; length = T)))
+        lomd = LowOrderMoment(; w = TrackedDecayWeights(), mu = pr.mu)
+        @test isapprox(track(lomd)(w, X, fees), mean(max.(tgt .- x, 0), ow); rtol = 1e-12)
+        # Every moment family resolves its weights against `X`, down to the variance
+        # estimator it holds, and agrees with the same measure built with the resolved
+        # weights (#1319).
+        sha = PortfolioOptimisers.StandardisedHighOrderMoment
+        for f in (ow -> LowOrderMoment(; w = ow, mu = pr.mu, alg = SecondMoment()),
+                  ow -> HighOrderMoment(; w = ow, mu = pr.mu, alg = sha()),
+                  ow -> Kurtosis(; w = ow, mu = pr.mu), ow -> Skewness(; w = ow, mu = pr.mu))
+            @test isapprox(track(f(TrackedDecayWeights()))(w, X, fees),
+                           track(f(ow))(w, X, fees); rtol = 1e-12)
+        end
+        # A tracking error takes the norm of the series minus its own benchmark series.
+        te = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb2))
+        @test isapprox(track(te)(w, X, fees), norm(x - X * wb2, 2) / sqrt(T - 1);
+                       rtol = 1e-12)
+        # A nested independent mode subtracts its benchmark weights. A nested dependent mode
+        # subtracts the risk of its benchmark weights, which pay their own fee.
+        @test isapprox(track(track(cvar; b = wb2))(w, X, fees),
+                       cvar(X * (wd - wb2) .- 0.002 * sum(w)); rtol = 1e-12)
+        @test isapprox(track(track(cvar; b = wb2, alg = DependentVariableTracking()))(w, X,
+                                                                                      fees),
+                       abs(cvar(x) - cvar(X * wb2 .- 0.002 * sum(wb2))); rtol = 1e-12)
+        # A ratio divides the two results, and a composite of the weights reads no fee.
+        cvar10 = ConditionalValueatRisk(; alpha = 0.1)
+        @test isapprox(track(RiskRatio(; r1 = cvar, r2 = cvar10))(w, X, fees),
+                       cvar(x) / cvar10(x); rtol = 1e-12)
+        vsk = factory(VarianceSkewKurtosis(), prior(HighOrderPriorEstimator(), X))
+        @test track(vsk)(w, X, fees) == vsk(wd, X)
+        # Any other measure that reads weights and returns reads the series, or refuses.
+        @test isapprox(PortfolioOptimisers.difference_risk(PortfolioOptimisers.WeightsReturnsFeesInput(),
+                                                           LowOrderMoment(), wd, w, X,
+                                                           fees), LowOrderMoment()(x);
+                       rtol = 1e-12)
+        @test_throws ArgumentError PortfolioOptimisers.difference_risk(PortfolioOptimisers.WeightsReturnsFeesInput(),
+                                                                       te, wd, w, X, fees)
+        # In an optimisation the functor reads back the value of the model.
+        for ri in (lom, te, track(cvar; b = wb2))
+            r = track(ri)
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv, fees = fees)))
+            @test isa(sol.retcode, OptimisationSuccess)
+            # The net target lets the tracked moment reach zero at the benchmark (#1320).
+            @test isapprox(expected_risk(factory(r, pr, slv), sol.w, X, fees),
+                           JuMP.value(sol.model[:risk]); rtol = 1e-6, atol = 1e-9)
+        end
+    end
+
+    @testset "in an optimisation the independent mode is exact and the dependent mode one-sided" begin
+        cvar = ConditionalValueatRisk()
+        rb = expected_risk(cvar, wb, X)
+        head(tr) = MeanRisk(; r = cvar, obj = MinimumRisk(),
+                            opt = JuMPOptimiser(; pe = pr, slv = slv, tr = tr))
+        # The independent bound binds at `err`.
+        err = 1e-3
+        sol = optimise(head(RiskTrackingError(; tr = WeightsTracking(; w = wb), r = cvar,
+                                              err = err)))
+        @test isa(sol.retcode, OptimisationSuccess)
+        @test isapprox(expected_risk(cvar, sol.w - wb, X), err; rtol = 1e-3)
+        # The dependent bound holds from above only: the portfolio is less risky than the
+        # benchmark by far more than `err` (#1317).
+        err = 1e-5
+        sol = optimise(head(RiskTrackingError(; tr = WeightsTracking(; w = wb), r = cvar,
+                                              err = err, alg = DependentVariableTracking())))
+        @test isa(sol.retcode, OptimisationSuccess)
+        rw = expected_risk(cvar, sol.w, X)
+        @test rw - rb <= err
+        @test rb - rw > 10 * err
+        # In the objective, the model reports zero for a portfolio that is less risky. This
+        # holds for every measure whose model is an upper bound on the risk (#1317).
+        for ri in (cvar, factory(StandardDeviation(), pr), factory(LowOrderMoment(), pr))
+            rbi = expected_risk(ri, wb, X)
+            r = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = ri,
+                                        alg = DependentVariableTracking())
+            sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv)))
+            @test isa(sol.retcode, OptimisationSuccess)
+            @test abs(JuMP.value(sol.model[:risk])) < 1e-8
+            @test rbi - expected_risk(ri, sol.w, X) > 1e-5
+            @test isapprox(r(sol.w, X), rbi - expected_risk(ri, sol.w, X); rtol = 1e-12)
+        end
+    end
+
+    @testset "the constructors" begin
+        @test_throws DomainError RiskTrackingError(; tr = WeightsTracking(; w = wb),
+                                                   err = -1.0)
+        @test_throws DomainError RiskTrackingError(; tr = WeightsTracking(; w = wb),
+                                                   err = Inf)
+        # The tracked measure loses its own bound and objective flag.
+        ub = RiskMeasureSettings(; ub = 0.1, rke = true)
+        rte = RiskTrackingError(; tr = WeightsTracking(; w = wb),
+                                r = StandardDeviation(; settings = ub))
+        @test isnothing(rte.r.settings.ub)
+        @test !rte.r.settings.rke
+        rt = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb),
+                                     r = ConditionalValueatRisk(; settings = ub))
+        @test isnothing(rt.r.settings.ub)
+        @test !rt.r.settings.rke
+        # The dependent mode warns for a measure whose model is a quadratic expression.
+        @test_logs (:warn, r"not guaranteed to work") RiskTrackingRiskMeasure(;
+                                                                              tr = WeightsTracking(;
+                                                                                                   w = wb),
+                                                                              alg = DependentVariableTracking())
+        @test_logs RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb))
+    end
+
+    @testset "port_opt_view slices the benchmark and the tracked measure" begin
+        i = [1, 3]
+        sd = factory(StandardDeviation(), pr)
+        rte = RiskTrackingError(; tr = WeightsTracking(; w = wb), r = sd, err = 0.01,
+                                alg = DependentVariableTracking())
+        v = PortfolioOptimisers.port_opt_view(rte, i, X)
+        @test v.tr.w == wb[i]
+        @test v.r.sigma == pr.sigma[i, i]
+        @test v.err == rte.err
+        @test v.alg === rte.alg
+        rt = RiskTrackingRiskMeasure(; settings = RiskMeasureSettings(; scale = 2.0),
+                                     tr = WeightsTracking(; w = wb), r = sd)
+        v = PortfolioOptimisers.port_opt_view(rt, i, X)
+        @test v.tr.w == wb[i]
+        @test v.r.sigma == pr.sigma[i, i]
+        @test v.settings === rt.settings
+        @test v.alg === rt.alg
+        tm = TrackingRiskMeasure(; tr = WeightsTracking(; w = wb))
+        @test PortfolioOptimisers.port_opt_view(tm, i).tr.w == wb[i]
+    end
+
+    @testset "factory advances the benchmark and resolves the tracked measure" begin
+        w1 = [0.1, 0.2, 0.3, 0.4]
+        moving = WeightsTracking(; w = wb)
+        fixed = WeightsTracking(; w = wb, fixed = true)
+        # RiskTrackingError.
+        rte = RiskTrackingError(; tr = moving, r = StandardDeviation(), err = 0.01)
+        f = factory(rte, pr, slv, nothing, w1)
+        @test f.tr.w == w1
+        @test f.r.sigma == pr.sigma
+        @test f.err == rte.err && f.alg === rte.alg
+        f = factory(rte, pr, slv, nothing)
+        @test f.tr === rte.tr
+        @test f.r.sigma == pr.sigma
+        @test factory(rte, w1).tr.w == w1
+        @test factory(RiskTrackingError(; tr = fixed, err = 0.01), w1).tr === fixed
+        # TrackingRiskMeasure.
+        tm = TrackingRiskMeasure(; tr = moving, alg = L1Norm())
+        @test factory(tm, w1).tr.w == w1
+        @test factory(tm, w1).alg === tm.alg
+        @test factory(tm, pr, slv, nothing, w1).tr.w == w1
+        @test factory(TrackingRiskMeasure(; tr = fixed), w1).tr === fixed
+        ret = ReturnsTracking(; w = X * wb)
+        @test factory(TrackingRiskMeasure(; tr = ret), w1).tr === ret
+        # RiskTrackingRiskMeasure.
+        rt = RiskTrackingRiskMeasure(; tr = moving, r = StandardDeviation())
+        f = factory(rt, pr, slv)
+        @test f.tr === rt.tr
+        @test f.r.sigma == pr.sigma
+        f = factory(rt, w1)
+        @test f.tr.w == w1
+        @test factory(RiskTrackingRiskMeasure(; tr = fixed), w1).tr === fixed
+    end
+
+    @testset "needs_previous_weights reads the benchmark and the tracked measure" begin
+        moving = WeightsTracking(; w = wb)
+        fixed = WeightsTracking(; w = wb, fixed = true)
+        tn = TurnoverRiskMeasure(; w = wb)
+        @test PortfolioOptimisers.needs_previous_weights(TrackingRiskMeasure(; tr = moving))
+        @test !PortfolioOptimisers.needs_previous_weights(TrackingRiskMeasure(; tr = fixed))
+        @test !PortfolioOptimisers.needs_previous_weights(TrackingRiskMeasure(;
+                                                                              tr = ReturnsTracking(;
+                                                                                                   w = X *
+                                                                                                       wb)))
+        for Tracker in (RiskTrackingError, RiskTrackingRiskMeasure)
+            @test PortfolioOptimisers.needs_previous_weights(Tracker(; tr = moving))
+            @test !PortfolioOptimisers.needs_previous_weights(Tracker(; tr = fixed))
+            @test PortfolioOptimisers.needs_previous_weights(Tracker(; tr = fixed, r = tn))
+        end
+    end
+end
+
+# The relativistic risk measures of `src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl`,
+# checked against the mathematics their docstrings state. The reference below solves the
+# Kaniadakis ball of the dual with no conic solver, so it is independent of both programmes
+# that `RRM` builds.
+using Clarabel, JuMP
+
+# The Kaniadakis logarithm, written out so the reference does not read `kappa_log`.
+rl_lnk(u, k) = (u^k - u^(-k)) / (2k)
+# Stationarity of `q ln_k(q / c)` at slope `y` has the root `q = c u^(1/k)` below.
+function rl_q(L, c, k, lam, eta)
+    y = (L .- eta) ./ lam
+    u = (k .* y .+ sqrt.(k^2 .* y .^ 2 .+ (1 - k^2))) ./ (1 + k)
+    return c .* u .^ (1 / k)
+end
+# The multiplier of `sum(q) = 1`, found by bisection, because `sum(q)` falls as it rises.
+function rl_eta(L, c, k, lam)
+    lo = minimum(L) - 1.0
+    hi = maximum(L) + 1.0
+    while sum(rl_q(L, c, k, lam, lo)) < 1
+        lo -= hi - lo
+    end
+    while sum(rl_q(L, c, k, lam, hi)) > 1
+        hi += hi - lo
+    end
+    for _ in 1:200
+        m = (lo + hi) / 2
+        sum(rl_q(L, c, k, lam, m)) > 1 ? (lo = m) : (hi = m)
+    end
+    return (lo + hi) / 2
+end
+# sup_q q'L subject to sum(q) = 1 and sum(q ln_k(q / (p T))) <= ln_k(1 / (alpha T)). The
+# multiplier `lam` of the ball is found by bisection on its logarithm, because the
+# divergence of the maximiser falls as `lam` rises.
+function rl_reference(x, alpha, k, w = nothing)
+    T = length(x)
+    L = -x
+    p = isnothing(w) ? fill(1 / T, T) : w ./ sum(w)
+    c = p .* T
+    r = rl_lnk(1 / (alpha * T), k)
+    divergence(lam) = (q = rl_q(L, c, k, lam, rl_eta(L, c, k, lam));
+                       sum(q .* rl_lnk.(q ./ c, k)))
+    llo, lhi = -30.0, 30.0
+    for _ in 1:200
+        m = (llo + lhi) / 2
+        divergence(exp(m)) > r ? (llo = m) : (lhi = m)
+    end
+    lam = exp((llo + lhi) / 2)
+    q = rl_q(L, c, k, lam, rl_eta(L, c, k, lam))
+    return dot(q, L)
+end
+# A solver whose first construction fails, so the primal programme of `RRM` fails and the
+# dual programme runs on the same solver.
+function rl_fails_once()
+    n = Ref(0)
+    f = () -> (n[] += 1;
+               n[] == 1 ? error("the first construction fails") : Clarabel.Optimizer())
+    return Solver(; name = :fails_once, solver = f, settings = Dict("verbose" => false),
+                  check_sol = (; allow_local = true, allow_almost = true))
+end
+
+@testset "Relativistic risk measures" begin
+    rng = StableRNG(123)
+    x = 0.01 .* randn(rng, 200) .+ 0.0005
+    wt = rand(rng, 200) .+ 0.5
+    W = pweights(wt)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+
+    @testset "RRM solves the Kaniadakis ball" begin
+        for (a, k) in ((0.05, 0.3), (0.05, 0.7), (0.1, 0.1), (0.2, 0.5))
+            @test isapprox(PortfolioOptimisers.RRM(x, slv, a, k), rl_reference(x, a, k);
+                           rtol = 1e-5)
+            @test isapprox(PortfolioOptimisers.RRM(x, slv, a, k, W),
+                           rl_reference(x, a, k, wt); rtol = 1e-5)
+        end
+        # Equal weights are the unweighted measure.
+        @test isapprox(PortfolioOptimisers.RRM(x, slv, 0.2, 0.5, pweights(fill(3.0, 200))),
+                       PortfolioOptimisers.RRM(x, slv, 0.2, 0.5); rtol = 1e-10)
+        # With equal weights and alpha T <= 1 the ball holds every distribution.
+        @test isapprox(PortfolioOptimisers.RRM(x, slv, 1e-3, 0.3), -minimum(x); rtol = 1e-6)
+        @test_throws IsEmptyError PortfolioOptimisers.RRM(x, Solver[], 0.05, 0.3)
+        for T in (RelativisticValueatRisk, RelativisticValueatRiskRange,
+                  RelativisticDrawdownatRisk, RelativeRelativisticDrawdownatRisk)
+            @test_throws IsEmptyError T(; slv = Solver[])
+        end
+    end
+
+    @testset "RRM falls back to the dual programme" begin
+        for (a, k) in ((0.1, 0.1), (0.2, 0.5))
+            @test isapprox(PortfolioOptimisers.RRM(x, rl_fails_once(), a, k),
+                           rl_reference(x, a, k); rtol = 1e-5)
+            @test isapprox(PortfolioOptimisers.RRM(x, rl_fails_once(), a, k, W),
+                           rl_reference(x, a, k, wt); rtol = 1e-5)
+        end
+        dead = Solver(; name = :dead, solver = () -> error("no solver"))
+        @test isnan(PortfolioOptimisers.RRM(x, dead, 0.05, 0.3))
+        @test isnan(PortfolioOptimisers.RRM(x, dead, 0.05, 0.3, W))
+    end
+
+    @testset "RelativisticValueatRisk sits between EVaR and the largest loss" begin
+        a = 0.05
+        cvar = ConditionalValueatRisk(; alpha = a)(x)
+        evar = EntropicValueatRisk(; alpha = a, slv = slv)(x)
+        rl = [RelativisticValueatRisk(; alpha = a, kappa = k, slv = slv)(x)
+              for k in (0.01, 0.3, 0.7, 0.99)]
+        @test issorted([cvar; evar; rl; -minimum(x)])
+        @test isapprox(rl[1], evar; rtol = 1e-3)
+        @test isapprox(rl[end], -minimum(x); rtol = 1e-6)
+        # The functor needs a solver, and `factory` fills it.
+        @test_throws MethodError RelativisticValueatRisk()(x)
+        pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 200)))
+        @test factory(RelativisticValueatRisk(), pr, slv).slv === slv
+    end
+
+    @testset "The range adds the loss tail and the gain tail" begin
+        r = RelativisticValueatRiskRange(; slv = slv, alpha = 0.2, kappa_a = 0.5,
+                                         beta = 0.1, kappa_b = 0.1)
+        @test isapprox(r(x), rl_reference(x, 0.2, 0.5) + rl_reference(-x, 0.1, 0.1);
+                       rtol = 1e-5)
+    end
+
+    @testset "The drawdown measures read their drawdown series" begin
+        c = cumsum(x)
+        dd = c .- accumulate(max, [0.0; c])[2:end]
+        C = cumprod(1 .+ x)
+        rdd = C ./ accumulate(max, [1.0; C])[2:end] .- 1
+        a, k = 0.2, 0.5
+        rldar = RelativisticDrawdownatRisk(; alpha = a, kappa = k, slv = slv)(x)
+        @test isapprox(rldar, rl_reference(dd, a, k); rtol = 1e-5)
+        @test isapprox(RelativeRelativisticDrawdownatRisk(; alpha = a, kappa = k,
+                                                          slv = slv)(x),
+                       rl_reference(rdd, a, k); rtol = 1e-5)
+        # DaR <= CDaR <= EDaR <= RLDaR <= MDD, Cajas's Equation 7.100.
+        @test issorted([DrawdownatRisk(; alpha = a)(x),
+                        ConditionalDrawdownatRisk(; alpha = a)(x),
+                        EntropicDrawdownatRisk(; alpha = a, slv = slv)(x), rldar,
+                        MaximumDrawdown()(x)])
+    end
+end
+
+# The conditional tail measures of `src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl`,
+# checked against the forms their docstrings state: every functor against a Rockafellar-Uryasev
+# linear program and the sorted closed form, the weight validation of all seven constructors,
+# and the two robust programs against Equation 27 of Mohajerin Esfahani and Kuhn.
+using Clarabel, HiGHS, JuMP
+
+# The weighted Rockafellar-Uryasev minimum, min over nu of -nu + sum(p .* max.(nu .- x, 0)) /
+# (alpha * sum(p)), solved as a linear program.
+function ru_lp(x, alpha, p = ones(length(x)))
+    m = Model(HiGHS.Optimizer)
+    set_silent(m)
+    @variable(m, nu)
+    @variable(m, z[1:length(x)] >= 0)
+    @constraint(m, z .>= nu .- x)
+    @objective(m, Min, -nu + sum(p .* z) / (alpha * sum(p)))
+    optimize!(m)
+    return objective_value(m)
+end
+# The sorted closed form of the same minimum, without weights.
+function sorted_tail(x, alpha)
+    s = sort(x)
+    aT = alpha * length(x)
+    k = floor(Int, aT) + 1
+    return -(sum(s[1:(k - 1)]) + (aT - (k - 1)) * s[k]) / aT
+end
+# The drawdown series of the definitions, with the running peaks starting at c_0 = 0 and C_0 = 1.
+abs_dd(x) = cumsum(x) .- accumulate(max, cumsum(x); init = zero(eltype(x)))
+rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltype(x))) .- 1
+# The long-only minimum of mean(loss) + l * CVaR(loss) over the simplex, with the loss the
+# negated portfolio return, or the portfolio drawdown when `dd` is true. It is the limit of the
+# robust measures as the radius goes to zero.
+function mean_cvar_lp(X, alpha, l, p; dd = false)
+    T, N = size(X)
+    m = Model(HiGHS.Optimizer)
+    set_silent(m)
+    @variable(m, w[1:N] >= 0)
+    @constraint(m, sum(w) == 1)
+    @variable(m, nu)
+    @variable(m, z[1:T] >= 0)
+    loss = if dd
+        C = cumsum(X; dims = 1)
+        @variable(m, d[1:T])
+        for t in 1:T
+            @constraint(m, d[t] >= -dot(C[t, :], w))
+            for s in 1:t
+                @constraint(m, d[t] >= dot(C[s, :] - C[t, :], w))
+            end
+        end
+        d
+    else
+        -X * w
+    end
+    @constraint(m, z .>= loss .- nu)
+    sp = sum(p)
+    @objective(m, Min, sum(p .* loss) / sp + l * (nu + sum(p .* z) / (alpha * sp)))
+    optimize!(m)
+    return objective_value(m)
+end
+
+@testset "Conditional tail measures" begin
+    @testset "Each functor is the Rockafellar-Uryasev minimum" begin
+        rng = StableRNG(1047)
+        for T in (7, 20, 63), alpha in (0.01, 0.05, 0.33, 0.9)
+            x = 0.02 .* randn(rng, T) .+ 0.001
+            x0 = copy(x)
+            p = rand(rng, T)
+            p[1] = 0.0
+            pw = pweights(p)
+            cv = ConditionalValueatRisk(; alpha = alpha)
+            @test isapprox(cv(x), ru_lp(x, alpha); atol = 1e-12)
+            @test isapprox(cv(x), sorted_tail(x, alpha); atol = 1e-14)
+            @test isapprox(ConditionalValueatRisk(; alpha = alpha, w = pw)(x),
+                           ru_lp(x, alpha, p); atol = 1e-12)
+            # Unit weights price the same quantity as no weights.
+            @test isapprox(ConditionalValueatRisk(; alpha = alpha, w = pweights(ones(T)))(x),
+                           cv(x); atol = 1e-14)
+            @test DistributionallyRobustConditionalValueatRisk(; alpha = alpha)(x) == cv(x)
+            for beta in (alpha, 0.2)
+                rg = ConditionalValueatRiskRange(; alpha = alpha, beta = beta)
+                rgw = ConditionalValueatRiskRange(; alpha = alpha, beta = beta, w = pw)
+                @test isapprox(rg(x), ru_lp(x, alpha) + ru_lp(-x, beta); atol = 1e-12)
+                @test isapprox(rgw(x), ru_lp(x, alpha, p) + ru_lp(-x, beta, p);
+                               atol = 1e-12)
+                @test DistributionallyRobustConditionalValueatRiskRange(; alpha = alpha,
+                                                                        beta = beta)(x) ==
+                      rg(x)
+            end
+            cd = ConditionalDrawdownatRisk(; alpha = alpha)
+            @test isapprox(cd(x), ru_lp(abs_dd(x), alpha); atol = 1e-12)
+            @test isapprox(ConditionalDrawdownatRisk(; alpha = alpha, w = pw)(x),
+                           ru_lp(abs_dd(x), alpha, p); atol = 1e-12)
+            @test DistributionallyRobustConditionalDrawdownatRisk(; alpha = alpha)(x) ==
+                  cd(x)
+            @test isapprox(RelativeConditionalDrawdownatRisk(; alpha = alpha)(x),
+                           ru_lp(rel_dd(x), alpha); atol = 1e-12)
+            @test isapprox(RelativeConditionalDrawdownatRisk(; alpha = alpha, w = pw)(x),
+                           ru_lp(rel_dd(x), alpha, p); atol = 1e-12)
+            # No functor reorders the caller's vector.
+            @test x == x0
+        end
+    end
+
+    @testset "The upper tail of the range is the CVaR of the negated returns, bit for bit" begin
+        # The functor negates its copy and sorts it ascending, rather than sorting it with
+        # `rev = true` (issue #1341). Negation is exact, so the range must equal the two plain
+        # CVaRs exactly, ties and all, in every precision.
+        rng = StableRNG(1341)
+        for T in (Float32, Float64, BigFloat), n in (1, 7, 50), alpha in (0.05, 0.3, 0.99),
+            beta in (0.05, 0.3, 0.99)
+
+            x = T.(round.(randn(rng, n); digits = 1))
+            x0 = copy(x)
+            rg = ConditionalValueatRiskRange(; alpha = alpha, beta = beta)
+            @test isequal(rg(x),
+                          ConditionalValueatRisk(; alpha = alpha)(x) +
+                          ConditionalValueatRisk(; alpha = beta)(-x))
+            @test x == x0
+        end
+    end
+
+    @testset "Every constructor refuses a negative weight" begin
+        # `DistributionallyRobustConditionalValueatRisk` checked only that the weights were not
+        # empty, and took a negative weight its six siblings refuse.
+        bad = pweights([0.5, -0.1, 0.6])
+        for R in (ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
+                  ConditionalValueatRiskRange, DistributionallyRobustConditionalValueatRiskRange,
+                  ConditionalDrawdownatRisk, DistributionallyRobustConditionalDrawdownatRisk,
+                  RelativeConditionalDrawdownatRisk)
+            @test_throws DomainError R(; w = bad)
+            @test R(; w = pweights([0.5, 0.0, 0.5])) isa R
+        end
+    end
+
+    rng = StableRNG(10471)
+    X = 0.02 .* randn(rng, 40, 4) .+ [0.002 0.001 0.0 -0.001]
+    pr = prior(EmpiricalPrior(), X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
+                                 "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10))
+    min_risk(r) = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = pr, slv = slv)))
+
+    @testset "The robust program is Equation 27" begin
+        # Values of Equation 27 over this sample, from an independent implementation of it:
+        # (alpha, l, r) => (optimum, long-only weights).
+        ref = ((0.05, 1.0, 1e-4) => (1.562371905272e-02,
+                                     [4.934610126584e-01, 4.881094891810e-01, 0.0, 1.842949813185e-02]),
+               (0.2, 3.0, 1e-4) => (2.864793597636e-02,
+                                    [3.368775790342e-01, 2.049947764238e-01, 0.0, 4.581276439958e-01]),
+               (0.05, 1.0, 0.02) => (1.238196688788e-01, fill(0.25, 4)),
+               (0.2, 0.5, 0.1) => (9.027779962236e-02, fill(0.25, 4)))
+        for ((alpha, l, r), (val, w)) in ref
+            sol = min_risk(DistributionallyRobustConditionalValueatRisk(; alpha = alpha,
+                                                                        l = l, r = r))
+            @test isapprox(JuMP.value(sol.model[:risk]), val; rtol = 1e-8)
+            @test isapprox(sol.w, w; atol = 1e-6)
+        end
+    end
+
+    @testset "As the radius goes to zero the mean term stays" begin
+        p = collect(range(0.2, 1.0; length = size(X, 1)))
+        for (wo, pp) in ((nothing, ones(size(X, 1))), (pweights(p), p)), l in (0.5, 3.0),
+            alpha in (0.05, 0.2)
+
+            cvar = min_risk(DistributionallyRobustConditionalValueatRisk(; alpha = alpha,
+                                                                         l = l, r = 1e-9,
+                                                                         w = wo))
+            @test isapprox(JuMP.value(cvar.model[:risk]), mean_cvar_lp(X, alpha, l, pp);
+                           atol = 1e-7)
+            cdar = min_risk(DistributionallyRobustConditionalDrawdownatRisk(; alpha = alpha,
+                                                                            l = l, r = 1e-9,
+                                                                            w = wo))
+            @test isapprox(JuMP.value(cdar.model[:risk]),
+                           mean_cvar_lp(X, alpha, l, pp; dd = true); atol = 1e-7)
+        end
+        # The mean terms of the two tails of the range cancel.
+        for (alpha, beta, la, lb) in ((0.05, 0.1, 1.0, 2.0), (0.2, 0.05, 0.5, 3.0))
+            sol = min_risk(DistributionallyRobustConditionalValueatRiskRange(;
+                                                                             alpha = alpha,
+                                                                             beta = beta,
+                                                                             l_a = la,
+                                                                             l_b = lb,
+                                                                             r_a = 1e-9,
+                                                                             r_b = 1e-9))
+            m = Model(HiGHS.Optimizer)
+            set_silent(m)
+            T, N = size(X)
+            @variable(m, w[1:N] >= 0)
+            @constraint(m, sum(w) == 1)
+            @variable(m, nu[1:2])
+            @variable(m, z[1:T, 1:2] >= 0)
+            @constraint(m, z[:, 1] .>= -X * w .- nu[1])
+            @constraint(m, z[:, 2] .>= X * w .- nu[2])
+            @objective(m, Min,
+                       la * (nu[1] + sum(z[:, 1]) / (alpha * T)) +
+                       lb * (nu[2] + sum(z[:, 2]) / (beta * T)))
+            optimize!(m)
+            @test isapprox(JuMP.value(sol.model[:risk]), objective_value(m); atol = 1e-7)
+        end
+    end
+
+    @testset "The drawdown premium reads a bound on the portfolio drawdown" begin
+        # For long-only weights the portfolio drawdown is at most -w' D_t, the linear function
+        # of the asset drawdowns that the robust premium of the drawdown measure reads.
+        D = PortfolioOptimisers.absolute_drawdown_arr(X)
+        for _ in 1:50
+            w = rand(rng, size(X, 2))
+            w ./= sum(w)
+            @test all(-PortfolioOptimisers.absolute_drawdown_vec(X * w) .<= -D * w .+ 1e-15)
+        end
+    end
+
+    @testset "A measure whose slots hold numbers resolves to itself" begin
+        for r in (DistributionallyRobustConditionalValueatRisk(),
+                  DistributionallyRobustConditionalValueatRiskRange(),
+                  DistributionallyRobustConditionalDrawdownatRisk())
+            @test PortfolioOptimisers.resolve_deferred_quantities(r, pr) === r
+        end
+    end
+end
+
+# A per-asset moment target centres a net series on its net mean (#1320). The series a moment
+# measure reads is net of the fee, so a gross target `dot(w, mu)` shifted every deviation by the
+# mean fee: the MAD model reported its functor plus the fee, and the Kurtosis functor disagreed
+# with its fee-free model. Both levels now subtract the mean fee from a per-asset target.
+using Clarabel, JuMP, Statistics
+
+@testset "A per-asset moment target is the net mean (#1320)" begin
+    rng = StableRNG(1049)
+    T, N = 60, 4
+    X = 0.01 .* randn(rng, T, N) .+ 0.001
+    w = [0.4, 0.3, 0.2, 0.1]
+    pr = prior(EmpiricalPrior(), X)
+    prh = prior(HighOrderPriorEstimator(), X)
+    mu = vec(mean(X; dims = 1))
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    per = Fees(; l = 0.002)
+    fixed = Fees(; l = 0.002, fl = 0.01)
+    amort = Fees(; l = 0.002, fl = 0.01, fa = AmortisedFees())
+
+    @testset "the target subtracts the mean fee per period" begin
+        F(fees) = PortfolioOptimisers.term_fees(w, fees, T, true)
+        mtf(m, fees) = PortfolioOptimisers.moment_target_fees(m, w, fees, T)
+        # A per-asset target subtracts the mean fee; the one-off terms spread over `T`.
+        @test mtf(mu, per) == F(per) == 0.002
+        @test isapprox(mtf(mu, fixed), 0.002 + 4 * 0.01 / T; rtol = 1e-12)
+        @test mtf(mu, amort) == mtf(mu, fixed)
+        @test mtf(VecScalar(mu, 0.001), per) == F(per)
+        @test iszero(mtf(mu, nothing))
+        # A target stated on the net series takes no fee.
+        @test iszero(mtf(nothing, per))
+        @test iszero(mtf(0.001, per))
+        @test iszero(mtf(MeanCentering(), per))
+    end
+
+    @testset "the prior mean agrees with the mean of the net series" begin
+        # `mu` is the sample mean, so the net mean of the prior is the mean of the net series,
+        # on either clock of the one-off terms.
+        for fees in (nothing, per, fixed, amort)
+            for r in (LowOrderMoment(), LowOrderMoment(; alg = MeanAbsoluteDeviation()),
+                      LowOrderMoment(; alg = SecondMoment()),
+                      LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment())),
+                      HighOrderMoment(; alg = ThirdLowerMoment()),
+                      HighOrderMoment(; alg = FourthMoment()), ThirdCentralMoment())
+                @test isapprox(factory(r, pr)(w, X, fees), r(w, X, fees); rtol = 1e-10)
+            end
+            @test isapprox(factory(Kurtosis(), prh)(w, X, fees), Kurtosis()(w, X, fees);
+                           rtol = 1e-10)
+            @test isapprox(MedianAbsoluteDeviation(; mu = mu)(w, X, fees),
+                           MedianAbsoluteDeviation(; mu = MeanCentering())(w, X, fees);
+                           rtol = 1e-10)
+        end
+        # A per period fee cancels from every deviation of a per-asset target.
+        r = factory(LowOrderMoment(; alg = MeanAbsoluteDeviation()), pr)
+        @test isapprox(r(w, X, per), r(w, X); rtol = 1e-12)
+        # A scalar target is a threshold on the net series, so the fee moves the value.
+        x = X * w .- 0.002
+        @test isapprox(LowOrderMoment(; mu = 0.0)(w, X, per), mean(max.(-x, 0));
+                       rtol = 1e-12)
+    end
+
+    @testset "the model agrees with the functor" begin
+        tn = Turnover(; w = fill(0.25, N), val = 0.001)
+        for fees in (per, Fees(; l = 0.002, tn = tn))
+            for (r, p) in ((LowOrderMoment(), pr),
+                           (LowOrderMoment(; alg = MeanAbsoluteDeviation()), pr),
+                           (LowOrderMoment(; alg = SecondMoment()), pr),
+                           (LowOrderMoment(; alg = SecondMoment(; alg1 = SemiMoment())), pr),
+                           (LowOrderMoment(; alg = MeanAbsoluteDeviation(), mu = mu), pr),
+                           (LowOrderMoment(; mu = VecScalar(mu, 0.0)), pr),
+                           (LowOrderMoment(; mu = 0.0), pr), (Kurtosis(), prh))
+                sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                        opt = JuMPOptimiser(; pe = p, slv = slv,
+                                                            fees = fees)))
+                @test isa(sol.retcode, OptimisationSuccess)
+                @test isapprox(expected_risk(factory(r, p, slv), sol.w, X, fees),
+                               JuMP.value(sol.model[:risk]); atol = 1e-8)
+            end
+        end
+    end
+end
+
+# The second-moment measures of `src/16_RiskMeasures/02_Variance.jl`, checked against the forms
+# their docstrings state: the functors against the closed forms, the models of the four encodings
+# against the functors, the worst-case variance of every fitted set against an independent solve
+# of the worst case over that set, and the factories, views and no-bounds copies of the measures.
+using Clarabel, HiGHS, JuMP
+import JuMP.MOI
+
+# A Clarabel model with tolerances tight enough that a solve agrees with a closed form to 1e-8.
+function tight_clarabel()
+    m = Model(Clarabel.Optimizer)
+    set_silent(m)
+    for (k, v) in ("tol_gap_abs" => 1e-12, "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12,
+                   "max_iter" => 500)
+        set_attribute(m, k, v)
+    end
+    return m
+end
+
+@testset "Variance measures" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(817)
+    N = 4
+    X = randn(rng, 250, N) *
+        [1.0 0.3 0.0 0.1; 0.0 1.0 0.4 0.0; 0.0 0.0 1.0 0.2; 0.0 0.0 0.0 1.0] .* 0.01
+    S = cov(X)
+    w = [0.4, 0.3, 0.2, 0.1]
+    W = w * transpose(w)
+    rd = ReturnsResult(; X = X, nx = string.("A", 1:N))
+    pr = prior(EmpiricalPrior(), rd)
+    lb = S .- 0.3 .* abs.(S)
+    ub = S .+ 0.2 .* abs.(S)
+    box = BoxUncertaintySet(; lb = lb, ub = ub)
+    Om = let B = randn(rng, N^2, N^2)
+        B * transpose(B) / N^2 + I
+    end
+    ell = EllipsoidalUncertaintySet(; sigma = Om, k = 0.05,
+                                    class = SigmaUncertaintySetClass())
+
+    @testset "The functors are the closed forms" begin
+        @test Variance(; sigma = S)(w) ≈ dot(w, S * w)
+        @test StandardDeviation(; sigma = S)(w) ≈ sqrt(dot(w, S * w))
+        # An estimator defines no set, so the functor gives the nominal variance.
+        @test UncertaintySetVariance(; sigma = S)(w) ≈ dot(w, S * w)
+        @test UncertaintySetVariance(; ucs = nothing, sigma = S)(w) ≈ dot(w, S * w)
+        @test UncertaintySetVariance(; ucs = box, sigma = S)(w) ≈ PO.ucs_variance(box, S, w)
+    end
+
+    @testset "Each encoding reports the units of its functor" begin
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "max_iter" => 500,
+                                     "tol_gap_abs" => 1e-10, "tol_gap_rel" => 1e-10,
+                                     "tol_feas" => 1e-10),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        model_and_value(r) =
+            let res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt), rd)
+                (value(res.model[:risk]), expected_risk(factory(r, pr), res.w, X), res.w)
+            end
+        for alg in (QuadRiskExpr(), SquaredSOCRiskExpr())
+            m, v, wo = model_and_value(Variance(; alg = alg))
+            @test isapprox(m, v; rtol = 1e-6)
+            @test v ≈ dot(wo, pr.sigma * wo)
+        end
+        m, v, wo = model_and_value(StandardDeviation())
+        @test isapprox(m, v; rtol = 1e-6)
+        @test v ≈ sqrt(dot(wo, pr.sigma * wo))
+        # The three quadratic encodings report the second moment, and the cone encoding its
+        # square root, in the model and in the functor alike.
+        vals = Dict{Any, Float64}()
+        for alg in (QuadRiskExpr(), SquaredSOCRiskExpr(), RSOCRiskExpr(), SOCRiskExpr())
+            m, v, _ = model_and_value(LowOrderMoment(; alg = SecondMoment(; alg2 = alg)))
+            @test isapprox(m, v; rtol = 1e-6)
+            vals[typeof(alg)] = v
+        end
+        @test isapprox(vals[SOCRiskExpr], sqrt(vals[QuadRiskExpr]); rtol = 1e-6)
+        @test isapprox(vals[RSOCRiskExpr], vals[QuadRiskExpr]; rtol = 1e-6)
+    end
+
+    @testset "ucs_variance is the worst case over the set" begin
+        # Box: a linear programme over the symmetric entries between the bounds. A weight vector
+        # with a short position reads the lower bound on its negative entries.
+        for v in (w, [0.7, -0.2, 0.4, 0.1])
+            m = Model(HiGHS.Optimizer)
+            set_silent(m)
+            @variable(m, lb[i, j] <= Sg[i = 1:N, j = 1:N] <= ub[i, j])
+            @constraint(m, [i = 1:N, j = 1:N; i < j], Sg[i, j] == Sg[j, i])
+            @objective(m, Max, dot(v * transpose(v), Sg))
+            optimize!(m)
+            @test isapprox(PO.ucs_variance(box, S, v), objective_value(m); rtol = 1e-10)
+        end
+        # Ellipsoid: the value is the worst case without the condition that the matrix is
+        # positive semidefinite, and it lies above the worst case with that condition.
+        L = cholesky(Om).L
+        function ell_primal(psd)
+            m = tight_clarabel()
+            @variable(m, u[1:(N ^ 2)])
+            @constraint(m, [0.05; u] in SecondOrderCone())
+            s = vec(S) .+ L * u
+            psd && @constraint(m,
+                               Symmetric(0.5 .* (reshape(s, N, N) .+ transpose(reshape(s, N, N)))) in
+                               PSDCone())
+            @objective(m, Max, dot(vec(W), s))
+            optimize!(m)
+            return objective_value(m)
+        end
+        @test isapprox(PO.ucs_variance(ell, S, w), ell_primal(false); rtol = 1e-7)
+        @test PO.ucs_variance(ell, S, w) > ell_primal(true)
+        # The set names its own centre, and `sigma` is the fallback.
+        ellc = EllipsoidalUncertaintySet(; sigma = Om, k = 0.05,
+                                         class = SigmaUncertaintySetClass(), val = 2 .* S)
+        @test PO.ucs_variance(ellc, S, w) ≈ PO.ucs_variance(ell, 2 .* S, w)
+        # Norm ball of orders 2, Inf and 1: the radius times the dual norm of the exposure.
+        Lb = randn(rng, N^2, 3) .* 1e-3
+        cones = Dict(2 => SecondOrderCone(), Inf => MOI.NormInfinityCone(4),
+                     1 => MOI.NormOneCone(4))
+        for p in (2, Inf, 1)
+            nb = NormBallUncertaintySet(; kappa = 0.7, L = Lb, p = p,
+                                        class = SigmaUncertaintySetClass())
+            m = tight_clarabel()
+            @variable(m, u[1:3])
+            @constraint(m, [0.7; u] in cones[p])
+            @objective(m, Max, dot(vec(W), vec(S) .+ Lb * u))
+            optimize!(m)
+            @test isapprox(PO.ucs_variance(nb, S, w), objective_value(m); rtol = 1e-7)
+        end
+        nb0 = NormBallUncertaintySet(; kappa = 0.7, L = zeros(N^2, 0), p = 2,
+                                     class = SigmaUncertaintySetClass())
+        @test PO.ucs_variance(nb0, S, w) ≈ dot(w, S * w)
+        # Compact: the penalty is the squared norm of the part of `C w` outside the span of the
+        # basis, for an orthonormal basis and for any other basis of the same span.
+        Q = Matrix(qr(randn(rng, N, 2)).Q)[:, 1:2]
+        C = [1.0, 0.5, 2.0, 1.5] .* 0.01
+        P = I - Q * transpose(Q)
+        closed = dot(w, S * w) + 3.0 * dot(C .* w, P * (C .* w))
+        cpt = CompactCovarianceUncertaintySet(; kappa = 3.0, C = C, Q = Q)
+        @test PO.ucs_variance(cpt, S, w) ≈ closed
+        cpt2 = CompactCovarianceUncertaintySet(; kappa = 3.0, C = C,
+                                               Q = Q * [2.0 1.0; 0.0 3.0])
+        @test PO.ucs_variance(cpt2, S, w) ≈ closed
+        cpt0 = CompactCovarianceUncertaintySet(; kappa = 3.0, C = C, Q = zeros(N, 0))
+        @test PO.ucs_variance(cpt0, S, w) ≈ dot(w, S * w) + 3.0 * sum(abs2, C .* w)
+    end
+
+    @testset "The factories select a pair and keep a stated set" begin
+        r = factory(Variance(), pr)
+        @test r.sigma === pr.sigma && r.chol === pr.chol
+        # A stated matrix is not paired with the factorisation of the prior.
+        r = factory(StandardDeviation(; sigma = 2 .* S), pr)
+        @test r.sigma == 2 .* S && isnothing(r.chol)
+        # The set that the measure holds wins over the argument.
+        usv = UncertaintySetVariance(; ucs = box)
+        usv0 = UncertaintySetVariance(; ucs = nothing)
+        @test factory(usv, pr, nothing, ell).ucs === box
+        @test factory(usv, pr, ell).ucs === box
+        @test factory(usv, ell, pr).ucs === box
+        @test factory(usv0, pr, nothing, ell).ucs === ell
+        @test factory(usv0, pr, ell).ucs === ell
+        @test factory(usv0, pr).sigma === pr.sigma
+        # Without a prior the uncertainty-set-first method keeps `sigma` as it stands.
+        r = factory(usv0, ell)
+        @test r.ucs === ell && isnothing(r.sigma)
+        r = factory(usv0, ell, pr)
+        @test r.ucs === ell && r.sigma === pr.sigma
+        @test factory(UncertaintySetVariance(; ucs = nothing, sigma = S), ell, pr).sigma ===
+              S
+    end
+
+    @testset "The views slice sigma on both axes and chol on its columns" begin
+        G = Matrix(cholesky(S).U)
+        for (T, i) in ((Variance, [1, 3]), (StandardDeviation, [2, 4]))
+            rv = PO.port_opt_view(T(; sigma = S, chol = G), i)
+            @test rv.sigma == S[i, i] && rv.chol == G[:, i]
+        end
+        rv = PO.port_opt_view(UncertaintySetVariance(; ucs = box, sigma = S), [1, 4])
+        @test rv.sigma == S[[1, 4], [1, 4]] && rv.ucs.ub == ub[[1, 4], [1, 4]]
+    end
+
+    @testset "The no-bounds copies" begin
+        usv = UncertaintySetVariance(; ucs = box, sigma = S,
+                                     settings = RiskMeasureSettings(; ub = 1.0,
+                                                                    scale = 2.0))
+        # `flag` keeps the set, or drops it for the nominal Variance.
+        for f in (nothing, Val(true))
+            a = PO.no_bounds_risk_measure(usv, f)
+            @test a isa UncertaintySetVariance && a.ucs === box && a.sigma === S
+            @test isnothing(a.settings.ub) && a.settings.scale == 2 && a.settings.rke
+            c = PO.no_bounds_no_risk_expr_risk_measure(usv, f)
+            @test c isa UncertaintySetVariance && c.ucs === box
+            @test isnothing(c.settings.ub) && isone(c.settings.scale) && !c.settings.rke
+        end
+        b = PO.no_bounds_risk_measure(usv, Val(false))
+        @test b isa Variance && b.sigma === S
+        @test isnothing(b.settings.ub) && b.settings.scale == 2 && b.settings.rke
+        d = PO.no_bounds_no_risk_expr_risk_measure(usv, Val(false))
+        @test d isa Variance && d.sigma === S && isnothing(d.rc)
+        @test isnothing(d.settings.ub) && isone(d.settings.scale) && !d.settings.rke
+        # The copy of an uncertainty-set variance matches the copy of every other measure.
+        e = PO.no_bounds_no_risk_expr_risk_measure(Variance(; sigma = S,
+                                                            settings = usv.settings))
+        @test e.settings.scale == d.settings.scale && e.settings.rke == d.settings.rke
+    end
+
+    @testset "ucs_risk_measure fits the set on the returns" begin
+        r = PO.ucs_risk_measure(UncertaintySetVariance(; sigma = S), rd)
+        @test r.ucs isa BoxUncertaintySet && r.sigma === S
+        # A set that reads a prior result has nothing to fit before the prior exists.
+        est = NormalUncertaintySet(; pe = nothing)
+        @test PO.ucs_risk_measure(UncertaintySetVariance(; ucs = est), rd).ucs === est
+        rs = PO.ucs_risk_measure([UncertaintySetVariance(; ucs = box), Variance()], rd)
+        @test rs[1].ucs === box && rs[2] isa Variance
+    end
+
+    @testset "Validation" begin
+        for T in (Variance, StandardDeviation, UncertaintySetVariance)
+            @test_throws DimensionMismatch T(; sigma = rand(3, 4))
+            @test_throws IsEmptyError T(; sigma = zeros(0, 0))
+        end
+        @test_throws IsEmptyError Variance(; sigma = S, chol = zeros(0, 0))
+        @test_throws ArgumentError Variance(; chol = Matrix(cholesky(S).U))
+    end
+end
+
+# The observation weights of the risk measures (#1621): the constructor and evaluation checks of
+# `assert_observation_weights` and `checked_observation_weights`, the weighted Ulcer Index, and
+# the significance level zero of the four tail measures, which is the largest loss among the
+# observations with positive weight. The models are checked against the functors.
+using Clarabel, JuMP
+
+# A `DynamicAbstractWeights` that resolves to one weight too many, and one that resolves to a
+# negative weight. Neither has values when the constructor runs, so evaluation must catch them.
+struct LongObsWeights09p <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::LongObsWeights09p,
+                                                     X::PortfolioOptimisers.VecNum_MatNum;
+                                                     kwargs...)
+    return pweights(ones(size(X, 1) + 1))
+end
+struct NegativeObsWeights09p <: PortfolioOptimisers.DynamicAbstractWeights end
+function PortfolioOptimisers.get_observation_weights(::NegativeObsWeights09p,
+                                                     X::PortfolioOptimisers.VecNum_MatNum;
+                                                     kwargs...)
+    return pweights([-1.0; ones(size(X, 1) - 1)])
+end
+
+@testset "Risk measure observation weights" begin
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    rng = StableRNG(7)
+    x = 0.02 .* randn(rng, 40)
+    w = pweights(rand(rng, 40))
+    dd = PortfolioOptimisers.absolute_drawdown_vec(x)
+    rdd = PortfolioOptimisers.relative_drawdown_vec(x)
+    # The worst loss sits on the first observation, which carries no weight.
+    xz = copy(x)
+    xz[1] = -0.5
+    wz = pweights([0.0; ones(39)])
+    ddz = PortfolioOptimisers.absolute_drawdown_vec(xz)
+
+    @testset "Constructors refuse invalid weights" begin
+        @test_throws DomainError UlcerIndex(; w = pweights(zeros(40)))
+        @test_throws DomainError RelativeUlcerIndex(; w = pweights([1.0, -1.0]))
+        @test_throws DomainError ConditionalValueatRisk(; w = pweights(zeros(3)))
+        @test_throws IsEmptyError AverageDrawdown(; w = pweights(Float64[]))
+        @test_throws DomainError MeanReturn(; w = pweights([1.0, -2.0]))
+        # `LowOrderMoment` checked only emptiness before.
+        @test_throws DomainError LowOrderMoment(; w = pweights([1.0, -1.0]))
+        @test_throws DomainError LowOrderMoment(; w = pweights(zeros(2)))
+        @test_nowarn LowOrderMoment(; w = pweights([0.0, 1.0]))
+        # A dynamic weight has no values yet, so the constructor passes it.
+        @test_nowarn UlcerIndex(; w = NegativeObsWeights09p())
+    end
+
+    @testset "Evaluation refuses weights that do not fit the data" begin
+        long = pweights(rand(StableRNG(1), 41))
+        # The weighted quantile kernels read the weights through the sort permutation, so a
+        # long weight vector used to pass in silence.
+        @test_throws DimensionMismatch ConditionalValueatRisk(; w = long)(x)
+        @test_throws DimensionMismatch ConditionalDrawdownatRisk(; w = long)(x)
+        @test_throws DimensionMismatch ValueatRisk(; w = long)(x)
+        @test_throws DimensionMismatch UlcerIndex(; w = long)(x)
+        @test_throws DimensionMismatch AverageDrawdown(; w = long)(x)
+        # Stored weights of a moment measure are checked against the data.
+        @test_throws DimensionMismatch LowOrderMoment(; w = long)(x)
+        @test_throws DimensionMismatch HighOrderMoment(; w = long)(x)
+        @test_throws DimensionMismatch LowOrderMoment(; w = long)(fill(0.2, 5),
+                                                                  randn(StableRNG(2), 40,
+                                                                        5))
+        # Dynamic weights are checked when they resolve.
+        @test_throws DimensionMismatch UlcerIndex(; w = LongObsWeights09p())(x)
+        @test_throws DomainError UlcerIndex(; w = NegativeObsWeights09p())(x)
+        @test_throws DimensionMismatch LowOrderMoment(; w = LongObsWeights09p())(x)
+        @test isnothing(PortfolioOptimisers.checked_observation_weights(nothing, x))
+        @test PortfolioOptimisers.checked_observation_weights(w, x) === w
+        @test isnothing(PortfolioOptimisers.assert_observation_weights(nothing, :w))
+    end
+
+    @testset "Weighted Ulcer Index" begin
+        @test UlcerIndex(; w = w)(x) ≈ sqrt(sum(w .* dd .^ 2) / sum(w))
+        @test RelativeUlcerIndex(; w = w)(x) ≈ sqrt(sum(w .* rdd .^ 2) / sum(w))
+        # Equal weights give the unweighted index.
+        @test UlcerIndex(; w = pweights(fill(3.0, 40)))(x) ≈ UlcerIndex()(x)
+        @test UlcerIndex()(x) ≈ sqrt(sum(dd .^ 2) / 40)
+        @test RelativeUlcerIndex()(x) ≈ sqrt(sum(rdd .^ 2) / 40)
+        # A zero weight drops the observation from the mean, not from the path.
+        @test UlcerIndex(; w = wz)(xz) ≈ sqrt(sum(ddz[2:end] .^ 2) / 39)
+        # The prior's weights reach a measure that states none.
+        X = 0.01 .* randn(StableRNG(5), 40, 3)
+        pr0 = prior(EmpiricalPrior(), X)
+        pr = LowOrderPrior(; X = pr0.X, mu = pr0.mu, sigma = pr0.sigma, w = w)
+        wp = fill(inv(3), 3)
+        ddp = PortfolioOptimisers.absolute_drawdown_vec(X * wp)
+        @test expected_risk(UlcerIndex(), wp, pr) ≈ sqrt(sum(w .* ddp .^ 2) / sum(w))
+        @test expected_risk(UlcerIndex(), wp, pr0) ≈ sqrt(sum(ddp .^ 2) / 40)
+    end
+
+    @testset "Significance level zero" begin
+        @test_throws DomainError ConditionalValueatRisk(; alpha = 1)
+        @test_throws DomainError ConditionalValueatRisk(; alpha = -0.1)
+        @test_throws DomainError ValueatRisk(; alpha = 0)
+        @test_throws DomainError ConditionalValueatRiskRange(; alpha = 0)
+        @test_throws DomainError PortfolioOptimisers.assert_half_open_unit_interval(1.0)
+        @test isnothing(PortfolioOptimisers.assert_half_open_unit_interval(nothing))
+        # Unweighted, level zero reads every observation.
+        @test ConditionalValueatRisk(; alpha = 0)(xz) ≈ 0.5
+        @test EntropicValueatRisk(; slv = slv, alpha = 0)(xz) ≈ 0.5
+        @test ConditionalValueatRisk(; alpha = 0)(x) ≈ WorstRealisation()(x)
+        @test ConditionalDrawdownatRisk(; alpha = 0)(x) ≈ MaximumDrawdown()(x)
+        @test EntropicDrawdownatRisk(; slv = slv, alpha = 0)(x) ≈ MaximumDrawdown()(x)
+        @test RelativeConditionalDrawdownatRisk(; alpha = 0)(x) ≈
+              RelativeMaximumDrawdown()(x)
+        @test RelativeEntropicDrawdownatRisk(; slv = slv, alpha = 0)(x) ≈
+              RelativeMaximumDrawdown()(x)
+        # Weighted, the zero-weight loss cannot set the risk, but it stays in the path.
+        @test ConditionalValueatRisk(; alpha = 0, w = wz)(xz) ≈ -minimum(xz[2:end])
+        @test EntropicValueatRisk(; slv = slv, alpha = 0, w = wz)(xz) ≈ -minimum(xz[2:end])
+        @test ConditionalDrawdownatRisk(; alpha = 0, w = wz)(xz) ≈ -minimum(ddz[2:end])
+        @test EntropicDrawdownatRisk(; slv = slv, alpha = 0, w = wz)(xz) ≈
+              -minimum(ddz[2:end])
+        @test -minimum(ddz[2:end]) > 0.4
+        @test WorstRealisation()(xz) ≈ 0.5
+        # Level zero bounds a small positive level from above.
+        @test ConditionalValueatRisk(; alpha = 0, w = w)(x) >=
+              ConditionalValueatRisk(; alpha = 0.05, w = w)(x)
+    end
+
+    @testset "JuMP models agree with the functors" begin
+        X = 0.01 .* randn(StableRNG(11), 120, 4) .+ 0.0005
+        # Every asset loses on the first observation, which carries no weight.
+        X[1, :] .= -0.2
+        rd = ReturnsResult(; nx = string.('A':'D'), X = X)
+        pr = prior(EmpiricalPrior(), rd)
+        wo = pweights(rand(StableRNG(3), 120))
+        wo0 = pweights([0.0; ones(119)])
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        function solved_risk(r)
+            res = optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt), rd)
+            @test isa(res.retcode, OptimisationSuccess)
+            return JuMP.value(res.model[:risk]),
+                   expected_risk(factory(r, pr, slv), res.w, pr)
+        end
+        for r in (UlcerIndex(), UlcerIndex(; w = wo), UlcerIndex(; w = wo0),
+                  ConditionalValueatRisk(; alpha = 0),
+                  ConditionalValueatRisk(; alpha = 0, w = wo0), EntropicValueatRisk(; alpha = 0),
+                  EntropicValueatRisk(; alpha = 0, w = wo0),
+                  ConditionalDrawdownatRisk(; alpha = 0),
+                  ConditionalDrawdownatRisk(; alpha = 0, w = wo0),
+                  EntropicDrawdownatRisk(; alpha = 0),
+                  EntropicDrawdownatRisk(; alpha = 0, w = wo0))
+            model_risk, functor_risk = solved_risk(r)
+            @test isapprox(model_risk, functor_risk; rtol = 1e-6)
+        end
+        # Unweighted, level zero is the worst realisation and the maximum drawdown.
+        @test isapprox(solved_risk(ConditionalValueatRisk(; alpha = 0))[1],
+                       solved_risk(WorstRealisation())[1]; rtol = 1e-6)
+        @test isapprox(solved_risk(ConditionalDrawdownatRisk(; alpha = 0))[1],
+                       solved_risk(MaximumDrawdown())[1]; rtol = 1e-6)
+        # The zero-weight loss of 0.2 sets the unweighted worst loss and no weighted one.
+        @test solved_risk(ConditionalValueatRisk(; alpha = 0))[1] ≈ 0.2 atol = 1e-6
+        @test solved_risk(ConditionalValueatRisk(; alpha = 0, w = wo0))[1] < 0.1
+        @test solved_risk(EntropicValueatRisk(; alpha = 0, w = wo0))[1] < 0.1
+        # Two Ulcer Index measures with different weights build two expressions.
+        res = optimise(MeanRisk(;
+                                r = [UlcerIndex(; w = wo),
+                                     UlcerIndex(; w = wo0,
+                                                settings = RiskMeasureSettings(;
+                                                                               scale = 2.0))],
+                                obj = MinimumRisk(), opt = opt), rd)
+        @test isa(res.retcode, OptimisationSuccess)
+        m = res.model
+        @test haskey(m, :uci_risk_1) && haskey(m, :uci_risk_2)
+        @test JuMP.value(m[:uci_risk_1]) ≈ UlcerIndex(; w = wo)(X * res.w) rtol = 1e-6
+        @test JuMP.value(m[:uci_risk_2]) ≈ UlcerIndex(; w = wo0)(X * res.w) rtol = 1e-6
+        # Weights of the wrong length are refused when the model is built.
+        @test_throws DimensionMismatch optimise(MeanRisk(;
+                                                         r = UlcerIndex(;
+                                                                        w = pweights(ones(119))),
+                                                         obj = MinimumRisk(), opt = opt),
+                                                rd)
+    end
+end

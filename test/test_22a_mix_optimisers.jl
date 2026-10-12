@@ -205,7 +205,9 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                      opto = SubsetResampling(; rng = StableRNG(100), seed = 42,
                                              opt = MeanRisk(; opt = jopto)))]
     df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
-    for (i, opt) in enumerate(opts)
+    # The loop is split by index over two files, so that each file of the suite runs in
+    # about the same time. This file checks one half of `opts`.
+    for (i, opt) in collect(enumerate(opts))[1:(length(opts) ÷ 2)]
         res = try
             optimise(opt, rd)
         catch err

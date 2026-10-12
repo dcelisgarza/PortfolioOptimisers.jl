@@ -248,7 +248,7 @@ cancels from all of them.
 
 - **A constant weight gives the unweighted answer.** Measured against the unweighted matrix on
   `randn(StableRNG(987654321), 40, 4)`, the weights `1 / T`, `1` and `7.5` each agree to `1e-14`.
-  `test_08g_dependence_covariances.jl` pins all three.
+  `test_08b_robust_moments.jl` pins all three.
 - **The unweighted path is bit-identical.** Column 15 of `test/assets/covariance.csv.gz`, the
   unweighted `DistanceCovariance`, matches the stored values to `0.0`.
 - **Every weighted `DistanceCovariance` number moves**, and the golden column 16 of

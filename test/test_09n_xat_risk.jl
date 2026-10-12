@@ -203,9 +203,9 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
                       settings = merge(opts, Dict("mip_feasibility_tolerance" => 1e-9)))
         # With b = 1000 the default tolerance of 1e-6 left these three about 1e-4 apart (#1323).
         # The levels exempt the 28 and 9 observations of that measurement. A range that exempts
-        # 10 gain observations, as beta = 0.1 now does, takes HiGHS twice as long (#1364).
-        for r in (ValueatRisk(; alpha = 0.285), DrawdownatRisk(; alpha = 0.285),
-                  ValueatRiskRange(; alpha = 0.285, beta = 0.095))
+        # 10 gain observations, as beta = 0.1 now does, takes HiGHS twice as long (#1364). The
+        # range is the third measure, and `test_09n_xat_risk_range.jl` solves it.
+        for r in (ValueatRisk(; alpha = 0.285), DrawdownatRisk(; alpha = 0.285))
             sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
                                     opt = JuMPOptimiser(; pe = pr, slv = slv)))
             tsol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),

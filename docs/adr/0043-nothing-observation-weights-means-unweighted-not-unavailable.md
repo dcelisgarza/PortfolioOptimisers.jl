@@ -104,7 +104,7 @@ deliberately partial implementation.
 - `cov(::GeneralCovariance, …)` with a *complete* dynamic weights type changes from `MethodError` to
   a correctly weighted covariance. This is a bug fix, not a break.
 - `DynamicAbstractWeights` gains its first test coverage
-  ([`test_08c_observation_weights.jl`](../../test/test_08c_observation_weights.jl)), pinning the
+  ([`test_08b_robust_moments.jl`](../../test/test_08b_robust_moments.jl)), pinning the
   resolver contract, the error message's content, the shared `moment_window_and_weights` helper, the
   `08_Moments` estimators, and the `19_RiskMeasures` resolve-then-rebuild path.
 - Documenting the permissive `nothing` contract, as #177 asked for, is no longer needed: after this

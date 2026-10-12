@@ -101,10 +101,10 @@ scale ask for it.
 ## Consequences
 
 - The collapse is closed. Every row of the table above now pins at the floor and returns weights
-    that meet both the linear row and the weight bound. `test_18q_degeneracy_guard.jl` holds the
+    that meet both the linear row and the weight bound. `test_18o_no_return.jl` holds the
     asset-axis case, the dense group row, the inertness of the floor where a tangency portfolio
     exists, the caller-set floor and the validation;
-    `test_02b_factor_exposure_constraints.jl` holds the `FactorSpace` row, and reproduces the
+    `test_02_equation_parsing.jl` holds the `FactorSpace` row, and reproduces the
     defect with `kmin = 1e-12` so the fix is pinned from both sides.
 - The floor is inert where the ratio is well posed. Measured across the five risk measures, the
     healthy `k` is unchanged to seven significant figures, and a floor a million times smaller

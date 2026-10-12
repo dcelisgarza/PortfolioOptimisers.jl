@@ -357,7 +357,7 @@ The coverage is still the one statistic that reads the kept date, by design: it 
 silenced, so the least coverage of a summary can be `0` where the oracle's, over the dates it
 kept, cannot.
 
-`test_08x_parity_forecast_evaluation.jl` pins every per-date series, the forward-window tables,
+`test_08x_forecast_evaluation.jl` pins every per-date series, the forward-window tables,
 the calibration curve and the summary against the oracle on nine cases, and the two differences
 this ADR rules (the t-statistic of an overlap and the kept date) by identity.
 

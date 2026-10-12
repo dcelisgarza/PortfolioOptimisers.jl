@@ -135,7 +135,7 @@ finding stays open on those terms.
 - **The reduction to `GerberCovariance` is bit-exact for `Gerber0` and `Gerber1`, and exact to one
   unit in the last place for `Gerber2`.** The classic family divides by `sqrt(di) * sqrt(dj)`
   through `standardise_comovement!`, and this family groups the same three operations as
-  `sqrt(di * dj)`. `test_08i_gerberiq.jl` pins the gap at one `eps`.
+  `sqrt(di * dj)`. `test_08b_robust_moments.jl` pins the gap at one `eps`.
 - **A caller who passes a hand-tuned template sees more weights lowered than before.** The clamp was
   always silent and always replaced `kind`; it now covers the whole table. A template that already
   met the bound is returned unchanged, and `clamp_gerber_iq_n(FullGerberIQ(), Gerber2()) ==
@@ -147,7 +147,7 @@ finding stays open on those terms.
   `Gerber2` by up to `0.7587` on the `SP500` sample, and its equation (A1) as typeset carries the
   concordance sign inside both denominator sums while its proof treats them as sums of non-negative
   weights. A future ticket that adds it must implement the proof and not the typography.
-- **`test_08i_gerberiq.jl` holds the contract.** `The Gerber2 bound holds (#494, #500)` pins that no
+- **`test_08b_robust_moments.jl` holds the contract.** `The Gerber2 bound holds (#494, #500)` pins that no
   shipped default owes the clamp anything, that both four-row reproductions now return one exactly,
   that the discordant channel `n13` is clamped like any other, that a pair-dependent scaler answers
   the same matrix as a separable one on the volatility-spread sample, that the diagonal is exactly

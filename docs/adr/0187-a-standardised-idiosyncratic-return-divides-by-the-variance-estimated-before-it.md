@@ -42,8 +42,8 @@ is the one-step-ahead rule already.
 ## Consequences
 
 - A calibration series of a released version moves: its first entry is `NaN`, and every other
-  entry reads the variance of the previous row. `test/test_08t_idio_diagnostics.jl` pins the
-  oracle's literals under `ahead = false`, and `test/test_12r_parity_cs_diagnostics.jl` pins the
+  entry reads the variance of the previous row. `test/test_08r_cs_regression_diagnostics.jl` pins the
+  oracle's literals under `ahead = false`, and `test/test_12o_parity_harness.jl` pins the
   default against the oracle's own kernels on the one-step-ahead standardisation.
 - The verbs over `z` (`idio_calibration(z)` and its siblings) do not change: they read the
   standardised returns they are given.

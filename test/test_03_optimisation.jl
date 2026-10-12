@@ -709,3 +709,1088 @@ end
     @test all(nres.resi[k].w == w8[cls[k]] for k in eachindex(cls))
     @test all(isa(r.retcode, OptimisationSuccess) for r in nres.resi)
 end
+
+# Solver-free tests for the shared JuMP model-assembly pipeline (ADR 0008).
+#
+# These build a model through the per-optimiser head and `assemble_jump_model!`, then
+# assert on the *constructed* model — without ever solving it. The interface under test is
+# the assembler's keyword arguments (`r`, `l2c`/`l1`/… settings); the assertions check which
+# Model-State keys the middle registers, so they exercise the routing rather than numerics.
+@testset "JuMP model assembly (solver-free)" begin
+    using Test, PortfolioOptimisers, CSV, TimeSeries, Clarabel, JuMP
+    PO = PortfolioOptimisers
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+
+    # Run the head + assembler for `mr`, stop before solving, return the set of registered
+    # Model-State key names. `r`/`b1`/`obj`/… default to the optimiser's own values but can
+    # be overridden to probe a single branch in isolation.
+    function assemble_keys(mr; r = mr.r, b1 = nothing, obj = mr.obj,
+                           sdp_asset_phylogeny = true)
+        attrs = PO.processed_jump_optimiser_attributes(mr.opt, rd)
+        model = JuMP.Model()
+        PO.set_model_scales!(model, mr.opt.sc, mr.opt.so)
+        PO.set_model_observations!(model, size(attrs.pr.X, 1))
+        # Reach the head's own seams, not a copy of them: `set_maximum_ratio_factor_variables!`
+        # takes exactly one objective, and the budget group travels as `mr.opt`. A hand-copied
+        # call used to pass three arguments here and to name `bgt`/`sbgt` alone, so the
+        # `MaximumRatio` branch was never built and `gbgt` never reached the model.
+        PO.set_maximum_ratio_factor_variables!(model, obj)
+        PO.set_w!(model, attrs.pr.X, mr.wi)
+        PO.set_weight_constraints!(model, attrs.wb, mr.opt)
+        PO.assemble_jump_model!(model, mr, mr.opt, attrs, rd, r, obj, b1,
+                                sdp_asset_phylogeny)
+        return Set(string.(keys(JuMP.object_dictionary(model))))
+    end
+
+    base = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = slv))
+
+    @testset "core state is established" begin
+        ks = assemble_keys(base)
+        @test "w" in ks
+        @test "k" in ks
+        @test "ret" in ks
+    end
+
+    # `k` has two spellings and the objective picks between them. A wrong-arity call to the
+    # producer used to be absorbed by a variadic fallback, which registered the constant
+    # under every objective — so this branch built but was never the one under test.
+    @testset "the objective picks the spelling of `k`" begin
+        model = JuMP.Model()
+        PO.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+        @test model[:k] == 1
+        @test !isa(model[:k], JuMP.VariableRef)
+
+        rmodel = JuMP.Model()
+        PO.set_maximum_ratio_factor_variables!(rmodel, MaximumRatio())
+        @test isa(rmodel[:k], JuMP.VariableRef)
+        @test JuMP.lower_bound(rmodel[:k]) == 0
+
+        # The producer takes exactly one objective; a wrong-arity call must not be absorbed.
+        @test_throws MethodError PO.set_maximum_ratio_factor_variables!(JuMP.Model(),
+                                                                        nothing,
+                                                                        MaximumRatio())
+    end
+
+    # The budget group travels as one object, so a head cannot read part of it. `gbgt` binds
+    # only once the long/short decomposition exists, which a negative weight bound forces.
+    @testset "the gross budget reaches the model through the optimiser" begin
+        gopt = JuMPOptimiser(; slv = slv, wb = WeightBounds(; lb = -1.0, ub = 1.0),
+                             bgt = nothing, sbgt = nothing, gbgt = 2.0)
+        ks = assemble_keys(MeanRisk(; r = Variance(), opt = gopt))
+        @test "gbgt" in ks
+        @test "gbgt" ∉ assemble_keys(base)
+    end
+
+    @testset "risk is routed by the `r` kwarg" begin
+        ks = assemble_keys(base)
+        @test "variance_risk_1" in ks
+        @test "variance_risk_2" ∉ ks
+
+        # A vector of risk measures registers one indexed expression each.
+        ksv = assemble_keys(MeanRisk(; r = [Variance(), Variance()],
+                                     opt = JuMPOptimiser(; slv = slv)))
+        @test "variance_risk_1" in ksv
+        @test "variance_risk_2" in ksv
+
+        # r = nothing → the risk + scalarise step is a no-op (the RelaxedRiskBudgeting path),
+        # but the head and the return constraints are still applied.
+        ksn = assemble_keys(base; r = nothing)
+        @test "variance_risk_1" ∉ ksn
+        @test "risk" ∉ ksn
+        @test "w" in ksn
+        @test "ret" in ksn
+    end
+
+    @testset "optional constraints toggle on their settings" begin
+        @test "l2c" ∉ assemble_keys(base)
+        @test "l2c" in assemble_keys(MeanRisk(; r = Variance(),
+                                              opt = JuMPOptimiser(; slv = slv, l2c = 0.5)))
+
+        @test "l1" ∉ assemble_keys(base)
+        @test "l1" in assemble_keys(MeanRisk(; r = Variance(),
+                                             opt = JuMPOptimiser(; slv = slv, l1 = 0.1)))
+    end
+
+    @testset "integer phylogeny gates on the held indicator, not a fixed key" begin
+        # `set_iplg_constraints!` re-read `model[:ib]`, which only the long-only builder
+        # registers. Anything that routes the model to the long-short builder — a short
+        # threshold here, but fixed fees or `xbgt` do it too — registers `ilb`/`isb`/`i_mip`
+        # and no `:ib`, so the phylogeny constraint threw `KeyError(:ib)` at assembly time.
+        # The builder now registers its bundle in Model State (`set_mip_indicators!`) and the
+        # late emitter reads it back with `mip_indicators` + `held_bin` — no key involved.
+        mr = MeanRisk(; r = Variance(),
+                      opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
+                                          wb = WeightBounds(; lb = -1, ub = 1),
+                                          ple = IntegerPhylogenyEstimator(;
+                                                                          pl = NetworkEstimator(),
+                                                                          B = 1),
+                                          st = Threshold(; val = 0.05)))
+        ks = assemble_keys(mr)
+        @test "card_plg_1" in ks       # the phylogeny constraint was emitted at all
+        @test "i_mip" in ks            # ... gated on the long-short builder's held indicator
+        @test "ib" ∉ ks                # ... which is not `:ib`; that key is never registered
+
+        # The long-only builder still routes through the same call and keeps `:ib`.
+        mrl = MeanRisk(; r = Variance(),
+                       opt = JuMPOptimiser(; slv = slv, bgt = 1, sbgt = 1,
+                                           wb = WeightBounds(; lb = -1, ub = 1),
+                                           ple = IntegerPhylogenyEstimator(;
+                                                                           pl = NetworkEstimator(),
+                                                                           B = 1)))
+        ksl = assemble_keys(mrl)
+        @test "card_plg_1" in ksl
+        @test "ib" in ksl
+    end
+
+    @testset "lp penalty and lpc constraint register distinct keys" begin
+        # The p-norm weight constraint and the Lp regularisation penalty both build
+        # PowerCone epigraphs. They must not register under the same Model-State names,
+        # or whichever runs second silently clobbers the other's handle in the object
+        # dictionary (JuMP's `model[k] = v` overwrites without complaint).
+        ks = assemble_keys(MeanRisk(; r = Variance(),
+                                    opt = JuMPOptimiser(; slv = slv,
+                                                        lp = LpRegularisation(; p = 3,
+                                                                              val = 0.1),
+                                                        lpc = LpRegularisation(; p = 3,
+                                                                               val = 0.5))))
+        for k in ("clp_1", "cslp_1", "t_lp_1", "r_lp_1")       # Lp penalty
+            @test k in ks
+        end
+        for k in ("clpc_1", "cslpc_1", "t_lpc_1", "r_lpc_1")   # p-norm constraint
+            @test k in ks
+        end
+    end
+end
+
+# Tests for the custom JuMP objective/constraint extension points.
+#
+# `cobj`/`ccnt` on a `JuMPOptimiser` are the user-facing escape hatch: subtype
+# `CustomJuMPObjective`/`CustomJuMPConstraint` and implement one builder method. Nothing else
+# in the suite exercises them, so this file pins the contract:
+#   - a single estimator reaches the model and moves the solution,
+#   - a VECTOR of them applies every element (both vector paths were broken: a `ccnt` vector
+#     silently hit the no-op `args...` fallback, a `cobj` vector raised a MethodError),
+#   - the `get_k` idiom is load-bearing under a ratio objective,
+#   - the hook still fires through `NearOptimalCentering`, which calls it from its own
+#     objective builder rather than through `set_portfolio_objective_function!`,
+#   - a subtype with no method defined RAISES rather than silently contributing nothing,
+#   - the same term is sense-correct under a minimisation and a maximisation with no
+#     sign dispatch by the implementer, and a QUADRATIC term works against an AFFINE
+#     objective — both consequences of routing custom terms through the objective penalty
+#     (ADR 0036).
+#
+# The custom types must be defined at module top level (a `struct` cannot be declared inside
+# the `@testset` block).
+using Test, PortfolioOptimisers, CSV, TimeSeries, Clarabel, JuMP, LinearAlgebra, Statistics,
+      Logging
+const PO = PortfolioOptimisers
+
+# A soft reward on a per-asset score. Contributed as a NEGATIVE penalty: the library applies
+# the factor matching each objective's optimisation sense, so this one definition rewards
+# score exposure under a minimisation and a maximisation alike.
+struct ScoreTilt{T1, T2} <: PO.CustomJuMPObjective
+    score::T1
+    lambda::T2
+end
+function PO.add_custom_objective_term!(model::JuMP.Model, obj, cobj::ScoreTilt, optimiser,
+                                       attrs)
+    w = PO.get_w(model)
+    PO.add_to_objective_penalty!(model, -cobj.lambda * (cobj.score' * w))
+    return nothing
+end
+
+# A quadratic concentration penalty. Before ADR 0036 this was impossible against an affine
+# objective: the hook mutated `obj_expr` in place, and `add_to_expression!(::AffExpr,
+# ::QuadExpr)` is a MethodError. The penalty accumulator promotes instead.
+struct SpreadPenalty{T} <: PO.CustomJuMPObjective
+    lambda::T
+end
+function PO.add_custom_objective_term!(model::JuMP.Model, obj, cobj::SpreadPenalty,
+                                       optimiser, attrs)
+    w = PO.get_w(model)
+    PO.add_to_objective_penalty!(model, cobj.lambda * JuMP.@expression(model, dot(w, w)))
+    return nothing
+end
+
+# A hard floor on the same score exposure, following the model idiom: scale by the constraint
+# scale, and lift the constant bound to `k`.
+struct ScoreFloor{T1, T2} <: PO.CustomJuMPConstraint
+    score::T1
+    floor::T2
+end
+function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreFloor, optimiser, attrs)
+    w = PO.get_w(model)
+    k = PO.get_k(model)
+    sc = PO.get_constraint_scale(model)
+    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor * k) >= 0)
+    return nothing
+end
+
+# The floor's mirror image, used to prove a `ccnt` vector applies *both* elements.
+struct ScoreCap{T1, T2} <: PO.CustomJuMPConstraint
+    score::T1
+    cap::T2
+end
+function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreCap, optimiser, attrs)
+    w = PO.get_w(model)
+    k = PO.get_k(model)
+    sc = PO.get_constraint_scale(model)
+    JuMP.@constraint(model, sc * (ccnt.cap * k - ccnt.score' * w) >= 0)
+    return nothing
+end
+
+# The same floor with the `* k` omitted — correct only where `k == 1`.
+struct ScoreFloorNoK{T1, T2} <: PO.CustomJuMPConstraint
+    score::T1
+    floor::T2
+end
+function PO.add_custom_constraint!(model::JuMP.Model, ccnt::ScoreFloorNoK, optimiser, attrs)
+    w = PO.get_w(model)
+    sc = PO.get_constraint_scale(model)
+    JuMP.@constraint(model, sc * (ccnt.score' * w - ccnt.floor) >= 0)
+    return nothing
+end
+
+# Records the arguments the objective hook is handed, without touching `obj_expr`. Used to
+# pin the calling convention on every path that invokes the hook.
+struct SpyObjective{T} <: PO.CustomJuMPObjective
+    log::T
+end
+function PO.add_custom_objective_term!(model::JuMP.Model, obj, cobj::SpyObjective,
+                                       optimiser, attrs)
+    push!(cobj.log, (; obj, optimiser, attrs))
+    return nothing
+end
+
+# Subtypes that never define a builder method: they must hit the no-op fallback.
+struct InertConstraint <: PO.CustomJuMPConstraint end
+struct InertObjective <: PO.CustomJuMPObjective end
+
+@testset "custom JuMP objective/constraint hooks" begin
+    rd = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__, "./assets/SP500.csv.gz"));
+                                     timestamp = :Date)[(end - 252):end])
+    pr = prior(EmpiricalPrior(), rd)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    rf = 4.2 / 100 / 252
+
+    # Standardised trailing-63-day momentum: a continuous per-asset preference.
+    score = let m = vec(sum(rd.X[(end - 62):end, :]; dims = 1))
+        (m .- sum(m) / length(m)) ./ std(m)
+    end
+    exposure(res) = dot(score, res.w)
+
+    minrisk(; kwargs...) = optimise(MeanRisk(; obj = MinimumRisk(),
+                                             opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                 kwargs...)))
+    ratio(; kwargs...) = optimise(MeanRisk(; obj = MaximumRatio(; rf = rf),
+                                           opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                               kwargs...)))
+
+    base = minrisk()
+    base_exp = exposure(base)
+
+    @testset "objective hook: a single term reaches the objective" begin
+        tilted = minrisk(; cobj = ScoreTilt(score, 1e-4))
+        # The tilt rewards score exposure, so it must rise above the untilted baseline.
+        @test exposure(tilted) > base_exp + 1e-3
+    end
+
+    @testset "objective hook: a vector composes additively" begin
+        # Regression: a `cobj` vector used to raise a MethodError, because every
+        # `set_portfolio_objective_function!` typed `cobj::Option{<:CustomJuMPObjective}`.
+        # Two λ terms accumulate into the same expression, so they must equal one 2λ term.
+        two = minrisk(; cobj = [ScoreTilt(score, 1e-4), ScoreTilt(score, 1e-4)])
+        one = minrisk(; cobj = ScoreTilt(score, 2e-4))
+        @test isapprox(exposure(two), exposure(one); rtol = 1e-5)
+        @test exposure(two) > base_exp + 1e-3
+    end
+
+    @testset "constraint hook: a single constraint binds at its bound" begin
+        f = base_exp + 0.5                     # above the free optimum, so it must bind
+        res = minrisk(; ccnt = ScoreFloor(score, f))
+        @test isapprox(exposure(res), f; atol = 1e-4)
+    end
+
+    @testset "constraint hook: a vector applies every element" begin
+        # Regression: a `ccnt` vector used to hit the no-op `args...` fallback and be
+        # SILENTLY DROPPED — the solve returned the unconstrained weights.
+        lo = base_exp + 0.3
+        hi = lo + 0.2
+        res = minrisk(; ccnt = [ScoreFloor(score, lo), ScoreCap(score, hi)])
+        e = exposure(res)
+        @test e >= lo - 1e-4                   # the floor element was applied
+        @test e <= hi + 1e-4                   # ... and so was the cap element
+        @test e > base_exp + 1e-3              # the pair genuinely moved the solution
+    end
+
+    @testset "constraint hook: the `k` idiom is load-bearing under a ratio objective" begin
+        # `MaximumRatio` solves in a rescaled space (`w_real == w / k`), so a constant bound
+        # must be multiplied by `k`. Under `MinimumRisk` `k == 1` and both spellings agree —
+        # which is exactly why omitting it hides.
+        f_min = base_exp + 0.3
+        @test isapprox(exposure(minrisk(; ccnt = ScoreFloor(score, f_min))),
+                       exposure(minrisk(; ccnt = ScoreFloorNoK(score, f_min))); rtol = 1e-5)
+
+        # Under the ratio objective only the k-scaled floor honours the requested level.
+        ratio_exp = exposure(ratio())
+        f = ratio_exp + 0.02                   # just above the free optimum: binds, stays feasible
+        right = ratio(; ccnt = ScoreFloor(score, f))
+        wrong = ratio(; ccnt = ScoreFloorNoK(score, f))
+        @test isapprox(exposure(right), f; atol = 1e-4)
+        @test !isapprox(exposure(wrong), f; atol = 1e-3)
+    end
+
+    @testset "objective hook: the same term is sense-correct without sign dispatch" begin
+        # ADR 0036: a term contributed to the objective penalty is oriented by the library,
+        # so ONE definition rewards score exposure under a minimisation and a maximisation
+        # alike. Before this, the implementer had to dispatch a sign on the objective type
+        # and get it right, and `MaximumRatio` had no correct fixed sign at all.
+        util(; kwargs...) = optimise(MeanRisk(; obj = MaximumUtility(),
+                                              opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                  kwargs...)))
+        @test exposure(util(; cobj = ScoreTilt(score, 5e-3))) > exposure(util()) + 1e-3
+        # ... and the same term still rewards under the minimisation.
+        @test exposure(minrisk(; cobj = ScoreTilt(score, 1e-4))) > base_exp + 1e-3
+    end
+
+    @testset "objective hook: a quadratic term works against an affine objective" begin
+        # Regression: `MaximumReturn` builds an AFFINE `obj_expr`, so a quadratic term used to
+        # be a MethodError from `add_to_expression!(::AffExpr, ::QuadExpr)` — a custom term
+        # whose validity depended on the risk measure and objective. The penalty accumulator
+        # promotes, so it now works everywhere.
+        maxret(; kwargs...) = optimise(MeanRisk(; obj = MaximumReturn(),
+                                                opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                    kwargs...)))
+        plain = maxret()
+        spread = maxret(; cobj = SpreadPenalty(1e2))
+        # An unconstrained max-return solve piles into the highest-mean asset; the quadratic
+        # penalty prices concentration, so the book must spread out.
+        @test dot(spread.w, spread.w) < dot(plain.w, plain.w) - 1e-4
+    end
+
+    @testset "objective hook is called with the documented argument order" begin
+        # The contract is `(model, obj, cobj, optimiser, attrs)`. A caller that shifts `cobj`
+        # out of position 3 means the user's method misses dispatch — which now RAISES via the
+        # typed fallback rather than silently dropping the term. `NearOptimalCentering` invokes
+        # the hook from its own objective builder rather than through
+        # `set_portfolio_objective_function!`, so assert the convention holds on both paths.
+        # Only the *constrained* NOC algorithm routes through that call.
+        #
+        # This is deliberately solver-free: the spy records the call during model assembly, so
+        # it pins the calling convention even where the subsequent solve is ill-conditioned.
+        function spy_log(build)
+            log = Any[]
+            with_logger(NullLogger()) do
+                return build(SpyObjective(log))
+            end
+            return log
+        end
+
+        main = spy_log(spy -> minrisk(; cobj = spy))
+        @test length(main) == 1
+        @test main[1].obj isa PO.ObjectiveFunction
+        @test main[1].optimiser isa MeanRisk
+        @test main[1].attrs isa ProcessedJuMPOptimiserAttributes
+
+        noc = spy_log(spy -> optimise(NearOptimalCentering(; r = StandardDeviation(),
+                                                           obj = MinimumRisk(),
+                                                           alg = ConstrainedNearOptimalCentering(),
+                                                           opt = JuMPOptimiser(; pe = pr,
+                                                                               slv = slv,
+                                                                               cobj = spy))))
+        # NOC also solves `MeanRisk` sub-problems for its reference points, and those reach the
+        # hook through the main path — so a non-empty log proves nothing. The centring
+        # objective's own call is the one under test, and it is the only invocation carrying
+        # the `NearOptimalCentering` estimator in the `optimiser` slot. (Before ADR 0036 this
+        # call was the odd one out for the wrong reason: it passed a `JuMPOptimiser` there,
+        # a different branch of the type tree from every other caller.)
+        @test any(e -> isa(e.optimiser, NearOptimalCentering), noc)
+        @test all(e -> e.obj isa PO.ObjectiveFunction, noc)
+        @test all(e -> e.optimiser isa PO.OptimisationEstimator, noc)
+        @test all(e -> e.attrs isa ProcessedJuMPOptimiserAttributes, noc)
+    end
+
+    @testset "fallback: a subtype with no builder method raises" begin
+        # ADR 0036: the untyped `args...` catch-all used to absorb these silently, which is how
+        # a `ccnt` vector once vanished without a word — and is how every stale hook would have
+        # vanished when this signature changed. A subtype that defines no method is a user
+        # error, and now says so.
+        @test_throws ArgumentError minrisk(; cobj = InertObjective())
+        @test_throws ArgumentError minrisk(; ccnt = InertConstraint())
+        # `nothing` — no custom term configured — remains the one legitimate no-op.
+        @test isapprox(minrisk(; cobj = nothing, ccnt = nothing).w, base.w; atol = 1e-6)
+    end
+end
+
+# The docstrings of `src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/` checked against
+# numbers: the type families, the custom hooks, the model accessors, the Model State verbs,
+# the frontier builders and the model setup. Most testsets build a model by hand and never
+# solve it; the last ones solve a five-asset panel with Clarabel.
+using Test, PortfolioOptimisers, JuMP, Clarabel, HiGHS, StableRNGs, LinearAlgebra
+using InteractiveUtils: subtypes
+
+# A subtype of each hook with no method of its own. A struct is defined at the top level.
+struct HookConstraint03d <: PortfolioOptimisers.CustomJuMPConstraint end
+struct HookObjective03d <: PortfolioOptimisers.CustomJuMPObjective end
+
+@testset "Base JuMP optimisation against its docstrings" begin
+    PO = PortfolioOptimisers
+
+    @testset "the objective and return families have the stated members" begin
+        # Four classic objectives and the internal corner objective.
+        @test Set(subtypes(PO.ObjectiveFunction)) ==
+              Set([MinimumRisk, MaximumReturn, MaximumUtility, MaximumRatio,
+                   PO.MaximumElementReturn])
+        @test Set(subtypes(PO.JuMPReturnsEstimator)) ==
+              Set([ArithmeticReturn, LogarithmicReturn, NoReturn])
+    end
+
+    @testset "a custom hook with no method raises, and nothing is the only no-op" begin
+        model = JuMP.Model()
+        @test isnothing(PO.add_custom_constraint!(model, nothing, nothing, nothing))
+        @test isnothing(PO.add_custom_objective_term!(model, MinimumRisk(), nothing,
+                                                      nothing, nothing))
+        @test_throws ArgumentError PO.add_custom_constraint!(model, HookConstraint03d(),
+                                                             nothing, nothing)
+        @test_throws ArgumentError PO.add_custom_objective_term!(model, MinimumRisk(),
+                                                                 HookObjective03d(),
+                                                                 nothing, nothing)
+        # The vector methods reach the per-type method of each entry.
+        @test_throws ArgumentError PO.add_custom_constraint!(model, [HookConstraint03d()],
+                                                             nothing, nothing)
+        @test_throws ArgumentError PO.add_custom_objective_term!(model, MinimumRisk(),
+                                                                 [HookObjective03d()],
+                                                                 nothing, nothing)
+        @test !PO.needs_previous_weights(HookConstraint03d())
+        @test !PO.needs_previous_weights([HookConstraint03d(), HookConstraint03d()])
+        @test !PO.needs_previous_weights(HookObjective03d())
+        @test !PO.needs_previous_weights([HookObjective03d()])
+        @test isnothing(PO.port_opt_view(HookConstraint03d(), 1:2))
+        @test isnothing(PO.port_opt_view(HookObjective03d(), 1:2))
+        @test_throws IsEmptyError PO.JuMPOptimisationSolution(; w = Float64[])
+    end
+
+    @testset "every accessor raises on a model that lacks its entry" begin
+        model = JuMP.Model()
+        for f in
+            (PO.get_constraint_scale, PO.get_objective_scale, PO.get_T, PO.get_w, PO.get_k,
+             PO.get_ret, PO.get_risk, PO.get_net_X)
+            @test_throws ArgumentError f(model)
+        end
+        @test !PO.has_net_X(model)
+        # The message names the builder that registers `:ret`.
+        msg = try
+            PO.get_ret(model)
+        catch e
+            e.msg
+        end
+        @test occursin("scalarise_return_expression!", msg)
+        @test isnothing(PO.decomposition_contract(model))
+        @test !PO.is_unit_budget(model)
+    end
+
+    @testset "scales, observation count, unit budget and decomposition contract" begin
+        model = JuMP.Model()
+        PO.set_model_scales!(model, 2.0, 3.0)
+        PO.set_model_observations!(model, 7)
+        # JuMP stores a number given to `@expressions` as the number itself.
+        @test PO.get_constraint_scale(model) === 2.0
+        @test PO.get_objective_scale(model) === 3.0
+        @test PO.get_T(model) == 7
+        JuMP.@variable(model, k)
+        @test PO.effective_k(model) === k
+        PO.set_unit_budget!(model)
+        @test PO.is_unit_budget(model)
+        @test PO.effective_k(model) == 1
+        @test PO.get_k(model) === k
+        # The first record stays.
+        PO.set_decomposition_contract!(model, PO.WeightsFromParts())
+        PO.set_decomposition_contract!(model, PO.PartsBoundWeights())
+        @test PO.decomposition_contract(model) isa PO.WeightsFromParts
+    end
+
+    @testset "Model State: keys, the collision guard, build once and flags" begin
+        model = JuMP.Model()
+        p = Symbol("")
+        @test PO.state_key(p, :ret_, 1) == :ret_1
+        @test PO.state_key(:a_, :x) == :a_x
+        # Two different sets of parts give one key, and the second registration raises.
+        @test PO.state_key(p, :tr_dr_, 11) == PO.state_key(p, :tr_dr_1, 1)
+        @test PO.state_set!(model, p, :tr_dr_1, 1, :first) == :first
+        @test_throws ArgumentError PO.state_set!(model, p, :tr_dr_, 11, :second)
+        @test model[:tr_dr_11] == :first
+        @test PO.state_set!(model, :a_, :y, 5) == 5
+        @test_throws ArgumentError PO.state_set!(model, :a_, :y, 6)
+        @test PO.state_has(model, :a_, :y) && PO.state_has(model, p, :tr_dr_1, 1)
+        @test PO.state_get(model, :a_, :y) == 5
+        @test PO.state_get(model, p, :tr_dr_1, 1) == :first
+        @test_throws ArgumentError PO.state_get(model, :a_, :z)
+        @test_throws ArgumentError PO.state_get(model, :a_, :z, 1)
+        # `f` runs once for each key.
+        calls = Ref(0)
+        f = () -> (calls[] += 1; calls[])
+        @test PO.state_build!(f, model, :b_, :x) == 1
+        @test PO.state_build!(f, model, :b_, :x) == 1
+        @test PO.state_build!(f, model, :b_, :x, 2) == 2
+        @test PO.state_build!(f, model, :b_, :x, 2) == 2
+        @test calls[] == 2
+        # A flag holds `true`, and a second mark has no effect.
+        PO.mark_state!(model, :c_, :flag)
+        PO.mark_state!(model, :c_, :flag)
+        PO.mark_state!(model, :c_, :flag, 3)
+        @test model[:c_flag] === true && model[:c_flag3] === true
+        @test PO.nested_prefix(:a_, :tr_dr_) == :a_tr_dr_
+        @test PO.nested_prefix(:a_, :tr_dr_, 3) == :a_tr_dr_3_
+        @test PO.nested_index(:loss_, 2) == :loss_2
+        @test PO.nested_index(:gain_, PO.nested_index(:loss_, 2)) == :gain_loss_2
+        # The shared verbs refuse a name off the list, and `shared_set!` replaces an entry.
+        @test :X ∉ PO.SHARED_STATE
+        @test_throws ArgumentError PO.shared_get(model, :X)
+        @test_throws ArgumentError PO.shared_has(model, :X)
+        @test_throws ArgumentError PO.shared_set!(model, :X, 1)
+        @test_throws ArgumentError PO.shared_get(model, :fees)
+        @test PO.shared_set!(model, :fee_fa, nothing) === nothing
+        @test PO.shared_set!(model, :fee_fa, PO.AmortisedFees()) isa PO.AmortisedFees
+        @test PO.shared_get(model, :fee_fa) isa PO.AmortisedFees
+    end
+
+    @testset "frontier rows: the floor, the polarity and the count" begin
+        model = JuMP.Model()
+        PO.set_model_scales!(model, 2.0, 1.0)
+        PO.set_maximum_ratio_factor_variables!(model, MinimumRisk())
+        JuMP.@variable(model, x)
+        @test PO.frontier_sweep_points(model) == (big(1), Pair{Symbol, Int}[])
+        @test isnothing(PO.assert_frontier_sweep_cap(model))
+        @test PO.frontier_point_count(Frontier(; N = 4)) == 4
+        @test PO.frontier_point_count([1.0, 2.0]) == 2
+        risk = [(:a_var, :a) => (1.0 * x, [1.0, 2.0], true, 0),
+                (:b_var, :b) => (1.0 * x, [3.0], false, 0)]
+        rax = PO.set_risk_frontier_parameters!(model, risk)
+        # A `true` flag is the ceiling `x <= u k`, a `false` flag the floor `x >= u k`,
+        # and `s_c = 2` multiplies both.
+        ca = JuMP.constraint_object(model[:a])
+        cb = JuMP.constraint_object(model[:b])
+        @test ca.set == JuMP.MOI.LessThan(0.0) && cb.set == JuMP.MOI.LessThan(0.0)
+        @test JuMP.coefficient(ca.func, x) == 2.0
+        @test JuMP.coefficient(ca.func, model[:a_var]) == -2.0
+        @test JuMP.coefficient(cb.func, x) == -2.0
+        @test JuMP.coefficient(cb.func, model[:b_var]) == 2.0
+        ret = [(:r_var, :r) => (3.0 * x, [0.5, 0.7, 0.9], 1)]
+        tax = PO.set_ret_frontier_parameters!(model, ret)
+        cr = JuMP.constraint_object(model[:r])
+        @test cr.set == JuMP.MOI.GreaterThan(0.0)
+        @test JuMP.coefficient(cr.func, x) == 6.0
+        @test JuMP.coefficient(cr.func, model[:r_var]) == -2.0
+        # The product: two risk points, one risk point and three return points.
+        pts = collect(PO.frontier_sweep_axes(tax, rax))
+        @test length(pts) == 6
+        @test length(collect(PO.frontier_sweep_axes(tax, nothing))) == 3
+        @test length(collect(PO.frontier_sweep_axes(nothing, rax))) == 2
+        @test length(collect(PO.frontier_sweep_axes(nothing, nothing))) == 1
+        # The risk axis changes fastest.
+        PO.set_frontier_point!(model, pts[2])
+        @test JuMP.parameter_value(model[:a_var]) == 2.0
+        @test JuMP.parameter_value(model[:r_var]) == 0.5
+        PO.set_frontier_point!(model, pts[3])
+        @test JuMP.parameter_value(model[:a_var]) == 1.0
+        @test JuMP.parameter_value(model[:r_var]) == 0.7
+        @test JuMP.parameter_value(model[:b_var]) == 3.0
+    end
+
+    @testset "weights, start values and the return series" begin
+        X = [0.01 0.02; -0.01 0.03; 0.02 -0.02; 0.0 0.01]
+        model = JuMP.Model()
+        PO.set_w!(model, X, [0.25, 0.75])
+        w = PO.get_w(model)
+        @test length(w) == 2
+        @test JuMP.start_value.(w) == [0.25, 0.75]
+        @test !JuMP.has_lower_bound(w[1]) && !JuMP.has_upper_bound(w[1])
+        @test_throws DimensionMismatch PO.set_initial_w!(w, [1.0])
+        # A vector of weight vectors, as a sweep of anchors passes, sets no start value.
+        model2 = JuMP.Model()
+        PO.set_w!(model2, X, [[0.5, 0.5], [0.2, 0.8]])
+        @test all(isnothing, JuMP.start_value.(PO.get_w(model2)))
+        Xw = PO.set_portfolio_returns!(model, X)
+        @test PO.set_portfolio_returns!(model, X) === Xw
+        @test PO.state_get(model, Symbol(""), :X) === Xw
+        wv = [0.6, 0.4]
+        val(e) = JuMP.value(v -> wv[JuMP.index(v).value], e)
+        @test val.(Xw) ≈ X * wv
+        net = PO.set_net_portfolio_returns!(model, X)
+        # With no fees the net series is the gross one.
+        @test val.(net) ≈ X * wv
+        @test PO.has_net_X(model) && PO.get_net_X(model) === net
+    end
+
+    @testset "the net series charges the one-off fee on its clock" begin
+        X = [0.01 0.02; -0.01 0.03; 0.02 -0.02; 0.0 0.01]
+        wv = [0.6, 0.4]
+        function net_series(fa)
+            model = JuMP.Model()
+            PO.set_model_scales!(model, 1.0, 1.0)
+            PO.set_model_observations!(model, 4)
+            JuMP.@variable(model, w[1:2])
+            PO.add_to_fees!(model, 0.001 * w[1])
+            PO.add_to_one_time_fees!(model, 0.004 * w[2])
+            PO.shared_set!(model, :fee_fa, fa)
+            net = PO.set_net_portfolio_returns!(model, X)
+            @test PO.set_net_portfolio_returns!(model, X) === net
+            return [JuMP.value(v -> wv[JuMP.index(v).value], e) for e in net]
+        end
+        gross = X * wv .- 0.001 * 0.6
+        one_off = 0.004 * 0.4
+        # The first observation pays the whole one-off fee on the default clock.
+        @test net_series(nothing) ≈ gross .- one_off .* [1, 0, 0, 0]
+        @test net_series(PO.FirstObservationFees()) ≈ gross .- one_off .* [1, 0, 0, 0]
+        # Each of the four observations pays a quarter on the amortised clock.
+        @test net_series(PO.AmortisedFees()) ≈ gross .- one_off / 4
+    end
+
+    @testset "the plus-one matrices" begin
+        X = [0.01 0.02; -0.03 0.03; 0.02 -0.02]
+        model = JuMP.Model()
+        a = PO.set_asset_returns_plus_one!(model, X)
+        @test a == X .+ 1
+        @test PO.set_asset_returns_plus_one!(model, X) === a
+        @test PO.state_get(model, Symbol(""), :Xap1) === a
+        d = PO.set_portfolio_drawdowns_plus_one!(model, X)
+        # The drawdown of each column of the cumulative sum, the peak seeded at zero.
+        c = cumsum(X; dims = 1)
+        @test d ≈ 1 .+ c .- max.(0, accumulate(max, c; dims = 1))
+        @test d ≈ [1.0 1.0; 0.97 1.0; 0.99 0.98]
+        @test all(<=(1), d)
+        @test PO.set_portfolio_drawdowns_plus_one!(model, X) === d
+        @test PO.state_get(model, Symbol(""), :ddap1) === d
+        # The prefix keeps a second build apart.
+        @test PO.set_asset_returns_plus_one!(model, -X; prefix = :gain_) == 1 .- X
+        @test PO.state_get(model, :gain_, :Xap1) == 1 .- X
+        @test PO.state_get(model, Symbol(""), :Xap1) === a
+    end
+
+    @testset "the drawdown builder registers its variables" begin
+        X = [0.01 0.02; -0.03 0.03; 0.02 -0.02]
+        model = JuMP.Model()
+        PO.set_model_scales!(model, 1.0, 1.0)
+        PO.set_w!(model, X, nothing)
+        @test !PO.state_has(model, Symbol(""), :dd)
+        dd = PO.set_drawdown_constraints!(model, X)
+        @test PO.state_get(model, Symbol(""), :dd) === dd
+        # One more variable than observations.
+        @test length(dd) == size(X, 1) + 1
+    end
+
+    X = 0.01 * randn(StableRNG(42), 120, 5) .+ 0.001 * (1:5)'
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D", "E"], X = X)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = "verbose" => false)
+    bad = Solver(; name = :bad, solver = () -> error("no solver"),
+                 check_sol = (; allow_local = true, allow_almost = true))
+
+    @testset "the solver loop falls back, and the weights are divided by k" begin
+        res = optimise(MeanRisk(; r = Variance(), obj = MaximumRatio(),
+                                opt = JuMPOptimiser(; slv = [bad, slv])), rd)
+        @test res.retcode isa OptimisationSuccess
+        # Only the solver that failed has an entry.
+        @test collect(keys(res.retcode.res)) == [:bad]
+        k = JuMP.value(res.model[:k])
+        @test k > 0 && !isapprox(k, 1)
+        @test res.w ≈ JuMP.value.(res.model[:w]) / k
+        @test sum(res.w) ≈ 1
+        # The default `getproperty` forwards `w` and the fields of `pa` to `jr`.
+        @test res.w === getfield(res, :jr).w
+        @test res.r === getfield(res, :r)
+        @test :w in propertynames(res) && :pa in propertynames(res)
+        # Every solver fails, so the weights are `NaN`.
+        all_bad = MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = bad))
+        failed = @test_logs (:warn, r"Failed to solve") match_mode = :any optimise(all_bad,
+                                                                                   rd)
+        @test failed.retcode isa OptimisationFailure
+        @test length(failed.w) == 5 && all(isnan, failed.w)
+    end
+
+    @testset "a solver that raises in optimize! is recorded, and the next one solves" begin
+        # HiGHS takes no conic row without bridges, so `optimize!` raises.
+        hs = Solver(; name = :highs, solver = HiGHS.Optimizer, add_bridges = false,
+                    settings = "log_to_console" => false,
+                    check_sol = (; allow_local = true, allow_almost = true))
+        res = optimise(MeanRisk(; r = Variance(), opt = JuMPOptimiser(; slv = [hs, slv])),
+                       rd)
+        @test res.retcode isa OptimisationSuccess
+        @test collect(keys(res.retcode.res)) == [:highs]
+        @test collect(keys(res.retcode.res[:highs])) == [:optimize!]
+    end
+
+    @testset "a reset removes every time-dependent field" begin
+        mr = MeanRisk(; r = Variance(),
+                      obj = TimeDependent([MinimumRisk(), MaximumRatio()]),
+                      opt = JuMPOptimiser(; slv = slv))
+        @test PO.is_time_dependent(mr)
+        reset = PO.reset_time_dependent_estimator(mr)
+        @test !PO.is_time_dependent(reset)
+        @test reset.obj isa PO.ObjectiveFunction
+        # A static optimiser comes back unchanged.
+        @test PO.reset_time_dependent_estimator(reset) === reset
+    end
+
+    @testset "a return frontier sweeps its own points" begin
+        ret = ArithmeticReturn(;
+                               settings = PO.JuMPReturnsSettings(; lb = Frontier(; N = 3)))
+        res = optimise(MeanRisk(; r = Variance(), obj = MinimumRisk(),
+                                opt = JuMPOptimiser(; slv = slv, ret = ret)), rd)
+        @test length(res.w) == 3
+        mu = vec(sum(X; dims = 1)) / size(X, 1)
+        rets = [dot(mu, w) for w in res.w]
+        @test issorted(rets)
+        # The last point binds its floor.
+        lb = JuMP.parameter_value(res.model[:ret_lb_var_1])
+        @test rets[end] >= lb - 1e-8
+        @test isapprox(rets[end], lb; rtol = 1e-6)
+    end
+end
+
+# The docstrings of `src/17_Optimisation/01_Base_Optimisation/` checked against numbers: the
+# type families and their fallbacks, the routing of Pipeline targets, the fold schedules, the
+# weight finalisers, the panel collapse and the investable view of a result. The finaliser
+# testsets solve three-asset programmes with Clarabel; the others build no model.
+using Test, PortfolioOptimisers, Clarabel, LinearAlgebra
+using InteractiveUtils: subtypes
+
+# A result with no prior, no fees and no mask, which reaches every fallback of the family.
+struct BareResult03e <: PortfolioOptimisers.OptimisationResult
+    w::Vector{Float64}
+end
+# A keyword constructor that records each call, for the substitution check.
+const SUB03E_LOG = Any[]
+struct Sub03e
+    a::Any
+    b::Any
+end
+function Sub03e(; a, b)
+    push!(SUB03E_LOG, (a, b))
+    return Sub03e(a, b)
+end
+
+@testset "Base optimisation against its docstrings" begin
+    PO = PortfolioOptimisers
+    # The concrete subtypes of `T` that the package defines. Another test file in the same
+    # process can define subtypes of its own, which `subtypes` also returns.
+    function leaves(T)
+        out = Any[]
+        for S in subtypes(T)
+            if isabstracttype(S)
+                append!(out, leaves(S))
+            elseif parentmodule(S) === PO
+                push!(out, S)
+            end
+        end
+        return out
+    end
+    rd = ReturnsResult(; nx = ["A", "B", "C"],
+                       X = [0.01 0.02 -0.01; 0.0 0.01 0.02; -0.01 0.0 0.01; 0.02 -0.01 0.0])
+    slv = Solver(; solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
+                                 "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10))
+
+    @testset "the result families have the stated shape" begin
+        # `fb` is the last field of every concrete result, and `factory(res, fb)` needs it.
+        for R in leaves(PO.OptimisationResult)
+            @test last(fieldnames(R)) === :fb
+        end
+        # A return code has the one field `res`.
+        for R in leaves(PO.OptimisationReturnCode)
+            @test fieldnames(R) == (:res,)
+        end
+        # The hierarchical family holds the three results of a `HierarchicalOptimiser`, and
+        # `NestedClustered` is one of the four clustering estimators but not a member.
+        @test Set(leaves(PO.HierarchicalOptimisationResult)) ==
+              Set([HierarchicalRiskParityResult, HierarchicalEqualRiskContributionResult,
+                   SchurComplementHierarchicalRiskParityResult])
+        @test length(leaves(PO.ClusteringOptimisationEstimator)) == 4
+        @test NestedClustered in leaves(PO.ClusteringOptimisationEstimator)
+        @test JuMPOptimiser <: PO.BaseOptimisationEstimator
+        @test PO.HierarchicalOptimiser <: PO.BaseOptimisationEstimator
+    end
+
+    @testset "the fallbacks of the family" begin
+        res = BareResult03e([0.5, 0.5])
+        @test isnothing(PO.result_investable_mask(res))
+        # One fallback of the reset serves every estimator and every result.
+        @test PO.reset_time_dependent_estimator(res) === res
+        ga = GreedyAllocation()
+        @test PO.reset_time_dependent_estimator(ga) === ga
+        # A result with no method of `set_retcode` throws, and names its type.
+        nres = optimise(EqualWeighted(), rd)
+        err = try
+            PO.set_retcode(nres, OptimisationFailure())
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("NaiveOptimisationResult", err.msg)
+        # A precomputed result in `fb` keeps its identity when `factory` gives the estimator
+        # the previous weights.
+        @test factory(nres, [0.2, 0.3, 0.5]) === nres
+        mr = MeanRisk(; opt = JuMPOptimiser(; slv = slv), fb = nres)
+        @test factory(mr, [0.2, 0.3, 0.5]).fb === nres
+        # `factory(res, fb)` replaces the last field and keeps the others.
+        chain = [(EqualWeighted(), nres)]
+        nres2 = factory(nres, chain)
+        @test nres2.fb === chain
+        @test nres2.w == nres.w
+        # `needs_previous_weights` falls back to `false` for nothing, an estimator and an
+        # algorithm.
+        @test !PO.needs_previous_weights(nothing)
+        @test !PO.needs_previous_weights(EqualWeighted())
+        @test !PO.needs_previous_weights(nres)
+        @test isnothing(PO.assert_special_nco_requirements(nres))
+    end
+
+    @testset "the routing of Pipeline targets" begin
+        rb = RiskBudgeting(; opt = JuMPOptimiser(; slv = slv))
+        @test PO.pipe_config_field(rb) === :opt
+        @test isnothing(PO.pipe_config_field(EqualWeighted()))
+        # `:rkb` lands one level down, in `rba.rkb`.
+        rkb = PO.risk_budget_constraints(nothing; N = 3)
+        @test PO.pipe_accepts(rb, Val(:rkb))
+        @test PO.pipe_route(rb, Val(:rkb), rkb).rba.rkb === rkb
+        # A schedule in `rba` has no `rkb`, so the optimiser refuses the target.
+        rbt = RiskBudgeting(; opt = JuMPOptimiser(; slv = slv),
+                            rba = TimeDependent([AssetRiskBudgeting(),
+                                                 AssetRiskBudgeting()]))
+        @test !PO.pipe_accepts(rbt, Val(:rkb))
+        @test_throws ArgumentError PO.pipe_route(rbt, Val(:rkb), rkb)
+        # A target with the name of a field lands in that field.
+        @test PO.pipe_accepts(EqualWeighted(), Val(:wb))
+        wb = WeightBounds(; lb = 0.0, ub = 0.6)
+        @test PO.pipe_route(EqualWeighted(), Val(:wb), wb).wb === wb
+    end
+
+    @testset "a schedule resolves as its docstring states" begin
+        ctx = TimeDependentContext(; i = 2, n = 3, rd = rd, train_idx = [1:2, 1:3, 1:4],
+                                   test_idx = [3:3, 4:4, 4:4])
+        # A vector reads entry `ctx.i`, a function and a wrapped function read the context.
+        @test PO.time_dependent_value(TimeDependent([10, 20, 30]), ctx) == 20
+        @test PO.time_dependent_value(TimeDependent(c -> 5 * c.i), ctx) == 10
+        pwf = PreviousWeightsFunction(; f = c -> c.n)
+        @test PO.time_dependent_value(TimeDependent(pwf), ctx) == 3
+        @test PO.needs_previous_weights(pwf)
+        @test PO.needs_previous_weights(TimeDependent(pwf))
+        @test !PO.needs_previous_weights(TimeDependent(c -> 1))
+        @test_throws DomainError TimeDependentContext(; i = 4, n = 3, rd = rd,
+                                                      train_idx = [], test_idx = [])
+        # The constructor refuses the stated values.
+        @test_throws IsEmptyError TimeDependent([])
+        @test_throws ArgumentError TimeDependent(TimeDependent([1, 2]))
+        @test_throws ArgumentError TimeDependent(TimeDependent([1, 2]), :nearest)
+        # The refusal of a nested schedule is no method of its own, so no call is ambiguous
+        # with the positional constructor that `@concrete` writes.
+        @test !any(p -> p[1].name === :TimeDependent || p[2].name === :TimeDependent,
+                   Test.detect_ambiguities(PortfolioOptimisers))
+        @test_throws ArgumentError TimeDependent([TimeDependent([1, 2]), 3])
+        @test_throws ArgumentError TimeDependent([1, 2]; default = TimeDependent([1, 2]))
+        @test_throws ArgumentError TimeDependent([1, 2], :innermost)
+        # A vector of optimisers and results is stored as a `Vector{OptE_Opt}`.
+        nres = optimise(EqualWeighted(), rd)
+        mixed = TimeDependent(Any[EqualWeighted(), nres])
+        @test eltype(mixed.val) == PO.OptE_Opt
+        @test isa(mixed, PO.TD_OptE_Opt)
+        # The slice of a schedule slices its entries and its default, and a function passes.
+        td = TimeDependent([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]; default = [7.0, 8.0, 9.0])
+        tv = PO.nothing_scalar_array_view(td, [1, 3])
+        @test tv.val == [[1.0, 3.0], [4.0, 6.0]]
+        @test tv.default == [7.0, 9.0]
+        f = c -> 1
+        @test PO.nothing_scalar_array_view(TimeDependent(f), [1]).val === f
+        # `factory` reaches the entries and the default.
+        tf = factory(TimeDependent([nres, nres]; default = nres), [0.2, 0.3, 0.5])
+        @test all(x -> x === nres, tf.val)
+        @test tf.default === nres
+        # The known entries are the vector and the default, and a function has none.
+        @test length(PO.time_dependent_entries(TimeDependent([1, 2]; default = 3))) == 3
+        @test isempty(PO.time_dependent_entries(TimeDependent(f)))
+    end
+
+    @testset "the value outside every fold loop, and the stand-in" begin
+        # The reset value: the default of the schedule, then the static default, then
+        # `nothing` for a field that the defaults do not list.
+        defaults = (; a = 5, b = NoDefault())
+        @test PO.time_dependent_reset_value(TimeDependent([1, 2]; default = 9), defaults,
+                                            :b, EqualWeighted()) == 9
+        @test PO.time_dependent_reset_value(TimeDependent([1, 2]), defaults, :a,
+                                            EqualWeighted()) == 5
+        @test isnothing(PO.time_dependent_reset_value(TimeDependent([1, 2]), defaults, :c,
+                                                      EqualWeighted()))
+        @test_throws TimeDependentDefaultError PO.time_dependent_reset_value(TimeDependent([1,
+                                                                                            2]),
+                                                                             defaults, :b,
+                                                                             EqualWeighted())
+        # The stand-in: the default, the static default, the first entry, else nothing.
+        @test something(PO.time_dependent_stand_in(TimeDependent([1, 2]; default = 9),
+                                                   defaults, :b)) == 9
+        @test something(PO.time_dependent_stand_in(TimeDependent([1, 2]), defaults, :a)) ==
+              5
+        @test something(PO.time_dependent_stand_in(TimeDependent([1, 2]), defaults, :b)) ==
+              1
+        @test isnothing(PO.time_dependent_stand_in(TimeDependent(c -> 1), defaults, :b))
+        # The static defaults fall back to an empty tuple.
+        @test PO.time_dependent_field_defaults(BareResult03e([1.0])) == (;)
+        # A schedule in the place of an optimiser must carry a default.
+        @test_throws TimeDependentDefaultError PO.reset_time_dependent_estimator(TimeDependent([EqualWeighted(),
+                                                                                                EqualWeighted()]))
+        ew = EqualWeighted()
+        @test PO.reset_time_dependent_estimator(TimeDependent([ew, ew]; default = ew)) ===
+              ew
+    end
+
+    @testset "the substitution check calls the constructor once for each entry" begin
+        empty!(SUB03E_LOG)
+        args = (; a = TimeDependent([1, 2]; default = 3), b = TimeDependent([4, 5]))
+        @test isnothing(PO.assert_time_dependent_substitution(Sub03e, args, (; b = 6)))
+        # `a` runs its two entries and its default with `b` at its static default 6, then
+        # `b` runs its two entries with `a` at its default 3.
+        @test SUB03E_LOG == [(1, 6), (2, 6), (3, 6), (3, 4), (3, 5)]
+        # A function schedule in a required field has no stand-in, so nothing is called.
+        empty!(SUB03E_LOG)
+        args = (; a = TimeDependent(c -> 1), b = TimeDependent([4, 5]))
+        @test isnothing(PO.assert_time_dependent_substitution(Sub03e, args,
+                                                              (; a = NoDefault())))
+        @test isempty(SUB03E_LOG)
+        @test isnothing(PO.substitute_time_dependent_entries(Sub03e, (; a = 1), :a, 1))
+        @test isempty(SUB03E_LOG)
+    end
+
+    @testset "the fold count and the bind checks" begin
+        ew = EqualWeighted()
+        td = TimeDependent([ew, ew])
+        @test isnothing(PO.assert_time_dependent_fold_count(td, 2))
+        @test_throws DimensionMismatch PO.assert_time_dependent_fold_count(td, 3)
+        # A schedule with `:nearest` is left for the nearest loop when `all_binds` is false.
+        tdn = TimeDependent([ew, ew], :nearest)
+        @test isnothing(PO.assert_time_dependent_fold_count(tdn, 3, false))
+        @test_throws DimensionMismatch PO.assert_time_dependent_fold_count(tdn, 3, true)
+        ctx = TimeDependentContext(; i = 1, n = 2, rd = rd, train_idx = [1:2, 1:3],
+                                   test_idx = [3:3, 4:4])
+        @test PO.update_time_dependent_estimator(tdn, ctx, false) === tdn
+        @test PO.update_time_dependent_estimator(tdn, ctx, true) === ew
+        # A function in the place of an optimiser that returns no optimiser is refused.
+        @test_throws ArgumentError PO.update_time_dependent_estimator(TimeDependent(c -> 1),
+                                                                      ctx)
+        # The guards of `:nearest` in a field with no inner fold loop, and in one with.
+        @test_throws ArgumentError PO.assert_no_nearest_bind_optimiser_schedule(tdn, :fb,
+                                                                                :MeanRisk)
+        @test isnothing(PO.assert_no_nearest_bind_optimiser_schedule(td, :fb, :MeanRisk))
+        @test_throws TimeDependentDefaultError PO.assert_nearest_optimiser_schedule(tdn,
+                                                                                    :opti,
+                                                                                    KFold(),
+                                                                                    :NestedClustered)
+        tdd = TimeDependent([ew, ew], :nearest; default = ew)
+        @test_throws ArgumentError PO.assert_nearest_optimiser_schedule(tdd, :opti, nothing,
+                                                                        :NestedClustered)
+        @test isnothing(PO.assert_nearest_optimiser_schedule(tdd, :opti, KFold(),
+                                                             :NestedClustered))
+        # A configuration with no schedule has no candidate field.
+        @test PO.time_dependent_candidate_fields(JuMPOptimiser(; slv = slv)) == ()
+    end
+
+    @testset "the four JuMP formulations give their hand minimisers" begin
+        # w0 = [0.7, 0.2, 0.1] under ub = 0.5 moves a mass of 0.2 to the two free weights.
+        wb = WeightBounds(; lb = 0.0, ub = 0.5)
+        w0 = [0.7, 0.2, 0.1]
+        fin(alg) = PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv, alg = alg), wb, w0)
+        # The L2 norm of the absolute deviation shifts the free weights by one constant.
+        @test isapprox(fin(SquaredAbsoluteErrorWeightFinaliser()), [0.5, 0.3, 0.2];
+                       atol = 1e-6)
+        # The L1 norm of the relative deviation moves the mass to the largest free weight.
+        @test isapprox(fin(RelativeErrorWeightFinaliser()), [0.5, 0.4, 0.1]; atol = 1e-6)
+        # The L2 norm of the relative deviation gives w0 + c w0², with c = 4.
+        @test isapprox(fin(SquaredRelativeErrorWeightFinaliser()), [0.5, 0.36, 0.14];
+                       atol = 1e-6)
+        # The L1 norm of the absolute deviation is not unique, and its value is twice the
+        # moved mass.
+        wa = fin(AbsoluteErrorWeightFinaliser())
+        @test isapprox(sum(abs, wa - w0), 0.4; atol = 1e-6)
+        @test isapprox(sum(wa), 1.0; atol = 1e-8)
+        @test all(x -> -1e-8 <= x <= 0.5 + 1e-8, wa)
+        # The Euclidean projection is the minimiser of the absolute L2 norm.
+        @test isapprox(PO.opt_weight_bounds(EuclideanWeightFinaliser(), wb, w0),
+                       [0.5, 0.3, 0.2]; atol = 1e-12)
+        # A relative formulation does not change the weights of the caller.
+        wz = [0.7, 0.3, 0.0]
+        PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv,
+                                                 alg = SquaredRelativeErrorWeightFinaliser()),
+                             wb, wz)
+        @test wz == [0.7, 0.3, 0.0]
+        # Weights in the bounds come back unchanged, with no solve.
+        wi = [0.4, 0.4, 0.2]
+        @test PO.opt_weight_bounds(JuMPWeightFinaliser(; slv = slv), wb, wi) === wi
+    end
+
+    @testset "a failed solve and the iterative finaliser" begin
+        wb = WeightBounds(; lb = 0.0, ub = 0.4)
+        # The iterative loop stalls on this input, and step 9 returns the projection.
+        @test PO.opt_weight_bounds(IterativeWeightFinaliser(), wb, [0.6, 0.4, 0.0]) ≈
+              [0.4, 0.4, 0.2]
+        # A solver that cannot start makes the JuMP finaliser warn and use the iterative one.
+        bad = JuMPWeightFinaliser(; slv = Solver(; solver = () -> error("no solver")))
+        w = @test_logs((:warn, r"IterativeWeightFinaliser"), match_mode = :any,
+                       PO.opt_weight_bounds(bad, wb, [0.6, 0.4, 0.0]))
+        @test w ≈ [0.4, 0.4, 0.2]
+        # A set of bounds that cannot hold the budget fails.
+        rc, w = PO.finalise_weight_bounds(IterativeWeightFinaliser(),
+                                          WeightBounds(; lb = 0.3, ub = 1.0), fill(0.25, 4))
+        @test isa(rc, OptimisationFailure)
+        @test w ≈ fill(0.3, 4)
+        rc, w = PO.finalise_weight_bounds(IterativeWeightFinaliser(), wb, [0.6, 0.4, 0.0])
+        @test isa(rc, OptimisationSuccess)
+        @test sum(w) ≈ 1.0
+    end
+
+    @testset "the collapse of the panel" begin
+        # The normalised weights are |W| over the gross exposure of each column.
+        @test PO.synthetic_asset_weights([0.5, -0.25, 0.25]) ≈ [0.5, 0.25, 0.25]
+        Wn = PO.synthetic_asset_weights([0.5 0.0; -0.5 0.0; 1.0 0.0])
+        @test Wn ≈ [0.25 0.0; 0.25 0.0; 0.5 0.0]
+        @test PO.synthetic_asset_weights(zeros(3)) == zeros(3)
+        W = PO.synthetic_asset_weights([0.5 0.0; 0.5 1.0; 0.0 0.0])
+        @test PO.collapse_panel_numeric([1.0, 2.0, 4.0], W) ≈ [1.5, 2.0]
+        # A mask collapses as its support, and a categorical mask repeats over the levels.
+        @test PO.collapse_categorical_mask(BitVector([true, false, false]), W, 3,
+                                           nothing) == Bool[1 1 1; 0 0 0]
+        om = BitMatrix([true false false; false true false])
+        cm = PO.collapse_categorical_mask(om, W, 2, trues(2, 3))
+        @test size(cm) == (2, 2, 2)
+        @test cm[:, :, 1] == Bool[1 0; 1 1]
+        @test cm[:, :, 2] == cm[:, :, 1]
+        # An observed member that is inactive does not count.
+        cmi = PO.collapse_categorical_mask(om, W, 2,
+                                           BitMatrix([true true true; true false true]))
+        @test cmi[:, :, 1] == Bool[1 0; 0 0]
+        @test isnothing(PO.collapse_categorical_mask(nothing, W, 2, nothing))
+    end
+
+    @testset "the investable view of a result" begin
+        nres = optimise(EqualWeighted(), rd)
+        # An explicit prior has priority, and a result with no prior throws.
+        @test PO.extract_pr(nres, nres.pr) === nres.pr
+        @test PO.extract_pr(nres) === nres.pr
+        @test_throws ArgumentError PO.extract_pr(BareResult03e([1.0]))
+        @test isnothing(PO.extract_fees(BareResult03e([1.0])))
+        fees = Fees(; l = 0.001)
+        @test PO.extract_fees(BareResult03e([1.0]), fees) === fees
+        # A result whose mask is nothing views nothing.
+        imsk, w, X, f, nx = PO.result_investable_view(BareResult03e([0.5, 0.5]),
+                                                      [1.0 2.0; 3.0 4.0], nothing,
+                                                      ["a", "b"])
+        @test isnothing(imsk)
+        @test w == [0.5, 0.5]
+        @test X == [1.0 2.0; 3.0 4.0]
+        @test nx == ["a", "b"]
+    end
+end

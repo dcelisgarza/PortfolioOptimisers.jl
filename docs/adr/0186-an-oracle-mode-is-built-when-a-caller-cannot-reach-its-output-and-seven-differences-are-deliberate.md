@@ -149,7 +149,7 @@ here.
   rule above before it asks the maintainer. A design that leaves an oracle output out of reach
   fails the rule, however simple it is.
 - A parity test of the nearest-correlation repair compares the oracle with the algorithm of #1412,
-  not with Newton. `test/test_07c_parity_clipped_nearest_correlation.jl` measures it on every exit
+  not with Newton. `test/test_07_linear_algebra.jl` measures it on every exit
   path of the repair, and it is the measure of the last box of #1383.
 - The premise of #929, that the oracle persists nothing, was wrong. #1399 builds the round trip
   that parity needs.

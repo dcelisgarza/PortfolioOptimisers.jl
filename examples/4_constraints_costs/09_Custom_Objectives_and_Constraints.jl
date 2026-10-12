@@ -395,7 +395,7 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src      than the main path, so a custom objective missed dispatch there. Fixed by inserting
 #src      MinimumRisk() as `obj` (NOC minimises: @objective(…, Min) + penalty factor 1).
 #src      test_20 NOC suite 39/39 green after.
-#src   2. New test/test_03c_custom_jump_hooks.jl covers both hooks: single + vector cobj/ccnt,
+#src   2. New test/test_03_optimisation.jl covers both hooks: single + vector cobj/ccnt,
 #src      the k idiom under MaximumRatio, the fallback, and a spy pinning the calling
 #src      convention on BOTH the main and NOC paths. Mutation-checked.
 #src      Gotcha: `!isempty(spy_log)` is NOT a valid NOC regression detector — NOC solves

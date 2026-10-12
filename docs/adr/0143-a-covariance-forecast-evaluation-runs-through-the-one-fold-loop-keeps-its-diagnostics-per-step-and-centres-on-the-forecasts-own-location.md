@@ -280,7 +280,7 @@ R91), built by [#1513](https://github.com/dcelisgarza/PortfolioOptimisers.jl/iss
 
 With all three keywords set, the rolling series equal the oracle's point for point, and the
 summary under `EqualStepWeighting()` equals the oracle's summary.
-`test_25b_parity_covariance_forecast_plots.jl` pins both.
+`test_24e_parity_covariance_forecast_evaluation.jl` pins both.
 
 **An exponentially weighted estimator names its centring with a type, not a flag.** Fact 5 and
 the decision above name a Bool `centred` on `ExpWeightedCovariance` and

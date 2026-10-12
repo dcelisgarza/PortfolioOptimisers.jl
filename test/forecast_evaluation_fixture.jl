@@ -1,6 +1,6 @@
 #=
 The fixture of the Return Forecast evaluation, shared by `test_08x_forecast_evaluation.jl` and
-`test_08x_parity_forecast_evaluation.jl`. Include it after `test06c_setup.jl`, which defines
+`test_08x_forecast_evaluation.jl`. Include it after `test06c_setup.jl`, which defines
 `synthetic_asset_panel`.
 =#
 # The synthetic panel of issue #656, with a factor-model block fitted on a strict suffix of

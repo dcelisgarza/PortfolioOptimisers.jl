@@ -940,3 +940,1070 @@ end
     @test M[2, 2, 1] == 3
     @test_throws BoundsError M[3, 1, 1]
 end
+
+#=
+The synthetic Asset Panel generator (issue #656, map #643).
+
+The generator draws a panel from a factor model it also returns, so every test here asks one
+question: does the panel the caller receives still hold the model the generator drew? The
+shapes, the two masks, the reconciliation `X = f B' + eps` and the reproducibility of one
+seed are the four the acceptance tests of the prior stand on.
+
+The generator is a toy fixture for this one acceptance test, not library functionality, so it
+lives in `test06c_setup.jl` beside this file rather than under `src/`.
+=#
+include(joinpath(@__DIR__, "test06c_setup.jl"))
+using Statistics, Dates
+
+@testset "Synthetic panel shapes and carrier" begin
+    res = synthetic_asset_panel(; n_assets = 8, n_observations = 60, n_industries = 3,
+                                rng = StableRNG(987))
+    rd, tr = res.rd, res.truth
+    T, N, K = 60, 8, 1 + 3 + length(SYNTHETIC_STYLES)
+
+    @test size(rd.X) == (T, N)
+    @test length(rd.nx) == N
+    @test rd.nx[1] == "A00001"
+    @test length(rd.ts) == T
+    @test allunique(rd.ts)
+    @test all(d -> Dates.dayofweek(d) <= 5, rd.ts)
+    @test issorted(rd.ts)
+
+    # Twenty numeric Panel Fields, each with its observed-mask column, then the one-hot
+    # industry block.
+    @test size(panel_feature_matrix(rd.pnl)[2]) == (T, N, 43)
+    @test length(panel_feature_matrix(rd.pnl)[1]) == 43
+    @test panel_feature_matrix(rd.pnl)[1][1] == "adj_close"
+    @test panel_feature_matrix(rd.pnl)[1][2] == "adj_close::observed"
+    @test panel_feature_matrix(rd.pnl)[1][(end - 2):end] ==
+          ["industry=Real Estate", "industry=Software", "industry=Banks"]
+    @test all(isfinite, panel_feature_matrix(rd.pnl)[2])
+    @test length(rd.pnl.pf) == 21
+    @test isa(PortfolioOptimisers.panel_field(rd.pnl, "market_cap"), NumericPanelField)
+    @test PortfolioOptimisers.panel_field(rd.pnl, "industry").levels ==
+          ["Real Estate", "Software", "Banks"]
+
+    @test size(tr.B) == (N, K)
+    @test size(tr.f) == (T, K)
+    @test size(tr.eps) == (T, N)
+    @test length(tr.ivar) == N
+    @test length(tr.nf) == K
+    @test length(tr.fgrp) == K
+    @test tr.nf[1] == "market"
+    @test tr.fgrp == vcat("market", fill("industry", 3), fill("style", 10))
+    @test tr.nf[5:end] == [s[1] for s in SYNTHETIC_STYLES]
+    @test all(x -> x > 0, tr.ivar)
+end
+
+@testset "Synthetic panel masks" begin
+    res = synthetic_asset_panel(; n_assets = 40, n_observations = 400, n_industries = 4,
+                                rng = StableRNG(4242))
+    amsk, emsk = res.rd.pnl.amsk, res.rd.pnl.emsk
+
+    # The subset invariant the carrier checks, and the listing structure it describes.
+    @test all(emsk .<= amsk)
+    @test !all(amsk)
+    @test all(view(amsk, :, 1))
+    @test all(view(emsk, :, 1))
+    @test count(!, emsk) > count(!, amsk)
+
+    # A cell that is not active carries a `NaN` return and no observed value.
+    @test all(isnan, res.rd.X[.!amsk])
+    @test all(isfinite, res.rd.X[amsk])
+    obs = panel_feature_matrix(res.rd.pnl)[2][:, :,
+                                              findfirst(==("market_cap::observed"),
+                                                        panel_feature_matrix(res.rd.pnl)[1])]
+    @test all(iszero, obs[.!amsk])
+    @test all(isone, obs[amsk])
+
+    # Every active window is contiguous: an asset lists once and delists once.
+    for i in axes(amsk, 2)
+        col = findall(view(amsk, :, i))
+        @test col == first(col):last(col)
+    end
+
+    # Both probabilities at zero leave every asset listed throughout.
+    full = synthetic_asset_panel(; n_assets = 10, n_observations = 50, n_industries = 2,
+                                 late_listing_proba = 0.0, delisting_proba = 0.0,
+                                 rng = StableRNG(11))
+    @test all(full.rd.pnl.amsk)
+    @test all(isfinite, full.rd.X)
+
+    # Both probabilities at one drive the late-listing and the delisting branches.
+    thin = synthetic_asset_panel(; n_assets = 10, n_observations = 400, n_industries = 2,
+                                 late_listing_proba = 1.0, delisting_proba = 1.0,
+                                 rng = StableRNG(12))
+    tmsk = thin.rd.pnl.amsk
+    @test !any(view(tmsk, 1, 2:10))
+    @test all(view(tmsk, :, 1))
+end
+
+@testset "Synthetic panel reconciles with its own model" begin
+    svr = 0.4
+    res = synthetic_asset_panel(; n_assets = 12, n_observations = 120, n_industries = 3,
+                                systematic_variance_ratio = svr, rng = StableRNG(2024))
+    rd, tr = res.rd, res.truth
+    amsk = rd.pnl.amsk
+
+    # The floor at -0.99 is part of the model, so the reconciliation carries it.
+    recon = max.(tr.f * tr.B' .+ tr.eps, -0.99)
+    @test isapprox(rd.X[amsk], recon[amsk]; rtol = 1e-12)
+
+    # The market exposure is positive and bounded, and the industry block is one-hot.
+    onehot = tr.B[:, 2:4]
+    @test all(x -> 0.1 <= x <= 3.0, tr.B[:, 1])
+    @test all(x -> x == 0 || x == 1, onehot)
+    @test all(isone, sum(onehot; dims = 2))
+
+    # The style exposures are standardised across the cross-section.
+    styles = tr.B[:, 5:end]
+    @test isapprox(vec(sum(styles; dims = 1)), zeros(10); atol = 1e-10)
+    @test isapprox(vec(Statistics.std(styles; dims = 1, corrected = false)), ones(10);
+                   rtol = 1e-10)
+
+    # The systematic share of the cross-sectional variance is the caller's number.
+    sysvar = Statistics.mean(Statistics.var(tr.f * tr.B'; dims = 2, corrected = false))
+    @test isapprox(sysvar / (sysvar + Statistics.mean(tr.ivar)), svr; rtol = 1e-10)
+end
+
+@testset "Synthetic panel is reproducible from one seed" begin
+    kwargs = (; n_assets = 7, n_observations = 45, n_industries = 2, missing_ratio = 0.05)
+    a = synthetic_asset_panel(; kwargs..., rng = StableRNG(7))
+    b = synthetic_asset_panel(; kwargs..., rng = StableRNG(7))
+    c = synthetic_asset_panel(; kwargs..., rng = StableRNG(8))
+
+    # `X` carries a `NaN` where an asset is not active, so equality is `isequal`.
+    @test isequal(a.rd.X, b.rd.X)
+    @test panel_feature_matrix(a.rd.pnl)[2] == panel_feature_matrix(b.rd.pnl)[2]
+    @test panel_feature_matrix(a.rd.pnl)[1] == panel_feature_matrix(b.rd.pnl)[1]
+    @test a.rd.ts == b.rd.ts
+    @test a.rd.pnl.amsk == b.rd.pnl.amsk
+    @test a.rd.pnl.emsk == b.rd.pnl.emsk
+    @test a.truth.B == b.truth.B
+    @test a.truth.f == b.truth.f
+    @test a.truth.eps == b.truth.eps
+    @test a.truth.ivar == b.truth.ivar
+    @test !isequal(a.rd.X, c.rd.X)
+end
+
+@testset "Synthetic panel coverage and blanking" begin
+    res = synthetic_asset_panel(; n_assets = 30, n_observations = 300, n_industries = 3,
+                                missing_ratio = 0.2, rng = StableRNG(55))
+    rd = res.rd
+    amsk = rd.pnl.amsk
+    obs_share = name -> begin
+        col = panel_feature_matrix(rd.pnl)[2][:, :,
+                                              findfirst(==(name * "::observed"),
+                                                        panel_feature_matrix(rd.pnl)[1])]
+        return sum(col[amsk]) / sum(amsk)
+    end
+
+    # A protected Panel Field is observed on every active cell; a named one sits at its
+    # own coverage; an unnamed one sits at `1 - missing_ratio`.
+    @test obs_share("adj_close") == 1
+    @test obs_share("market_cap") == 1
+    @test isapprox(obs_share("eps_ntm"), 0.8; atol = 0.05)
+    @test isapprox(obs_share("ebitda_ttm"), 0.9; atol = 0.05)
+    @test isapprox(obs_share("sales_ttm"), 0.8; atol = 0.05)
+
+    # Nothing is blanked when the coverage is complete and no Panel Field is named below
+    # one, so the observed columns of the unnamed fields are the active mask itself.
+    none = synthetic_asset_panel(; n_assets = 6, n_observations = 40, n_industries = 2,
+                                 missing_ratio = 0.0, rng = StableRNG(56))
+    ncol = panel_feature_matrix(none.rd.pnl)[2][:, :,
+                                                findfirst(==("sales_ttm::observed"),
+                                                          panel_feature_matrix(none.rd.pnl)[1])]
+    @test ncol == none.rd.pnl.amsk
+end
+
+@testset "Synthetic panel accounting identities" begin
+    res = synthetic_asset_panel(; n_assets = 10, n_observations = 80, n_industries = 2,
+                                missing_ratio = 0.0, rng = StableRNG(99))
+    rd = res.rd
+    amsk = rd.pnl.amsk
+    field = name -> panel_feature_matrix(rd.pnl)[2][:, :,
+                                                    findfirst(==(name),
+                                                              panel_feature_matrix(rd.pnl)[1])]
+
+    # The market capitalisation is the price times the share count, on every active cell.
+    mcap = field("market_cap")[amsk]
+    @test isapprox(mcap, (field("adj_close") .* field("adj_shares_outstanding"))[amsk];
+                   rtol = 1e-10)
+
+    # The levels every descriptor divides by stay strictly positive, and the gross margin
+    # keeps the cost of revenue below the sales.
+    @test all(x -> x > 0, mcap)
+    @test all(x -> x > 0, field("adj_close")[amsk])
+    @test all(x -> x > 0, field("total_assets")[amsk])
+    @test all(x -> x >= 0, field("adj_volume")[amsk])
+    @test all(x -> x >= 0, field("short_interest")[amsk])
+    @test all(x -> x >= 0, field("eps_ntm_std")[amsk])
+    @test all((field("cost_of_revenue_ttm") .< field("sales_ttm"))[amsk])
+end
+
+@testset "Synthetic panel helpers" begin
+    # A constant cross-section standardises to zero rather than to a division by zero.
+    @test synthetic_standardise(fill(3.0, 5)) == zeros(5)
+    @test isapprox(synthetic_standardise([1.0, 2.0, 3.0]), [-sqrt(1.5), 0.0, sqrt(1.5)];
+                   rtol = 1e-10)
+
+    # The autoregressive filter keeps the stationary variance at one.
+    rng = StableRNG(3)
+    filt = synthetic_ar1_filter(randn(rng, 20000, 2), 0.9)
+    @test isapprox(Statistics.var(filt[:, 1]), 1.0; rtol = 0.1)
+    @test isapprox(Statistics.cor(filt[2:end, 1], filt[1:(end - 1), 1]), 0.9; rtol = 0.1)
+
+    # The paths hit their stated annualised volatility and mean.
+    paths = synthetic_ar1_paths(StableRNG(4), 20000, [0.2], [0.1], [0.0])
+    @test isapprox(Statistics.std(paths[:, 1]) * sqrt(252), 0.2; rtol = 0.1)
+    @test isapprox(Statistics.mean(paths[:, 1]) * 252, 0.1; atol = 0.05)
+
+    # The fat-tailed draw is unit variance and heavier tailed than a normal.
+    z = synthetic_fat_tailed_normal(StableRNG(5), 6.0, 40000)
+    @test isapprox(Statistics.var(z), 1.0; rtol = 0.15)
+    @test StatsBase.kurtosis(z) > 1
+end
+
+@testset "Synthetic panel statistical truths" begin
+    res = synthetic_asset_panel(; n_assets = 25, n_observations = 1500, n_industries = 4,
+                                rng = StableRNG(606))
+    tr = res.truth
+
+    # The idiosyncratic variances the generator reports are the ones it drew.
+    realised = vec(Statistics.var(tr.eps; dims = 1, corrected = false))
+    @test isapprox(Statistics.mean(realised ./ tr.ivar), 1.0; rtol = 0.15)
+
+    # The idiosyncratic returns are close to uncorrelated with the factor returns.
+    @test maximum(abs.(Statistics.cor(tr.f, tr.eps))) < 0.25
+end
+
+@testset "Synthetic panel refusals" begin
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 1)
+    @test_throws DomainError synthetic_asset_panel(; n_observations = 1)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   n_industries = 0)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   n_industries = 17)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   systematic_variance_ratio = 0.0)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   systematic_variance_ratio = 1.0)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   late_listing_proba = 1.5)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   delisting_proba = -0.1)
+    @test_throws DomainError synthetic_asset_panel(; n_assets = 4, n_observations = 10,
+                                                   missing_ratio = 2.0)
+
+    # One industry is the smallest classification the generator admits.
+    one = synthetic_asset_panel(; n_assets = 4, n_observations = 20, n_industries = 1,
+                                rng = StableRNG(1))
+    @test one.truth.nf[2] == "industry=Real Estate"
+    @test all(isone, one.truth.B[:, 2])
+end
+
+#=
+The Asset Panel's DataFrame export (issue #929, map #643).
+
+The library has no file format of its own, so `panel_dataframe` is its interchange: a caller
+writes the table with whatever they already use. `asset_panel(df, mf)` reads the table back with
+its Panel Manifest, and `test_06b_asset_panel.jl` tests that round trip (#1399). The file tests the three shapes a
+call can take -- one Panel Field laid out as it stands, the long layout and the wide layout --
+across the panel's static and time-varying shapes, and the two selections and the categorical
+decoding that narrow each of them.
+
+A `TensorPanelField` is the one Panel Field the oracle's own export skips.
+Here it is carried: its trailing axis spreads into one column per label, under the
+`"<field>=<label>"` name it already takes in a derived Feature Matrix. Only the single-field
+shape refuses it, because observations × assets has no room for a third axis.
+=#
+function panel_929_static()
+    return AssetPanel(;
+                      pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0, 3.0]),
+                            CategoricalPanelField(; name = "sector",
+                                                  levels = ["Tech", "Energy"],
+                                                  codes = [1, 2, 1],
+                                                  omsk = [true, false, true]),
+                            TensorPanelField(; name = "beta", axis = "factor",
+                                             labels = ["size", "value"],
+                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])])
+end
+function panel_929_timevarying()
+    amsk = [true true true; true false true]
+    emsk = [true true false; true false true]
+    return AssetPanel(;
+                      pf = [NumericPanelField(; name = "mcap",
+                                              vals = [1.0 2.0 3.0; 4.0 5.0 6.0],
+                                              omsk = amsk),
+                            CategoricalPanelField(; name = "sector",
+                                                  levels = ["Tech", "Energy"],
+                                                  codes = [1 2 1; 2 2 1]),
+                            TensorPanelField(; name = "beta", axis = "factor",
+                                             labels = ["size", "value"],
+                                             vals = reshape(collect(1.0:12.0), 2, 3, 2),
+                                             omsk = reshape(trues(12), 2, 3, 2))],
+                      amsk = amsk, emsk = emsk)
+end
+@testset "panel_frame_columns, the one place a table and a Feature Matrix differ" begin
+    pnl = panel_929_static()
+    num, cat, ten = pnl.pf
+
+    # A numeric Panel Field is one column under its own name, in both renderings.
+    cols = PortfolioOptimisers.panel_frame_columns(num, true)
+    @test length(cols) == 1
+    @test first(cols)[1] == "mcap"
+    @test first(cols)[2] == [1.0, 2.0, 3.0]
+    @test first(cols)[3] === nothing
+
+    # A categorical Panel Field is ONE column here and one per level in a Feature Matrix,
+    # because a table cell holds the level itself.
+    cols = PortfolioOptimisers.panel_frame_columns(cat, true)
+    @test length(cols) == 1
+    @test length(PortfolioOptimisers.panel_field_labels(cat)) == 2
+    @test first(cols)[1] == "sector"
+    @test first(cols)[2] == ["Tech", "Energy", "Tech"]
+    @test first(cols)[3] == [true, false, true]
+
+    # `decode = false` hands the codes back instead.
+    @test first(PortfolioOptimisers.panel_frame_columns(cat, false))[2] == [1, 2, 1]
+
+    # A tensor Panel Field takes the name a Feature Matrix gives it, one column per label.
+    cols = PortfolioOptimisers.panel_frame_columns(ten, true)
+    @test [c[1] for c in cols] == PortfolioOptimisers.panel_field_labels(ten)
+    @test [c[1] for c in cols] == ["beta=size", "beta=value"]
+    @test cols[1][2] == [1.0, 3.0, 5.0]
+    @test cols[2][2] == [2.0, 4.0, 6.0]
+    @test all(isnothing(c[3]) for c in cols)
+
+    # A tensor Panel Field that carries a mask slices the mask on the same axis.
+    tvten = panel_929_timevarying().pf[3]
+    cols = PortfolioOptimisers.panel_frame_columns(tvten, true)
+    @test size(cols[1][2]) == (2, 3)
+    @test cols[2][3] == trues(2, 3)
+end
+@testset "panel_frame_fields and panel_frame_assets, the two selections" begin
+    pnl = panel_929_static()
+
+    # `nothing` is every Panel Field, in panel order; a collection is the order it writes.
+    @test PortfolioOptimisers.panel_frame_fields(pnl, nothing) === pnl.pf
+    @test [f.name for f in PortfolioOptimisers.panel_frame_fields(pnl, ["beta", "mcap"])] ==
+          ["beta", "mcap"]
+    @test_throws KeyError PortfolioOptimisers.panel_frame_fields(pnl, ["mcapp"])
+
+    # The panel does not name its assets, so the names are the caller's.
+    nx = ["A", "B", "C"]
+    @test PortfolioOptimisers.panel_frame_assets(nx, nothing) == [1, 2, 3]
+    @test PortfolioOptimisers.panel_frame_assets(nx, "B") == [2]
+    @test PortfolioOptimisers.panel_frame_assets(nx, ["C", "A"]) == [3, 1]
+    @test_throws KeyError PortfolioOptimisers.panel_frame_assets(nx, ["D"])
+    @test_throws ArgumentError PortfolioOptimisers.panel_frame_assets(nx, ["A", "A"])
+end
+@testset "The long layout of a static panel" begin
+    pnl = panel_929_static()
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"])
+
+    # A static panel has no observation axis and no mask, so the asset is the only key.
+    @test names(df) ==
+          ["asset", "mcap", "sector", "sector::observed", "beta=size", "beta=value"]
+    @test DataFrames.nrow(df) == 3
+    @test df.asset == ["A", "B", "C"]
+    @test df.mcap == [1.0, 2.0, 3.0]
+    @test df.sector == ["Tech", "Energy", "Tech"]
+    @test df[!, "sector::observed"] == [true, false, true]
+    @test df[!, "beta=size"] == [1.0, 3.0, 5.0]
+    @test df[!, "beta=value"] == [2.0, 4.0, 6.0]
+
+    # With no `nx` an asset is named by its position on the panel's asset axis.
+    @test panel_dataframe(pnl).asset == ["1", "2", "3"]
+
+    # `decode = false` keeps the storage the panel holds.
+    @test panel_dataframe(pnl; decode = false).sector == [1, 2, 1]
+
+    # Both selections narrow the table, each in the order it writes.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], fields = ["beta", "mcap"],
+                         assets = ["C", "A"])
+    @test names(df) == ["asset", "beta=size", "beta=value", "mcap"]
+    @test df.asset == ["C", "A"]
+    @test df.mcap == [3.0, 1.0]
+    @test df[!, "beta=size"] == [5.0, 1.0]
+end
+@testset "The long layout of a time-varying panel is filtered by the active mask" begin
+    pnl = panel_929_timevarying()
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"])
+
+    # One row per (observation, asset) that the active mask holds: (2, B) is not in the
+    # universe, so it has no row at all. The estimation mask stays as a column, because it
+    # varies within the rows that survive.
+    @test names(df) ==
+          ["observation", "asset", "mcap", "mcap::observed", "sector", "beta=size",
+           "beta=size::observed", "beta=value", "beta=value::observed", "emsk"]
+    @test DataFrames.nrow(df) == 5
+    @test df.observation == [1, 1, 1, 2, 2]
+    @test df.asset == ["A", "B", "C", "A", "C"]
+    @test df.mcap == [1.0, 2.0, 3.0, 4.0, 6.0]
+    @test df.sector == ["Tech", "Energy", "Tech", "Energy", "Tech"]
+    @test df.emsk == [true, true, false, true, true]
+
+    # The tensor Panel Field lands on the same rows, one column per trailing-axis label.
+    @test df[!, "beta=size"] == [1.0, 3.0, 5.0, 2.0, 6.0]
+    @test df[!, "beta=value"] == [7.0, 9.0, 11.0, 8.0, 12.0]
+    @test all(df[!, "beta=size::observed"])
+
+    # `ts` labels the observations, and the asset order is the order `assets` writes.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], ts = ["d1", "d2"], assets = ["C", "A"],
+                         fields = ["mcap"])
+    @test names(df) == ["observation", "asset", "mcap", "mcap::observed", "emsk"]
+    @test df.observation == ["d1", "d1", "d2", "d2"]
+    @test df.asset == ["C", "A", "C", "A"]
+    @test df.mcap == [3.0, 1.0, 6.0, 4.0]
+end
+@testset "The wide layout keeps every cell, and both universe masks" begin
+    pnl = panel_929_timevarying()
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], layout = :wide, fields = ["mcap"])
+
+    # One row per observation, one column per (Panel Field column, asset). Nothing is
+    # filtered, which is why the active mask comes with it as a block of its own.
+    @test names(df) == ["observation", "mcap@A", "mcap@B", "mcap@C", "mcap::observed@A",
+                        "mcap::observed@B", "mcap::observed@C", "amsk@A", "amsk@B", "amsk@C", "emsk@A",
+                        "emsk@B", "emsk@C"]
+    @test DataFrames.nrow(df) == 2
+    @test df.observation == [1, 2]
+    @test df[!, "mcap@B"] == [2.0, 5.0]
+    @test df[!, "amsk@B"] == [true, false]
+    @test df[!, "emsk@C"] == [false, true]
+
+    # A tensor Panel Field spreads on both axes at once: label, then asset.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], layout = :wide, fields = ["beta"],
+                         assets = ["A"])
+    @test names(df) ==
+          ["observation", "beta=size@A", "beta=size::observed@A", "beta=value@A",
+           "beta=value::observed@A", "amsk@A", "emsk@A"]
+    @test df[!, "beta=size@A"] == [1.0, 2.0]
+    @test df[!, "beta=value@A"] == [7.0, 8.0]
+
+    # A static panel has one implicit observation, so its wide table is one row.
+    df = panel_dataframe(panel_929_static(); nx = ["A", "B", "C"], layout = :wide,
+                         fields = ["mcap", "sector"])
+    @test DataFrames.nrow(df) == 1
+    @test names(df) == ["mcap@A", "mcap@B", "mcap@C", "sector@A", "sector@B", "sector@C",
+                        "sector::observed@A", "sector::observed@B", "sector::observed@C"]
+    @test df[!, "mcap@C"] == [3.0]
+    @test df[!, "sector@B"] == ["Energy"]
+end
+@testset "One Panel Field is laid out as it stands, and a tensor field has no such shape" begin
+    pnl = panel_929_timevarying()
+
+    # A single name is the third shape: observations × assets, no layout, no mask.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], fields = "mcap", ts = ["d1", "d2"])
+    @test names(df) == ["observation", "A", "B", "C"]
+    @test df.observation == ["d1", "d2"]
+    @test df.B == [2.0, 5.0]
+
+    # It decodes like every other shape, and it takes the asset selection.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], fields = "sector", assets = "B")
+    @test names(df) == ["observation", "B"]
+    @test df.B == ["Energy", "Energy"]
+    @test panel_dataframe(pnl; nx = ["A", "B", "C"], fields = "sector", decode = false).A ==
+          [1, 2]
+
+    # A static panel's single-field table is its one implicit observation.
+    df = panel_dataframe(panel_929_static(); nx = ["A", "B", "C"], fields = "mcap")
+    @test names(df) == ["A", "B", "C"]
+    @test df.A == [1.0]
+
+    # A tensor Panel Field carries a third axis, so it has no observations × assets table.
+    # The message names the layouts that do carry it.
+    @test_throws ArgumentError panel_dataframe(pnl; fields = "beta")
+    msg = try
+        panel_dataframe(pnl; fields = "beta")
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("factor axis of 2 label(s)", msg)
+    @test occursin("fields = [\"beta\"]", msg)
+end
+@testset "The axes and the layout are checked against the panel" begin
+    pnl = panel_929_timevarying()
+    @test_throws ArgumentError panel_dataframe(pnl; layout = :tall)
+    @test_throws DimensionMismatch panel_dataframe(pnl; nx = ["A", "B"])
+    @test_throws DimensionMismatch panel_dataframe(pnl; ts = [1])
+    @test_throws KeyError panel_dataframe(pnl; fields = ["mcapp"])
+    @test_throws KeyError panel_dataframe(pnl; nx = ["A", "B", "C"], assets = ["D"])
+
+    # A static panel has no observation axis, so `ts` is ignored rather than checked.
+    @test DataFrames.nrow(panel_dataframe(panel_929_static(); ts = [1, 2, 3, 4])) == 3
+end
+@testset "A panel view exports the universe it was cut down to" begin
+    pnl = panel_929_timevarying()
+    v = PortfolioOptimisers.port_opt_view(pnl, 1:2, [1, 3])
+    df = panel_dataframe(v; nx = ["A", "C"], fields = ["mcap", "beta"])
+    @test df.asset == ["A", "C", "A", "C"]
+    @test df.mcap == [1.0, 3.0, 4.0, 6.0]
+    @test df[!, "beta=value"] == [7.0, 11.0, 8.0, 12.0]
+    @test DataFrames.nrow(panel_dataframe(v; nx = ["A", "C"], layout = :wide)) == 2
+end
+@testset "The docstrings of 16_PanelDataFrame.jl against numbers" begin
+    # panel_frame_columns returns the array of a numeric Panel Field, the codes of a
+    # categorical one when decode = false, and a view of a tensor one, never a copy.
+    pnl = panel_929_static()
+    num, cat, ten = pnl.pf
+    @test first(PortfolioOptimisers.panel_frame_columns(num, true))[2] === num.vals
+    @test first(PortfolioOptimisers.panel_frame_columns(cat, false))[2] === cat.codes
+    @test parent(first(PortfolioOptimisers.panel_frame_columns(ten, true))[2]) === ten.vals
+
+    # An entry of `fields` or `assets` can be a Symbol, and a repeated name in `nx`
+    # resolves to its first position.
+    df = panel_dataframe(pnl; nx = ["A", "B", "C"], fields = [:mcap], assets = [:C, :A])
+    @test names(df) == ["asset", "mcap"]
+    @test df.mcap == [3.0, 1.0]
+    @test PortfolioOptimisers.panel_frame_assets(["A", "B", "A"], ["A"]) == [1]
+
+    # `layout` is checked in every call, also when `fields` names one Panel Field.
+    @test_throws ArgumentError panel_dataframe(pnl; fields = "mcap", layout = :tall)
+
+    # The long layout of a time-varying panel: before the filter, row (t - 1) n + k holds
+    # observation t and asset k, and the filter keeps the rows where the active mask is true.
+    tv = AssetPanel(;
+                    pf = [NumericPanelField(; name = "x",
+                                            vals = [11.0 12.0 13.0; 21.0 22.0 23.0])],
+                    amsk = [true true true; true true true],
+                    emsk = [true false true; false true true])
+    df = panel_dataframe(tv; nx = ["A", "B", "C"], ts = ["t1", "t2"])
+    @test df.observation == ["t1", "t1", "t1", "t2", "t2", "t2"]
+    @test df.asset == ["A", "B", "C", "A", "B", "C"]
+    @test df.x == [11.0, 12.0, 13.0, 21.0, 22.0, 23.0]
+    @test df.emsk == [true, false, true, false, true, true]
+    @test df.observation isa Vector{String}
+
+    # A panel with no Panel Field and two masks gives the key and mask columns alone.
+    mo = AssetPanel(; amsk = [true false; true true], emsk = [true false; false true])
+    df = panel_dataframe(mo; nx = ["A", "B"])
+    @test names(df) == ["observation", "asset", "emsk"]
+    @test df.asset == ["A", "A", "B"]
+    @test df.emsk == [true, false, true]
+    df = panel_dataframe(mo; nx = ["A", "B"], layout = :wide)
+    @test names(df) == ["observation", "amsk@A", "amsk@B", "emsk@A", "emsk@B"]
+    @test df[!, "amsk@B"] == [false, true]
+
+    # An empty asset selection gives a table with its columns and no row.
+    df = panel_dataframe(tv; assets = String[])
+    @test names(df) == ["observation", "asset", "x", "emsk"]
+    @test DataFrames.nrow(df) == 0
+
+    # The element type of the values stays as the panel holds it.
+    @test eltype(panel_dataframe(AssetPanel(;
+                                            pf = [NumericPanelField(; name = "x",
+                                                                    vals = Float32[1, 2])])).x) ===
+          Float32
+    rp = AssetPanel(; pf = [NumericPanelField(; name = "x", vals = [1//2 1//3; 1//4 1//5])],
+                    amsk = trues(2, 2), emsk = trues(2, 2))
+    @test eltype(panel_dataframe(rp; layout = :wide)[!, "x@1"]) === Rational{Int}
+    @test panel_dataframe(rp; fields = "x")[!, "2"] == [1//3, 1//5]
+
+    # Every shape holds copies: a change to a cell of the table leaves the panel unchanged.
+    # The static long layout shared the memory of the panel before, through the view that
+    # `vec(permutedims(v))` returns for a vector.
+    for (kw, col) in (((;), "mcap"), ((; decode = false), "sector"), ((;), "beta=size"),
+                      ((; layout = :wide), "mcap@1"), ((; fields = "mcap"), "1"))
+        p = panel_929_static()
+        before = deepcopy(p)
+        df = panel_dataframe(p; kw...)
+        df[1, col] += 100
+        @test p.pf[1].vals == before.pf[1].vals
+        @test p.pf[2].codes == before.pf[2].codes
+        @test p.pf[3].vals == before.pf[3].vals
+    end
+    p = panel_929_timevarying()
+    df = panel_dataframe(p; layout = :wide)
+    df[1, "amsk@1"] = false
+    df[1, "mcap@1"] = -1.0
+    @test p.amsk[1, 1]
+    @test p.pf[1].vals[1, 1] == 1.0
+
+    # Two columns with one name raise an error. Before, the second column replaced the first
+    # and the table lost data with no error.
+    mk(names...) = AssetPanel(;
+                              pf = [NumericPanelField(; name = n,
+                                                      vals = [1.0 2.0; 3.0 4.0])
+                                    for n in names], amsk = [true true; true false],
+                              emsk = [true false; true false])
+    for (p, kw) in ((mk("asset"), (;)), (mk("observation"), (;)), (mk("emsk"), (;)),
+                    (mk("amsk"), (; layout = :wide)), (mk("emsk"), (; layout = :wide)),
+                    (mk("x"), (; nx = ["observation", "B"], fields = "x")),
+                    (mk("x"), (; nx = ["A", "A"], layout = :wide)),
+                    (AssetPanel(; pf = [NumericPanelField(; name = "asset", vals = [1.0, 2.0])]), (;)))
+        @test_throws ArgumentError panel_dataframe(p; kw...)
+    end
+    # The AssetPanel constructor refuses two Panel Fields that derive one column name
+    # (#1335), so these two panels never reach panel_dataframe.
+    @test_throws ArgumentError AssetPanel(;
+                                          pf = [NumericPanelField(; name = "x",
+                                                                  vals = [1.0, 2.0],
+                                                                  omsk = [true, false]),
+                                                NumericPanelField(; name = "x::observed",
+                                                                  vals = [5.0, 6.0])])
+    @test_throws ArgumentError AssetPanel(;
+                                          pf = [NumericPanelField(; name = "beta=size",
+                                                                  vals = [1.0, 2.0]),
+                                                TensorPanelField(; name = "beta",
+                                                                 axis = "f",
+                                                                 labels = ["size"],
+                                                                 vals = reshape([7.0, 8.0],
+                                                                                2, 1))])
+    msg = try
+        panel_dataframe(mk("asset"))
+    catch e
+        sprint(showerror, e)
+    end
+    @test occursin("already holds a column named \"asset\"", msg)
+    df = DataFrames.DataFrame(; a = [1])
+    @test_throws ArgumentError PortfolioOptimisers.panel_frame_column!(df, "a", [2])
+    @test df.a == [1]
+end
+
+#=
+The public read of a Panel Field at a stated policy for its inactive and its unobserved cells
+(#1411). The panel keeps a finite value in every cell (ADR 0102), and the caller picks, at read
+time, what an inactive cell and an unobserved cell read as. The element type is derived from the
+stored type and the two policies.
+=#
+
+@testset "panel_field_values: a policy for the inactive and the unobserved cells (#1411)" begin
+    PO = PortfolioOptimisers
+    # Asset 2 lists at observation 2, and asset 1 has a blank at observation 3.
+    amsk = [true false; true true; true true]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap",
+                                         vals = [1.0 NaN; 3.0 4.0; NaN 6.0],
+                                         alg = ForwardPanelFill(; val = 0.0)),
+                       NumericPanelInput(; name = "shares", vals = [10 20; 30 40; 50 60]),
+                       NumericPanelInput(; name = "f32", vals = Float32[1 2; 3 4; 5 6]),
+                       CategoricalPanelInput(; name = "sector",
+                                             vals = ["a" "b"; "b" "b"; "a" "a"])];
+                      amsk = amsk, emsk = amsk)
+    stored = panel_field(pnl, "mcap").vals
+    @testset "A float field" begin
+        # The default keeps an inactive cell and blanks each cell the fill wrote. Cell (1, 2)
+        # is both, and the default inactive policy keeps no value, so the fill reads NaN.
+        @test isequal(panel_field_values(pnl, "mcap"), [1.0 NaN; 3.0 4.0; NaN 6.0])
+        @test isequal(panel_field_values(pnl, "mcap"; unobserved = nothing),
+                      [1.0 stored[1, 2]; 3.0 4.0; stored[3, 1] 6.0])
+        @test isequal(panel_field_values(pnl, "mcap"; inactive = NaN),
+                      [1.0 NaN; 3.0 4.0; NaN 6.0])
+        @test isequal(panel_field_values(pnl, "mcap"; inactive = 0),
+                      [1.0 0.0; 3.0 4.0; NaN 6.0])
+        # With no unobserved policy the fill value reads back.
+        @test panel_field_values(pnl, "mcap"; inactive = 0, unobserved = nothing) ==
+              [1.0 0.0; 3.0 4.0; stored[3, 1] 6.0]
+        @test panel_field_values(pnl, "mcap"; inactive = nothing, unobserved = nothing) ==
+              stored
+        @test eltype(panel_field_values(pnl, "mcap"; inactive = 0)) === Float64
+    end
+    @testset "A cell both inactive and unobserved takes the inactive policy" begin
+        # Cell (1, 2) was blank in the input and is inactive, so it is both.
+        @test !panel_field(pnl, "mcap").omsk[1, 2]
+        @test panel_field_values(pnl, "mcap"; inactive = -1)[1, 2] == -1.0
+        @test isnan(panel_field_values(pnl, "mcap"; inactive = nothing)[1, 2])
+    end
+    @testset "An integer field" begin
+        # An integer policy keeps the integer type, and a NaN policy floats it.
+        V = panel_field_values(pnl, "shares"; inactive = 0, unobserved = nothing)
+        @test V == [10 0; 30 40; 50 60]
+        @test eltype(V) === Int
+        W = panel_field_values(pnl, "shares"; inactive = NaN)
+        @test isequal(W, [10.0 NaN; 30.0 40.0; 50.0 60.0])
+        @test eltype(W) === Float64
+        # The default unobserved policy is NaN, so the default read is floated too.
+        @test eltype(panel_field_values(pnl, "shares")) === Float64
+        @test eltype(panel_field_values(pnl, "shares"; inactive = 0.5,
+                                        unobserved = nothing)) === Float64
+        # A Float32 field stays Float32 under a NaN policy.
+        F = panel_field_values(pnl, "f32"; inactive = NaN)
+        @test eltype(F) === Float32
+        @test isequal(F, Float32[1 NaN; 3 4; 5 6])
+    end
+    @testset "A categorical field reads its codes" begin
+        C = panel_field_values(pnl, "sector"; inactive = PO.CS_MISSING_GROUP,
+                               unobserved = nothing)
+        @test C == [1 PO.CS_MISSING_GROUP; 2 2; 1 1]
+        @test eltype(C) === Int
+        @test isequal(panel_field_values(pnl, "sector"; inactive = NaN),
+                      [1.0 NaN; 2.0 2.0; 1.0 1.0])
+        @test cross_sectional_groups(pnl, "sector") == C
+    end
+    @testset "A tensor field takes the policy on every label" begin
+        tp = AssetPanel(;
+                        pf = [TensorPanelField(; name = "b", axis = "factor",
+                                               labels = ["x", "y"],
+                                               vals = reshape(collect(1.0:12.0), 3, 2, 2))],
+                        amsk = amsk, emsk = amsk)
+        B = panel_field_values(tp, "b"; inactive = NaN)
+        @test size(B) == (3, 2, 2)
+        @test all(isnan, B[1, 2, :])
+        @test count(isnan, B) == 2
+        @test isequal(B[.!isnan.(B)], tp.pf[1].vals[.!isnan.(B)])
+    end
+    @testset "A static panel has no inactive cell" begin
+        sp = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = [1, 2, 3])])
+        @test panel_field_values(sp, "m"; inactive = NaN) == [1.0, 2.0, 3.0]
+        @test panel_field_values(sp, "m"; inactive = 0, unobserved = nothing) == [1, 2, 3]
+    end
+    @testset "A ReturnsResult reads its panel, and the read is a copy" begin
+        rd = ReturnsResult(; nx = ["A", "B"], X = zeros(3, 2), pnl = pnl)
+        @test isequal(panel_field_values(rd, "mcap"; inactive = NaN),
+                      panel_field_values(pnl, "mcap"; inactive = NaN))
+        V = panel_field_values(rd, "mcap"; unobserved = nothing)
+        V .= -1.0
+        @test panel_field(pnl, "mcap").vals == stored
+        @test_throws IsNothingError panel_field_values(ReturnsResult(; nx = ["A", "B"],
+                                                                     X = zeros(3, 2)),
+                                                       "mcap")
+        @test_throws KeyError panel_field_values(pnl, "mcp")
+    end
+    @testset "A policy the answer cannot hold refuses at the first cell it writes" begin
+        rp = AssetPanel(;
+                        pf = [NumericPanelField(; name = "r",
+                                                vals = [1//2 1//3; 1//4 1//5])],
+                        amsk = [true false; true true], emsk = [true false; true true])
+        @test_throws InexactError panel_field_values(rp, "r"; inactive = NaN)
+        @test panel_field_values(rp, "r"; inactive = 0) == [1//2 0//1; 1//4 1//5]
+        @test eltype(panel_field_values(rp, "r"; inactive = 0)) === Rational{Int}
+    end
+end
+
+#=
+The round trip of an Asset Panel through a table (#1399, map #1375).
+
+`panel_dataframe` writes the values and the masks of a panel, `panel_manifest` writes the parts that
+a table column cannot hold, and `asset_panel(df, mf)` reads the panel back from the two tables. The
+oracle saves its panel to a directory and loads it, so parity is a round trip. Every case here goes
+through CSV files, which keep no type and no metadata, so a case that passes through CSV passes
+through any table format.
+
+The wide layout keeps every cell, so its round trip is exact. The long layout keeps only the cells
+in the universe, so its round trip is exact on those cells, and a cell outside the universe comes
+back as zero, the first level, and an unobserved cell.
+=#
+using Dates
+
+include(joinpath(@__DIR__, "parity_harness.jl"))
+
+function panel_1399_csv(df::DataFrame, mf::DataFrame; kwargs...)
+    return mktempdir() do d
+        p, m = joinpath(d, "panel.csv"), joinpath(d, "manifest.csv")
+        CSV.write(p, df)
+        CSV.write(m, mf)
+        return asset_panel(DataFrame(CSV.File(p; types = Dict("asset" => String),
+                                              validate = false)), DataFrame(CSV.File(m));
+                           kwargs...)
+    end
+end
+function panel_1399_trip(pnl; nx = nothing, ts = nothing, layout = :wide, decode = true,
+                         kwargs...)
+    return panel_1399_csv(panel_dataframe(pnl; nx, ts, layout, decode),
+                          panel_manifest(pnl; nx, ts); decode, kwargs...)
+end
+# Every part of a Panel Field but the values, which a long table keeps on the active cells only.
+function panel_1399_schema(f::NumericPanelField)
+    return (NumericPanelField, f.name, isnothing(f.omsk), isnothing(f.pmsk))
+end
+function panel_1399_schema(f::CategoricalPanelField)
+    return (CategoricalPanelField, f.name, isnothing(f.omsk), isnothing(f.pmsk), f.levels)
+end
+function panel_1399_schema(f::TensorPanelField)
+    return (TensorPanelField, f.name, isnothing(f.omsk), isnothing(f.pmsk), f.axis,
+            f.labels, f.groups)
+end
+panel_1399_values(f::CategoricalPanelField) = f.codes
+panel_1399_values(f::PortfolioOptimisers.AbstractPanelField) = f.vals
+# The cells of a Panel Field array where the active mask is true, one entry per trailing label.
+function panel_1399_active(A::AbstractArray, amsk::AbstractMatrix{Bool})
+    return [A[t, k, l...] for l in Iterators.product(axes(A)[3:end]...)
+            for t in axes(A, 1), k in axes(A, 2) if amsk[t, k]]
+end
+function panel_1399_equal(p1::AssetPanel, p2::AssetPanel; active_only::Bool = false)
+    ok = length(p1.pf) == length(p2.pf) && p1.amsk == p2.amsk && p1.emsk == p2.emsk
+    for (f1, f2) in zip(p1.pf, p2.pf)
+        ok &= panel_1399_schema(f1) == panel_1399_schema(f2)
+        for (a1, a2) in
+            ((panel_1399_values(f1), panel_1399_values(f2)), (f1.omsk, f2.omsk),
+             (f1.pmsk, f2.pmsk))
+            if isnothing(a1)
+                continue
+            end
+            ok &= if active_only
+                panel_1399_active(a1, p1.amsk) == panel_1399_active(a2, p1.amsk)
+            else
+                a1 == a2
+            end
+        end
+    end
+    return ok
+end
+function panel_1399_static()
+    return AssetPanel(;
+                      pf = [NumericPanelField(; name = "mcap", vals = [1.5, 2.0, 3.25]),
+                            CategoricalPanelField(; name = "sector",
+                                                  levels = ["Tech", "Energy", "Unused"],
+                                                  codes = [2, 2, 1],
+                                                  omsk = [true, false, true]),
+                            TensorPanelField(; name = "beta", axis = "factor",
+                                             labels = ["size", "value"],
+                                             groups = ["style", ""],
+                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0])])
+end
+function panel_1399_timevarying()
+    # Asset 3 is never in the universe, and observation 3 holds no asset in the universe.
+    amsk = Bool[1 1 0; 1 0 0; 0 0 0; 0 1 0]
+    emsk = Bool[1 0 0; 1 0 0; 0 0 0; 0 1 0]
+    rng = StableRNG(1399)
+    return AssetPanel(;
+                      pf = [NumericPanelField(; name = "mcap", vals = randn(rng, 4, 3),
+                                              omsk = rand(rng, Bool, 4, 3)),
+                            NumericPanelField(; name = "count",
+                                              vals = rand(rng, 1:9, 4, 3)),
+                            CategoricalPanelField(; name = "sector",
+                                                  levels = ["Energy", "Tech", "Unused"],
+                                                  codes = [2 1 2; 2 1 1; 1 1 1; 1 2 1]),
+                            TensorPanelField(; name = "beta", axis = "factor",
+                                             labels = ["size", "value", "mom"],
+                                             groups = ["style", "style", "momentum"],
+                                             vals = randn(rng, 4, 3, 3),
+                                             omsk = rand(rng, Bool, 4, 3, 3)),
+                            TensorPanelField(; name = "load", axis = "pc", labels = ["pc1"],
+                                             vals = randn(rng, 4, 3, 1))], amsk = amsk,
+                      emsk = emsk)
+end
+const TS_1399 = Date(2024, 1, 1) .+ Day.(0:3)
+# The message of a `KeyError`, which `showerror` prints with its quotes escaped.
+function panel_1399_keyerror(f)
+    try
+        f()
+    catch e
+        return e isa KeyError ? string(e.key) : ""
+    end
+    return ""
+end
+@testset "panel_manifest" begin
+    pnl = panel_1399_timevarying()
+    mf = panel_manifest(pnl; nx = ["A", "B", "C"], ts = TS_1399)
+    @test names(mf) ==
+          ["kind", "field", "label", "group", "observed", "placeholder", "grouped"]
+    @test mf.kind[1:8] ==
+          ["panel", "observation", "observation", "observation", "observation", "asset",
+           "asset", "asset"]
+    @test mf.label[1:8] ==
+          ["time-varying", "2024-01-01", "2024-01-02", "2024-01-03", "2024-01-04", "A", "B",
+           "C"]
+    # Each Panel Field in order; a level with no cell keeps its row.
+    @test mf.kind[9:end] ==
+          ["numeric", "numeric", "categorical", "level", "level", "level", "tensor",
+           "label", "label", "label", "tensor", "label"]
+    @test isequal(mf.label[12:14], ["Energy", "Tech", "Unused"])
+    @test isequal(mf.observed[9:11], [true, false, false])
+    @test isequal(mf.label[15], "factor") && isequal(mf.grouped[15], true)
+    @test isequal(mf.group[16:18], ["style", "style", "momentum"])
+    @test isequal(mf.grouped[19], false) && all(ismissing, mf.group[20:end])
+
+    # A static panel has no observation row, and the selections narrow the manifest as they
+    # narrow the table.
+    smf = panel_manifest(panel_1399_static(); fields = "sector", assets = ["3", "1"])
+    @test smf.kind == ["panel", "asset", "asset", "categorical", "level", "level", "level"]
+    @test isequal(smf.label[1:3], ["static", "3", "1"])
+    @test_throws DimensionMismatch panel_manifest(pnl; nx = ["A"])
+    @test_throws DimensionMismatch panel_manifest(pnl; ts = TS_1399[1:2])
+    @test_throws KeyError panel_manifest(pnl; fields = ["nope"])
+end
+@testset "asset_panel(df, mf): a static panel" begin
+    pnl = panel_1399_static()
+    for layout in (:long, :wide), decode in (true, false)
+        p2 = panel_1399_trip(pnl; nx = ["A", "B", "C"], layout, decode)
+        @test isnothing(p2.amsk) && isnothing(p2.emsk)
+        @test panel_1399_equal(pnl, p2)
+    end
+    # The positions name the assets when the caller gives no names.
+    @test panel_1399_equal(pnl, panel_1399_trip(pnl; layout = :long))
+    # In memory, with no file.
+    df = panel_dataframe(pnl)
+    @test panel_1399_equal(pnl, asset_panel(df, panel_manifest(pnl)))
+end
+@testset "asset_panel(df, mf): a time-varying panel" begin
+    pnl = panel_1399_timevarying()
+    nx = ["A", "007", "C"]
+    for decode in (true, false)
+        # The wide layout keeps every cell, so the round trip is exact.
+        w = panel_1399_trip(pnl; nx, ts = TS_1399, layout = :wide, decode)
+        @test panel_1399_equal(pnl, w)
+        @test eltype(panel_field(w, "count").vals) == Int
+        # The long layout keeps the cells in the universe. The manifest restores the asset
+        # that is never active and the observation with no active asset.
+        l = panel_1399_trip(pnl; nx, ts = TS_1399, layout = :long, decode)
+        @test size(l.amsk) == (4, 3)
+        @test panel_1399_equal(pnl, l; active_only = true)
+        # A cell outside the universe comes back as zero, the first level, and unobserved.
+        @test all(iszero, panel_field(l, "mcap").vals[.!pnl.amsk])
+        @test all(isone, panel_field(l, "sector").codes[.!pnl.amsk])
+        @test !any(panel_field(l, "mcap").omsk[.!pnl.amsk])
+        @test !panel_1399_equal(pnl, l)
+    end
+    # A subset of the Panel Fields, in the order of the call, from the whole pair.
+    df = panel_dataframe(pnl; layout = :long)
+    mf = panel_manifest(pnl)
+    s = asset_panel(df, mf; fields = ["beta", "mcap"])
+    @test [f.name for f in s.pf] == ["beta", "mcap"]
+    @test panel_1399_schema(s.pf[1]) == panel_1399_schema(pnl.pf[4])
+    @test [f.name for f in asset_panel(df, mf; fields = "sector").pf] == ["sector"]
+    # A table with a subset of the Panel Fields reads with the same subset.
+    sub = panel_dataframe(pnl; fields = ["load"], layout = :wide)
+    @test panel_field(asset_panel(sub, mf; fields = ["load"]), "load").vals ==
+          panel_field(pnl, "load").vals
+    @test_throws KeyError asset_panel(sub, mf)
+end
+@testset "an observation with no active asset is valid input" begin
+    # Better than the oracle (R76 of #1416, ADR 0102). The universe of an observation is a set
+    # of assets, and the empty set is a set: before the first listing, or in a sub-universe
+    # whose assets are all delisted. A view on assets intersects each row with the selection,
+    # so the views of a panel are panels only when an empty row is allowed. The oracle refuses
+    # an empty row, so it refuses its own selection of asset 1 below.
+    amsk = Bool[1 0; 1 1; 0 1]
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "book",
+                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0],
+                                             omsk = Bool[0 0; 1 1; 1 1])], amsk = amsk,
+                     emsk = copy(amsk))
+    # Every observation holds an active asset, and the view on asset 1 has none at
+    # observation 3.
+    v = PortfolioOptimisers.port_opt_view(pnl, :, [1])
+    @test v.amsk == reshape(Bool[1, 1, 0], 3, 1)
+    @test v.emsk == v.amsk
+    # The alignment to `book` moves the start of asset 1 to observation 2, so observation 1
+    # holds no active asset.
+    res = panel_align_active(pnl, "book")
+    @test res.n == 1
+    @test res.pnl.amsk == Bool[0 0; 1 1; 0 1]
+    @test !any(res.pnl.amsk[1, :])
+    # The long table keeps no cell of that observation, and the manifest restores it.
+    @test panel_1399_equal(res.pnl, panel_1399_trip(res.pnl; layout = :long);
+                           active_only = true)
+    # The count of active assets of each observation is 0, 2 and 1.
+    c = PortfolioOptimisers.panel_mask_coverage(res.pnl.amsk)
+    @test c.per_observation == (; min = 0, median = 1.0, max = 2)
+end
+@testset "asset_panel(df, mf): masks alone, a lifted field and the parity fixture" begin
+    # A panel with no Panel Field, and one with no observation.
+    for T in (3, 0)
+        amsk = trues(T, 2)
+        pnl = AssetPanel(; amsk = amsk, emsk = amsk)
+        for layout in (:long, :wide)
+            p2 = panel_1399_trip(pnl; layout)
+            @test isempty(p2.pf) && p2.amsk == amsk && p2.emsk == amsk
+        end
+    end
+    # A static input that a time-varying build lifts comes back as an ordinary array.
+    amsk = Bool[1 1; 0 1; 1 1]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap",
+                                         vals = [10.0 20.0; 11.0 21.0; 12.0 22.0]),
+                       CategoricalPanelInput(; name = "sector", vals = ["Fin", "Tech"])];
+                      amsk = amsk, emsk = amsk)
+    @test panel_field(pnl, "sector").codes isa PortfolioOptimisers.RepeatedLeading
+    p2 = panel_1399_trip(pnl)
+    @test panel_field(p2, "sector").codes isa Matrix{Int}
+    @test panel_1399_equal(pnl, p2)
+    # The panel of the parity fixture, with its real names and dates.
+    fx = parity_small_panel()
+    ppnl = fx.rd.pnl
+    ts = Date(2020, 1, 1) .+ Day.(0:(size(ppnl.amsk, 1) - 1))
+    @test panel_1399_equal(ppnl, panel_1399_trip(ppnl; nx = fx.rd.nx, ts))
+    @test panel_1399_equal(ppnl, panel_1399_trip(ppnl; nx = fx.rd.nx, ts, layout = :long);
+                           active_only = true)
+end
+@testset "asset_panel(df, mf): refusals" begin
+    pnl = panel_1399_timevarying()
+    L = panel_dataframe(pnl; nx = ["A", "B", "C"], ts = TS_1399)
+    W = panel_dataframe(pnl; nx = ["A", "B", "C"], ts = TS_1399, layout = :wide)
+    mf = panel_manifest(pnl; nx = ["A", "B", "C"], ts = TS_1399)
+    # Not a manifest.
+    @test_throws KeyError asset_panel(L, mf[:, 1:5])
+    @test_throws "one \"panel\" row" asset_panel(L, mf[2:end, :])
+    bad = copy(mf)
+    bad.kind[9] = "vector"
+    @test_throws "a \"level\" or a \"label\" row follows" asset_panel(L, bad)
+    bad = copy(mf)
+    bad.field[12] = "industry"
+    @test_throws "a \"level\" or a \"label\" row follows" asset_panel(L, bad)
+    bad = copy(mf)
+    bad.label[1] = "static"
+    @test_throws "a static panel has no observation axis" asset_panel(L, bad)
+    bad = copy(mf)
+    bad.label[8] = "A"
+    @test_throws "names an asset twice" asset_panel(W, bad)
+    bad = copy(mf)
+    bad.label[3] = "2024-01-01"
+    @test_throws "names an observation twice" asset_panel(L, bad)
+    @test_throws KeyError asset_panel(L, mf; fields = ["nope"])
+    # The table does not match the manifest.
+    @test_throws DimensionMismatch asset_panel(W[1:3, :], mf)
+    @test_throws KeyError asset_panel(DataFrames.select(L, DataFrames.Not("beta=mom")), mf)
+    r = copy(L)
+    r.asset[1] = "D"
+    @test occursin("names no asset \"D\"", panel_1399_keyerror(() -> asset_panel(r, mf)))
+    r = copy(L)
+    r.observation[1] = Date(1999, 1, 1)
+    @test occursin("names no observation \"1999-01-01\"",
+                   panel_1399_keyerror(() -> asset_panel(r, mf)))
+    @test_throws "two rows of the long table" asset_panel(vcat(L, L[1:1, :]), mf)
+    r = DataFrames.allowmissing(W)
+    r[2, "mcap@B"] = missing
+    @test_throws "no value in column \"mcap@B\" at row 2" asset_panel(r, mf)
+    r = copy(L)
+    r.sector[1] = "Retail"
+    @test occursin("holds no level \"Retail\"",
+                   panel_1399_keyerror(() -> asset_panel(r, mf)))
+    @test_throws "decode = false" asset_panel(L, mf; decode = false)
+    # A static long table holds every asset.
+    spnl = panel_1399_static()
+    @test_throws "one row per asset" asset_panel(panel_dataframe(spnl)[1:2, :],
+                                                 panel_manifest(spnl))
+    # A reader that types the asset "007" as the integer 7 loses the name; reading the key
+    # column as text keeps it.
+    tv = panel_1399_timevarying()
+    mktempdir() do d
+        p, m = joinpath(d, "panel.csv"), joinpath(d, "manifest.csv")
+        CSV.write(p, panel_dataframe(tv; nx = ["007", "8", "9"]))
+        CSV.write(m, panel_manifest(tv; nx = ["007", "8", "9"]))
+        mf2 = DataFrame(CSV.File(m))
+        @test occursin("read the key columns as text",
+                       panel_1399_keyerror(() -> asset_panel(DataFrame(CSV.File(p)), mf2)))
+        @test panel_1399_equal(tv,
+                               asset_panel(DataFrame(CSV.File(p;
+                                                              types = Dict("asset" =>
+                                                                               String))),
+                                           mf2); active_only = true)
+    end
+end
+
+# #1631: a placeholder mask comes back from both layouts, and its manifest row records it.
+@testset "asset_panel(df, mf): a placeholder mask survives the round trip (#1631)" begin
+    amsk = Bool[1 1; 1 1; 0 1]
+    pnl = asset_panel([NumericPanelInput(; name = "mcap",
+                                         vals = [NaN 1.0; 2.0 NaN; 3.0 NaN],
+                                         alg = ForwardPanelFill()),
+                       CategoricalPanelInput(; name = "sector",
+                                             vals = [missing "a"; "b" "a"; "b" missing],
+                                             alg = ForwardPanelFill(; val = "z")),
+                       TensorPanelInput(; name = "beta", axis = "factor",
+                                        labels = ["u", "v"],
+                                        vals = cat([NaN 1.0; 2.0 3.0; 4.0 5.0],
+                                                   [1.0 NaN; 2.0 3.0; 4.0 5.0]; dims = 3),
+                                        alg = ForwardPanelFill())]; amsk = amsk)
+    @test panel_field(pnl, "mcap").pmsk == Bool[1 0; 0 0; 0 0]
+    @test panel_field(pnl, "sector").pmsk == Bool[1 0; 0 0; 0 0]
+    mf = panel_manifest(pnl; nx = ["A", "B"])
+    @test isequal(mf.placeholder[mf.kind .∈ Ref(["numeric", "categorical", "tensor"])],
+                  [true, true, true])
+    for decode in (true, false)
+        w = panel_1399_trip(pnl; nx = ["A", "B"], layout = :wide, decode)
+        @test panel_1399_equal(pnl, w)
+        l = panel_1399_trip(pnl; nx = ["A", "B"], layout = :long, decode)
+        @test panel_1399_equal(pnl, l; active_only = true)
+    end
+end

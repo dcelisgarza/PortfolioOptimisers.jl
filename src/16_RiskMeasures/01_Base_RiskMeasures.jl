@@ -484,7 +484,7 @@ Erroring tripwire for [`WeightsReturnsFeesInput`](@ref) measures that have not d
 must declare it there: moment measures as `supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`; weights-dependent measures (tracking, variance-carrying
 composites) as `supports_precomputed_returns(::T) = false`. Reaching this leaf means a
 measure forgot to declare it — throws an `ArgumentError` with instructions rather than
-silently mis-routing (and the completeness test in `test_09c_risk_input_kind.jl` turns that
+silently mis-routing (and the completeness test in `test_09_risk_measures.jl` turns that
 into a CI failure).
 
 # Validation
