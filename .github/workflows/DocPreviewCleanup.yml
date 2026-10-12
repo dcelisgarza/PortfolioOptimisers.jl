@@ -5,41 +5,68 @@ on:
     types: [closed]
 
 # `gh-pages` carries one full documentation build per open pull request, under
-# `previews/PR<number>`. Nothing removed them until this workflow, so the branch kept every
-# preview it ever built. This job deletes the preview of the pull request that closed.
+# `previews/PR<number>`. This job deletes the preview of every pull request that is not open.
+#
+# It deletes every such preview, not only the one of the pull request that closed. A preview that
+# an earlier run missed still goes, so the previews of closed pull requests cannot pile up. They
+# did pile up once: the site passed the 10 GiB limit of GitHub Pages and every deployment failed.
 concurrency:
-  # `gh-pages` takes one writer at a time. Two cleanups that run together push over each other,
-  # so queue them instead of cancelling them.
-  group: doc-preview-cleanup
-  cancel-in-progress: false
+  # This is the group of the Docs run of the same pull request (`Docs.yml` names its group
+  # `${{ github.workflow }}-${{ github.ref }}`), so this run cancels a preview build that is in
+  # progress. Without the cancellation, a build that started before the close deploys after the
+  # cleanup, and its preview comes back.
+  group: Docs-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   doc-preview-cleanup:
-    name: Delete the preview of the closed pull request
+    name: Delete the previews of closed pull requests
     runs-on: ubuntu-latest
-    # The job rewrites `gh-pages` and pushes it. Write access to the contents is the only scope
-    # that it needs.
+    # `gh-pages` takes one writer at a time. Two cleanups that run together push over each other,
+    # so queue them instead of cancelling them. A queued run that a newer one replaces loses
+    # nothing: the newer run deletes every preview of a closed pull request.
+    concurrency:
+      group: doc-preview-cleanup
+      cancel-in-progress: false
+    # The job rewrites `gh-pages` and pushes it, and it lists the open pull requests.
     permissions:
       contents: write
+      pull-requests: read
     steps:
       - name: Checkout the gh-pages branch
         uses: actions/checkout@v7
         with:
           ref: gh-pages
-      - name: Delete the preview and the history, then push
+      - name: Delete the previews and the history, then push
         run: |
           set -euo pipefail
-          if [ ! -d "${preview_dir}" ]; then
-            echo "No preview at ${preview_dir}. Nothing to delete."
+          base="$(git rev-parse HEAD)"
+          # A failed listing stops the job here. It must never read as "no pull request is open",
+          # because that deletes every preview.
+          open_previews="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 \
+            --json number --jq '.[] | "previews/PR\(.number)"')"
+          removed=0
+          for dir in previews/PR*; do
+            [ -d "${dir}" ] || continue
+            if grep -qxF "${dir}" <<< "${open_previews}"; then
+              continue
+            fi
+            echo "Delete ${dir}"
+            git rm -rf --quiet "${dir}"
+            removed=$((removed + 1))
+          done
+          if [ "${removed}" -eq 0 ]; then
+            echo "No preview of a closed pull request. Nothing to delete."
             exit 0
           fi
           git config user.name "Documenter.jl"
           git config user.email "documenter@juliadocs.github.io"
-          git rm -rf --quiet "${preview_dir}"
-          git commit -m "delete preview ${preview_dir}"
+          git commit -m "delete ${removed} previews of closed pull requests"
           # A plain delete leaves every preview in the history of the branch, so the repository
           # never gets smaller. Replace the history with one commit that holds the current tree.
           git branch gh-pages-new "$(echo "delete history" | git commit-tree HEAD^{tree})"
-          git push --force origin gh-pages-new:gh-pages
+          # The lease refuses the push when a deploy moved `gh-pages` after the checkout. A plain
+          # force push discards that deploy. The next cleanup deletes what this run leaves.
+          git push --force-with-lease="gh-pages:${base}" origin gh-pages-new:gh-pages
         env:
-          preview_dir: previews/PR${{ github.event.number }}
+          GH_TOKEN: ${{ github.token }}
