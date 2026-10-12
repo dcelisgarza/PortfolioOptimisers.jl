@@ -222,7 +222,7 @@ each call with no data, and `PinnedChoice()` keeps the choice of the first fit.
 
 Every `Parity_CrossSectionalFactorPrior_Online*` file is an output of the oracle's online update
 over one stream of batches, rows 1-90, 91-170 and 171-250 of the exchange that
-`parity_write(dir, grid_fixture(parity_large_panel()).rd; filled = true)` writes. The panel holds
+`parity_write(dir, grid_fixture(parity_large_panel()); filled = true)` writes. The panel holds
 Panel Fields, and its estimation mask differs from its active mask on asset 6. Each file stacks
 the three steps vertically: one row of `mu`, one 40 x 40 block of `sigma`, or the factor returns
 of every row fitted so far. `Fold*` is the oracle's online update after each batch, and `Prefix*`

@@ -831,10 +831,10 @@ The method that Julia selects is the algorithm.
  1. A [`PanelFieldRatio`](@ref), a [`PanelFieldLog`](@ref) and a [`Passthrough`](@ref) read their own row, so each returns one. So do a [`ConstantExposure`](@ref), a [`OneHotExposure`](@ref), a [`CurrencyExposure`](@ref) and a [`CustomValueReturnForecast`](@ref).
  2. A [`GrowthRate`](@ref), a [`ChangeToScale`](@ref) and a [`ChangeInIntensity`](@ref) read their own row and the row `lag` observations earlier, so each returns `lag + 1`.
  3. A [`RollingLogReturn`](@ref) returns `skip + window`, and a [`RollingMax`](@ref) returns `window`.
- 4. A vector of estimators returns the largest look-back of its members, and `nothing` when one member returns `nothing`. A [`CompositeExposure`](@ref) returns it over its Descriptors, and a [`FixedWeightedReturnForecast`](@ref) over the Descriptors of its scores. An [`ObservedExposure`](@ref) returns the look-back of the member it wraps.
+ 4. A vector of estimators returns the largest look-back of its members, and `nothing` when one member returns `nothing`. A [`CompositeExposure`](@ref) returns it over its Descriptors, and a [`FixedWeightedReturnForecast`](@ref), an [`ExpWeightedReturnForecast`](@ref) and a [`TargetReturnForecast`](@ref) over the Descriptors of their scores. An [`ObservedExposure`](@ref) returns the look-back of the member it wraps.
  5. A [`DerivedExposure`](@ref) returns one. The factor it is derived from is in the same factor list, so the look-back of the prior counts the rows of that factor.
  6. A [`CrossSectionalFactorPrior`](@ref) returns the look-back of its factors plus `lag`, because the regression of one observation reads the Factor Exposures `lag` observations earlier. The look-back of its Return Forecast Estimator replaces that sum when it is larger. `nothing` from either part gives `nothing`.
- 7. Every other estimator returns `nothing`. This covers every exponentially weighted Descriptor, an [`ExpWeightedReturnForecast`](@ref) and a [`TargetReturnForecast`](@ref), which fit over every observation.
+ 7. Every other estimator returns `nothing`. This covers every exponentially weighted Descriptor, which is a recursion from the first observation.
 
 The look-back of the prior counts the Asset Panel rows that its Factor Exposures and its Return Forecast read. Its moment estimators `pe` and `ve` read every factor return and every idiosyncratic return, and a fold keeps their state rather than their rows.
 

@@ -509,7 +509,7 @@ The reconstitution verb of `optimise(opt)` with no data. `rows` is the buffer th
 
 # Returns
 
-  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with the parts that the route of the prior recorded: both masks and the Panel Fields for a refit prior that reads them, and the active mask alone on the carry or with no prior. `iv` and `ivpa` come back as `nothing`. An optimiser with a prior refuses a step that carries a part its route cannot record, and a head with no prior reads none of them.
+  - `rd::ReturnsResult`: The rebuilt returns data. Field by field, it is equal to the `ReturnsResult` that a batch fit over the same observations reads, with two exceptions. A time-varying panel comes back with the parts that the route of the prior recorded: both masks and the Panel Fields for a refit prior that reads them, both masks and no Panel Field on the carry fold of a [`CrossSectionalFactorPrior`](@ref), and the active mask alone on the carry of another prior or with no prior. `iv` and `ivpa` come back as `nothing`. An optimiser with a prior refuses a step that carries a part its route cannot record, and a head with no prior reads none of them.
 
 # Related
 

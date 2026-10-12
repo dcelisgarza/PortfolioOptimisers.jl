@@ -861,5 +861,21 @@ end
         @test !po.reads_panel_fields(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]))
         @test po.reads_panel_fields(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
                                                         pe1 = PanelFieldProbe()))
+        # Every host that passes the panel and the series to the prior it embeds answers for
+        # that prior: the augmented Black-Litterman prior through its asset prior, and the
+        # hosts of a factor-axis prior through an embedding prior.
+        blv = BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
+        cs = CrossSectionalFactorPrior(; lambda = 1,
+                                       factors = ["market" => ConstantExposure(),
+                                                  "ccy" => CurrencyExposure()])
+        for (inner, reads) in
+            ((PanelFieldProbe(), po.reads_panel_fields), (cs, po.reads_exogenous_series))
+            @test reads(AugmentedBlackLittermanPrior(; a_pe = inner, a_views = blv,
+                                                     f_views = blv))
+            @test !reads(AugmentedBlackLittermanPrior(; a_views = blv, f_views = blv))
+            ep = EntropyPoolingPrior(; pe = inner)
+            @test reads(BayesianBlackLittermanPrior(; pe = ep, views = blv))
+            @test reads(HighOrderFactorPriorEstimator(; pe = ep))
+        end
     end
 end

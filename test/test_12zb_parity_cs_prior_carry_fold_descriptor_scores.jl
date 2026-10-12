@@ -19,18 +19,18 @@ right after its step.
 
 Every `Parity_CrossSectionalFactorPrior_CarrySeed*` file is an output of the oracle's online update
 over the stream of #1468, rows 1-90, 91-170 and 171-250 of the exchange that
-`parity_write(dir, grid_fixture(parity_large_panel()).rd; filled = true)` writes. Its factor prior
+`parity_write(dir, grid_fixture(parity_large_panel()); filled = true)` writes. Its factor prior
 is an exponentially weighted mean and covariance of half-life 20 and `min_observations = 5`, whose
 window of 60 rows cuts the factor returns of the first call alone. Each file stacks the three steps
-vertically, as the `Online*` files of test_12za do: one row of `mu`, one 40 x 40 block of `sigma`,
+vertically, as the `Online*` files of test_12z do: one row of `mu`, one 40 x 40 block of `sigma`,
 or the factor returns of every row fitted so far. The cases are `SeedStyle` (`Base` with
 `families = ["style" => nothing]`) and `SeedIndustry` (`FamOne`). The pinned choice with no window
-is checked against the `Online*Fold*` files of test_12za.
+is checked against the `Online*Fold*` files of test_12z.
 
 A prior whose tree reads the Exogenous Series folds on the carry route too (#1479, ADR 0193): the
 buffer and the carried rows hold the series, and the state derives each row of the returns net of
 the observed factors one time. Its pinned choice under currency factors is checked against the
-`OnlineCurrencyStyle_Fold*` files of test_12za.
+`OnlineCurrencyStyle_Fold*` files of test_12z.
 
 A slot that reads the Return Forecast history makes the state carry it (#1484): each step fits the
 member once for each new observation, and the history and the resolved `lambda` and `c` equal those

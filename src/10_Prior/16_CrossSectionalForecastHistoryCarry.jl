@@ -5,7 +5,7 @@
 
 Answers whether the history of a Return Forecast Estimator comes from a refit at each observation.
 
-[`FixedWeightedReturnForecast`](@ref) and [`ExpWeightedReturnForecast`](@ref) publish their history in the Result of one fit, so the call with no data of the carry fold reads it there and the state carries no row. Every other member answers `true`. A member that publishes a history and answers `true` costs a fit at each step, and the call with no data still reads the history of its Result.
+[`FixedWeightedReturnForecast`](@ref) and [`ExpWeightedReturnForecast`](@ref) publish their history in the Result of one fit, so the call with no data of the carry fold reads it there and the state carries no row. Every other member answers `true`. A member that publishes a history and answers `true` costs a fit at each step unless it folds its rows, as [`folds_forecast_rows`](@ref) states, and the call with no data still reads the history of its Result.
 
 # Arguments
 
@@ -628,8 +628,8 @@ end
     orthogonal_forecast_step(ofit::AbstractOrthogonalForecastFit, rfe, P::NamedTuple,
                              csfm::CrossSectionalFactorModel, fs,
                              cre::AbstractCrossSectionalRegressionEstimator)
-    orthogonal_forecast_step(ofit::OrthogonalPartCalibration, rfe::TargetReturnForecast,
-                             P::NamedTuple, csfm::CrossSectionalFactorModel, fs,
+    orthogonal_forecast_step(ofit::OrthogonalPartCalibration, rfe, P::NamedTuple,
+                             csfm::CrossSectionalFactorModel, fs,
                              cre::AbstractCrossSectionalRegressionEstimator)
 
 Runs a step of the Return Forecast of the carry fold of a Cross-Sectional Factor Prior under its Orthogonal Forecast Fit, as [`orthogonal_forecast_result`](@ref) fits it in the batch fit.
@@ -638,8 +638,8 @@ Runs a step of the Return Forecast of the carry fold of a Cross-Sectional Factor
 
 The method that Julia selects is the algorithm.
 
- 1. [`OrthogonalPartCalibration`](@ref) with a [`TargetReturnForecast`](@ref): call [`return_forecast_step`](@ref) with `cre`, so the fold state also carries the regression of `κ⊥`.
- 2. Any other pair: call [`return_forecast_step`](@ref) with no `cre`.
+ 1. [`OrthogonalPartCalibration`](@ref): call [`return_forecast_step`](@ref) with `cre`, so the fold state also carries the regression of `κ⊥`. The batch fit calls [`orthogonal_forecast_result`](@ref) with `cre` for every member under this rule, and the prior refuses a member that answers `false` to [`calibrates_orthogonal_part`](@ref), so the step does the same for every member that it accepts.
+ 2. Any other rule: call [`return_forecast_step`](@ref) with no `cre`.
 
 # Arguments
 
@@ -664,8 +664,8 @@ function orthogonal_forecast_step(::AbstractOrthogonalForecastFit, rfe, P::Named
                                   ::AbstractCrossSectionalRegressionEstimator)
     return return_forecast_step(rfe, P, csfm, fs)
 end
-function orthogonal_forecast_step(::OrthogonalPartCalibration, rfe::TargetReturnForecast,
-                                  P::NamedTuple, csfm::CrossSectionalFactorModel, fs,
+function orthogonal_forecast_step(::OrthogonalPartCalibration, rfe, P::NamedTuple,
+                                  csfm::CrossSectionalFactorModel, fs,
                                   cre::AbstractCrossSectionalRegressionEstimator)
     return return_forecast_step(rfe, P, csfm, fs, cre)
 end

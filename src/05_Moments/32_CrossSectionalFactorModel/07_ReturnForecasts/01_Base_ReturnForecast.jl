@@ -785,7 +785,7 @@ The Orthogonal Forecast Fit is not the Orthogonal Forecast Scale `c`. The fit re
 
 # Interfaces
 
-A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field, and three steps of [`cross_sectional_return_forecast`](@ref) dispatch on it: [`orthogonal_forecast_member`](@ref) gives the member that the prior fits, [`orthogonal_forecast_result`](@ref) fits it, and [`orthogonal_forecast_rescale`](@ref) scales the orthogonal part of the split. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes.
+A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field, and three steps of [`cross_sectional_return_forecast`](@ref) dispatch on it: [`orthogonal_forecast_member`](@ref) gives the member that the prior fits, [`orthogonal_forecast_result`](@ref) fits it, and [`orthogonal_forecast_rescale`](@ref) scales the orthogonal part of the split. The carry fold dispatches on it at a fourth step, [`orthogonal_forecast_step`](@ref), which folds the rows of a step into a member that folds, and a rule that changes [`orthogonal_forecast_result`](@ref) changes this step in the same way, or the carry fold differs from the batch fit. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes.
 
 # Related
 
@@ -970,7 +970,7 @@ Where:
 
 The method that Julia selects is the algorithm.
 
- 1. Any rule but [`OrthogonalPartCalibration`](@ref), or a Result that carries no `κ⊥`: return `g` and `ap` unchanged. The prior refuses [`OrthogonalPartCalibration`](@ref) with a member other than a [`TargetReturnForecast`](@ref), so the second case does not happen.
+ 1. Any rule but [`OrthogonalPartCalibration`](@ref), or a Result that carries no `κ⊥`: return `g` and `ap` unchanged. The prior refuses [`OrthogonalPartCalibration`](@ref) with a member that answers `false` to [`calibrates_orthogonal_part`](@ref). So the second case happens only for a caller's member that answers `true` and gives a Result of its own type, and that member adds a method of this function for its Result, or its orthogonal part keeps the scale of its fit.
  2. [`OrthogonalPartCalibration`](@ref) with a [`TargetReturnForecastResult`](@ref): return the zero split unchanged. Otherwise return a zero `g` and a zero `ap` when `κ⊥ / κ` is not finite, which is the warm-up of either slope, and `g` with `ap` times the ratio when it is finite.
 
 # Arguments

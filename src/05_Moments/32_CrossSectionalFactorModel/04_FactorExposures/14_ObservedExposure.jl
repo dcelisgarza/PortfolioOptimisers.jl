@@ -461,9 +461,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuse a Factor Family of a [`CrossSectionalFactorPrior`](@ref) that holds both estimated and observed factors, or that a constrained family names although it is observed.
+Refuse a Factor Family of a [`CrossSectionalFactorPrior`](@ref) that holds both estimated and observed factors, or that a constrained family names although it is observed, and refuse a factor list of observed members alone.
 
-The family label of an observed factor is a property of its member, so no label is reserved. A family is still one kind or the other: the attribution of a family states a standard error only for factors the fit estimated, and the zero-sum condition of a constrained family reaches only the regression. So a label that an estimated member and an observed member both carry is refused, and so is a constrained family whose label an observed member carries.
+The cross-sectional regression fits the estimated factors, so a list of observed members alone gives it nothing to fit. The family label of an observed factor is a property of its member, so no label is reserved. A family is still one kind or the other: the attribution of a family states a standard error only for factors the fit estimated, and the zero-sum condition of a constrained family reaches only the regression. So a label that an estimated member and an observed member both carry is refused, and so is a constrained family whose label an observed member carries.
 
 # Arguments
 
@@ -472,6 +472,7 @@ The family label of an observed factor is a property of its member, so no label 
 
 # Validation
 
+  - `factors` holds an estimated member when it holds an observed member. Raises an `ArgumentError`.
   - No family label belongs to an estimated member and to an observed member. Raises an `ArgumentError`.
   - No key of `families` is the family label of an observed member. Raises an `ArgumentError`.
 
@@ -488,6 +489,8 @@ The family label of an observed factor is a property of its member, so no label 
 function assert_cross_sectional_observed_families(factors::AbstractVector{<:Pair},
                                                   families::Option{<:AbstractVector{<:Pair}})::Nothing
     (; est, obs) = cross_sectional_factor_partition(factors)
+    @argcheck(isempty(obs) || !isempty(est),
+              ArgumentError("factors holds observed members alone, and the cross-sectional regression needs at least one estimated member to fit. Add an Exposure Estimator that the prior estimates, for example \"market\" => ConstantExposure()"))
     fo = unique(String[String(last(p).family) for p in obs])
     both = intersect(fo, String[String(last(p).family) for p in est])
     @argcheck(isempty(both),

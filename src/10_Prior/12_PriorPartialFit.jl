@@ -611,7 +611,9 @@ end
     reads_panel_fields(pe::Nothing) -> false
     reads_panel_fields(pe::Online)
     reads_panel_fields(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                 BayesianBlackLittermanPrior, HighOrderFactorPriorEstimator,
                                  MeucciEntropyPoolingPrior, EntropyPoolingPrior})
+    reads_panel_fields(pe::AugmentedBlackLittermanPrior)
     reads_panel_fields(pe::OpinionPoolingPrior)
 
 Answers whether the fit of a prior reads the Panel Fields of its Asset Panel, from its estimator tree.
@@ -648,8 +650,13 @@ function reads_panel_fields(pe::Online)
     return reads_panel_fields(pe.est)
 end
 function reads_panel_fields(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
+                                      <:BayesianBlackLittermanPrior,
+                                      <:HighOrderFactorPriorEstimator,
                                       <:MeucciEntropyPoolingPrior, <:EntropyPoolingPrior})
     return reads_panel_fields(pe.pe)
+end
+function reads_panel_fields(pe::AugmentedBlackLittermanPrior)
+    return reads_panel_fields(pe.a_pe)
 end
 function reads_panel_fields(pe::OpinionPoolingPrior)
     return any(reads_panel_fields, (pe.pe1, pe.pe2, pe.pes...))
@@ -667,7 +674,10 @@ end
     reads_exogenous_series(pe::CrossSectionalFactorPrior) -> Bool
     reads_exogenous_series(pe::Online) -> Bool
     reads_exogenous_series(pe::Union{HighOrderPriorEstimator, BlackLittermanPrior,
+                                     BayesianBlackLittermanPrior,
+                                     HighOrderFactorPriorEstimator,
                                      MeucciEntropyPoolingPrior, EntropyPoolingPrior}) -> Bool
+    reads_exogenous_series(pe::AugmentedBlackLittermanPrior) -> Bool
     reads_exogenous_series(pe::OpinionPoolingPrior) -> Bool
 
 Answers whether the fit of an estimator reads the Exogenous Series `rd.E`, from its estimator tree.
@@ -722,9 +732,14 @@ function reads_exogenous_series(pe::Online)
     return reads_exogenous_series(pe.est)
 end
 function reads_exogenous_series(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior,
+                                          <:BayesianBlackLittermanPrior,
+                                          <:HighOrderFactorPriorEstimator,
                                           <:MeucciEntropyPoolingPrior,
                                           <:EntropyPoolingPrior})
     return reads_exogenous_series(pe.pe)
+end
+function reads_exogenous_series(pe::AugmentedBlackLittermanPrior)
+    return reads_exogenous_series(pe.a_pe)
 end
 function reads_exogenous_series(pe::OpinionPoolingPrior)
     return any(reads_exogenous_series, (pe.pe1, pe.pe2, pe.pes...))

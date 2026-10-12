@@ -297,6 +297,17 @@ end
                                                                                      "market")],
                                                              lx = "local")
         @test_throws ArgumentError ObservedExposure(; xe = CurrencyExposure(), series = "x")
+        # The regression needs an estimated member, so observed members alone are refused at
+        # construction, under every Spanned Shrinkage.
+        for lambda in (1, PrecisionBlend())
+            err = try
+                CrossSectionalFactorPrior(; lambda = lambda,
+                                          factors = ["ccy" => CurrencyExposure()])
+            catch e
+                e
+            end
+            @test err isa ArgumentError && occursin("observed members alone", err.msg)
+        end
         # An empty name is refused with a message about the Exogenous Series (#1365).
         err = try
             ObservedExposure(; xe = ConstantExposure(), series = "")

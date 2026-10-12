@@ -429,7 +429,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
 """
 @propagatable @concrete struct CrossSectionalFactorPrior <: AbstractLowOrderPriorEstimator_A
     """
-    Pairs of `factor name => Exposure Estimator`. The estimated factors take the factor axis in the order they are written, and the observed factors follow them in the order they are written. A one-hot member contributes one factor per level of its categorical Panel Field, and so does a [`CurrencyExposure`](@ref), so a Pair is not always one factor.
+    Pairs of `factor name => Exposure Estimator`. The estimated factors take the factor axis in the order they are written, and the observed factors follow them in the order they are written. A one-hot member contributes one factor per level of its categorical Panel Field, and so does a [`CurrencyExposure`](@ref), so a Pair is not always one factor. The list holds at least one estimated member, because the cross-sectional regression fits the estimated factors, and the constructor refuses a list of observed members alone.
     """
     factors
     """
