@@ -203,14 +203,23 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
                       settings = merge(opts, Dict("mip_feasibility_tolerance" => 1e-9)))
         # With b = 1000 the default tolerance of 1e-6 left these three about 1e-4 apart (#1323).
         # The levels exempt the 28 and 9 observations of that measurement. A range that exempts
-        # 10 gain observations, as beta = 0.1 now does, takes HiGHS twice as long (#1364). The
-        # range is the third measure, and `test_09n_xat_risk_range.jl` solves it.
-        for r in (ValueatRisk(; alpha = 0.285), DrawdownatRisk(; alpha = 0.285))
+        # 10 gain observations, as beta = 0.1 now does, takes HiGHS twice as long (#1364).
+        #
+        # The range solves a draw of 40 rows from the same seed. On the 100 rows its two solves
+        # took about 490 s (#1634), and on 40 rows each takes about 1 s. The draw still guards
+        # #1323. Measured: `MIPValueatRisk(; b = 1000)` at the default tolerance leaves the model
+        # 7.6e-4 below the functor and 3.5e-4 below the solve at the tight tolerance, and the
+        # derived constant leaves 1.8e-17 and 1.0e-17.
+        X40 = 0.01 .* randn(StableRNG(1046), 40, 4) .+ 0.0005
+        pr40 = prior(EmpiricalPrior(), X40)
+        for (r, Xr, prr) in ((ValueatRisk(; alpha = 0.285), X, pr),
+                             (DrawdownatRisk(; alpha = 0.285), X, pr),
+                             (ValueatRiskRange(; alpha = 0.285, beta = 0.095), X40, pr40))
             sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
-                                    opt = JuMPOptimiser(; pe = pr, slv = slv)))
+                                    opt = JuMPOptimiser(; pe = prr, slv = slv)))
             tsol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
-                                     opt = JuMPOptimiser(; pe = pr, slv = tslv)))
-            @test isapprox(JuMP.value(sol.model[:risk]), expected_risk(r, sol.w, X);
+                                     opt = JuMPOptimiser(; pe = prr, slv = tslv)))
+            @test isapprox(JuMP.value(sol.model[:risk]), expected_risk(r, sol.w, Xr);
                            atol = 1e-12)
             @test isapprox(JuMP.value(sol.model[:risk]), JuMP.value(tsol.model[:risk]);
                            atol = 1e-12)
