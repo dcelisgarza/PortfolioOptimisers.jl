@@ -130,3 +130,12 @@ posterior weights, so a factor model carries the views; and a caller states prio
   reported against the prior that was actually wrapped.
 + An opinion whose wrapped estimator drops rows is refused by name rather than by a bare
   `DimensionMismatch` out of an array write.
+
+## Amendment (2026-10-12)
+
+Context item 3 said that a `ProbabilityWeights` that sums to one gives GLM an effective sample size
+of one, so a `StepwiseRegression` under it chose other factor sets. That was a defect of the
+regression targets, not a property of the weights. [#1640](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1640)
+fixed it: [ADR 0203](0203-a-weighted-regression-reads-the-kish-count-of-its-weights.md) scales the
+weights to their Kish count before the call to GLM. A uniform push now gives the unweighted
+stepwise sets, as it gives the unweighted moments. The decision of this ADR does not change.

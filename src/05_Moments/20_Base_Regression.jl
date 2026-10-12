@@ -600,7 +600,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits each response by ordinary least squares through `GLM.LinearModel`.
 
-The `kwargs` field is forwarded verbatim to `GLM`, so any option that routine accepts — observation weights among them — reaches the fit. This is the default target of every regression estimator in the library.
+The `kwargs` field is forwarded to `GLM`, so any option that routine accepts — observation weights among them — reaches the fit. The one entry that changes on the way is `weights`: [`glm_weights`](@ref) scales it to the count that `GLM` reads, which leaves the coefficients unchanged. This is the default target of every regression estimator in the library.
 
 # Fields
 
@@ -668,6 +668,85 @@ function factory(re::LinearModel, w::ObsWeights)::LinearModel
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
 """
+    glm_weights(w::StatsBase.AbstractWeights) -> StatsBase.FrequencyWeights
+
+Return the frequency weights that `GLM` reads as the observation weights `w`.
+
+`GLM` reads every weight vector as frequency weights, so the number of observations of a weighted fit is ``\\sum_t w_t``. A count is what `StatsBase.FrequencyWeights` state, so they pass unchanged. Every other kind states the relative weight of each observation and no count. Probability weights that sum to one would read as one observation, a residual degree of freedom below zero, and a p-value of one for every coefficient. So the other kinds are scaled to sum to their Kish effective sample size, which leaves the coefficients unchanged, because a weighted fit is invariant to a constant scale of its weights.
+
+The Kish count is the correct count for observations that are drawn alike and then reweighted, which is what the scenario probabilities and the decay weights of the library are. It reads ``T`` under uniform weights, so the fit equals the unweighted one, and ``k`` under equal weights on ``k`` of the rows, so the fit equals the fit of those rows alone. `docs/adr/0203-a-weighted-regression-reads-the-kish-count-of-its-weights.md` records the choice and the null test that measured it. A caller who wants another count states it with `StatsBase.fweights`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+T_{e} &= \\frac{\\left(\\sum_{t} w_{t}\\right)^2}{\\sum_{t} w_{t}^2}\\,,\\\\
+\\tilde{w}_{t} &= w_{t} \\frac{T_{e}}{\\sum_{s} w_{s}} = w_{t} \\frac{\\sum_{s} w_{s}}{\\sum_{s} w_{s}^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_t_obs])
+  - $(math_dict[:cal_T_e])
+  - ``\\tilde{w}_{t}``: Frequency weight of observation ``t``. The frequency weights sum to ``T_{e}``.
+
+# Arguments
+
+  - `w`: Resolved observation weights, one per row of the design.
+
+# Returns
+
+  - `w::StatsBase.FrequencyWeights`: `w` itself when it is `StatsBase.FrequencyWeights`, otherwise ``\\tilde{w}``.
+
+# Related
+
+  - [`glm_fit_kwargs`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+"""
+function glm_weights(w::StatsBase.FrequencyWeights)
+    return w
+end
+function glm_weights(w::StatsBase.AbstractWeights)
+    return StatsBase.fweights(w .* (sum(w) / sum(abs2, w)))
+end
+"""
+    glm_fit_kwargs(kwargs::NamedTuple, X::MatNum) -> NamedTuple
+
+Return the keyword arguments that a library regression target passes to `GLM`.
+
+[`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) keep their observation weights under the `weights` key of their `kwargs`, where [`factory`](@ref) puts them. A [`DynamicAbstractWeights`](@ref) holds no values until it meets the design, and `GLM` reads every weight vector as a count, so both targets resolve and scale the entry here before the fit.
+
+# Algorithm
+
+ 1. Read the `weights` entry of `kwargs`. When it is not an [`ObsWeights`](@ref), return `kwargs` unchanged.
+ 2. Resolve the entry against `X` with [`get_observation_weights`](@ref), and scale it with [`glm_weights`](@ref).
+ 3. Return `kwargs` with the scaled weights under the `weights` key.
+
+# Arguments
+
+  - `kwargs`: The `kwargs` field of the regression target.
+  - `X`: The design matrix (observations × factors).
+
+# Returns
+
+  - `kwargs::NamedTuple`: The keyword arguments of the call to `GLM`.
+
+# Related
+
+  - [`glm_weights`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+"""
+function glm_fit_kwargs(kwargs::NamedTuple, X::MatNum)
+    w = get(kwargs, :weights, nothing)
+    if !isa(w, ObsWeights)
+        return kwargs
+    end
+    return (; kwargs..., weights = glm_weights(get_observation_weights(w, X)))
+end
+"""
     StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
@@ -676,7 +755,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 
 # Algorithm
 
- 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 1. Resolve and scale the `weights` entry of `tgt.kwargs` with [`glm_fit_kwargs`](@ref), giving `kwargs`. Weights that are not `StatsBase.FrequencyWeights` then sum to their Kish effective sample size, so the inference of the fit reads that count of observations.
  2. Call `StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)`, giving the fitted model.
 
 # Arguments
@@ -695,14 +774,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
 function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
-    kwargs = if haskey(tgt.kwargs, :weights) &&
-                isa(tgt.kwargs.weights, DynamicAbstractWeights)
-        w = get_observation_weights(tgt.kwargs.weights, X)
-        (; tgt.kwargs..., weights = w)
-    else
-        tgt.kwargs
-    end
-    return StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)
+    return StatsAPI.fit(GLM.LinearModel, X, y; glm_fit_kwargs(tgt.kwargs, X)...)
 end
 """
     PSEUDO_R2_VARIANTS
@@ -913,7 +985,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
 
 # Algorithm
 
- 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 1. Resolve and scale the `weights` entry of `tgt.kwargs` with [`glm_fit_kwargs`](@ref), giving `kwargs`. Weights that are not `StatsBase.FrequencyWeights` then sum to their Kish effective sample size, so the inference of the fit reads that count of observations.
  2. Call `StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)`, giving the fitted model.
 
 # Arguments
@@ -932,14 +1004,8 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
 function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
-    kwargs = if haskey(tgt.kwargs, :weights) &&
-                isa(tgt.kwargs.weights, DynamicAbstractWeights)
-        w = get_observation_weights(tgt.kwargs.weights, X)
-        (; tgt.kwargs..., weights = w)
-    else
-        tgt.kwargs
-    end
-    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)
+    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...;
+                        glm_fit_kwargs(tgt.kwargs, X)...)
 end
 """
     regression_target_weights(tgt::AbstractRegressionTarget)

@@ -44,15 +44,17 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                          rd).w, rtol = 5e-6)
 
     # ADR 0116. This pair compares the two solvers, so both sides state the same prior
-    # probabilities. An explicit uniform `w` is now a different fit from no `w` at all: only
-    # a caller's `w` reaches the nested estimator, and a `StepwiseRegression` under uniform
-    # probability weights selects a different factor set for every asset.
+    # probabilities. Only a caller's `w` reaches the nested estimator. Before #1640 a
+    # `StepwiseRegression` under uniform probability weights read one observation and selected
+    # a different factor set for every asset. ADR 0203 scales the weights to their Kish count,
+    # so the nested fit selects the unweighted sets, and the miss is the 5.0e-4 of the fit
+    # with no `w` above.
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    alg = H0_EntropyPooling(),
                                    pe = FactorPrior(;
                                                     re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, mu_views = mu_views), rd)
-    @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+    @test isapprox(pr.mu[1], 0.002, rtol = 1e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              w = StatsBase.pweights(range(iT, iT;

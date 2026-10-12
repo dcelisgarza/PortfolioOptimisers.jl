@@ -340,4 +340,19 @@ set over every observation.
         @test same(prior(pe, X[rows(1), :], F[rows(1), :]),
                    prior(ep(dr(; proj = projw)), X[rows(1), :], F[rows(1), :]))
     end
+
+    @testset "A stepwise refit under uniform pooled weights is the unweighted fit (#1640)" begin
+        # No view leaves the pooled weights uniform, so the refit of pe2 must select the factors
+        # of the unweighted fit. Before #1640 GLM read the weights, which sum to one, as one
+        # observation, and every asset fell back to factor 1.
+        Xr, Fr = X[rows(1), :], F[rows(1), :]
+        for kw in (sw, swb)
+            fp = FactorPrior(; re = StepwiseRegression(; kw...))
+            M1 = prior(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()], pe2 = fp), Xr,
+                       Fr).rr.M
+            M0 = prior(fp, Xr, Fr).rr.M
+            @test isapprox(M1, M0; rtol = 1e-12)
+            @test any(>(1), vec(count(!iszero, M0; dims = 2)))
+        end
+    end
 end

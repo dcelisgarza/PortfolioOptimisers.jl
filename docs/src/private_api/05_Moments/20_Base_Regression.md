@@ -30,6 +30,8 @@ regression_criterion_func
 regression_polarity
 regression_threshold
 pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatNum, ::MatNum, ::Option{<:ObsWeights} = nothing)
+glm_weights
+glm_fit_kwargs
 ```
 
 ## References

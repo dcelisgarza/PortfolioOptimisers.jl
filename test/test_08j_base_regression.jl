@@ -403,10 +403,54 @@ using Accessors: Accessors
                              Xd, y)
         @test GLM.coef(g_dyn) ≈ GLM.coef(g_res)
 
-        # A plain weights vector passes straight through, untouched.
+        # A plain weights vector of another kind over the same values gives the same
+        # coefficients: the scale `glm_weights` applies moves no coefficient.
         pw = pweights(range(0.5, 1.5; length = T))
         m_pw = StatsAPI.fit(PO.LinearModel(; kwargs = (; weights = pw)), Xd, y)
         @test GLM.coef(m_pw) ≈ GLM.coef(m_dyn)
+    end
+
+    @testset "A weighted fit reads the Kish count of its weights (#1640)" begin
+        kish(w) = sum(w)^2 / sum(abs2, w)
+        # A count passes unchanged, and every other kind sums to its Kish count.
+        fw = fweights(fill(2.0, T))
+        @test PO.glm_weights(fw) === fw
+        for w in (pweights(range(0.5, 1.5; length = T)), aweights(fill(1 / T, T)),
+                  eweights(1:T, 0.05), pweights([fill(1 // 20, 20); zeros(Int, T - 20)]))
+            gw = PO.glm_weights(w)
+            @test isa(gw, StatsBase.FrequencyWeights)
+            @test sum(gw) ≈ kish(w)
+            @test gw ./ sum(gw) ≈ w ./ sum(w)
+        end
+        # A Rational stays Rational: the scale is read off the weights.
+        @test eltype(PO.glm_weights(pweights([1 // 2, 1 // 4, 1 // 4]))) == Rational{Int}
+        # Only an entry of ObsWeights is touched.
+        kw = (; dropcollinear = false)
+        @test PO.glm_fit_kwargs(kw, Xd) === kw
+        @test PO.glm_fit_kwargs((; weights = fw), Xd).weights === fw
+
+        # Probability weights that sum to one read T observations, so the inference of the fit
+        # is that of the unweighted one. Before #1640 GLM read one observation, a negative
+        # residual degree of freedom and a p-value of one for every coefficient.
+        u = pweights(fill(1 / T, T))
+        for tgt in (PO.LinearModel(), PO.GeneralisedLinearModel())
+            m0 = StatsAPI.fit(tgt, Xd, y)
+            m1 = StatsAPI.fit(PO.factory(tgt, u), Xd, y)
+            @test GLM.nobs(m1) ≈ T
+            @test GLM.dof_residual(m1) ≈ GLM.dof_residual(m0)
+            @test GLM.stderror(m1) ≈ GLM.stderror(m0)
+            @test coeftable(m1).cols[4] ≈ coeftable(m0).cols[4]
+            @test GLM.aic(m1) ≈ GLM.aic(m0)
+            @test GLM.bic(m1) ≈ GLM.bic(m0)
+        end
+        # Equal weights on 20 rows and none on the rest read 20 observations, so the fit is the
+        # fit of those rows alone.
+        s = pweights([fill(1 / 20, 20); zeros(T - 20)])
+        ms = StatsAPI.fit(PO.factory(PO.LinearModel(), s), Xd, y)
+        mr = StatsAPI.fit(PO.LinearModel(), Xd[1:20, :], y[1:20])
+        @test GLM.nobs(ms) ≈ 20
+        @test GLM.stderror(ms) ≈ GLM.stderror(mr)
+        @test coeftable(ms).cols[4] ≈ coeftable(mr).cols[4]
     end
 
     @testset "The criterion tuples and their unions" begin
@@ -569,7 +613,9 @@ function PortfolioOptimisers.StatsAPI.fit(tgt::CallerTestTarget, A::AbstractMatr
     if isnothing(tgt.w)
         return StatsAPI.fit(PO.GLM.LinearModel, A, y)
     end
-    return StatsAPI.fit(PO.GLM.LinearModel, A, y; weights = tgt.w)
+    # GLM reads every weight vector as a count, so the caller states the count the library
+    # states, the Kish count of its weights (ADR 0203), and its fit equals the library's.
+    return StatsAPI.fit(PO.GLM.LinearModel, A, y; weights = PO.glm_weights(tgt.w))
 end
 function PortfolioOptimisers.regression_target_weights(tgt::CallerTestTarget)
     return tgt.w
