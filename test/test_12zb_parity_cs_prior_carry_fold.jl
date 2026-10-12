@@ -82,6 +82,13 @@ struct BasisBoundTarget <: PortfolioOptimisers.AbstractRegressionTarget end
 function PortfolioOptimisers.factory(::BasisBoundTarget, w::PortfolioOptimisers.ObsWeights)
     return factory(LinearModel(), w)
 end
+# A test-local Descriptor that reads the implied volatility of its own row, so the carry
+# answers the batch fit only when the rows it carries hold the surface (#1647).
+struct ImpliedVolatilityLevel <: PortfolioOptimisers.AbstractDescriptorEstimator end
+function PortfolioOptimisers.descriptor(::ImpliedVolatilityLevel, rd::ReturnsResult)
+    return ifelse.(rd.pnl.amsk, rd.iv, NaN)
+end
+PortfolioOptimisers.lookback(::ImpliedVolatilityLevel) = 1
 
 @testset "The carry fold of the Cross-Sectional Factor Prior (#1471)" begin
     po = PortfolioOptimisers
@@ -173,5 +180,51 @@ end
         for (k, x) in enumerate(stream(pe, rd, e))
             @test near(x.pr, batch(pe, k, rd, e))
         end
+    end
+
+    @testset "The carried rows hold the implied volatilities that a Descriptor reads (#1647)" begin
+        iv = 0.15 .+ 0.1 .* rand(StableRNG(1647), size(rd.X)...)
+        rdi = ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, ne = rd.ne,
+                            E = rd.E, ts = rd.ts, iv = iv, ivpa = 1.1, pnl = rd.pnl)
+        base = grid_config("Base", rdi)
+        fl = vcat(base.factors,
+                  ["ivl" => CompositeExposure(; descriptors = [ImpliedVolatilityLevel()],
+                                              outlier = nothing, scoring = nothing,
+                                              family = "ivl")])
+        pe = CrossSectionalFactorPrior(; lambda = 1, base..., factors = fl)
+        @test po.cross_sectional_carry_rows(pe) isa Integer
+        s = stream(pe, rdi)
+        @test all(k -> agrees(s[k].pr, batch(pe, k, rdi)), 1:3)
+        # The buffer records the surface, so a member above the prior reads it back.
+        kw = po.implied_volatility_buffer_kwargs(po.prior_returns_buffer(s[end].pe))
+        @test kw.iv == iv && kw.ivpa == 1.1
+        # The first step fixes whether the steps carry `iv`, and pins `ivpa`.
+        r = rows(rdi, 91:91)
+        p = partial_fit!(pe, rows(rdi, 1:90))
+        m = message(() -> partial_fit!(po.copy_states(p),
+                                       ReturnsResult(; nx = r.nx, X = r.X, ne = r.ne,
+                                                     E = r.E, ts = r.ts, iv = r.iv,
+                                                     ivpa = 2.0, pnl = r.pnl)))
+        @test occursin("`ivpa`", m)
+        m = message(() -> partial_fit!(po.copy_states(p),
+                                       ReturnsResult(; nx = r.nx, X = r.X, ne = r.ne,
+                                                     E = r.E, ts = r.ts, pnl = r.pnl)))
+        @test occursin("implied volatilities", m)
+        # An optimiser over the unwrapped prior steps when its clustering reads the surface,
+        # and gives the batch weights. The clustering reads the returns data, so the plain
+        # method of `ImpliedVolatility` reads the assets whose returns have no gap. Under
+        # `x_src = :prior` it reads the rows of the prior and the surface of the returns
+        # data, which the batch fit refuses too (#1655).
+        cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
+        hrp = HierarchicalRiskParity(;
+                                     opt = HierarchicalOptimiser(; pe = pe, cle = cle,
+                                                                 x_src = :data))
+        rdc = po.port_opt_view(rdi, :,
+                               findall(j -> all(isfinite, view(rdi.X, :, j)),
+                                       axes(rdi.X, 2)))
+        o = foldl((o, k) -> partial_fit!(o, rows(rdc, (edges[k] + 1):edges[k + 1])), 1:3;
+                  init = hrp)
+        @test po.returns_result(o).iv == rdc.iv
+        @test optimise(o).w == optimise(hrp, rdc).w
     end
 end

@@ -42,11 +42,11 @@ Keywords correspond to the struct's fields, and every field but `buf` and `tip` 
 """
 @concrete struct CrossSectionalCarryState <: AbstractPartialFitState
     """
-    Buffer of every folded observation: the returns, both masks, and the Exogenous Series when the prior reads it. The online step of an optimiser rebuilds its returns data from it with [`returns_buffer`](@ref).
+    Buffer of every folded observation: the returns, both masks, the implied volatilities and `ivpa` when the steps carry them, and the Exogenous Series when the prior reads it. The online step of an optimiser rebuilds its returns data from it with [`returns_buffer`](@ref).
     """
     buf
     """
-    The carried rows of the Asset Panel, as a [`ReturnsResult`](@ref) of the returns, the panel, and the Exogenous Series when the prior reads it, or `nothing` before the first step. It holds the last rows that the Factor Exposures of a new observation read, as [`cross_sectional_carry_rows`](@ref) states, or every row.
+    The carried rows of the Asset Panel, as a [`ReturnsResult`](@ref) of the returns, the panel, the implied volatilities and `ivpa` when the steps carry them, and the Exogenous Series when the prior reads it, or `nothing` before the first step. It holds the last rows that the Factor Exposures of a new observation read, as [`cross_sectional_carry_rows`](@ref) states, or every row.
     """
     win
     """
@@ -375,28 +375,40 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Appends the observations of a step to the carried panel rows, and returns the rows that the exposures of the step read.
 
+The Descriptors of a batch fit read `iv` and `ivpa` off the returns data, so the rows carry them. A row of `iv` belongs to the observation of the same row, so it is appended with the returns. `ivpa` has no observation axis, so the first step pins it.
+
 # Arguments
 
   - `win`: The carried rows, or `nothing` before the first step.
   - `rd`: The returns data of the step.
   - `xk`: The Exogenous Series of the step, `(; ne, E)` as [`exogenous_step_kwargs`](@ref) answers when the prior reads it, or an empty `NamedTuple`.
 
+# Validation
+
+  - `win.iv` and `rd.iv` are both `nothing`, or neither is, as [`assert_buffer_presence_agreement`](@ref) checks. An `ArgumentError` is thrown otherwise.
+  - `rd.ivpa` equals `win.ivpa`, as [`assert_pinned_value`](@ref) checks. An `ArgumentError` is thrown otherwise.
+
 # Returns
 
-  - `rd::ReturnsResult`: The carried rows followed by the rows of the step, with the returns, the Asset Panel and the series of `xk` alone.
+  - `rd::ReturnsResult`: The carried rows followed by the rows of the step, with the returns, the Asset Panel, `iv`, `ivpa` and the series of `xk` alone.
 
 # Related
 
   - [`cross_sectional_carry_fold`](@ref)
 """
 function cross_sectional_window_append(::Nothing, rd::ReturnsResult, xk::NamedTuple)
-    return ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl, xk...)
+    return ReturnsResult(; nx = rd.nx, X = rd.X, pnl = rd.pnl, iv = rd.iv, ivpa = rd.ivpa,
+                         xk...)
 end
 function cross_sectional_window_append(win::ReturnsResult, rd::ReturnsResult,
                                        xk::NamedTuple)
+    assert_buffer_presence_agreement(win.iv, rd.iv, "implied volatilities")
+    assert_pinned_value(win.ivpa, rd.ivpa, :ivpa)
     return ReturnsResult(; nx = rd.nx, X = vcat(win.X, rd.X), pnl = vcat(win.pnl, rd.pnl),
                          ne = win.ne,
-                         E = cross_sectional_fold_append(win.E, get(xk, :E, nothing)))
+                         E = cross_sectional_fold_append(win.E, get(xk, :E, nothing)),
+                         iv = isnothing(win.iv) ? nothing : vcat(win.iv, rd.iv),
+                         ivpa = win.ivpa)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -941,6 +953,8 @@ function cross_sectional_fold_rows(pe::CrossSectionalFactorPrior,
                                                                                             win.pnl;
                                                                                             ne = win.ne,
                                                                                             E = win.E,
+                                                                                            iv = win.iv,
+                                                                                            ivpa = win.ivpa,
                                                                                             kept = st.der,
                                                                                             g0 = g0,
                                                                                             n = n,
@@ -1176,9 +1190,9 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 
 # Algorithm
 
- 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), implied volatilities, and a panel that is absent or static. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
- 2. Append the rows of the step and their series to the carried panel rows with [`cross_sectional_window_append`](@ref).
- 3. Compute the neutralised exposures, the observed factors and the derived series of the new observations with [`cross_sectional_fold_rows`](@ref), and append the rows after the warm-up to the histories with [`cross_sectional_fold_histories`](@ref), and their Descriptor scores with [`cross_sectional_carry_scores`](@ref). Append the returns, both masks and the series to the buffer `buf`. Keep the panel rows and their derived series that [`cross_sectional_carry_rows`](@ref) names.
+ 1. Refuse returns data that no fold takes with [`assert_prior_fold_returns`](@ref), and a panel that is absent or static. Take the Exogenous Series of the step with [`exogenous_step_kwargs`](@ref), which refuses a step with no series when the prior reads it.
+ 2. Append the rows of the step, their series and their implied volatilities to the carried panel rows with [`cross_sectional_window_append`](@ref).
+ 3. Compute the neutralised exposures, the observed factors and the derived series of the new observations with [`cross_sectional_fold_rows`](@ref), and append the rows after the warm-up to the histories with [`cross_sectional_fold_histories`](@ref), and their Descriptor scores with [`cross_sectional_carry_scores`](@ref). Append the returns, both masks, the implied volatilities and the series to the buffer `buf`. Keep the panel rows and their derived series that [`cross_sectional_carry_rows`](@ref) names.
  4. Before the first fit, fit every observation with [`cross_sectional_fold_refit`](@ref) once `lag + 2` observations follow the warm-up, as the batch fit needs.
  5. After it, apply the Choice Rule with [`cross_sectional_fold_choice`](@ref). When the choice moves, fold the move into the state with [`cross_sectional_fold_move`](@ref). Then fit the new observations with [`cross_sectional_fold_step`](@ref), which folds a factor that comes alive. Fit every observation again with [`cross_sectional_fold_refit`](@ref) when either one answers `nothing`. A variance estimator `pe.ve` that does not fold, as [`supports_partial_fit`](@ref) answers, carries no state, so every step fits every observation again.
  6. Bring the outputs that read the fit up to the fitted observations with [`cross_sectional_carry_outputs`](@ref): the Return Forecast history that a slot reads, the rows of a Return Forecast that folds, and the standardised idiosyncratic returns. Each keeps the carried rows after a step of [`cross_sectional_fold_step`](@ref), and makes every row again after a fit of every observation.
@@ -1192,7 +1206,7 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 # Validation
 
   - The rules of [`assert_prior_fold_returns`](@ref).
-  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise. The carried panel rows hold no implied volatilities, and the refit route of [`Online`](@ref) records them.
+  - The rules of [`cross_sectional_window_append`](@ref): every step carries `iv` or none does, under the `ivpa` of the first step.
   - `rd.pnl` is a time-varying Asset Panel. An `ArgumentError` is thrown otherwise.
   - The rules of [`exogenous_step_kwargs`](@ref) and of the block method of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref): a prior that reads the Exogenous Series gets it at every step, under the names of the first step.
   - The rules of every verb the algorithm names.
@@ -1210,8 +1224,6 @@ This is the step of a prior that carries a [`CrossSectionalCarryState`](@ref). I
 function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
                                     st::CrossSectionalCarryState, rd::ReturnsResult)
     assert_prior_fold_returns(rd)
-    @argcheck(isnothing(rd.iv),
-              ArgumentError("the carry fold of a Cross-Sectional Factor Prior takes no implied volatilities: its Descriptors read the carried panel rows, which hold no slot for `iv`, so a Descriptor that reads `rd.iv` would give an answer that a batch fit does not give. Wrap the prior in `Online` to take the refit route, which records `iv`, or drop `iv` from `rd`."))
     pnl = rd.pnl
     @argcheck(!isnothing(pnl) && !panel_is_static(pnl),
               ArgumentError("a Cross-Sectional Factor Prior reads its Factor Exposures off a time-varying Asset Panel, and the step carries $(isnothing(pnl) ? "no panel" : "a static panel"). Fold a ReturnsResult whose `pnl` is the one asset_panel returns."))
@@ -1227,7 +1239,8 @@ function cross_sectional_carry_fold(pe::CrossSectionalFactorPrior,
                                     (;
                                      buf = partial_fit!(st.buf, rd.X;
                                                         active_mask = pnl.amsk,
-                                                        estimation_mask = pnl.emsk, xk...),
+                                                        estimation_mask = pnl.emsk,
+                                                        iv = rd.iv, ivpa = rd.ivpa, xk...),
                                      win = cross_sectional_window_trim(win, n),
                                      der = cross_sectional_window_trim(rows.der, n),
                                      xf = rows.xf))

@@ -385,7 +385,7 @@ The batch fit gives the forecast the returns data that the estimated members rea
 function cross_sectional_forecast_window(pe::CrossSectionalFactorPrior, win::ReturnsResult,
                                          der::Option{<:NamedTuple})
     (; rdb) = cross_sectional_benchmark_stage(pe, win.X, nothing, win.pnl; ne = win.ne,
-                                              E = win.E)
+                                              E = win.E, iv = win.iv, ivpa = win.ivpa)
     return if isnothing(der)
         rdb
     else

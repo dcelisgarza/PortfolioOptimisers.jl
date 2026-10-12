@@ -874,12 +874,8 @@ end
             m = message(() -> cov(ce, Xc; dims = 1, iv = ivg, ivpa = 1.1))
             @test occursin("all(isfinite, iv) must hold", m)
         end
-        # The carry fold of a Cross-Sectional Factor Prior has no slot for the surface.
-        cs = CrossSectionalFactorPrior(; lambda = 1,
-                                       factors = ["market" => ConstantExposure()])
-        m = message(() -> partial_fit!(cs, rd(full; iv = fill(0.2, T, N), ivpa = 1.0)))
-        @test occursin("the carry fold of a Cross-Sectional Factor Prior takes no implied volatilities",
-                       m)
+        # The carry fold of a Cross-Sectional Factor Prior carries the surface in its rows
+        # too: test_12zb_parity_cs_prior_carry_fold.jl (#1647).
     end
     @testset "The carry refits a member that does not fold over the panel of its buffer (#1639)" begin
         r0 = rd(nothing)

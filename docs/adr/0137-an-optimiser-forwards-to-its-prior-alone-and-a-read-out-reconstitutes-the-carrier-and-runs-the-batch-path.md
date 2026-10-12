@@ -274,12 +274,14 @@ carriers already pins it, and a later step with another `ivpa` is refused by nam
   of `EmpiricalPrior` gives them to a member that it refits, and a member that folds never reads them.
   `returns_result` gives them back, so the clustering and every other member above the prior read the
   surface as they read it in batch.
-- **Two folds still refuse it, by name.** The carry fold of `CrossSectionalFactorPrior` computes its
-  Descriptors from carried panel rows that hold no surface, so a Descriptor that reads `rd.iv` would
-  differ from batch. It refuses `iv` and names the refit route of `Online`, which records it. The
-  exact folds that keep numbers alone, the step of a covariance estimator in
-  `covariance_forecast_evaluation` and the step of an online portfolio selection, refuse it in
-  `step_active_mask`.
+- **The carry of `CrossSectionalFactorPrior` carries it twice.** Its Descriptors read the carried
+  panel rows, as the batch Descriptors read the returns data, so the carried rows hold `iv` beside
+  the returns and the first step pins `ivpa`
+  ([#1647](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1647)). Its buffer records
+  them too, so `returns_result` gives them to every member above the prior.
+- **Two folds still refuse it, by name.** The exact folds that keep numbers alone, the step of a
+  covariance estimator in `covariance_forecast_evaluation` and the step of an online portfolio
+  selection, refuse it in `step_active_mask`.
 - **A gap in the surface.** The panel method of `ImpliedVolatility` excludes an asset whose surface
   has a gap from the Coverage Universe, and the refit calls that method, so it gives the batch answer
   for a gapped surface too. The carry of `EmpiricalPrior` refits a member through its plain method,
