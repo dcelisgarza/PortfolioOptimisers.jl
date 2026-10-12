@@ -631,6 +631,16 @@ function factor_residual_config(pe::OpinionPoolingPrior)
     # forwards it (see [`factor_residual_config`](@ref)).
     return factor_residual_config(pe.pe2)
 end
+# The pooled weights are the prior probabilities of a host that reweights the scenarios, so
+# its refit holds the rows of `pe1` and the model of `pe2` under the pooled weights, and
+# reweights only the scenarios of `pe2` under the posterior weights (#1649). The opinions
+# run once more, for the pooled weights alone. `scenario_prior` documents every method.
+function scenario_prior(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:MatNum},
+                        pnl::Option{<:AssetPanel}; kwargs...)
+    X = isnothing(pe.pe1) ? X : prior(pe.pe1, X, F, pnl; kwargs...).X
+    wp = first(opinion_pooling_weights(pe, X, F, pnl; kwargs...))
+    return scenario_prior(factory(pe.pe2, wp), w, X, F, pnl; kwargs...)
+end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior
 public OpinionPoolingAlgorithm, compute_pooling

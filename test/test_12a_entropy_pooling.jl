@@ -15,12 +15,11 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                    pe = FactorPrior(;
                                                     re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, mu_views = mu_views), rd)
-    # ADR 0116. The view is enforced on the scenarios, and a `FactorPrior` answers
-    # `B * f_mu + b` rather than the scenario mean, so this tolerance is a proxy for the
-    # view. The relative miss reads 5.0e-4 since the uniform push was removed, because the
-    # nested fit now selects the factors an unweighted `FactorPrior` selects, and that is a
-    # different set for every asset.
-    @test isapprox(pr.mu[1], 0.002, rtol = 1e-3)
+    # ADR 0205. The refit under the posterior weights holds the regression of the fit that
+    # the views read, so `B * f_mu + b` is the mean of the scenarios under the posterior,
+    # and the view holds on the read-out. The miss was 5.0e-4 relative while the refit fitted
+    # a new regression (#1649).
+    @test isapprox(pr.mu[1], 0.002, rtol = 1e-6)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              pe = FactorPrior(;
@@ -1639,4 +1638,138 @@ the row names no asset.
     @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = nsets,
                                                          mu_views = lce("1 == 0.004")), rd;
                                      strict = true)
+end
+
+@testset "An entropy pooling prior over a factor prior meets its views (#1649)" begin
+    # The data of #1649: asset 1 loads on factor 1 in the first 60 rows, and the fit reads
+    # those rows alone.
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X[1:60, 1] .= F[1:60, 1] .+ randn(rng, 60) ./ 400
+    X[61:end, 1] .= F[61:end, 2] .+ randn(rng, T - 60) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    mv = LinearConstraintEstimator(; val = "A1 == 0.004")
+    sv = LinearConstraintEstimator(; val = "A2 == 3.0e-5")
+    pca = DimensionReductionRegression(; drtgt = PCA(; kwargs = (; maxoutdim = 2)))
+    for fp in (FactorPrior(), FactorPrior(; re = pca))
+        pr0 = prior(fp, X, F)
+        d = pr0.rr.esigma
+        @test PortfolioOptimisers.scenario_residual_variances(pr0) == d
+        # `pinned` is `true` for a staged algorithm, which pins the mean of every asset that a
+        # variance view reads. `H0_EntropyPooling` pins nothing, so its row states the
+        # variance about the mean of the fit that the views read.
+        for (mk, pinned) in
+            (((; kw...) -> EntropyPoolingPrior(; alg = H0_EntropyPooling(), kw...), false),
+             ((; kw...) -> EntropyPoolingPrior(; alg = H2_EntropyPooling(), kw...), true),
+             ((; kw...) -> MeucciEntropyPoolingPrior(; kw...), true))
+            # The refit holds the model of the fit that the views read, so the rows and the
+            # loadings do not move, and the mean view holds on the read-out. Before the fix
+            # the read-out was 0.004022 and 0.003954.
+            pr = prior(mk(; sets = sets, mu_views = mv, pe = fp), X, F)
+            @test pr.X == pr0.X
+            @test pr.rr.M == pr0.rr.M
+            @test pr.rr.b == pr0.rr.b
+            @test pr.rr.esigma == d
+            @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
+            @test isapprox(pr.mu, transpose(pr.X) * pr.w / sum(pr.w), rtol = 1e-10)
+            # The variance view states the variance of the read-out, residual block included.
+            # The rows meet the view less the block, and the read-out misses it by the bias
+            # correction of the covariance alone. The default `FactorPrior` with this view
+            # raised a `PosDefException` before the fix, from the stepwise regression refitted
+            # under the posterior weights.
+            pr = prior(mk(; sets = sets, mu_views = mv, sigma_views = sv, pe = fp), X, F)
+            mu2 = pinned ? transpose(pr.X[:, 2]) * pr.w : pr0.mu[2]
+            @test isapprox(sum(pr.w .* (pr.X[:, 2] .- mu2) .^ 2) + d[2], 3.0e-5,
+                           rtol = 5e-3)
+            if pinned
+                @test isapprox(pr.sigma[2, 2], 3.0e-5, rtol = 2e-2)
+            end
+        end
+        # A covariance view on one asset twice is the variance view.
+        cv = LinearConstraintEstimator(; val = "(A2, A2) == 3.0e-5")
+        a = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sv, pe = fp), X, F)
+        b = prior(EntropyPoolingPrior(; sets = sets, cov_views = cv, pe = fp), X, F)
+        @test isapprox(a.w, b.w, rtol = 1e-6)
+        # A skewness view holds the variance of the scenarios through `fix_sigma!`, so the
+        # read-out variance stays at the prior variance. Before the fix the row held the
+        # scenarios at the variance of the model, and the read-out rose by the residual block.
+        kv = LinearConstraintEstimator(; val = "A2 == 0.1")
+        pr = prior(EntropyPoolingPrior(; sets = sets, sk_views = kv, pe = fp,
+                                       alg = H2_EntropyPooling()), X, F)
+        @test isapprox(pr.sigma[2, 2], pr0.sigma[2, 2], rtol = 2e-2)
+    end
+    # An asset view over a factor prior and the equivalent factor view under a factor prior
+    # are one model: the regression and the residual block read no posterior weights in
+    # either.
+    fp = FactorPrior(; re = pca)
+    pr0 = prior(fp, X, F)
+    M, b = pr0.rr.M, pr0.rr.b
+    fsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["F$i" for i in 1:K]))
+    fv = LinearConstraintEstimator(;
+                                   val = join(["$(M[1, k])*F$k" for k in 1:K], " + ") *
+                                         " == $(0.004 - b[1])")
+    pa = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = fp), X, F)
+    pf = prior(FactorPrior(; re = pca,
+                           pe = EntropyPoolingPrior(; sets = fsets, mu_views = fv)), X, F)
+    @test isapprox(pa.w, pf.w, rtol = 1e-8)
+    @test isapprox(pa.mu, pf.mu, rtol = 1e-8)
+    @test isapprox(pa.sigma, pf.sigma, rtol = 1e-8)
+    # A nested entropy pooling prior already holds its views in the prior probabilities of the
+    # host, so the refit reweights its scenarios and does not solve its views again. Before
+    # the fix the view of the host read -0.0004, and `mu` missed `X' * w` by 0.0052.
+    for p in (EmpiricalPrior(), fp)
+        inner = EntropyPoolingPrior(; sets = sets, pe = p,
+                                    mu_views = LinearConstraintEstimator(;
+                                                                         val = "A3 == 0.001"))
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = inner), X, F)
+        @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
+        @test isapprox(pr.mu, transpose(pr.X) * pr.w / sum(pr.w), rtol = 1e-10)
+    end
+    # An entropy pooling prior of the factors, inside a factor prior, is a nested pool too. The
+    # refit reweights its model and does not solve its factor views again, so no entropy
+    # pooling constructor reads the posterior weights. Before the fix the view of the host read
+    # 0.0039853.
+    fep = FactorPrior(;
+                      pe = EntropyPoolingPrior(; sets = fsets,
+                                               mu_views = LinearConstraintEstimator(;
+                                                                                    val = "F3 == 0.002")))
+    pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = fep), X, F)
+    @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
+    @test isapprox(pr.mu, transpose(pr.X) * pr.w, rtol = 1e-10)
+    @test isa(PortfolioOptimisers.scenario_factory(fep, pr.w).pe, EmpiricalPrior)
+    # An opinion pool reweights scenarios too, so the refit holds the rows of `pe1` and the
+    # model of `pe2` under the pooled weights, and the opinions do not pool again. Before the
+    # fix the view of the host read 0.0028 over `EmpiricalPrior` pools.
+    ops = [EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(; val = "A3 == 0.001")),
+           EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(; val = "A4 == -0.001"))]
+    for op in (OpinionPoolingPrior(; pes = ops),
+               OpinionPoolingPrior(; pes = ops, pe1 = FactorPrior(), pe2 = FactorPrior()))
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = op), X, F)
+        @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
+        @test isapprox(pr.mu, transpose(pr.X) * pr.w, rtol = 1e-10)
+        @test pr.X == prior(op, X, F).X
+    end
+    # A prior with no residual block beyond its scenarios answers zero.
+    @test iszero(PortfolioOptimisers.scenario_residual_variances(prior(EmpiricalPrior(), X)))
+    @test iszero(PortfolioOptimisers.scenario_residual_variances(prior(FactorPrior(;
+                                                                                   rsd = false),
+                                                                       X, F)))
+    # `scenario_factory` keeps the regression of every factor prior and of every wrapper.
+    w = pweights(fill(inv(size(X, 1)), size(X, 1)))
+    blv = BlackLittermanViews(; P = [1.0 0.0 0.0 0.0], Q = [0.001])
+    for p in (FactorPrior(), FactorBlackLittermanPrior(; views = blv),
+              AugmentedBlackLittermanPrior(; a_views = blv, f_views = blv),
+              BlackLittermanPrior(; pe = FactorPrior(), views = blv))
+        q = PortfolioOptimisers.scenario_factory(p, w)
+        r = hasproperty(p, :re) ? p : p.pe
+        s = hasproperty(q, :re) ? q : q.pe
+        @test s.re === r.re
+    end
+    @test typeof(PortfolioOptimisers.scenario_factory(EmpiricalPrior(), w)) ==
+          typeof(PortfolioOptimisers.factory(EmpiricalPrior(), w))
 end

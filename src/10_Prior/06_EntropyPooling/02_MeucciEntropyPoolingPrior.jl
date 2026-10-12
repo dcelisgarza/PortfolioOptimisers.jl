@@ -775,7 +775,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
 # Algorithm
 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
- 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Build the empty constraint dictionary `epc` and the fixing ledger `fixed`. Resolve the `cvar_views` once against that fit, through [`ep_cvar_views_setup`](@ref) into `cvv`. Every stage searches the targets it holds, so a `prior(...)` reference states one number for the whole chain.
  4. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When `epc` holds a row or `cvv` states a search, solve through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
  5. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`, and pin the mean of every asset those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment an earlier stage set. Under the same emptiness test, solve into `w1`, and refit `pr` under it.
@@ -864,9 +864,9 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     # no view. The prior is the answer, so neither the solve nor the refit runs. See issue
     # #852.
     if !isempty(epc) || !isnothing(cvv)
-        w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
-        pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # See the note at the same step in `EntropyPoolingPrior`'s staged `ep_prior` (#1649).
+        w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, w0, pe.opt), 1)
+        pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
         vpr = investable_prior(imsk, pr)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
@@ -884,10 +884,9 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         end
         # See the twin note one stage up: a stage that states no view does not solve.
         if !isempty(epc) || !isnothing(cvv)
-            w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
-                                      pe.opt)
-            pe = factory(pe, w1)
-            pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+            ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
+            w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, ws, pe.opt), 1)
+            pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
             vpr = investable_prior(imsk, pr)
         end
     end
@@ -915,10 +914,9 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         end
         # See the twin note two stages up: a stage that states no view does not solve.
         if !isempty(epc) || !isnothing(cvv)
-            w1 = ep_cvar_views_solve!(cvv, epc, ifelse(isa(alg, H1_EntropyPooling), w0, w1),
-                                      pe.opt)
-            pe = factory(pe, w1)
-            pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+            ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
+            w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, ws, pe.opt), 1)
+            pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
         end
     end
     announce_ep_departures(ni, led, isempty(epc) && isnothing(cvv) && !isempty(led))
@@ -972,7 +970,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
 # Algorithm
 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
- 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`factory`](@ref), and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Build the empty constraint dictionary `epc`. Resolve the `cvar_views` once against that fit, through [`ep_cvar_views_setup`](@ref) into `cvv`.
  4. Write the `mu_views` and `var_views` rows into `epc`.
  5. Write the `sigma_views` and `cov_views` rows into `epc`. No moment is pinned, so [`fix_mu!`](@ref) is never called on this route.
@@ -1077,9 +1075,8 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     # states nothing. The prior is the answer, so neither the solve nor the refit runs. See
     # issue #852.
     if !isempty(epc) || !isnothing(cvv)
-        w1 = ep_cvar_views_solve!(cvv, epc, w0, pe.opt)
-        pe = factory(pe, w1)
-        pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, w0, pe.opt), 1)
+        pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).

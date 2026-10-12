@@ -177,7 +177,7 @@ StepwiseRegression
     """
     @fprop tgt
     """
-    Choice Rule of the factor set of each asset. Under [`BatchChoice`](@ref), the default, each fit searches again over every observation. Under [`PinnedChoice`](@ref), the online step of a prior that fits this regression writes the factor set of the first fit of each asset into `included` of the estimator that it returns. The two agree in a batch fit, except where an entropy pooling prior refits it under the posterior weights, and under [`PinnedChoice`](@ref) each refit reads the choice of the fit that the views read.
+    Choice Rule of the factor set of each asset. Under [`BatchChoice`](@ref), the default, each fit searches again over every observation. Under [`PinnedChoice`](@ref), the online step of a prior that fits this regression writes the factor set of the first fit of each asset into `included` of the estimator that it returns. The two agree in a batch fit. An entropy pooling prior refits the prior under the posterior weights and holds this regression of the fit that its views read, so its refits agree too.
     """
     choice
     """

@@ -318,7 +318,9 @@ set over every observation.
         for host in hosts
             b = prior(host(dr(; choice = PinnedChoice())), X[rows(1), :], F[rows(1), :])
             @test same(b, prior(host(dr(; proj = proj0)), X[rows(1), :], F[rows(1), :]))
-            @test !same(b, prior(host(dr()), X[rows(1), :], F[rows(1), :]))
+            # Every refit holds the regression of the fit that the views read (#1649), so
+            # the two Choice Rules agree in a batch fit.
+            @test same(b, prior(host(dr()), X[rows(1), :], F[rows(1), :]))
             e = online(host(dr(; choice = PinnedChoice())))
             e = partial_fit!(e, X[rows(1), :], F[rows(1), :])
             proj = e.pe.re.proj

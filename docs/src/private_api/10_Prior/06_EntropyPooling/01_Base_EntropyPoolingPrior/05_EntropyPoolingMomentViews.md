@@ -6,6 +6,7 @@ Description = "Entropy pooling moment views, private API of PortfolioOptimisers.
 
 ```@docs
 replace_coprior_views
+scenario_residual_variances
 ep_sigma_views!
 fix_sigma!
 ep_cov_views!

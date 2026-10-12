@@ -286,7 +286,8 @@ about 0.03 s for the step of the oracle. The carry equals the batch fit to 5.7e-
   pins `pe` under `w0` alone, with no view and no solve (#1641). A pin under the weights of the
   last refit was rejected: the views of the step then read another regression than the views of
   the batch fit, so the posterior weights differ (3.7 % on the data of the test), and that choice
-  is not a fixed point of its own posterior. Under `BatchChoice` each refit still chooses again.
+  is not a fixed point of its own posterior. Since #1649 every refit holds the regression of the
+  `w0` fit (ADR 0205), so under `BatchChoice` the refits read the same choice too.
 
 ### The carry fold carries only the rows that the Descriptors read
 
