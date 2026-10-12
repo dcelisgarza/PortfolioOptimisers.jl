@@ -285,17 +285,17 @@ end
         # is the buffer under the pinned names with the masks as a time-varying panel.
         ob = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
                              rows(rdg, 9:12))
-        B = ob.cache.X
+        B = ob.cache.X.X
         @test B.n == 3 && size(B.A) == size(B.X)
         @test isnan(po.sample_buffer(B)[1, 4]) && !B.A[B.off + 1, 4]
         @test all(isfinite, po.sample_buffer(B)[2:3, :]) &&
               all(B.A[(B.off + 2):(B.off + 3), :])
-        crd = po.buffer_returns_result(B, ob.cache.nx)
+        crd = po.buffer_returns_result(ob.cache.X)
         @test isa(crd, ReturnsResult) && crd.nx == nx && size(crd.X) == (3, 4)
         @test crd.pnl.amsk == amsk[10:12, :] && crd.pnl.emsk == amsk[10:12, :]
-        @test isnothing(po.buffer_returns_result(nothing, nx)) &&
-              isnothing(po.buffer_returns_result(nothing, nothing))
-        @test_throws po.IsNothingError po.buffer_returns_result(B, nothing)
+        @test isnothing(po.buffer_returns_result(nothing))
+        @test_throws po.IsNothingError po.buffer_returns_result(po.ReturnsBufferState(;
+                                                                                      X = B))
         # The fold arm reads the current row under the last mask row of the carrier.
         @test po.last_active_mask(crd.pnl) == amsk[12, :]
         @test isnothing(po.last_active_mask(nothing))
@@ -315,14 +315,35 @@ end
         # On a static panel the buffer records no mask and the carrier carries no panel.
         os = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
                              rows(rd, 1:4))
-        @test isnothing(os.cache.X.A) && isnothing(po.buffer_panel(os.cache.X))
-        @test isnothing(po.buffer_returns_result(os.cache.X, nx).pnl)
+        @test isnothing(os.cache.X.X.A) && isnothing(po.buffer_panel(os.cache.X.X))
+        @test isnothing(po.buffer_returns_result(os.cache.X).pnl)
+        # The rows that the rules read drop no field of the Returns Result (ADR 0204): the
+        # factor returns, the benchmark, the Exogenous Series, the timestamps and the
+        # implied volatilities travel with the rows, under the cap of the buffer.
+        Tx = 12
+        tsx = Date(2021, 1, 1) .+ Day.(0:(Tx - 1))
+        rdx = ReturnsResult(; nx = nx, X = R[1:Tx, :], ts = tsx, nf = ["F1"],
+                            F = R[1:Tx, 1:1] ./ 2, nb = ["BM"], B = R[1:Tx, 2] ./ 3,
+                            ne = ["E1"], E = R[1:Tx, 3:3], iv = 0.2 .+ abs.(R[1:Tx, :]),
+                            ivpa = 1.1)
+        ox = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)), rdx)
+        wx = po.buffer_returns_result(ox.cache.X)
+        kx = (Tx - size(wx.X, 1) + 1):Tx
+        @test wx.X == rdx.X[kx, :] &&
+              wx.F == rdx.F[kx, :] &&
+              wx.B == rdx.B[kx] &&
+              wx.E == rdx.E[kx, :] &&
+              wx.ts == tsx[kx] &&
+              wx.iv == rdx.iv[kx, :]
+        @test wx.nf == ["F1"] && wx.nb == ["BM"] && wx.ne == ["E1"] && wx.ivpa == 1.1
+        @test isa(optimise(OPS(; alg = MovingAverageReversion(; window = 4)), rdx).retcode,
+                  OptimisationSuccess)
         # A windowed statistic over a relisted asset reads the rows it has, not filled
         # zeros: at row 15 a plain moving average over D is undefined, so the step holds
         # that leg, and the answer is finite.
         mar = MovingAverageReversion(; window = 15)
         om = po.partial_fit!(OPS(; alg = mar), rows(rdg, 1:15))
-        crd15 = po.buffer_returns_result(om.cache.X, nx)
+        crd15 = po.buffer_returns_result(om.cache.X)
         muD = vec(mean(PriceLevelExpectedReturns(; alg = MovingAverage(; window = 15)),
                        crd15.X, crd15.pnl; dims = 1))
         @test isnan(muD[4]) && all(isfinite, muD[1:3])
@@ -380,7 +401,7 @@ end
         opt = OPS(; alg = MovingAverageReversion(; window = 4))
         o = po.partial_fit!(opt, rows(rd, 1:9))
         st = o.cache
-        @test st.X.n == 3 && st.X.max_history == 3
+        @test st.X.X.n == 3 && st.X.max_history == 3
         @test st.nx == nx && st.n == 9 && isnothing(st.amsk)
         @test isnothing(po.partial_fit!(OPS(; alg = BuyAndHold()), rows(rd, 1:3)).cache.X)
         @test isnothing(po.partial_fit!(OPS(; alg = NewtonStep()), rows(rd, 1:3)).cache.X) ==
@@ -390,11 +411,11 @@ end
         # verbatim that the fold reads (ADR 0158, ADR 0170).
         pref = OPS(; alg = ForecastReversion(; me = MedianExpectedReturns()))
         @test isnothing(po.partial_fit!(pref, rows(rd, 1:9)).cache.X.max_history)
-        @test po.partial_fit!(pref, rows(rd, 1:9)).cache.X.n == 9
+        @test po.partial_fit!(pref, rows(rd, 1:9)).cache.X.X.n == 9
         pfold = po.partial_fit!(OPS(;
                                     alg = ForecastReversion(; me = SimpleExpectedReturns())),
                                 rows(rd, 1:9)).cache
-        @test pfold.X.n == 1 && pfold.X.max_history == 1
+        @test pfold.X.X.n == 1 && pfold.X.max_history == 1
         @test pfold.st isa po.ForecasterState && pfold.st.me.cache.n == 9
         @test pfold.st.me.cache.mu ≈ vec(mean(R[1:9, :]; dims = 1))
         # A copy aliases no array.
@@ -407,7 +428,7 @@ end
         v = po.port_opt_view(st, [1, 3], R)
         @test isapprox(sum(v.w), 1; atol = 1e-14)
         @test v.w == st.w[[1, 3]] ./ sum(st.w[[1, 3]])
-        @test size(po.sample_buffer(v.X), 2) == 2 && v.nx == ["A", "C"] && v.ts == st.ts
+        @test size(po.sample_buffer(v.X.X), 2) == 2 && v.nx == ["A", "C"] && v.ts == st.ts
         vn = po.port_opt_view(ns, [2, 4], R)
         @test vn.st.A == ns.st.A[[2, 4], [2, 4]] && vn.st.b == ns.st.b[[2, 4]]
         mixs = po.partial_fit!(OPS(;

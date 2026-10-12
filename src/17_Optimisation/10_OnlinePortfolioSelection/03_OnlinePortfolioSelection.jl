@@ -328,7 +328,7 @@ The uniform start and a given `w0` meet the set in the same way. So the allocati
  2. Project `start` once onto `set` in the rule's geometry through [`project_start`](@ref), giving `w0`. A set that reads rows returns `start` unchanged.
  3. Seed the state of the rule on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing. Steps 2 and 3 run inside one [`with_projection_step`](@ref) under the head's `strict`, which collects the holds in `held`.
  4. Warn on a hold through [`report_held_steps`](@ref).
- 5. Size the rows buffer `X` from [`rows_needed`](@ref). A count of `nothing` gives an uncapped buffer, a count of zero gives no buffer, and any other count caps the buffer at that count.
+ 5. Size the rows buffer `X`, a [`ReturnsBufferState`](@ref) that keeps the rows with every other field of the Returns Result, from [`rows_needed`](@ref). A count of `nothing` gives an uncapped buffer, a count of zero gives no buffer, and any other count caps the buffer at that count.
  6. Keep the panel of `rd` as `pnl` when it is static, and `nothing` otherwise.
  7. Return the state with no row folded, the allocation `w0`, the state `st` of the rule, the buffer `X`, the names and `pnl`.
 
@@ -372,11 +372,11 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
     report_held_steps(held, "the start")
     need = rows_needed(opt)
     X = if isnothing(need)
-        SampleBufferState()
+        ReturnsBufferState()
     elseif iszero(need)
         nothing
     else
-        SampleBufferState(; max_history = need)
+        ReturnsBufferState(; max_history = need)
     end
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     return OnlinePortfolioSelectionState(; n = 0, w = w0, st = st, X = X, nx = rd.nx,
@@ -395,7 +395,7 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
  1. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
  2. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
  3. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
- 4. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+ 4. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it, with the row viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
  5. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
 
 # Arguments
@@ -435,7 +435,7 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
     hold = state.hold
     for t in axes(rd.X, 1)
         row = (; r = vec(rd.X[t, :]), amsk = isnothing(amsk) ? nothing : vec(amsk[t, :]),
-               ts = row_timestamp(rd.ts, t, n), i = n + 1)
+               ts = row_timestamp(rd.ts, t, n), i = n + 1, rd = port_opt_view(rd, t:t, :))
         st, w, X, hold = online_selection_row!(opt, st, w, X, row, rd.nx, set)
         n += 1
         last_amsk = row.amsk
@@ -493,7 +493,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
 # Algorithm
 
  1. Name the Held Gaps of the returns `r` at the row's index `i` through [`report_row_gaps`](@ref).
- 2. Push `r` verbatim, with its active mask `amsk`, into the rows buffer `X`, when the tree keeps one.
+ 2. Fold the row's Returns Result `rd` into the rows buffer `X` through [`partial_fit!`](@ref), when the tree keeps one. The buffer keeps `r` verbatim with its active mask, and every other field of `rd` beside it.
  3. Form the price relative `x` through [`price_relative`](@ref), which is one at a gap.
  4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`buffer_returns_result`](@ref).
  5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows` and the timestamp `ts` that [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
@@ -505,7 +505,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
   - `st`: The state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
   - `w`: The allocation held during the row's period.
   - `X`: The rows buffer, or `nothing`.
-  - `row`: The row, as a named tuple of four fields. `r` holds its returns verbatim, `amsk` holds its active mask or `nothing`, `ts` holds its timestamp or its index in the fold, and `i` holds its index in the fold.
+  - `row`: The row, as a named tuple of five fields. `r` holds its returns verbatim, `amsk` holds its active mask or `nothing`, `ts` holds its timestamp or its index in the fold, `i` holds its index in the fold, and `rd` holds the row as a [`ReturnsResult`](@ref) of one observation.
   - `nx`: The asset names, for the Held Gap message.
   - `set`: The Allocation Set, resolved.
 
@@ -524,49 +524,76 @@ A row with a held projection warns once, with the row's timestamp and each hold,
   - [`HeldStep`](@ref)
 """
 function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVector,
-                               X::Option{<:SampleBufferState}, row::NamedTuple,
+                               X::Option{<:ReturnsBufferState}, row::NamedTuple,
                                nx::Option{<:VecStr}, set::AbstractAllocationSet)
     (; r, amsk, ts, i) = row
     report_row_gaps(r, w, amsk, nx, opt.strict, i)
     if !isnothing(X)
-        X = partial_fit!(X, r; active_mask = amsk)
+        X = partial_fit!(X, row.rd; own_returns = true)
     end
     x = price_relative.(r)
-    rows = buffer_returns_result(X, nx)
+    rows = buffer_returns_result(X)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
                                          rows, ts; strict = opt.strict)
     return st, w, X, report_held_steps(held, ts)
 end
 """
-    buffer_returns_result(X::Nothing, nx)
-    buffer_returns_result(X::SampleBufferState, nx::VecStr)
-    buffer_returns_result(X::SampleBufferState, nx::Nothing)
+    buffer_returns_result(X::Nothing)
+    buffer_returns_result(X::ReturnsBufferState)
 
 Reads the rows buffer out as the Returns Result that the Online Update gets.
 
-The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. The method returns `nothing` when the tree keeps no rows.
+The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names, with every other field that the folded rows carried: the factor returns, the benchmark, the Exogenous Series, the timestamps and the implied volatilities of the rows, and the pinned names and `ivpa`. So a leader whose `brt` is `true` picks the benchmark that the rows carry, as it does in batch. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. Otherwise the result carries the static panel that the buffer pinned. The method returns `nothing` when the tree keeps no rows.
 
-Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because the Returns Result views the valid region of the buffer. The method throws an `ArgumentError` for a buffer with no pinned names. A Returns Result that carries rows carries their names by its own contract, so the head never meets that pair.
+Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because every array of the Returns Result views the valid region of its buffer. A Returns Result that carries rows carries their names by its own contract, so the refusal of a buffer with no pinned names never meets the head.
 
 # Validation
 
-  - `nx` is not `nothing` when the head keeps rows. An `IsNothingError` is thrown otherwise.
+  - The buffer pinned asset names. An `IsNothingError` is thrown otherwise.
 
 # Related
 
   - [`online_selection_row!`](@ref)
   - [`buffer_panel`](@ref)
-  - [`SampleBufferState`](@ref)
+  - [`buffer_column_view`](@ref)
+  - [`ReturnsBufferState`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function buffer_returns_result(::Nothing, ::Any)
+function buffer_returns_result(::Nothing)
     return nothing
 end
-function buffer_returns_result(X::SampleBufferState, nx::VecStr)
-    return ReturnsResult(; nx = nx, X = sample_buffer(X), pnl = buffer_panel(X))
+function buffer_returns_result(X::ReturnsBufferState)
+    @argcheck(!isnothing(X.nx),
+              IsNothingError("the head keeps rows and pins no asset names: a Returns Result that carries rows carries their names, so the rows that the rules read cannot be formed. Hand the head a Returns Result whose `nx` is set."))
+    rows = X.X
+    vols = implied_volatility_buffer_kwargs(rows)
+    return ReturnsResult(; nx = X.nx, X = sample_buffer(rows), nf = X.nf,
+                         F = buffer_column_view(X.F), nb = X.nb,
+                         B = buffer_column_view(X.B), ne = X.ne,
+                         E = buffer_column_view(X.E), ts = X.ts,
+                         iv = get(vols, :iv, nothing), ivpa = get(vols, :ivpa, nothing),
+                         pnl = something(buffer_panel(rows), Some(X.pnl)))
 end
-function buffer_returns_result(::SampleBufferState, ::Nothing)
-    return throw(IsNothingError("the head keeps rows and pins no asset names: a Returns Result that carries rows carries their names, so the rows that the rules read cannot be formed. Hand the head a Returns Result whose `nx` is set."))
+"""
+    buffer_column_view(buffer::Nothing)
+    buffer_column_view(buffer::SampleBufferState)
+    buffer_column_view(buffer::AbstractVector)
+
+Views one column of a [`ReturnsBufferState`](@ref) for the Returns Result of the rows that the head holds. A buffer gives a view of its valid rows, a plain vector gives itself, and `nothing` gives `nothing`. It takes no copy, as [`column_matrix`](@ref) does, because the Online Update reads the rows within the step.
+
+# Related
+
+  - [`buffer_returns_result`](@ref)
+  - [`column_matrix`](@ref)
+"""
+function buffer_column_view(::Nothing)
+    return nothing
+end
+function buffer_column_view(buffer::SampleBufferState)
+    return sample_buffer(buffer)
+end
+function buffer_column_view(buffer::AbstractVector)
+    return buffer
 end
 """
     buffer_panel(X::SampleBufferState)

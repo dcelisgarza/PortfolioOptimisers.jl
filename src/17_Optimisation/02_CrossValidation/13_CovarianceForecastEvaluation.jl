@@ -870,6 +870,7 @@ This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
   - Everything [`step_active_mask`](@ref) refuses.
+  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise. The exact fold of a covariance estimator holds numbers alone and keeps no implied volatilities, so a step that carried them would fold an estimate that reads them without them.
 
 # Returns
 
@@ -884,6 +885,8 @@ This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of
 function partial_fit!(ce::AbstractCovarianceEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     amsk = step_active_mask(rd)
+    @argcheck(isnothing(rd.iv),
+              ArgumentError("this online step takes no implied-volatility surface: the exact fold of a covariance estimator keeps numbers alone, so a step carrying `iv` would fold an estimate that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch. An optimiser's prior records `iv` on its own step."))
     return if isnothing(amsk)
         partial_fit!(ce, rd.X)
     else

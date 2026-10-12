@@ -204,19 +204,34 @@
         @test_throws ArgumentError PO.port_opt_view(PredictionReturnsResult(; nx = nx,
                                                                             X = Bv), 1)
 
-        # returns_result_picker subtracts the benchmark once, and keeps every other field.
+        # returns_result_picker moves the returns to the Excess Frame and drops no field
+        # (ADR 0204): the benchmark becomes its own excess return, zero, so a second pick
+        # subtracts zero and changes no value.
         r1 = returns_result_picker(rdv, true)
         @test r1.X == X .- Bv
-        @test isnothing(r1.nb) && isnothing(r1.B)
+        @test r1.nb == rdv.nb && r1.B == zero(Bv)
         @test r1.iv === iv && r1.ivpa == 2.0
-        @test returns_result_picker(r1, true) === r1
+        r11 = returns_result_picker(r1, true)
+        @test r11.X == r1.X && r11.B == r1.B && r11.nb == r1.nb
         r2 = returns_result_picker(rd, true)
-        @test r2.X == X - Bm
+        @test r2.X == X - Bm && r2.B == zero(Bm) && r2.nb == rd.nb
         @test r2.ts === ts && r2.F === F && r2.nx === nx
         @test returns_result_picker(rd, false) === rd
+        # A gap of the benchmark stays a gap in the Excess Frame.
+        Bg = copy(Bv)
+        Bg[2] = NaN
+        rg = returns_result_picker(ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = Bg),
+                                   true)
+        @test isnan(rg.B[2]) && iszero(rg.B[[1; 3:end]])
+        # brt = true on returns with no benchmark is a refusal, not a pass-through.
         rn = ReturnsResult(; nx = nx, X = X)
-        @test returns_result_picker(rn, :any) === rn
+        @test returns_result_picker(rn, false) === rn
+        @test_throws ArgumentError returns_result_picker(rn, true)
+        # Returns data with no returns holds nothing to pick.
+        re = ReturnsResult()
+        @test returns_result_picker(re, true) === re
         @test_throws MethodError returns_result_picker(rd, 1)
+        @test_throws MethodError returns_result_picker(rn, :any)
         @test_throws MethodError returns_result_picker(ReturnsResult(; nb = ["BM"], B = Bv),
                                                        true)
 

@@ -478,7 +478,7 @@ of the ADRs; the papers' defaults are asserted where they decide the shape of th
             opt = OPS(; alg = ForecastReversion(; me = me))
             @test po.rows_needed(opt) == 1
             o = po.partial_fit!(opt, rows(rd, 1:9))
-            @test o.cache.X.n == 1 && o.cache.X.max_history == 1
+            @test o.cache.X.X.n == 1 && o.cache.X.max_history == 1
             @test isa(o.cache.st, po.ForecasterState)
             @test isnothing(po.online_entry_state(me))
             # The folded forecast equals the batch forecast over the same rows.

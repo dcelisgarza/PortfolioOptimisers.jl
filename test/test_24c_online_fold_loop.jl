@@ -85,6 +85,25 @@ assets is what keeps the JuMP families cheap.
         @test seen == 1:n
     end
 
+    @testset "A benchmark-relative walk steps in the Excess Frame (#1645)" begin
+        # With `brt = true` every fold fits `X - B`. The step picks before it folds, so the
+        # online walk reaches the batch weights fold for fold (ADR 0204).
+        Bv = randn(StableRNG(1645), T) ./ 100
+        rdb = ReturnsResult(; nx = nx, X = X, ts = ts, nb = ["BM"], B = Bv)
+        for opt in (MeanRisk(;
+                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)),
+                    HierarchicalRiskParity(;
+                                           opt = HierarchicalOptimiser(; pe = EmpiricalPrior(),
+                                                                       brt = true)))
+            b = cross_val_predict(opt, rdb, batch_cv)
+            o = cross_val_predict(opt, rdb, online_cv)
+            @test length(o.pred) == length(b.pred)
+            for (pb, po_) in zip(b.pred, o.pred)
+                @test isapprox(po_.res.w, pb.res.w; atol = weight_tol(opt))
+            end
+        end
+    end
+
     @testset "The capped identity: a rolling scheme equals an online one with a capped prior" begin
         rolling = IndexWalkForward(w + p, t; purged_size = p)
         stepped = OnlineIndexWalkForward(w + p, t; purged_size = p)

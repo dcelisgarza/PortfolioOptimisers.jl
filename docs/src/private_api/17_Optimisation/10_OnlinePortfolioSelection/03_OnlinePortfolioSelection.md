@@ -13,6 +13,7 @@ PortfolioOptimisers.row_timestamp
 PortfolioOptimisers.report_held_steps
 PortfolioOptimisers.report_row_gaps
 PortfolioOptimisers.buffer_returns_result
+PortfolioOptimisers.buffer_column_view
 PortfolioOptimisers.buffer_panel
 PortfolioOptimisers.online_selection_result
 PortfolioOptimisers.batch_from_state(::OnlinePortfolioSelection)

@@ -137,6 +137,11 @@ The pervasive Algorithm distinction in moment estimation: `FullMoment` includes 
 **ReturnsResult**
 The central data structure carrying all return series through the library: asset, factor and benchmark returns, the Exogenous Series, their names, timestamps, implied volatility, and the Asset Panel. Produced by `prices_to_returns`.
 Its asset returns are in the investor's base currency, with or without Currency Factors (§3). A model that needs returns net of its Observed Factors, the local-currency returns under Currency Factors, derives them, or reads them from a Panel Field the caller names; it never reads the asset returns as local. See ADR 0184.
+Code that builds a `ReturnsResult` from another one carries every field, and drops one only when the field has no meaning on the new axis. See ADR 0204.
+
+**Excess Frame**
+The coordinates of a `ReturnsResult` after the benchmark pick of an optimiser with `brt = true`: the asset returns are `X - B`, and the benchmark is its own excess return `B - B`, zero where `B` is finite. A second pick subtracts zero, so the frame is a fixed point of the pick. Returns with no benchmark have no Excess Frame, and the pick refuses them. See ADR 0204.
+*Avoid*: relative returns, which can also mean a ratio to the benchmark.
 
 **PricesResult**
 The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators. It also carries the Exogenous Series as level series, which `prices_to_returns` converts with the return rule of the assets.

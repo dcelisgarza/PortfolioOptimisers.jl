@@ -635,7 +635,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         o = po.partial_fit!(o, rows(rd, 21:21))
         Σ = cov(R[2:21, :]; corrected = true)
         @test o.cache.st.u == po.project_simplex(u20 .- 0.3 .* (2 .* Σ * u20))
-        @test o.cache.n == 21 && o.cache.X.max_history == 20 && o.cache.X.n == 20
+        @test o.cache.n == 21 && o.cache.X.max_history == 20 && o.cache.X.X.n == 20
         # One step of a small rate on a convex quadratic lowers it, unless at its minimum.
         @test dot(o.cache.st.u, Σ, o.cache.st.u) < dot(u20, Σ, u20)
         # The whole path, by hand: the window grows to 20 and then rolls; the first step

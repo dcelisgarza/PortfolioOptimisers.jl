@@ -197,6 +197,27 @@ The default of each keyword is written at its site and is the site's own decisio
 [ADR 0087](../../docs/adr/0087-one-written-bias-correction-default-not-the-upstream-one.md) fixes
 `corrected = true`.
 
+## A Returns Result drops no field that the mathematics lets it carry
+
+Code that builds a `ReturnsResult` from another one, or from a buffer, a state or a window of one,
+carries every field: `nx`, `X`, `nf`, `F`, `nb`, `B`, `ne`, `E`, `ts`, `iv`, `ivpa` and `pnl`. A
+field that a consumer does not read today is carried too, because the next consumer cannot see
+that it was dropped.
+
+- **Drop a field only when it has no meaning on the new axis.** An asset-indexed field after a
+  collapse to synthetic assets with no collapse rule is an example. State the reason in a comment
+  or in the docstring at the site.
+- **Transform a field rather than drop it.** `returns_result_picker` moves the data to the Excess
+  Frame: `X - B` for the returns, and `B - B` for the benchmark, which is its own excess return.
+  The pick then stays idempotent with no field dropped.
+- **Refuse by name where a field cannot travel.** A fold that holds numbers alone refuses `iv` with
+  an error that names it. A silent drop is never correct.
+- **Refuse a flag that needs a field the data does not carry.** `brt = true` on returns with no `B`
+  is an `ArgumentError`, not a pass-through.
+
+[ADR 0204](../../docs/adr/0204-a-returns-result-drops-no-field-that-the-mathematics-lets-it-carry.md)
+owns the rule.
+
 ## Union Type Aliases and Dispatch Groups
 
 When multiple abstract subtypes share a common interface, define a `const` union alias and dispatch on it:

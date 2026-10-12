@@ -650,31 +650,36 @@ const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 
 Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
 
-The function reads the benchmark field `B` of `rd` and the flag `brt`, which asks for benchmark tracking. When `brt` is `true` and `rd` carries a benchmark, it returns a new `ReturnsResult` whose asset returns are the excess returns over the benchmark. Otherwise it returns `rd`.
+The function reads the benchmark field `B` of `rd` and the flag `brt`, which asks for benchmark tracking. When `brt` is `true`, it returns a new `ReturnsResult` in the Excess Frame, whose asset returns are the excess returns over the benchmark. Otherwise it returns `rd`.
+
+The pick drops no field. In the Excess Frame the benchmark is its own excess return, ``\\tilde{b}_{t} = b_{t} - b_{t}``. This is zero where `B` is finite and `NaN` where `B` has a gap. So a second pick subtracts zero and changes no value, and the inner optimiser of a meta-optimiser and `optimise(opt)` with no returns after an online step can pick again without a second subtraction of the benchmark.
+
+`brt = true` on returns that carry no benchmark is a refusal and not a pass-through, because no excess return exists without a benchmark.
 
 # Algorithm
 
-The method that Julia selects on the type of the field `B` is the first step, so an `rd` that holds no benchmark runs no branch.
-
- 1. `rd` carries no benchmark, because its `B` field is `Nothing`. Return `rd`.
- 2. `brt` is `false`. Return `rd`.
- 3. `brt` is `true`. Subtract the benchmark from the asset returns, which gives `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes the benchmark value of each observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
- 4. Rebuild the [`ReturnsResult`](@ref) from `X`, with `nb` and `B` set to `nothing`. The subtraction uses up the benchmark, so a second call returns its argument unchanged. The fields `nx`, `nf`, `F`, `ne`, `E`, `ts`, `iv`, `ivpa` and `pnl` pass through. The function does not modify `rd`.
+ 1. `brt` is `false`. Return `rd`.
+ 2. `brt` is `true` and `rd` holds no returns, because its `X` field is `nothing`. Return `rd`, because there is nothing to pick.
+ 3. `brt` is `true` and `rd` carries no benchmark, because its `B` field is `nothing`. Throw an `ArgumentError`.
+ 4. Subtract the benchmark from the asset returns, which gives `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes the benchmark value of each observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
+ 5. Subtract the benchmark from itself, which gives `B = rd.B - rd.B`.
+ 6. Rebuild the [`ReturnsResult`](@ref) from `X` and `B`. The fields `nx`, `nf`, `F`, `nb`, `ne`, `E`, `ts`, `iv`, `ivpa` and `pnl` pass through. The function does not modify `rd`.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the factor and benchmark returns. When it carries a benchmark, it also holds `X`.
-  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them. When `rd` holds no benchmark, any value is valid.
+  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them.
 
 # Validation
 
+  - `brt` is `false`, or `rd` carries a benchmark, or `rd` holds no returns. An `ArgumentError` is thrown otherwise.
   - When `rd` carries a benchmark, `rd.X` is a matrix and `brt` is a `Bool`. Otherwise no method matches, and the call raises a `MethodError`.
 
 # Returns
 
   - `rd::ReturnsResult`:
 
-      + If `brt` is `true` and `rd` carries a benchmark, a new `ReturnsResult` that holds the excess returns in `X`. Its `nb` and `B` are `nothing`, so a second call returns it unchanged.
+      + If `brt` is `true` and `rd` carries a benchmark, a new `ReturnsResult` in the Excess Frame. It holds the excess returns in `X`, the benchmark names in `nb`, and `rd.B - rd.B` in `B`, so a second call changes no value.
       + Otherwise, `rd` itself.
 
 # Examples
@@ -720,8 +725,8 @@ ReturnsResult
      X ┼ 2×2 Matrix{Float64}
     nf ┼ nothing
      F ┼ nothing
-    nb ┼ nothing
-     B ┼ nothing
+    nb ┼ Vector{String}: ["BM"]
+     B ┼ Vector{Float64}: [0.0, 0.0]
     ne ┼ nothing
      E ┼ nothing
     ts ┼ nothing
@@ -731,6 +736,9 @@ ReturnsResult
 
 julia> rd.X .- rd.B == rd3.X
 true
+
+julia> returns_result_picker(rd3, true).X == rd3.X  # a second pick subtracts zero
+true
 ```
 
 # Related
@@ -739,7 +747,9 @@ true
   - [`port_opt_view`](@ref)
 """
 function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                 Nothing}, ::Any)
+                                                 Nothing}, brt::Bool)
+    @argcheck(!brt || isnothing(rd.X),
+              ArgumentError("brt = true asks for the returns in excess of a benchmark, and this ReturnsResult carries no benchmark: its `B` is `nothing`, so no excess return exists. Pass returns data that carries `nb` and `B`, or set `brt = false` to optimise over the asset returns as they are."))
     return rd
 end
 function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
@@ -748,8 +758,11 @@ function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, 
         rd
     else
         X = isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
-        ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ne = rd.ne, E = rd.E,
-                      ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa, pnl = rd.pnl)
+        # The benchmark in the Excess Frame is its own excess return, so a second pick
+        # subtracts zero and no field is dropped.
+        ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
+                      B = rd.B - rd.B, ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv,
+                      ivpa = rd.ivpa, pnl = rd.pnl)
     end
 end
 """

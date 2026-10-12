@@ -204,7 +204,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test v.alg.sel === Prefix()
         # The buffer holds returns; the selector reads relatives.
         st = po.partial_fit!(ftl, rows(rd, 1:5)).cache
-        @test po.sample_buffer(st.X) == R[1:5, :]
+        @test po.sample_buffer(st.X.X) == R[1:5, :]
     end
 
     @testset "Follow the leader over a JuMP head equals the walk-forward" begin
@@ -313,6 +313,38 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test maximum(abs.(rl.w .- w30)) < 2e-9
         @test isapprox(optimise(OPS(; alg = FollowTheLeader(; opt = long)), rows(rd, 1:30)).w,
                        w30; atol = 1e-8)
+    end
+
+    @testset "A leader with brt = true fits the excess returns its rows carry (#1646)" begin
+        # The rows buffer of the head keeps every field of the rows, the benchmark among
+        # them, so the leader picks `X - B` as a batch fit over the same window does
+        # (ADR 0204).
+        Bv = 0.01 .* randn(StableRNG(1646), T)
+        rdB = ReturnsResult(; nx = nx, X = R, ts = ts, nb = ["BM"], B = Bv)
+        minv(; kw...) = MeanRisk(; obj = MinimumRisk(),
+                                 opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                                     kw...))
+        lead = minv(; brt = true)
+        ftl = OPS(; alg = FollowTheLeader(; opt = lead))
+        win = po.buffer_returns_result(po.partial_fit!(ftl, rows(rdB, 1:8)).cache.X)
+        @test win.X == R[1:8, :] &&
+              win.B == Bv[1:8] &&
+              win.nb == ["BM"] &&
+              win.ts == ts[1:8]
+        # Follow the leader equals the walk-forward of its leader, fold for fold.
+        k = 5
+        pred = cross_val_predict(lead, rdB, IndexWalkForward(k, 1; expand_train = true))
+        for i in 1:4
+            @test isapprox(pred.pred[i].res.w, optimise(ftl, rows(rdB, 1:(k + i - 1))).w;
+                           atol = 1e-5)
+        end
+        # The benchmark moves a minimum-variance leader: var(x'w - b) is not var(x'w).
+        @test !isapprox(optimise(ftl, rows(rdB, 1:12)).w,
+                        optimise(OPS(; alg = FollowTheLeader(; opt = minv())),
+                                 rows(rdB, 1:12)).w; atol = 1e-2)
+        # A leader with brt = true on rows with no benchmark refuses: no excess return
+        # exists without one.
+        @test_throws ArgumentError optimise(ftl, rows(rd, 1:8))
     end
 
     @testset "The Allocation Set Constraint (ADR 0164)" begin

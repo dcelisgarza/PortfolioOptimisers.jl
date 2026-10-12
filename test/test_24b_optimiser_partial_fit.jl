@@ -138,6 +138,41 @@ end
         @test isapprox(optimise(o).w, optimise(MeanRisk(; opt = jopt), b).w; atol = 1e-5)
     end
 
+    @testset "A benchmark-relative step picks before it folds (#1645)" begin
+        # With `brt = true` the batch path fits `X - B`. The step picks first, so the prior
+        # and the Fold Context hold the Excess Frame, and the pick at the read-out subtracts
+        # a zero benchmark (ADR 0204).
+        t = 80
+        jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
+        jbrt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)
+        hbrt = HierarchicalOptimiser(; pe = EmpiricalPrior(), brt = true)
+        fams = (MeanRisk(; opt = jbrt), HierarchicalRiskParity(; opt = hbrt),
+                HierarchicalEqualRiskContribution(; opt = hbrt),
+                InverseVolatility(; brt = true),
+                NestedClustered(; opti = MeanRisk(; opt = jopt),
+                                opto = MeanRisk(; opt = jopt), brt = true),
+                SubsetResampling(; opt = MeanRisk(; opt = jopt), seed = 3, n_subsets = 3,
+                                 subset_size = 5, brt = true))
+        for r in (rdf, rdv), opt in fams
+            b = rows(r, 1:t)
+            o = step(opt, r, t)
+            # The context gives back the picked rows, field by field.
+            @test same_fields(po.returns_result(o), po.returns_result_picker(b, true))
+            solved = isa(opt, po.JuMPOptimisationEstimator) ||
+                     isa(opt, NestedClustered) ||
+                     isa(opt, SubsetResampling)
+            @test isapprox(optimise(o).w, optimise(opt, b).w; atol = solved ? 1e-5 : 1e-10)
+        end
+        # The pick is what the step honours: the weights differ from those over `X`.
+        o = step(InverseVolatility(; brt = true), rdv, t)
+        @test !isapprox(optimise(o).w, optimise(InverseVolatility(), rows(rdv, 1:t)).w;
+                        atol = 1e-6)
+        # `brt = true` with no benchmark refuses at the first step, as in batch.
+        @test_throws ArgumentError partial_fit!(InverseVolatility(; brt = true),
+                                                rows(rd, 1:1))
+        @test_throws ArgumentError optimise(InverseVolatility(; brt = true), rows(rd, 1:t))
+    end
+
     @testset "A factor prior folds both matrices, and a wrapping prior forwards" begin
         t = 80
         b = rows(rdf, 1:t)
@@ -320,8 +355,10 @@ end
         @test_throws ArgumentError partial_fit!(o,
                                                 ReturnsResult(; nx = nx, X = r11.X,
                                                               ts = r11.ts))
-        # A fold that keeps numbers alone takes no surface.
-        @test_throws ArgumentError po.step_active_mask(r11)
+        # The exact fold of a covariance estimator keeps numbers alone and takes no
+        # surface. The mask reader itself leaves the surface to its caller.
+        @test isnothing(po.step_active_mask(r11))
+        @test_throws ArgumentError partial_fit!(Covariance(), r11)
     end
 
     @testset "What the step refuses, by name" begin

@@ -1077,7 +1077,7 @@ The fold-taking [`factor_risk_contribution`](@ref) reads `rd` by dispatch. A cal
 # Algorithm
 
  1. On a caller's `rd`, view it at `imsk` with [`investable_returns_view`](@ref).
- 2. On `nothing`, view the asset returns `hw.X` of the fold at `imsk`, and build a [`ReturnsResult`](@ref) from them, the `nx` of the fold and the factor block `nf`, `F` that [`reconstruct_rd`](@ref) kept.
+ 2. On `nothing`, view the asset returns `hw.X` of the fold at `imsk`, and build a [`ReturnsResult`](@ref) from them, the `nx` of the fold, the factor block `nf`, `F`, the Exogenous Series `ne`, `E` and the timestamps `ts` that [`reconstruct_rd`](@ref) kept. The benchmark and the implied volatilities of the fold are on the portfolio axis, so they do not line up with `hw.X` and the result does not carry them.
 
 # Arguments
 
@@ -1099,7 +1099,7 @@ The fold-taking [`factor_risk_contribution`](@ref) reads `rd` by dispatch. A cal
 function fold_factor_returns(imsk, ::Nothing, pred::PredictionResult)
     X = investable_weights_view(imsk, pred.hw.X)
     return ReturnsResult(; nx = pred.rd.nx, X = X, nf = pred.rd.nf, F = pred.rd.F,
-                         ne = pred.rd.ne, E = pred.rd.E)
+                         ne = pred.rd.ne, E = pred.rd.E, ts = pred.rd.ts)
 end
 function fold_factor_returns(imsk, rd::ReturnsResult, ::PredictionResult)
     return investable_returns_view(imsk, rd)

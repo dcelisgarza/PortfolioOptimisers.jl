@@ -3,13 +3,13 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the active mask of the Asset Panel that a step carries to an exact fold that is not a prior, and refuses what that fold cannot carry.
 
-The step of a covariance estimator in [`covariance_forecast_evaluation`](@ref) and the step of an online portfolio selection read the mask through this function. A prior does not: it folds through [`partial_fit!`](@ref) over the `ReturnsResult`, whose route decides what the step honours. A [`ReturnsResult`](@ref) with no panel, or with a static one, gives no mask, because the fold context pins a static panel. A time-varying panel that holds masks alone, which is the shape the ingestion layer writes, gives its active mask, and the fold records the mask beside the rows. This function refuses a time-varying panel that holds Panel Fields, because these folds read none and hold numbers alone.
+The step of a covariance estimator in [`covariance_forecast_evaluation`](@ref) and the step of an online portfolio selection read the mask through this function. Each caller decides on the implied volatilities itself: the head of an online portfolio selection records them with its rows, and the covariance step refuses them. A prior does not: it folds through [`partial_fit!`](@ref) over the `ReturnsResult`, whose route decides what the step honours. A [`ReturnsResult`](@ref) with no panel, or with a static one, gives no mask, because the fold context pins a static panel. A time-varying panel that holds masks alone, which is the shape the ingestion layer writes, gives its active mask, and the fold records the mask beside the rows. This function refuses a time-varying panel that holds Panel Fields, because these folds read none and hold numbers alone.
 
 The estimation mask does not travel these folds. The exact folds of the moment layer take an active mask and no estimation mask, so a step whose estimation universe is narrower than its active universe would fit the wrong universe without a word. The function refuses such a panel with an `ArgumentError`.
 
 # Algorithm
 
- 1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref), and `rd` with implied volatilities.
+ 1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref).
  2. Return `nothing` when `rd` holds no panel, or when its panel is static.
  3. Refuse a time-varying panel that holds a Panel Field.
  4. Refuse a time-varying panel whose estimation mask differs from its active mask.
@@ -22,7 +22,6 @@ The estimation mask does not travel these folds. The exact folds of the moment l
 # Validation
 
   - The rules of [`assert_prior_fold_returns`](@ref).
-  - `rd.iv` is `nothing`. An `ArgumentError` is thrown otherwise. These folds hold numbers alone and keep no implied volatilities, so a step that carried them would fold an estimate that reads them without them.
   - A time-varying `rd.pnl` holds no Panel Field. An `ArgumentError` is thrown otherwise.
   - A time-varying `rd.pnl` has an estimation mask equal to its active mask. An `ArgumentError` is thrown otherwise.
 
@@ -38,8 +37,6 @@ The estimation mask does not travel these folds. The exact folds of the moment l
 """
 function step_active_mask(rd::ReturnsResult)
     assert_prior_fold_returns(rd)
-    @argcheck(isnothing(rd.iv),
-              ArgumentError("this online step takes no implied-volatility surface: the exact fold of a covariance estimator or of an online portfolio selection keeps numbers alone, so a step carrying `iv` would fold an estimate that reads the surface without it and read out an answer a batch fit would not give. Drop `iv` from `rd`, or fit in batch. An optimiser's prior records `iv` on its own step."))
     pnl = rd.pnl
     if isnothing(pnl) || panel_is_static(pnl)
         return nothing
@@ -142,24 +139,27 @@ Takes the step of an optimiser that holds a prior and a fold context. It forward
 
 The prior folds first, because the context takes its cap from the buffer of the prior. The `max_history` of an [`Online`](@ref) wrapper caps the rows of the prior, and the context must drop the same rows at the same step, so the [`ReturnsResult`](@ref) that `optimise(opt)` with no returns rebuilds matches the rows of the prior.
 
+The step picks first. [`returns_result_picker`](@ref) under `opt.brt` gives the returns that the batch path fits, so the prior and the context fold the Excess Frame when `brt` is `true`. The pick that `optimise(opt)` with no returns runs then subtracts a zero benchmark and changes no value, and `optimise(opt)` with no returns equals `optimise(opt, rd[1:t])` under `brt` too.
+
 One place holds `F`. The context keeps the factor column only when the tree of the prior never reads it, that is, when [`needs_factor_returns`](@ref) answers `false`. Otherwise the buffer of the prior records it, and `optimise(opt)` with no returns reads it back through [`prior_returns_buffer`](@ref), as it reads the returns. One place holds the Exogenous Series on the same terms. The context keeps it only when [`reads_exogenous_series`](@ref) answers `false`, and the buffer of the prior records it otherwise.
 
 # Algorithm
 
- 1. Fold `rd` into `opt.pe` with [`fold_prior`](@ref), giving the folded prior `pe`.
- 2. Read the buffer `rows` of `pe` with [`prior_returns_buffer`](@ref).
- 3. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`, and `own_exogenous` to `true` when `reads_exogenous_series(pe)` is `false`.
- 4. Fold `rd` into `opt.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context never keeps the returns.
- 5. Rebuild `opt` with `pe` and `cache`.
+ 1. Pick the returns that `opt.brt` selects with [`returns_result_picker`](@ref), giving `rd`.
+ 2. Fold `rd` into `opt.pe` with [`fold_prior`](@ref), giving the folded prior `pe`.
+ 3. Read the buffer `rows` of `pe` with [`prior_returns_buffer`](@ref).
+ 4. Set `own_factors` to `true` when `needs_factor_returns(pe) === false`, and `own_exogenous` to `true` when `reads_exogenous_series(pe)` is `false`.
+ 5. Fold `rd` into `opt.cache` with [`fold_context`](@ref), under the cap `rows.max_history`, giving `cache`. The context never keeps the returns.
+ 6. Rebuild `opt` with `pe` and `cache`.
 
 # Arguments
 
-  - `opt`: An estimator that holds `pe` and `cache`.
+  - `opt`: An estimator that holds `pe`, `cache` and `brt`.
   - `rd`: The returns data to fold, `observations × assets`.
 
 # Validation
 
-  - Everything [`fold_prior`](@ref) and [`fold_context`](@ref) refuse.
+  - Everything [`returns_result_picker`](@ref), [`fold_prior`](@ref) and [`fold_context`](@ref) refuse.
 
 # Returns
 
@@ -174,6 +174,7 @@ One place holds `F`. The context keeps the factor column only when the tree of t
   - [`reads_exogenous_series`](@ref)
 """
 function fold_returns(opt, rd::ReturnsResult)
+    rd = returns_result_picker(rd, opt.brt)
     pe = fold_prior(opt.pe, rd)
     rows = prior_returns_buffer(pe)
     own_factors = needs_factor_returns(pe) === false
@@ -196,7 +197,7 @@ The online step of an optimiser has two functions. `partial_fit!(opt, rd)` folds
 
 The step takes a `ReturnsResult`, as `optimise(opt, rd)` does. `rd` holds one observation or a block of them, and the step unpacks it into the arity of the prior's step. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds, and a hierarchical head to its [`HierarchicalOptimiser`](@ref). The optimiser that holds the prior and the context takes the step. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly, so each takes its own step. [`EqualWeighted`](@ref), [`RandomWeighted`](@ref) and [`BestConstantRebalancedPortfolio`](@ref) hold no prior but read the observations, so their context keeps the rows itself. [`PreviousWeights`](@ref) reads no observation, so its step returns it unchanged and it carries no context.
 
-After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `ReturnsResult` that `optimise(opt)` with no returns rebuilds equals `rd[1:t]` field by field. The weights of a family that solves no programme agree to rounding, and the weights of a JuMP family agree to the tolerance of its solver.
+After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `ReturnsResult` that `optimise(opt)` with no returns rebuilds equals `rd[1:t]` field by field, after the pick of [`returns_result_picker`](@ref) under the optimiser's `brt`. The weights of a family that solves no programme agree to rounding, and the weights of a JuMP family agree to the tolerance of its solver.
 
 # Algorithm
 

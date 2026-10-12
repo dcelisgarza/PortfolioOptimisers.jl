@@ -1408,7 +1408,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the Partial Fit State of an online portfolio selection head: the Rule State, the rows, the Fold Context and every folded timestamp.
 
-The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`SampleBufferState`](@ref) of returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`buffer_returns_result`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
+The pair `(st, w)` is the Rule State, the unit over which the family recurses. The state holds once the rows that any rule of the tree reads, as a [`ReturnsBufferState`](@ref) that owns the returns. The buffer keeps the rows of the Returns Result as they arrived, with `NaN` where there was no return, and under a time-varying panel it keeps the active mask of each row beside it. It keeps every other field of the Returns Result too, such as the benchmark and the factor returns, so the rows that a rule reads drop no field. [`rows_needed`](@ref) of the rule tree caps the buffer, and the buffer is `nothing` for a tree that reads no rows. At every row the head reads the buffer out as a [`ReturnsResult`](@ref) through [`buffer_returns_result`](@ref), so a statistic over the rows reduces to its Coverage Universe as a batch fit over the same window does. No cap applies to the timestamps, so [`Resume`](@ref) works for a rule with no state. The active mask of the last folded row is the Investable Mask on which `optimise(opt)` with no data reduces the allocation, and it is `nothing` under a static panel. The recursion keeps the full `w` and never carries a forced zero.
 
 # Fields
 
@@ -1420,7 +1420,7 @@ $(DocStringExtensions.FIELDS)
         n::Integer = 0,
         w::AbstractVector,
         st = nothing,
-        X::Option{<:SampleBufferState} = nothing,
+        X::Option{<:ReturnsBufferState} = nothing,
         nx::Option{<:VecStr} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
         amsk::Option{<:AbstractVector{<:Bool}} = nothing,
@@ -1450,7 +1450,7 @@ Keywords correspond to the struct's fields.
 
   - [`AbstractPartialFitState`](@ref)
   - [`OnlinePortfolioSelection`](@ref)
-  - [`SampleBufferState`](@ref)
+  - [`ReturnsBufferState`](@ref)
   - [`rule_state_view`](@ref)
   - [`merge_states`](@ref)
 """
@@ -1468,7 +1468,7 @@ Keywords correspond to the struct's fields.
     """
     st
     """
-    The rows of returns that any rule of the tree reads, a [`SampleBufferState`](@ref) of the rows as they arrived and of their active masks. [`rows_needed`](@ref) caps it. It is `nothing` when the tree reads no rows.
+    The rows of returns that any rule of the tree reads, a [`ReturnsBufferState`](@ref) of the rows as they arrived, of their active masks, and of every other field of the Returns Result. [`rows_needed`](@ref) caps it. It is `nothing` when the tree reads no rows.
     """
     X
     """
@@ -1493,7 +1493,7 @@ Keywords correspond to the struct's fields.
     hold
 end
 function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st = nothing,
-                                       X::Option{<:SampleBufferState} = nothing,
+                                       X::Option{<:ReturnsBufferState} = nothing,
                                        nx::Option{<:VecStr} = nothing,
                                        pnl::Option{<:AssetPanel} = nothing,
                                        amsk::Option{<:AbstractVector{<:Bool}} = nothing,
@@ -1556,7 +1556,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices an [`OnlinePortfolioSelectionState`](@ref) to the selected assets, giving the state of the same observations over those assets.
 
-The method slices `w` and renormalises it. It sends the state of the rule to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`SampleBufferState`](@ref). It slices the names, the panel and the mask, and it keeps the count, the timestamps and the hold record. The view is a copy for `optimise(opt)` with no data, and the recursion keeps the full `w`.
+The method slices `w` and renormalises it. It sends the state of the rule to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`ReturnsBufferState`](@ref). It slices the names, the panel and the mask, and it keeps the count, the timestamps and the hold record. The view is a copy for `optimise(opt)` with no data, and the recursion keeps the full `w`.
 
 # Arguments
 

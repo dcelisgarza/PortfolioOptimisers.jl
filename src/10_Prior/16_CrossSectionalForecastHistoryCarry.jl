@@ -389,7 +389,8 @@ function cross_sectional_forecast_window(pe::CrossSectionalFactorPrior, win::Ret
     return if isnothing(der)
         rdb
     else
-        ReturnsResult(; nx = rdb.nx, X = der.Xl, ne = rdb.ne, E = rdb.E, pnl = rdb.pnl)
+        ReturnsResult(; nx = rdb.nx, X = der.Xl, nf = rdb.nf, F = rdb.F, ne = rdb.ne,
+                      E = rdb.E, iv = rdb.iv, ivpa = rdb.ivpa, pnl = rdb.pnl)
     end
 end
 """

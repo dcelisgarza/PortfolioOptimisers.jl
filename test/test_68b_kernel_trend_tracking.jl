@@ -290,7 +290,7 @@ the worked step the paper prints for five assets at its defaults.
             opt = OPS(; alg = alg)
             @test po.rows_needed(opt) == 1
             o = po.partial_fit!(opt, rows(rd, 1:10))
-            @test o.cache.X.n == 1 && isa(o.cache.st, po.ForecasterState)
+            @test o.cache.X.X.n == 1 && isa(o.cache.st, po.ForecasterState)
             o = po.partial_fit!(o, rows(rd, 11:17))
             o = po.partial_fit!(o, rows(rd, 18:18))
             a = optimise(o)
