@@ -226,3 +226,29 @@ to that prior *and* folds its own recursion, and everything else it holds still 
 ordinary batch treatment at read-out. The sentence in `GLOSSARY.md`'s *Fold Context* entry that
 nothing above the prior takes a step of its own now names the recursion as the one thing that
 does.
+
+## Amendment (2026-10-12)
+
+**A fallback under a reconstitution fits its own prior from the rebuilt carrier, and steps not
+at all.** [#1633](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1633) asked whether
+a fallback estimator at a read-out should take the carried prior of the optimiser it replaces, or
+fit its own prior over the folded rows. The decision above already hands each fallback the
+reconstituted carrier, and #1633 keeps that rule after it weighed two other options.
+
+- **Step the fallback beside the optimiser.** Rejected. A carry fold is exact (ADR 0136), so a
+  batch fit over the held window gives the prior that a stepped fallback would carry. The step
+  would cost a fold at every row for a fallback that runs only when a solve fails, where the batch
+  fit costs one fit on the failed read-out alone.
+- **Hand the fallback the carried prior of the optimiser.** Rejected. The prior of a fallback is
+  its own configuration, and a different estimator from the prior of the optimiser in general, so
+  the substitution would change what the fallback computes and say nothing.
+
+A fallback therefore sees the window the optimiser holds: every folded row under an uncapped
+carry, and the last `max_history` rows under `Online(pe; max_history)`. An `Online` in a fallback
+stays refused at the entry of the online arm, because nothing steps it.
+`test/test_24c_online_fold_loop.jl` locks the rule: an estimator fallback answers a failed step
+as it answers the batch fold.
+
+An Online Portfolio Selection head has no carrier to rebuild, so its fallback cannot take this
+route. [ADR 0155](0155-an-online-portfolio-selection-head-is-a-naive-optimiser-whose-batch-verb-is-a-causal-pass-and-whose-read-out-is-its-own-recursion.md)
+carries the amendment that steps it.

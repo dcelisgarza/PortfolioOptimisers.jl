@@ -343,6 +343,26 @@ end
         held = OPS(; alg = BuyAndHold(), fb = PreviousWeights(; w = fill(0.25, 4)))
         hs = po.partial_fit!(held, rd0)
         @test optimise(hs).w == fill(0.25, 4)
+        # A fallback that needs rows steps with the head, so online it answers from the
+        # rows that it reads in batch, and the chain records the same attempts (#1633).
+        amsk1 = trues(T, N)
+        amsk1[T, 1:2] .= false
+        R1 = copy(R)
+        R1[T, 1:2] .= NaN
+        rd1 = ReturnsResult(; nx = nx, X = R1,
+                            pnl = AssetPanel(; amsk = amsk1, emsk = amsk1))
+        w0 = [0.5, 0.5, 0.0, 0.0]
+        for fb in (EqualWeighted(), InverseVolatility(),
+                   OPS(; alg = BuyAndHold(), w0 = w0, fb = EqualWeighted()))
+            head = OPS(; alg = BuyAndHold(), w0 = w0, fb = fb)
+            b = optimise(head, rd1)
+            o = optimise(po.partial_fit!(po.partial_fit!(head, rows(rd1, 1:20)),
+                                         rows(rd1, 21:T)))
+            @test isa(o.retcode, OptimisationSuccess)
+            @test o.w[1:2] == [0.0, 0.0]
+            @test isapprox(o.w, b.w; atol = 1e-14)
+            @test length(o.fb) == length(b.fb)
+        end
         # The identity holds under the time-varying panel too.
         og = po.partial_fit!(po.partial_fit!(opt, rows(rdg, 1:12)), rows(rdg, 13:28))
         @test optimise(og).w == optimise(opt, rows(rdg, 1:28)).w

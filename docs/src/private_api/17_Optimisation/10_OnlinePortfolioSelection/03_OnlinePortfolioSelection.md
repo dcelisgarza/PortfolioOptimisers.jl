@@ -17,6 +17,9 @@ PortfolioOptimisers.buffer_panel
 PortfolioOptimisers.online_selection_result
 PortfolioOptimisers.batch_from_state(::OnlinePortfolioSelection)
 PortfolioOptimisers.held_timestamps(opt::OnlinePortfolioSelection)
+PortfolioOptimisers.step_fallback
+PortfolioOptimisers.update_online_estimator(opt::OnlinePortfolioSelection)
+PortfolioOptimisers.online_unreached_path(opt::OnlinePortfolioSelection)
 PortfolioOptimisers.fees_carry_turnover
 PortfolioOptimisers.assert_online_fee_source(opt::OnlinePortfolioSelection, pws)
 PortfolioOptimisers.online_portfolio_selection_td_defaults

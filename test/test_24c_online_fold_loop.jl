@@ -490,6 +490,14 @@ assets is what keeps the JuMP families cheap.
         @test isa(of.pred[2].res.retcode, OptimisationSuccess)
         @test of.pred[2].res.w == of.pred[1].res.w
         @test threaded(of.pred[3]) == of.pred[1].res.w
+        # An estimator fallback fits its own prior over the window that the read-out
+        # rebuilds, not the carried prior of the primary, so it answers the step as it
+        # answers the batch fold (#1633).
+        ofi = cross_val_predict(mk(2; fb = InverseVolatility()), rd, online_cv)
+        bfi = cross_val_predict(mk(2; fb = InverseVolatility()), rd, batch_cv)
+        @test isa(ofi.pred[2].res.retcode, OptimisationSuccess)
+        @test isa(only(ofi.pred[2].res.fb)[1], MeanRisk)
+        @test isapprox(ofi.pred[2].res.w, bfi.pred[2].res.w; atol = 1e-10)
         # A failure at step 1 threads nothing, so step 2 reads the estimator's own `w`.
         o1 = cross_val_predict(mk(1), rd, online_d)
         @test isa(o1.pred[1].res.retcode, OptimisationFailure)

@@ -254,3 +254,32 @@ Derived from the rulings above, not decided separately:
   folded every row and then died at the read-out. `returns_result` is written for no head.
 - `test/test_67g_cross_validation_and_tuning.jl` gains the group that locks both refusals and the
   routes they name.
+
+## Amendment (2026-10-12)
+
+**The fallback chain is reached at a read-out, and the head steps its fallback.** The Decision
+above says that a read-out never reaches the chain, because an update over a finite row cannot
+fail. That stopped being true when the read-out reduced the allocation to the assets active at
+the last row: when every held asset is inactive there, the Recursion Result is an
+`OptimisationFailure`, and the chain walks.
+
+[#1633](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1633) found that the walk
+refused every fallback that needs rows. The read-out called `optimise(opt.fb)` with no data, and
+a fallback that had folded nothing threw an `ArgumentError` that stopped a walk-forward. Only
+`PreviousWeights`, a precomputed result and an optimiser whose prior is already a result answered.
+
+The head now folds every step into its fallback, in `partial_fit!` and in `online_step_fold`,
+through `step_fallback`. The fallback reads out from its own state, so it answers from the rows
+that the batch verb gives it, and `optimise(opt)` equals `optimise(opt, rd[1:t])` through the
+chain too. The warm-up of the head resolves an `Online` in the prior of the fallback, and the entry
+of the online arm names a wrapper that it leaves. A `TimeDependent` schedule of fallbacks steps not
+at all: its entries are batch configuration, so an entry that needs rows still refuses at the
+read-out. The chain of the Result starts with the failed pair of the head and continues with the
+chain that the fallback walked, as the batch verb records it.
+
+The alternatives were to refuse a fallback that needs rows in the constructor, which removes the
+fallbacks that batch admits, and to give the fallback the rows the head buffers, which hold
+`rows_needed` rows of the rule tree or none. The cost of the decision is a fold of the fallback at
+every step, paid also when the fallback never runs. A reconstitution pays no such cost, and
+[ADR 0137](0137-an-optimiser-forwards-to-its-prior-alone-and-a-read-out-reconstitutes-the-carrier-and-runs-the-batch-path.md)
+states why its fallback does not step.

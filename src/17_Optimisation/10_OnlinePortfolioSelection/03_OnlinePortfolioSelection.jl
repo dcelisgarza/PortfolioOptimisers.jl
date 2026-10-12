@@ -676,7 +676,7 @@ end
 
 Folds the rows of a Returns Result into the head's recursion as the Block Step, and reads nothing out.
 
-Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and builds no Recursion Result. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates.
+Each row of `rd` is one Online Update, in order, and the state never learns the cadence of the loop. A fold of `k` rows is `k` updates and builds no Recursion Result. After a fold of rows `1:t`, `optimise(opt)` equals `optimise(opt, rd[1:t])` exactly, because both take the same `t` single-row updates. The step also folds `rd` into the fallback through [`step_fallback`](@ref), because the head holds no returns window that the fallback could read at the read-out.
 
 # Arguments
 
@@ -686,29 +686,65 @@ Each row of `rd` is one Online Update, in order, and the state never learns the 
 # Validation
 
   - Everything [`fold_online_selection`](@ref) refuses.
+  - Everything [`step_fallback`](@ref) refuses.
 
 # Returns
 
-  - `opt`: The head, with its `cache` rebound to the state after the last row.
+  - `opt`: The head, with its `cache` rebound to the state after the last row and its fallback stepped.
 
 # Related
 
   - [`OnlinePortfolioSelection`](@ref)
   - [`fold_online_selection`](@ref)
+  - [`step_fallback`](@ref)
   - [`optimise`](@ref)
 """
 function partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any,
                                                     <:Any,
                                                     <:Option{<:OnlinePortfolioSelectionState}},
                       rd::ReturnsResult)
-    return rebuild_estimator(opt, (; cache = fold_online_selection(opt, opt.cache, rd)))
+    return rebuild_estimator(opt,
+                             (; cache = fold_online_selection(opt, opt.cache, rd),
+                              fb = step_fallback(opt.fb, rd)))
+end
+"""
+    step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
+    step_fallback(fb, rd::ReturnsResult)
+
+Folds the rows of an online step into the fallback of an [`OnlinePortfolioSelection`](@ref) head.
+
+The head reads out a Recursion Result and rebuilds no returns data, so its fallback gets no rows at the read-out. A fallback that steps with the head holds its own state, and `optimise(fb)` with no data reads that state out as the online step of any optimiser does. So every fallback that the batch verb admits also answers online. A fallback estimator steps through [`partial_fit!`](@ref). Any other value passes unchanged: `nothing`, a precomputed result, which answers itself, and a [`TimeDependent`](@ref) schedule, whose entries are batch configuration and carry no state.
+
+# Arguments
+
+  - `fb`: The fallback of the head.
+  - `rd`: The returns data of the step.
+
+# Validation
+
+  - Everything [`partial_fit!`](@ref) refuses on `fb`.
+
+# Returns
+
+  - `fb`: The fallback, stepped when it is an estimator.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`OnlinePortfolioSelection`](@ref)
+"""
+function step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
+    return partial_fit!(fb, rd)
+end
+function step_fallback(fb, ::ReturnsResult)
+    return fb
 end
 """
     online_step_fold(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, rd::ReturnsResult)
 
 Folds the fold's rows into the head inside the fold's own Allocation Set.
 
-The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. So the method resolves the entry here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state, so the method returns the head with its `cache` rebound.
+The head is the one family whose online step is the optimisation. The Constrained Update projects the raw step of every row onto `set`, so the step reads a schedule on `set`, and not only `optimise(opt)` with no data. So the method resolves the entry here, in the same fold and before `optimise(opt)` with no data resolves the other schedules. The head that the loop threads on keeps the schedule, so fold `i + 1` resolves from the schedule and not from entry `i`. The step writes no field but the state and the fallback, so the method returns the head with its `cache` rebound and its fallback stepped through [`step_fallback`](@ref).
 
 # Arguments
 
@@ -734,7 +770,8 @@ function online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:A
     set = opt.set
     set = isa(set, TimeDependent) ? time_dependent_value(set, ctx) : set
     return rebuild_estimator(opt,
-                             (; cache = fold_online_selection(opt, opt.cache, rd, set)))
+                             (; cache = fold_online_selection(opt, opt.cache, rd, set),
+                              fb = step_fallback(opt.fb, rd)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -872,7 +909,7 @@ end
 
 Returns the Recursion Result, the allocation of the state as a Result, and runs no batch path.
 
-The method refuses a head that has taken no step with an `ArgumentError`. The Recursion Result fails in one way, when the allocation has no mass on the assets active at the last row. The fallback chain then runs as the batch verb runs it, and each fallback reads out through its own `optimise(fb)`. A fallback that needs rows has folded none and refuses. So the fallback that serves here is a head that needs no rows, such as [`PreviousWeights`](@ref).
+The method refuses a head that has taken no step with an `ArgumentError`. The Recursion Result fails in one way, when the allocation has no mass on the assets active at the last row. The fallback chain then runs as the batch verb runs it. The fallback reads out through its own `optimise(fb)`, from the rows that [`step_fallback`](@ref) folded into it at every step of the head. So a fallback that needs rows answers from the same rows as in batch. The chain of the Result starts with the failed pair of the head, and the chain that the fallback walked follows it.
 
 # Algorithm
 
@@ -880,12 +917,13 @@ The method refuses a head that has taken no step with an `ArgumentError`. The Re
  2. Reset every schedule of the head to its fold-less value through [`reset_time_dependent_estimator`](@ref).
  3. Read the state out through [`online_selection_result`](@ref), giving `res`.
  4. Return `res` when it succeeded or when the head has no fallback.
- 5. Otherwise warn, read the fallback out with `optimise(opt.fb)`, and return its Result through [`factory`](@ref), which records the failed pair of `opt` and `res`.
+ 5. Otherwise warn, and read the fallback out with `optimise(opt.fb; kwargs...)`, giving `fbres`.
+ 6. Return `fbres` through [`factory`](@ref) with the chain of the failed pair of `opt` and `res`, followed by the chain of `fbres` when the fallback is an estimator that walked one.
 
 # Arguments
 
   - `opt`: The stepped head.
-  - `kwargs`: Ignored.
+  - `kwargs`: The keyword arguments of the read-out of the fallback, passed on unchanged.
 
 # Validation
 
@@ -911,7 +949,13 @@ function optimise(opt::OnlinePortfolioSelection; kwargs...)
     end
     fb = Tuple{OptimisationEstimator, OptimisationResult}[(opt, res)]
     @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-    return factory(optimise(opt.fb), fb)
+    fbres = optimise(opt.fb; kwargs...)
+    # A precomputed result answers itself, and its own `fb` is not a chain this read-out
+    # walked, as in the batch verb.
+    if isa(opt.fb, OptimisationEstimator) && isa(fbres.fb, FbChain)
+        append!(fb, fbres.fb)
+    end
+    return factory(fbres, fb)
 end
 """
     batch_from_state(opt::OnlinePortfolioSelection)
@@ -940,6 +984,40 @@ Returns every timestamp that the head's state holds, or `nothing` before the fir
 """
 function held_timestamps(opt::OnlinePortfolioSelection)
     return isnothing(opt.cache) ? nothing : opt.cache.ts
+end
+"""
+    update_online_estimator(opt::OnlinePortfolioSelection)
+
+Resolves the [`Online`](@ref) wrappers in the fallback of the head, at the warm-up.
+
+The head steps its fallback through [`step_fallback`](@ref), so a wrapper in the prior of a fallback estimator declares the window that the fallback folds. The method resolves the fallback as the warm-up resolves an optimiser. Any other fallback holds no wrapper to resolve, so the head passes unchanged. The recursion of the head holds no wrapper.
+
+# Related
+
+  - [`update_online_estimator`](@ref)
+  - [`step_fallback`](@ref)
+  - [`online_unreached_path`](@ref)
+"""
+function update_online_estimator(opt::OnlinePortfolioSelection)
+    if !isa(opt.fb, OptimisationEstimator)
+        return opt
+    end
+    return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
+end
+"""
+    online_unreached_path(opt::OnlinePortfolioSelection)
+
+Names the first [`Online`](@ref) wrapper in the head that the warm-up leaves unresolved, or answers `nothing`.
+
+The method runs the warm-up of [`update_online_estimator`](@ref) on the head, and names the wrapper that is left, such as one in an inner optimiser of a meta-optimiser that is the fallback.
+
+# Related
+
+  - [`online_unreached_path`](@ref)
+  - [`assert_online_entry`](@ref)
+"""
+function online_unreached_path(opt::OnlinePortfolioSelection)
+    return online_wrapper_path(update_online_estimator(opt))
 end
 """
     Online(::OnlinePortfolioSelection, args...; kwargs...)
