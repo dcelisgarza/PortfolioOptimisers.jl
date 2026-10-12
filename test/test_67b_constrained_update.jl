@@ -1646,4 +1646,40 @@ end
              ProgrammeAllocationSet(; slv = slv, tn = Turnover(; w = zeros(3), val = 0.1)))
         @test occursin("ProgrammeAllocationSet", String(take!(io)))
     end
+
+    @testset "The set's prior reads the implied volatilities of the rows (#1644)" begin
+        # The set fits its prior on the rows that the head holds, and those rows carry `iv`
+        # and `ivpa`. So a variance ceiling on an `ImpliedVolatility` prior binds on the
+        # surface, and the online fold equals the batch fit.
+        rng = StableRNG(1644)
+        T, N = 30, 3
+        R = 0.01 .* randn(rng, T, N)
+        iv = 0.15 .+ 0.1 .* rand(rng, T, N)
+        rd = ReturnsResult(; nx = ["A", "B", "C"], X = R, iv = iv, ivpa = 1.0)
+        rows(r, i) = po.port_opt_view(r, i, :)
+        pe_iv = EmpiricalPrior(;
+                               ce = PortfolioOptimisersCovariance(;
+                                                                  ce = ImpliedVolatility(;
+                                                                                         alg = ImpliedVolatilityPremium(),
+                                                                                         ppy = 1),
+                                                                  mp = MatrixProcessing(;
+                                                                                        pdm = nothing)))
+        # The ceiling lies above the least variance of every window under the surface,
+        # 0.0135, so each step is feasible. The free path goes above it at eight steps, up
+        # to 0.0168, so it binds there. Under the sample covariance it never binds.
+        mk(pe) = OPS(; alg = ExponentiatedGradient(),
+                     set = ProgrammeAllocationSet(; slv = slv, pe = pe,
+                                                  r = Variance(;
+                                                               settings = RiskMeasureSettings(;
+                                                                                              ub = 0.014))))
+        opt = mk(pe_iv)
+        w = (@test_logs (:warn, r"Held Step at 1") optimise(opt, rd)).w
+        ws = (@test_logs (:warn, r"Held Step at 1") optimise(mk(EmpiricalPrior()), rd)).w
+        @test !isapprox(w, ws; atol = 1e-2)
+        o = opt
+        @test_logs (:warn, r"Held Step at 1") for t in 1:T
+            o = po.partial_fit!(o, rows(rd, t:t))
+        end
+        @test optimise(o).w == w
+    end
 end

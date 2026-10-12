@@ -387,8 +387,8 @@ end
         # The identity holds under the time-varying panel too.
         og = po.partial_fit!(po.partial_fit!(opt, rows(rdg, 1:12)), rows(rdg, 13:28))
         @test optimise(og).w == optimise(opt, rows(rdg, 1:28)).w
-        # The fold loop's Held Gap idiom is reused: `iv`, a panel with fields and
-        # `emsk != amsk` are refused by name.
+        # The fold loop's Held Gap idiom is reused: a panel with fields and
+        # `emsk != amsk` are refused by name. The head takes `iv` (ADR 0204).
         emsk = copy(amsk)
         emsk[2, 1] = false
         @test_throws ArgumentError optimise(opt,
@@ -836,6 +836,52 @@ end
             end
             @test isa(err, ArgumentError) && occursin(outside, err.msg)
         end
+    end
+
+    @testset "An inner prior reads the implied volatilities of the rows (#1644)" begin
+        # A forecaster and a Risk Loss fit their prior on the rows that the head holds, and
+        # those rows carry `iv` and `ivpa`. So an `ImpliedVolatility` inside the prior reads
+        # the surface over the same rows, and the online fold equals the batch fit.
+        iv = 0.15 .+ 0.1 .* rand(StableRNG(1644), T, N)
+        rdv = ReturnsResult(; nx = nx, X = R, iv = iv, ivpa = 1.0)
+        pe_iv = EmpiricalPrior(;
+                               ce = PortfolioOptimisersCovariance(;
+                                                                  ce = ImpliedVolatility(;
+                                                                                         alg = ImpliedVolatilityPremium(),
+                                                                                         ppy = 1),
+                                                                  mp = MatrixProcessing(;
+                                                                                        pdm = nothing)))
+        fr = PriorExpectedReturns(; pe = pe_iv)
+        wme = WindowedExpectedReturns(; me = fr, window = 6)
+        # The refit arm gives the surface to the prior of the adapter, and a windowed
+        # adapter cuts it to its window first.
+        win = rows(rdv, 1:12)
+        x12 = 1 .+ R[12, :]
+        @test po.forecast_relative(fr, nothing, x12, win)[2] ≈ 1 .+ prior(pe_iv, win).mu
+        @test po.forecast_relative(wme, nothing, x12, win)[2] ≈
+              1 .+ prior(pe_iv, rows(rdv, 7:12)).mu
+        # A forecaster that reads no surface ignores it.
+        @test po.forecast_relative(PriorExpectedReturns(), nothing, x12, win)[2] ==
+              po.forecast_relative(PriorExpectedReturns(), nothing, x12, rows(rd, 1:12))[2]
+        for alg in (ForecastReversion(; me = fr), ForecastReversion(; me = wme),
+                    ForecastTracking(; me = fr),
+                    MirrorDescent(; obj = RiskLoss(; window = 8, pe = pe_iv)))
+            opt = OPS(; alg = alg)
+            wb = optimise(opt, rdv).w
+            o = opt
+            for t in 1:T
+                o = po.partial_fit!(o, rows(rdv, t:t))
+            end
+            @test optimise(o).w == wb
+            ob = po.partial_fit!(po.partial_fit!(opt, rows(rdv, 1:11)), rows(rdv, 12:T))
+            @test optimise(ob).w == wb
+        end
+        # The Risk Loss reads the surface: its path differs from the one under the
+        # sample covariance.
+        md(pe) = optimise(OPS(;
+                              alg = MirrorDescent(; obj = RiskLoss(; window = 8, pe = pe))),
+                          rdv).w
+        @test !isapprox(md(pe_iv), md(EmpiricalPrior()); atol = 1e-6)
     end
 
     @testset "Show, docs and the search seam" begin

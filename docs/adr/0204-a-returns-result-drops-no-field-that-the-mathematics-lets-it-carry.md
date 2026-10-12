@@ -46,9 +46,16 @@ unless they truly cannot be carried for mathematical reasons.
 5. **The rows buffer of an online portfolio selection head is a `ReturnsBufferState` that owns the
    returns**, as the Fold Context of a head with no prior is. The window that every rule, leader
    and programme set reads carries every field of the folded rows: `nf`, `F`, `nb`, `B`, `ne`, `E`,
-   `ts`, `iv`, `ivpa` and the static panel. So the head no longer refuses `iv`. The covariance
-   step of `covariance_forecast_evaluation` still refuses it, because its exact fold holds numbers
-   alone and has no place for it.
+   `ts`, `iv`, `ivpa` and the static panel. So the head no longer refuses `iv`. Every prior that
+   the head fits on those rows reads the surface: the prior of a programme set, the prior of a
+   Risk Loss, and the prior of a forecaster. The refit arm of a forecast rule gives `iv` and
+   `ivpa` to every forecaster, as `prior` over a `ReturnsResult` gives them to every member
+   ([#1644](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1644)). A
+   `PriorExpectedReturns` gives them to its prior, a `WindowedExpectedReturns` cuts them to its
+   window, and every other forecaster ignores them. The covariance step of
+   `covariance_forecast_evaluation` gives them to a buffer, and an exact fold, which holds numbers
+   alone, ignores them as its batch fit does
+   ([#1643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1643)).
 
 ## Consequences
 

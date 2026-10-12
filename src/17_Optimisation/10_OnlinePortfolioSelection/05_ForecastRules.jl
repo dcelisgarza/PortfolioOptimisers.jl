@@ -158,9 +158,9 @@ A forecast of one in every asset is flat, and the step of every rule holds on a 
 
 With no state, the refit arm:
 
- 1. Take the returns `X` and the Asset Panel `pnl` with [`refit_rows`](@ref).
+ 1. Take the returns `X`, the Asset Panel `pnl` and the implied-volatility keywords `vols` with [`refit_rows`](@ref).
  2. When `X` has fewer rows than [`forecast_min_rows`](@ref), return `nothing` and a flat forecast. Stop.
- 3. Estimate the expected returns with `mean(me, X, pnl; dims = 1)`.
+ 3. Estimate the expected returns with `mean(me, X, pnl; dims = 1, vols...)`.
  4. Return `nothing` and one plus the expected returns, through [`flat_where_undefined`](@ref).
 
 With a [`ForecasterState`](@ref), the fold arm:
@@ -189,13 +189,13 @@ With a [`ForecasterState`](@ref), the fold arm:
 """
 function forecast_relative(me::AbstractExpectedReturnsEstimator, ::Nothing,
                            x::AbstractVector, rows::Option{<:ReturnsResult})
-    X, pnl = refit_rows(rows, x)
+    X, pnl, vols = refit_rows(rows, x)
     if size(X, 1) < forecast_min_rows(me)
         return nothing, fill(one(eltype(x)), length(x))
     end
     return nothing,
            flat_where_undefined(one(eltype(x)) .+
-                                vec(Statistics.mean(me, X, pnl; dims = 1)))
+                                vec(Statistics.mean(me, X, pnl; dims = 1, vols...)))
 end
 function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
                            x::AbstractVector, ::Nothing)
@@ -306,19 +306,22 @@ end
     refit_rows(rows::ReturnsResult, x::AbstractVector)
     refit_rows(rows::Nothing, x::AbstractVector)
 
-Returns the returns that the refit arm fits a forecaster on, and the Asset Panel that explains them.
+Returns the returns that the refit arm fits a forecaster on, the Asset Panel that explains them, and the implied volatilities of the rows as keywords of `mean`.
 
-When `rows` is a [`ReturnsResult`](@ref), these are its `X` and its `pnl`. Without one, they are the current row as a matrix of one row, and no panel.
+When `rows` is a [`ReturnsResult`](@ref), these are its `X`, its `pnl`, and its `iv` and `ivpa`. Without one, they are the current row as a matrix of one row, no panel and no keywords.
+
+The keywords go to every forecaster, as [`prior`](@ref) over a [`ReturnsResult`](@ref) gives them to every member. A [`PriorExpectedReturns`](@ref) gives them to its prior, so a member of the prior that reads them, such as an [`ImpliedVolatility`](@ref) covariance, reads the surface over the same rows. A [`WindowedExpectedReturns`](@ref) cuts `iv` to its window first. Every other forecaster ignores them.
 
 # Related
 
   - [`forecast_relative`](@ref)
+  - [`scale_relative`](@ref)
 """
 function refit_rows(rows::ReturnsResult, ::AbstractVector)
-    return rows.X, rows.pnl
+    return rows.X, rows.pnl, (; iv = rows.iv, ivpa = rows.ivpa)
 end
 function refit_rows(::Nothing, x::AbstractVector)
-    return reshape(x .- one(eltype(x)), 1, :), nothing
+    return reshape(x .- one(eltype(x)), 1, :), nothing, (;)
 end
 """
     scale_relative(scale::Nothing, x::AbstractVector, rows)
@@ -339,9 +342,9 @@ end
 function scale_relative(scale::AbstractPriceLevelStatistic, x::AbstractVector,
                         rows::Option{<:ReturnsResult})
     me = PriceLevelExpectedReturns(; alg = scale)
-    X, pnl = refit_rows(rows, x)
+    X, pnl, vols = refit_rows(rows, x)
     return flat_where_undefined(one(eltype(x)) .+
-                                vec(Statistics.mean(me, X, pnl; dims = 1)))
+                                vec(Statistics.mean(me, X, pnl; dims = 1, vols...)))
 end
 """
     scale_rows(scale::Nothing)
