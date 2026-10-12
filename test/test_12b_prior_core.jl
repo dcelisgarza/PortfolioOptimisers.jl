@@ -2497,6 +2497,49 @@ The correction is a subtraction, and it must undo what the factor lift added. Sw
 end
 
 #=
+The block that comes off is the block the prior added, under the weights of its fit. A caller's
+`w` on an entropy pooling prior and the pooled weights of an opinion pool reach the `ve` of the
+fit and not the `ve` of the declaration, so a variance of the residuals under the declared `ve`
+missed the block by 7.5 % and 1.3 % on this data. Found after #1649.
+=#
+@testset "The residual block that comes off is the block the prior added" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    mv = LinearConstraintEstimator(; val = "A1 == 0.004")
+    v = collect(range(0.5, 1.5; length = 60))
+    wu = pweights(v ./ sum(v))
+    # The host gives `wu` to `pe` in both, so the two fits are one model, and only the `ve`
+    # that each declares differs. The old variance under the declared `ve` was exact for the
+    # second and 7.5 % off for the first.
+    e1 = EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = FactorPrior(), w = wu)
+    e2 = EntropyPoolingPrior(; sets = sets, mu_views = mv,
+                             pe = PO.factory(FactorPrior(), wu), w = wu)
+    h1 = prior(HighOrderFactorPriorEstimator(; pe = e1), X, F)
+    h2 = prior(HighOrderFactorPriorEstimator(; pe = e2), X, F)
+    @test isapprox(h1.pr.sigma, h2.pr.sigma)
+    @test h1.kt == h2.kt
+    # An opinion pool fits `pe2` under the pooled weights. The correction is the one built on
+    # the covariance less the block that its loadings result records.
+    ops = [EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(; val = "A3 == 0.001")),
+           EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(; val = "A4 == -0.001"))]
+    op = OpinionPoolingPrior(; pes = ops, pe2 = FactorPrior())
+    h = HighOrderFactorPriorEstimator(; pe = op)
+    p_on = prior(h, X, F)
+    p_off = prior(HighOrderFactorPriorEstimator(; pe = op, rsd = false), X, F)
+    sigma = p_on.pr.sigma - Diagonal(p_on.pr.rr.esigma)
+    posdef!(PO.factor_residual_config(op).pdm, sigma)
+    kt_ref = PO.cokurtosis_residuals(sigma, X - p_on.pr.X, h.kte.me, h.ex)
+    @test isapprox(p_on.kt, p_off.kt + kt_ref)
+end
+
+#=
 `ShrunkFactorPrior` is the falsification witness for the guard in step 9 of
 `prior(::HighOrderFactorPriorEstimator, …)`: a wrapper that declares a residual block and then
 reports a covariance the block was never added to. Sweep ticket #534.

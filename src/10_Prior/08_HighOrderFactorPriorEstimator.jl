@@ -444,7 +444,7 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-defaul
  6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`.
  7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
  8. Still under `pe.rsd`, and when step 3 produced a `posterior_kt`, read the wrapped estimator's residual declaration with [`factor_residual_config`](@ref) and check its shape with [`assert_factor_residual_config`](@ref).
- 9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise size the block as `err_sigma`, the column variances of `err` under `rsd_cfg.ve`, subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
+ 9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise read the block as `err_sigma`, the residual variances that the wrapped estimator added, with [`idiosyncratic_variances`](@ref) of `rpr.rr`. They were measured under the weights of that fit, which a variance of `err` under `rsd_cfg.ve` does not read. Subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
 10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under `pe.kte.mp.pdm`.
 11. When step 4 produced a `posterior_sk`, recompute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), so `V` describes the corrected coskewness rather than the projected one.
 12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` back to the full asset universe with [`expand_moment`](@ref), `NaN` outside the investable block. `V` is expanded rather than recomputed, because it is a spectral quantity of the reduced coskewness and the frame carries no reduced returns to rebuild it from. The all-investable sentinel needs no branch of its own: [`expand_moment`](@ref) on a `nothing` mask hands the block straight back, at every one of its arities.
@@ -565,10 +565,10 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         end
         if !isnothing(f_kt)
             # `cokurtosis_residuals` is defined on the *systematic* covariance, so a residual
-            # block the wrapped estimator added has to come back off. Which estimator added one,
-            # and with what variance estimator, is a declaration rather than a field read: the
-            # `pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior`
-            # and `FactorBlackLittermanPrior` carry `ve` and `mp.pdm` — a wrapper over either
+            # block the wrapped estimator added has to come back off. Whether an estimator added
+            # one, and under which `pdm`, is a declaration rather than a field read: the `pe`
+            # slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior` and
+            # `FactorBlackLittermanPrior` carry `rsd` and `mp.pdm` — a wrapper over either
             # forwards the declaration, everything else declares `nothing` (see
             # [`factor_residual_config`](@ref)). The shape is checked before the property
             # access, so a wrong declaration names itself here instead of surfacing as a
@@ -578,7 +578,11 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
             sigma = if isnothing(rsd_cfg) || !rsd_cfg.rsd
                 rpr.sigma
             else
-                err_sigma = vec(Statistics.var(rsd_cfg.ve, err; dims = 1))
+                # The block comes off as the prior added it, from the loadings result. A
+                # variance of `err` under `rsd_cfg.ve` read the weights of the configuration,
+                # not the weights of the fit: a caller's `w` on an entropy pooling prior, or
+                # the pooled weights of an opinion pool, moved it 7.5 % and 1.3 %.
+                err_sigma = idiosyncratic_variances(rpr.rr)
                 sigma = if any(map((x, y) -> x > y, err_sigma,
                                    LinearAlgebra.diag(rpr.sigma)))
                     @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
