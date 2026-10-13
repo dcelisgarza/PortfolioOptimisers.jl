@@ -47,11 +47,26 @@ changes:
 A binding replaces a benchmark bound earlier, so a benchmark never reads the rows of another reader.
 A reader with no returns data leaves the benchmark unbound, and `tracking_benchmark` refuses it.
 
+**A batch cross-validation with more than one fold refuses a `ReturnsTracking` series** (#1669, the
+maintainer chose it on 2026-10-13 after `DataTracking` was on `dev`). The fold loop calls
+`assert_folds_track_no_series` once, before the folds run, and the error names the field and points
+at `DataTracking`. The walk is `returns_tracking_path`, so:
+
+- the series of an online portfolio selection head is refused too, because its cut to the first rows
+  aligns only with a fold that starts at the first row;
+- an entry of a `TimeDependent` schedule is not refused, because it is the value of one fold only, but
+  the `default` of a schedule is refused, because more than one solve can read it;
+- one fold is one batch fit, so the loop lets a series through when it runs one fold.
+
 ## Consequences
 
 - The online step, a rolling online window and every fold of a walk-forward read the benchmark of
   their own rows, so online equals batch with no more work. A rolling batch walk-forward, the case of
-  #1669, tracks the rows of each fold.
+  #1669, tracks the rows of each fold, and the same walk-forward refuses a `ReturnsTracking` series.
+- The online step and the batch fold loop both read a schedule through its `default` only, so a
+  schedule of one series for each fold passes the online step too.
+- The walk enters an algorithm as well as an estimator and a Result, so it finds the series in the
+  set of a selection head. The online step of a meta-optimiser that holds such a head refuses it too.
 - A result keeps its risk measures bound to the rows of the fit, as it keeps them resolved against
   the prior of the fit. A value-level call on a `ReturnsResult` binds them again.
 - A data benchmark pays no fee. A `WeightsTracking` benchmark keeps its own `fees`.

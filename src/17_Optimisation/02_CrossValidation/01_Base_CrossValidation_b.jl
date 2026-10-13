@@ -615,7 +615,7 @@ It is positional for the reason that [`parallel_folds`](@ref) gives.
 # Algorithm
 
  1. When `est` [`is_time_dependent`](@ref), check the number of folds against its schedules with [`assert_time_dependent_fold_count`](@ref).
- 2. When `cv` is not an Online Scheme ([`folds_are_stepped`](@ref)), refuse an [`Online`](@ref) anywhere in `est` with [`assert_batch_entry`](@ref). The batch arms refit every fold from its training window and run no warm-up, so the loop refuses it once here and not once per fold on the workers of `ex`.
+ 2. When `cv` is not an Online Scheme ([`folds_are_stepped`](@ref)), refuse an [`Online`](@ref) anywhere in `est` with [`assert_batch_entry`](@ref). When `n > 1`, refuse a [`ReturnsTracking`](@ref) series too, with [`assert_folds_track_no_series`](@ref). The batch arms refit every fold from its training window and run no warm-up, so the loop refuses both once here and not once per fold on the workers of `ex`.
  3. Choose the arm: [`online_folds`](@ref) for an Online Scheme; [`run_folds`](@ref) when [`folds_are_time_ordered`](@ref) holds of `cv` and `est` [`needs_previous_weights`](@ref); and [`parallel_folds`](@ref) otherwise.
  4. For fold `i`, take the view of `(est, rd)` that `fold_view(i)` gives, or `(est, rd)` when `fold_view` is `nothing`. An asset-resampling scheme gives a view.
  5. Read the previous weights with [`previous_weights`](@ref), giving `w_prev`, and swap every [`TimeDependent`](@ref) schedule for its value at fold `i` against a [`TimeDependentContext`](@ref). The swap runs first, so a per-fold entry that it swaps in also receives the weights of step 6.
@@ -636,6 +636,7 @@ It is positional for the reason that [`parallel_folds`](@ref) gives.
   - [`run_folds`](@ref)
   - [`parallel_folds`](@ref)
   - [`assert_unshuffled_folds`](@ref)
+  - [`assert_folds_track_no_series`](@ref)
   - [`folds_are_stepped`](@ref)
   - [`folds_are_time_ordered`](@ref)
   - [`fit_and_predict`](@ref)
@@ -651,6 +652,7 @@ function fold_loop(fit_fold, est, n::Integer, ex::FLoops.Transducers.Executor,
     end
     if !folds_are_stepped(cv)
         assert_batch_entry(est, "the fold loop under a scheme that is not an Online Scheme")
+        assert_folds_track_no_series(est, n)
     end
     prev_w_flag = needs_previous_weights(est)
     # The per-fold copy. `esti` is the fold's estimator before resolution: the configuration

@@ -1292,6 +1292,12 @@ function time_dependent_entries(td::TimeDependent)
     end
     return entries
 end
+function returns_tracking_path(td::TimeDependent)
+    # Entry `i` of a schedule is the value of fold `i` alone, so its series can align with
+    # the rows of that fold. The default is one value that every solve with no fold reads.
+    path = returns_tracking_path(td.default)
+    return isnothing(path) ? nothing : tree_path(:default, path)
+end
 function assert_internal_optimiser(td::Union{<:TD_OptE_Opt, <:TD_VecOptE_Opt})::Nothing
     for opt in time_dependent_entries(td)
         assert_internal_optimiser(opt)

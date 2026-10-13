@@ -2726,6 +2726,26 @@ end
                                                                err = 0.1)))
         @test isnothing(PO.returns_tracking_path([1.0, 2.0]))
         @test isnothing(PO.returns_tracking_path(nothing))
+        # A schedule answers through its default only, because entry i is fold i's alone.
+        @test isnothing(PO.returns_tracking_path(TimeDependent([TrackingRiskMeasure(;
+                                                                                    tr = rt),
+                                                                Variance()])))
+        @test PO.returns_tracking_path(TimeDependent([Variance()];
+                                                     default = TrackingRiskMeasure(;
+                                                                                   tr = rt))) ==
+              "default.tr"
+        # A batch fold loop refuses a series over more than one fold, and names the field.
+        @test isnothing(PO.assert_folds_track_no_series(TrackingRiskMeasure(; tr = rt), 1))
+        err = try
+            PO.assert_folds_track_no_series(TrackingRiskMeasure(; tr = rt), 2)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("at `tr`", err.msg) && occursin("DataTracking", err.msg)
+        @test isnothing(PO.assert_folds_track_no_series(TrackingRiskMeasure(;
+                                                                            tr = DataTracking()),
+                                                        2))
     end
 
     @testset "factory obeys fixed the way Turnover's does" begin

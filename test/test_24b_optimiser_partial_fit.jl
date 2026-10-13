@@ -577,6 +577,24 @@ end
                for tr in split(rcv, rdb).train_idx]
         @test length(own) == length(pr.pred) > 1
         @test all(isapprox(x.res.w, y; atol = 1e-8) for (x, y) in zip(pr.pred, own))
+        # A returns series as long as every training window passes the length check at
+        # each fold, so the loop refuses it before the folds run. A schedule of one series
+        # per fold aligns each fold, and one fold is one batch fit.
+        refusal = try
+            cross_val_predict(mrr(ReturnsTracking(; w = bw[1:40])), rdb, rcv)
+        catch e
+            e
+        end
+        @test isa(refusal, ArgumentError)
+        @test occursin("at `r.tr`", refusal.msg) && occursin("DataTracking", refusal.msg)
+        tds = TimeDependent([TrackingRiskMeasure(; tr = ReturnsTracking(; w = bw[tr]))
+                             for tr in split(rcv, rdb).train_idx])
+        pt = cross_val_predict(MeanRisk(; r = tds,
+                                        opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                            slv = slv)), rdb, rcv)
+        @test all(isapprox(x.res.w, y; atol = 1e-8) for (x, y) in zip(pt.pred, own))
+        @test length(cross_val_predict(mrr(ReturnsTracking(; w = bw[1:100])), rdb,
+                                       IndexWalkForward(100, 20)).pred) == 1
     end
 
     @testset "The state merges, copies and slices" begin

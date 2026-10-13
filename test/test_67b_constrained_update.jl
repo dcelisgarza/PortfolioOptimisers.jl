@@ -1760,5 +1760,17 @@ end
             end
             @test optimise(o).w == res.w
         end
+        # A batch walk-forward refuses a returns series in the set: each fold restarts the
+        # head at its first training row, so the cut to the first rows misaligns (#1669).
+        # The walk enters the set, which is an algorithm, and names the field.
+        rtw = ReturnsTracking(; w = R * wb)
+        @test po.returns_tracking_path(OPS(; alg = PassiveAggressiveMeanReversion(),
+                                           set = sets[1](rtw))) == "set.tr.tr"
+        for set in sets
+            @test_throws ArgumentError cross_val_predict(OPS(;
+                                                             alg = PassiveAggressiveMeanReversion(),
+                                                             set = set(rtw)), rd,
+                                                         IndexWalkForward(10, 5))
+        end
     end
 end

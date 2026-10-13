@@ -437,7 +437,7 @@ Carries the benchmark return series itself, for a benchmark whose weights are un
 
 [`tracking_benchmark`](@ref) returns the `w` field unchanged, so no return matrix is read and no fee is applied. This is the case the book states first: an index whose published series is all the caller has. Use [`WeightsTracking`](@ref) when the benchmark allocation is known.
 
-The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on, and [`tracking_benchmark`](@ref) refuses a mismatch. The series is fixed, so it cannot follow rows that change: the online step of an optimiser refuses it, and so do the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref). Use [`DataTracking`](@ref) to track the benchmark that the returns data carries, which follows the rows.
+The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on, and [`tracking_benchmark`](@ref) refuses a mismatch. The series is fixed, so it cannot follow rows that change: the online step of an optimiser refuses it, and so do the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref). A batch cross-validation with more than one fold refuses it too, through [`assert_folds_track_no_series`](@ref), because each fold refits on rows of its own. Use [`DataTracking`](@ref) to track the benchmark that the returns data carries, which follows the rows.
 
 # Fields
 
@@ -696,24 +696,29 @@ end
     returns_tracking_path(::ReturnsTracking)
     returns_tracking_path(v::AbstractVector)
     returns_tracking_path(p::Pair)
+    returns_tracking_path(td::TimeDependent)
     returns_tracking_path(::Any)
 
 Names the first field of an estimator tree that holds a [`ReturnsTracking`](@ref), or answers `nothing`.
 
-A returns series is fixed at construction, and it aligns only with the rows of one batch fit. The online step of an optimiser and the two row readers of an online portfolio selection head, the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref), use this walk to refuse it. The walk reads every field of an estimator and of a Result, because a [`TrackingError`](@ref) is a Result and a [`TrackingRiskMeasure`](@ref) is an estimator. A vector answers with the index of its element in brackets, and a Pair answers through its value, as [`element_path`](@ref) joins them. A series at the root answers `""`, the empty path. A numeric array and every other value answer `nothing`.
+A returns series is fixed at construction, and it aligns only with the rows of one batch fit. The online step of an optimiser, a batch cross-validation with more than one fold ([`assert_folds_track_no_series`](@ref)), and the two row readers of an online portfolio selection head, the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref), use this walk to refuse it. The walk reads every field of an estimator, of a Result and of an algorithm, because a [`TrackingError`](@ref) is a Result, a [`TrackingRiskMeasure`](@ref) is an estimator, and a [`ProgrammeAllocationSet`](@ref) is an algorithm that holds tracking errors. A vector answers with the index of its element in brackets, and a Pair answers through its value, as [`element_path`](@ref) joins them. A series at the root answers `""`, the empty path. A numeric array and every other value answer `nothing`.
+
+A [`TimeDependent`](@ref) schedule answers through its `default` only. Entry `i` of the schedule is the value of fold `i` alone, so the caller can give each fold a series of its own rows. The `default` is one value that every solve with no fold reads, so it can misalign as a field can.
 
 # Algorithm
 
  1. Answer `""` when `est` is a [`ReturnsTracking`](@ref).
- 2. Walk every field of `est` in order, and find the path in each field with this function.
- 3. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
- 4. Answer `nothing` when no field gives a path.
+ 2. When `est` is a [`TimeDependent`](@ref), answer the path in its `default`, after the name `default`.
+ 3. Walk every field of `est` in order, and find the path in each field with this function.
+ 4. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
+ 5. Answer `nothing` when no field gives a path.
 
 # Arguments
 
-  - `est`: The estimator, the Result, or any value a field holds.
+  - `est`: The estimator, the Result, the algorithm, or any value a field holds.
   - `v`: A vector that a field holds.
   - `p`: A Pair that a vector holds.
+  - `td`: A schedule that a field holds.
 
 # Returns
 
@@ -723,10 +728,13 @@ A returns series is fixed at construction, and it aligns only with the rows of o
 
   - [`ReturnsTracking`](@ref)
   - [`partial_fit!`](@ref)
+  - [`assert_folds_track_no_series`](@ref)
+  - [`TimeDependent`](@ref)
   - [`element_path`](@ref)
   - [`tree_path`](@ref)
 """
-function returns_tracking_path(est::Union{<:AbstractEstimator, <:AbstractResult})
+function returns_tracking_path(est::Union{<:AbstractEstimator, <:AbstractResult,
+                                          <:AbstractAlgorithm})
     paths = map(f -> returns_tracking_path(getfield(est, f)), fieldnames(typeof(est)))
     i = findfirst(!isnothing, paths)
     return if isnothing(i)
@@ -745,6 +753,48 @@ function returns_tracking_path(p::Pair)
     return returns_tracking_path(last(p))
 end
 function returns_tracking_path(::Any)
+    return nothing
+end
+"""
+    assert_folds_track_no_series(est, n::Integer)
+
+Refuses a [`ReturnsTracking`](@ref) in the tree of `est` when a batch cross-validation runs more than one fold.
+
+Each fold of a batch cross-validation refits on its own training rows. A returns series is fixed at construction, so it covers the rows of one fold at most. The length check of [`tracking_benchmark`](@ref) cannot see the misalignment when the folds share one training length, as the folds of a rolling walk-forward or of a `KFold` do: the series then passes the check at every fold. So [`fold_loop`](@ref) calls this function once, before the folds run, and refuses the series by the name of its field. The walk is [`returns_tracking_path`](@ref), so the series of an online portfolio selection head is refused too. Its cut to the first rows aligns only with a fold that starts at the first row.
+
+One fold is one batch fit, so a series of its training rows aligns, and the function lets it through. An entry of a [`TimeDependent`](@ref) schedule is the value of one fold only, so the walk does not read it.
+
+# Algorithm
+
+ 1. When `n > 1`, find the first returns series in the tree of `est` with [`returns_tracking_path`](@ref).
+ 2. Refuse `est` when there is one.
+
+# Arguments
+
+  - `est`: The estimator that the fold loop takes.
+  - `n`: The number of folds.
+
+# Validation
+
+  - When `n > 1`, no field in the tree of `est` holds a [`ReturnsTracking`](@ref). An `ArgumentError` that names the field is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ReturnsTracking`](@ref)
+  - [`DataTracking`](@ref): The form that follows the rows, because each fold binds it to the benchmark of its training rows.
+  - [`returns_tracking_path`](@ref)
+  - [`fold_loop`](@ref)
+"""
+function assert_folds_track_no_series(est, n::Integer)
+    if n > 1
+        path = returns_tracking_path(est)
+        @argcheck(isnothing(path),
+                  ArgumentError("`$(typeof(est).name.name)` runs $n folds of a batch cross-validation holding a `ReturnsTracking` at `$(path)`, and a fixed series covers the rows of one fold at most: each fold refits on its own training rows, and when the folds share one training length, the series passes the length check at every fold and misaligns with no error. Track the benchmark that the returns data carries with `DataTracking`, which binds to the `B` of the training rows of each fold, track a benchmark portfolio with `WeightsTracking`, or give each fold its own series in a `TimeDependent` schedule."))
+    end
     return nothing
 end
 """
