@@ -2,7 +2,8 @@
 `log_wealth_regret` (ADR 0161): the verb over two prediction results with the same rows,
 its Result, the hand example, the self-regret, the refusals, and the two Hindsight
 Comparator recipes — `BestConstantRebalancedPortfolio` fit on the rows it is scored on,
-and the best stock as a top-1 `ScoreSelector` composed with `EqualWeighted`.
+and the best stock as a top-1 `ScoreSelector` composed with `EqualWeighted`. The one-argument
+form compares a prediction result against the benchmark of its own rows (#1664).
 =#
 @testset "Log-wealth regret" begin
     using PortfolioOptimisers, Test, LinearAlgebra, StableRNGs, Statistics, Dates,
@@ -182,6 +183,80 @@ and the best stock as a top-1 `ScoreSelector` composed with `EqualWeighted`.
                                  po.port_opt_view(rd, 20:(T - 1), :)),
                         po.port_opt_view(rd, 20:(T - 1), :))
         @test_throws ArgumentError log_wealth_regret(ew, other)
+    end
+
+    @testset "The benchmark of the rows is the comparator (#1664)" begin
+        # A bare prediction result that carries a benchmark series beside its returns.
+        function bench_prediction(r, B, ts)
+            res = po.NaiveOptimisationResult(; pr = nothing, wb = nothing,
+                                             retcode = OptimisationSuccess(), w = [1.0],
+                                             fb = nothing)
+            return PredictionResult(; res = res,
+                                    rd = po.PredictionReturnsResult(; nx = ["P"], X = r,
+                                                                    B = B, ts = ts))
+        end
+        # Every field of the two results agrees, the `NaN` path length included.
+        function same_regret(x, y)
+            return all(f -> isequal(getproperty(x, f), getproperty(y, f)) ||
+                            isapprox(getproperty(x, f), getproperty(y, f)),
+                       fieldnames(LogWealthRegretResult))
+        end
+        # The comparator built by hand: a one-asset returns data whose one column is the
+        # benchmark series, fit and predicted over the same rows.
+        function hand_comparator(series, tss)
+            r = ReturnsResult(; nx = ["M"], X = reshape(series, :, 1), ts = tss)
+            return predict(optimise(EqualWeighted(), r), r)
+        end
+        a = [0.02, -0.01, 0.03]
+        b = [0.025, 0.0, 0.03]
+        tsh = Date(2024, 1, 1) .+ Day.(0:2)
+        reg = log_wealth_regret(bench_prediction(a, b, tsh))
+        @test same_regret(reg,
+                          log_wealth_regret(bare_prediction(a, tsh),
+                                            bare_prediction(b, tsh)))
+        @test isnan(reg.path_length)
+        @test same_regret(log_wealth_regret(bench_prediction(a, b, tsh); lags = 1),
+                          log_wealth_regret(bare_prediction(a, tsh),
+                                            bare_prediction(b, tsh); lags = 1))
+        # A population reads its first path and its first benchmark series.
+        @test same_regret(log_wealth_regret(bench_prediction([a, b], [b, a], tsh)), reg)
+        # A multi-period result stacks the benchmark series of its folds.
+        mp = MultiPeriodPredictionResult(;
+                                         pred = [bench_prediction(a[1:2], b[1:2], tsh[1:2]),
+                                                 bench_prediction(a[3:3], b[3:3], tsh[3:3])])
+        @test same_regret(log_wealth_regret(mp), reg)
+        # No benchmark, no comparator; the checks on the lags and the returns still hold.
+        @test_throws ArgumentError log_wealth_regret(bare_prediction(a, tsh))
+        @test_throws DomainError log_wealth_regret(bench_prediction(a, b, tsh); lags = 3)
+        @test_throws DomainError log_wealth_regret(bench_prediction(a, [0.0, -1.5, 0.0],
+                                                                    tsh))
+
+        # A walk-forward keeps the benchmark of its test rows: a vector `B` as it is, a
+        # matrix `B` collapsed by each fold's weights, in batch and online alike.
+        Bv = 0.002 .+ 0.01 .* randn(StableRNG(1664), T)
+        Bm = 0.01 .* randn(StableRNG(1665), T, N)
+        rdv = ReturnsResult(; nx = nx, X = X, ts = ts, nb = ["M"], B = Bv)
+        rdm = ReturnsResult(; nx = nx, X = X, ts = ts, nb = nx, B = Bm)
+        tst = ts[21:T]
+        cv = IndexWalkForward(20, 1)
+        ewv = cross_val_predict(EqualWeighted(), rdv, cv)
+        @test same_regret(log_wealth_regret(ewv),
+                          log_wealth_regret(ewv, hand_comparator(Bv[21:T], tst)))
+        ewm = cross_val_predict(EqualWeighted(), rdm, cv)
+        @test same_regret(log_wealth_regret(ewm),
+                          log_wealth_regret(ewm,
+                                            hand_comparator(Bm[21:T, :] * fill(1 / N, N),
+                                                            tst)))
+        ocv = OnlineIndexWalkForward(20, 1)
+        ops = po.OnlinePortfolioSelection(; alg = ExponentiatedGradient())
+        ov = cross_val_predict(ops, rdv, ocv)
+        @test same_regret(log_wealth_regret(ov),
+                          log_wealth_regret(ov, hand_comparator(Bv[21:T], tst)))
+        om = cross_val_predict(ops, rdm, ocv)
+        # The head moves its weights at every fold, so the series is collapsed fold by fold.
+        bom = [dot(Bm[20 + i, :], p.res.w) for (i, p) in enumerate(om.pred)]
+        @test same_regret(log_wealth_regret(om),
+                          log_wealth_regret(om, hand_comparator(bom, tst)))
     end
 end
 
