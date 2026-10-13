@@ -707,6 +707,42 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         o = po.partial_fit!(o, rows(rd, 14:40))
         @test maxerr(full, o.cache.w) < 1e-14
         @test maxerr(full, optimise(o).w) < 1e-14
+
+        # Issue #1661: the loss reads the last `window` rows of what the head holds, and
+        # not every row. The gradient over 20 rows is the one over the last 5, and not
+        # the one of a prior fitted on all 20.
+        u = fill(1 / N, N)
+        rl5 = RiskLoss(; window = 5)
+        g20 = po.loss_gradient(rl5, u, X[21, :], rows(rd, 1:20))
+        @test g20 == po.loss_gradient(rl5, u, X[21, :], rows(rd, 16:20))
+        @test isapprox(g20, 2 .* cov(R[16:20, :]) * u; atol = 1e-15)
+        @test maxerr(g20, 2 .* cov(R[1:20, :]) * u) > 1e-5
+        # A tracking error on the set needs every row, so the head holds them all. The
+        # set does not bind, and the path is still the hand recursion on 5 rows. The set
+        # fits no covariance on one row, so the first step is a Held Step at the drifted
+        # allocation, and the recursion starts there.
+        slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false, "tol_gap_abs" => 1e-12,
+                                     "tol_gap_rel" => 1e-12, "tol_feas" => 1e-12),
+                     check_sol = (; allow_local = true, allow_almost = true))
+        tw = WeightsTracking(; w = fill(1 / N, N))
+        trset = ProgrammeAllocationSet(; slv = slv,
+                                       tr = TrackingError(; tr = tw, err = 1.0))
+        alg5 = GradientProjection(; eta = 50, obj = rl5)
+        @test isnothing(po.rows_needed(OPS(; alg = alg5, set = trset)))
+        @test po.rows_needed(alg5) == 5
+        function heldpath(win)
+            W = zeros(T, N)
+            W[1, :] .= 1 / N
+            W[2, :] .= W[1, :] .* X[1, :] ./ dot(W[1, :], X[1, :])
+            for t in 2:(T - 1)
+                S = cov(R[max(1, t - win + 1):t, :]; corrected = true)
+                W[t + 1, :] .= po.project_simplex(W[t, :] .- 50 .* (2 .* S * W[t, :]))
+            end
+            return W
+        end
+        @test maxerr(libpath(alg5; set = trset), heldpath(5)) < 1e-6
+        @test maxerr(heldpath(5), heldpath(T)) > 1e-2
     end
 
     @testset "The numbers the docstrings state, on the fixtures they name" begin

@@ -953,11 +953,11 @@ The Risk Loss replaces log wealth as the objective. `r` is one risk measure or a
 
 `sca` scalarises a vector of measures at the `settings.scale` of each measure. So `[MeanReturn(), Variance()]`, with a negative scale on the mean, gives one step on the mean-variance utility.
 
-A prior fitted on one row has no covariance. So the loss starts when the head holds two rows, and the step before that leaves the iterate unchanged. The head's rows buffer holds at most `window` rows, so the first `window - 1` steps read a shorter window.
+A prior fitted on one row has no covariance. So the loss starts when the head holds two rows, and the step before that leaves the iterate unchanged. The loss reads the last `window` rows that the head holds, so the first `window - 1` steps read a shorter window. The head can hold more rows, because its Allocation Set or another rule can need more, and the loss does not read them.
 
 **A risk gradient is small, so a rule on a Risk Loss needs a much larger rate than a log-wealth rule.** A variance gradient ``2 \\boldsymbol{\\Sigma} \\boldsymbol{w}`` has the size of one period's variance. Take 1000 periods of returns `randn(StableRNG(7), 1000, 4) .* [0.01 0.02 0.03 0.04]`, a window of 20 and the uniform allocation. Over every window, the log-wealth gradient is then between 1100 and 6400 times larger than the variance gradient. The entropic rule on [`Variance`](@ref) at the log-wealth default `eta = 0.05` ends 0.005 from its uniform start, and the minimum-variance allocation is 0.45 away. At `eta = 100` the rule ends within 0.06 of that allocation.
 
-The prior is fitted on the rows that the head holds, a [`ReturnsResult`](@ref), as a batch prior is fitted on any returns data. The rows hold `NaN` where there was no return, and the active mask beside them. So under a time-varying panel the prior reduces to the Coverage Universe of the window, and answers `NaN` at an asset that the window does not cover. The loss reads its gradient on the Investable Mask of that result, and writes zero at every other leg. The window holds no data about such a leg, so the loss does not move it, and the projection alone places it. A plain `pe` therefore never meets a constant column. A leg unlisted for a part of the window is outside the Coverage Universe of a plain prior until the window clears that part. A mask-aware prior takes the leg in after its own warm-up.
+The prior is fitted on the window, a view of the rows that the head holds as a [`ReturnsResult`](@ref), as a batch prior is fitted on any returns data. The rows hold `NaN` where there was no return, and the active mask beside them. So under a time-varying panel the prior reduces to the Coverage Universe of the window, and answers `NaN` at an asset that the window does not cover. The loss reads its gradient on the Investable Mask of that result, and writes zero at every other leg. The window holds no data about such a leg, so the loss does not move it, and the projection alone places it. A plain `pe` therefore never meets a constant column. A leg unlisted for a part of the window is outside the Coverage Universe of a plain prior until the window clears that part. A mask-aware prior takes the leg in after its own warm-up.
 
 The regret theorems of the first-order rules need a convex loss. So they hold here for the measures that are convex in the weights: [`Variance`](@ref), [`StandardDeviation`](@ref), [`ConditionalValueatRisk`](@ref), [`EntropicValueatRisk`](@ref), [`WorstRealisation`](@ref), [`Range`](@ref), [`MaximumDrawdown`](@ref), [`AverageDrawdown`](@ref), [`ConditionalDrawdownatRisk`](@ref), [`EntropicDrawdownatRisk`](@ref), the low-order moment measures, and [`MeanReturn`](@ref), which is linear. A quantile measure such as [`ValueatRisk`](@ref) or [`DrawdownatRisk`](@ref), a kurtosis, a skewness and a ratio are not convex, and on them the step is a heuristic with no bound. At a kink of a convex measure, a finite-difference gradient is the chord across the kink, near a subgradient, as [`risk_gradient`](@ref) states.
 
@@ -1110,9 +1110,10 @@ For [`LogWealth`](@ref) the gradient reads the price relative `x` alone. For a [
 The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref) method runs these steps.
 
  1. When `rows` is `nothing`, or holds fewer than two rows, return the zero vector.
- 2. Fit the prior `pr` of the loss on `rows`, as a batch prior is fitted, on the returns of `rows` and their Asset Panel. The prior answers `NaN` at an asset outside its Coverage Universe.
- 3. Read the Investable Mask of `pr`.
- 4. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref). It is zero at every other leg.
+ 2. View the last `min(window, n)` of the `n` rows of `rows`. The head can hold more rows than the loss reads, because another part of the head can need more.
+ 3. Fit the prior `pr` of the loss on that view, as a batch prior is fitted, on its returns and its Asset Panel. The prior answers `NaN` at an asset outside its Coverage Universe.
+ 4. Read the Investable Mask of `pr`.
+ 5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref). It is zero at every other leg.
 
 # Related
 
@@ -1128,7 +1129,8 @@ function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector,
     if isnothing(rows) || size(rows.X, 1) < 2
         return zeros(eltype(u), length(u))
     end
-    pr = prior(obj.pe, rows)
+    n = size(rows.X, 1)
+    pr = prior(obj.pe, port_opt_view(rows, (n - min(obj.window, n) + 1):n, :))
     return investable_risk_gradient(obj, u, pr, investable_mask(pr))
 end
 """
