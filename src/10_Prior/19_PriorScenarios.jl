@@ -150,6 +150,53 @@ function scenario_window(max_scenarios::Integer, X::MatNum)
     return max_scenarios >= t ? X : view(X, (t - max_scenarios + 1):t, :)
 end
 """
+    scenario_weights(w::Nothing, t::Integer)
+    scenario_weights(w::ObsWeights, t::Integer)
+
+Put the probabilities `w` of the scenarios of a capped Prior Result on the `t` observations that its moments read.
+
+[`scenario_window`](@ref) keeps the last rows of the observations as scenarios, and the moment estimators read every observation. A prior that reweights scenarios, such as [`EntropyPoolingPrior`](@ref), states a probability for each scenario and none for the observations that the cap removed. Its posterior gives those observations no probability, so this function gives them a zero weight. A weighted moment over the `t` observations is then the moment of the scenarios under `w`, and the posterior mean is `pr.X' * w`, the mean that a view states.
+
+# Algorithm
+
+ 1. A `nothing` `w` returns `nothing`.
+ 2. Otherwise take `s = length(w)`, and refuse `s > t`.
+ 3. When `s == t`, the cap removed no row: return `w`.
+ 4. Otherwise return the probability weights of `t - s` zeros followed by `w`.
+
+# Arguments
+
+  - `w`: The probabilities of the scenarios, or `nothing`.
+  - `t`: The number of observations that the moments read.
+
+# Validation
+
+  - `length(w) <= t`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `w′::Option{<:ObsWeights}`: The weights over the `t` observations, or `nothing`.
+
+# Related
+
+  - [`scenario_window`](@ref)
+  - [`scenario_factory`](@ref)
+  - [`prior_probability_factory`](@ref)
+  - [`scenario_rows`](@ref)
+"""
+function scenario_weights(::Nothing, ::Integer)
+    return nothing
+end
+function scenario_weights(w::ObsWeights, t::Integer)
+    s = length(w)
+    @argcheck(s <= t,
+              DimensionMismatch("the prior answers $s scenario probabilities, but its moments read $t observations. A Scenario Cap keeps the last rows of the observations, so the probabilities of the scenarios cannot outnumber the observations."))
+    if s == t
+        return w
+    end
+    return StatsBase.pweights(vcat(zeros(eltype(w), t - s), w))
+end
+"""
     scenario_ens(::Nothing, X::MatNum)
     scenario_ens(max_scenarios::Integer, X::MatNum)
 

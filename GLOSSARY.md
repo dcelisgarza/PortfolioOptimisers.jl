@@ -53,6 +53,7 @@ Fold Only refuses a Batch Choice that can move, because each move fits the facto
 
 **Scenario Cap**
 The number of observations a fold-and-carry Prior Estimator keeps in its Result's `X`, written `max_scenarios` and applied in batch and online alike. It bounds memory and the zero-filled share a Scenario Fill reports, and it does **not** move `mu` or `sigma`, which stay fitted over every observation — so a capped fit equals no batch fit, and that divergence is documented rather than tested. ADR 0136. A capped Result states the count its moments were fitted over in `ens`, so a consumer that prices a sample size — an Uncertainty Set (§3.9), a calibration rule — reads that count and not the rows carried; only a bootstrap, which can resample nothing but the rows carried, reads the cap. ADR 0138.
+Under an entropy pooling posterior the moments are those of the scenarios: the posterior gives no probability to an observation that the cap removed, so `mu == pr.X' * w`. ADR 0209, #1667.
 *Avoid*: reading `size(X, 1)` of a capped Result as its sample size; that is the number of scenarios it carries.
 *Avoid*: reading it as `max_history`, the `Online` wrapper's cap, which windows the whole fit and does have a batch equal. Both may be set on one estimator, and they nest.
 

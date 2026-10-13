@@ -1941,3 +1941,67 @@ end
     @test isapprox(h.kt, hd.kt; rtol = 1e-10)
     @test isapprox(h.sk, hd.sk; rtol = 1e-10)
 end
+
+@testset "An entropy pooling prior over a Scenario Cap weighs the scenarios alone (#1667)" begin
+    # The data of #1667. The cap keeps the last 40 of the 60 rows as scenarios, and the
+    # posterior states a probability for these alone. Before the fix every refit raised a
+    # bare `DimensionMismatch` from the moment estimators, which read all 60 rows.
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    mv = LinearConstraintEstimator(; val = "A2 == 0.002")
+    sv = LinearConstraintEstimator(; val = "A3 == 2.0e-5")
+    cap = EmpiricalPrior(; max_scenarios = 40)
+    w0 = pweights(LinearAlgebra.normalize(collect(range(1, 2; length = 40)), 1))
+    mks = ((; kw...) -> EntropyPoolingPrior(; alg = H0_EntropyPooling(), kw...),
+           (; kw...) -> EntropyPoolingPrior(; kw...),
+           (; kw...) -> MeucciEntropyPoolingPrior(; kw...))
+    for (pe, args) in ((cap, (X,)), (FactorPrior(; pe = cap), (X, F)))
+        for (i, mk) in enumerate(mks), w in (nothing, w0)
+            # The posterior mean is the mean of the scenarios under the posterior weights,
+            # so the mean view holds on it.
+            pr = prior(mk(; sets = sets, mu_views = mv, pe = pe, w = w), args...)
+            @test size(pr.X, 1) == length(pr.w) == 40
+            @test isapprox(pr.mu[2], 0.002; rtol = 1e-6)
+            @test isapprox(pr.mu, transpose(pr.X) * pr.w; rtol = 1e-10)
+            # The staged algorithms pin the mean that a variance view reads, and the view
+            # holds on the scenarios. A factor prior adds its residual block, as in #1649,
+            # and a caller's prior probabilities weigh the fit of that block.
+            if i > 1
+                pr = prior(mk(; sets = sets, mu_views = mv, sigma_views = sv, pe = pe,
+                              w = w), args...)
+                d = isnothing(pr.rr) ? 0.0 : pr.rr.esigma[3]
+                @test isapprox(sum(pr.w .* (pr.X[:, 3] .- pr.mu[3]) .^ 2) + d, 2.0e-5;
+                               rtol = 1e-6)
+            end
+        end
+    end
+    # The moments are those of the last 40 rows under the posterior weights.
+    pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, sigma_views = sv,
+                                   pe = cap), X)
+    pr1 = prior(factory(EmpiricalPrior(), pr.w), X[21:end, :])
+    @test isapprox(pr.mu, pr1.mu; rtol = 1e-12)
+    @test isapprox(pr.sigma, pr1.sigma; rtol = 1e-12)
+    @test isapprox(pr.sigma[3, 3], 2.0e-5 * 40 / 39; rtol = 1e-6)
+    # With no view, a caller's prior probabilities are the posterior.
+    pr = prior(EntropyPoolingPrior(; pe = cap, w = w0), X)
+    @test pr.w == w0
+    @test isapprox(pr.mu, transpose(pr.X) * w0; rtol = 1e-12)
+    # A nested entropy pooling prior keeps a caller's prior probabilities on its scenarios.
+    inner = EntropyPoolingPrior(; sets = sets, sigma_views = sv, pe = cap)
+    pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = inner, w = w0), X)
+    @test length(pr.w) == 40
+    @test isapprox(pr.mu[2], 0.002; rtol = 1e-6)
+    @test isapprox(pr.mu, transpose(pr.X) * pr.w; rtol = 1e-10)
+    # The weights of the scenarios take a zero weight on the rows that the cap removed.
+    sw = PortfolioOptimisers.scenario_weights(w0, 60)
+    @test length(sw) == 60
+    @test all(iszero, sw[1:20])
+    @test sw[21:end] == w0
+    @test PortfolioOptimisers.scenario_weights(w0, 40) === w0
+    @test isnothing(PortfolioOptimisers.scenario_weights(nothing, 60))
+    @test_throws DimensionMismatch PortfolioOptimisers.scenario_weights(w0, 30)
+end

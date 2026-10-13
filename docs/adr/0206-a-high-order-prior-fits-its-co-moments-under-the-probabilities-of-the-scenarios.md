@@ -73,6 +73,8 @@ are the co-moments of the same scenarios under `w1`.
 - The warning of `HighOrderFactorPriorEstimator` about a Black-Litterman prior stays true. A
   Black-Litterman prior answers the `w` of the prior it wraps, and it has no higher moment update
   to state.
-- `EntropyPoolingPrior` with a view over a prior with a Scenario Cap fails before it reaches a
-  high order estimator, with a bare `DimensionMismatch`. That is not this decision, and
-  [#1667](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1667) records it.
+- `EntropyPoolingPrior` with a view over a prior with a Scenario Cap failed before it reached a
+  high order estimator, with a bare `DimensionMismatch`.
+  [#1667](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1667) recorded it, and
+  ADR 0209 decides it: the posterior moments are those of the scenarios under `w1`, the same rows
+  that `scenario_rows` gives the co-moments.
