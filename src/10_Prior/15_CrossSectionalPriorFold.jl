@@ -1291,7 +1291,7 @@ An unwrapped prior follows the rule of the carry fold: it folds what folds and r
 
 # Validation
 
-  - With `pe.cache` at `nothing`, no member of `pe` holds a partial-fit state. The carry reads every member as configuration, and keeps each state that it folds in its own state, so a state that the caller folded into a member would enter the first step, and the prior would no longer equal the batch fit (#1642). An `ArgumentError` is thrown otherwise, and it names the path of the state.
+  - With `pe.cache` at `nothing`, no member of `pe` holds a partial-fit state. The carry reads every member as configuration, and keeps each state that it folds in its own state, so a state that the caller folded into a member would enter the first step, and the prior would no longer equal the batch fit. An `ArgumentError` is thrown otherwise, and it names the path of the state.
   - The rules of [`cross_sectional_carry_fold`](@ref).
 
 # Returns

@@ -201,7 +201,7 @@ Names the first field of an estimator tree that holds a windowed estimator under
 
 The constructor of [`Online`](@ref) uses this walk to refuse a seed window, because the wrapper refits its estimator at each step. The answer is the path from the root to the `rule` field, such as `"ce.rule"` for the covariance member of a prior. A windowed estimator under a seed window answers `"rule"` through its own method. A value that is not an estimator answers `nothing`.
 
-The walk reads every field, not only the fields of [`estimator_fields`](@ref). A refit reaches the estimators that a vector holds, such as the factor list of a [`CrossSectionalFactorPrior`](@ref), the Descriptors of a [`DescriptorScores`](@ref) and the priors of an [`OpinionPoolingPrior`](@ref), so the refusal must reach them too (#1638). A vector answers with the index of its element in brackets, and a Pair answers through its value, so a Descriptor in a factor list gives a path such as `"factors[2].descriptors[1].ce.rule"`. [`element_path`](@ref) walks the vector.
+The walk reads every field, not only the fields of [`estimator_fields`](@ref). A refit reaches the estimators that a vector holds, such as the factor list of a [`CrossSectionalFactorPrior`](@ref), the Descriptors of a [`DescriptorScores`](@ref) and the priors of an [`OpinionPoolingPrior`](@ref), so the refusal must reach them too. A vector answers with the index of its element in brackets, and a Pair answers through its value, so a Descriptor in a factor list gives a path such as `"factors[2].descriptors[1].ce.rule"`. [`element_path`](@ref) walks the vector.
 
 # Algorithm
 

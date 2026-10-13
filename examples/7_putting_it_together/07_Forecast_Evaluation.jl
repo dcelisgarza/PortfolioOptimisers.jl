@@ -239,7 +239,7 @@ mean over the standard deviation, the coefficient's own information ratio. `t_st
 say whether the mean is distinguishable from zero at all.
 
 The coefficients of consecutive dates can be correlated, so the test of the mean must read that
-dependence. A Mean Test does this. The default, [`WildBootstrapMeanTest`](@ref), reads the
+dependence. A mean test does this. The default, [`WildBootstrapMeanTest`](@ref), reads the
 dependence at every lag up to a fixed fraction of the sample, and takes its p-value from a wild
 bootstrap. Its t-statistic is not on the scale of the normal law, so read the p-value. The bootstrap
 draws random numbers, so this example passes a seeded test to every summary, and the tables are the
@@ -426,7 +426,7 @@ says how quickly the information goes stale.
 
 The stride between two dates stays at the base evaluation's, so from the second row of the
 holding-period table on, consecutive windows use the same returns, and their coefficients are not
-independent. The Mean Test of the table reads that dependence at each row, as it does in the
+independent. The mean test of the table reads that dependence at each row, as it does in the
 summary above. A p-value that stays small down the column therefore reflects the forecast, not the
 overlap. Without the test, a forecast with no skill would look more significant at every row.
 =#

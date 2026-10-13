@@ -4,7 +4,7 @@ Description = "Online (b), public API of PortfolioOptimisers.jl: AbstractWindowR
 
 # Online (b)
 
-A window rule says which observations the window of a windowed moment estimator keeps on the online step. A Choice Rule says how a choice that a fit makes over its whole sample behaves on the online step.
+A window rule says which observations the window of a windowed moment estimator keeps on the online step. A choice rule says how a choice that a fit makes over its whole sample behaves on the online step.
 
 ```@docs
 PortfolioOptimisers.AbstractWindowRule
