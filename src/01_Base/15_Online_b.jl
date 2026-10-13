@@ -352,7 +352,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Joins the name of a field, or the bracketed index of an element, to the path that a walk found below it.
 
-A path that starts with a bracket follows the name with no dot, so a walk names a member of a vector field as `"factors[2]"` and not as `"factors.[2]"`. Every other path follows the name after a dot.
+A path that starts with a bracket follows the name with no dot, so a walk names a member of a vector field as `"factors[2]"` and not as `"factors.[2]"`. An empty path answers the name alone, so a walk whose leaf answers `""` names the field that holds the leaf, such as `"tr"`. Every other path follows the name after a dot.
 
 # Arguments
 
@@ -370,14 +370,18 @@ A path that starts with a bracket follows the name with no dot, so a walk names 
   - [`element_path`](@ref)
 """
 function tree_path(head::Union{<:Symbol, <:AbstractString}, path::AbstractString)
-    return startswith(path, '[') ? string(head, path) : string(head, ".", path)
+    return if isempty(path) || startswith(path, '[')
+        string(head, path)
+    else
+        string(head, ".", path)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Walks the elements of a vector in order with `walk`, and answers the path of the first element that gives one, or `nothing`.
 
-The walks of an estimator tree that must see the estimators a vector holds call this function: [`seed_window_path`](@ref) and [`online_entry_state`](@ref). The answer starts with the index of the element in brackets, as [`tree_path`](@ref) joins it.
+The walks of an estimator tree that must see the estimators a vector holds call this function: [`seed_window_path`](@ref), [`online_entry_state`](@ref) and [`returns_tracking_path`](@ref). The answer starts with the index of the element in brackets, as [`tree_path`](@ref) joins it.
 
 # Arguments
 

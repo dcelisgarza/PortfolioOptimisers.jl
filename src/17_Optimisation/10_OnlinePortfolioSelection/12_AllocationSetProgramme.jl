@@ -290,7 +290,7 @@ end
 
 Cuts a [`ReturnsTracking`](@ref) benchmark of a programme set to its first `T` entries when it is longer.
 
-The head's rows are the first rows of the fold, up to the current period, so a benchmark series stated over the whole fold aligns with them by its first `T` entries. A benchmark shorter than the rows goes to the builder unchanged, and the builder throws a `DimensionMismatch`. A weights benchmark reads the rows themselves and is returned unchanged. A vector of tracking errors is cut entry by entry.
+The head's rows are the first rows of the fold, up to the current period, so a benchmark series stated over the whole fold aligns with them by its first `T` entries. A benchmark shorter than the rows goes to the builder unchanged, and [`tracking_benchmark`](@ref) refuses it with an `ArgumentError` that names the two lengths. A weights benchmark reads the rows themselves and is returned unchanged. A vector of tracking errors is cut entry by entry.
 
 # Arguments
 

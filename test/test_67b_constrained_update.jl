@@ -66,6 +66,23 @@ end
         @test_throws TypeError ProgrammeAllocationSet(; slv = slv, tn = -0.1)
         @test_throws DomainError ProgrammeAllocationSet(; slv = slv, card = 0)
         @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv, r = Variance())
+        # The ceiling reads rows that change at every step, so a fixed returns series is
+        # refused by name, in a vector too. The set's `tr` keeps it, cut to the rows (#1656).
+        rtrm = TrackingRiskMeasure(; settings = RiskMeasureSettings(; ub = 0.1),
+                                   tr = ReturnsTracking(; w = zeros(3)))
+        err = try
+            ProgrammeAllocationSet(; slv = slv, r = [rtrm])
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("at `tr`", err.msg)
+        @test isa(ProgrammeAllocationSet(; slv = slv,
+                                         r = TrackingRiskMeasure(;
+                                                                 settings = RiskMeasureSettings(;
+                                                                                                ub = 0.1),
+                                                                 tr = WeightsTracking(;
+                                                                                      w = zeros(3)))),
+                  ProgrammeAllocationSet)
         @test_throws Exception ProgrammeAllocationSet(; slv = slv,
                                                       wb = WeightBoundsEstimator())
         @test isa(ProgrammeAllocationSet(; slv = slv,

@@ -7,6 +7,8 @@ Refuses a risk measure that cannot be the ceiling of a [`ProgrammeAllocationSet`
 
 The ceiling of a measure is its `settings.ub`, and a one-step projection can bound the measure by one number only. The function refuses a measure with no `ub`, with a `Frontier` or with a per-asset vector, and it refuses an empty vector of measures. A set with no measure passes.
 
+The ceiling reads every row that the head holds, and those rows change at every step. A [`ReturnsTracking`](@ref) series is fixed at construction, so it cannot follow them, and the function refuses a measure that holds one. A [`WeightsTracking`](@ref) benchmark reads the rows themselves and passes.
+
 # Arguments
 
   - `r`: The set's risk measure, `nothing`, or a vector of measures.
@@ -14,6 +16,7 @@ The ceiling of a measure is its `settings.ub`, and a one-step projection can bou
 # Validation
 
   - `settings.ub` of a measure is not a finite non-negative number. An `ArgumentError` is thrown.
+  - No field of a measure holds a [`ReturnsTracking`](@ref). An `ArgumentError` that names the field is thrown otherwise.
   - `rs` is empty. An `IsEmptyError` is thrown.
 
 # Returns
@@ -25,6 +28,7 @@ The ceiling of a measure is its `settings.ub`, and a one-step projection can bou
   - [`ProgrammeAllocationSet`](@ref)
   - [`set_allocation_risk_ceiling!`](@ref)
   - [`set_risk_upper_bound!`](@ref): refuses a frontier or a vector for a set that reaches the builder without this check.
+  - [`returns_tracking_path`](@ref)
 """
 function assert_risk_ceiling(::Nothing)::Nothing
     return nothing
@@ -33,6 +37,9 @@ function assert_risk_ceiling(r::RiskMeasure)::Nothing
     ub = r.settings.ub
     @argcheck(isa(ub, Number) && isfinite(ub) && ub >= zero(ub),
               ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet is its `settings.ub`, a finite non-negative number; got `$ub`"))
+    path = returns_tracking_path(r)
+    @argcheck(isnothing(path),
+              ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet holds a `ReturnsTracking` at `$(path)`, and the ceiling reads every row the head holds, which change at every step. A fixed series cannot follow them. Track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves, or bound the tracking error with the set's `tr`, which cuts its series to the rows."))
     return nothing
 end
 function assert_risk_ceiling(rs::VecRM)::Nothing

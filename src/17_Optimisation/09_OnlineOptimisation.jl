@@ -228,6 +228,37 @@ function fold_returns(opt, rd::ReturnsResult)
     return rebuild_estimator(opt, (; pe = pe, cache = cache))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses, at the online step of an optimiser, a [`ReturnsTracking`](@ref) anywhere in its tree, with an error that names the field.
+
+A returns series is fixed at construction, and each step changes the rows that a tracking error reads. An expanding step adds rows, so the series has the length of the rows at no more than one step, and [`tracking_benchmark`](@ref) refuses every other step. A capped step under `max_history` drops the oldest rows, so the series and the window keep the same length and cover different rows. No length check sees that misalignment, so the step refuses the series before it folds a row. The walk is [`returns_tracking_path`](@ref).
+
+# Arguments
+
+  - `opt`: The optimiser that takes the step.
+
+# Validation
+
+  - No field in the tree of `opt` holds a [`ReturnsTracking`](@ref). An `ArgumentError` that names the field is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`returns_tracking_path`](@ref)
+  - [`WeightsTracking`](@ref)
+"""
+function assert_step_tracks_no_series(opt)
+    path = returns_tracking_path(opt)
+    @argcheck(isnothing(path),
+              ArgumentError("`$(typeof(opt).name.name)` takes an online step holding a `ReturnsTracking` at `$(path)`, and a fixed series cannot follow the rows: each step adds rows, and a window under `max_history` drops the oldest, so the series covers the rows of no more than one step, and a rolling window misaligns it with no error. Track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves, or fit in batch with `optimise(opt, rd)` and the series of the rows of `rd`."))
+    return nothing
+end
+"""
     partial_fit!(opt::JuMPOptimisationEstimator, rd::ReturnsResult)
     partial_fit!(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity}, rd::ReturnsResult)
     partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, rd::ReturnsResult)
@@ -246,10 +277,11 @@ After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `Re
 
 # Algorithm
 
- 1. A JuMP head or a hierarchical head steps the bundle it holds in `opt`, and rebuilds itself around the result.
- 2. An optimiser that holds a prior steps through [`fold_returns`](@ref).
- 3. A head that holds no prior checks that `rd.X` is present. It then folds `rd` into its own context with [`fold_context`](@ref), and the context keeps the returns and the factor column.
- 4. [`PreviousWeights`](@ref) returns `opt` unchanged.
+ 1. An optimiser that holds a prior refuses a [`ReturnsTracking`](@ref) anywhere in its tree, through [`assert_step_tracks_no_series`](@ref).
+ 2. A JuMP head or a hierarchical head steps the bundle it holds in `opt`, and rebuilds itself around the result.
+ 3. An optimiser that holds a prior steps through [`fold_returns`](@ref).
+ 4. A head that holds no prior checks that `rd.X` is present. It then folds `rd` into its own context with [`fold_context`](@ref), and the context keeps the returns and the factor column.
+ 5. [`PreviousWeights`](@ref) returns `opt` unchanged.
 
 # Arguments
 
@@ -260,6 +292,7 @@ After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `Re
 
   - `opt` is not a finite allocation. An `ArgumentError` is thrown otherwise, because a finite allocation converts a weight vector and prices into share counts and reads no returns window.
   - `opt` is not a [`TimeDependent`](@ref) schedule of optimisers. An `ArgumentError` is thrown otherwise, because a schedule swaps the optimiser that carries the state.
+  - No field in the tree of an optimiser that holds a prior holds a [`ReturnsTracking`](@ref). An `ArgumentError` that names the field is thrown otherwise.
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
   - Everything [`fold_prior`](@ref) and the step of [`ReturnsBufferState`](@ref) refuse.
 
@@ -276,17 +309,20 @@ After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `Re
   - [`update_online_estimator`](@ref)
 """
 function partial_fit!(opt::JuMPOptimisationEstimator, rd::ReturnsResult)
+    assert_step_tracks_no_series(opt)
     return rebuild_estimator(opt, (; opt = partial_fit!(opt.opt, rd)))
 end
 function partial_fit!(opt::Union{<:HierarchicalRiskParity,
                                  <:HierarchicalEqualRiskContribution,
                                  <:SchurComplementHierarchicalRiskParity},
                       rd::ReturnsResult)
+    assert_step_tracks_no_series(opt)
     return rebuild_estimator(opt, (; opt = partial_fit!(opt.opt, rd)))
 end
 function partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                  <:InverseVolatility, <:NestedClustered, <:Stacking,
                                  <:SubsetResampling}, rd::ReturnsResult)
+    assert_step_tracks_no_series(opt)
     return fold_returns(opt, rd)
 end
 function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,

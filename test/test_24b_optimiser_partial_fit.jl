@@ -429,6 +429,53 @@ end
                                                                                    mu = zeros(N)))
     end
 
+    @testset "A returns tracking series: the step refuses it, a batch fit checks its length (#1656)" begin
+        t = 40
+        bv = X[1:t, :] * fill(inv(N), N)
+        te = TrackingError(; tr = ReturnsTracking(; w = bv), err = 0.01)
+        trm = TrackingRiskMeasure(; tr = ReturnsTracking(; w = bv))
+        mk(pe) = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv, tr = te))
+        # A batch fit over the rows of the series solves.
+        @test isa(optimise(mk(EmpiricalPrior()), rows(rdv, 1:t)).retcode,
+                  OptimisationSuccess)
+        # A batch fit over other rows names both lengths.
+        err = try
+            optimise(mk(EmpiricalPrior()), rows(rdv, 1:(t + 2)))
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) &&
+              occursin("$(t) entries", err.msg) &&
+              occursin("$(t + 2) rows", err.msg)
+        # The step refuses the series before it folds a row, expanding and under a rolling
+        # window, whose rows keep the length of the series but not its rows.
+        cases = (mk(EmpiricalPrior()) => "opt.tr.tr",
+                 po.update_online_estimator(mk(po.Online(EmpiricalPrior(); max_history = t))) => "opt.tr.tr",
+                 MeanRisk(; r = trm, opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)) => "r.tr",
+                 HierarchicalRiskParity(; r = trm, opt = HierarchicalOptimiser(; pe = EmpiricalPrior())) => "r.tr",
+                 NestedClustered(; opti = mk(EmpiricalPrior()), opto = MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))) => "opti.opt.tr.tr")
+        for (opt, path) in cases
+            err = try
+                partial_fit!(opt, rows(rdv, 1:t))
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError) && occursin("at `$(path)`", err.msg)
+        end
+        # A weights benchmark reads the rows themselves, so it steps and agrees with batch.
+        wt = MeanRisk(;
+                      opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                          tr = TrackingError(;
+                                                             tr = WeightsTracking(;
+                                                                                  w = fill(inv(N),
+                                                                                           N)),
+                                                             err = 0.01)))
+        @test isapprox(optimise(step(wt, rdv, t)).w, optimise(wt, rows(rdv, 1:t)).w;
+                       atol = 1e-6)
+    end
+
     @testset "The state merges, copies and slices" begin
         a = step(EqualWeighted(), rdf, 30).cache
         b = step(EqualWeighted(), rows(rdf, 31:60), 30).cache

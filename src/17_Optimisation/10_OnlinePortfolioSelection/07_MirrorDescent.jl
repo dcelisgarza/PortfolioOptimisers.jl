@@ -998,6 +998,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `window >= 2`. A `DomainError` is thrown otherwise, because a prior fitted on one row has no covariance, and the loss never reads a window of one row.
+  - No field of `r` holds a [`ReturnsTracking`](@ref). An `ArgumentError` that names the field is thrown otherwise, because the loss reads rows that change at every step, and a fixed series cannot follow them. A [`WeightsTracking`](@ref) benchmark reads the rows themselves and passes.
 
 # Examples
 
@@ -1069,6 +1070,9 @@ RiskLoss
                       pe::T4) where {T1 <: BaseRM_VecBaseRM, T2 <: Integer,
                                      T3 <: Scalariser, T4 <: AbstractPriorEstimator}
         @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
+        path = returns_tracking_path(r)
+        @argcheck(isnothing(path),
+                  ArgumentError("a `RiskLoss` holds a `ReturnsTracking` at `$(tree_path(:r, something(path, "")))`, and the loss reads the rows of the head's buffer, which change at every step. A fixed series cannot follow them. Track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
         return new{T1, T2, T3, T4}(r, window, sca, pe)
     end
 end

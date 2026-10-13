@@ -614,6 +614,20 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test isa(rl, po.AbstractOnlineObjective) &&
               isa(LogWealth(), po.AbstractOnlineObjective)
         @test_throws DomainError RiskLoss(; window = 1)
+        # The loss reads rows that change at every step, so a fixed returns series is
+        # refused by name, and a weights benchmark, which reads the rows, passes (#1656).
+        err = try
+            RiskLoss(;
+                     r = [Variance(),
+                          TrackingRiskMeasure(; tr = ReturnsTracking(; w = zeros(5)))])
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("at `r[2].tr`", err.msg)
+        @test isa(RiskLoss(;
+                           r = TrackingRiskMeasure(;
+                                                   tr = WeightsTracking(; w = [0.5, 0.5]))),
+                  RiskLoss)
         @test_throws TypeError MirrorDescent(; obj = Variance())
         @test po.rows_needed(MirrorDescent()) == 0
         @test po.rows_needed(MirrorDescent(; obj = RiskLoss(; window = 7))) == 7

@@ -424,7 +424,7 @@ julia> PortfolioOptimisers.tracking_benchmark(tr, X)
   - [`MatNum`](@ref)
   - [`calc_net_returns`](@ref): The single definition this method forwards to.
   - [`Fees`](@ref)
-  - [`tracking_benchmark(tr::ReturnsTracking, args...)`](@ref): The sibling, which reads no return matrix at all.
+  - [`tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)`](@ref): The sibling, which reads only the number of rows of the return matrix.
 """
 function tracking_benchmark(tr::WeightsTracking, X::MatNum)
     return calc_net_returns(tr.w, X, tr.fees)
@@ -436,7 +436,7 @@ Carries the benchmark return series itself, for a benchmark whose weights are un
 
 [`tracking_benchmark`](@ref) returns the `w` field unchanged, so no return matrix is read and no fee is applied. This is the case the book states first: an index whose published series is all the caller has. Use [`WeightsTracking`](@ref) when the benchmark allocation is known.
 
-The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on.
+The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on, and [`tracking_benchmark`](@ref) refuses a mismatch. The series is fixed, so it cannot follow rows that change: the online step of an optimiser refuses it, and so do the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref).
 
 # Fields
 
@@ -487,22 +487,30 @@ function ReturnsTracking(; w::VecNum)
     return ReturnsTracking(w)
 end
 """
-    tracking_benchmark(tr::ReturnsTracking, args...)
+    tracking_benchmark(tr::ReturnsTracking)
+    tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)
 
 Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 `tracking_benchmark` extracts the benchmark portfolio returns stored in a [`ReturnsTracking`](@ref) object. This is used for tracking error measurement and constraint generation where the comparison is made directly between portfolio returns and benchmark returns.
 
-**No return matrix is read, and no fee is applied.** Every trailing argument is ignored, so a matrix whose number of rows does not match `length(tr.w)` still returns `tr.w` unchanged: a three-entry `w` against a seven-row matrix succeeds here. That is deliberate. A length mismatch is a property of the model the series is put into, so it is raised there rather than by this function.
+**No return matrix is read, and no fee is applied.** The form with `X` reads only the number of rows of `X`. The series holds one return per row, so the form refuses a matrix whose number of rows is not `length(tr.w)`. Every reader of a tracking error subtracts the series from a series of the same rows. Without the check, a three-entry `w` against a seven-row matrix fails inside the reader with a `DimensionMismatch`, or, when the lengths agree by chance, gives a tracking error against the wrong rows.
+
+The series is fixed at construction, so it does not follow the rows of an online step. The online step of an optimiser refuses it, see [`partial_fit!`](@ref). Use [`WeightsTracking`](@ref) to track a benchmark whose weights are known: it reads the rows that the reader holds.
 
 # Algorithm
 
- 1. Return `tr.w`. No argument after `tr` is read.
+ 1. Refuse `X` when its number of rows is not `length(tr.w)`.
+ 2. Return `tr.w`.
 
 # Arguments
 
   - `tr`: [`ReturnsTracking`](@ref) tracking algorithm containing benchmark returns.
-  - `args...`: For interface compatibility (ignored).
+  - `X`: The asset return matrix, or the portfolio return series, that the benchmark is compared with. Only its number of rows is read.
+
+# Validation
+
+  - `size(X, 1) == length(tr.w)`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -518,6 +526,9 @@ julia> PortfolioOptimisers.tracking_benchmark(tr)
  0.01
  0.02
  0.03
+
+julia> PortfolioOptimisers.tracking_benchmark(tr, zeros(3, 2)) === tr.w
+true
 ```
 
 # Related
@@ -527,8 +538,70 @@ julia> PortfolioOptimisers.tracking_benchmark(tr)
   - [`tracking_benchmark(tr::WeightsTracking, X::MatNum)`](@ref): The sibling, which does read the return matrix and does charge a fee.
   - [`TrackingError`](@ref)
 """
-function tracking_benchmark(tr::ReturnsTracking, args...)
+function tracking_benchmark(tr::ReturnsTracking)
     return tr.w
+end
+function tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)
+    T = size(X, 1)
+    @argcheck(length(tr.w) == T,
+              ArgumentError("a `ReturnsTracking` series holds one benchmark return per row of the returns it is compared with, but `w` has $(length(tr.w)) entries and the returns have $(T) rows. The series is fixed at construction, so give it the benchmark returns of exactly these rows, or track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
+    return tr.w
+end
+"""
+    returns_tracking_path(est)
+    returns_tracking_path(::ReturnsTracking)
+    returns_tracking_path(v::AbstractVector)
+    returns_tracking_path(p::Pair)
+    returns_tracking_path(::Any)
+
+Names the first field of an estimator tree that holds a [`ReturnsTracking`](@ref), or answers `nothing`.
+
+A returns series is fixed at construction, and it aligns only with the rows of one batch fit. The online step of an optimiser and the two row readers of an online portfolio selection head, the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref), use this walk to refuse it. The walk reads every field of an estimator and of a Result, because a [`TrackingError`](@ref) is a Result and a [`TrackingRiskMeasure`](@ref) is an estimator. A vector answers with the index of its element in brackets, and a Pair answers through its value, as [`element_path`](@ref) joins them. A series at the root answers `""`, the empty path. A numeric array and every other value answer `nothing`.
+
+# Algorithm
+
+ 1. Answer `""` when `est` is a [`ReturnsTracking`](@ref).
+ 2. Walk every field of `est` in order, and find the path in each field with this function.
+ 3. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
+ 4. Answer `nothing` when no field gives a path.
+
+# Arguments
+
+  - `est`: The estimator, the Result, or any value a field holds.
+  - `v`: A vector that a field holds.
+  - `p`: A Pair that a vector holds.
+
+# Returns
+
+  - `path::Option{<:String}`: The path of the first returns series found, `""` when `est` is itself one, or `nothing`.
+
+# Related
+
+  - [`ReturnsTracking`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`element_path`](@ref)
+  - [`tree_path`](@ref)
+"""
+function returns_tracking_path(est::Union{<:AbstractEstimator, <:AbstractResult})
+    paths = map(f -> returns_tracking_path(getfield(est, f)), fieldnames(typeof(est)))
+    i = findfirst(!isnothing, paths)
+    return if isnothing(i)
+        nothing
+    else
+        tree_path(fieldname(typeof(est), i), something(paths[i]))
+    end
+end
+function returns_tracking_path(::ReturnsTracking)
+    return ""
+end
+function returns_tracking_path(v::AbstractVector)
+    return eltype(v) <: Number ? nothing : element_path(returns_tracking_path, v)
+end
+function returns_tracking_path(p::Pair)
+    return returns_tracking_path(last(p))
+end
+function returns_tracking_path(::Any)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)

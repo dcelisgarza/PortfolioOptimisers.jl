@@ -2697,13 +2697,35 @@ end
         @test PO.tracking_benchmark(trn, Xt) == calc_net_returns(wb, Xt, nothing)
     end
 
-    @testset "a ReturnsTracking benchmark reads no return matrix" begin
+    @testset "a ReturnsTracking benchmark reads only the row count" begin
         rt = ReturnsTracking(; w = [0.01, 0.02, 0.03])
         @test PO.tracking_benchmark(rt) === rt.w
-        # a matrix of the wrong number of rows still succeeds: the length mismatch is the
-        # model's to raise, not this function's
-        @test PO.tracking_benchmark(rt, zeros(7, 2)) === rt.w
-        @test PO.tracking_benchmark(rt, zeros(7, 2), :nonsense, 42) === rt.w
+        @test PO.tracking_benchmark(rt, zeros(3, 2)) === rt.w
+        @test PO.tracking_benchmark(rt, zeros(3)) === rt.w
+        # A series of the wrong length is refused with both lengths, not subtracted from
+        # the rows deep inside a reader.
+        err = try
+            PO.tracking_benchmark(rt, zeros(7, 2))
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("3 entries", err.msg) && occursin("7 rows", err.msg)
+        @test_throws ArgumentError PO.tracking_benchmark(rt, zeros(2))
+        @test_throws MethodError PO.tracking_benchmark(rt, zeros(3, 2), :nonsense)
+        # The walk names the field that holds a series, and passes a weights benchmark.
+        @test PO.returns_tracking_path(rt) == ""
+        @test PO.returns_tracking_path(TrackingError(; tr = rt, err = 0.1)) == "tr"
+        @test PO.returns_tracking_path([Variance(), TrackingRiskMeasure(; tr = rt)]) ==
+              "[2].tr"
+        @test PO.returns_tracking_path(:a => TrackingRiskMeasure(; tr = rt)) == "tr"
+        @test isnothing(PO.returns_tracking_path(TrackingError(;
+                                                               tr = WeightsTracking(;
+                                                                                    w = [0.5,
+                                                                                         0.5]),
+                                                               err = 0.1)))
+        @test isnothing(PO.returns_tracking_path([1.0, 2.0]))
+        @test isnothing(PO.returns_tracking_path(nothing))
     end
 
     @testset "factory obeys fixed the way Turnover's does" begin

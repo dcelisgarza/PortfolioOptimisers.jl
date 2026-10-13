@@ -18,6 +18,7 @@ PortfolioOptimisers.assert_stateless_schedule
 PortfolioOptimisers.assert_stateless_prior
 PortfolioOptimisers.assert_online_entry(::TimeDependent)
 PortfolioOptimisers.assert_online_fee_source(::Any, ::Any)
+PortfolioOptimisers.assert_step_tracks_no_series
 PortfolioOptimisers.returns_result(host::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
 PortfolioOptimisers.held_timestamps
 PortfolioOptimisers.batch_without_state
