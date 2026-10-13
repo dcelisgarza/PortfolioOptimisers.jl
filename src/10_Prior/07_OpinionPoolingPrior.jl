@@ -641,6 +641,22 @@ function scenario_prior(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:MatNu
     wp = first(opinion_pooling_weights(pe, X, F, pnl; kwargs...))
     return scenario_prior(factory(pe.pe2, wp), w, X, F, pnl; kwargs...)
 end
+# A pool that a factor prior or a Black-Litterman prior embeds is rebuilt as an estimator,
+# not refitted, so it pools on the rows of the fit that the rebuild sees. Those are its own
+# rows only when it holds no `pe1`, which `assert_scenario_model` checks (#1652).
+function scenario_factory(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:MatNum},
+                          pnl::Option{<:AssetPanel}; kwargs...)
+    wp = first(opinion_pooling_weights(pe, X, F, pnl; kwargs...))
+    return scenario_factory(factory(pe.pe2, wp), w, X, F, pnl; kwargs...)
+end
+function assert_scenario_model(pe::OpinionPoolingPrior)
+    @argcheck(isnothing(pe.pe1),
+              ArgumentError("An entropy pooling prior refits the opinion pool inside a factor prior or a Black-Litterman prior under its posterior weights, on the rows that the wrapping prior gives the pool. A pool with `pe1` reads the rows of `pe1` instead, so the refit cannot state its model. Set `pe1 = nothing` in this pool, or give the pool to the entropy pooling prior directly as its `pe`."))
+    return assert_scenario_model(pe.pe2)
+end
+function assert_scenario_refit(pe::OpinionPoolingPrior)
+    return assert_scenario_refit(pe.pe2)
+end
 
 export LinearOpinionPooling, LogarithmicOpinionPooling, OpinionPoolingPrior
 public OpinionPoolingAlgorithm, compute_pooling

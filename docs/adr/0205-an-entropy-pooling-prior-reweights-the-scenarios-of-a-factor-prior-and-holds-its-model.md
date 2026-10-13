@@ -43,7 +43,15 @@ so the model is held too.
    A prior that reweights scenarios itself is replaced by its model. A nested entropy pooling
    prior becomes `pe.pe` under its own `w`, in `scenario_factory`, so an entropy pooling prior
    of the factors inside a `FactorPrior` is covered too. An `OpinionPoolingPrior` has no single
-   estimator for its model, so `scenario_prior` refits `pe2` on the rows of `pe1`. The
+   estimator for its model, because its pooled weights `wp` come from running the pool on its
+   rows. So `scenario_factory` takes the data of the fit that it reweights, and each method
+   gives a nested prior the rows that its own fit gives it: a factor prior gives `F` to its
+   `pe`. A pool then computes `wp` on those rows and becomes `pe2` under `wp`, reweighted under
+   `w1`. A pool that the host embeds directly is refitted by `scenario_prior` on the rows of
+   `pe1`. A pool with `pe1` inside a factor prior or a Black-Litterman prior reads other rows
+   than the rows that the wrapping prior gives it, and no estimator states that model, so the
+   constructor of the host refuses it through `assert_scenario_refit`
+   ([#1652](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1652)). The
    posterior of such a prior is already the prior probabilities `w0` of the host, so its views
    or opinions are in `w1` too. The refit through `factory` solved them again from `w1`, so the
    read-out reported the moments of other weights than the `w` of the result: on the data of
@@ -113,6 +121,11 @@ agree to the tolerance of the solver: the weights to 8.9e-11, `mu` to 8.0e-12 an
   by 7.5 % under a caller's `w` and by 1.3 % under an opinion pool. Its factor co-moments still
   read the weights of its own `kte` and `ske`, not `w1`, which
   [#1650](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1650) records.
-- An `OpinionPoolingPrior` on the factors inside a `FactorPrior` still re-pools under `w1`,
-  because `scenario_factory` sees no data to pool on.
-  [#1652](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1652) records it.
+- An `OpinionPoolingPrior` on the factors inside a `FactorPrior` re-pooled under `w1` while
+  `scenario_factory` saw no data to pool on. On the data of #1652 the view of the host read
+  0.0033538 for 0.004, and `mu` missed `X' * w` by 0.0011940. It now meets the view, and the
+  same holds for a pool inside a `FactorBlackLittermanPrior`, a Black-Litterman wrapper or an
+  `AugmentedBlackLittermanPrior`.
+- A pool with `pe1` inside a factor prior or a Black-Litterman prior under an entropy pooling
+  prior is refused when the host is built. It was accepted before, and its read-out missed the
+  views. A caller sets `pe1 = nothing` in the pool, or gives the pool to the host directly.

@@ -1739,7 +1739,8 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = fep), X, F)
     @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
     @test isapprox(pr.mu, transpose(pr.X) * pr.w, rtol = 1e-10)
-    @test isa(PortfolioOptimisers.scenario_factory(fep, pr.w).pe, EmpiricalPrior)
+    @test isa(PortfolioOptimisers.scenario_factory(fep, pr.w, X, F, nothing).pe,
+              EmpiricalPrior)
     # An opinion pool reweights scenarios too, so the refit holds the rows of `pe1` and the
     # model of `pe2` under the pooled weights, and the opinions do not pool again. Before the
     # fix the view of the host read 0.0028 over `EmpiricalPrior` pools.
@@ -1754,6 +1755,70 @@ end
         @test isapprox(pr.mu, transpose(pr.X) * pr.w, rtol = 1e-10)
         @test pr.X == prior(op, X, F).X
     end
+    # A pool of the factors, inside a factor prior or a Black-Litterman prior, pools on the
+    # rows of the fit that the views read, and the refit reweights the model of `pe2` under
+    # the posterior weights. So each read-out is the wrapping prior over the factors under
+    # those weights. Before the fix the pool pooled again from the posterior weights, and the
+    # view of the host read 0.0033538 under a `FactorPrior` (#1652).
+    fops = [EntropyPoolingPrior(; sets = fsets,
+                                mu_views = LinearConstraintEstimator(; val = "F3 == 0.002")),
+            EntropyPoolingPrior(; sets = fsets,
+                                mu_views = LinearConstraintEstimator(;
+                                                                     val = "F1 == -0.001"))]
+    fpool = OpinionPoolingPrior(; pes = fops)
+    for mk in ((; kw...) -> EntropyPoolingPrior(; kw...),
+               (; kw...) -> MeucciEntropyPoolingPrior(; kw...))
+        pr = prior(mk(; sets = sets, mu_views = mv, pe = FactorPrior(; pe = fpool)), X, F)
+        @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
+        @test isapprox(pr.mu, transpose(pr.X) * pr.w, rtol = 1e-10)
+    end
+    sets2 = UniverseSets(; xkey = "nx",
+                         dict = Dict("nx" => ["A$i" for i in 1:N],
+                                     "nf" => ["F$i" for i in 1:K]))
+    av = LinearConstraintEstimator(; val = "A2 == 0.001")
+    fv2 = LinearConstraintEstimator(; val = "F2 == 0.001")
+    for mk in (p -> FactorBlackLittermanPrior(; pe = p, views = fv2, sets = sets2),
+               p -> BlackLittermanPrior(; pe = FactorPrior(; pe = p), views = av, sets = sets),
+               p -> BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = p), views = fv2,
+                                                sets = sets2))
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = mk(fpool)), X, F)
+        ref = prior(mk(PortfolioOptimisers.factory(EmpiricalPrior(), pweights(copy(pr.w)))),
+                    X, F)
+        @test isapprox(pr.mu, ref.mu, rtol = 1e-10)
+        @test isapprox(pr.sigma, ref.sigma, rtol = 1e-10)
+    end
+    # The refit of an augmented prior reweights its asset prior under the same weights.
+    pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv,
+                                   pe = AugmentedBlackLittermanPrior(; f_pe = fpool,
+                                                                     a_views = av,
+                                                                     f_views = fv2,
+                                                                     sets = sets2)), X, F)
+    ew = PortfolioOptimisers.factory(EmpiricalPrior(), pweights(copy(pr.w)))
+    ref = prior(AugmentedBlackLittermanPrior(; a_pe = ew, f_pe = ew, a_views = av,
+                                             f_views = fv2, sets = sets2), X, F)
+    @test isapprox(pr.mu, ref.mu, rtol = 1e-10)
+    @test isapprox(pr.sigma, ref.sigma, rtol = 1e-10)
+    # A pool with `pe1` reads the rows of `pe1`, which no estimator fitted on the factor
+    # returns states, so the host refuses it when it is built. A pool that the host embeds
+    # directly keeps its `pe1`.
+    rpool = OpinionPoolingPrior(; pes = fops, pe1 = EmpiricalPrior())
+    for mk in ((; kw...) -> EntropyPoolingPrior(; kw...),
+               (; kw...) -> MeucciEntropyPoolingPrior(; kw...))
+        @test_throws ArgumentError mk(; sets = sets, mu_views = mv,
+                                      pe = FactorPrior(; pe = rpool))
+        @test_throws ArgumentError mk(; sets = sets, mu_views = mv,
+                                      pe = AugmentedBlackLittermanPrior(; f_pe = rpool,
+                                                                        a_views = av,
+                                                                        f_views = fv2,
+                                                                        sets = sets2))
+        @test_throws ArgumentError mk(; sets = sets, mu_views = mv,
+                                      pe = OpinionPoolingPrior(; pes = ops,
+                                                               pe2 = FactorPrior(;
+                                                                                 pe = rpool)))
+        @test isa(mk(; sets = sets, mu_views = mv,
+                     pe = OpinionPoolingPrior(; pes = ops, pe1 = FactorPrior())),
+                  PortfolioOptimisers.AbstractPriorEstimator)
+    end
     # A prior with no residual block beyond its scenarios answers zero.
     @test iszero(PortfolioOptimisers.scenario_residual_variances(prior(EmpiricalPrior(), X)))
     @test iszero(PortfolioOptimisers.scenario_residual_variances(prior(FactorPrior(;
@@ -1765,11 +1830,11 @@ end
     for p in (FactorPrior(), FactorBlackLittermanPrior(; views = blv),
               AugmentedBlackLittermanPrior(; a_views = blv, f_views = blv),
               BlackLittermanPrior(; pe = FactorPrior(), views = blv))
-        q = PortfolioOptimisers.scenario_factory(p, w)
+        q = PortfolioOptimisers.scenario_factory(p, w, X, F, nothing)
         r = hasproperty(p, :re) ? p : p.pe
         s = hasproperty(q, :re) ? q : q.pe
         @test s.re === r.re
     end
-    @test typeof(PortfolioOptimisers.scenario_factory(EmpiricalPrior(), w)) ==
+    @test typeof(PortfolioOptimisers.scenario_factory(EmpiricalPrior(), w, X, F, nothing)) ==
           typeof(PortfolioOptimisers.factory(EmpiricalPrior(), w))
 end

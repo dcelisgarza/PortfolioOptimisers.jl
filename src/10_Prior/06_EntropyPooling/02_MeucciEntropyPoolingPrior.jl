@@ -64,6 +64,7 @@ Keywords correspond to the struct's fields.
   - If any view constraint is not `nothing`, `sets` must not be `nothing`.
   - If `var_views` is a vector, `!isempty(var_views)`.
   - If `w` is not `nothing`, it must be non-empty and match the number of observations.
+  - The refit under the posterior weights can state the model of `pe`, through [`assert_scenario_refit`](@ref). An [`OpinionPoolingPrior`](@ref) with `pe1` inside a factor prior or a Black-Litterman prior of `pe` is refused.
 
 ## Propagated parameters
 
@@ -260,6 +261,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
                                        w::Option{<:StatsBase.ProbabilityWeights},
                                        alg::AbstractEntropyPoolingAlgorithm,
                                        cache::Option{<:AbstractPartialFitState})
+        assert_scenario_refit(pe)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
             if ismutable(w.values)

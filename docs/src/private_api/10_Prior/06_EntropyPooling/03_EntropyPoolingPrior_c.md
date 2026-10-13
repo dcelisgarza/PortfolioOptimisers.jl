@@ -1,5 +1,5 @@
 ```@meta
-Description = "Entropy pooling Prior (c), private API of PortfolioOptimisers.jl: VecEP, show_fields, ep_prior, embedded_pin_weights, scenario_factory, scenario_prior."
+Description = "Entropy pooling Prior (c), private API of PortfolioOptimisers.jl: VecEP, show_fields, ep_prior, embedded_pin_weights, scenario_factory, scenario_prior, …"
 ```
 
 # Entropy pooling Prior (c): private API
@@ -12,4 +12,6 @@ ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
 embedded_pin_weights
 scenario_factory
 scenario_prior
+assert_scenario_model
+assert_scenario_refit
 ```

@@ -51,6 +51,7 @@ Keywords correspond to the struct's fields.
   - If `cvar_views` is not `nothing`, `opt` must be a [`JuMPEntropyPooling`](@ref).
   - If a view field is a vector, it must not be empty.
   - If `w` is not `nothing`, it must be non-empty and match the number of observations.
+  - The refit under the posterior weights can state the model of `pe`, through [`assert_scenario_refit`](@ref). An [`OpinionPoolingPrior`](@ref) with `pe1` inside a factor prior or a Black-Litterman prior of `pe` is refused.
 
 ## Propagated parameters
 
@@ -265,6 +266,7 @@ EntropyPoolingPrior
                                  w::Option{<:StatsBase.ProbabilityWeights},
                                  alg::AbstractEntropyPoolingAlgorithm,
                                  cache::Option{<:AbstractPartialFitState})
+        assert_scenario_refit(pe)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
             if ismutable(w.values)
@@ -733,11 +735,18 @@ function embedded_pin_weights(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPo
     return isnothing(w) ? pe.w : w
 end
 """
-    scenario_factory(pe::AbstractPriorEstimator, w)
-    scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                               <:BlackLittermanPrior, <:BayesianBlackLittermanPrior}, w)
-    scenario_factory(pe::AugmentedBlackLittermanPrior, w)
-    scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w)
+    scenario_factory(pe::AbstractPriorEstimator, w, X::MatNum, F::Option{<:MatNum},
+                     pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w, X::MatNum,
+                     F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    scenario_factory(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior}, w,
+                     X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum, F::MatNum,
+                     pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+                     X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_factory(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:MatNum},
+                     pnl::Option{<:AssetPanel}; kwargs...)
 
 Return the estimator that an entropy pooling prior refits under its posterior weights `w`.
 
@@ -763,16 +772,23 @@ where ``\\mathbf{B}``, ``\\boldsymbol{\\alpha}`` and ``\\mathbf{\\Sigma}_\\varep
 The method that Julia selects is the algorithm.
 
  1. Any other prior: return [`factory`](@ref) of `pe` under `w`. Its rows are the returns, which no weight moves.
- 2. A [`FactorPrior`](@ref), a [`FactorBlackLittermanPrior`](@ref), a [`BlackLittermanPrior`](@ref) or a [`BayesianBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w`, and keep every other field. The two factor priors keep `re` and `ve`, and the `pe` of the two Black-Litterman priors is their only weighted field.
- 3. An [`AugmentedBlackLittermanPrior`](@ref): replace the asset prior `a_pe` and the factor prior `f_pe` with this function of each under `w`, and keep `re`.
- 4. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, under [`factory`](@ref) of `pe.w` when the caller set one. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`, and [`factory`](@ref) would give it `w` as its own prior probabilities and solve its views again. This holds for an entropy pooling prior of the factors in step 2 too.
+ 2. A [`FactorPrior`](@ref) or a [`FactorBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w` on the factor returns `F` alone, as the fit of `pe` fits `pe.pe`, and keep every other field. The two factor priors keep `re` and `ve`.
+ 3. A [`BlackLittermanPrior`](@ref) or a [`BayesianBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w` on `X`, `F` and `pnl`. Their `pe` is their only weighted field.
+ 4. An [`AugmentedBlackLittermanPrior`](@ref): replace the asset prior `a_pe` with this function of it on `X` and `pnl`, and the factor prior `f_pe` with this function of it on `F` alone, each under `w`. Keep `re`.
+ 5. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, under [`factory`](@ref) of `pe.w` when the caller set one. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`, and [`factory`](@ref) would give it `w` as its own prior probabilities and solve its views again. This holds for an entropy pooling prior of the factors in step 2 too.
+ 6. An [`OpinionPoolingPrior`](@ref): pool the opinions on `X` with [`opinion_pooling_weights`](@ref), giving the pooled weights `wp`, under which its own fit fits `pe.pe2`. Return this function of [`factory`](@ref) of `pe.pe2` under `wp`, under `w`. The posterior of the pool is already in the prior probabilities of the host, so [`factory`](@ref) of the pool under `w` pooled its opinions again from `w`, and a [`FactorPrior`](@ref) around it read the factor moments of other weights (#1652).
 
-Every step recurses through this function and never through [`factory`](@ref) of a prior that reweights scenarios, so no entropy pooling constructor reads `w` and normalises it a second time. An [`OpinionPoolingPrior`](@ref) has no single estimator that states its model, and [`scenario_prior`](@ref) refits it instead.
+Every step recurses through this function and never through [`factory`](@ref) of a prior that reweights scenarios, so no entropy pooling constructor reads `w` and normalises it a second time. Each step gives a nested prior the rows that the fit of `pe` gives it, so a pool computes `wp` on the rows of the fit that the views read. A pool with `pe1` refits on the rows of `pe1`, and no estimator that is fitted on `X` states that model. [`assert_scenario_model`](@ref) refuses such a pool when the host is built, and [`scenario_prior`](@ref) refits a pool that the host embeds directly.
 
 # Arguments
 
   - `pe`: The prior that an entropy pooling prior embeds.
   - `w`: The posterior weights.
+  - $(arg_dict[:X])
+  - `F`: Optional factor returns matrix, already oriented.
+  - $(arg_dict[:pnl_prior])
+  - `strict`: If `true`, throws error for missing assets; otherwise, issues warnings. Default is `false`.
+  - `kwargs...`: Additional keyword arguments, forwarded where the fit of `pe` forwards them.
 
 # Returns
 
@@ -787,21 +803,32 @@ Every step recurses through this function and never through [`factory`](@ref) of
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`FactorPrior`](@ref)
 """
-function scenario_factory(pe::AbstractPriorEstimator, w)
+function scenario_factory(pe::AbstractPriorEstimator, w, ::MatNum, ::Option{<:MatNum},
+                          ::Option{<:AssetPanel}; kwargs...)
     return factory(pe, w)
 end
-function scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
-                                    <:BlackLittermanPrior, <:BayesianBlackLittermanPrior},
-                          w)
-    return rebuild_estimator(pe, (; pe = scenario_factory(pe.pe, w)))
+function scenario_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
+                          ::MatNum, F::MatNum, ::Option{<:AssetPanel}; strict::Bool = false,
+                          kwargs...)
+    inner = scenario_factory(pe.pe, w, F, nothing, nothing; strict = strict)
+    return rebuild_estimator(pe, (; pe = inner))
 end
-function scenario_factory(pe::AugmentedBlackLittermanPrior, w)
-    return rebuild_estimator(pe,
-                             (; a_pe = scenario_factory(pe.a_pe, w),
-                              f_pe = scenario_factory(pe.f_pe, w)))
+function scenario_factory(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior},
+                          w, X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                          kwargs...)
+    return rebuild_estimator(pe, (; pe = scenario_factory(pe.pe, w, X, F, pnl; kwargs...)))
 end
-function scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w)
-    return scenario_factory(isnothing(pe.w) ? pe.pe : factory(pe.pe, pe.w), w)
+function scenario_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum, F::MatNum,
+                          pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    a_pe = scenario_factory(pe.a_pe, w, X, nothing, pnl; strict = strict, kwargs...)
+    f_pe = scenario_factory(pe.f_pe, w, F, nothing, nothing; strict = strict)
+    return rebuild_estimator(pe, (; a_pe = a_pe, f_pe = f_pe))
+end
+function scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
+                          X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                          kwargs...)
+    return scenario_factory(isnothing(pe.w) ? pe.pe : factory(pe.pe, pe.w), w, X, F, pnl;
+                            kwargs...)
 end
 """
     scenario_prior(pe::AbstractPriorEstimator, w, X::MatNum, F::Option{<:MatNum},
@@ -820,7 +847,7 @@ Refit the prior that an entropy pooling prior embeds, with its scenarios under t
 The method that Julia selects is the algorithm.
 
  1. Any other prior: fit [`scenario_factory`](@ref) of `pe` under `w` on `X`, `F` and `pnl`.
- 2. A nested entropy pooling prior: apply this function to the estimator that fits its model, as step 4 of [`scenario_factory`](@ref) does. This method exists because that model can be an [`OpinionPoolingPrior`](@ref).
+ 2. A nested entropy pooling prior: apply this function to the estimator that fits its model, as step 5 of [`scenario_factory`](@ref) does. This method exists because that model can be an [`OpinionPoolingPrior`](@ref).
  3. An [`OpinionPoolingPrior`](@ref): take the rows of `pe.pe1` when it is set, and the returns otherwise, as its own fit does. Pool the opinions on those rows with [`opinion_pooling_weights`](@ref), giving the pooled weights `wp`, under which its own fit fits `pe.pe2`. Apply this function to [`factory`](@ref) of `pe.pe2` under `wp`, under `w`, on those rows. The opinions run for `wp` alone, and their views do not reach the result.
 
 # Arguments
@@ -845,13 +872,109 @@ The method that Julia selects is the algorithm.
 """
 function scenario_prior(pe::AbstractPriorEstimator, w, X::MatNum, F::Option{<:MatNum},
                         pnl::Option{<:AssetPanel}; kwargs...)
-    return prior(scenario_factory(pe, w), X, F, pnl; kwargs...)
+    return prior(scenario_factory(pe, w, X, F, pnl; kwargs...), X, F, pnl; kwargs...)
 end
 function scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
                         X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                         kwargs...)
     return scenario_prior(isnothing(pe.w) ? pe.pe : factory(pe.pe, pe.w), w, X, F, pnl;
                           kwargs...)
+end
+"""
+    assert_scenario_model(pe::AbstractPriorEstimator)
+    assert_scenario_model(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                    <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                                    <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    assert_scenario_model(pe::AugmentedBlackLittermanPrior)
+    assert_scenario_model(pe::OpinionPoolingPrior)
+
+Check that [`scenario_factory`](@ref) can state the model of `pe` as one estimator.
+
+[`scenario_factory`](@ref) returns the estimator that the refit of an entropy pooling prior fits on the rows of `pe`. An [`OpinionPoolingPrior`](@ref) with `pe1` refits `pe2` on the rows of `pe1`, which differ from the rows of `pe`, so no such estimator states its model. The check walks the priors that [`scenario_factory`](@ref) walks, and refuses such a pool, so the entropy pooling prior fails when it is built and not at the refit (#1652).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other prior: return `nothing`.
+ 2. A prior that [`scenario_factory`](@ref) rebuilds around `pe.pe`: apply this function to `pe.pe`.
+ 3. An [`AugmentedBlackLittermanPrior`](@ref): apply this function to `pe.a_pe` and to `pe.f_pe`.
+ 4. An [`OpinionPoolingPrior`](@ref): check that `pe.pe1` is `nothing`, and apply this function to `pe.pe2`.
+
+# Arguments
+
+  - `pe`: The prior that [`scenario_factory`](@ref) rebuilds.
+
+# Validation
+
+  - Every [`OpinionPoolingPrior`](@ref) that the walk meets has no `pe1`. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_scenario_refit`](@ref)
+  - [`scenario_factory`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+"""
+function assert_scenario_model(::AbstractPriorEstimator)
+    return nothing
+end
+function assert_scenario_model(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                         <:BlackLittermanPrior,
+                                         <:BayesianBlackLittermanPrior,
+                                         <:EntropyPoolingPrior,
+                                         <:MeucciEntropyPoolingPrior})
+    return assert_scenario_model(pe.pe)
+end
+function assert_scenario_model(pe::AugmentedBlackLittermanPrior)
+    assert_scenario_model(pe.a_pe)
+    return assert_scenario_model(pe.f_pe)
+end
+"""
+    assert_scenario_refit(pe::AbstractPriorEstimator)
+    assert_scenario_refit(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
+    assert_scenario_refit(pe::OpinionPoolingPrior)
+
+Check that [`scenario_prior`](@ref) can refit `pe`, the prior that an entropy pooling prior embeds, under its posterior weights.
+
+The constructors of [`EntropyPoolingPrior`](@ref) and [`MeucciEntropyPoolingPrior`](@ref) call this on their `pe`. The check walks the priors that [`scenario_prior`](@ref) walks, and applies [`assert_scenario_model`](@ref) where [`scenario_prior`](@ref) calls [`scenario_factory`](@ref). [`scenario_prior`](@ref) refits a pool that the host embeds directly on the rows of its `pe1`, so this function lets such a pool keep its `pe1`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other prior: apply [`assert_scenario_model`](@ref) to `pe`.
+ 2. A nested entropy pooling prior: apply this function to `pe.pe`.
+ 3. An [`OpinionPoolingPrior`](@ref): apply this function to `pe.pe2`.
+
+# Arguments
+
+  - `pe`: The prior that an entropy pooling prior embeds.
+
+# Validation
+
+  - The rules of [`assert_scenario_model`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_scenario_model`](@ref)
+  - [`scenario_prior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+"""
+function assert_scenario_refit(pe::AbstractPriorEstimator)
+    return assert_scenario_model(pe)
+end
+function assert_scenario_refit(pe::Union{<:EntropyPoolingPrior,
+                                         <:MeucciEntropyPoolingPrior})
+    return assert_scenario_refit(pe.pe)
 end
 
 export EntropyPoolingPrior
