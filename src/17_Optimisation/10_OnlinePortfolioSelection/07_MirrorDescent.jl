@@ -953,6 +953,8 @@ The Risk Loss replaces log wealth as the objective. `r` is one risk measure or a
 
 `sca` scalarises a vector of measures at the `settings.scale` of each measure. So `[MeanReturn(), Variance()]`, with a negative scale on the mean, gives one step on the mean-variance utility.
 
+**Under `brt = true` the loss reads the returns in excess of the benchmark.** The prior fits the window on `X - B`, which [`benchmark_relative_returns`](@ref) gives, so a [`Variance`](@ref) becomes the tracking variance against the benchmark `B` that the rows carry. The head's rows keep the raw returns and the benchmark, so the loss applies its own `brt`, whatever the `brt` of the head is. A [`DataTracking`](@ref) in `r` refuses `brt = true`, because it would subtract the benchmark twice.
+
 A prior fitted on one row has no covariance. So the loss starts when the head holds two rows, and the step before that leaves the iterate unchanged. The loss reads the last `window` rows that the head holds, so the first `window - 1` steps read a shorter window. The head can hold more rows, because its Allocation Set or another rule can need more, and the loss does not read them.
 
 **A risk gradient is small, so a rule on a Risk Loss needs a much larger rate than a log-wealth rule.** A variance gradient ``2 \\boldsymbol{\\Sigma} \\boldsymbol{w}`` has the size of one period's variance. Take 1000 periods of returns `randn(StableRNG(7), 1000, 4) .* [0.01 0.02 0.03 0.04]`, a window of 20 and the uniform allocation. Over every window, the log-wealth gradient is then between 1100 and 6400 times larger than the variance gradient. The entropic rule on [`Variance`](@ref) at the log-wealth default `eta = 0.05` ends 0.005 from its uniform start, and the minimum-variance allocation is 0.45 away. At `eta = 100` the rule ends within 0.06 of that allocation.
@@ -974,7 +976,7 @@ Where:
 
   - ``\\ell_t``: Loss of period ``t``.
   - ``\\rho``: Risk measure, resolved against the prior fitted on ``\\mathbf{X}_t``. A vector of measures is their scalarisation.
-  - ``\\mathbf{X}_t``: Returns of the last ``\\min(t, W)`` periods through period ``t``, with ``W`` the field `window`.
+  - ``\\mathbf{X}_t``: Returns of the last ``\\min(t, W)`` periods through period ``t``, with ``W`` the field `window`. Under `brt = true` they are the returns in excess of the benchmark.
   - $(math_dict[:w_t_iter])
   - $(math_dict[:g_t_loss])
 
@@ -990,7 +992,8 @@ $(DocStringExtensions.FIELDS)
         r::BaseRM_VecBaseRM = Variance(),
         window::Integer = 20,
         sca::Scalariser = SumScalariser(),
-        pe::AbstractPriorEstimator = EmpiricalPrior()
+        pe::AbstractPriorEstimator = EmpiricalPrior(),
+        brt::Bool = false
     ) -> RiskLoss
 
 Keywords correspond to the struct's fields.
@@ -1039,6 +1042,7 @@ RiskLoss
          │              │   w ┴ nothing
          │      horizon ┼ nothing
          │   fill_limit ┴ nothing
+     brt ┴ Bool: false
 ```
 
 # Related
@@ -1066,27 +1070,32 @@ RiskLoss
     $(field_dict[:pe])
     """
     pe
-    function RiskLoss(r::T1, window::T2, sca::T3,
-                      pe::T4) where {T1 <: BaseRM_VecBaseRM, T2 <: Integer,
-                                     T3 <: Scalariser, T4 <: AbstractPriorEstimator}
+    """
+    $(arg_dict[:brt_read]) The prior of the loss fits the window on `X - B`. The head's rows stay raw, so the loss applies its own `brt`. Rows with no benchmark `B` are refused.
+    """
+    brt
+    function RiskLoss(r::T1, window::T2, sca::T3, pe::T4,
+                      brt::Bool) where {T1 <: BaseRM_VecBaseRM, T2 <: Integer,
+                                        T3 <: Scalariser, T4 <: AbstractPriorEstimator}
         @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
         path = returns_tracking_path(r)
         @argcheck(isnothing(path),
                   ArgumentError("a `RiskLoss` holds a `ReturnsTracking` at `$(tree_path(:r, something(path, "")))`, and the loss reads the rows of the head's buffer, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
-        return new{T1, T2, T3, T4}(r, window, sca, pe)
+        return new{T1, T2, T3, T4, Bool}(r, window, sca, pe, brt)
     end
 end
 function RiskLoss(; r::BaseRM_VecBaseRM = Variance(), window::Integer = 20,
                   sca::Scalariser = SumScalariser(),
-                  pe::AbstractPriorEstimator = EmpiricalPrior())::RiskLoss
-    return RiskLoss(r, window, sca, pe)
+                  pe::AbstractPriorEstimator = EmpiricalPrior(),
+                  brt::Bool = false)::RiskLoss
+    return RiskLoss(r, window, sca, pe, brt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a [`RiskLoss`](@ref) whose measure takes the Price-Adjusted Allocation `w` of the step.
 
-`factory(obj.r, w)` advances the measure. A [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, and every other measure stays as it is. A rule calls this method before it reads the gradient, so the loss reads the step's book, as the turnover and the tracking error of a [`ProgrammeAllocationSet`](@ref) do. `window`, `sca` and `pe` pass through unchanged.
+`factory(obj.r, w)` advances the measure. A [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, and every other measure stays as it is. A rule calls this method before it reads the gradient, so the loss reads the step's book, as the turnover and the tracking error of a [`ProgrammeAllocationSet`](@ref) do. `window`, `sca`, `pe` and `brt` pass through unchanged.
 
 # Related
 
@@ -1095,7 +1104,7 @@ Return a [`RiskLoss`](@ref) whose measure takes the Price-Adjusted Allocation `w
   - [`factory`](@ref)
 """
 function factory(obj::RiskLoss, w::VecNum)::RiskLoss
-    return RiskLoss(factory(obj.r, w), obj.window, obj.sca, obj.pe)
+    return RiskLoss(factory(obj.r, w), obj.window, obj.sca, obj.pe, obj.brt)
 end
 """
     rows_needed(obj::LogWealth)
@@ -1131,7 +1140,7 @@ The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref)
 
  1. When `rows` is `nothing`, or holds fewer than two rows, return the zero vector.
  2. View the last `min(window, n)` of the `n` rows of `rows`. The head can hold more rows than the loss reads, because another part of the head can need more.
- 3. Fit the prior `pr` of the loss on that view, as a batch prior is fitted, on its returns and its Asset Panel. The prior answers `NaN` at an asset outside its Coverage Universe.
+ 3. Fit the prior `pr` of the loss on that view under the loss's `brt`, as a batch prior is fitted, on its returns and its Asset Panel. Under `brt = true` the prior reads `X - B`. The prior answers `NaN` at an asset outside its Coverage Universe.
  4. Read the Investable Mask of `pr`.
  5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref), against the rows of the view. It is zero at every other leg.
 
@@ -1151,7 +1160,7 @@ function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector,
     end
     n = size(rows.X, 1)
     window = port_opt_view(rows, (n - min(obj.window, n) + 1):n, :)
-    pr = prior(obj.pe, window)
+    pr = prior(obj.pe, window; brt = obj.brt)
     return investable_risk_gradient(obj, u, pr, investable_mask(pr), window)
 end
 """
@@ -1164,7 +1173,7 @@ A leg that the window does not cover gets a zero gradient, so the loss does not 
 
 # Algorithm
 
-The measure reads the rows `rd` that the prior is fitted on: each [`DataTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The prior of the loss fits the raw rows whatever the head's `brt` is, so the measure binds under `brt = false`.
+The measure reads the rows `rd` that the prior is fitted on: each [`DataTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The prior of the loss fits the rows under the loss's own `brt`, whatever the head's `brt` is, so the measure binds under the loss's `brt`. A data benchmark refuses `brt = true`.
 
 When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the bound measure at `u`. Otherwise it runs these steps.
 
@@ -1182,13 +1191,14 @@ When the mask is `nothing`, every asset is priced, and the method returns [`risk
 """
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
                                   ::Nothing, rd::ReturnsResult)
-    return risk_gradient(bind_data_benchmark(obj.r, rd, false), u, pr; sca = obj.sca)
+    return risk_gradient(bind_data_benchmark(obj.r, rd, obj.brt), u, pr; sca = obj.sca)
 end
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
                                   imsk::BitVector, rd::ReturnsResult)
     idx = findall(imsk)
     g = zeros(eltype(u), length(u))
-    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx), false)
+    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx),
+                            obj.brt)
     g[idx] .= risk_gradient(r, u[idx], port_opt_view(pr, idx); sca = obj.sca)
     return g
 end

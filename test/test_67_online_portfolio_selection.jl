@@ -965,6 +965,46 @@ end
         @test copy(om.cache).nb == nbm
     end
 
+    @testset "A Risk Loss fits its prior in the Excess Frame under its own brt (#1663)" begin
+        # The rows stay raw, so the loss applies its own `brt`: under `brt = true` its
+        # gradient equals that of the same loss on hand-built `X - B` rows, under a vector
+        # and a matrix benchmark, and a Variance loss becomes a tracking variance.
+        rngb = StableRNG(1663)
+        Bv = 0.01 .* randn(rngb, T)
+        Bm = 0.01 .* randn(rngb, T, N)
+        rdb = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bv, ts = ts)
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nx .* "_b", B = Bm, ts = ts)
+        exv = ReturnsResult(; nx = nx, X = R .- Bv, ts = ts)
+        exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
+        u = [0.1, 0.2, 0.3, 0.4]
+        grad(brt, r) = po.loss_gradient(RiskLoss(; window = 8, brt = brt), u, ones(N), r)
+        for (b, e) in ((rdb, exv), (rdm, exm)), t in (2, 8, 30)
+            @test grad(true, rows(b, 1:t)) == grad(false, rows(e, 1:t))
+            @test !isapprox(grad(true, rows(b, 1:t)), grad(false, rows(b, 1:t)))
+        end
+        # The head: the loss's `brt` and the head's `brt` together equal the plain head on
+        # `X - B`. The loss's `brt` alone moves the head, and online equals batch.
+        md(brt) = MirrorDescent(; eta = 50.0, obj = RiskLoss(; window = 8, brt = brt))
+        @test optimise(OPS(; alg = md(true), brt = true), rdm).w ==
+              optimise(OPS(; alg = md(false)), exm).w
+        w = optimise(OPS(; alg = md(true)), rdm).w
+        @test !isapprox(w, optimise(OPS(; alg = md(false)), rdm).w; atol = 1e-6)
+        o = OPS(; alg = md(true))
+        for t in 1:T
+            o = po.partial_fit!(o, rows(rdm, t:t))
+        end
+        @test optimise(o).w == w
+        @test po.factory(RiskLoss(; brt = true), u).brt
+        # Rows with no benchmark are refused, and so is a data benchmark under `brt = true`,
+        # which would subtract the benchmark twice.
+        @test_throws ArgumentError optimise(OPS(; alg = md(true)), rows(rd, 1:10))
+        @test_throws ArgumentError po.partial_fit!(OPS(; alg = md(true)), rows(rd, 1:10))
+        dtl = RiskLoss(; window = 8, brt = true,
+                       r = TrackingRiskMeasure(; tr = DataTracking()))
+        @test_throws ArgumentError optimise(OPS(; alg = MirrorDescent(; obj = dtl)),
+                                            rows(rdb, 1:10))
+    end
+
     @testset "Show, docs and the search seam" begin
         opt = po.partial_fit!(OPS(; alg = BuyAndHold()), rows(rd, 1:3))
         s = sprint(show, MIME("text/plain"), opt)

@@ -94,14 +94,14 @@ end
 
 Fits the prior result that a programme set's row-reading slots are built on.
 
-The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The fit reads the rows as they are and the Asset Panel beside them, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
+The set fits its `pe` on the rows that the head holds under its own `brt`, the same way a batch head fits a prior on any returns data. Under `brt = true` the fit reads `X - B`, which [`benchmark_relative_returns`](@ref) gives. The fit reads the Asset Panel beside the rows, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
 
 # Algorithm
 
  1. Ask [`rows_needed`](@ref) whether the set reads the head's rows. It answers `nothing` when a slot reads them.
  2. If no slot reads them, return `nothing`.
  3. Check that `X` is not `nothing`.
- 4. Fit `set.pe` on `X` with [`prior`](@ref), and return the result.
+ 4. Fit `set.pe` on `X` under `set.brt` with [`prior`](@ref), and return the result.
 
 # Arguments
 
@@ -111,6 +111,7 @@ The set fits its `pe` on the rows that the head holds, the same way a batch head
 # Validation
 
   - A slot reads the rows and `X` is `nothing`. An `ArgumentError` is thrown.
+  - The rules of [`benchmark_relative_returns`](@ref), under `set.brt`.
 
 # Returns
 
@@ -126,7 +127,7 @@ function allocation_set_prior(set::ProgrammeAllocationSet, X::Option{<:ReturnsRe
     if isnothing(rows_needed(set))
         @argcheck(!isnothing(X),
                   ArgumentError("a ProgrammeAllocationSet with a slot that reads the head's rows — a ceiling built on its prior, a tracking error, a centrality or phylogeny estimator, an exposure row, a return floor or a Calibration Rule — reads them inside an Online Update alone; `project` was called with none."))
-        return prior(set.pe, X)
+        return prior(set.pe, X; brt = set.brt)
     end
     return nothing
 end

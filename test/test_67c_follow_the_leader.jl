@@ -347,6 +347,34 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test_throws ArgumentError optimise(ftl, rows(rd, 1:8))
     end
 
+    @testset "The built-in programmes take the leader's brt (#1663)" begin
+        # SPOLC and OLDEM give their `brt` to the `MeanRisk` they build, so each equals the
+        # walk-forward of its own leader over the window of its selector, fold for fold. The
+        # turnover fee of OLDEM measures from the head's book, and that of a walk-forward
+        # from its own last weights, so the parity takes `xi = 0`.
+        Bm = 0.01 .* randn(StableRNG(1663), T, N)
+        rdm = ReturnsResult(; nx = nx, X = R, ts = ts, nb = nx .* "_b", B = Bm)
+        sp(brt) = ShortTermLossControlPortfolio(; slv = slv, brt = brt)
+        ld(brt; xi = 0.002) = LowDimensionEnsemblePortfolio(; N = N, slv = slv, brt = brt,
+                                                            xi = xi)
+        @test sp(true).opt.opt.brt && !sp(false).opt.opt.brt
+        @test ld(true).opt.opt.brt && !ld(false).opt.opt.brt
+        for (alg, k) in ((sp(true), 5), (ld(true; xi = 0.0), 6))
+            ftl = OPS(; alg = alg)
+            pred = cross_val_predict(alg.opt, rdm, IndexWalkForward(k, 1))
+            for i in 1:6
+                @test isapprox(pred.pred[i].res.w,
+                               optimise(ftl, rows(rdm, 1:(k + i - 1))).w; atol = 1e-6)
+            end
+        end
+        # The benchmark moves the leader.
+        for alg in (sp, ld)
+            @test !isapprox(optimise(OPS(; alg = alg(true)), rows(rdm, 1:16)).w,
+                            optimise(OPS(; alg = alg(false)), rows(rdm, 1:16)).w;
+                            atol = 0.5)
+        end
+    end
+
     @testset "The Allocation Set Constraint (ADR 0164)" begin
         # Sixty rows of three assets on a two-period cycle: the first two co-moving, the
         # second with the lower drift, the third in anti-phase. The unconstrained leader is

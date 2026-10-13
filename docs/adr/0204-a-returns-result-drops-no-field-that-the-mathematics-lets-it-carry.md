@@ -131,6 +131,15 @@ whatever `X` is in scope.
    prior of a programme set apply their own `brt`, as decision 4 states for an inner optimiser.
    The state pins `nb` under `brt = true`, because the frame of every row is the excess over that
    benchmark. `predict` reports the raw wealth of the fund, because the fund holds the assets.
+10. **A Risk Loss and a programme set take a `brt` of their own** (#1663). `RiskLoss` and
+    `ProgrammeAllocationSet` take `brt::Bool = false`, and fit their prior with
+    `prior(pe, rows; brt)`. So a `Variance` loss or ceiling under `brt = true` is a tracking
+    variance against the `B` that the rows carry. Each slot of the set that reads the rows takes
+    the set's `brt`, as the same slot of a `JuMPOptimiser` takes the optimiser's: the exposure
+    rows, the centrality and phylogeny rows, the return floor, and the binding of a
+    `DataTracking`. The built-in programmes of `ShortTermLossControlPortfolio` and
+    `LowDimensionEnsemblePortfolio` take a `brt` keyword and give it to the `JuMPOptimiser` of
+    their `MeanRisk`. The `brt` of the head does not reach them, as decision 4 states.
 
 ## Consequences
 
@@ -153,6 +162,9 @@ whatever `X` is in scope.
 - Under a vector `B`, the Excess Frame moves a log-wealth rule such as `ExponentiatedGradient`,
   because `1 + r - b` is not a scaling of `1 + r` by one number. A rule with an absolute threshold
   or a correlation moves too.
+- A tracking variance can bound an online allocation in two ways: a `Variance` ceiling of a set
+  with `brt = true`, or a `TrackingRiskMeasure` ceiling on a `DataTracking` of a set with
+  `brt = false`. The set refuses a `DataTracking` under `brt = true`, as a `JuMPOptimiser` does.
 - A pipeline that injected a raw prior into an optimiser with `brt = true` now fails when it is
   built. The caller wraps the prior step with `brt = true`. The same holds for a raw uncertainty
   set, clustering, phylogeny, centrality or exposure step.
@@ -189,6 +201,9 @@ whatever `X` is in scope.
   beside the `X - B` of every other reader of the library.
 - **Thread `brt` through `online_update!`.** Each of its methods and every rule over other rules
   would take one more argument that most of them do not read.
+- **Let a Risk Loss and a programme set read the head's `brt`** (#1663). It needs no new field,
+  but a caller could not bound the tracking variance of a head that selects on raw returns, and
+  the rule would differ from decision 4 for every other inner estimator.
 
 ## Related
 

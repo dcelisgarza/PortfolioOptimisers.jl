@@ -953,7 +953,7 @@ end
                                           ret = ArithmeticReturn(;
                                                                  settings = JuMPReturnsSettings(;
                                                                                                 lb = 0.0)))
-            @test fieldnames(typeof(full))[1:4] == (:pe, :slv, :r, :wb)
+            @test fieldnames(typeof(full))[1:4] == (:pe, :brt, :slv, :r)
             @test isnothing(po.rows_needed(full))
             @test po.rows_needed(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
                                                         wb = WeightBounds(; lb = -0.2,
@@ -1772,5 +1772,63 @@ end
                                                              set = set(rtw)), rd,
                                                          IndexWalkForward(10, 5))
         end
+    end
+
+    @testset "The set fits its prior in the Excess Frame under its own brt (#1663)" begin
+        # The rows stay raw, so the set applies its own `brt`. Under `brt = true` a Variance
+        # ceiling is a ceiling on the tracking variance against the benchmark of the rows.
+        rng = StableRNG(1663)
+        T, N = 40, 4
+        R = 0.02 .* randn(rng, T, N)
+        Bv = 0.01 .* randn(rng, T)
+        Bm = 0.01 .* randn(rng, T, N)
+        nx = ["A", "B", "C", "D"]
+        ts = Date(2020, 1, 1) .+ Day.(0:(T - 1))
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nx .* "_b", B = Bm, ts = ts)
+        exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
+        rows(r, i) = po.port_opt_view(r, i, :)
+        vset(brt) = ProgrammeAllocationSet(; slv = slv, brt = brt,
+                                           r = Variance(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       ub = 2e-4)))
+        # One projection: the ceiling binds on the covariance of `X - B`. The covariance
+        # of the view and that of the hand-built matrix differ by 1e-19, which the solve
+        # takes to 2e-7 at the binding ceiling.
+        win, wine = rows(rdm, 1:20), rows(exm, 1:20)
+        S = cov(wine.X)
+        pj(set, r) = first(po.with_projection_step(() -> po.project(EuclideanProjection(),
+                                                                    resolve(set, N),
+                                                                    [1.0, 0.0, 0.0, 0.0],
+                                                                    fill(0.25, N)), r, 20))
+        wx = pj(vset(true), win)
+        @test dot(wx, S, wx) ≈ 2e-4 rtol = 1e-8
+        @test isapprox(wx, pj(vset(false), wine); atol = 1e-6)
+        @test !isapprox(wx, pj(vset(false), win); atol = 1e-2)
+        # The head: the set's `brt` and the head's `brt` together equal the plain head on
+        # `X - B`. The set's `brt` alone moves the head, and online equals batch.
+        mk(brt, hbrt) = OPS(; alg = PassiveAggressiveMeanReversion(), brt = hbrt,
+                            set = vset(brt))
+        held = r"Held Step at 2020-01-01"
+        w2 = (@test_logs (:warn, held) optimise(mk(false, false), exm)).w
+        @test isapprox((@test_logs (:warn, held) optimise(mk(true, true), rdm)).w, w2;
+                       atol = 1e-6)
+        w = (@test_logs (:warn, held) optimise(mk(true, false), rdm)).w
+        @test !isapprox(w, (@test_logs (:warn, held) optimise(mk(false, false), rdm)).w;
+                        atol = 1e-2)
+        o = mk(true, false)
+        @test_logs (:warn, held) for t in 1:T
+            o = po.partial_fit!(o, rows(rdm, t:t))
+        end
+        @test optimise(o).w == w
+        # A view keeps the set's `brt`, and so does the resolution of a fold.
+        @test po.port_opt_view(vset(true), [1, 2]).brt
+        @test resolve(vset(true), N).brt
+        # Rows with no benchmark are refused, and so is a data benchmark under `brt = true`.
+        rd0 = ReturnsResult(; nx = nx, X = R, ts = ts)
+        @test_throws ArgumentError optimise(mk(true, false), rows(rd0, 1:10))
+        dts = ProgrammeAllocationSet(; slv = slv, brt = true,
+                                     tr = TrackingError(; tr = DataTracking(), err = 0.01))
+        @test_throws ArgumentError optimise(OPS(; alg = PassiveAggressiveMeanReversion(),
+                                                set = dts), rows(rdm, 1:10))
     end
 end

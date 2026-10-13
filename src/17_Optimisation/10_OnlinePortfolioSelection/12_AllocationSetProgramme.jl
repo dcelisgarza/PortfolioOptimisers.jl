@@ -27,15 +27,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolves the slots of a [`ProgrammeAllocationSet`](@ref) that read the head's rows, at every step.
 
-This is the second stage of the set's resolution. [`resolve_allocation_set`](@ref) resolves the slots keyed by name once per fold. This function resolves the rest on the prior result `pr` that is fitted on the rows `rd` that the head holds, as [`processed_jump_optimiser_attributes`](@ref) and [`assemble_jump_model!`](@ref) resolve them for a batch head. A set that reads no rows has no prior, and its slots come back as they are.
+This is the second stage of the set's resolution. [`resolve_allocation_set`](@ref) resolves the slots keyed by name once per fold. This function resolves the rest on the prior result `pr` that is fitted on the rows `rd` that the head holds, as [`processed_jump_optimiser_attributes`](@ref) and [`assemble_jump_model!`](@ref) resolve them for a batch head. Each reader of the rows takes the set's `brt`, as the same reader takes the optimiser's `brt` there. A set that reads no rows has no prior, and its slots come back as they are.
 
 # Algorithm
 
 The method on a prior result runs these steps.
 
  1. Read `strict` from the current [`ProjectionStep`](@ref).
- 2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr` and the rows. Otherwise `lcsr` is `lcse`.
- 3. Fit the centrality rows `ctr` and the phylogeny result `plr` on the prior and the rows.
+ 2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr`, the rows and the set's `brt`. Otherwise `lcsr` is `lcse`.
+ 3. Fit the centrality rows `ctr` and the phylogeny result `plr` on the prior, the rows and the set's `brt`.
  4. Resolve the return floor `ret` against the prior.
  5. Resolve the Calibration Rules of the norm ceilings `l2c`, `linfc` and `lpc`, and of the penalties `l1`, `l2`, `lp` and `linf`, against the prior and the set's solver.
  6. Return the resolved slots and `rd`.
@@ -78,12 +78,12 @@ function resolve_allocation_set_rows(set::ProgrammeAllocationSet, pr::AbstractPr
     slv = set.slv
     lcsr = if exposure_keyed(set.lcse)
         linear_constraints(set.lcse, set.sets; datatype = eltype(rd.X), strict = strict,
-                           rr = pr.rr, rd = rd)
+                           rr = pr.rr, rd = rd, brt = set.brt)
     else
         set.lcse
     end
-    ctr = centrality_constraints(set.cte, pr; rd = rd, strict = strict)
-    plr = phylogeny_constraints(set.ple, pr; rd = rd)
+    ctr = centrality_constraints(set.cte, pr; rd = rd, brt = set.brt, strict = strict)
+    plr = phylogeny_constraints(set.ple, pr; rd = rd, brt = set.brt)
     ret = factory(set.ret, pr)
     l2c = resolve_calibration_slot(set.l2c, :l2c, pr, pr.w, slv,
                                    CalibrationContext(; p = 2))
@@ -216,11 +216,11 @@ Both arms call it after they add the bounds. The bare projection model passes th
  4. Add the linear rows `lcsr`, then the centrality rows `ctr`.
  5. Add the MIP kinds, then the sub-group MIP kinds.
  6. Add the turnover ceilings, each with its reference replaced by `w`, through [`set_allocation_turnover!`](@ref).
- 7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataTracking`](@ref) to the benchmark of the rows `rd` with [`bind_data_benchmark`](@ref), and add the rows.
+ 7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref). Bind each [`DataTracking`](@ref) to the benchmark of the rows `rd` under the set's `brt` with [`bind_data_benchmark`](@ref), and add the rows.
  8. Add the norm ceilings `l2c`, `lpc` and `linfc`.
  9. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
-10. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 6 and 7. A measure that holds neither stays as it is. Bind each [`DataTracking`](@ref) of the ceilings to the benchmark of the rows `rd`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
-11. Add the return floor `ret` with [`set_allocation_return_floor!`](@ref).
+10. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 6 and 7. A measure that holds neither stays as it is. Bind each [`DataTracking`](@ref) of the ceilings to the benchmark of the rows `rd` under the set's `brt`, and add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
+11. Add the return floor `ret` with [`set_allocation_return_floor!`](@ref), with the rows and the set's `brt`.
 12. Add the integer phylogeny rows and the semidefinite phylogeny rows of `plr`.
 13. Add the custom constraints.
 
@@ -266,10 +266,10 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
                           set.slt, set.sst, set.sglt, set.sgst, set.ss)
     set_allocation_turnover!(model, factory(set.tn, w), bare)
     if !isnothing(set.tr)
-        # The set's prior fits the raw rows whatever the head's `brt` is, so a data
-        # benchmark binds under `brt = false`.
+        # The set's prior fits the rows under the set's own `brt`, whatever the head's
+        # `brt` is, so a data benchmark binds under the set's `brt`.
         tr = bind_data_benchmark(prefix_tracking_benchmark(factory(set.tr, w),
-                                                           size(pr.X, 1)), rd, false)
+                                                           size(pr.X, 1)), rd, set.brt)
         set_tracking_error_constraints!(model, pr, tr, set, plr, nothing; prefix = prefix)
     end
     set_weight_norm_2_constraints!(model, l2c)
@@ -279,9 +279,9 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
     set_l2_regularisation!(model, l2)
     set_lp_regularisation!(model, lp)
     set_linf_regularisation!(model, linf)
-    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd, false),
+    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd, set.brt),
                                  set, pr, plr; prefix = prefix)
-    set_allocation_return_floor!(model, ret, pr, bare; rd = rd)
+    set_allocation_return_floor!(model, ret, pr, bare; rd = rd, brt = set.brt)
     set_iplg_constraints!(model, plr)
     set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)
     add_custom_constraint!(model, set.ccnt, set, nothing)

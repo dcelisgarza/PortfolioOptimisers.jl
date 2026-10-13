@@ -17,6 +17,8 @@ The kinds read their data at two times. Once per fold, [`resolve_allocation_set`
 
 At every step [`factory`](@ref) replaces the reference of a turnover ceiling, and of a [`WeightsTracking`](@ref), with the Price-Adjusted Allocation of the step. That is the book the fund trades from. A `fixed` object keeps the caller's reference.
 
+**Under `brt = true` the set reads the returns in excess of the benchmark.** Its prior fits the rows on `X - B`, which [`benchmark_relative_returns`](@ref) gives, so a [`Variance`](@ref) ceiling becomes a ceiling on the tracking variance against the benchmark `B` that the rows carry. The slots that read the rows take the set's `brt`, as the same slots of a [`JuMPOptimiser`](@ref) take the optimiser's. The head's rows keep the raw returns and the benchmark, so the set applies its own `brt`, whatever the `brt` of the head is. A [`DataTracking`](@ref) in `tr` or `r` refuses `brt = true`, because it would subtract the benchmark twice. Rows with no benchmark are refused.
+
 A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Result is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
 
 The set has no field for a budget, fees, the return term as an objective, the scalariser, the execution settings of the optimiser or a `TimeDependent` schedule. At construction [`assert_risk_ceiling`](@ref) refuses a frontier or a per-asset `ub` on a measure, because a ceiling is one number. The set does not read the `rke` or the `scale` of a measure. The ceiling is a constraint, and the objective is the divergence plus the penalties. The Euclidean, Gram and diagonal geometries admit a negative lower bound. The entropic, Tsallis and log-barrier geometries refuse it, at the head's construction when the bound is a value ([`assert_geometry_admits_set`](@ref)) and at the projection when an estimator resolves it. The wealth factor of a leveraged allocation can reach zero on an extreme day. At that point the log wealth and the next gradient are undefined, and the set does not guard against it.
@@ -53,6 +55,7 @@ $(DocStringExtensions.FIELDS)
     ProgrammeAllocationSet(;
         slv::Slv_VecSlv,
         pe::AbstractPriorEstimator = EmpiricalPrior(),
+        brt::Bool = false,
         r::Option{<:RM_VecRM} = nothing,
         wb::Option{<:WbE_Wb} = WeightBounds(),
         sbgt::Option{<:Num_BgtRg} = nothing,
@@ -110,6 +113,7 @@ Keywords correspond to the struct's fields. `slv` has no default, because every 
 `ProgrammeAllocationSet` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - The method passes the arguments after `i` to the tracking errors `tr` alone. It views the risk ceilings `r` with `nothing` in place of those arguments.
+  - `brt` passes through unchanged.
   - The prior estimator `pe`, the per-asset slots `wb`, `lt`, `st`, `lcse`, `smtx`, `sgmtx`, `slt`, `sst`, `sglt`, `sgst`, `tn`, `sets`, `ret`, `ccnt` and `cobj`, and the ceilings and tracking errors recurse through [`port_opt_view`](@ref), as the fields of [`JuMPOptimiser`](@ref) do.
   - The centrality rows `cte`, the grouped cardinality slots `gcarde` and `sgcarde`, and the phylogeny kinds `ple` pass through unchanged, as they do on the optimiser. A precomputed [`LinearConstraint`](@ref) is the identity under a view.
   - When a sub-group slot and its sub-grouped slot hold one object, such as `smtx` and `sgmtx`, the method views it once, and the two slots stay one object.
@@ -142,6 +146,7 @@ ProgrammeAllocationSet
           │              │   w ┴ nothing
           │      horizon ┼ nothing
           │   fill_limit ┴ nothing
+      brt ┼ Bool: false
       slv ┼ Solver
           │          name ┼ String: \"\"
           │        solver ┼ nothing
@@ -211,6 +216,10 @@ ProgrammeAllocationSet
     The prior estimator that the set fits on the head's rows at every step. The risk ceilings, the tracking errors, the centrality and phylogeny rows, an exposure row and the return floor use its result. The set does not read it when no slot reads the rows.
     """
     pe
+    """
+    $(arg_dict[:brt_read]) The prior of the set fits the rows on `X - B`, and every slot that reads the rows reads that prior. The head's rows stay raw, so the set applies its own `brt`. Rows with no benchmark `B` are refused.
+    """
+    brt
     """
     $(field_dict[:slv])
     """
@@ -359,7 +368,7 @@ ProgrammeAllocationSet
     $(field_dict[:linf])
     """
     linf
-    function ProgrammeAllocationSet(pe::AbstractPriorEstimator, slv::Slv_VecSlv,
+    function ProgrammeAllocationSet(pe::AbstractPriorEstimator, brt::Bool, slv::Slv_VecSlv,
                                     r::Option{<:RM_VecRM}, wb::Option{<:WbE_Wb},
                                     sbgt::Option{<:Num_BgtRg}, gbgt::Option{<:Num_BgtRg},
                                     xbgt::Bool, lt::Option{<:BtE_Bt}, st::Option{<:BtE_Bt},
@@ -423,16 +432,16 @@ ProgrammeAllocationSet
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when a slot holds an estimator keyed by name"))
         end
-        return new{typeof(pe), typeof(slv), typeof(r), typeof(wb), typeof(sbgt),
-                   typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
-                   typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
+        return new{typeof(pe), typeof(brt), typeof(slv), typeof(r), typeof(wb),
+                   typeof(sbgt), typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st),
+                   typeof(lcse), typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
                    typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
                    typeof(tn), typeof(sets), typeof(tr), typeof(ple), typeof(ret),
                    typeof(ccnt), typeof(cobj), typeof(sc), typeof(so), typeof(ss),
                    typeof(card), typeof(scard), typeof(l2c), typeof(lpc), typeof(linfc),
-                   typeof(l1), typeof(l2), typeof(lp), typeof(linf)}(pe, slv, r, wb, sbgt,
-                                                                     gbgt, xbgt, lt, st,
-                                                                     lcse, cte, gcarde,
+                   typeof(l1), typeof(l2), typeof(lp), typeof(linf)}(pe, brt, slv, r, wb,
+                                                                     sbgt, gbgt, xbgt, lt,
+                                                                     st, lcse, cte, gcarde,
                                                                      sgcarde, smtx, sgmtx,
                                                                      slt, sst, sglt, sgst,
                                                                      tn, sets, tr, ple, ret,
@@ -444,7 +453,7 @@ ProgrammeAllocationSet
 end
 function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 pe::AbstractPriorEstimator = EmpiricalPrior(),
-                                r::Option{<:RM_VecRM} = nothing,
+                                brt::Bool = false, r::Option{<:RM_VecRM} = nothing,
                                 wb::Option{<:WbE_Wb} = WeightBounds(),
                                 sbgt::Option{<:Num_BgtRg} = nothing,
                                 gbgt::Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
@@ -478,7 +487,7 @@ function ProgrammeAllocationSet(; slv::Slv_VecSlv,
                                 l2::Option{<:L2Reg_VecL2Reg} = nothing,
                                 lp::Option{<:LpReg_VecLpReg} = nothing,
                                 linf::Option{<:Num_AmbRadCal} = nothing)::ProgrammeAllocationSet
-    return ProgrammeAllocationSet(pe, slv, r, wb, sbgt, gbgt, xbgt, lt, st, lcse, cte,
+    return ProgrammeAllocationSet(pe, brt, slv, r, wb, sbgt, gbgt, xbgt, lt, st, lcse, cte,
                                   gcarde, sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn,
                                   sets, tr, ple, ret, ccnt, cobj, sc, so, ss, card, scard,
                                   l2c, lpc, linfc, l1, l2, lp, linf)
@@ -502,8 +511,8 @@ function port_opt_view(set::ProgrammeAllocationSet, i, args...)
         sst = port_opt_view(set.sst, i)
         sgst = port_opt_view(set.sgst, i)
     end
-    return ProgrammeAllocationSet(; pe = port_opt_view(set.pe, i), slv = set.slv,
-                                  r = port_opt_view(set.r, i, nothing),
+    return ProgrammeAllocationSet(; pe = port_opt_view(set.pe, i), brt = set.brt,
+                                  slv = set.slv, r = port_opt_view(set.r, i, nothing),
                                   wb = port_opt_view(set.wb, i), sbgt = set.sbgt,
                                   gbgt = set.gbgt, xbgt = set.xbgt,
                                   lt = port_opt_view(set.lt, i),
@@ -626,17 +635,18 @@ function resolve_allocation_set(set::ProgrammeAllocationSet, N::Integer, strict:
     else
         linear_constraints(set.lcse, sets; datatype = datatype, strict = strict)
     end
-    return ProgrammeAllocationSet(; pe = set.pe, slv = set.slv, r = set.r, wb = wb,
-                                  sbgt = set.sbgt, gbgt = set.gbgt, xbgt = set.xbgt,
-                                  lt = lt, st = st, lcse = lcse, cte = set.cte,
-                                  gcarde = gcarde, sgcarde = sgcarde, smtx = smtx,
-                                  sgmtx = sgmtx, slt = slt, sst = sst, sglt = sglt,
-                                  sgst = sgst, tn = tn, sets = sets, tr = set.tr,
-                                  ple = set.ple, ret = set.ret, ccnt = set.ccnt,
-                                  cobj = set.cobj, sc = set.sc, so = set.so, ss = set.ss,
-                                  card = set.card, scard = set.scard, l2c = set.l2c,
-                                  lpc = set.lpc, linfc = set.linfc, l1 = set.l1,
-                                  l2 = set.l2, lp = set.lp, linf = set.linf)
+    return ProgrammeAllocationSet(; pe = set.pe, brt = set.brt, slv = set.slv, r = set.r,
+                                  wb = wb, sbgt = set.sbgt, gbgt = set.gbgt,
+                                  xbgt = set.xbgt, lt = lt, st = st, lcse = lcse,
+                                  cte = set.cte, gcarde = gcarde, sgcarde = sgcarde,
+                                  smtx = smtx, sgmtx = sgmtx, slt = slt, sst = sst,
+                                  sglt = sglt, sgst = sgst, tn = tn, sets = sets,
+                                  tr = set.tr, ple = set.ple, ret = set.ret,
+                                  ccnt = set.ccnt, cobj = set.cobj, sc = set.sc,
+                                  so = set.so, ss = set.ss, card = set.card,
+                                  scard = set.scard, l2c = set.l2c, lpc = set.lpc,
+                                  linfc = set.linfc, l1 = set.l1, l2 = set.l2, lp = set.lp,
+                                  linf = set.linf)
 end
 """
     exposure_keyed(x)

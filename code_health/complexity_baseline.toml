@@ -389,11 +389,11 @@ commit = "286953e299"
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 93, cog_sum = 56, arg_sum = 122, macros = ["@propagatable"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 59, cog_sum = 30, arg_sum = 100, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 8, arg = 8, cyc_sum = 86, cog_sum = 62, arg_sum = 78, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 10, cog = 11, arg = 38, cyc_sum = 57, cog_sum = 39, arg_sum = 81, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/04_ProgrammeAllocationSet.jl" = { cyc = 10, cog = 11, arg = 39, cyc_sum = 57, cog_sum = 39, arg_sum = 82, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 83, cog_sum = 37, arg_sum = 138, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/06_SecondSetRules.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 58, cog_sum = 28, arg_sum = 109, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 87, cog_sum = 28, arg_sum = 142, macros = [] }
-"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 85, cog_sum = 42, arg_sum = 122, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/07_MirrorDescent.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 88, cog_sum = 29, arg_sum = 145, macros = [] }
+"src/17_Optimisation/10_OnlinePortfolioSelection/08_FollowTheLeader.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 85, cog_sum = 42, arg_sum = 124, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/09_AdaptiveOptimistic.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 55, cog_sum = 18, arg_sum = 127, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/10_MetaLearning.jl" = { cyc = 2, cog = 2, arg = 6, cyc_sum = 9, cog_sum = 5, arg_sum = 11, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/11_AllocationRiskCeiling.jl" = { cyc = 3, cog = 2, arg = 3, cyc_sum = 30, cog_sum = 8, arg_sum = 19, macros = [] }
