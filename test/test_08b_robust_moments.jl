@@ -830,8 +830,22 @@ end
         end
         # The positive factor the bad ones were derived from still answers.
         @test all(isfinite, cov(cep, X; iv = iv, ivpa = ivpav))
-        # The implied volatility series itself is mandatory.
-        @test_throws UndefKeywordError cov(ImpliedVolatility(; ppy = 252), X)
+        # The implied volatility series itself is mandatory. Every method refuses a missing
+        # `iv` and an `iv = nothing` by name, and so does a prior fitted on returns that
+        # carry none, since `prior(pe, rd)` passes `iv = rd.iv`.
+        cei = ImpliedVolatility(; ppy = 252)
+        for f in (cov, cor)
+            @test_throws IsNothingError f(cei, X)
+            @test_throws IsNothingError f(cei, X; iv = nothing)
+            @test_throws IsNothingError f(cei, X, nothing)
+            @test_throws IsNothingError f(cei, X, nothing; iv = nothing)
+        end
+        @test_throws "Pass `iv` to `cov` or `cor`" cov(cei, X)
+        @test_throws IsNothingError prior(EmpiricalPrior(;
+                                                         ce = PortfolioOptimisersCovariance(;
+                                                                                            ce = cei)),
+                                          ReturnsResult(; nx = string.(1:size(X, 2)),
+                                                        X = X))
         # The periods per year are mandatory too. The implied volatility is annual, and
         # `iv / sqrt(ppy)` is the identity only on annual data, so no default fits every
         # frequency (#1517).

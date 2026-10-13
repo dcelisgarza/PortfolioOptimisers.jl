@@ -685,8 +685,37 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
     return rv_p
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a fit of an [`ImpliedVolatility`](@ref) estimator that receives no implied volatilities.
+
+The estimator scales a correlation by the realised volatilities that it predicts from `iv`, so it has no answer without them. A [`prior`](@ref) over a [`ReturnsResult`](@ref) gives `rd.iv` to every member, and `rd.iv` is `nothing` when the returns carry no implied volatilities. So the keyword `iv` of each method of `cov` and `cor` admits `nothing`, and this function refuses it with an error that names the input and the remedy.
+
+# Arguments
+
+  - `iv`: The implied volatilities, `observations × assets`, or `nothing`.
+
+# Validation
+
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function assert_implied_volatility(iv::Option{<:MatNum})
+    @argcheck(!isnothing(iv),
+              IsNothingError("`ImpliedVolatility` predicts the volatility of each asset from the implied volatilities `iv`, `observations × assets`, and none were given. Pass `iv` to `cov` or `cor`, or fit the prior on a `ReturnsResult` that carries `iv`."))
+    return nothing
+end
+"""
     Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                   iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                   iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 
 Compute the covariance matrix using implied volatility scaling.
 
@@ -710,7 +739,7 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 
 # Algorithm
 
- 1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
  2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` or in `iv` with [`assert_finite_sample`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `sigma`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it. Every other shipped estimator absorbs it into its own `kwargs...` and ignores it.
  4. Divide `iv` by `sqrt(ce.ppy)`, converting the annualised implied volatility to the frequency of `X`.
@@ -730,6 +759,7 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 
 # Validation
 
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
   - Every entry of `X` and of `iv` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
@@ -743,10 +773,12 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 
   - [`ImpliedVolatility`](@ref)
   - [`predict_realised_vols`](@ref)
-  - [`cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
+  - [`cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                        iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    assert_implied_volatility(iv)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     assert_finite_sample(X)
@@ -761,7 +793,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
 end
 """
     Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                   iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                   iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 
 Compute the correlation matrix using implied volatility scaling.
 
@@ -773,7 +805,7 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
 # Algorithm
 
- 1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
  2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` or in `iv` with [`assert_finite_sample`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `rho`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it.
  4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.ppy)` for it exactly as it is in `cov`.
@@ -792,6 +824,7 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
 # Validation
 
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
   - Every entry of `X` and of `iv` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
@@ -805,10 +838,12 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
   - [`ImpliedVolatility`](@ref)
   - [`predict_realised_vols`](@ref)
-  - [`cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
+  - [`cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                        iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    assert_implied_volatility(iv)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     assert_finite_sample(X)
@@ -854,12 +889,12 @@ function coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector)
 end
 """
     Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                   dims::Int = 1, mean = nothing, iv::MatNum,
+                   dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    ivpa::Option{<:Num_VecNum} = nothing,
                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                    kwargs...) -> MatNum
     Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                   dims::Int = 1, mean = nothing, iv::MatNum,
+                   dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    ivpa::Option{<:Num_VecNum} = nothing,
                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                    kwargs...) -> MatNum
@@ -872,7 +907,7 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
 
 # Algorithm
 
- 1. Check `dims`, and orient `X` and `iv` to `observations × assets`.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Check `dims`, and orient `X` and `iv` to `observations × assets`.
  2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref). It reads `active_mask` in the place of the active mask of `pnl` when the caller gives one, through [`coverage_mask_source`](@ref).
  3. Slice `X`, `iv` and `ivpa` onto it.
  4. Call the two-argument method on the clean block.
@@ -892,6 +927,7 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
 
 # Validation
 
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - $(val_dict[:dims])
   - `size(X) == size(iv)`.
   - At least one asset must be covered.
@@ -907,9 +943,10 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
   - [`expand_moment`](@ref)
 """
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                        dims::Int = 1, mean = nothing, iv::MatNum,
+                        dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                         ivpa::Option{<:Num_VecNum} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_implied_volatility(iv)
     src = coverage_mask_source(pnl, active_mask, dims)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
@@ -920,9 +957,10 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPan
     return expand_moment(sigma, cmsk)
 end
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                        dims::Int = 1, mean = nothing, iv::MatNum,
+                        dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                         ivpa::Option{<:Num_VecNum} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_implied_volatility(iv)
     src = coverage_mask_source(pnl, active_mask, dims)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
