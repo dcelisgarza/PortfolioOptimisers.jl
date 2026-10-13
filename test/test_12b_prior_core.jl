@@ -1522,6 +1522,58 @@ end
     @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :prior
 end
 
+@testset "A prior that keeps the last rows pairs them with the last rows of iv (#1655)" begin
+    # A Scenario Cap keeps the last rows of the observations in `pr.X`, and the returns data
+    # keeps every row of `iv`. Under `x_src = :prior` the clustering reads `pr.X`, so it must
+    # read the rows of `iv` of the same observations.
+    rng = StableRNG(1655)
+    T, N, n = 200, 8, 120
+    Xi = 0.01 .* randn(rng, T, N)
+    ivi = 0.15 .+ 0.1 .* rand(rng, T, N)
+    rdi = ReturnsResult(; nx = string.('a':'h'), X = Xi, iv = ivi, ivpa = 1.1)
+
+    pick = PortfolioOptimisers.implied_volatility_picker
+    @test isnothing(pick(Xi, nothing))
+    @test pick(Xi, ivi) === ivi
+    @test pick(Xi[(T - n + 1):end, :], ivi) == ivi[(T - n + 1):end, :]
+    # An `iv` with fewer rows pairs no row, so it passes on unchanged and the estimator
+    # refuses it.
+    @test pick(Xi, ivi[1:n, :]) == ivi[1:n, :]
+
+    cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
+    pr = prior(EmpiricalPrior(; max_scenarios = n), rdi)
+    @test size(pr.X, 1) == n
+    tail = ReturnsResult(; nx = rdi.nx, X = Xi[(T - n + 1):end, :],
+                         iv = ivi[(T - n + 1):end, :], ivpa = 1.1)
+    # Each forwarder that reads the prior returns gives the answer of the last rows.
+    clr = clusterise(cle, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa)
+    clt = clusterise(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa)
+    @test clr.res.order == clt.res.order
+    @test isapprox(clr.D, clt.D)
+    @test phylogeny_matrix(cle, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
+          phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
+    ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)))
+    @test isapprox(centrality_vector(ct, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X,
+                   centrality_vector(ct, tail.X; iv = tail.iv, ivpa = tail.ivpa).X)
+    # Under `x_src = :data` the clustering reads `rd.X`, whose rows `iv` already pairs.
+    @test clusterise(cle, pr; rd = rdi, x_src = :data, iv = rdi.iv, ivpa = rdi.ivpa).res.order ==
+          clusterise(cle, rdi.X; iv = rdi.iv, ivpa = rdi.ivpa).res.order
+    # An `iv` with fewer rows than the prior returns is still refused.
+    @test_throws DimensionMismatch clusterise(cle, pr; rd = rdi, iv = rdi.iv[1:(n - 1), :],
+                                              ivpa = rdi.ivpa)
+
+    # An optimiser that clusters the prior returns now fits, where it raised a
+    # `DimensionMismatch` before.
+    hrp = HierarchicalRiskParity(;
+                                 opt = HierarchicalOptimiser(;
+                                                             pe = EmpiricalPrior(;
+                                                                                 max_scenarios = n),
+                                                             cle = cle))
+    res = optimise(hrp, rdi)
+    @test res.clr.res.order == clt.res.order
+    @test isapprox(sum(res.w), 1)
+end
+
 @testset "The prior carrier's `w` is documented as observation weights" begin
     # `field_dict[:w_prior]` is what `LowOrderPrior`'s `# Fields` entry for `w` interpolates,
     # and it read "Portfolio weights vector used in prior computation" — the wrong noun and

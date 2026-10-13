@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "b97cc1980b"
+commit = "4c442f5031"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -259,6 +259,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/19_PriorScenarios.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -669,6 +670,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/19_PriorScenarios.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }

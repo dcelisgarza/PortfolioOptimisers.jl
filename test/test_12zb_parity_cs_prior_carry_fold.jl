@@ -212,9 +212,7 @@ PortfolioOptimisers.lookback(::ImpliedVolatilityLevel) = 1
         @test occursin("implied volatilities", m)
         # An optimiser over the unwrapped prior steps when its clustering reads the surface,
         # and gives the batch weights. The clustering reads the returns data, so the plain
-        # method of `ImpliedVolatility` reads the assets whose returns have no gap. Under
-        # `x_src = :prior` it reads the rows of the prior and the surface of the returns
-        # data, which the batch fit refuses too (#1655).
+        # method of `ImpliedVolatility` reads the assets whose returns have no gap.
         cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
         hrp = HierarchicalRiskParity(;
                                      opt = HierarchicalOptimiser(; pe = pe, cle = cle,
@@ -226,5 +224,17 @@ PortfolioOptimisers.lookback(::ImpliedVolatilityLevel) = 1
                   init = hrp)
         @test po.returns_result(o).iv == rdc.iv
         @test optimise(o).w == optimise(hrp, rdc).w
+        # Under `x_src = :prior` the clustering reads the fitted rows of the prior, the last
+        # rows after the Descriptor warm-up and the exposure lag, and the last rows of the
+        # surface pair them (#1655).
+        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+        res = optimise(hrp, rdc)
+        @test size(res.pr.X, 1) < size(rdc.X, 1)
+        n = size(res.pr.X, 1)
+        @test res.clr.res.order ==
+              clusterise(cle, res.pr.X; iv = rdc.iv[(end - n + 1):end, :], ivpa = rdc.ivpa).res.order
+        o = foldl((o, k) -> partial_fit!(o, rows(rdc, (edges[k] + 1):edges[k + 1])), 1:3;
+                  init = hrp)
+        @test optimise(o).w == res.w
     end
 end

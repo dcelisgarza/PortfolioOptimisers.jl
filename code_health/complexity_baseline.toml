@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "93df99ae16"
+commit = "4c442f5031"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -222,7 +222,7 @@ commit = "93df99ae16"
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 3, macros = ["@propagatable"] }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 20, cog_sum = 15, arg_sum = 26, macros = [] }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 5, arg = 3, cyc_sum = 15, cog_sum = 8, arg_sum = 11, macros = [] }
-"src/10_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 11, arg = 11, cyc_sum = 135, cog_sum = 100, arg_sum = 159, macros = ["@forward_properties"] }
+"src/10_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 11, cyc_sum = 110, cog_sum = 84, arg_sum = 142, macros = ["@forward_properties"] }
 "src/10_Prior/02_EmpiricalPrior.jl" = { cyc = 4, cog = 3, arg = 7, cyc_sum = 12, cog_sum = 7, arg_sum = 26, macros = ["@propagatable"] }
 "src/10_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 10, cyc_sum = 19, cog_sum = 7, arg_sum = 48, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 6, cyc_sum = 49, cog_sum = 64, arg_sum = 31, macros = ["@forward_properties", "@propagatable"] }
@@ -253,6 +253,7 @@ commit = "93df99ae16"
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { cyc = 6, cog = 8, arg = 6, cyc_sum = 55, cog_sum = 51, arg_sum = 61, macros = [] }
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { cyc = 4, cog = 4, arg = 6, cyc_sum = 63, cog_sum = 36, arg_sum = 96, macros = [] }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 44, cog_sum = 21, arg_sum = 80, macros = [] }
+"src/10_Prior/19_PriorScenarios.jl" = { cyc = 10, cog = 11, arg = 6, cyc_sum = 28, cog_sum = 18, arg_sum = 37, macros = [] }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 71, cog_sum = 37, arg_sum = 106, macros = [] }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 11, cog_sum = 4, arg_sum = 34, macros = [] }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { cyc = 3, cog = 3, arg = 10, cyc_sum = 37, cog_sum = 10, arg_sum = 129, macros = [] }
