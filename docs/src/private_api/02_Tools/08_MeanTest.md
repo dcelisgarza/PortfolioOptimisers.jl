@@ -1,8 +1,8 @@
 ```@meta
-Description = "Mean tests, private API of PortfolioOptimisers.jl: long_run_quadratic_form, lag_cross_sum, assert_mean_test_rules, bootstrap_exceedance_cap, …"
+Description = "Mean test, private API of PortfolioOptimisers.jl: long_run_quadratic_form, lag_cross_sum, assert_mean_test_rules, bootstrap_exceedance_cap, …"
 ```
 
-# Mean tests: private API
+# Mean test: private API
 
 ## Functions
 

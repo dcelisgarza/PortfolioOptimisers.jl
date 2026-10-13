@@ -1,8 +1,8 @@
 ```@meta
-Description = "Mean tests, public API of PortfolioOptimisers.jl: AbstractMeanTestEstimator, OverlapMeanTest, WildBootstrapMeanTest, AbstractLongRunKernel, BartlettKernel, QuadraticSpectralKernel, …"
+Description = "Mean test, public API of PortfolioOptimisers.jl: AbstractMeanTestEstimator, OverlapMeanTest, WildBootstrapMeanTest, mean_test, mean_test_rng, …"
 ```
 
-# Mean tests
+# Mean test
 
 ## Tests of a zero mean
 

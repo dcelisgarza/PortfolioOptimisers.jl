@@ -1,5 +1,5 @@
 ```@meta
-Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_sentinel, coverage_reduction, coverage_reduced_pair, panel_moment_masks, …"
+Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_mask_source, coverage_sentinel, coverage_reduction, coverage_reduced_pair, …"
 ```
 
 # Coverage Universe: private API

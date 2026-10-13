@@ -21,6 +21,7 @@ AdaptiveMomentGradient
 PortfolioOptimisers.AbstractOnlineObjective
 LogWealth
 RiskLoss
+factory(obj::RiskLoss, w::VecNum)
 MirrorDescent
 PortfolioOptimisers.gradient_state_seed
 PortfolioOptimisers.transform_gradient!

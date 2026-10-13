@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online (b), public API of PortfolioOptimisers.jl: AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, supports_partial_fit, …"
+Description = "Online (b), public API of PortfolioOptimisers.jl: AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, …"
 ```
 
 # Online (b)

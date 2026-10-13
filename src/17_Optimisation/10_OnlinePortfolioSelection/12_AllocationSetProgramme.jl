@@ -219,7 +219,7 @@ Both arms call it after they add the bounds. The bare projection model passes th
  7. When the set has tracking errors, resolve each against `w`, so that a benchmark that is not fixed takes `w`. Cut each benchmark series to the row count of the prior with [`prefix_tracking_benchmark`](@ref), and add the rows.
  8. Add the norm ceilings `l2c`, `lpc` and `linfc`.
  9. Add the penalties `l1`, `l2`, `lp` and `linf` to the Objective Penalty.
-10. Add the risk ceilings with [`set_allocation_risk_ceiling!`](@ref).
+10. Resolve the risk ceilings against `w` with [`factory`](@ref), so that a [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, as in steps 6 and 7. A measure that holds neither stays as it is. Add the ceilings with [`set_allocation_risk_ceiling!`](@ref).
 11. Add the return floor `ret` with [`set_allocation_return_floor!`](@ref).
 12. Add the integer phylogeny rows and the semidefinite phylogeny rows of `plr`.
 13. Add the custom constraints.
@@ -276,7 +276,7 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
     set_l2_regularisation!(model, l2)
     set_lp_regularisation!(model, lp)
     set_linf_regularisation!(model, linf)
-    set_allocation_risk_ceiling!(model, set.r, set, pr, plr; prefix = prefix)
+    set_allocation_risk_ceiling!(model, factory(set.r, w), set, pr, plr; prefix = prefix)
     set_allocation_return_floor!(model, ret, pr, bare; rd = rd)
     set_iplg_constraints!(model, plr)
     set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)

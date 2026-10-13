@@ -1121,6 +1121,33 @@ end
             wrt = proj(resolve(ProgrammeAllocationSet(; slv = slv, tr = rte), 3))
             @test dot(wrt - w3, cov(R), wrt - w3) <= 1e-5 * (1 + 1e-4)
             @test !isapprox(wrt, free; atol = 1e-3)
+            # Issue #1660: a tracking or a turnover ceiling that is not fixed takes the
+            # step's book, as the `tr` and `tn` slots do. A tracking ceiling equals the
+            # tracking error of the same bound, in both forms.
+            trc(fixed) = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = TrackingRiskMeasure(;
+                                                                                settings = ub_of(0.002),
+                                                                                tr = WeightsTracking(;
+                                                                                                     w = [0.2,
+                                                                                                          0.3,
+                                                                                                          0.5],
+                                                                                                     fixed = fixed))),
+                                 3)
+            @test isapprox(proj(trc(false)), wt_book; atol = 1e-5)
+            @test isapprox(proj(trc(true)), wt_fixed; atol = 1e-5)
+            tnc(fixed) = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = TurnoverRiskMeasure(;
+                                                                                settings = ub_of(0.1),
+                                                                                w = [0.6,
+                                                                                     0.2,
+                                                                                     0.2],
+                                                                                fixed = fixed)),
+                                 3)
+            wtn_book = proj(tnc(false); q = [1.0, 0.0, 0.0], w = wh)
+            @test sum(abs, wtn_book - wh) <= 0.1 + 1e-6
+            wtn_fixed = proj(tnc(true); q = [1.0, 0.0, 0.0], w = wh)
+            @test sum(abs, wtn_fixed - [0.6, 0.2, 0.2]) <= 0.1 + 1e-6
+            @test sum(abs, wtn_fixed - wh) > 0.1
         end
         @testset "The ceilings, the budgets, the norm ceilings and the return floor" begin
             # A vector of ceilings: every one binds.

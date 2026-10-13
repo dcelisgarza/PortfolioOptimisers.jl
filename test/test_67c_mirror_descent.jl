@@ -757,6 +757,34 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         end
         @test maxerr(libpath(alg5; set = trset), heldpath(5)) < 1e-6
         @test maxerr(heldpath(5), heldpath(T)) > 1e-2
+
+        # Issue #1660: a benchmark or a turnover reference of the loss that is not fixed
+        # takes the Price-Adjusted Allocation of the step, and a fixed one stays.
+        wb = [0.4, 0.3, 0.2, 0.1]
+        trl(w; fixed) = RiskLoss(;
+                                 r = TrackingRiskMeasure(;
+                                                         tr = WeightsTracking(; w = w,
+                                                                              fixed = fixed)),
+                                 window = 10)
+        wq = fill(1 / N, N)
+        @test po.factory(trl(wq; fixed = false), wb).r.tr.w == wb
+        @test po.factory(trl(wq; fixed = true), wb).r.tr.w == wq
+        @test po.factory(RiskLoss(; r = TurnoverRiskMeasure(; w = wq)), wb).r.w == wb
+        @test po.factory(LogWealth(), wb) === LogWealth()
+        # On two rows the first step reads one row, so its gradient is zero and every rule
+        # holds the uniform start. The second step trades from `wh`, the uniform start after
+        # row 2, so a benchmark that is not fixed equals a fixed benchmark at `wh`. Each
+        # rule reads the resolved loss, and the optimistic step's predictor reads it too.
+        wh2 = X[2, :] ./ sum(X[2, :])
+        for mk in (o -> GradientProjection(; eta = 50, obj = o),
+                   o -> AdaptiveSubgradient(; obj = o),
+                   o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
+                                       predictor = LastGradient(; at_played = false)))
+            walk(o) = optimise(OPS(; alg = mk(o)), rows(rd, 1:2)).w
+            w_book = walk(trl(wq; fixed = false))
+            @test maxerr(w_book, walk(trl(wh2; fixed = true))) < 1e-14
+            @test maxerr(w_book, walk(trl(wq; fixed = true))) > 1e-3
+        end
     end
 
     @testset "The numbers the docstrings state, on the fixtures they name" begin
@@ -817,6 +845,17 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         g = po.loss_gradient(RiskLoss(; window = 10), u, X[11, :], rdn)
         @test g[4] == 0
         @test isapprox(g[1:3], 2 .* cov(R[1:10, 1:3]) * u[1:3]; atol = 1e-15)
+        # Issue #1660: the measure is viewed on the mask with the prior, so a benchmark of
+        # four legs is cut to the three priced ones and is not renormalised.
+        tr4 = TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.4, 0.3, 0.2, 0.1]))
+        tr3 = TrackingRiskMeasure(; tr = WeightsTracking(; w = [0.4, 0.3, 0.2]))
+        gt = po.loss_gradient(RiskLoss(; r = tr4, window = 10), u, X[11, :], rdn)
+        @test gt[4] == 0
+        @test isapprox(gt[1:3],
+                       po.loss_gradient(RiskLoss(; r = tr3, window = 10), u[1:3],
+                                        X[11, 1:3],
+                                        ReturnsResult(; nx = nx[1:3], X = R[1:10, 1:3]));
+                       atol = 1e-12)
 
         # `reprojection`: a bounded set returns an allocation inside its bounds as the
         # same object, and every other set projects it.

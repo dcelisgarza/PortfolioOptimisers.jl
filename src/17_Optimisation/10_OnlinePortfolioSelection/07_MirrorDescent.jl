@@ -1082,6 +1082,22 @@ function RiskLoss(; r::BaseRM_VecBaseRM = Variance(), window::Integer = 20,
     return RiskLoss(r, window, sca, pe)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return a [`RiskLoss`](@ref) whose measure takes the Price-Adjusted Allocation `w` of the step.
+
+`factory(obj.r, w)` advances the measure. A [`WeightsTracking`](@ref) benchmark or a [`TurnoverRiskMeasure`](@ref) reference that is not fixed takes `w`, and every other measure stays as it is. A rule calls this method before it reads the gradient, so the loss reads the step's book, as the turnover and the tracking error of a [`ProgrammeAllocationSet`](@ref) do. `window`, `sca` and `pe` pass through unchanged.
+
+# Related
+
+  - [`RiskLoss`](@ref)
+  - [`loss_gradient`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(obj::RiskLoss, w::VecNum)::RiskLoss
+    return RiskLoss(factory(obj.r, w), obj.window, obj.sca, obj.pe)
+end
+"""
     rows_needed(obj::LogWealth)
     rows_needed(obj::RiskLoss)
     rows_needed(alg::MirrorDescent)
@@ -1151,7 +1167,7 @@ When the mask is `nothing`, every asset is priced, and the method returns [`risk
 
  1. Find the indices `idx` of the assets on the mask.
  2. Make the zero vector `g` of the length of `u`.
- 3. Write [`risk_gradient`](@ref) of the measure at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The slice of `u` is not renormalised.
+ 3. Write [`risk_gradient`](@ref) of the measure viewed at `idx` with [`port_opt_view`](@ref), at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The view cuts a benchmark, a turnover reference or a moment that the measure holds to the legs on the mask. The slice of `u` is not renormalised.
 
 # Related
 
@@ -1167,7 +1183,8 @@ function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::Abstract
                                   imsk::BitVector)
     idx = findall(imsk)
     g = zeros(eltype(u), length(u))
-    g[idx] .= risk_gradient(obj.r, u[idx], port_opt_view(pr, idx); sca = obj.sca)
+    g[idx] .= risk_gradient(port_opt_view(obj.r, idx, pr.X), u[idx], port_opt_view(pr, idx);
+                            sca = obj.sca)
     return g
 end
 """
@@ -1283,7 +1300,7 @@ The seven-argument [`online_update!`](@ref) runs these steps at the period's row
  3. When the schedule reads the period's row, write its statistic from `w` and `x`.
  4. Read the rate `eta` and the share `alpha` of period `t`. A schedule's share takes precedence over the field `alpha`.
  5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
- 6. Take the gradient `g` of the loss at `point`, from `xm` and the head's `rows`.
+ 6. Resolve the loss against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that loss at `point`, from `xm` and the head's `rows`.
  7. Transform `g` with the Gradient Transform, which updates its state.
  8. Take the mirror step `q` from the iterate `st.u`, on `eta` times the transformed gradient.
  9. Project `q` onto the set from `wh`, which gives the new iterate `u`.
@@ -1500,7 +1517,7 @@ function online_update!(alg::MirrorDescent, st::MirrorDescentState, w::AbstractV
     eta = learning_rate(alg.eta, t, st)
     alpha = mixing_share(alg.eta, t, alg.alpha)
     xm = mixed_relatives(x, alpha)
-    g = loss_gradient(alg.obj, point, xm, rows)
+    g = loss_gradient(factory(alg.obj, wh), point, xm, rows)
     q = mirror_step(alg.proj, st.u, eta .* transform_gradient!(alg.grad, st.gs, g))
     u = project(alg.proj, set, q, wh)
     s = statistic_after_step(alg.eta, st.s, w, x)

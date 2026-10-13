@@ -192,8 +192,8 @@ The full-matrix variant, Algorithm 2 of [duchi2011](@cite), uses ``H_t = \\delta
 
 The seven-argument [`online_update!`](@ref) runs these steps at the period's row `x`. The six-argument form calls it with the book `w` as the Gradient Point `point`.
 
- 1. Take the gradient `g` of `obj` at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref).
- 2. Form the Price-Adjusted Allocation `wh` of the book `w` after the row.
+ 1. Form the Price-Adjusted Allocation `wh` of the book `w` after the row.
+ 2. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref).
  3. When every entry of `g` is zero, project `w` onto the set from `wh` in the Euclidean geometry. Count the period, keep the gradient mass, and return that allocation. Stop.
  4. Add `g` to the gradient mass `st.s` in place, as the root of the sum of squares of each asset.
  5. Form the diagonal `h = delta .+ st.s`.
@@ -287,8 +287,8 @@ end
 function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
                         w::AbstractVector, x::AbstractVector, rows,
                         set::AbstractAllocationSet, point::AbstractVector)
-    g = loss_gradient(alg.obj, point, x, rows)
     wh = price_adjusted_allocation(w, x)
+    g = loss_gradient(factory(alg.obj, wh), point, x, rows)
     if all(iszero, g)
         # A zero gradient is a zero step, and no mass accrues: the norm is undefined, so
         # the iterate is projected in the Euclidean geometry, as a first-order rule's zero
@@ -855,9 +855,9 @@ The seven-argument [`online_update!`](@ref) runs these steps at the period's row
  3. When the schedule reads the period's row before the rate, write its statistic from `w` and `x`.
  4. Read the rate `eta` and the share `alpha` of period `t`.
  5. Mix the price relatives into `xm` with [`mixed_relatives`](@ref).
- 6. Take the gradient `g` of `obj` at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref).
+ 6. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `xm` and the head's `rows`, with [`loss_gradient`](@ref).
  7. Take the first half-step from the secondary iterate `st.v` on `eta .* g` with [`half_step`](@ref), which gives the new secondary iterate `v`.
- 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from `g`, `v`, `x` and `xm`.
+ 8. Form the hint `m` and the state `ps` of the predictor with [`predict_gradient!`](@ref), from the resolved objective, `g`, `v`, `x` and `xm`.
  9. Measure the residual `r` of `g` against the last hint `st.m` with [`hint_residual`](@ref), and shift the residual sums into `res`.
 10. When the schedule reads the past alone, write its statistic `s` from `w` and `x`.
 11. Read the rate of period `t + 1` from a state of the rule that holds the period's row. Take the second half-step from `v` on that rate times `m`, which gives the unmixed played iterate `u`.
@@ -991,9 +991,10 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
     eta = learning_rate(md.eta, t, st)
     alpha = mixing_share(md.eta, t, md.alpha)
     xm = mixed_relatives(x, alpha)
-    g = loss_gradient(md.obj, point, xm, rows)
+    obj = factory(md.obj, wh)
+    g = loss_gradient(obj, point, xm, rows)
     v = half_step(md, set, st.v, eta .* g, wh)
-    ps, m = predict_gradient!(alg.predictor, st.ps, md.obj, g, v, x, xm, rows, t)
+    ps, m = predict_gradient!(alg.predictor, st.ps, obj, g, v, x, xm, rows, t)
     r = hint_residual(md.proj, g .- st.m)
     res = [st.res[1] + r, st.res[1]]
     s = statistic_after_step(md.eta, st.s, w, x)
