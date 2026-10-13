@@ -31,6 +31,12 @@ of `UncertaintySetVariance` and `NearOptimalCentering`, and the factor loadings 
 `RiskBudgeting`, `RelaxedRiskBudgeting` and `FactorRiskContribution` refit read the raw `X`, while
 the prior read `X - B`.
 
+The benchmark census for the online estimators found a third gap
+([#1659](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1659)). A `Pipeline` prior
+step had no `brt`, and `inject_context` put its Prior Result into the optimiser unchanged, because
+`prior` returns a Prior Result as it is. Under the optimiser's `brt = true` that prior held the
+moments of the raw `X`, while every other reader of the optimiser read `X - B`.
+
 The maintainer stated the rule on 2026-10-12: the quantities of a `ReturnsResult` are never dropped,
 unless they truly cannot be carried for mathematical reasons. The maintainer decided #1651 on the
 same day: `brt` stops rebuilding the `ReturnsResult`, and each reader subtracts the benchmark at the
@@ -81,6 +87,16 @@ whatever `X` is in scope.
    alone, ignores them as its batch fit does
    ([#1643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1643)).
 
+7. **A prior step of a `Pipeline` states its frame in its `PipelineStep`, and the frame must
+   equal the frame of the optimiser that receives the prior** (#1659). A prior estimator holds no
+   `brt`, so `PipelineStep(; est = pe, writes = :prior, brt = true)` fits the step on `X - B`: in
+   batch through `prior(pe, rd; brt)`, and in the online step through `fold_prior` under `brt`,
+   with the raw rows in the Fold Context of the Pipeline, as decision 5 states for an optimiser.
+   `assert_benchmark_frame` refuses a mismatch when the `Pipeline` is built, because the
+   configuration alone decides it. A bare prior step fits on the raw returns, so it meets an
+   optimiser with `brt = true` with that refusal. `brt = true` on a step that wraps no prior is
+   refused too, because the wrapper passes it to no other step.
+
 ## Consequences
 
 - A leader, a programme set or a fallback of the head reads the rows as a batch fit over the same
@@ -96,6 +112,8 @@ whatever `X` is in scope.
 - `NestedClustered(brt = true)` and `Stacking(brt = true)` no longer make their inner optimisers fit
   `X - B`. A caller who wants that sets `brt = true` on each inner optimiser.
 - The window of the head is views into its buffers, as before, so the step takes no copy.
+- A pipeline that injected a raw prior into an optimiser with `brt = true` now fails when it is
+  built. The caller wraps the prior step with `brt = true`.
 
 ## Alternatives considered
 
@@ -109,6 +127,11 @@ whatever `X` is in scope.
 - **Refuse `brt = true` on a follow-the-leader leader** (option 1 of #1646). It hides the defect for
   one caller, leaves the head without a benchmark-relative leader, and keeps the silent no-op for
   every other caller.
+- **Refuse `brt = true` on an optimiser below a prior step** (option 1 of #1659). It makes the mix
+  loud, but it leaves no way to fit a pipeline prior in the Excess Frame.
+- **Pass the optimiser's `brt` up to the prior step when the pipeline is built** (option 3 of
+  #1659). It hides the frame of the step from the caller who reads the step, and a step in a
+  nested pipeline or under a schedule has no single optimiser to read it from.
 - **Let the `brt` of a meta-optimiser pass down to its inner optimisers.** It keeps the weights that
   the rebuild gave, but an inner optimiser that holds no `brt` field cannot take it, and the
   fallback and the corner solves already apply their own `brt`.
@@ -118,4 +141,4 @@ whatever `X` is in scope.
 - ADR 0137: the online step forwards to the prior and the read-out runs the batch path.
 - ADR 0164: the Allocation Set Constraint through which a leader honours the head's set.
 - `benchmark_relative_returns`, `prior_step_returns`, `outer_returns_source`, `fold_returns`,
-  `buffer_returns_result`, `ReturnsBufferState`.
+  `buffer_returns_result`, `ReturnsBufferState`, `PipelineStep`, `assert_benchmark_frame`.

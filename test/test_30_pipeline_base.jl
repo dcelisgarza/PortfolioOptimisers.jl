@@ -773,6 +773,82 @@ end
         @test ew2 === EqualWeighted()
     end
 
+    @testset "a prior step fits in the frame of the optimiser (#1659)" begin
+        # `inject_context` puts the Prior Result of a prior step into the optimiser
+        # unchanged, so the optimiser's `brt` never reached it. Under `brt = true` the
+        # other readers of the optimiser read `X - B`, and a prior on the raw `X` mixed two
+        # frames with no error. The PipelineStep wrapper now carries the frame, and the
+        # Pipeline refuses a prior step whose frame differs from the optimiser's.
+        rd0 = make_returns()
+        rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, nb = ["BM"],
+                           B = randn(StableRNG(1659), size(rd0.X, 1)) / 100)
+        step(brt) = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = brt)
+        jo(brt) = JuMPOptimiser(;
+                                slv = Solver(; name = :Clarabel,
+                                             solver = Clarabel.Optimizer,
+                                             settings = Dict("verbose" => false)),
+                                brt = brt)
+        ho(brt) = HierarchicalOptimiser(; brt = brt, x_src = :data)
+        cases = (brt -> MeanRisk(; opt = jo(brt)),
+                 brt -> PipelineStep(; est = MeanRisk(; opt = jo(brt)), reads = (:returns,),
+                                     writes = :opt),
+                 brt -> HierarchicalRiskParity(; opt = ho(brt)),
+                 brt -> InverseVolatility(; brt = brt),
+                 brt -> NestedClustered(; brt = brt, opti = InverseVolatility(),
+                                        opto = InverseVolatility()))
+        for mk in cases, brt in (false, true)
+            # A matched frame equals the optimiser with no prior step, which fits its own
+            # prior under its own `brt`.
+            res = fit(Pipeline(; steps = (step(brt), mk(brt))), rd)
+            ref = fit(Pipeline(; steps = (mk(brt),)), rd)
+            @test isapprox(res.w, ref.w; atol = 1e-6)
+            @test res.ctx.prior.mu ≈ prior(EmpiricalPrior(), rd; brt = brt).mu
+            # The returns data keeps its raw `X` and its `B`.
+            @test res.ctx.returns === rd
+            # A mismatch is refused when the pipeline is built, in both directions.
+            err = try
+                Pipeline(; steps = (step(!brt), mk(brt)))
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError)
+            @test occursin("brt = $(!brt)", err.msg) && occursin("brt = $brt", err.msg)
+        end
+        # A bare prior estimator fits on the raw returns, so it meets `brt = true` with a
+        # refusal, and it composes with `brt = false` as before.
+        @test_throws ArgumentError Pipeline(; steps = (EmpiricalPrior(), cases[1](true)))
+        @test Pipeline(; steps = (EmpiricalPrior(), cases[1](false))) isa Pipeline
+        # The prior of a nested pipeline is the prior of its last step.
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (Pipeline(; steps = (step(false),)),
+                                                     cases[3](true)))
+        @test Pipeline(; steps = (Pipeline(; steps = (step(true),)), cases[3](true))) isa
+              Pipeline
+        # The pipeline did not read the benchmark itself: the batch fit equals a prior on
+        # the excess returns.
+        rdx = ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, true))
+        @test isapprox(fit(Pipeline(; steps = (step(true), cases[4](true))), rd).w,
+                       optimise(InverseVolatility(), rdx).w)
+        # An optimiser that reads no prior, and a callable prior step, declare no frame.
+        @test Pipeline(; steps = (step(true), EqualWeighted())) isa Pipeline
+        callable = PipelineStep(; est = ctx -> prior(EmpiricalPrior(), ctx.returns),
+                                reads = (:returns,), writes = :prior)
+        @test Pipeline(; steps = (callable, cases[1](true))) isa Pipeline
+        # Only a prior step takes `brt = true`: the wrapper passes it to no other step.
+        @test step(true).brt && !step(false).brt
+        @test PipelineStep(; est = Online(EmpiricalPrior(); max_history = 10),
+                           writes = :prior, brt = true).brt
+        for (est, slot) in
+            ((MeanRisk(; opt = jo(true)), :opt), (ClustersEstimator(), :phylogeny),
+             (ctx -> nothing, :prior))
+            @test_throws ArgumentError PipelineStep(; est = est, writes = slot, brt = true)
+        end
+        # `brt = true` on returns with no benchmark is refused by the step, as by `prior`.
+        @test_throws ArgumentError fit(Pipeline(; steps = (step(true), cases[4](true))),
+                                       rd0)
+    end
+
     @testset "uncertainty steps and routing" begin
         rd = make_returns()
         ps_mu = PipelineStep(; est = DeltaUncertaintySet(), reads = (:returns,),

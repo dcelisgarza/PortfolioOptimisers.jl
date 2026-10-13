@@ -387,6 +387,39 @@ what keeps the JuMP families cheap.
         end
     end
 
+    @testset "A benchmark-relative prior step folds the excess returns (#1659)" begin
+        # The prior step of the online pipeline folds under the `brt` of its PipelineStep,
+        # as the prior of an optimiser folds under the optimiser's `brt`, and the Fold
+        # Context of the Pipeline keeps the raw rows. So the read-out equals the batch fit
+        # field by field, and online equals batch fold for fold.
+        Xb = randn(StableRNG(1659), T, N) ./ 100
+        Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(16590), T) ./ 1000
+        rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
+        pstep = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = true)
+        mrb = MeanRisk(;
+                       opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true))
+        hrpb = HierarchicalRiskParity(;
+                                      opt = HierarchicalOptimiser(; pe = EmpiricalPrior(),
+                                                                  brt = true,
+                                                                  x_src = :data))
+        for opt in (mrb, hrpb)
+            pipe = Pipeline(; steps = (pstep, opt))
+            on = fit(stepped(pipe, rdb, blocks))
+            ba = fit(pipe, rows(rdb, 1:80))
+            @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+            @test on.ctx.prior.sigma ≈ ba.ctx.prior.sigma
+            @test on.ctx.prior.mu ≈ prior(EmpiricalPrior(), rows(rdb, 1:80); brt = true).mu
+            # The rebuilt returns data is raw, as the caller gave it.
+            @test isequal(Matrix(on.ctx.returns.X), Matrix(ba.ctx.returns.X))
+            @test isequal(collect(on.ctx.returns.B), collect(ba.ctx.returns.B))
+            @test isapprox(on.w, ba.w; atol = weight_tol(pipe))
+            b = cross_val_predict(pipe, rdb, batch_cv)
+            o = cross_val_predict(pipe, rdb, online_cv)
+            @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-5)
+                      for (pb, po_) in zip(b.pred, o.pred))
+        end
+    end
+
     @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the fold route" begin
         # A statistic fill is window-valued, which the fold route refuses and the refit
         # route admits: every fold is a batch fit over the buffer.

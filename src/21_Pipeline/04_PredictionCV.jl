@@ -143,7 +143,11 @@ function update_time_dependent_step(ps::PipelineStep, ctx::TimeDependentContext,
         return ps
     end
     newest = update_time_dependent_step(est, ctx, all_binds)
-    return newest === est ? ps : PipelineStep(newest, ps.reads, ps.writes, ps.target)
+    return if newest === est
+        ps
+    else
+        PipelineStep(newest, ps.reads, ps.writes, ps.target, ps.brt)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -212,7 +216,11 @@ function reset_time_dependent_step(ps::PipelineStep)
         return ps
     end
     newest = reset_time_dependent_step(est)
-    return newest === est ? ps : PipelineStep(newest, ps.reads, ps.writes, ps.target)
+    return if newest === est
+        ps
+    else
+        PipelineStep(newest, ps.reads, ps.writes, ps.target, ps.brt)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -259,7 +267,11 @@ function pipeline_step_factory(ps::PipelineStep, w)
         return ps
     end
     newest = pipeline_step_factory(est, w)
-    return newest === est ? ps : PipelineStep(newest, ps.reads, ps.writes, ps.target)
+    return if newest === est
+        ps
+    else
+        PipelineStep(newest, ps.reads, ps.writes, ps.target, ps.brt)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

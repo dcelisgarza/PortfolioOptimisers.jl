@@ -55,10 +55,13 @@ Each estimator family dispatches to its native verb — [`prior`](@ref) for prio
 
 Estimators whose family is not steppable throw an `ArgumentError` directing the caller to [`PipelineStep`](@ref).
 
+A prior step fits under the `brt` of its [`PipelineStep`](@ref) wrapper, so [`prior`](@ref) reads the returns in excess of the benchmark when the wrapper says so. An unwrapped prior step fits on the raw returns.
+
 # Arguments
 
   - `est`: The step estimator (or a [`PipelineStep`](@ref) wrapper).
   - `ctx`: The pipeline context.
+  - $(arg_dict[:brt_read]) Only the method for a prior estimator takes it.
 
 # Returns
 
@@ -74,9 +77,9 @@ Estimators whose family is not steppable throw an `ArgumentError` directing the 
 function run_step(est, ::PipelineContext)
     return throw(ArgumentError("a $(typeof(est)) is not steppable; wrap it in a PipelineStep to declare its reads/writes explicitly"))
 end
-function run_step(pe::AbstractPriorEstimator, ctx::PipelineContext)
+function run_step(pe::AbstractPriorEstimator, ctx::PipelineContext; brt::Bool = false)
     require_slot(ctx, :returns, pe)
-    pr = prior(pe, ctx.returns)
+    pr = prior(pe, ctx.returns; brt = brt)
     return pr, set_slot(ctx, :prior, pr)
 end
 function run_step(cle::AbstractClustersEstimator, ctx::PipelineContext)
@@ -134,7 +137,35 @@ function run_step(ps::PipelineStep, ctx::PipelineContext)
     if isa(ps.est, AbstractConstraintEstimator)
         return run_constraint_step(ps.est, ps.target, ctx)
     end
-    return run_step(ps.est, ctx)
+    return run_step_under(ps.est, ctx, ps.brt)
+end
+"""
+    run_step_under(est, ctx::PipelineContext, brt::Bool)
+
+Run the estimator of a [`PipelineStep`](@ref) under the `brt` of the step.
+
+A prior estimator fits under `brt` through [`run_step`](@ref). Every other estimator runs as a bare step, because [`assert_step_brt`](@ref) gives it `brt = false`.
+
+Internal machinery — not part of the user-facing API.
+
+# Arguments
+
+  - `est`: The estimator that the step wraps.
+  - `ctx`: The pipeline context.
+  - $(arg_dict[:brt_read])
+
+# Returns
+
+  - `(fitted, ctx′)`: The fitted object and the updated context, as [`run_step`](@ref) returns them.
+
+# Related
+
+  - [`run_step`](@ref)
+  - [`assert_step_brt`](@ref)
+"""
+run_step_under(est, ctx::PipelineContext, ::Bool) = run_step(est, ctx)
+function run_step_under(pe::AbstractPriorEstimator, ctx::PipelineContext, brt::Bool)
+    return run_step(pe, ctx; brt = brt)
 end
 function run_step(ue::AbstractUncertaintySetEstimator, ::PipelineContext)
     return throw(ArgumentError("a $(typeof(ue)) step must declare which parameter it bounds; wrap it in a PipelineStep with target = :mu, target = :sigma, or target = :both"))
@@ -503,4 +534,178 @@ function run_step(tts::TrainTestSplit, ctx::PipelineContext)
     require_slot(ctx, slot, tts)
     res = fit_preprocessing(tts, getproperty(ctx, slot))
     return res, set_slot(ctx, slot, res.train)
+end
+"""
+    assert_step_brt(est, brt::Bool)
+
+Refuse `brt = true` on a [`PipelineStep`](@ref) whose estimator is not a prior.
+
+A prior estimator takes `brt = true`, and so does an [`Online`](@ref) declaration of one, which the warm-up of the online arm resolves to the prior. The wrapper passes `brt` to no other step, so every other estimator and every callable takes `brt = false` alone. The constructor of `PipelineStep` calls this check.
+
+Internal machinery — not part of the user-facing API.
+
+# Arguments
+
+  - `est`: The estimator or the callable that the step wraps.
+  - $(arg_dict[:brt_read])
+
+# Validation
+
+  - `brt` is `false`, or `est` is a prior estimator or an `Online` declaration of one. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PipelineStep`](@ref)
+  - [`assert_benchmark_frame`](@ref)
+"""
+function assert_step_brt(est, brt::Bool)::Nothing
+    @argcheck(!brt,
+              ArgumentError("brt = true fits a prior step on the returns in excess of the benchmark, and this PipelineStep wraps a $(Base.typename(typeof(est)).wrapper), which is not a prior estimator: the wrapper passes brt to no other step. Set the brt of the optimiser to optimise over the excess returns, or wrap a prior estimator."))
+    return nothing
+end
+assert_step_brt(::AbstractPriorEstimator, ::Bool) = nothing
+assert_step_brt(o::Online, brt::Bool) = assert_step_brt(o.est, brt)
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the `brt` of the optimiser configuration that receives a computed prior.
+
+[`pipe_route`](@ref) puts the `:pe` routing target into the field `pe` of the optimiser, or of the configuration that [`@pipe_delegates`](@ref) names. The `brt` beside that field states the frame that the optimiser reads its prior in. Under `brt` every other reader of the optimiser subtracts the benchmark, so the prior must hold the moments of the excess returns `X - B`. This function follows the path of `pipe_route`.
+
+# Algorithm
+
+ 1. When `x` has a field `pe`, return the field `brt` of `x`, or `false` when `x` has no such field.
+ 2. Else, when `x` delegates to a configuration ([`pipe_config_field`](@ref)), return the answer for that configuration.
+ 3. Else return `false`.
+
+# Arguments
+
+  - `x`: The optimiser or the optimiser configuration.
+
+# Returns
+
+  - `brt::Bool`: The frame of the prior that `x` reads.
+
+# Related
+
+  - [`assert_benchmark_frame`](@ref)
+  - [`pipe_route`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+"""
+function pipe_prior_brt(x)::Bool
+    if hasfield(typeof(x), :pe)
+        return hasfield(typeof(x), :brt) && getfield(x, :brt)
+    end
+    f = pipe_config_field(x)
+    return isnothing(f) ? false : pipe_prior_brt(getfield(x, f))
+end
+"""
+    step_prior_brt(step) -> Option{Bool}
+
+Return the frame of the prior that a step of a [`Pipeline`](@ref) writes into the `prior` slot.
+
+The answer is `true` when the step fits its prior on the returns in excess of the benchmark, and `false` when it fits on the raw returns. A bare prior estimator fits on the raw returns, and a [`PipelineStep`](@ref) fits under its `brt`. A nested `Pipeline` writes the prior of its last step. A callable step declares no frame, so the answer is `nothing`, and [`assert_benchmark_frame`](@ref) does not check it.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`assert_benchmark_frame`](@ref)
+  - [`PipelineStep`](@ref)
+"""
+step_prior_brt(::Any) = false
+function step_prior_brt(ps::PipelineStep)
+    return if isa(ps.est, Function)
+        nothing
+    elseif isa(ps.est, Pipeline)
+        step_prior_brt(ps.est)
+    else
+        ps.brt
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the optimiser of the last step of a [`Pipeline`](@ref), or `nothing` when the pipeline has none that a construction check can read.
+
+The checks that compare the earlier steps with the optimiser read it here: [`assert_routable`](@ref) and [`assert_benchmark_frame`](@ref).
+
+# Algorithm
+
+ 1. Return `nothing` when the pipeline has one step, or when its last step writes a slot other than `:opt`.
+ 2. Read the optimiser from the last step, without its [`PipelineStep`](@ref) wrapper.
+ 3. Return it when it is an [`OptimisationEstimator`](@ref). Otherwise return `nothing`. A [`TimeDependent`](@ref) schedule and a precomputed result are such steps, and the fold loop resolves them later.
+
+# Arguments
+
+  - `ests`: The step estimators, with the optimisation step last, see [`assert_opt_last`](@ref).
+
+# Returns
+
+  - `opt::Option{<:OptimisationEstimator}`: The optimiser, or `nothing`.
+
+# Related
+
+  - [`assert_routable`](@ref)
+  - [`assert_benchmark_frame`](@ref)
+"""
+function pipe_terminal_optimiser(ests)
+    n = length(ests)
+    if n < 2 || !(pipe_writes(ests[n]) === :opt)
+        return nothing
+    end
+    opt = isa(ests[n], PipelineStep) ? ests[n].est : ests[n]
+    return isa(opt, OptimisationEstimator) ? opt : nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuse at construction a pipeline whose prior step fits in a frame other than the frame of the optimiser that receives the prior.
+
+[`inject_context`](@ref) puts the prior of a prior step into the `pe` field of the last optimiser, and [`prior`](@ref) returns a Prior Result unchanged, so the `brt` of the optimiser never reaches that prior. Under `brt = true` every other reader of the optimiser reads the excess returns `X - B`: the clustering under `x_src = :data`, the exposure regression, the uncertainty sets and the loadings of the risk budgeting. A prior fitted on the raw `X` then mixes two frames, and no error shows it. So the `brt` of the prior step, see [`PipelineStep`](@ref), must equal the `brt` of the optimiser. The configuration alone decides this, so the check runs when the pipeline is built.
+
+# Algorithm
+
+ 1. Read the optimiser `opt` of the last step with [`pipe_terminal_optimiser`](@ref). Stop when there is none, or when it has no field for the `:pe` routing target ([`pipe_accepts`](@ref)).
+ 2. Read the frame of the optimiser with [`pipe_prior_brt`](@ref).
+ 3. Read the frame of each earlier step that writes `:prior` with [`step_prior_brt`](@ref), and compare the two. Skip a callable step, which declares no frame.
+
+# Arguments
+
+  - `ests`: The step estimators, with the optimisation step last, see [`assert_opt_last`](@ref).
+
+# Validation
+
+  - Each prior step has the `brt` of the optimiser. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`PipelineStep`](@ref)
+  - [`pipe_prior_brt`](@ref)
+  - [`step_prior_brt`](@ref)
+  - [`assert_routable`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+"""
+function assert_benchmark_frame(ests)::Nothing
+    opt = pipe_terminal_optimiser(ests)
+    if isnothing(opt) || !pipe_accepts(opt, Val(:pe))
+        return nothing
+    end
+    brt = pipe_prior_brt(opt)
+    n = length(ests)
+    #! The terminal step writes `:opt`, so the walk over the prior steps never meets it.
+    for i in findall(e -> pipe_writes(e) === :prior, ests)
+        sbrt = step_prior_brt(ests[i])
+        @argcheck(isnothing(sbrt) || sbrt == brt,
+                  ArgumentError("step $i of $n fits its prior with brt = $sbrt, and the terminal $(Base.typename(typeof(opt)).wrapper) reads its prior with brt = $brt; the injected prior and the other readers of the optimiser would read the returns in two frames, the raw X and the excess X - B. Wrap the prior step as PipelineStep(; est = <prior>, writes = :prior, brt = $brt), or set the brt of the optimiser to $sbrt."))
+    end
+    return nothing
 end

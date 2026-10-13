@@ -250,10 +250,9 @@ The check is structural. It finds whether the optimiser family can receive the t
 
 # Algorithm
 
- 1. Stop when the pipeline has one step, or when its last step writes a slot other than `:opt`.
- 2. Read the optimiser `opt` from the last step, without its [`PipelineStep`](@ref) wrapper. Stop when `opt` is not an [`OptimisationEstimator`](@ref). A [`TimeDependent`](@ref) schedule and a precomputed result are such steps, and the fold loop resolves them later.
- 3. Read the targets of each earlier step with [`pipe_required_targets`](@ref).
- 4. Check each target with [`pipe_accepts`](@ref).
+ 1. Read the optimiser `opt` of the last step with [`pipe_terminal_optimiser`](@ref). Stop when there is none. A [`TimeDependent`](@ref) schedule and a precomputed result have none, and the fold loop resolves them later.
+ 2. Read the targets of each earlier step with [`pipe_required_targets`](@ref).
+ 3. Check each target with [`pipe_accepts`](@ref).
 
 # Arguments
 
@@ -274,18 +273,11 @@ The check is structural. It finds whether the optimiser family can receive the t
   - [`Pipeline`](@ref)
 """
 function assert_routable(ests)::Nothing
+    opt = pipe_terminal_optimiser(ests)
+    if isnothing(opt)
+        return nothing
+    end
     n = length(ests)
-    if !(n > 1)
-        return nothing
-    end
-    terminal = ests[n]
-    if !(pipe_writes(terminal) === :opt)
-        return nothing
-    end
-    opt = isa(terminal, PipelineStep) ? terminal.est : terminal
-    if !(isa(opt, OptimisationEstimator))
-        return nothing
-    end
     for i in 1:(n - 1)
         for target in pipe_required_targets(ests[i])
             @argcheck(pipe_accepts(opt, Val(target)),
@@ -369,6 +361,7 @@ Give the steps in the order of execution. Each element is a step estimator or a 
   - A nested pipeline changes no Data Slot that the outer pipeline does not receive, see [`assert_nested_data_slots`](@ref).
   - Each constraint step resolves to one routing target, see [`assert_constraint_targets`](@ref).
   - The last optimiser can receive each target that an earlier step writes, see [`assert_routable`](@ref).
+  - Each prior step fits in the frame of the last optimiser, `brt` for `brt`, see [`assert_benchmark_frame`](@ref).
   - An earlier step writes each slot that a step reads, or the pipeline input fills it with `prices` or `returns`. Raises an `ArgumentError`.
   - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
   - The step names are unique. Raises an `ArgumentError`.
@@ -441,6 +434,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
     assert_nested_data_slots(ests)
     assert_constraint_targets(ests)
     assert_routable(ests)
+    assert_benchmark_frame(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
     written = Dict{Symbol, Any}()
@@ -477,6 +471,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
+step_prior_brt(p::Pipeline) = step_prior_brt(p.steps[end])
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

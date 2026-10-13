@@ -1,5 +1,5 @@
 ```@meta
-Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, require_slot, set_slot, run_uncertainty_step, uncertainty_step_source, run_constraint_step, …"
+Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, run_step_under, require_slot, set_slot, run_uncertainty_step, uncertainty_step_source, …"
 ```
 
 # Step execution: private API
@@ -10,6 +10,7 @@ The estimators do not depend on the pipeline code, and their docstrings are with
 
 ```@docs
 run_step
+run_step_under
 require_slot
 set_slot
 run_uncertainty_step
@@ -18,6 +19,18 @@ run_constraint_step
 resolve_constraint_target
 pipeline_asset_sets
 add_constraint_result
+```
+
+## The frame of a prior step
+
+A prior step fits on the raw returns, or on the returns in excess of the benchmark when its [`PipelineStep`](@ref) sets `brt = true`. The optimiser that receives the prior must read it in the same frame, and the [`Pipeline`](@ref) constructor checks this.
+
+```@docs
+assert_step_brt
+pipe_prior_brt
+step_prior_brt
+pipe_terminal_optimiser
+assert_benchmark_frame
 ```
 
 A [`TrainTestSplit`](@ref) is the one step whose written slot does not follow from its type. It narrows whichever data slot the pipeline input filled, the prices or the returns. [`pipe_writes`](@ref) returns `:split` for it, which is not a slot, so the pipeline treats the step as one that writes nothing. The docstrings of `run_step`, [`pipe_reads`](@ref) and [`pipe_writes`](@ref) cover the `run_step` method of the split and its slot declarations.

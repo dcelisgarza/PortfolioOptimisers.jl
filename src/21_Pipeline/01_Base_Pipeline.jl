@@ -544,6 +544,8 @@ Most estimators are used as pipeline steps directly: their family determines whi
   - **Slots dispatch cannot infer**: a custom callable, or an estimator routed to a nonstandard slot. `reads` and `writes` supply what the family would otherwise declare. This includes a bare-callable [`TimeDependent`](@ref) schedule of optimisers (`TimeDependent(ctx -> optimiser)`), whose output kind is not in its type: it enters via `PipelineStep(; est = td, writes = :opt)` and its output is type-checked when the fold loop swaps it in (see [`TD_OptE_Opt_Inferable`](@ref)).
   - **Routing intent dispatch must not guess**: an uncertainty-set estimator writes the `uncertainty` slot either way, so the slot is never in doubt; what the wrapper declares through `target` is *which parameters you want bounded* — `:mu`, `:sigma`, or `:both`. Since [`ucs`](@ref) derives both halves from a single fit, this is a statement of intent, not a disambiguation, and every populated half must reach the optimiser or [`inject_context`](@ref) rejects it.
 
+The wrapper also states the frame of a prior step. A prior estimator has no `brt` field, so `PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = true)` fits the prior on the returns in excess of the benchmark, `X - B`, as the `brt` of an optimiser makes its own prior do. The [`Pipeline`](@ref) refuses a prior step whose `brt` differs from the `brt` of the optimiser that receives the prior, see [`assert_benchmark_frame`](@ref). In batch the step calls [`prior`](@ref) under `brt`. In the online step the prior folds the excess returns through [`fold_prior`](@ref), and the Fold Context of the Pipeline keeps the raw rows.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -555,6 +557,7 @@ $(DocStringExtensions.FIELDS)
         writes::Symbol,
         reads::Tuple{Vararg{Symbol}} = (),
         target::Option{Symbol} = nothing,
+        brt::Bool = false,
     ) -> PipelineStep
 
 Keywords correspond to the struct's fields.
@@ -565,6 +568,7 @@ Keywords correspond to the struct's fields.
   - `all(r -> r in PIPELINE_SLOTS, reads)`.
   - `isnothing(target) || target in PIPELINE_STEP_TARGETS`.
   - A [`TimeDependent`](@ref) `est` must be an optimiser-position schedule ([`TD_OptE_Opt`](@ref)) and declare `writes = :opt`: schedules of non-optimiser families are not steppable — a per-fold prior/constraint/… is spelled as a `TimeDependent` *field* of the optimisation step instead.
+  - `brt = true` needs an `est` that is a prior estimator, or an [`Online`](@ref) declaration of one. Every other step reads no benchmark through the wrapper, so `brt` would have no effect. Raises an `ArgumentError`.
 
 # Examples
 
@@ -577,6 +581,9 @@ julia> PortfolioOptimisers.pipe_writes(ps)
 
 julia> PortfolioOptimisers.pipe_reads(ps)
 (:returns,)
+
+julia> PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = true).brt
+true
 ```
 
 # Related
@@ -603,9 +610,13 @@ julia> PortfolioOptimisers.pipe_reads(ps)
     Optional routing annotation for heterogeneous slots (one of [`PIPELINE_STEP_TARGETS`](@ref), or `nothing`).
     """
     target
+    """
+    $(field_dict[:brt_read]) Only a prior step takes `true`.
+    """
+    brt
     function PipelineStep(est::Union{<:AbstractEstimator, <:Function},
                           reads::Tuple{Vararg{Symbol}}, writes::Symbol,
-                          target::Option{Symbol})
+                          target::Option{Symbol}, brt::Bool)
         @argcheck(writes in PIPELINE_SLOTS,
                   ArgumentError("writes must be one of $(PIPELINE_SLOTS), got :$writes"))
         @argcheck(all(r -> r in PIPELINE_SLOTS, reads),
@@ -618,15 +629,18 @@ julia> PortfolioOptimisers.pipe_reads(ps)
             @argcheck(writes === :opt,
                       ArgumentError("a TimeDependent schedule step stands in for the optimiser, so it must declare writes = :opt, got :$writes"))
         end
-        return new{typeof(est), typeof(reads), typeof(writes), typeof(target)}(est, reads,
-                                                                               writes,
-                                                                               target)
+        assert_step_brt(est, brt)
+        return new{typeof(est), typeof(reads), typeof(writes), typeof(target), typeof(brt)}(est,
+                                                                                            reads,
+                                                                                            writes,
+                                                                                            target,
+                                                                                            brt)
     end
 end
 function PipelineStep(; est::Union{<:AbstractEstimator, <:Function}, writes::Symbol,
-                      reads::Tuple{Vararg{Symbol}} = (),
-                      target::Option{Symbol} = nothing)::PipelineStep
-    return PipelineStep(est, reads, writes, target)
+                      reads::Tuple{Vararg{Symbol}} = (), target::Option{Symbol} = nothing,
+                      brt::Bool = false)::PipelineStep
+    return PipelineStep(est, reads, writes, target, brt)
 end
 pipe_writes(ps::PipelineStep) = ps.writes
 pipe_reads(ps::PipelineStep) = ps.reads
