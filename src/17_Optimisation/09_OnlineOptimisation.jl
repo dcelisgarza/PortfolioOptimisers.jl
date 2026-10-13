@@ -52,7 +52,9 @@ end
 
 Returns the observations that the prior of an optimiser folds in its online step.
 
-The step of a prior reads a [`ReturnsResult`](@ref), and under `brt` the batch fit of the prior reads the returns in excess of the benchmark. So the function gives the prior a `ReturnsResult` that holds `X - B` in its `X` and every other field of `rd` unchanged. The prior is the one reader of this `ReturnsResult`. The Fold Context records `rd` itself, with its raw `X`, so `optimise(opt)` with no returns rebuilds the raw returns data.
+The step of a prior reads a [`ReturnsResult`](@ref), and under `brt` the batch fit of the prior reads the returns in excess of the benchmark. So the function gives the prior a `ReturnsResult` that holds `X - B` in its `X` and every other field of `rd` unchanged. The prior is the one reader of this `ReturnsResult` in an optimiser. The Fold Context records `rd` itself, with its raw `X`, so `optimise(opt)` with no returns rebuilds the raw returns data.
+
+[`covariance_forecast_evaluation`](@ref) reads this `ReturnsResult` too. Every reader of an evaluation reads one frame, the fit, the online step and the test rows, so the whole fold loop of the evaluation runs on it.
 
 # Algorithm
 
@@ -77,6 +79,7 @@ The step of a prior reads a [`ReturnsResult`](@ref), and under `brt` the batch f
   - [`fold_prior`](@ref)
   - [`fold_returns`](@ref)
   - [`benchmark_relative_returns`](@ref)
+  - [`covariance_forecast_evaluation`](@ref)
 """
 function prior_step_returns(rd::ReturnsResult, brt::Bool)
     return if !brt

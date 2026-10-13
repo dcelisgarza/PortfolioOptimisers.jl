@@ -1048,7 +1048,7 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CovarianceForecastEvaluationResult(
-        dates, test_idx, horizon, target, n_valid, mahalanobis_ratio, diagonal_ratio,
+        dates, test_idx, horizon, target, brt, n_valid, mahalanobis_ratio, diagonal_ratio,
         qlike, frobenius, standardised_return, portfolio_qlike, w, sigma, location
     ) -> CovarianceForecastEvaluationResult
 
@@ -1079,6 +1079,10 @@ The arguments correspond to the fields of the struct, in the order of their decl
     Realised quantity that the evaluation judged the forecasts against.
     """
     target
+    """
+    Whether the evaluation read the returns in excess of the benchmark, `X - B`, in place of `X`. The forecasts are forecasts of the returns in this frame, so [`covariance_forecast_portfolio`](@ref) reads its test rows in it.
+    """
+    brt
     """
     Number of active assets at each step, one entry per step. An active asset has a finite forecast variance, a finite location and at least one finite test return. A step with no active asset is unscored: its count is `0` and every diagnostic of the step is `NaN`.
     """
@@ -1124,7 +1128,8 @@ end
     covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online},
                                    rd::ReturnsResult, cv::WFCVER; w::Option{<:VecNum_VecVecNum} = nothing,
                                    target::AbstractRealisedTarget = RealisedCovariance(),
-                                   store_forecasts::Bool = false) -> CovarianceForecastEvaluationResult
+                                   store_forecasts::Bool = false,
+                                   brt::Bool = false) -> CovarianceForecastEvaluationResult
 
 Evaluate a covariance forecast out of sample over a walk-forward, in batch or online.
 
@@ -1137,16 +1142,19 @@ The verb runs through the one fold loop of the library. At each fold the callbac
 
 The verb reads none of these settings. So the online run gives the rows of the batch expanding run fold for fold, to the tolerance of the estimator's own fold. The date form, the purge, and a listing or a delisting need no code of their own.
 
+With `brt = true` the verb evaluates a forecast of the returns in excess of the benchmark, `X - B`, which is the covariance that a tracking-error portfolio reads. Every reader of the returns in the evaluation reads this one frame: the fit over a training window, the online step, and the test rows. So the verb gives the fold loop the returns data of [`prior_step_returns`](@ref), which holds `X - B` in `X` and keeps `B` and every other field. A vector `B` is one benchmark, which [`benchmark_relative_returns`](@ref) subtracts from every asset. A matrix `B` holds one benchmark per asset. An [`ImpliedVolatility`](@ref) estimator reads the surface `iv` of the assets beside `X - B`, as the prior of an optimiser does under `brt`, because the returns data holds no surface of the excess returns.
+
 The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses an estimator that enters with a state or that cannot fold, with an error that names it. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each estimate made from the state is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
 
 # Algorithm
 
  1. Check `rd.X`, and check that an [`Online`](@ref) at the root comes with an Online Scheme.
- 2. Split `rd` by `cv`, giving `train_idx` and `test_idx`, and check that the folds are not shuffled.
- 3. Run [`fold_loop`](@ref) over the `n` folds, giving `steps`. At each fold, read `(sigma, c)` through [`forecast_moments`](@ref) and score the test rows through [`covariance_forecast_step`](@ref). When `store_forecasts = true`, add copies of `sigma` and `c` to the step record, because an online state writes its location in place.
- 4. Stack the diagonal ratios, the standardised returns and the portfolio QLIKE losses of the steps into the matrices `d`, `b` and `pq`, one row per step.
- 5. Label each step with the timestamp of its first test row, or with the index of that row when `rd.ts` is `nothing`, giving `dates`.
- 6. Build the Result from the columns, the horizons `length.(test_idx)`, `target` and `w`.
+ 2. Take the returns data that every reader reads, `prior_step_returns(rd, brt)`, giving `rdb`. It is `rd` when `brt` is `false`.
+ 3. Split `rdb` by `cv`, giving `train_idx` and `test_idx`, and check that the folds are not shuffled.
+ 4. Run [`fold_loop`](@ref) over the `n` folds of `rdb`, giving `steps`. At each fold, read `(sigma, c)` through [`forecast_moments`](@ref) and score the test rows through [`covariance_forecast_step`](@ref). When `store_forecasts = true`, add copies of `sigma` and `c` to the step record, because an online state writes its location in place.
+ 5. Stack the diagonal ratios, the standardised returns and the portfolio QLIKE losses of the steps into the matrices `d`, `b` and `pq`, one row per step.
+ 6. Label each step with the timestamp of its first test row, or with the index of that row when `rd.ts` is `nothing`, giving `dates`.
+ 7. Build the Result from the columns, the horizons `length.(test_idx)`, `target`, `brt` and `w`.
 
 # Arguments
 
@@ -1156,10 +1164,12 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
   - `w`: The test portfolios on the full universe. `nothing` means inverse volatility recomputed from the forecast of each step, a vector is one static portfolio, and a vector of vectors is several.
   - `target`: The realised quantity that the evaluation judges the forecasts against.
   - `store_forecasts`: Whether to keep the forecast and the location of every step in the Result, for [`covariance_forecast_portfolio`](@ref).
+  - $(arg_dict[:brt_read])
 
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - The rules of [`benchmark_relative_returns`](@ref).
   - The folds of the scheme are not shuffled, through [`assert_unshuffled_folds`](@ref). An `ArgumentError` is thrown otherwise.
   - An [`Online`](@ref) at the root comes with an Online Scheme. An `ArgumentError` is thrown otherwise, because a batch fold would never seed the buffer.
   - Everything that [`covariance_forecast_step`](@ref) refuses at a step, and everything that the online arm of the fold loop refuses at entry under an Online Scheme.
@@ -1176,6 +1186,7 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
   - [`covariance_forecast_compare`](@ref)
   - [`covariance_forecast_portfolio`](@ref)
   - [`forecast_location`](@ref)
+  - [`benchmark_relative_returns`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)
   - [`OnlineIndexWalkForward`](@ref)
@@ -1187,15 +1198,17 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
                                         rd::ReturnsResult, cv::WFCVER;
                                         w::Option{<:VecNum_VecVecNum} = nothing,
                                         target::AbstractRealisedTarget = RealisedCovariance(),
-                                        store_forecasts::Bool = false)
+                                        store_forecasts::Bool = false, brt::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     @argcheck(!isa(est, Online) || folds_are_stepped(cv),
               ArgumentError("`Online($(typeof(est.est).name.name))` declares a refit from a sample buffer, which only the fold loop's online arm seeds and threads, and this scheme is not an Online Scheme, so every fold would refit the estimator from its training window and the buffer would never exist. Run the evaluation under `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand it the estimator unwrapped."))
-    cv_res = split(cv, rd)
+    # Every reader of the evaluation reads one frame, so the fold loop folds and scores `X - B`.
+    rdb = prior_step_returns(rd, brt)
+    cv_res = split(cv, rdb)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     n = length(train_idx)
-    steps, _ = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rd,
+    steps, _ = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rdb,
                          train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         sigma, c = forecast_moments(fold.est, fold.rd, fold.train)
         step = covariance_forecast_step(sigma, view(fold.rd.X, fold.test, :), c, w, target)
@@ -1216,7 +1229,7 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
     firsts = [first(t) for t in test_idx]
     dates = isnothing(rd.ts) ? firsts : rd.ts[firsts]
     return CovarianceForecastEvaluationResult(dates, test_idx,
-                                              [length(t) for t in test_idx], target,
+                                              [length(t) for t in test_idx], target, brt,
                                               [s.n_valid for s in steps],
                                               [s.mahalanobis_ratio for s in steps], d,
                                               [s.qlike for s in steps],

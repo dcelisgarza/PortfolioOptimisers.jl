@@ -37,7 +37,11 @@ step had no `brt`, and `inject_context` put its Prior Result into the optimiser 
 `prior` returns a Prior Result as it is. Under the optimiser's `brt = true` that prior held the
 moments of the raw `X`, while every other reader of the optimiser read `X - B`. The uncertainty-set,
 clustering, phylogeny, centrality and exposure steps had the same gap
-([#1670](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1670)).
+([#1670](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1670)). The same census found
+that `covariance_forecast_evaluation` had no `brt`
+([#1658](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1658)). A caller could not
+evaluate a forecast of the covariance of `X - B`, which a tracking-error portfolio reads, unless
+they built `ReturnsResult(; X = X .- B)` by hand and lost `B`.
 
 The maintainer stated the rule on 2026-10-12: the quantities of a `ReturnsResult` are never dropped,
 unless they truly cannot be carried for mathematical reasons. The maintainer decided #1651 on the
@@ -72,7 +76,8 @@ whatever `X` is in scope.
    `NearOptimalCentering` take the `brt` of the head, because they are its own sub-problem.
 5. **The online step of an optimiser folds `X - B` into its prior and keeps the raw rows**
    (`fold_returns`). `prior_step_returns` gives the prior the returns data with `X - B` in `X`, the
-   one `ReturnsResult` that `brt` still builds, read by the prior alone. The Fold Context keeps the
+   one `ReturnsResult` that `brt` still builds. In an optimiser the prior alone reads it, and
+   decision 8 gives it to the fold loop of a covariance forecast evaluation. The Fold Context keeps the
    raw rows under `brt`, so `optimise(opt)` with no returns rebuilds the raw `rd`, and it equals
    `optimise(opt, rd[1:t])` under `brt` too (ADR 0137).
 6. **The rows buffer of an online portfolio selection head is a `ReturnsBufferState` that owns the
@@ -104,6 +109,17 @@ whatever `X` is in scope.
    reads no returns is refused too: an uncertainty set that reads the prior, an exposure constraint
    that reads the loadings of the prior, and every other family, because the wrapper passes `brt`
    to none of them.
+8. **`covariance_forecast_evaluation(est, rd, cv; brt = true)` evaluates a forecast of `X - B`**
+   (#1658). Every reader of the returns in an evaluation reads one frame: the fit over a training
+   window, the online step and the test rows. No reader needs the raw `X`, so the verb gives its
+   fold loop `prior_step_returns(rd, brt)`, which keeps `B`. No reader subtracts twice, because
+   the estimator receives no `brt`. A vector `B` is subtracted from every asset, which is the frame
+   of a tracking error, and a matrix `B` asset by asset, as `benchmark_relative_returns` does. The
+   Result records `brt`. So `covariance_forecast_portfolio` reads its test rows in the frame of the
+   stored forecasts and takes no `brt` of its own, and `covariance_forecast_compare` refuses two
+   evaluations in different frames. An `ImpliedVolatility` reads the surface of the assets beside
+   `X - B`, as the prior of an optimiser does under `brt`. The returns data holds no surface of the
+   excess returns, so the docstring states this and the verb does not refuse it.
 
 ## Consequences
 
@@ -120,6 +136,9 @@ whatever `X` is in scope.
 - `NestedClustered(brt = true)` and `Stacking(brt = true)` no longer make their inner optimisers fit
   `X - B`. A caller who wants that sets `brt = true` on each inner optimiser.
 - The window of the head is views into its buffers, as before, so the step takes no copy.
+- A caller who evaluated a hand-built `ReturnsResult(; X = X .- B)` passes `rd` and `brt = true`, and
+  gets the same diagnostics with `B` kept. A caller who builds a `CovarianceForecastEvaluationResult`
+  by position passes `brt` after `target`.
 - A pipeline that injected a raw prior into an optimiser with `brt = true` now fails when it is
   built. The caller wraps the prior step with `brt = true`. The same holds for a raw uncertainty
   set, clustering, phylogeny, centrality or exposure step.
@@ -141,6 +160,11 @@ whatever `X` is in scope.
 - **Pass the optimiser's `brt` up to the prior step when the pipeline is built** (option 3 of
   #1659). It hides the frame of the step from the caller who reads the step, and a step in a
   nested pipeline or under a schedule has no single optimiser to read it from.
+- **Subtract at each reader of a covariance forecast evaluation, as decision 2 does.** The online
+  arm of the fold loop calls `partial_fit!(est, rd)` with no `brt`, so the loop would have to
+  thread a `brt` to every estimator that it steps, for no reader that needs the raw `X`.
+- **A `brt` keyword on `covariance_forecast_portfolio`** (the proposal of #1658). A caller could
+  score a forecast of `X - B` on the rows of `X`, with no error.
 - **Let the `brt` of a meta-optimiser pass down to its inner optimisers.** It keeps the weights that
   the rebuild gave, but an inner optimiser that holds no `brt` field cannot take it, and the
   fallback and the corner solves already apply their own `brt`.
@@ -150,4 +174,5 @@ whatever `X` is in scope.
 - ADR 0137: the online step forwards to the prior and the read-out runs the batch path.
 - ADR 0164: the Allocation Set Constraint through which a leader honours the head's set.
 - `benchmark_relative_returns`, `prior_step_returns`, `outer_returns_source`, `fold_returns`,
-  `buffer_returns_result`, `ReturnsBufferState`, `PipelineStep`, `assert_benchmark_frame`.
+  `buffer_returns_result`, `ReturnsBufferState`, `PipelineStep`, `assert_benchmark_frame`,
+  `covariance_forecast_evaluation`, `CovarianceForecastEvaluationResult`.

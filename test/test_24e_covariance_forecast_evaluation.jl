@@ -398,6 +398,66 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("PortfolioOptimisersCovariance", e.value.msg)
     end
 
+    @testset "brt evaluates a forecast of the returns in excess of the benchmark (#1658)" begin
+        # A vector `B` is one benchmark for every asset, and a matrix `B` is one per asset.
+        Bv = randn(StableRNG(1658), T) ./ 100
+        Bm = randn(StableRNG(16580), T, N) ./ 100
+        wt = [fill(1 / N, N), collect(1.0:N) ./ sum(1:N)]
+        runs = ((Covariance(), batch_cv), (Covariance(), online_cv),
+                (EmpiricalPrior(), batch_cv), (EmpiricalPrior(), online_cv),
+                (po.Online(Covariance()), online_cv))
+        for (nb, B) in ((["bm"], Bv), (["bm$i" for i in 1:N], Bm))
+            rb = ReturnsResult(; nx = nx, X = X, nb = nb, B = B, ts = ts)
+            # The evaluation of a hand-built `X - B`, which loses `B`.
+            rx = ReturnsResult(; nx = nx, X = X .- B, ts = ts)
+            for (est, cv) in runs
+                a = cfe(est, rb, cv; brt = true, store_forecasts = true)
+                z = cfe(est, rx, cv; store_forecasts = true)
+                @test a.brt && !z.brt
+                @test a.n_valid == z.n_valid
+                for f in columns
+                    @test finite_max(getfield(a, f), getfield(z, f)) == 0
+                end
+                @test a.sigma == z.sigma && a.location == z.location
+                # The re-projection reads the test rows in the frame of the evaluation.
+                @test isequal(covariance_forecast_portfolio(a, rb, wt),
+                              covariance_forecast_portfolio(z, rx, wt))
+            end
+            # Under `brt = false` the benchmark is not read.
+            a = cfe(Covariance(), rb, batch_cv)
+            z = cfe(Covariance(), rd, batch_cv)
+            @test !a.brt
+            for f in columns
+                @test finite_max(getfield(a, f), getfield(z, f)) == 0
+            end
+        end
+        # An `ImpliedVolatility` reads the surface of the assets beside `X - B`.
+        wv = 90
+        cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
+        iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
+        ce = ImpliedVolatility(; ppy = 252)
+        a = cfe(ce,
+                ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, iv = iv, ivpa = 1.1,
+                              ts = ts), cvb; brt = true)
+        z = cfe(ce, ReturnsResult(; nx = nx, X = X .- Bv, iv = iv, ivpa = 1.1, ts = ts),
+                cvb)
+        for f in columns
+            @test finite_max(getfield(a, f), getfield(z, f)) == 0
+        end
+        # No excess return exists without a benchmark.
+        e = @test_throws ArgumentError cfe(Covariance(), rd, batch_cv; brt = true)
+        @test occursin("carries no benchmark", e.value.msg)
+        rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, ts = ts)
+        a = cfe(Covariance(), rb, batch_cv; brt = true, store_forecasts = true)
+        e = @test_throws ArgumentError covariance_forecast_portfolio(a, rd, nothing)
+        @test occursin("carries no benchmark", e.value.msg)
+        # Two evaluations in different frames do not compare.
+        e = @test_throws ArgumentError covariance_forecast_compare(a,
+                                                                   cfe(Covariance(), rb,
+                                                                       batch_cv))
+        @test occursin("read different returns", e.value.msg)
+    end
+
     @testset "The date form" begin
         bd = DateWalkForward(w, h; period = Day(1), purged_size = p, expand_train = true)
         od = OnlineDateWalkForward(w, h; period = Day(1), purged_size = p)
@@ -441,7 +501,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         stack(f) = reduce(vcat, [permutedims(getfield(s, f)) for s in steps])
         cfer = CovarianceForecastEvaluationResult(collect(0:(M - 1)),
                                                   [(1:3) .+ 3k for k in 0:(M - 1)],
-                                                  fill(3, M), HorizonReturn(),
+                                                  fill(3, M), HorizonReturn(), false,
                                                   [s.n_valid for s in steps],
                                                   [s.mahalanobis_ratio for s in steps],
                                                   stack(:diagonal_ratio),
@@ -487,7 +547,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # The realised covariance has `N h` degrees of freedom per step, so its band is
         # narrower by `√h` and its exceedance threshold sits at `χ²_{N h}`.
         cfr = CovarianceForecastEvaluationResult(cfer.dates, cfer.test_idx, cfer.horizon,
-                                                 RealisedCovariance(), cfer.n_valid,
+                                                 RealisedCovariance(), false, cfer.n_valid,
                                                  cfer.mahalanobis_ratio,
                                                  cfer.diagonal_ratio, cfer.qlike,
                                                  cfer.frobenius, cfer.standardised_return,

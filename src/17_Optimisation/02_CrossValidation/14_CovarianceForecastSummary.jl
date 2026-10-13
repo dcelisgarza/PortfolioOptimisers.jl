@@ -705,6 +705,7 @@ Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. 
 # Validation
 
   - `a.dates == b.dates` and `a.horizon == b.horizon`. An `ArgumentError` is thrown otherwise, because a per-step difference needs the same steps on both sides.
+  - `a.brt == b.brt`. An `ArgumentError` is thrown otherwise, because a forecast of `X - B` and a forecast of `X` are scored on different returns, so their losses do not compare.
   - `a` and `b` carry the same number of test portfolios. A `DimensionMismatch` is thrown otherwise.
   - `0 <= lags < n_steps`, where `n_steps` counts the steps that both evaluations scored. A `DomainError` is thrown otherwise.
 
@@ -731,6 +732,8 @@ function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
                                                          length(a.qlike)) - 1)
     @argcheck(isequal(a.dates, b.dates) && a.horizon == b.horizon,
               ArgumentError("the two evaluations do not share their steps: a comparison reads a per-step loss difference, so both must be run over one walk-forward, with the same dates and the same horizon at every step. Run both forecasts through `covariance_forecast_evaluation` with the same `rd` and `cv`."))
+    @argcheck(a.brt == b.brt,
+              ArgumentError("the two evaluations read different returns: one has `brt = $(a.brt)` and the other `brt = $(b.brt)`, so one scored its forecast on `X - B` and the other on `X`, and their losses do not compare. Run both forecasts through `covariance_forecast_evaluation` with the same `brt`."))
     P = size(a.portfolio_qlike, 2)
     @argcheck(size(b.portfolio_qlike, 2) == P,
               DimensionMismatch("the first evaluation carries $(P) test portfolio(s) and the second $(size(b.portfolio_qlike, 2)); hand both the same `w`."))
@@ -806,11 +809,14 @@ Score the stored forecasts of an evaluation again, on a new test portfolio.
 
 With `store_forecasts = true` the Result holds the forecast of every step and the location that the forecast was centred on, so this verb scores a new portfolio without a new run of the loop. The own `w` of the evaluation reproduces its columns.
 
+The test rows are read in the frame of the evaluation, `cfer.brt`, because a forecast of `X - B` is scored on the rows of `X - B`. The verb takes no `brt` of its own, so it cannot score the forecasts of one frame on the rows of another.
+
 # Algorithm
 
- 1. For each step, read the stored forecast and location, and the test rows `rd.X[cfer.test_idx[i], :]`.
- 2. Score them on `w` with the target of the evaluation, through [`covariance_forecast_step`](@ref).
- 3. Put the standardised returns and the portfolio QLIKE losses of the step in its row of each matrix.
+ 1. Read the returns in the frame of the evaluation with [`benchmark_relative_returns`](@ref) under `cfer.brt`, giving `X`.
+ 2. For each step, read the stored forecast and location, and the test rows `X[cfer.test_idx[i], :]`.
+ 3. Score them on `w` with the target of the evaluation, through [`covariance_forecast_step`](@ref).
+ 4. Put the standardised returns and the portfolio QLIKE losses of the step in its row of each matrix.
 
 # Arguments
 
@@ -822,6 +828,7 @@ With `store_forecasts = true` the Result holds the forecast of every step and th
 
   - `cfer.sigma` is not `nothing`. An `ArgumentError` is thrown otherwise, which names `store_forecasts`.
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - The rules of [`benchmark_relative_returns`](@ref) under `cfer.brt`.
 
 # Returns
 
@@ -832,13 +839,15 @@ With `store_forecasts = true` the Result holds the forecast of every step and th
   - [`covariance_forecast_evaluation`](@ref)
   - [`CovarianceForecastEvaluationResult`](@ref)
   - [`covariance_forecast_step`](@ref)
+  - [`benchmark_relative_returns`](@ref)
 """
 function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
                                        rd::ReturnsResult, w::Option{<:VecNum_VecVecNum})
     @argcheck(!isnothing(cfer.sigma),
               ArgumentError("the evaluation holds no forecasts to re-project: run `covariance_forecast_evaluation` with `store_forecasts = true`, which keeps every step's forecast and the location it was centred on."))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    steps = [covariance_forecast_step(cfer.sigma[i], view(rd.X, cfer.test_idx[i], :),
+    X = benchmark_relative_returns(rd, cfer.brt)
+    steps = [covariance_forecast_step(cfer.sigma[i], view(X, cfer.test_idx[i], :),
                                       cfer.location[i], w, cfer.target)
              for i in eachindex(cfer.sigma)]
     P = length(steps[1].standardised_return)
