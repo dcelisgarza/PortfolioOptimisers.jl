@@ -423,5 +423,52 @@ Every partial-fit state records the count of observations it has seen in its `n`
 function observation_count(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
     return partial_fit_cache(est).n
 end
+"""
+    shared_series_member_rows(X::MatNum, gaps::Nothing; kwargs...)
+    shared_series_member_rows(X::MatNum, gaps::AbstractVector{Bool}; active_mask = nothing,
+                              kwargs...)
+
+Return the observations of a carry step that its members fold, and the keyword arguments of their fold.
+
+A carry fold adds each observation to running moments. A batch fit drops an observation with a Shared Series gap, see [`shared_series_view`](@ref), so the running moments must not see it. The carried rows keep it, because the Fold Context of an optimiser holds one row for each observation. So the members fold the unmarked rows of `X` with the rows of the active mask that belong to them, and the carried rows take every row with its mark.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No marks: return `X` and the keyword arguments.
+ 2. Marks: view `X` and the active mask at the unmarked rows.
+
+# Arguments
+
+  - `X`: The observations of the step, `observations × assets`.
+  - `gaps`: One mark for each observation, `true` at an observation with a Shared Series gap, or `nothing`.
+  - $(arg_dict[:pf_active_mask])
+  - `kwargs...`: The other keyword arguments of the fold of a member, unchanged.
+
+# Returns
+
+  - `(X, kwargs)::Tuple`: The observations that the members fold, and the keyword arguments of their fold.
+
+# Related
+
+  - [`fold_member`](@ref)
+  - [`shared_series_gaps`](@ref)
+  - [`fold_prior_step`](@ref)
+"""
+function shared_series_member_rows(X::MatNum, ::Nothing; kwargs...)
+    return X, (; kwargs...)
+end
+function shared_series_member_rows(X::MatNum, gaps::AbstractVector{Bool};
+                                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                                   kwargs...)
+    rows = findall(!, gaps)
+    kw = if isnothing(active_mask)
+        (; kwargs...)
+    else
+        (; active_mask = view(active_mask, rows, :), kwargs...)
+    end
+    return view(X, rows, :), kw
+end
 export partial_fit!, partial_fit
 public merge_states

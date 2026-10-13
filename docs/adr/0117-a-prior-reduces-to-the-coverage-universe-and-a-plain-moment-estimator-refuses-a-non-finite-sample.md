@@ -457,17 +457,36 @@ because about fifteen readers pair the observations of a prior with the last obs
 returns data, and a drop inside a prior would misalign each of them. The entries are `prior(pe,
 rd)`, the uncertainty sets over a `ReturnsResult`, `regression(re, rd)`,
 `resolve_factor_regression`, `forecast_location`, the batch entry of every optimiser through
-`shared_series_args`, the uncertainty step of a `Pipeline`, and `covariance_forecast_evaluation`
+`shared_series_args` (the generic entry, and the `optimise` method of each head with no fallback
+since #1688), the uncertainty step of a `Pipeline`, and `covariance_forecast_evaluation`
 under `brt`, before it splits the folds. A fit reads `F` when `needs_factor_returns` answers `true`,
 which `reads_factor_returns` states. A regression on matrices refuses a non-finite factor row with
 `IsNonFiniteError`, because its caller chose the observations.
 
-An online step cannot drop an observation. An optimiser appends each observation to the buffer of
-its prior and to its Fold Context together, and `optimise(opt)` rebuilds the returns data from
-both, row by row. So `fold_prior` and `partial_fit!(pe, rd)` refuse an observation with a Shared
-Series gap through `assert_no_shared_gap`, with an `IsNonFiniteError` that names it. Before this
-amendment the same step failed later, with `NaN` running moments or `NaN` loadings. #1675 records
-the design that would let the step drop it.
+An online step keeps the observation and marks it (#1675). An optimiser appends each observation
+to the buffer of its prior and to its Fold Context together, and `optimise(opt)` rebuilds the
+returns data from both, row by row, so neither can skip a row. `fold_prior` finds the marks with
+`shared_series_gaps` under the `brt` of the optimiser, because a prior under `brt` reads `X - B` and
+cannot see a gap of `B`, and `partial_fit!(pe, rd)` finds them from the factor returns. The marks
+travel through `fold_prior_step`, the verb of every route of the step, into the field `G` of the
+`SampleBufferState`. Every fit through the buffer reads `shared_series_buffer`, which drops the
+marked rows: the refit, the read of a carry, the high order co-moments, the Choice Rule and the
+forecast location. A carry fold leaves the marked rows out of its running moments, and the carry of
+a Cross-Sectional Factor Prior out of its histories, whose offsets count the kept rows with
+`buffer_fit_count`. `batch_from_state` cuts the rebuilt returns data with the rule of the prior
+estimator, before the prior becomes a result. So the call with no data equals the batch fit over
+the observations folded, and the last-rows pairing holds.
+
+The step keeps the row, and does not cut it before both buffers, for two reasons. A cap counts every
+row, so `Online(pe; max_history = w)` stays the rolling batch fit over the last `w` observations of
+the data, as the training window of a walk-forward counts them before the drop. And `Resume` aligns
+the state with the data by a contiguous span of the held timestamps, which a cut would break.
+
+A step with no gap costs what it cost before. `G` is `nothing` until the first gap, it is a declared
+field and not a type parameter, so the type of the estimator does not depend on the data, and every
+reader on the path of a step returns early when `G` is `nothing`. A step after a gap stays amortised
+`O(1)`: the Choice Rule copies the kept rows only while a choice is pending. A fit through a buffer
+with a gap copies the kept rows, which costs the same order as the refit that reads them.
 
 The cost is stated here. A fit now deletes an observation, which this ADR and ADR 0130 did not do.
 An estimator that reads observations by position, an exponentially weighted moment or a lagged

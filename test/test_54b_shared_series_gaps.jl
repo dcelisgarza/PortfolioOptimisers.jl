@@ -2,7 +2,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, T
       Clarabel
 
 # Gaps in the benchmark, the implied volatilities and the factor returns, issue #1672, under
-# ADR 0117 amended for #1672.
+# ADR 0117 amended for #1672. The online step drops the same observations, issue #1675.
 #
 # A gap in a Shared Series, a vector benchmark under `brt` or a factor return that the fit
 # reads, drops the observation at the entry of the fit, and keeps every asset. A gap in a
@@ -118,27 +118,155 @@ end
     @test a.dates == b.dates
 end
 
-@testset "An online step refuses an observation with a Shared Series gap" begin
-    # A batch fit drops the observation. A step cannot, because the buffer of the prior and
-    # the Fold Context hold one row each for every observation (#1675).
+@testset "An online step drops an observation with a Shared Series gap (#1675)" begin
+    # The step keeps the row in the buffer of the prior and in the Fold Context, and marks
+    # it, so every fit through the buffer drops it. The call with no data equals the batch
+    # fit over the rows folded so far, and the batch fit equals the fit with the gapped row
+    # removed by hand.
+    using Clarabel
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    rows(r, i) = PO.port_opt_view(r, i, :)
+    step(opt, r, t) = foldl((o, i) -> partial_fit!(o, rows(r, i:i)), 1:t; init = opt)
+    online(e; kwargs...) = PO.update_online_estimator(PO.Online(e; kwargs...))
+    t = 30
+    k30 = setdiff(1:t, gap)
     Bg = copy(Bv0)
     Bg[gap] = NaN
     rdg = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg, ts = ts0)
-    rows(r, i) = PO.port_opt_view(r, i, :)
-    step(opt, r, t) = foldl((o, i) -> partial_fit!(o, rows(r, i:i)), 1:t; init = opt)
-    opt = InverseVolatility(; brt = true)
-    o = step(opt, rdg, gap - 1)
-    @test isapprox(optimise(o).w, optimise(opt, rows(rdg, 1:(gap - 1))).w; atol = 1e-10)
-    @test_throws PO.IsNonFiniteError partial_fit!(o, rows(rdg, gap:gap))
-    # Without brt the step does not read the benchmark, so it folds the observation.
-    @test !isnothing(partial_fit!(step(InverseVolatility(), rdg, gap - 1),
-                                  rows(rdg, gap:gap)).cache)
-    # A prior that reads the factor returns refuses a gap in them at its own step.
-    Fg = copy(F0)
-    Fg[gap, 1] = NaN
-    rdf = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg, ts = ts0)
-    pe = PO.update_online_estimator(PO.Online(FactorPrior()))
-    @test_throws PO.IsNonFiniteError partial_fit!(pe, rdf)
+    rdh = ReturnsResult(; nx = nx, X = X0[k30, :], nb = ["BM"], B = Bv0[k30], ts = ts0[k30])
+
+    @testset "A gap of a vector benchmark under brt, per family" begin
+        jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
+        jbrt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)
+        hbrt = HierarchicalOptimiser(; pe = EmpiricalPrior(), brt = true)
+        fams = (MeanRisk(; opt = jbrt), HierarchicalRiskParity(; opt = hbrt),
+                HierarchicalEqualRiskContribution(; opt = hbrt),
+                InverseVolatility(; brt = true),
+                NestedClustered(; opti = MeanRisk(; opt = jopt),
+                                opto = MeanRisk(; opt = jopt), brt = true),
+                SubsetResampling(; opt = MeanRisk(; opt = jopt), seed = 3, n_subsets = 3,
+                                 subset_size = 2, brt = true))
+        for opt in fams
+            o = step(opt, rdg, t)
+            solved = !isa(opt,
+                          Union{HierarchicalRiskParity, HierarchicalEqualRiskContribution,
+                                InverseVolatility})
+            atol = solved ? 1e-8 : 1e-12
+            @test isapprox(optimise(o).w, optimise(opt, rows(rdg, 1:t)).w; atol = atol)
+            # The batch entry of an estimator with no fallback drops the row too (#1672).
+            @test isapprox(optimise(opt, rows(rdg, 1:t)).w, optimise(opt, rdh).w;
+                           atol = atol)
+            # The Fold Context keeps every row, so the rebuilt data is the data folded.
+            @test PO.returns_result(o).ts == ts0[1:t]
+        end
+        # The refit route marks the row in its buffer, and a rolling window counts every
+        # row, as the training window of a batch walk-forward does.
+        o = step(PO.update_online_estimator(InverseVolatility(;
+                                                              pe = PO.Online(EmpiricalPrior()),
+                                                              brt = true)), rdg, t)
+        @test PO.buffer_gap_marks(o.pe.cache) == ((1:t) .== gap)
+        @test PO.buffer_fit_count(o.pe.cache) == t - 1
+        @test isapprox(optimise(o).w, optimise(InverseVolatility(; brt = true), rdh).w;
+                       atol = 1e-12)
+        for w in (20, 10)
+            iw = PO.update_online_estimator(InverseVolatility(;
+                                                              pe = PO.Online(EmpiricalPrior();
+                                                                             max_history = w),
+                                                              brt = true))
+            @test isapprox(optimise(step(iw, rdg, t)).w,
+                           optimise(InverseVolatility(; brt = true),
+                                    rows(rdg, (t - w + 1):t)).w; atol = 1e-12)
+        end
+        # A scenario risk measure pairs the rows of the prior with the last rows of the
+        # returns data, and a high order carry folds its co-moments.
+        mk() = MeanRisk(;
+                        opt = JuMPOptimiser(;
+                                            pe = HighOrderPriorEstimator(;
+                                                                         pe = EmpiricalPrior()),
+                                            slv = slv, brt = true),
+                        r = ConditionalValueatRisk())
+        @test isapprox(optimise(step(mk(), rdg, t)).w, optimise(mk(), rdh).w; atol = 1e-8)
+        # A first step whose every row has a gap folds nothing into the moments.
+        B1 = copy(Bv0)
+        B1[1] = NaN
+        rd1 = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = B1, ts = ts0)
+        rh1 = ReturnsResult(; nx = nx, X = X0[2:t, :], nb = ["BM"], B = Bv0[2:t],
+                            ts = ts0[2:t])
+        @test isapprox(optimise(step(InverseVolatility(; brt = true), rd1, t)).w,
+                       optimise(InverseVolatility(; brt = true), rh1).w; atol = 1e-12)
+        # Without brt the step does not read the benchmark, so it marks nothing.
+        o = step(PO.update_online_estimator(InverseVolatility(;
+                                                              pe = PO.Online(EmpiricalPrior()))),
+                 rdg, t)
+        @test isnothing(o.pe.cache.G)
+    end
+
+    @testset "A gap of the factor returns, for a prior that reads them" begin
+        Fg = copy(F0)
+        Fg[gap, 1] = NaN
+        rdf = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg, ts = ts0)
+        pstep(pe, r, t) = foldl((p, i) -> partial_fit!(p, rows(r, i:i)), 1:t; init = pe)
+        p = prior(pstep(online(FactorPrior()), rdf, t))
+        q = prior(FactorPrior(), rows(rdf, 1:t))
+        @test p.sigma ≈ q.sigma
+        @test p.mu ≈ q.mu
+        @test size(p.X, 1) == t - 1
+        @test p.rr.idx == q.rr.idx
+        # A capped buffer counts every row.
+        @test prior(pstep(online(FactorPrior(); max_history = 12), rdf, t)).sigma ≈
+              prior(FactorPrior(), rows(rdf, (t - 11):t)).sigma
+        # The optimiser over the prior, and a host whose co-moments fold.
+        iv = PO.update_online_estimator(InverseVolatility(; pe = PO.Online(FactorPrior())))
+        @test isapprox(optimise(step(iv, rdf, t)).w,
+                       optimise(InverseVolatility(; pe = FactorPrior()), rows(rdf, 1:t)).w;
+                       atol = 1e-12)
+        h = prior(pstep(HighOrderPriorEstimator(; pe = online(FactorPrior())), rdf, t))
+        hb = prior(HighOrderPriorEstimator(; pe = FactorPrior()), rows(rdf, 1:t))
+        @test isapprox(h.sk, hb.sk; atol = 1e-15)
+        @test isapprox(h.kt, hb.kt; atol = 1e-15)
+        # A gap in the first row leaves the first step nothing to fit.
+        F1 = copy(F0)
+        F1[1, 2] = NaN
+        rd1 = ReturnsResult(; nx = nx, X = X0, nf = nf, F = F1, ts = ts0)
+        @test prior(pstep(online(FactorPrior()), rd1, t)).sigma ≈
+              prior(FactorPrior(), rows(rd1, 1:t)).sigma
+        # A buffer whose every row has a gap keeps no observation.
+        Fe = fill(NaN, 3, K)
+        rde = ReturnsResult(; nx = nx, X = X0[1:3, :], nf = nf, F = Fe, ts = ts0[1:3])
+        @test_throws PO.IsEmptyError prior(partial_fit!(online(FactorPrior()), rde))
+    end
+
+    @testset "The marks of a buffer travel with its rows" begin
+        s = partial_fit!(PO.SampleBufferState(; max_history = 4), [1.0 2; 3 4])
+        @test isnothing(s.G)
+        # A buffer that never met a gap costs what it cost before the marks existed.
+        @test PO.shared_series_buffer(s) === s
+        @test !PO.buffer_fits_none(s)
+        # Measured through a function barrier, so the call itself is what is counted.
+        allocs(f, x) = (f(x); @allocated f(x))
+        @test allocs(PO.shared_series_buffer, s) == 0
+        @test allocs(PO.buffer_fits_none, s) == 0
+        @test allocs(PO.buffer_fit_count, s) == 0
+        s = partial_fit!(s, [5.0 6; 7 8; 9 10]; gaps = [false, true, false])
+        @test PO.buffer_gap_marks(s) == [false, false, true, false]
+        @test PO.sample_buffer(PO.shared_series_buffer(s)) == [3.0 4; 5 6; 9 10]
+        @test PO.shared_series_buffer(PO.shared_series_buffer(s)).n == 3
+        m = PO.merge_states(s,
+                            partial_fit!(PO.SampleBufferState(; max_history = 4), [1.0 1]))
+        @test PO.buffer_gap_marks(m) == [false, true, false, false]
+        @test PO.buffer_gap_marks(copy(s)) == PO.buffer_gap_marks(s)
+        @test PO.buffer_gap_marks(PO.port_opt_view(s, [2])) == PO.buffer_gap_marks(s)
+        @test_throws DimensionMismatch partial_fit!(s, [1.0 1]; gaps = [true, false])
+    end
+
+    @testset "A fold of an empty block leaves a co-moment unchanged" begin
+        for e in (Coskewness(), Cokurtosis())
+            a = partial_fit!(e, X0[1:10, :])
+            b = partial_fit!(a, zeros(0, N))
+            @test b.cache === a.cache
+        end
+    end
 end
 
 @testset "A gap in the factor returns drops the observation" begin
@@ -298,4 +426,33 @@ end
     # The stepped filter counts the same cells.
     mdf, _ = PO.partial_fit_transform(MissingDataFilter(; col_thr = 0.1), pr)
     @test fit_preprocessing(mdf).nx == [:A]
+end
+
+@testset "A Cross-Sectional Factor Prior carry drops a benchmark gap under brt (#1675)" begin
+    # The carry computes its exposures, its histories and its lags from the observations
+    # that the batch fit keeps, and its buffer keeps every row with its mark.
+    include(joinpath(@__DIR__, "parity_harness.jl"))
+    rows(r, i) = PO.port_opt_view(r, i, :)
+    rdp = parity_panel(; T = 120, N = 15, seed = 1377).rd
+    mpass(f) = CompositeExposure(; descriptors = [Passthrough(; field = f)],
+                                 outlier = nothing, scoring = nothing, family = "style")
+    factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
+               "style2" => mpass("style2")]
+    est() = CrossSectionalFactorPrior(; lambda = 1, factors = factors, minra = 5)
+    Bp = randn(StableRNG(16750001), 120) ./ 200
+    # One gap inside a block and one at the first row of a block.
+    Bp[60] = NaN
+    Bp[91] = NaN
+    rdb = ReturnsResult(; nx = rdp.nx, X = rdp.X, nf = rdp.nf, F = rdp.F, nb = ["BM"],
+                        B = Bp, ne = rdp.ne, E = rdp.E, ts = rdp.ts, iv = rdp.iv,
+                        ivpa = rdp.ivpa, pnl = rdp.pnl)
+    pe = foldl((p, (a, b)) -> PO.fold_prior(p, rows(rdb, a:b); brt = true),
+               ((1, 50), (51, 90), (91, 120)); init = est())
+    @test PO.buffer_fit_count(pe.cache.buf) == 118
+    p = prior(pe)
+    q = prior(est(), rdb; brt = true)
+    @test isequal(isnan.(p.sigma), isnan.(q.sigma))
+    @test isapprox(filter(isfinite, p.sigma), filter(isfinite, q.sigma); atol = 1e-12)
+    @test isapprox(filter(isfinite, p.mu), filter(isfinite, q.mu); atol = 1e-12)
+    @test p.rr.idx == q.rr.idx
 end

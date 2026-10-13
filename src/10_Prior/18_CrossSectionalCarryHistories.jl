@@ -527,7 +527,8 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
     f = cross_sectional_move_solve(pe, st,
                                    (; fcb = fcb, f = fr[:, retained_factor_indices(fcb)],
                                     lv = marks.lv))
-    cb = cross_sectional_observed_block(st.obs, 1:Tf, r, st.buf.n - size(st.Ms, 1))
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, r,
+                                        buffer_fit_count(st.buf) - size(st.Ms, 1))
     fo = cross_sectional_fold_factor_returns(f, marks.lv, cb)
     (; eps, n, b, h1) = st.csr
     return cross_sectional_carry_with(st,
@@ -711,18 +712,54 @@ function cross_sectional_step_factors(pe::CrossSectionalFactorPrior,
                                       lv::AbstractVector{Bool})
     Tf = size(st.Ms, 1)
     if lv != st.lv
-        cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + 1):Tf, st.buf.n - Tf)
+        cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + 1):Tf,
+                                            buffer_fit_count(st.buf) - Tf)
         return cross_sectional_refold_factors(pe.pe,
                                               cross_sectional_fold_factor_returns(csr.f, lv,
                                                                                   cb),
                                               st.seed)
     end
     s = size(st.csr.f, 1)
-    cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + s + 1):Tf, st.buf.n - Tf)
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, (pe.lag + s + 1):Tf,
+                                        buffer_fit_count(st.buf) - Tf)
     return cross_sectional_fold_factors(st.pe,
                                         cross_sectional_fold_factor_returns(view(csr.f,
                                                                                  (s + 1):size(csr.f,
                                                                                               1),
                                                                                  :), lv,
                                                                             cb))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Appends the observed factors to the fitted factors of the carry fold of a Cross-Sectional Factor Prior.
+
+# Algorithm
+
+ 1. Take the observed factors of the fitted observations with [`cross_sectional_observed_block`](@ref).
+ 2. Append them to the fitted factors with [`cross_sectional_observed_append`](@ref), giving the raw exposures of the fitted observations and the reduced loadings of the last one. The two exposure histories share one backing, so the raw exposures are a view of it, as [`cross_sectional_joined_exposures`](@ref) states.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `st`: The state of its carry fold, after its first fit.
+
+# Returns
+
+  - `r::UnitRange`: The fitted observations among the observations after the warm-up.
+  - `ca::NamedTuple`: The answer of [`cross_sectional_observed_append`](@ref).
+
+# Related
+
+  - [`prior`](@ref)
+  - [`cross_sectional_carry_history`](@ref)
+"""
+function cross_sectional_carry_append(pe::CrossSectionalFactorPrior,
+                                      st::CrossSectionalCarryState)
+    Tf = size(st.Ms, 1)
+    r = (pe.lag + 1):Tf
+    cb = cross_sectional_observed_block(st.obs, 1:Tf, r, buffer_fit_count(st.buf) - Tf)
+    ca = cross_sectional_observed_append(cb, st.csr.f, st.Z[end, :, :],
+                                         view(st.Ms, r, :, :), st.nf, st.fam, st.fcb)
+    return (; r = r, ca = ca)
 end

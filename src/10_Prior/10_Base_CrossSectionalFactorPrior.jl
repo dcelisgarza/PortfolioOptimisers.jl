@@ -378,6 +378,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return whether one asset carries a finite Factor Exposure to every factor at one observation.
+
+# Arguments
+
+  - `Ms`: The exposure history, `observations × assets × factors`.
+  - `t`: The observation.
+  - `i`: The asset.
+
+# Returns
+
+  - `ans::Bool`: Whether every exposure of the pair is finite.
+
+# Related
+
+  - [`cross_sectional_warmup`](@ref)
+  - [`cross_sectional_eligible`](@ref)
+"""
+function cross_sectional_exposures_finite(Ms::Arr3Num, t::Integer, i::Integer)::Bool
+    for k in axes(Ms, 3)
+        if !isfinite(Ms[t, i, k])
+            return false
+        end
+    end
+    return true
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Return the eligibility mask of a cross-sectional fit.
 
 An asset enters the fit of an observation when it is in the estimation universe, its return is finite, and its lagged Factor Exposure is finite for every factor. The weight policy writes its weights on this mask, so an ineligible pair takes a weight of zero and does not enter the fit.

@@ -17,6 +17,7 @@ PortfolioOptimisers.scenario_rows
 PortfolioOptimisers.read_comoment
 PortfolioOptimisers.comoment_investable
 PortfolioOptimisers.assert_matched_coverage
+PortfolioOptimisers.fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 ```
 
 ## References

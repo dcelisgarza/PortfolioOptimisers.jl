@@ -97,17 +97,19 @@ end
 
 Forwards the observations of `rd` to the prior, in the arity of the prior's own step.
 
-This is the one forward that the step of an optimiser makes. An optimiser forwards each observation to its prior and to nothing else. `optimise(opt)` with no returns fits every other member in batch, from the fold context it rebuilds. The step folds `rd` through [`partial_fit!`](@ref) over the `ReturnsResult`, which reads it as [`prior`](@ref) reads it in batch. The route of the prior decides what the step honours. A refit honours the estimation mask and records the Panel Fields of a prior that reads them. The carry of [`EmpiricalPrior`](@ref) refuses an estimation mask that differs from the active mask, and each route refuses a Panel Field that its prior does not read. The tree of the prior decides what to do with `F`, as its batch function does.
+This is the one forward that the step of an optimiser makes. An optimiser forwards each observation to its prior and to nothing else. `optimise(opt)` with no returns fits every other member in batch, from the fold context it rebuilds. The step folds `rd` through [`fold_prior_step`](@ref), the verb of [`partial_fit!`](@ref) over the `ReturnsResult`, which reads it as [`prior`](@ref) reads it in batch. The route of the prior decides what the step honours. A refit honours the estimation mask and records the Panel Fields of a prior that reads them. The carry of [`EmpiricalPrior`](@ref) refuses an estimation mask that differs from the active mask, and each route refuses a Panel Field that its prior does not read. The tree of the prior decides what to do with `F`, as its batch function does.
 
 A prior that is already an [`AbstractPriorResult`](@ref) has no state to fold into. It is batch configuration, and an optimiser that holds one runs `optimise(opt, rd)`. This function also refuses a [`TimeDependent`](@ref) schedule on the prior. A schedule swaps the estimator that carries the state, and a member that never saw the folded rows cannot take them over.
 
 The prior folds the returns that its batch fit reads. Under `brt` these are the returns in excess of the benchmark, as [`prior`](@ref) reads them under `brt`, so [`prior_step_returns`](@ref) gives the prior the observations of `rd` with `X - B` in place of `X`.
 
+A batch fit drops an observation with a gap in a Shared Series that it reads, see [`shared_series_view`](@ref). The step cannot drop the row, because the buffer of the prior and the Fold Context hold one row each for every observation, and `optimise(opt)` with no returns rebuilds the returns data from both. So the step marks the observation, and the prior keeps the mark in its buffer: every fit through the buffer drops the observation, and a carry fold leaves it out of its running moments. The prior cannot find a gap of the benchmark, because under `brt` it reads `X - B` and not `B`, so this function finds the marks and hands them to the prior. `optimise(opt)` with no returns cuts the rebuilt returns data by the same rule, see [`batch_from_state`](@ref).
+
 # Algorithm
 
- 1. Refuse an observation with a Shared Series gap with [`assert_no_shared_gap`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `pe`. A batch fit drops such an observation, and a step cannot. Mark a gap of a matrix benchmark in the estimation mask under `brt` with [`benchmark_estimation_mask`](@ref), as the batch fit marks it.
+ 1. Mark the observations with a Shared Series gap with [`shared_series_gaps`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `pe`. Mark a gap of a matrix benchmark in the estimation mask under `brt` with [`benchmark_estimation_mask`](@ref), as the batch fit marks it.
  2. Take the observations that the prior folds with [`prior_step_returns`](@ref) under `brt`, giving `rdp`.
- 3. Fold `rdp` into `pe` with [`partial_fit!`](@ref) over the `ReturnsResult`, which refuses by route what the prior cannot honour.
+ 3. Fold `rdp` and the marks into `pe` with [`fold_prior_step`](@ref), which refuses by route what the prior cannot honour.
 
 # Arguments
 
@@ -128,14 +130,17 @@ The prior folds the returns that its batch fit reads. Under `brt` these are the 
 # Related
 
   - [`partial_fit!`](@ref)
+  - [`fold_prior_step`](@ref)
+  - [`shared_series_gaps`](@ref)
   - [`reads_panel_fields`](@ref)
   - [`needs_factor_returns`](@ref)
   - [`prior`](@ref)
   - [`assert_online_entry`](@ref): refuses a schedule on the prior before the warm-up of the fold loop.
 """
 function fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false)
-    assert_no_shared_gap(rd, brt, reads_factor_returns(pe))
-    return partial_fit!(pe, prior_step_returns(benchmark_estimation_mask(rd, brt), brt))
+    gaps = shared_series_gaps(rd, brt, reads_factor_returns(pe))
+    return fold_prior_step(pe, prior_step_returns(benchmark_estimation_mask(rd, brt), brt),
+                           gaps)
 end
 function fold_prior(pe::AbstractPriorResult, ::ReturnsResult; brt::Bool = false)
     return throw(ArgumentError("`pe` holds a fitted `$(typeof(pe))`, which has no state to fold an observation into: a prior result is batch configuration. Hand the optimiser the prior estimator to take the online step, or run `optimise(opt, rd)`."))
@@ -777,7 +782,9 @@ end
 
 Turns a folded optimiser into the batch call that reads it out, an estimator and a [`ReturnsResult`](@ref).
 
-`optimise(opt)` with no returns rebuilds the `ReturnsResult` and calls the ordinary batch path, so no member above the prior needs a method of its own. The prior becomes `prior(pe)`, a prior result, which the batch path does not refit, so the solve reads the folded prior. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer, and a fallback reads the same `ReturnsResult` as the optimiser it replaces.
+`optimise(opt)` with no returns rebuilds the `ReturnsResult` and calls the ordinary batch path, so no member above the prior needs a method of its own. The prior becomes `prior(pe)`, a prior result, which the batch path does not refit, so the solve reads the folded prior.
+
+The rebuilt `ReturnsResult` holds every observation that the step folded, and the folded prior drops the observations of a Shared Series gap, see [`shared_series_buffer`](@ref). So the function drops the same observations from the `ReturnsResult` with [`optimiser_shared_series_view`](@ref), while `opt` still holds the prior estimator: a prior result reads no factor return, so the batch path would not drop a gap of the factor returns. The prior and every reader that pairs its observations with the last observations of the returns data then read the same observations, as in the batch fit. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer, and a fallback reads the same `ReturnsResult` as the optimiser it replaces.
 
 The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser, such as [`PreviousWeights`](@ref), with an empty `ReturnsResult`, and its batch function decides whether it answers without returns.
 
@@ -785,7 +792,7 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
 
  1. A JuMP head or a hierarchical head reads out the bundle it holds in `opt`, and rebuilds itself around the bundle.
  2. An optimiser with no state goes to [`batch_without_state`](@ref).
- 3. Rebuild `rd` with [`returns_result`](@ref).
+ 3. Rebuild `rd` with [`returns_result`](@ref). An optimiser that holds a prior drops the observations of a Shared Series gap from it with [`optimiser_shared_series_view`](@ref).
  4. Rebuild the optimiser with `cache = nothing`. An optimiser that holds a prior also replaces `pe` with `prior(pe)`, the result of the folded prior.
  5. Return the optimiser and `rd`.
 
@@ -808,6 +815,7 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
   - [`returns_result`](@ref)
   - [`partial_fit!`](@ref)
   - [`prior`](@ref)
+  - [`optimiser_shared_series_view`](@ref)
 """
 function batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                      <:InverseVolatility, <:NestedClustered, <:Stacking,
@@ -815,7 +823,7 @@ function batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
     if isnothing(opt.cache)
         return batch_without_state(opt, opt.pe)
     end
-    rd = returns_result(opt)
+    rd = optimiser_shared_series_view(returns_result(opt), opt)
     return rebuild_estimator(opt, (; pe = prior(opt.pe), cache = nothing)), rd
 end
 function batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted,

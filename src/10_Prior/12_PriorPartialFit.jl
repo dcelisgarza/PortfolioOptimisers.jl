@@ -295,7 +295,7 @@ Reads a prior out of the state that its estimator carries, with no data matrix.
 
 This is the method of [`prior`](@ref) with no data, and the entry point of every prior that folds. It reads the state and dispatches on its type:
 
-  - A [`SampleBufferState`](@ref) means refit. The estimator has no recursion of its own, so the method runs the batch verb over the rows that the buffer kept. These are all the rows folded so far when the buffer has no cap, and the last `max_history` rows when an [`Online`](@ref) set one. The batch verb receives the factor rows that the buffer recorded, through [`factor_buffer`](@ref), or `nothing` where the buffer recorded none. The fold fixed that choice from the estimator tree.
+  - A [`SampleBufferState`](@ref) means refit. The estimator has no recursion of its own, so the method runs the batch verb over the rows that the buffer kept. These are all the rows folded so far when the buffer has no cap, and the last `max_history` rows when an [`Online`](@ref) set one. The method drops the rows that the buffer marks with a Shared Series gap, with [`shared_series_buffer`](@ref), as the batch fit over the same rows drops them at its entry. The batch verb receives the factor rows that the buffer recorded, through [`factor_buffer`](@ref), or `nothing` where the buffer recorded none. The fold fixed that choice from the estimator tree.
   - A [`PriorCarryState`](@ref) means fold and carry. Each family that takes it has its own method of `prior` with no data.
 
 # Mathematical definition
@@ -304,7 +304,8 @@ Under a [`SampleBufferState`](@ref):
 
 ```math
 \\begin{align}
-\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X}_{T-m+1:T},\\, \\mathbf{F}_{T-m+1:T},\\, \\mathbf{E}_{T-m+1:T},\\, \\mathcal{A}_{T-m+1:T})\\,, \\\\
+\\mathcal{P}_T &= \\mathcal{P}(\\mathbf{X}_{S},\\, \\mathbf{F}_{S},\\, \\mathbf{E}_{S},\\, \\mathcal{A}_{S})\\,, \\\\
+S &= \\{t \\in \\{T-m+1, \\ldots, T\\} : g_t = 0\\}\\,, \\\\
 m &= \\min(T,\\, M)\\,.
 \\end{align}
 ```
@@ -313,10 +314,12 @@ Where:
 
   - $(math_dict[:P_fold_prior])
   - $(math_dict[:P_batch_prior])
-  - ``\\mathbf{X}_{a:b}``: Rows ``a`` to ``b`` of the returns matrix of the folded observations.
-  - ``\\mathbf{F}_{a:b}``: Rows ``a`` to ``b`` of the factor returns matrix of the folded factor observations, absent when the fold recorded none.
-  - ``\\mathbf{E}_{a:b}``: Rows ``a`` to ``b`` of the folded Exogenous Series, absent when the fold recorded none.
-  - ``\\mathcal{A}_{a:b}``: The Asset Panel of rows ``a`` to ``b``, with the folded Panel Fields and both folded masks, absent when the fold recorded no Panel Field.
+  - ``\\mathbf{X}_{S}``: The rows in ``S`` of the returns matrix of the folded observations.
+  - ``\\mathbf{F}_{S}``: The rows in ``S`` of the factor returns matrix of the folded factor observations, absent when the fold recorded none.
+  - ``\\mathbf{E}_{S}``: The rows in ``S`` of the folded Exogenous Series, absent when the fold recorded none.
+  - ``\\mathcal{A}_{S}``: The Asset Panel of the rows in ``S``, with the folded Panel Fields and both folded masks, absent when the fold recorded no Panel Field.
+  - ``S``: The rows that the buffer holds and that have no Shared Series gap.
+  - ``g_t``: ``1`` when the fold marked observation ``t`` with a Shared Series gap, and ``0`` otherwise.
   - ``m``: Number of rows that the buffer holds.
   - ``M``: Cap on the buffer, the `max_history` of the wrapping [`Online`](@ref), and ``\\infty`` when it is `nothing`.
   - $(math_dict[:T])
@@ -324,7 +327,7 @@ Where:
 # Algorithm
 
  1. Read the state out of `pe.cache` with [`partial_fit_cache`](@ref).
- 2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the state with [`buffer_prior`](@ref), which gives the masks, the Panel Fields and the Exogenous Series that the buffer records, and the caller's keyword arguments.
+ 2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), and run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the result with [`buffer_prior`](@ref), which gives the masks, the Panel Fields and the Exogenous Series that the buffer records, and the caller's keyword arguments.
  3. Under a [`SampleBufferState`](@ref), correct the row key of the factor model block with [`buffer_row_key`](@ref). The batch verb counts the positions from the first row of the buffer, and a capped buffer does not record how many rows it dropped.
 
 # Arguments
@@ -335,6 +338,7 @@ Where:
 # Validation
 
   - `pe.cache` is not `nothing`. An `ArgumentError` that names the verb which fills the field is thrown otherwise.
+  - The rules of [`shared_series_buffer`](@ref).
 
 # Returns
 
@@ -354,7 +358,8 @@ function prior(pe::AbstractPriorEstimator; kwargs...)
     return prior(pe, partial_fit_cache(pe); kwargs...)
 end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
-    pr = buffer_prior(pe, state, sample_buffer_panel(state); kwargs...)
+    fit = shared_series_buffer(state)
+    pr = buffer_prior(pe, fit, sample_buffer_panel(fit); kwargs...)
     return buffer_row_key(pr, state.max_history)
 end
 """
@@ -868,12 +873,14 @@ The type of the prior selects the route, and each route states what it can honou
   - The Panel Fields, when [`reads_panel_fields`](@ref) answers `true`. The buffer records them, and the call with no data gives the batch verb the panel that [`sample_buffer_panel`](@ref) rebuilds. For any other prior the call refuses a Panel Field with an error that names it, because the buffer has no slot that the prior reads.
   - The Exogenous Series, when [`reads_exogenous_series`](@ref) answers `true`. The buffer records every column of it with its names, and the call with no data gives them to the batch verb. For any other prior the Fold Context keeps the series, and the prior's buffer records none.
 
-The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed. [`CrossSectionalFactorPrior`](@ref) has a method of its own, which takes the carry fold when the prior has no buffer and applies its Choice Rule after the fold of a refit.
+The carry of [`EmpiricalPrior`](@ref) has a route of its own, because its exact folds take no estimation mask. [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) forward `rd` to the prior they embed. [`CrossSectionalFactorPrior`](@ref) has a route of its own, which takes the carry fold when the prior has no buffer and applies its Choice Rule after the fold of a refit. [`fold_prior_step`](@ref) holds each route.
+
+A batch fit drops an observation with a gap in a Shared Series that it reads, with [`shared_series_view`](@ref). A prior reads the factor returns as a Shared Series when [`reads_factor_returns`](@ref) answers `true`. The step keeps the observation and marks it, because the buffer of a prior and the Fold Context of its optimiser hold one row each for every observation. Every fit through the buffer then drops it, and a carry fold leaves it out of its running moments. So the call with no data gives the batch fit over the same observations.
 
 # Algorithm
 
- 1. Refuse an observation at which a factor return is not finite, when the prior reads the factor returns, with [`assert_no_shared_gap`](@ref). A batch fit drops it, and a step cannot.
- 2. Fold `rd` into the buffer with [`refit_prior_step`](@ref).
+ 1. Mark the observations at which a factor return is not finite, when the prior reads the factor returns, with [`shared_series_gaps`](@ref).
+ 2. Fold `rd` with its marks with [`fold_prior_step`](@ref).
 
 # Arguments
 
@@ -882,7 +889,7 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
 
 # Validation
 
-  - The rules of [`assert_no_shared_gap`](@ref) and [`refit_prior_fold`](@ref).
+  - The rules of [`fold_prior_step`](@ref).
 
 # Returns
 
@@ -896,30 +903,34 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
   - [`SampleBufferState`](@ref)
   - [`sample_buffer_panel`](@ref)
   - [`Online`](@ref)
+  - [`fold_prior_step`](@ref)
+  - [`shared_series_gaps`](@ref)
 """
 function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    assert_no_shared_gap(rd, false, reads_factor_returns(pe))
-    return refit_prior_step(pe, rd)
+    return fold_prior_step(pe, rd, shared_series_gaps(rd, false, reads_factor_returns(pe)))
 end
 """
-    refit_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
+    fold_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult, gaps::Option{<:AbstractVector{Bool}})
+    fold_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult, gaps::Option{<:AbstractVector{Bool}})
 
 Takes the step of the refit route of a prior: the fold of [`refit_prior_fold`](@ref), and the work a prior adds around it.
 
-A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref). A [`CrossSectionalFactorPrior`](@ref) applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The step is a function of its own, and not a method of [`partial_fit!`](@ref), so every method of that verb that reads a family state narrows the `cache` of its estimator, and a buffer reaches this route alone.
+This is the verb of every route of the step of a prior. [`partial_fit!`](@ref) over a `ReturnsResult` marks the Shared Series gaps of the step and calls it, and the online step of an optimiser, [`fold_prior`](@ref), calls it with the marks of its own Shared Series. The step is a function of its own, and not a method of [`partial_fit!`](@ref), for two reasons. The marks are a fact of the fit that reads the prior, and a prior under `brt` reads the excess returns, so the caller finds them and not the prior. And every method of this verb that reads a family state narrows the `cache` of its estimator, so a buffer reaches the refit route alone.
+
+The marks `gaps` travel into the buffer of the prior, so every fit through it drops the marked observations with [`shared_series_buffer`](@ref). A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref), over the observations that a fit keeps. A [`CrossSectionalFactorPrior`](@ref) applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The carry of [`EmpiricalPrior`](@ref), the carry of [`CrossSectionalFactorPrior`](@ref), [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) have methods of their own.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Any prior: fold `rd` with [`refit_prior_fold`](@ref), and apply [`pin_prior_choice`](@ref) over the rows of the buffer.
- 2. A [`CrossSectionalFactorPrior`](@ref): fold `rd` with [`refit_prior_fold`](@ref), and pin the dropped members under a [`PinnedChoice`](@ref).
+ 1. Any prior: fold `rd` and `gaps` with [`refit_prior_fold`](@ref), and apply [`pin_prior_choice`](@ref) over the rows of [`shared_series_buffer`](@ref). A prior with no pending choice, which [`pending_choice`](@ref) answers, pins nothing, so its step copies no row. A buffer whose every observation has a gap pins nothing yet, which [`buffer_fits_none`](@ref) answers with no allocation.
+ 2. A [`CrossSectionalFactorPrior`](@ref): fold `rd` and `gaps` with [`refit_prior_fold`](@ref), and pin the dropped members under a [`PinnedChoice`](@ref).
 
 # Arguments
 
   - `pe`: The prior whose buffer the step folds forward.
   - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing` when no observation has one. See [`shared_series_gaps`](@ref).
 
 # Validation
 
@@ -932,14 +943,22 @@ The method that Julia selects is the algorithm.
 # Related
 
   - [`partial_fit!`](@ref)
+  - [`fold_prior`](@ref)
   - [`refit_prior_fold`](@ref)
   - [`pin_prior_choice`](@ref)
   - [`cross_sectional_pin_choice`](@ref)
+  - [`shared_series_gaps`](@ref)
+  - [`shared_series_buffer`](@ref)
 """
-function refit_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    pe = refit_prior_fold(pe, rd)
+function fold_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult,
+                         gaps::Option{<:AbstractVector{Bool}})
+    pe = refit_prior_fold(pe, rd, gaps)
     state = pe.cache
-    return pin_prior_choice(pe, sample_buffer(state), factor_buffer(state))
+    if !pending_choice(pe) || buffer_fits_none(state)
+        return pe
+    end
+    fit = shared_series_buffer(state)
+    return pin_prior_choice(pe, sample_buffer(fit), factor_buffer(fit))
 end
 """
     pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, X, F, w = nothing)
@@ -998,7 +1017,7 @@ When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe
   - [`pin_regression_choice`](@ref)
   - [`pending_choice`](@ref)
   - [`embedded_pin_weights`](@ref)
-  - [`refit_prior_step`](@ref)
+  - [`fold_prior_step`](@ref)
   - [`PinnedChoice`](@ref)
   - [`partial_fit!`](@ref)
 """
@@ -1105,22 +1124,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Folds the observations of a [`ReturnsResult`](@ref) into the sample buffer of a prior. This is the refit route of [`partial_fit!`](@ref).
+Folds the observations of a [`ReturnsResult`](@ref) and the marks of their Shared Series gaps into the sample buffer of a prior. This is the refit route of [`partial_fit!`](@ref).
 
-The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this function. A prior with a step of its own, such as [`CrossSectionalFactorPrior`](@ref), calls it for the fold and adds its own work around it.
+The generic method of [`fold_prior_step`](@ref) is this function and the Choice Rule. A prior with a step of its own, such as [`CrossSectionalFactorPrior`](@ref), calls it for the fold and adds its own work around it. The buffer keeps every observation and records the marks, so the fits through it drop the marked observations, see [`shared_series_buffer`](@ref).
 
 # Algorithm
 
  1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref).
  2. Apply the answer of [`needs_factor_returns`](@ref) to `rd.F` with [`fold_factor_argument`](@ref).
  3. Read the buffer out of `pe.cache` with [`assert_sample_buffer`](@ref).
- 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref), and the Exogenous Series of `rd` with [`exogenous_step_kwargs`](@ref). Fold `rd.X`, the factor returns, those keywords, and `rd.iv` and `rd.ivpa` into the buffer through the block method of [`partial_fit!`](@ref).
+ 4. Read the masks and the Panel Fields of `rd.pnl` with [`refit_step_kwargs`](@ref), and the Exogenous Series of `rd` with [`exogenous_step_kwargs`](@ref). Fold `rd.X`, the factor returns, those keywords, `rd.iv`, `rd.ivpa` and `gaps` into the buffer through the block method of [`partial_fit!`](@ref).
  5. Rebuild the prior with its `cache` set to the new buffer, and return it.
 
 # Arguments
 
   - `pe`: The prior whose buffer the function folds forward.
   - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing`.
 
 # Validation
 
@@ -1141,12 +1161,13 @@ The generic method of [`partial_fit!`](@ref) over a `ReturnsResult` is this func
   - [`exogenous_step_kwargs`](@ref)
   - [`SampleBufferState`](@ref)
 """
-function refit_prior_fold(pe::AbstractPriorEstimator, rd::ReturnsResult)
+function refit_prior_fold(pe::AbstractPriorEstimator, rd::ReturnsResult,
+                          gaps::Option{<:AbstractVector{Bool}})
     assert_prior_fold_returns(rd)
     F = fold_factor_argument(needs_factor_returns(pe), pe, rd.F)
     state = partial_fit!(assert_sample_buffer(pe), rd.X, F;
                          refit_step_kwargs(pe, rd.pnl)..., exogenous_step_kwargs(pe, rd)...,
-                         iv = rd.iv, ivpa = rd.ivpa)
+                         iv = rd.iv, ivpa = rd.ivpa, gaps = gaps)
     return rebuild_estimator(pe, (; cache = state))
 end
 """
@@ -1419,16 +1440,18 @@ Folds observations into an [`EmpiricalPrior`](@ref), which folds its moments and
 
 The two methods differ in one line. The method with no horizon folds the observation as it is. The horizon method folds `log1p` of the observation, because the batch horizon method fits its moments on log returns. It carries the observation itself, because the [`LowOrderPrior`](@ref) it returns carries the arithmetic returns that the caller passed. A buffer of log rows would change the matrix that every scenario risk measure reads.
 
+A matrix of observations can carry the marks `gaps` of its Shared Series gaps, see [`shared_series_gaps`](@ref). A batch fit drops a marked observation, so the two members fold the unmarked observations alone, and the carry state keeps every observation with its mark, because the Fold Context of an optimiser holds one row for each observation. The call with no data reads the unmarked rows, see [`shared_series_buffer`](@ref).
+
 A member that does not fold, such as a `SemiMoment` covariance or a composite whose `mp.alg` reads the sample, stays as it is under [`fold_member`](@ref), and `prior(pe)` with no data refits it over the carried rows. So a caller writes the estimator that they would write in batch, and no member keeps a second copy of the sample.
 
 The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(), X, F)` declares `F` and never reads it. The fold has the arity of the batch verb, so an outer estimator that passes `F` down its tree meets no `MethodError` here. [`needs_factor_returns`](@ref) answers `false` for this estimator, so no estimator above it keeps a factor row for it.
 
 # Algorithm
 
- 1. Orient a matrix `X` and a matrix `iv` to `observations × assets` with `dims_oriented`, transposing them when `dims == 2`.
- 2. Under the horizon method, take `log1p` of the observations, giving `xl` or `Xl`.
- 3. Fold `pe.me` and `pe.ce` through [`fold_member`](@ref), on the observations of step 2 under the horizon method and on the observations as they are otherwise.
- 4. Append the arithmetic observations, with `iv` and `ivpa`, to the carry state through [`fold_carry`](@ref), and return the estimator with its members and its `cache` field rebound. No member that folds reads `iv`, and a member that does not fold reads it from the carried buffer at the call with no data.
+ 1. Orient a matrix `X` and a matrix `iv` to `observations × assets` with `dims_oriented`, transposing them when `dims == 2`. Under a matrix `X`, take its unmarked observations and their active mask with [`shared_series_member_rows`](@ref).
+ 2. Under the horizon method, take `log1p` of the observations of step 1, giving `xl` or `Xl`.
+ 3. Fold `pe.me` and `pe.ce` through [`fold_member`](@ref), on the observations of step 2 under the horizon method and on the observations of step 1 otherwise.
+ 4. Append every arithmetic observation, with `iv`, `ivpa` and the marks `gaps`, to the carry state through [`fold_carry`](@ref), and return the estimator with its members and its `cache` field rebound. No member that folds reads `iv`, and a member that does not fold reads it from the carried buffer at the call with no data.
 
 # Arguments
 
@@ -1438,6 +1461,7 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
   - $(arg_dict[:dims])
   - `iv`: The implied volatilities of the observations, oriented as `X` is, or `nothing`. The carry state records them.
   - `ivpa`: The implied volatility risk premium adjustment, or `nothing`. The carry state pins it.
+  - `gaps`: Under a matrix `X`, one mark for each observation, `true` at an observation with a Shared Series gap, or `nothing`. The carry state records them.
   - `kwargs...`: Additional keyword arguments, forwarded to the two members and to the carry state.
 
 # Validation
@@ -1456,6 +1480,7 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
   - [`prior`](@ref)
   - [`fold_member`](@ref)
   - [`fold_carry`](@ref)
+  - [`shared_series_member_rows`](@ref)
 """
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
@@ -1470,12 +1495,13 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
                       ::Option{<:VecNum_MatNum} = nothing; dims::Int = 1,
                       iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
-                      kwargs...)
+                      gaps::Option{<:AbstractVector{Bool}} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
-    pe = Accessors.@reset pe.me = fold_member(pe.me, X; dims = 1, kwargs...)
-    pe = Accessors.@reset pe.ce = fold_member(pe.ce, X; dims = 1, kwargs...)
+    Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
+    pe = Accessors.@reset pe.me = fold_member(pe.me, Xm; dims = 1, kw...)
+    pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xm; dims = 1, kw...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
-                                                  ivpa = ivpa, kwargs...)
+                                                  ivpa = ivpa, gaps = gaps, kwargs...)
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
@@ -1491,32 +1517,35 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
                       ::Option{<:VecNum_MatNum} = nothing; dims::Int = 1,
                       iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
-                      kwargs...)
+                      gaps::Option{<:AbstractVector{Bool}} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
-    Xl = log1p.(X)
-    pe = Accessors.@reset pe.me = fold_member(pe.me, Xl; dims = 1, kwargs...)
-    pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xl; dims = 1, kwargs...)
+    Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
+    Xl = log1p.(Xm)
+    pe = Accessors.@reset pe.me = fold_member(pe.me, Xl; dims = 1, kw...)
+    pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xl; dims = 1, kw...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
-                                                  ivpa = ivpa, kwargs...)
+                                                  ivpa = ivpa, gaps = gaps, kwargs...)
 end
 """
-    partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                    <:Option{<:PriorCarryState}}, rd::ReturnsResult)
+    fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                       <:Option{<:PriorCarryState}}, rd::ReturnsResult,
+                    gaps::Option{<:AbstractVector{Bool}})
 
 Folds the observations of a [`ReturnsResult`](@ref) into an [`EmpiricalPrior`](@ref) on its carry route.
 
-This is the carry form of the fold of every prior, [`partial_fit!`](@ref) over a `ReturnsResult`. The carry folds `pe.me` and `pe.ce` exactly, and the exact folds of the moment layer take an active mask and no estimation mask. So the route cannot honour an estimation mask that differs from the active mask, and it refuses one by name. The refit route honours it: wrap the prior in [`Online`](@ref). The prior reads no Panel Field, so a Panel Field is refused as the refit route refuses it for such a prior.
+This is the carry form of [`fold_prior_step`](@ref), the fold of every prior that [`partial_fit!`](@ref) over a `ReturnsResult` takes. The members fold the observations that `gaps` does not mark, and the carry state keeps every observation with its mark. The carry folds `pe.me` and `pe.ce` exactly, and the exact folds of the moment layer take an active mask and no estimation mask. So the route cannot honour an estimation mask that differs from the active mask, and it refuses one by name. The refit route honours it: wrap the prior in [`Online`](@ref). The prior reads no Panel Field, so a Panel Field is refused as the refit route refuses it for such a prior.
 
 # Algorithm
 
  1. Refuse `rd` without returns with [`assert_prior_fold_returns`](@ref).
  2. Refuse the Panel Fields and an estimation mask that differs from the active mask with [`assert_carry_step_panel`](@ref).
- 3. Fold `rd.X` with the active mask that [`step_active_kwargs`](@ref) reads, and with `rd.iv` and `rd.ivpa`, through the matrix form of the carry. The carried buffer records the implied volatilities, and the call with no data gives them to a member that it refits.
+ 3. Fold `rd.X` with the active mask that [`step_active_kwargs`](@ref) reads, with `rd.iv` and `rd.ivpa`, and with the marks `gaps`, through the matrix form of the carry. The carried buffer records the implied volatilities, and the call with no data gives them to a member that it refits.
 
 # Arguments
 
   - `pe`: Empirical prior estimator on its carry route.
   - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing`.
 
 # Validation
 
@@ -1534,11 +1563,13 @@ This is the carry form of the fold of every prior, [`partial_fit!`](@ref) over a
   - [`assert_carry_step_panel`](@ref)
   - [`step_active_kwargs`](@ref)
 """
-function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                         <:Option{<:PriorCarryState}}, rd::ReturnsResult)
+function fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                            <:Option{<:PriorCarryState}}, rd::ReturnsResult,
+                         gaps::Option{<:AbstractVector{Bool}})
     assert_prior_fold_returns(rd)
     assert_carry_step_panel(pe, rd.pnl)
-    return partial_fit!(pe, rd.X; step_active_kwargs(rd.pnl)..., iv = rd.iv, ivpa = rd.ivpa)
+    return partial_fit!(pe, rd.X; step_active_kwargs(rd.pnl)..., iv = rd.iv, ivpa = rd.ivpa,
+                        gaps = gaps)
 end
 """
     assert_carry_step_panel(pe::EmpiricalPrior, pnl::Nothing) -> nothing
@@ -1635,7 +1666,7 @@ end
 
 Reads an [`EmpiricalPrior`](@ref) out of its fold, with no data matrix.
 
-`mu` comes from `pe.me`, `sigma` comes from `pe.ce`, and `X` is the matrix that the carry state already holds. The method copies the rows, and does not refit a member that folded. The horizon method then applies the algebra of the batch method through [`horizon_moments!`](@ref), which holds that algebra once.
+`mu` comes from `pe.me`, `sigma` comes from `pe.ce`, and `X` is the matrix that the carry state already holds, less the observations that it marks with a Shared Series gap. The members never folded those observations, and [`shared_series_buffer`](@ref) drops them from the rows, so the result is the batch fit over the observations that the batch fit keeps. The method copies the rows, and does not refit a member that folded. The horizon method then applies the algebra of the batch method through [`horizon_moments!`](@ref), which holds that algebra once.
 
 `pe.max_scenarios` cuts the rows that the result carries, as it does in batch, and the fill runs over the rows that remain. When the cap cuts, `ens` holds the number of observations folded, through [`scenario_ens`](@ref), so a consumer that prices a sample size reads ``T`` and not the number of rows carried. The named-asset set of the carry state limits the notice of the fill, so a walk-forward names an asset at the first step whose fill reaches it, and at no later step.
 
@@ -1664,7 +1695,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
 
  1. Read the carry state with [`partial_fit_cache`](@ref), giving `state`.
  2. Resolve the fill limit against the coverage floor of the members with [`resolve_fill_limit`](@ref), as the batch method does, giving `fill_limit`.
- 3. Read the carried rows with [`sample_buffer`](@ref), giving `X`. Under the horizon method, take `log1p` of the rows, giving `Xl`.
+ 3. Drop the carried rows of a Shared Series gap with [`shared_series_buffer`](@ref), and read the rows that remain with [`sample_buffer`](@ref), giving `X`. Under the horizon method, take `log1p` of the rows, giving `Xl`.
  4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
  5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
  6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
@@ -1680,6 +1711,7 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
 
   - `pe.cache` is not `nothing`. An `ArgumentError` is thrown otherwise.
   - Under `strict`, no investable column needs a fill. An `ArgumentError` is thrown otherwise.
+  - The rules of [`shared_series_buffer`](@ref).
 
 # Returns
 
@@ -1700,9 +1732,10 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                kwargs...)
     state = partial_fit_cache(pe)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    X = sample_buffer(state)
-    pnl = buffer_asset_panel(state.buf)
-    vols = implied_volatility_buffer_kwargs(state.buf)
+    buf = shared_series_buffer(state.buf)
+    X = sample_buffer(buf)
+    pnl = buffer_asset_panel(buf)
+    vols = implied_volatility_buffer_kwargs(buf)
     mu = vec(read_member(Statistics.mean, pe.me, X, pnl; vols..., kwargs...))
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
@@ -1722,12 +1755,13 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                kwargs...)
     state = partial_fit_cache(pe)
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
-    X = sample_buffer(state)
+    buf = shared_series_buffer(state.buf)
+    X = sample_buffer(buf)
     # The arms were folded on the log-returns, so a member that did not fold is refitted on
     # them too. The carried rows are the arithmetic ones the caller handed in.
     Xl = log1p.(X)
-    pnl = buffer_asset_panel(state.buf)
-    vols = implied_volatility_buffer_kwargs(state.buf)
+    pnl = buffer_asset_panel(buf)
+    vols = implied_volatility_buffer_kwargs(buf)
     mu = vec(read_member(Statistics.mean, pe.me, Xl, pnl; vols..., kwargs...))
     # A raw `StatsBase` estimator has no Coverage Policy, so it peels nothing and takes no
     # `strict`.
@@ -1772,52 +1806,6 @@ The estimator keeps no buffer, for the reason that [`HighOrderPriorEstimator`](@
 function partial_fit!(pe::BlackLittermanPrior, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
     return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, X, F; kwargs...)))
-end
-"""
-    partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
-    partial_fit!(pe::BlackLittermanPrior, rd::ReturnsResult)
-
-Folds the observations of a [`ReturnsResult`](@ref) into a prior that embeds another prior, by forwarding `rd` to it.
-
-This is the forwarding form of the fold of every prior, [`partial_fit!`](@ref) over a `ReturnsResult`. The outer prior keeps no rows. Its embedded prior keeps them, so the route of the embedded prior decides what the step honours: the estimation mask and the Panel Fields reach it unchanged, and it refuses what its route cannot honour. A [`HighOrderPriorEstimator`](@ref) also folds `pe.kte` and `pe.ske` through [`fold_member`](@ref). Those folds are exact, and they take the active mask alone, which [`step_active_kwargs`](@ref) reads.
-
-# Algorithm
-
- 1. Fold `pe.pe` with `rd` through [`partial_fit!`](@ref).
- 2. For a `HighOrderPriorEstimator`, fold `pe.kte` and `pe.ske` with `rd.X` and the active mask of `rd.pnl` through [`fold_member`](@ref).
- 3. Rebuild the estimator with its folded members with `rebuild_estimator`, and return it.
-
-# Arguments
-
-  - `pe`: The prior that embeds another prior.
-  - $(arg_dict[:rd])
-
-# Validation
-
-  - Every condition that the fold of `pe.pe` over `rd` checks.
-
-# Returns
-
-  - `pe`: The estimator, with its members folded.
-
-# Related
-
-  - [`HighOrderPriorEstimator`](@ref)
-  - [`BlackLittermanPrior`](@ref)
-  - [`fold_member`](@ref)
-  - [`step_active_kwargs`](@ref)
-"""
-function partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
-    assert_no_shared_gap(rd, false, reads_factor_returns(pe))
-    kw = step_active_kwargs(rd.pnl)
-    return rebuild_estimator(pe,
-                             (; pe = partial_fit!(pe.pe, rd),
-                              kte = fold_member(pe.kte, rd.X; kw...),
-                              ske = fold_member(pe.ske, rd.X; kw...)))
-end
-function partial_fit!(pe::BlackLittermanPrior, rd::ReturnsResult)
-    assert_no_shared_gap(rd, false, reads_factor_returns(pe))
-    return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, rd)))
 end
 """
     prior(pe::BlackLittermanPrior; strict::Bool = false, kwargs...)

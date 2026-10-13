@@ -1,5 +1,5 @@
 ```@meta
-Description = "Partial fit, private API of PortfolioOptimisers.jl: assert_mergeable_states, chan_merge, assert_partial_fit_state, partial_fit_cache, observation_count."
+Description = "Partial fit, private API of PortfolioOptimisers.jl: assert_mergeable_states, chan_merge, assert_partial_fit_state, partial_fit_cache, observation_count, …"
 ```
 
 # Partial fit: private API
@@ -10,6 +10,7 @@ PortfolioOptimisers.chan_merge
 PortfolioOptimisers.assert_partial_fit_state
 PortfolioOptimisers.partial_fit_cache
 PortfolioOptimisers.observation_count
+PortfolioOptimisers.shared_series_member_rows
 ```
 
 ## References

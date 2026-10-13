@@ -23,4 +23,5 @@ PortfolioOptimisers.cross_sectional_forecast_rows
 PortfolioOptimisers.cross_sectional_forecast_lead
 PortfolioOptimisers.orthogonal_forecast_step
 PortfolioOptimisers.cross_sectional_carry_outputs
+PortfolioOptimisers.cross_sectional_carry_forecast_returns
 ```

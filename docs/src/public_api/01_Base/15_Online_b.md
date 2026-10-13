@@ -1,8 +1,14 @@
 ```@meta
-Description = "Online (b), public API of PortfolioOptimisers.jl: AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, …"
+Description = "Online (b), public API of PortfolioOptimisers.jl: Online, AbstractWindowRule, RollingWindow, SeedWindow, AbstractChoiceRule, BatchChoice, PinnedChoice, …"
 ```
 
 # Online (b)
+
+[`Online`](@ref) wraps an estimator that has no exact incremental fit, and gives it a buffer of the observations it has seen.
+
+```@docs
+Online
+```
 
 A window rule says which observations the window of a windowed moment estimator keeps on the online step. A choice rule says how a choice that a fit makes over its whole sample behaves on the online step.
 

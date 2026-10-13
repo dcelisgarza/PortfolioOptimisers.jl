@@ -17,6 +17,8 @@ The buffer holds the implied volatilities on the same terms as the masks, for ev
 
 The first append fixes whether the buffer records a mask, whether it records factor rows, whether it records the Exogenous Series, whether it records implied volatilities and whether it records Panel Fields, as it fixes the width and the element type. It also fixes the names of the series and the adjustment `ivpa`. A later fold that disagrees is refused with an error that names the disagreement, in both directions. A buffer that holds no observations records nothing about them, so the next fold seeds it again from its block.
 
+The buffer marks the observations of a Shared Series gap in `G`, and keeps them. A Shared Series is a vector benchmark under `brt` or the factor returns of a prior that reads them, and a batch fit drops an observation with a gap in one of them, see [`shared_series_view`](@ref). An online step cannot drop the row, because the buffer of a prior and the Fold Context of its optimiser hold one row each for every observation, and the call with no data rebuilds the returns data from both. So the step keeps the row and marks it, and every fit through the buffer reads the rows of [`shared_series_buffer`](@ref), which drops the marked rows. A cap counts every row, as the training window of a batch walk-forward counts the observations before the drop. A fold that marks no gap leaves `G` at `nothing`, so a buffer that never meets a gap records nothing.
+
 An estimator whose `cache` holds this buffer is a refit. It has no recursion of its own, and its call with no data runs the batch verb over the rows of the buffer. [`Online`](@ref) seeds the buffer, and a wrapped estimator takes this route also when its statistic has an exact update. A fold-and-carry prior keeps its observations in one of these buffers too, inside a [`PriorCarryState`](@ref). That prior folds its moments exactly. It keeps the rows because [`LowOrderPrior`](@ref) carries `X` for the scenario risk measures, and its buffer has no cap. `max_history` is the window of a refit. A capped buffer holds the last `max_history` observations, and the call with no data gives the batch fit over them.
 
 The backing matrix has spare capacity, so an append costs amortised `O(1)`. `off` is the number of rows before the valid region, and `n` is the length of the region. [`reserve_sample_buffer`](@ref) moves the region to the front of the backing matrix only when an append would go past its end. [`sample_buffer`](@ref) reads the valid region.
@@ -39,6 +41,7 @@ $(DocStringExtensions.FIELDS)
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
         P::Option{<:AbstractVector} = nothing,
+        G::Option{<:AbstractVector{Bool}} = nothing,
         max_history::Option{<:Integer} = nothing
     ) -> SampleBufferState
 
@@ -55,6 +58,7 @@ Keywords correspond to the struct's fields. The default is the empty seed that [
   - `F`, when it is not `nothing`, has as many rows as `X`. A `DimensionMismatch` is thrown otherwise.
   - The rules of [`assert_buffer_series_shape`](@ref) hold for `ne` and `E`.
   - `P`, when it is not `nothing`, holds time-varying Panel Fields over `n` observations and the assets of `X`. The rules of [`assert_buffer_panel_shape`](@ref) apply.
+  - `G`, when it is not `nothing`, has one entry for each row of `X`. A `DimensionMismatch` is thrown otherwise.
 
 ## View parameters
 
@@ -68,6 +72,7 @@ When [`port_opt_view`](@ref) is called on this type, its fields are subset to th
   - `iv`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `ivpa`: Sliced to the selected indices when it is a vector, and kept when it is one number or `nothing`.
   - `P`: Each Panel Field viewed over the selected assets with [`panel_fields_view`](@ref).
+  - `G`: Copied unchanged, because the selection indexes assets and a Shared Series gap belongs to the observation.
 
 A buffer that holds no observations views to the empty seed with the same cap.
 
@@ -87,6 +92,7 @@ PortfolioOptimisers.SampleBufferState
            iv ┼ nothing
          ivpa ┼ nothing
             P ┼ nothing
+            G ┼ nothing
   max_history ┴ Int64: 2
 ```
 
@@ -107,6 +113,7 @@ PortfolioOptimisers.SampleBufferState
   - [`sample_buffer_panel`](@ref)
   - [`exogenous_buffer_kwargs`](@ref)
   - [`implied_volatility_buffer_kwargs`](@ref)
+  - [`shared_series_buffer`](@ref)
 """
 @concrete struct SampleBufferState <: AbstractPartialFitState
     """
@@ -154,6 +161,10 @@ PortfolioOptimisers.SampleBufferState
     """
     P
     """
+    Backing vector of the Shared Series gaps, `capacity` long, or `nothing` when no fold marked a gap. Entry `off + t` is `true` when observation `t` has a gap in a Shared Series that the fit reads, so every fit through the buffer drops it, see [`shared_series_buffer`](@ref). The same `off` and `n` index it and `X`. The field has a declared type and is not a type parameter, so the type of the buffer, and of every estimator that holds it, does not depend on whether a step met a gap. A step with no gap then compiles to the code it had before the marks existed.
+    """
+    G::Union{Nothing, Vector{Bool}}
+    """
     $(field_dict[:pf_max_history])
     """
     max_history
@@ -166,13 +177,15 @@ function SampleBufferState(; n::Integer = 0, off::Integer = 0,
                            E::Option{<:MatNum} = nothing, iv::Option{<:MatNum} = nothing,
                            ivpa::Option{<:Num_VecNum} = nothing,
                            P::Option{<:AbstractVector} = nothing,
+                           G::Option{<:AbstractVector{Bool}} = nothing,
                            max_history::Option{<:Integer} = nothing)::SampleBufferState
     assert_sample_buffer_state(n, off, X, max_history)
     assert_buffer_mask_shape(X, A, M, iv)
     assert_buffer_factor_shape(X, F)
     assert_buffer_series_shape(X, ne, E)
     assert_buffer_panel_shape(X, n, P)
-    return SampleBufferState(n, off, X, A, M, F, ne, E, iv, ivpa, P, max_history)
+    assert_buffer_gap_shape(X, G)
+    return SampleBufferState(n, off, X, A, M, F, ne, E, iv, ivpa, P, G, max_history)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -314,6 +327,43 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Refuses marks of the Shared Series gaps that are not one mark for each row of the observations.
+
+A mark belongs to the observation of the same row, so the marks that a fold receives have one entry for each row of its block, and the backing vector of a buffer has one entry for each row of `X`.
+
+# Algorithm
+
+ 1. Skip marks that are `nothing`.
+ 2. Refuse marks whose length is not `size(X, 1)`.
+
+# Arguments
+
+  - `X`: The observations that the marks belong to.
+  - `G`: The marks, `true` at an observation with a Shared Series gap, or `nothing`.
+
+# Validation
+
+  - `G`, when it is not `nothing`, has one entry for each row of `X`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`shared_series_buffer`](@ref)
+"""
+function assert_buffer_gap_shape(X::AbstractMatrix, G::Option{<:AbstractVector{Bool}})
+    if !isnothing(G)
+        @argcheck(length(G) == size(X, 1),
+                  DimensionMismatch("size(X, 1) ($(size(X, 1))) must match length(G) ($(length(G))): a Shared Series gap marks the observation of the same row."))
+    end
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Refuses an Exogenous Series whose rows are not the rows of the observations it belongs to, or whose names do not name its columns.
 
 A row of the series is contemporaneous with the asset observation of the same row, as a factor row is. The names travel with the series, so the two are both absent or both present, and there is one name for each column.
@@ -360,6 +410,7 @@ end
 """
     buffer_rows_view(M::Nothing, rows) -> Nothing
     buffer_rows_view(M::AbstractMatrix, rows) -> SubArray
+    buffer_rows_view(G::AbstractVector, rows) -> SubArray
 
 Reads a row range out of a per-observation backing, and passes a backing that is not there through.
 
@@ -367,7 +418,7 @@ The buffer slices a mask or the factor rows on the observation axis only through
 
 # Arguments
 
-  - `M`: The backing to slice, or `nothing`.
+  - `M`: The backing to slice, or `nothing`. A vector is the backing of the marks of the Shared Series gaps, one entry per row.
   - `rows`: The rows to keep.
 
 # Returns
@@ -386,6 +437,9 @@ function buffer_rows_view(::Nothing, args...)
 end
 function buffer_rows_view(M::AbstractMatrix, rows)
     return view(M, rows, :)
+end
+function buffer_rows_view(G::AbstractVector, rows)
+    return view(G, rows)
 end
 """
     sample_buffer(state::SampleBufferState)
@@ -548,6 +602,131 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Reads the marks of the Shared Series gaps of the valid region of a [`SampleBufferState`](@ref).
+
+A buffer with no marks has no gap, so it gives `false` for each of its observations. That answer allocates a vector, so a reader on the path of every step tests `isnothing(state.G)` first, as [`buffer_fit_count`](@ref), [`buffer_fits_none`](@ref) and [`shared_series_buffer`](@ref) do. [`merge_buffer_gaps`](@ref) reads it only when one of the two buffers has marks, and the merge copies every row anyway.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `marks::AbstractVector{Bool}`: One mark for each observation of the buffer, `true` at an observation with a Shared Series gap.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`shared_series_buffer`](@ref)
+  - [`merge_buffer_gaps`](@ref)
+"""
+function buffer_gap_marks(state::SampleBufferState)
+    rows = (state.off + 1):(state.off + state.n)
+    return isnothing(state.G) ? fill(false, state.n) : view(state.G, rows)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Count the observations of a [`SampleBufferState`](@ref) that a fit keeps, the rows that [`shared_series_buffer`](@ref) returns.
+
+A reader that holds a history of the fitted observations beside the buffer, as the carry of a [`CrossSectionalFactorPrior`](@ref) does, indexes that history by this count and not by `n`, because the history never holds an observation with a Shared Series gap.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `n::Int`: The number of observations of the buffer with no Shared Series gap.
+
+# Related
+
+  - [`shared_series_buffer`](@ref)
+  - [`buffer_gap_marks`](@ref)
+"""
+function buffer_fit_count(state::SampleBufferState)
+    return isnothing(state.G) ? state.n : state.n - count(buffer_gap_marks(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Answer `true` when every observation of a [`SampleBufferState`](@ref) has a Shared Series gap, so a fit through the buffer keeps no observation.
+
+A reader that fits on the buffer after each step, as the Choice Rule of a refit does, asks this first, because [`shared_series_buffer`](@ref) refuses such a buffer and the first steps of a run can hold only gaps. A buffer with no marks answers `false` at once and allocates nothing, so the step of a buffer that never meets a gap costs what it cost before the marks existed. A buffer that holds no observation and no mark answers `false` too, as it did before.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `ans::Bool`: Whether the buffer has marks and keeps no observation.
+
+# Related
+
+  - [`buffer_fit_count`](@ref)
+  - [`shared_series_buffer`](@ref)
+"""
+function buffer_fits_none(state::SampleBufferState)::Bool
+    return !isnothing(state.G) && iszero(buffer_fit_count(state))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Return the buffer that a fit reads, with the observations of a Shared Series gap dropped.
+
+This is the buffer form of [`shared_series_view`](@ref). An online step keeps an observation with a Shared Series gap in the buffer and marks it in `G`, because the buffer of a prior and the Fold Context of its optimiser hold one row each for every observation, see [`SampleBufferState`](@ref). A fit drops the observation, as the batch fit over the same rows drops it at its entry. So every reader that fits on the rows of the buffer of a prior reads this buffer, and the call with no data gives the batch fit over the same observations. A reader that rebuilds the returns data, [`returns_result`](@ref), reads the buffer itself, because the batch fit that it hands the data to drops the same observations again.
+
+The rows are copied. The masks, the factor rows, the Exogenous Series, the implied volatilities and the Panel Fields keep the same rows. The result has no marks, so the function is idempotent.
+
+# Algorithm
+
+ 1. Return `state` when it has no marks, which allocates nothing, or when no observation of its valid region is marked.
+ 2. Find the observations that are not marked, and refuse a buffer that has none.
+ 3. Copy the rows of the observations into a buffer of their own, with the same cap.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Validation
+
+  - At least one observation of the buffer has no Shared Series gap. An [`IsEmptyError`](@ref) is thrown otherwise.
+
+# Returns
+
+  - `state::SampleBufferState`: `state` itself when it has no gap, and otherwise a buffer of its observations with no gap.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`shared_series_view`](@ref)
+  - [`buffer_gap_marks`](@ref)
+"""
+function shared_series_buffer(state::SampleBufferState)::SampleBufferState
+    if isnothing(state.G)
+        return state
+    end
+    marks = buffer_gap_marks(state)
+    if !any(marks)
+        return state
+    end
+    rows = findall(!, marks)
+    @argcheck(!isempty(rows),
+              IsEmptyError("every observation that the online step folded has a gap in a Shared Series, the vector benchmark under brt or the factor returns, so the fit keeps no observation. Fold an observation whose Shared Series is finite."))
+    r = state.off .+ rows
+    return SampleBufferState(; n = length(rows), X = state.X[r, :],
+                             A = trim_merged_array(state.A, r),
+                             M = trim_merged_array(state.M, r),
+                             F = trim_merged_array(state.F, r), ne = state.ne,
+                             E = trim_merged_array(state.E, r),
+                             iv = trim_merged_array(state.iv, r), ivpa = state.ivpa,
+                             P = panel_fields_view(state.P, rows, :),
+                             max_history = state.max_history)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Returns the sample buffer an estimator carries, and refuses an estimator that carries none.
 
 The buffering arm of [`partial_fit!`](@ref) reads its state through this function. So an estimator that was never wrapped in [`Online`](@ref) gets a message that names the wrapper, not a `MethodError`. An estimator with no `cache` field gets the same message. An unresolved [`Online`](@ref) has a method of its own, because it does not lack a buffer. It lacks the warm-up that seeds one.
@@ -648,17 +827,19 @@ The masks, the factor rows, the Exogenous Series, the implied volatilities and t
 
 The Panel Fields are observations first whatever `dims` is, as the Panel Fields of an [`AssetPanel`](@ref) always are. They keep the rows of the buffer that the cap keeps, and [`panel_fields_append`](@ref) joins them to the rows of the block.
 
+The marks `gaps` of the Shared Series gaps are one entry for each observation whatever `dims` is. They travel with their rows as the masks do, but they have no presence rule: a buffer with no marks has no gap, so [`append_buffer_gaps`](@ref) writes the marks of a later fold onto `false` marks for the rows before it, and a fold with no marks gives `false` to a buffer that has them.
+
 # Algorithm
 
  1. Orient `X`, the masks, `iv`, `F` and `E` to `observations × assets`, `observations × factors` and `observations × series`. Transpose them when `dims == 2`.
- 2. Refuse a mask or an `iv` that does not have the shape of the block, a factor block whose row count is not the row count of the block, and a series that [`assert_buffer_series_shape`](@ref) refuses.
+ 2. Refuse a mask or an `iv` that does not have the shape of the block, a factor block whose row count is not the row count of the block, a series that [`assert_buffer_series_shape`](@ref) refuses, and marks that [`assert_buffer_gap_shape`](@ref) refuses.
  3. Return the state unchanged when the block is empty.
  4. Refuse Panel Fields that do not make a time-varying Asset Panel with the masks of the block, over the observations and the assets of the block.
- 5. When a cap is set, truncate the incoming rows, their masks, their implied volatilities, their factor rows, their series and their Panel Fields to the last `max_history` of them.
- 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref), seed `iv` with [`seed_buffer_array`](@ref), pin `ivpa`, and return it. The seed fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the series with its names, and the Panel Fields.
+ 5. When a cap is set, truncate the incoming rows, their masks, their implied volatilities, their factor rows, their series, their Panel Fields and their marks to the last `max_history` of them.
+ 6. When the buffer holds no observations, seed it from the block with [`seed_sample_buffer`](@ref), seed `iv` with [`seed_buffer_array`](@ref), seed `G` with [`seed_buffer_gaps`](@ref), pin `ivpa`, and return it. The seed fixes the width, the element type, the masks, the implied volatilities with `ivpa`, the factor rows, the series with its names, and the Panel Fields.
  7. Refuse a block whose width is not the fixed width. Refuse masks, implied volatilities, factor rows, a series or Panel Fields that are absent where the buffer records them or present where it does not, factor rows of a different width, a series under other names with [`assert_buffer_series_names`](@ref), and an `ivpa` that is not the pinned one with [`assert_pinned_value`](@ref).
  8. Make room for the block with [`reserve_sample_buffer`](@ref), which drops the rows that the cap pushes out and grows the backing matrices.
- 9. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region. Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
+ 9. Copy the block, its masks, its implied volatilities, its factor rows and its series after the valid region, and write its marks with [`append_buffer_gaps`](@ref). Join the Panel Fields that the buffer keeps to the Panel Fields of the block with [`panel_fields_append`](@ref), and rebind `P` and `n` with `Accessors.@reset`.
 
 # Arguments
 
@@ -673,10 +854,12 @@ The Panel Fields are observations first whatever `dims` is, as the Panel Fields 
   - `iv`: The implied volatilities of the block, oriented as `X` is, or `nothing`.
   - `ivpa`: The implied volatility risk premium adjustment, or `nothing`.
   - `panel_fields`: The time-varying Panel Fields of the block, observations first, or `nothing`.
+  - `gaps`: One mark for each observation of the block, `true` at an observation with a Shared Series gap, or `nothing` when the block has none.
 
 # Validation
 
   - $(val_dict[:dims])
+  - `gaps`, when it is not `nothing`, has one entry for each observation of the block. A `DimensionMismatch` is thrown otherwise.
   - `X` has the width the first append fixed. A `DimensionMismatch` is thrown otherwise.
   - `active_mask`, `estimation_mask` and `iv`, when they are not `nothing`, have the shape of `X`. A `DimensionMismatch` is thrown otherwise.
   - `ivpa` equals the adjustment that the first append pinned. An `ArgumentError` is thrown otherwise.
@@ -705,11 +888,14 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                       ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
                       iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
-                      panel_fields::Option{<:AbstractVector} = nothing)
+                      panel_fields::Option{<:AbstractVector} = nothing,
+                      gaps::Option{<:AbstractVector{Bool}} = nothing)
     Xo, Ao, Mo, Fo, Eo, Vo = dims_oriented(dims, X, active_mask, estimation_mask, F, E, iv)
     assert_buffer_mask_shape(Xo, Ao, Mo, Vo)
     assert_buffer_factor_shape(Xo, Fo)
     assert_buffer_series_shape(Xo, ne, Eo)
+    assert_buffer_gap_shape(Xo, gaps)
+    Go = gaps
     t = size(Xo, 1)
     if iszero(t)
         return state
@@ -726,11 +912,13 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
         Eo = buffer_rows_view(Eo, rows)
         Vo = buffer_rows_view(Vo, rows)
         Po = panel_fields_view(Po, rows, :)
+        Go = buffer_rows_view(Go, rows)
         t = w
     end
     if iszero(state.n)
         state = seed_sample_buffer(state, Xo, Ao, Mo, Fo, ne, Eo, Po)
         state = Accessors.@reset state.iv = seed_buffer_array(Vo)
+        state = Accessors.@reset state.G = seed_buffer_gaps(Go)
         return Accessors.@reset state.ivpa = ivpa
     end
     N = size(Xo, 2)
@@ -754,6 +942,7 @@ function partial_fit!(state::SampleBufferState, X::MatNum, F::Option{<:MatNum} =
     copy_buffer_rows!(state.F, rows, Fo)
     copy_buffer_rows!(state.E, rows, Eo)
     copy_buffer_rows!(state.iv, rows, Vo)
+    state = append_buffer_gaps(state, rows, Go)
     state = Accessors.@reset state.P = panel_fields_append(state.P, Po, state.n + t)
     return Accessors.@reset state.n = state.n + t
 end
@@ -969,6 +1158,71 @@ function copy_buffer_rows!(M::AbstractMatrix, rows, Mo::AbstractMatrix)
     return copyto!(view(M, rows, :), Mo)
 end
 """
+    seed_buffer_gaps(Go::Nothing) -> Nothing
+    seed_buffer_gaps(Go::AbstractVector{Bool}) -> Option{Vector{Bool}}
+
+Seeds the marks of the Shared Series gaps of a [`SampleBufferState`](@ref) from the first block that it holds.
+
+A block with no gap seeds no marks, so a buffer that never meets a gap keeps `G` at `nothing`. A block with a gap seeds a copy of its marks, because a later fold writes into the backing vector.
+
+# Arguments
+
+  - `Go`: The marks of the block, `true` at an observation with a Shared Series gap, or `nothing`.
+
+# Returns
+
+  - `G::Option{Vector{Bool}}`: The backing vector of the marks, or `nothing` when the block has no gap.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`append_buffer_gaps`](@ref)
+"""
+function seed_buffer_gaps(::Nothing)
+    return nothing
+end
+function seed_buffer_gaps(Go::AbstractVector{Bool})
+    return any(Go) ? collect(Go) : nothing
+end
+"""
+    append_buffer_gaps(state::SampleBufferState, rows, Go::Nothing) -> SampleBufferState
+    append_buffer_gaps(state::SampleBufferState, rows, Go::AbstractVector{Bool}) -> SampleBufferState
+
+Writes the marks of the Shared Series gaps of a block into the rows of a [`SampleBufferState`](@ref) that were just made room for.
+
+The marks have no presence rule, because a buffer with no marks has no gap. A buffer with no marks and a block with no gap keep no marks. The first block with a gap gives the buffer a backing vector of `false` marks for the rows before it, and a block with no marks writes `false` into a buffer that has them.
+
+# Arguments
+
+  - `state`: The buffer, after [`reserve_sample_buffer`](@ref) made room for the block.
+  - `rows`: The rows of the backing to write.
+  - `Go`: The marks of the block, or `nothing`.
+
+# Returns
+
+  - `state::SampleBufferState`: The buffer with the marks of the block written.
+
+# Related
+
+  - [`SampleBufferState`](@ref)
+  - [`seed_buffer_gaps`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function append_buffer_gaps(state::SampleBufferState, rows, ::Nothing)
+    if !isnothing(state.G)
+        fill!(view(state.G, rows), false)
+    end
+    return state
+end
+function append_buffer_gaps(state::SampleBufferState, rows, Go::AbstractVector{Bool})
+    if isnothing(state.G) && !any(Go)
+        return state
+    end
+    G = isnothing(state.G) ? fill(false, size(state.X, 1)) : state.G
+    copyto!(view(G, rows), Go)
+    return Accessors.@reset state.G = G
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Makes room for `t` further observations in a [`SampleBufferState`](@ref), and returns the buffer that has it.
@@ -982,7 +1236,7 @@ These steps make an append cost amortised `O(1)`. A drop moves `off` and copies 
  1. Drop the oldest observations the cap pushes out, by moving `off` forward and `n` back.
  2. Return when the valid region and the block already fit inside the backing matrix.
  3. Take a capacity of twice the current one, or of the room needed if that is larger, when the valid region and the block would fill more than half of the current one. Clamp it to twice the cap when a cap is set.
- 4. Compact the observations, each mask, the factor rows and the series the buffer records to that capacity with [`compact_buffer_array`](@ref), which allocates only when the capacity changes, and set `off` to zero.
+ 4. Compact the observations, each mask, the factor rows, the series and the marks of the Shared Series gaps that the buffer records to that capacity with [`compact_buffer_array`](@ref), which allocates only when the capacity changes, and set `off` to zero.
 
 # Arguments
 
@@ -1028,13 +1282,15 @@ function reserve_sample_buffer(state::SampleBufferState, t::Integer)
     state = Accessors.@reset state.F = compact_buffer_array(state.F, off, n, newcap)
     state = Accessors.@reset state.E = compact_buffer_array(state.E, off, n, newcap)
     state = Accessors.@reset state.iv = compact_buffer_array(state.iv, off, n, newcap)
+    state = Accessors.@reset state.G = compact_buffer_array(state.G, off, n, newcap)
     return Accessors.@reset state.off = 0
 end
 """
     compact_buffer_array(B::Nothing, off, n, newcap) -> Nothing
     compact_buffer_array(B::AbstractMatrix, off::Integer, n::Integer, newcap::Integer) -> AbstractMatrix
+    compact_buffer_array(G::AbstractVector, off::Integer, n::Integer, newcap::Integer) -> AbstractVector
 
-Moves the valid region of one backing matrix to the front, allocating a matrix of `newcap` rows when the capacity changes.
+Moves the valid region of one backing matrix to the front, allocating a matrix of `newcap` rows when the capacity changes. The backing vector of the marks of the Shared Series gaps has one entry per row, and compacts in the same way.
 
 This is the array part of [`reserve_sample_buffer`](@ref). The buffer carries five backing matrices with one index, and this function compacts each of them. A copy in place with an increasing row index is safe, because the destination row `i` is never after the source row `off + i`. So the loop reads each source row before a write can reach it.
 
@@ -1066,6 +1322,13 @@ function compact_buffer_array(B::AbstractMatrix, off::Integer, n::Integer, newca
     D = size(B, 1) == newcap ? B : similar(B, newcap, size(B, 2))
     for j in axes(B, 2), i in 1:n
         D[i, j] = B[off + i, j]
+    end
+    return D
+end
+function compact_buffer_array(G::AbstractVector, off::Integer, n::Integer, newcap::Integer)
+    D = length(G) == newcap ? G : similar(G, newcap)
+    for i in 1:n
+        D[i] = G[off + i]
     end
     return D
 end
@@ -1156,7 +1419,7 @@ The method does not call [`assert_mergeable_states`](@ref). That check compares 
  2. Return a copy of the other buffer when one buffer holds no observations.
  3. Refuse two buffers of different widths.
  4. Refuse two buffers that do not record the same masks, that disagree about factor rows, a series or Panel Fields, whose factor rows have different widths, or whose series have different names.
- 5. Concatenate the valid region of the first with the valid region of the second, and each mask, the factor rows and the series with their own.
+ 5. Concatenate the valid region of the first with the valid region of the second, and each mask, the factor rows and the series with their own. Concatenate the marks of the Shared Series gaps with [`merge_buffer_gaps`](@ref).
  6. Keep the last `max_history` rows when a cap is set.
  7. Join the Panel Fields of the two buffers over the rows that the result keeps, with [`panel_fields_append`](@ref).
 
@@ -1213,6 +1476,7 @@ function merge_states(a::SampleBufferState, b::SampleBufferState)
     F = merge_buffer_array(buffer_rows_view(a.F, ra), buffer_rows_view(b.F, rb))
     E = merge_buffer_array(buffer_rows_view(a.E, ra), buffer_rows_view(b.E, rb))
     V = merge_buffer_array(buffer_rows_view(a.iv, ra), buffer_rows_view(b.iv, rb))
+    G = merge_buffer_gaps(a, b)
     t = size(X, 1)
     if !isnothing(w) && t > w
         rows = (t - w + 1):t
@@ -1222,10 +1486,11 @@ function merge_states(a::SampleBufferState, b::SampleBufferState)
         F = trim_merged_array(F, rows)
         E = trim_merged_array(E, rows)
         V = trim_merged_array(V, rows)
+        G = trim_merged_array(G, rows)
         t = w
     end
     return SampleBufferState(t, 0, X, A, M, F, a.ne, E, V, a.ivpa,
-                             panel_fields_append(a.P, b.P, t), w)
+                             panel_fields_append(a.P, b.P, t), G, w)
 end
 """
     merge_buffer_array(Ma::Nothing, Mb::Nothing) -> Nothing
@@ -1256,8 +1521,36 @@ function merge_buffer_array(Ma::AbstractMatrix, Mb::AbstractMatrix)
     return vcat(Ma, Mb)
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Concatenates the marks of the Shared Series gaps of two buffers over their valid regions.
+
+The marks have no presence rule, because a buffer with no marks has no gap. So two buffers with no marks give no marks, and a buffer with no marks gives `false` for each of its observations beside a buffer that has them.
+
+# Arguments
+
+  - `a`: The buffer of the first block of observations.
+  - `b`: The buffer of the second block of observations.
+
+# Returns
+
+  - `G::Option{Vector{Bool}}`: The marks of the rows of `a` followed by the marks of the rows of `b`, or `nothing` when neither buffer has marks.
+
+# Related
+
+  - [`merge_states`](@ref)
+  - [`SampleBufferState`](@ref)
+"""
+function merge_buffer_gaps(a::SampleBufferState, b::SampleBufferState)
+    if isnothing(a.G) && isnothing(b.G)
+        return nothing
+    end
+    return vcat(buffer_gap_marks(a), buffer_gap_marks(b))
+end
+"""
     trim_merged_array(M::Nothing, rows) -> Nothing
     trim_merged_array(M::AbstractMatrix, rows) -> AbstractMatrix
+    trim_merged_array(G::AbstractVector, rows) -> AbstractVector
 
 Keeps the rows a cap admits of a merged mask or of the merged factor rows, by index copy, and passes a backing that is not there through.
 
@@ -1265,7 +1558,7 @@ This is the cap part of [`merge_states`](@ref). It copies the rows and does not 
 
 # Arguments
 
-  - `M`: The merged backing, or `nothing`.
+  - `M`: The merged backing, or `nothing`. A vector is the backing of the marks of the Shared Series gaps.
   - `rows`: The rows the cap admits.
 
 # Returns
@@ -1282,6 +1575,9 @@ function trim_merged_array(::Nothing, ::Any)
 end
 function trim_merged_array(M::AbstractMatrix, rows)
     return M[rows, :]
+end
+function trim_merged_array(G::AbstractVector, rows)
+    return G[rows]
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1308,15 +1604,16 @@ function Base.copy(x::SampleBufferState)
     return SampleBufferState(x.n, x.off, copy(x.X), copy_buffer_array(x.A),
                              copy_buffer_array(x.M), copy_buffer_array(x.F), x.ne,
                              copy_buffer_array(x.E), copy_buffer_array(x.iv),
-                             copy_column(x.ivpa), x.P, x.max_history)
+                             copy_column(x.ivpa), x.P, copy_buffer_array(x.G),
+                             x.max_history)
 end
 """
     copy_buffer_array(M::Nothing) -> Nothing
-    copy_buffer_array(M::AbstractMatrix) -> AbstractMatrix
+    copy_buffer_array(M::AbstractArray) -> AbstractArray
 
 Copies one backing matrix of a buffer, and passes a matrix that is not there through.
 
-This is the `nothing` case of `copy` for the two masks, the factor rows and the series. [`Base.copy`](@ref) and [`port_opt_view`](@ref) use it to copy each optional field in one line.
+This is the `nothing` case of `copy` for the two masks, the factor rows, the series and the backing vector of the marks of the Shared Series gaps. [`Base.copy`](@ref) and [`port_opt_view`](@ref) use it to copy each optional field in one line.
 
 # Arguments
 
@@ -1334,7 +1631,7 @@ This is the `nothing` case of `copy` for the two masks, the factor rows and the 
 function copy_buffer_array(::Nothing)
     return nothing
 end
-function copy_buffer_array(M::AbstractMatrix)
+function copy_buffer_array(M::AbstractArray)
     return copy(M)
 end
 """
@@ -1347,7 +1644,7 @@ A buffer holds its observations verbatim, so the slice of the buffer is the buff
 # Algorithm
 
  1. Return the empty seed with the same cap when the buffer holds no observations.
- 2. Copy the columns `i` of `X`, of each mask and of `iv`, view a vector `ivpa` over the entries `i`, copy `F` and `E` whole, and view each Panel Field over the columns `i`.
+ 2. Copy the columns `i` of `X`, of each mask and of `iv`, view a vector `ivpa` over the entries `i`, copy `F`, `E` and the marks `G` whole, and view each Panel Field over the columns `i`.
 
 # Arguments
 
@@ -1373,7 +1670,8 @@ function port_opt_view(x::SampleBufferState, i, args...)
                              slice_buffer_mask(x.M, i), copy_buffer_array(x.F), x.ne,
                              copy_buffer_array(x.E), slice_buffer_mask(x.iv, i),
                              nothing_scalar_array_view(x.ivpa, i),
-                             panel_fields_view(x.P, :, i), x.max_history)
+                             panel_fields_view(x.P, :, i), copy_buffer_array(x.G),
+                             x.max_history)
 end
 """
     slice_buffer_mask(M::Nothing, i) -> Nothing
@@ -1463,352 +1761,3 @@ function partial_fit!(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEsti
     end
     return Accessors.@set est.cache = state
 end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Declares that an estimator takes the online step from a buffer of the observations it has seen.
-
-An `Online` goes directly in the estimator field that it wraps, for example `HighOrderPriorEstimator(; pe = Online(EmpiricalPrior()))`, or the `pe` of an optimiser, `JuMPOptimiser(; pe = Online(EmpiricalPrior()), slv = …)`. It is transient, as [`TimeDependent`](@ref) is. [`update_online_estimator`](@ref) walks the fields that hold a wrapper, seeds the `cache` of each wrapped estimator with a [`SampleBufferState`](@ref), and rebuilds the outer estimator through its keyword constructor. The result is an ordinary estimator that carries a state. No `Online` exists after that, so each verb downstream receives a plain estimator.
-
-Only a field whose bound is `Onl` admits a wrapper. These are the `pe` field of a wrapping prior and of an optimiser. A moment field inside a prior, such as `ce`, `me`, `ske` or `kte`, admits none, so the bound of the field refuses `EmpiricalPrior(; ce = Online(…))` before any warm-up. The prior owns the rows. It holds its observations once, at the bottom of its chain, and it refits from those rows each member that does not fold. A buffer under one of its moments would hold the same rows a second time, so wrap the prior. Wrap a moment estimator alone only when it is the estimator under study, as in `update_online_estimator(Online(Coskewness()))`.
-
-It differs from [`TimeDependent`](@ref) in when it resolves. A schedule resolves again at each fold, because its value changes at each fold. An `Online` resolves once, at warm-up. After warm-up, the step passes the state from fold to fold, and a second resolution would discard the buffer.
-
-A wrapper replaces an exact fold, and it does not add to one. Each family that folds exactly narrows the `cache` type parameter of its own [`partial_fit!`](@ref) methods to the state of that fold, so a wrapped estimator never reaches them. It buffers its observations, and it answers each call with no data with the batch verb over the rows of the buffer. The type of the state selects the route, and the caller selects the type when it wraps the estimator or not.
-
-Wrap an estimator in one of these cases:
-
-  - Its estimate has no exact incremental fold.
-  - It folds exactly, and it carries its observations for a consumer downstream.
-  - Its estimate must come from a window, not from every observation.
-
-An estimator that folds exactly and carries nothing needs no wrapper. Unwrapped, it answers [`partial_fit!`](@ref) and seeds its own state at the first call, and it uses the memory of one state, not the memory of a buffer.
-
-A wrapper and a [`TimeDependent`](@ref) schedule do not wrap each other, because they resolve at different times. Neither `Online(TimeDependent(…))` nor a schedule whose entry or `default` is an `Online` is admissible. A wrapper inside a schedule entry would resolve at no fold, or it would seed again at each fold and discard the buffer that the step passes on. They compose the other way, in two ordinary forms. An estimator that an `Online` wraps can hold schedules of its own, which the seed does not change and which resolve at each fold after it. One outer estimator can hold a wrapper in one field and a schedule in another, and each resolves at its own time. The two field scans are disjoint by construction, because a field that holds one kind is not a candidate of the other scan. So neither resolution reaches the wrapper of the other.
-
-On a scheme, the same word declares an Online Scheme. `Online{<:WalkForwardEstimator}` wraps a walk-forward whose folds the loop fits by the online step, not by a refit. The loop warms one estimator up on the first training window, folds the new observations of each fold into it, and reads it out where a refit would run. Only the function constructor of the scheme builds one, [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref). Each takes the keywords of its scheme except the window knob, and it sets that knob `true`, because a fold cannot remove an observation. `Online(cv)` written by hand is refused with an error that names it. On a scheme the wrapper is not transient. Nothing resolves it, the loop reads it at each fold, and each function that takes the scheme decides on its type. It carries no `max_history`, because the estimator declares a window through the wrapper on the prior.
-
-`max_history` caps the buffer, and the cap is the window. An uncapped buffer gives the batch fit over every observation folded so far. A capped buffer gives the batch fit over the last `max_history` observations. This holds for the estimate and for each consumer that reads the observations, such as the scenario risk measures CVaR, EVaR and CDaR. The rule has no special case. A buffer always means the batch verb over its rows. An unwrapped estimator is not affected. It folds exactly, and it stays fitted over every observation.
-
-# Fields
-
-$(DocStringExtensions.FIELDS)
-
-# Constructors
-
-    Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
-           max_history::Option{<:Integer} = nothing)
-    Online(; est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
-           max_history::Option{<:Integer} = nothing)
-
-## Validation
-
-  - `est` is not an `Online`. An `ArgumentError` is thrown otherwise.
-  - `est` is not a cross-validation scheme, because the function constructor of a scheme builds its Online Scheme. An `ArgumentError` naming the constructors is thrown otherwise.
-  - `est` is not an [`OnlinePortfolioSelection`](@ref) head, because a refit of a head is a batch walk-forward, and the library runs both settings of the wrapper in other forms. An `ArgumentError` naming those forms is thrown otherwise.
-  - `est` has a `cache` field. An `ArgumentError` is thrown otherwise. Every covariance estimator of the library has one. A covariance estimator with no such field, such as a `StatsBase.CovarianceEstimator` of another package, takes the buffer of a [`PortfolioOptimisersCovariance`](@ref) that holds it.
-  - No field of the tree of `est` holds a windowed estimator under [`SeedWindow`](@ref), because the wrapper refits the tree at each step, and a refit has no first fit to remember. [`seed_window_path`](@ref) finds the field, and an `ArgumentError` that names it is thrown otherwise.
-  - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
-
-# Examples
-
-```jldoctest
-julia> Online(Covariance(; alg = SemiMoment()); max_history = 250)
-Online
-          est ┼ Covariance
-              │    me ┼ SimpleExpectedReturns
-              │       │   w ┴ nothing
-              │    ce ┼ GeneralCovariance
-              │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-              │       │    w ┴ nothing
-              │   alg ┼ SemiMoment()
-              │     w ┴ nothing
-  max_history ┴ Int64: 250
-```
-
-# Related
-
-  - [`SampleBufferState`](@ref)
-  - [`Online_Option`](@ref)
-  - [`update_online_estimator`](@ref)
-  - [`online_fields`](@ref)
-  - [`TimeDependent`](@ref)
-  - [`OnlineIndexWalkForward`](@ref)
-  - [`OnlineDateWalkForward`](@ref)
-  - [`OnlineHindsightSplit`](@ref)
-"""
-@concrete struct Online <: AbstractEstimator
-    """
-    Estimator that the wrapper seeds a buffer into. The field takes this value after the wrapper resolves.
-    """
-    est
-    """
-    $(field_dict[:pf_max_history])
-    """
-    max_history
-    function Online(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator};
-                    max_history::Option{<:Integer} = nothing)
-        @argcheck(hasfield(typeof(est), :cache),
-                  ArgumentError("`$(typeof(est))` has no `cache` field, so it has nowhere to carry a sample buffer and cannot be wrapped in `Online`. A covariance estimator of this kind takes the buffer of a `PortfolioOptimisersCovariance(; ce = …)`, which carries one for any estimator that it holds, and a prior holds the rows for each of its members."))
-        path = seed_window_path(est)
-        @argcheck(isnothing(path),
-                  ArgumentError("`$(typeof(est).name.name)` holds a `SeedWindow` at `$(path)`, and `Online` refits the estimator over its buffer at each step. A refit has no first fit to remember, so it cannot keep the window of the first fit alone. Fold the estimator without `Online` in a prior that folds, such as `EmpiricalPrior`, or set the rule to `RollingWindow()`."))
-        if !isnothing(max_history)
-            @argcheck(max_history > zero(max_history),
-                      DomainError(max_history, "max_history must be positive"))
-        end
-        return new{typeof(est), typeof(max_history)}(est, max_history)
-    end
-    # The Online Scheme path. Only the function constructors of the walk-forwards call it,
-    # with the window knob already set, so the wrapped scheme is expanding by construction
-    # and no value is checked here.
-    function Online{T1, T2}(cv::T1,
-                            max_history::T2) where {T1 <: CrossValidationEstimator,
-                                                    T2 <: Nothing}
-        return new{T1, T2}(cv, max_history)
-    end
-end
-function Online(cv::CrossValidationEstimator; kwargs...)
-    return throw(ArgumentError("`Online` on a scheme is an Online Scheme, and one is built by its function constructor alone — `OnlineIndexWalkForward`, `OnlineDateWalkForward` or `OnlineHindsightSplit` — never by wrapping a `$(nameof(typeof(cv)))` by hand. Each constructor takes its scheme's keywords minus the window knob and sets that knob `true`, because a fold cannot un-fold an observation, so an online run is expanding by construction. A scheme with no constructor of its own has no online form."))
-end
-function Online(::Online, args...; kwargs...)
-    return throw(ArgumentError("est cannot be an Online: wrappers do not nest. One wrapper declares one buffer, and an estimator it wraps may carry wrappers of its own — they resolve at the same warm-up — but they belong in its fields, not inside this one."))
-end
-function Online(; est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator},
-                max_history::Option{<:Integer} = nothing)::Online
-    return Online(est; max_history = max_history)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Refuses an [`Online`](@ref) that reached a fold without being resolved, naming the warm-up that resolves it.
-
-[`update_online_estimator`](@ref) replaces each wrapper that it can reach at warm-up. So a wrapper that reaches a fold is one that the warm-up did not see. A callable [`TimeDependent`](@ref) makes one. The value of a schedule is computed at each fold, after the warm-up, so nothing seeds a wrapper that the callable returns. The constructor of a schedule refuses a wrapper in its vector and `default` forms. It cannot refuse the return value of a callable, because that value does not exist until the fold.
-
-A callable that returns the estimator that the wrapper would make does not solve the problem. A schedule replaces the value of the field at each fold, and the step passes the buffer through that field. So a schedule that returns a captured estimator returns the buffer as it was when the closure was built, and it discards each step since then.
-
-# Arguments
-
-  - `::Online`: The unresolved wrapper.
-
-# Validation
-
-  - Always throws an `ArgumentError`.
-
-# Returns
-
-  - Never returns.
-
-# Related
-
-  - [`Online`](@ref)
-  - [`update_online_estimator`](@ref)
-  - [`assert_sample_buffer`](@ref)
-"""
-function assert_sample_buffer(::Online)
-    return throw(ArgumentError("an `Online` is a declaration, not an estimator that folds, and this one reached a fold unresolved. `update_online_estimator` resolves every wrapper it can reach at warm-up; a wrapper that survives to a fold came from a callable `TimeDependent`, whose value is computed per fold and so is never seeded. A schedule and a wrapper do not compose in that direction: a schedule replaces the field's value every fold, while the buffer is threaded through it, so a schedule that returns a captured estimator returns the buffer as it stood when the closure was built."))
-end
-"""
-    const Online_Option{X} = Union{Nothing, <:Online, X}
-
-Alias for a field that accepts `nothing`, a static estimator of type `X`, or an [`Online`](@ref) declaration.
-
-The fields whose constructor signatures use this alias are the fields that can take the online step from a sample buffer, as [`TD_Option`](@ref) marks the fields that can change over folds.
-
-# Related
-
-  - [`Online`](@ref)
-  - [`Option`](@ref)
-  - [`online_fields`](@ref)
-"""
-const Online_Option{X} = Union{Nothing, <:Online, X}
-"""
-    const Onl{X} = Union{<:Online, X}
-
-Alias for a required field that accepts a static estimator of type `X` or an [`Online`](@ref) declaration.
-
-This is the form of [`Online_Option`](@ref) for a required field, as [`TD`](@ref) is for [`TD_Option`](@ref). A field that the outer estimator requires takes this alias. A caller can declare the online step there, and the signature refuses `nothing`.
-
-# Related
-
-  - [`Online`](@ref)
-  - [`Online_Option`](@ref)
-  - [`online_fields`](@ref)
-"""
-const Onl{X} = Union{<:Online, X}
-"""
-    const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEstimator}}
-
-Alias for a cross-validation scheme, plain or an Online Scheme.
-
-An Online Scheme is an [`Online`](@ref) around a walk-forward, built by the function constructor of the scheme, [`OnlineIndexWalkForward`](@ref), [`OnlineDateWalkForward`](@ref) or [`OnlineHindsightSplit`](@ref). Its supertype is `AbstractEstimator` and not `CrossValidationEstimator`, because a struct has one supertype. Each function that takes a scheme dispatches on this alias, or on an alias built from it, so the wrapped form reaches the same functions as the plain form. The fold loop then reads [`folds_are_stepped`](@ref) from its type.
-
-# Related
-
-  - [`CrossValidationEstimator`](@ref)
-  - [`Online`](@ref)
-  - [`CVER`](@ref)
-  - [`folds_are_stepped`](@ref)
-"""
-const CVE_Onl = Union{<:CrossValidationEstimator, <:Online{<:CrossValidationEstimator}}
-"""
-    online_candidate_fields(x)
-
-Field names of `x` whose type admits an [`Online`](@ref), the candidate set that [`online_fields`](@ref) narrows by value.
-
-`fieldtype` alone decides whether a field can hold a wrapper, because a `@concrete` estimator records the type of the value in the type parameter of the field. The type of a field that holds a static estimator does not intersect [`Online`](@ref). So a generated function computes the tuple once for each estimator type, and for an estimator with no wrapper the tuple is empty at compile time. The warm-up then walks no field.
-
-# Related
-
-  - [`Online`](@ref)
-  - [`online_fields`](@ref)
-"""
-@generated function online_candidate_fields(::T) where {T}
-    fns = Tuple(f
-                for f in fieldnames(T)
-                if typeintersect(fieldtype(T, f), Online) !== Union{})
-    return :($fns)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Returns the tuple of field names of `est` whose values are [`Online`](@ref).
-
-The scan reads the fields of the outer estimator, so the constructor signatures that admit a wrapper, through [`Online_Option`](@ref) and [`Onl`](@ref), decide which estimators can take the step from a buffer. No list is kept by hand. The scan visits only the candidates of [`online_candidate_fields`](@ref), and the compiler removes the other fields.
-
-# Arguments
-
-  - `est`: Estimator whose fields are scanned.
-
-# Returns
-
-  - `fns::Tuple`: The field names holding an [`Online`](@ref).
-
-# Related
-
-  - [`Online`](@ref)
-  - [`online_candidate_fields`](@ref)
-  - [`update_online_estimator`](@ref)
-"""
-function online_fields(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
-    fns = online_candidate_fields(est)
-    return filter(f -> isa(getfield(est, f), Online), fns)
-end
-"""
-    update_online_estimator(est)
-
-Resolves the [`Online`](@ref) declarations of an estimator, seeding the sample buffer each one asks for.
-
-The warm-up calls it once, before the first fold. It replaces each wrapper with the estimator that the wrapper holds, rebuilt through its keyword constructor with the state of [`online_state_seed`](@ref) in `cache`. That state is an empty [`SampleBufferState`](@ref) with the cap of the wrapper, unless the family has a seed of its own. The function then rebuilds the outer estimator through its keyword constructor, so each construction check runs again. The result holds no `Online`, and each estimator that was wrapped carries the state that its refit or its carry reads.
-
-The function finds a wrapper in the fields of the estimator that it receives, and in the fields of an estimator inside a wrapper. An outer estimator that passes estimators across a boundary of its own, such as a meta-optimiser or a pipeline, has a method of its own that recurses, as it has for [`update_time_dependent_estimator`](@ref).
-
-The function takes no fold context, unlike [`update_time_dependent_estimator`](@ref). The seed reads nothing from a fold, because the wrapper resolves once and not at each fold.
-
-# Algorithm
-
- 1. For an [`Online`](@ref), rebuild the wrapped estimator with `cache` set to the state of [`online_state_seed`](@ref), and continue with that estimator.
- 2. Find the fields of the estimator that hold a wrapper, with [`online_fields`](@ref). Return the estimator when there is none.
- 3. Resolve the value of each of these fields with this function.
- 4. Rebuild the estimator with the resolved values through [`rebuild_estimator`](@ref).
-
-# Arguments
-
-  - `est`: Estimator, wrapper, or `nothing`.
-
-# Returns
-
-  - Estimator carrying a seeded buffer wherever a wrapper stood, and holding no [`Online`](@ref).
-
-# Related
-
-  - [`Online`](@ref)
-  - [`SampleBufferState`](@ref)
-  - [`online_fields`](@ref)
-  - [`rebuild_estimator`](@ref)
-"""
-function update_online_estimator(est::Union{<:AbstractEstimator,
-                                            <:StatsBase.CovarianceEstimator})
-    fns = online_fields(est)
-    if isempty(fns)
-        return est
-    end
-    repl = NamedTuple{fns}(map(f -> update_online_estimator(getfield(est, f)), fns))
-    return rebuild_estimator(est, repl)
-end
-function update_online_estimator(::Nothing)
-    return nothing
-end
-"""
-    estimator_fields(x)
-
-Field names of `x` whose type admits an estimator, the candidate set that [`online_wrapper_path`](@ref) and [`copy_states`](@ref) walk.
-
-`fieldtype` alone decides whether a field can hold an estimator, because a `@concrete` estimator records the type of the value in the type parameter of the field. So a generated function computes the tuple once for each estimator type, as for [`online_candidate_fields`](@ref). A field that holds a vector of estimators or a result is not a candidate. A vector is a batch configuration that the step never folds into, and a result carries no state field. A walk that must reach the estimators a vector holds reads every field instead, as [`online_entry_state`](@ref) and [`seed_window_path`](@ref) do. A field that holds a [`TimeDependent`](@ref) schedule is a candidate, because a schedule is an estimator. The `TimeDependent` methods of the two walks answer `nothing` for it, because the entries of a schedule resolve at each fold.
-
-# Related
-
-  - [`online_entry_state`](@ref)
-  - [`online_candidate_fields`](@ref)
-"""
-@generated function estimator_fields(::T) where {T}
-    fns = Tuple(f
-                for f in fieldnames(T)
-                if typeintersect(fieldtype(T, f),
-                                 Union{<:AbstractEstimator,
-                                       <:StatsBase.CovarianceEstimator}) !== Union{})
-    return :($fns)
-end
-"""
-    online_entry_state(est)
-    online_entry_state(v::AbstractVector)
-    online_entry_state(p::Pair)
-    online_entry_state(::TimeDependent)
-
-Names the first field of an estimator tree that carries a partial-fit state, or answers `nothing`.
-
-The cold start of the fold loop uses this walk. The online arm of [`fold_loop`](@ref) reads its argument as configuration only, so it refuses by name an estimator that holds a state, and this walk finds the state. The answer is the path from the root, for example `"opt.pe.me.cache"` for the state of a mean estimator under a JuMP head. The walk reads every field, not only the fields of [`estimator_fields`](@ref), because a state can stand in an estimator that a vector holds. A Descriptor that the caller folded before the call, in the factor list of a [`CrossSectionalFactorPrior`](@ref), is such an estimator, and the first step of the carry fold reads its state. So the first [`partial_fit!`](@ref) of that prior refuses a state with this walk too, because a direct call does not pass through the fold loop. A vector answers with the index of its element in brackets, as [`element_path`](@ref) states, and a Pair answers through its value, so the path is `"factors[2].descriptors[1].cache"` for that Descriptor. A [`TimeDependent`](@ref) schedule answers `nothing`, because its entries are batch configuration that resolves at each fold, and the loop passes no state through them. A value that is not an estimator also answers `nothing`.
-
-# Algorithm
-
- 1. Answer `"cache"` when `est` has a `cache` field that is not `nothing`.
- 2. Walk every field of `est` in order, and find the path in each field with this function.
- 3. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them, or `nothing` when no field gives one.
-
-# Arguments
-
-  - `est`: The estimator, or any value a field holds.
-  - `v`: A vector that a field holds.
-  - `p`: A Pair that a vector holds, such as a member of a factor list.
-
-# Returns
-
-  - `path::Option{<:String}`: The path of the first state found, or `nothing`.
-
-# Related
-
-  - [`estimator_fields`](@ref)
-  - [`element_path`](@ref)
-  - [`online_wrapper_path`](@ref)
-  - [`update_online_estimator`](@ref)
-  - [`partial_fit_cache`](@ref)
-  - [`AbstractPartialFitState`](@ref)
-"""
-function online_entry_state(est::Union{<:AbstractEstimator,
-                                       <:StatsBase.CovarianceEstimator})
-    if hasfield(typeof(est), :cache) && !isnothing(getfield(est, :cache))
-        return "cache"
-    end
-    for f in fieldnames(typeof(est))
-        path = online_entry_state(getfield(est, f))
-        if !isnothing(path)
-            return tree_path(f, path)
-        end
-    end
-    return nothing
-end
-function online_entry_state(::Any)
-    return nothing
-end
-
-export Online

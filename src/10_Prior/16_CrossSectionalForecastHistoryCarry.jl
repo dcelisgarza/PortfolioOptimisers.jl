@@ -701,3 +701,32 @@ function cross_sectional_carry_outputs(pe::CrossSectionalFactorPrior,
     st = cross_sectional_carry_history(pe, st, stepped)
     return cross_sectional_carry_standardised(pe, st, stepped)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the returns data that the Return Forecast of the carry fold of a Cross-Sectional Factor Prior reads at the call with no data.
+
+The batch fit gives the forecast the returns data that the estimated members read: the returns with the benchmark weights on the panel, and under observed factors the returns net of them. A forecast that reads the panel at the call with no data makes the state carry every row, so the carried rows and their derived series give that returns data, through [`cross_sectional_forecast_window`](@ref). Any other forecast reads no row, and gets the carried rows.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `st`: The state of its carry fold.
+
+# Returns
+
+  - `rd::ReturnsResult`: The returns data of the forecast.
+
+# Related
+
+  - [`cross_sectional_forecast_reads_panel`](@ref)
+  - [`cross_sectional_benchmark_stage`](@ref)
+  - [`cross_sectional_exposure_series`](@ref)
+"""
+function cross_sectional_carry_forecast_returns(pe::CrossSectionalFactorPrior,
+                                                st::CrossSectionalCarryState)
+    if !cross_sectional_forecast_reads_panel(pe.rfe)
+        return st.win
+    end
+    return cross_sectional_forecast_window(pe, st.win, st.der)
+end

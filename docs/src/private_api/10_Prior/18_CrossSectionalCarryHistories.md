@@ -34,4 +34,5 @@ A step where a factor that was empty at every fitted observation comes alive kee
 ```@docs
 PortfolioOptimisers.cross_sectional_alive_folds
 PortfolioOptimisers.cross_sectional_step_factors
+PortfolioOptimisers.cross_sectional_carry_append
 ```

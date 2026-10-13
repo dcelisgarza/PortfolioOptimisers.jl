@@ -1134,6 +1134,49 @@ function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                                     ske = fold_member(pe.ske, X; kwargs...)))
 end
 """
+    fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,
+                    gaps::Option{<:AbstractVector{Bool}})
+
+Folds the observations of a [`ReturnsResult`](@ref) into a [`HighOrderPriorEstimator`](@ref), by forwarding `rd` and its marks to the prior that it embeds.
+
+This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prior that [`partial_fit!`](@ref) over a `ReturnsResult` takes. The outer prior keeps no rows. Its embedded prior keeps them, so the route of the embedded prior decides what the step honours: the estimation mask and the Panel Fields reach it unchanged, and it refuses what its route cannot honour. The estimator also folds `pe.kte` and `pe.ske` through [`fold_member`](@ref). Those folds are exact, and they take the active mask alone, which [`step_active_kwargs`](@ref) reads. They fold the observations that `gaps` does not mark, as the members of a carry do, see [`shared_series_member_rows`](@ref).
+
+# Algorithm
+
+ 1. Fold `pe.pe` with `rd` and `gaps` through [`fold_prior_step`](@ref).
+ 2. Take the unmarked rows of `rd.X` and of the active mask of `rd.pnl` with [`shared_series_member_rows`](@ref), and fold `pe.kte` and `pe.ske` with them through [`fold_member`](@ref).
+ 3. Rebuild the estimator with its folded members with `rebuild_estimator`, and return it.
+
+# Arguments
+
+  - `pe`: The high order prior estimator.
+  - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing`.
+
+# Validation
+
+  - Every condition that the fold of `pe.pe` over `rd` checks.
+
+# Returns
+
+  - `pe`: The estimator, with its members folded.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`fold_member`](@ref)
+  - [`step_active_kwargs`](@ref)
+  - [`shared_series_member_rows`](@ref)
+"""
+function fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,
+                         gaps::Option{<:AbstractVector{Bool}})
+    X, kw = shared_series_member_rows(rd.X, gaps; step_active_kwargs(rd.pnl)...)
+    return rebuild_estimator(pe,
+                             (; pe = fold_prior_step(pe.pe, rd, gaps),
+                              kte = fold_member(pe.kte, X; kw...),
+                              ske = fold_member(pe.ske, X; kw...)))
+end
+"""
     prior(pe::HighOrderPriorEstimator; kwargs...)
 
 Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
@@ -1161,7 +1204,7 @@ The equality holds for the embedded result and for every co-moment, the ones tha
 # Algorithm
 
  1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
- 2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref) and [`sample_buffer`](@ref), giving `X`.
+ 2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref), drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), as the embedded prior and the members that fold drop them, and read the rows that remain with [`sample_buffer`](@ref), giving `X`.
  3. Rebuild the Asset Panel of the rows from the same buffer with [`buffer_asset_panel`](@ref), giving `pnl`, as the batch method gives `rd.pnl` to both co-moments.
  4. Read `kt` out of `pe.kte` through [`read_comoment`](@ref) under `pr.w`. It refits the member over `X` and `pnl` where it did not fold, and under `pr.w` where `pr.w` is not `nothing`.
  5. Read `sk` and `V` out of `pe.ske` through [`read_comoment`](@ref), on the same terms.
@@ -1191,10 +1234,11 @@ The equality holds for the embedded result and for every co-moment, the ones tha
   - [`prior_returns_buffer`](@ref)
   - [`buffer_asset_panel`](@ref)
   - [`partial_fit!`](@ref)
+  - [`shared_series_buffer`](@ref)
 """
 function prior(pe::HighOrderPriorEstimator; kwargs...)
     pr = prior(pe.pe; kwargs...)
-    buf = prior_returns_buffer(pe.pe)
+    buf = shared_series_buffer(prior_returns_buffer(pe.pe))
     X = sample_buffer(buf)
     pnl = buffer_asset_panel(buf)
     kt = read_comoment(cokurtosis, pe.kte, pr.w, X, pnl; kwargs...)

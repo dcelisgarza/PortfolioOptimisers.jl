@@ -478,7 +478,7 @@ end
 
 Read the location of a prior out of the state that its estimator carries, by the type of the state.
 
-This is the data-less arm of [`prior_forecast_location`](@ref), and it takes the routes that the data-less [`prior`](@ref) takes:
+This is the data-less arm of [`prior_forecast_location`](@ref), and it takes the routes that the data-less [`prior`](@ref) takes. Each route reads the rows of [`shared_series_buffer`](@ref), which drops the observations of a Shared Series gap, as the data-less [`prior`](@ref) does:
 
   - A [`SampleBufferState`](@ref) is a refit, so the method answers the data form over the rows, the factor rows and the masks of the buffer.
   - The [`PriorCarryState`](@ref) of an [`EmpiricalPrior`](@ref) answers the location of `ce`. A `ce` that folds answers [`forecast_location`](@ref) of its state. A `ce` that does not fold answers the data form over the carried rows, as [`read_member`](@ref) refits it. The horizon arm reads the log-returns of the rows, and maps the location as the data form does.
@@ -507,18 +507,21 @@ function prior_state_location(::AbstractPriorEstimator, pr::AbstractPriorResult,
 end
 function prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
                               state::SampleBufferState; kwargs...)
+    state = shared_series_buffer(state)
     return prior_forecast_location(pe, pr, sample_buffer(state), factor_buffer(state),
                                    nothing; sample_buffer_kwargs(state)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, Nothing},
                               ::AbstractPriorResult, state::PriorCarryState; kwargs...)
-    return carried_location(pe.ce, sample_buffer(state), buffer_asset_panel(state.buf);
-                            implied_volatility_buffer_kwargs(state.buf)..., kwargs...)
+    buf = shared_series_buffer(state.buf)
+    return carried_location(pe.ce, sample_buffer(buf), buffer_asset_panel(buf);
+                            implied_volatility_buffer_kwargs(buf)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, <:Number},
                               pr::AbstractPriorResult, state::PriorCarryState; kwargs...)
-    c = carried_location(pe.ce, log1p.(sample_buffer(state)), buffer_asset_panel(state.buf);
-                         implied_volatility_buffer_kwargs(state.buf)..., kwargs...)
+    buf = shared_series_buffer(state.buf)
+    c = carried_location(pe.ce, log1p.(sample_buffer(buf)), buffer_asset_panel(buf);
+                         implied_volatility_buffer_kwargs(buf)..., kwargs...)
     return horizon_location(c, pr, pe.horizon)
 end
 """

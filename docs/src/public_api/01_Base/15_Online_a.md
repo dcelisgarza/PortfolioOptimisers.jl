@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online (a), public API of PortfolioOptimisers.jl: Online, partial_fit!, port_opt_view, merge_states."
+Description = "Online (a), public API of PortfolioOptimisers.jl: partial_fit!, port_opt_view, merge_states."
 ```
 
 # Online (a)
@@ -9,7 +9,6 @@ Some estimators have no exact incremental fit. Such an estimator stores the obse
 [`PortfolioOptimisers.update_online_estimator`](@ref) replaces each `Online` with the estimator it wraps, which now carries an empty buffer. It runs once, before the first block of observations, so no `Online` remains in the estimator that you update. The buffer also stores the per-observation masks of a [`CoveragePolicy`](@ref) and the factor returns of a factor prior next to the asset returns. The first block of observations fixes which of them the buffer stores. A prior holds its rows in one buffer, and every member of the prior that has no incremental fit refits from those rows.
 
 ```@docs
-Online
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, X::PortfolioOptimisers.MatNum, F::PortfolioOptimisers.Option{<:PortfolioOptimisers.MatNum} = nothing; dims::Int = 1)
 PortfolioOptimisers.partial_fit!(state::PortfolioOptimisers.SampleBufferState, x::PortfolioOptimisers.VecNum, f::PortfolioOptimisers.Option{<:PortfolioOptimisers.VecNum} = nothing)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.SampleBufferState, i, args...)

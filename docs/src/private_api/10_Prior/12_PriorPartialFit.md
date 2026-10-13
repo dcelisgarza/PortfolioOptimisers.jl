@@ -20,7 +20,7 @@ PortfolioOptimisers.reads_panel_fields
 PortfolioOptimisers.reads_exogenous_series
 PortfolioOptimisers.assert_factor_returns
 PortfolioOptimisers.assert_prior_fold_returns
-PortfolioOptimisers.refit_prior_step
+PortfolioOptimisers.fold_prior_step(pe::PortfolioOptimisers.AbstractPriorEstimator, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 PortfolioOptimisers.refit_prior_fold
 PortfolioOptimisers.pin_prior_choice
 PortfolioOptimisers.pending_choice
@@ -30,6 +30,7 @@ PortfolioOptimisers.step_panel_fields
 PortfolioOptimisers.fold_factor_argument
 PortfolioOptimisers.fold_member
 PortfolioOptimisers.read_member
+PortfolioOptimisers.fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.PriorCarryState}}, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 PortfolioOptimisers.assert_carry_step_panel
 PortfolioOptimisers.step_active_kwargs
 PortfolioOptimisers.update_online_estimator(pe::Union{<:HighOrderPriorEstimator, <:BlackLittermanPrior})

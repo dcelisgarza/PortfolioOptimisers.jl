@@ -697,17 +697,18 @@ end
     returns_tracking_path(v::AbstractVector)
     returns_tracking_path(p::Pair)
     returns_tracking_path(td::TimeDependent)
+    returns_tracking_path(::AbstractPartialFitState)
     returns_tracking_path(::Any)
 
 Names the first field of an estimator tree that holds a [`ReturnsTracking`](@ref), or answers `nothing`.
 
-A returns series is fixed at construction, and it aligns only with the rows of one batch fit. The online step of an optimiser, a batch cross-validation with more than one fold ([`assert_folds_track_no_series`](@ref)), and the two row readers of an online portfolio selection head, the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref), use this walk to refuse it. The walk reads every field of an estimator, of a Result and of an algorithm, because a [`TrackingError`](@ref) is a Result, a [`TrackingRiskMeasure`](@ref) is an estimator, and a [`ProgrammeAllocationSet`](@ref) is an algorithm that holds tracking errors. A vector answers with the index of its element in brackets, and a Pair answers through its value, as [`element_path`](@ref) joins them. A series at the root answers `""`, the empty path. A numeric array and every other value answer `nothing`.
+A returns series is fixed at construction, and it aligns only with the rows of one batch fit. The online step of an optimiser, a batch cross-validation with more than one fold ([`assert_folds_track_no_series`](@ref)), and the two row readers of an online portfolio selection head, the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref), use this walk to refuse it. The walk reads every field of an estimator, of a Result and of an algorithm, because a [`TrackingError`](@ref) is a Result, a [`TrackingRiskMeasure`](@ref) is an estimator, and a [`ProgrammeAllocationSet`](@ref) is an algorithm that holds tracking errors. A vector answers with the index of its element in brackets, and a Pair answers through its value, as [`element_path`](@ref) joins them. A series at the root answers `""`, the empty path. A numeric array and every other value answer `nothing`. A partial-fit state answers `nothing` without a walk: it holds observations and folded copies of the members of its estimator, and never a configuration that a caller writes, and the walk already reads each member through the estimator. The online step of an optimiser calls the walk at every step, so a walk into the buffers would cost one dispatch for each of their fields at each step.
 
 A [`TimeDependent`](@ref) schedule answers through its `default` only. Entry `i` of the schedule is the value of fold `i` alone, so the caller can give each fold a series of its own rows. The `default` is one value that every solve with no fold reads, so it can misalign as a field can.
 
 # Algorithm
 
- 1. Answer `""` when `est` is a [`ReturnsTracking`](@ref).
+ 1. Answer `""` when `est` is a [`ReturnsTracking`](@ref), and `nothing` when it is an [`AbstractPartialFitState`](@ref).
  2. When `est` is a [`TimeDependent`](@ref), answer the path in its `default`, after the name `default`.
  3. Walk every field of `est` in order, and find the path in each field with this function.
  4. Answer the first path found, with the field name before it, as [`tree_path`](@ref) joins them.
@@ -745,6 +746,9 @@ function returns_tracking_path(est::Union{<:AbstractEstimator, <:AbstractResult,
 end
 function returns_tracking_path(::ReturnsTracking)
     return ""
+end
+function returns_tracking_path(::AbstractPartialFitState)
+    return nothing
 end
 function returns_tracking_path(v::AbstractVector)
     return eltype(v) <: Number ? nothing : element_path(returns_tracking_path, v)

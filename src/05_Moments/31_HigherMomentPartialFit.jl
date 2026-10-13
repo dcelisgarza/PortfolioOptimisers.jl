@@ -491,7 +491,7 @@ The method builds a new state rather than writing into the arrays of the old one
 # Algorithm
 
  1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
- 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref).
+ 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref). Return the estimator unchanged when the block holds no observation, because the fold of an empty sample is the identity, and the mean of an empty block is `NaN`, which the merge would carry into every accumulator.
  3. Build the state of the block alone, with [`comoment_block`](@ref).
  4. Merge it into the state the estimator carries, unless the estimator carries none.
  5. Rebind `cache` with `Accessors.@reset`, and return the estimator.
@@ -547,6 +547,9 @@ function partial_fit!(ske::Coskewness{<:Any, <:Any, <:FullMoment, <:Any, Nothing
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(ske.me, ske.w, "Coskewness")
     X = inactive_as_nonfinite(dims_oriented(dims, X), dims_oriented(dims, active_mask))
+    if iszero(size(X, 1))
+        return ske
+    end
     n, mu, M2, M3, _ = comoment_block(X)
     state = CoskewnessPartialFitState(n, mu, M2, M3)
     if !isnothing(ske.cache)
@@ -655,7 +658,7 @@ The companion of the [`Coskewness`](@ref) method, carried one order further. The
 # Algorithm
 
  1. Refuse the configuration no incremental fit reproduces, with [`assert_partial_fittable`](@ref).
- 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref).
+ 2. Orient `X` to observations × assets with [`dims_oriented`](@ref), which validates `dims`, and write `NaN` in each cell that `active_mask` turns off with [`inactive_as_nonfinite`](@ref). Return the estimator unchanged when the block holds no observation, for the reason that the [`Coskewness`](@ref) method states.
  3. Build the state of the block alone, with [`comoment_block`](@ref), and square its pairwise deviation product for the fourth accumulator.
  4. Merge it into the state the estimator carries, unless the estimator carries none.
  5. Rebind `cache` with `Accessors.@reset`, and return the estimator.
@@ -709,6 +712,9 @@ function partial_fit!(kte::Cokurtosis{<:Any, <:Any, <:FullMoment, <:Any, Nothing
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing)
     assert_partial_fittable(kte.me, kte.w, "Cokurtosis")
     X = inactive_as_nonfinite(dims_oriented(dims, X), dims_oriented(dims, active_mask))
+    if iszero(size(X, 1))
+        return kte
+    end
     n, mu, M2, M3, z = comoment_block(X)
     state = CokurtosisPartialFitState(n, mu, M2, M3, transpose(z) * z)
     if !isnothing(kte.cache)

@@ -888,11 +888,11 @@ function shared_series_view(rd::ReturnsResult, brt::Bool, rf::Bool)::ReturnsResu
     return benchmark_estimation_mask(rd, brt)
 end
 """
-    assert_no_shared_gap(rd::ReturnsResult, brt::Bool, rf::Bool) -> Nothing
+    shared_series_gaps(rd::ReturnsResult, brt::Bool, rf::Bool) -> Option{BitVector}
 
-Refuse an online step over observations with a gap in a Shared Series.
+Mark the observations of `rd` that have a gap in a Shared Series that the fit reads, for an online step.
 
-A batch fit drops such an observation with [`shared_series_view`](@ref). An online step cannot drop it. An optimiser appends each observation to the buffer of its prior and to its Fold Context together, and `optimise(opt)` with no data rebuilds the returns data from both, row by row. A row that one of them skips misaligns the other. A carry fold also adds each observation to running moments, and a gap stays in them. So the step refuses the observation by name, before any buffer moves.
+A batch fit drops such an observation with [`shared_series_view`](@ref). An online step cannot drop the row. An optimiser appends each observation to the buffer of its prior and to its Fold Context together, and `optimise(opt)` with no data rebuilds the returns data from both, row by row. So the step keeps the row in both, and the prior marks it in its buffer, see [`SampleBufferState`](@ref). Every fit through the buffer then drops it with [`shared_series_buffer`](@ref), and a carry fold leaves it out of its running moments. The marks are the complement of the rows of [`shared_series_rows`](@ref).
 
 # Arguments
 
@@ -900,28 +900,60 @@ A batch fit drops such an observation with [`shared_series_view`](@ref). An onli
   - $(arg_dict[:brt_read])
   - `rf`: `true` when the fit reads the factor returns of `rd`.
 
-# Validation
-
-  - No observation of `rd` has a gap in a Shared Series that the fit reads. An [`IsNonFiniteError`](@ref) that names the observations is thrown otherwise.
-
 # Returns
 
-  - `nothing`.
+  - `gaps::Option{BitVector}`: One mark for each observation of `rd`, `true` at an observation with a gap, or `nothing` when no observation has one.
 
 # Related
 
-  - [`shared_series_view`](@ref)
   - [`shared_series_rows`](@ref)
+  - [`shared_series_view`](@ref)
+  - [`shared_series_buffer`](@ref)
 """
-function assert_no_shared_gap(rd::ReturnsResult, brt::Bool, rf::Bool)::Nothing
+function shared_series_gaps(rd::ReturnsResult, brt::Bool, rf::Bool)::Option{BitVector}
     rows = shared_series_rows(rd, brt, rf)
     if isnothing(rows)
         return nothing
     end
-    gaps = setdiff(1:shared_series_length(brt && isa(rd.B, VecNum) ? rd.B : nothing,
-                                          rf ? rd.F : nothing), rows)
-    throw(IsNonFiniteError("an online step cannot drop an observation, because the buffer of the prior and the Fold Context are appended to together, and the observation(s) $(first(gaps, 5)) of this step have a gap in a Shared Series, the vector benchmark under brt or the factor returns. A batch fit drops them. Fill the gap with PriceGapFill before the conversion to returns, or drop the observation before the step."))
-    return nothing
+    gaps = trues(size(rd.X, 1))
+    gaps[rows] .= false
+    return gaps
+end
+"""
+    shared_series_step(rd::ReturnsResult, gaps::Nothing) -> ReturnsResult
+    shared_series_step(rd::ReturnsResult, gaps::AbstractVector{Bool}) -> Option{ReturnsResult}
+
+Return the observations of an online step that a carry fold folds, with the observations that `gaps` marks dropped.
+
+A carry fold computes running moments or histories from each observation. A batch fit drops an observation with a Shared Series gap at its entry, so the carry must not see it, while the buffer beside it keeps the row, see [`shared_series_gaps`](@ref). [`port_opt_view`](@ref) cuts every field of `rd` at the same observations, as [`shared_series_view`](@ref) does.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No marks: return `rd`.
+ 2. Marks: return `nothing` when every observation is marked, and the view of `rd` at the unmarked observations otherwise.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing`.
+
+# Returns
+
+  - `rd::Option{ReturnsResult}`: The observations with no mark, or `nothing` when the step has none.
+
+# Related
+
+  - [`shared_series_gaps`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function shared_series_step(rd::ReturnsResult, ::Nothing)
+    return rd
+end
+function shared_series_step(rd::ReturnsResult, gaps::AbstractVector{Bool})
+    rows = findall(!, gaps)
+    return isempty(rows) ? nothing : port_opt_view(rd, rows, :)
 end
 """
     benchmark_estimation_mask(rd::ReturnsResult, brt::Bool) -> ReturnsResult

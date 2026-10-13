@@ -1012,4 +1012,36 @@ function factor_residual_config(pe::BlackLittermanPrior)
     return factor_residual_config(pe.pe)
 end
 
+"""
+    fold_prior_step(pe::BlackLittermanPrior, rd::ReturnsResult,
+                    gaps::Option{<:AbstractVector{Bool}})
+
+Folds the observations of a [`ReturnsResult`](@ref) into a [`BlackLittermanPrior`](@ref), by forwarding `rd` and its marks to the prior that it embeds.
+
+This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prior that [`partial_fit!`](@ref) over a `ReturnsResult` takes. The outer prior keeps no rows. Its embedded prior keeps them, so the route of the embedded prior decides what the step honours: the estimation mask and the Panel Fields reach it unchanged, and it refuses what its route cannot honour.
+
+# Arguments
+
+  - `pe`: The Black-Litterman prior estimator.
+  - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing`.
+
+# Validation
+
+  - Every condition that the fold of `pe.pe` over `rd` checks.
+
+# Returns
+
+  - `pe`: The estimator, with its embedded prior folded.
+
+# Related
+
+  - [`BlackLittermanPrior`](@ref)
+  - [`fold_prior_step`](@ref)
+"""
+function fold_prior_step(pe::BlackLittermanPrior, rd::ReturnsResult,
+                         gaps::Option{<:AbstractVector{Bool}})
+    return rebuild_estimator(pe, (; pe = fold_prior_step(pe.pe, rd, gaps)))
+end
+
 export BlackLittermanPrior

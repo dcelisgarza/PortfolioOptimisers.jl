@@ -1059,34 +1059,6 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return whether one asset carries a finite Factor Exposure to every factor at one observation.
-
-# Arguments
-
-  - `Ms`: The exposure history, `observations × assets × factors`.
-  - `t`: The observation.
-  - `i`: The asset.
-
-# Returns
-
-  - `ans::Bool`: Whether every exposure of the pair is finite.
-
-# Related
-
-  - [`cross_sectional_warmup`](@ref)
-  - [`cross_sectional_eligible`](@ref)
-"""
-function cross_sectional_exposures_finite(Ms::Arr3Num, t::Integer, i::Integer)::Bool
-    for k in axes(Ms, 3)
-        if !isfinite(Ms[t, i, k])
-            return false
-        end
-    end
-    return true
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Return the number of leading observations a Cross-Sectional Factor Prior discards.
 
 A Descriptor warms up, so the first observations of an exposure history carry no usable asset. An observation is cold when no asset of the estimation universe carries both a finite return and a finite Factor Exposure to every factor. The prior fits from the first observation that is not cold.
@@ -1455,10 +1427,11 @@ This is the step of a [`PinnedChoice`](@ref). It runs the steps of the fit that 
 # Algorithm
 
  1. Answer `nothing` when `pe.families` is `nothing`, or names the dropped member of every family. Nothing is left to pin.
- 2. Answer `nothing` when the buffer records no Asset Panel. The call with no data refuses that buffer, so no fit is made.
- 3. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer, with the Exogenous Series that the buffer records. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
- 4. Neutralise the exposures after the warm-up with [`cross_sectional_neutralise!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
- 5. Name the dropped member of each family in the order of `pe.families`.
+ 2. Answer `nothing` when every observation of the buffer has a Shared Series gap, because the fit keeps none, which [`buffer_fits_none`](@ref) answers. Otherwise drop the observations with a gap with [`shared_series_buffer`](@ref), as the call with no data drops them.
+ 3. Answer `nothing` when the buffer records no Asset Panel. The call with no data refuses that buffer, so no fit is made.
+ 4. Run [`cross_sectional_exposure_stage`](@ref) over the rows of the buffer, with the Exogenous Series that the buffer records. Answer `nothing` when fewer than `pe.lag + 2` rows remain after the Descriptor warm-up, because the fit refuses them, so no first fit is made yet.
+ 5. Neutralise the exposures after the warm-up with [`cross_sectional_neutralise!`](@ref), and build the Factor Family Basis with [`factor_family_basis`](@ref).
+ 6. Name the dropped member of each family in the order of `pe.families`.
 
 # Arguments
 
@@ -1483,6 +1456,10 @@ function cross_sectional_pinned_families(pe::CrossSectionalFactorPrior)
         return nothing
     end
     state = pe.cache
+    if buffer_fits_none(state)
+        return nothing
+    end
+    state = shared_series_buffer(state)
     pnl = sample_buffer_panel(state)
     if isnothing(pnl)
         return nothing
