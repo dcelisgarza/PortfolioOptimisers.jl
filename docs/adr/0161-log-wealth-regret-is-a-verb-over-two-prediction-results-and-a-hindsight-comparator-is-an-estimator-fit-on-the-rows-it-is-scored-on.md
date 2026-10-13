@@ -195,5 +195,7 @@ benchmark. The benchmark holds no weights, so `path_length` is `NaN`. It pays no
 regret against it is the negated excess log wealth of the strategy net of its fees. Both methods
 form the result through one helper, `series_regret`, so they cannot drift.
 
-The decision "No scorer and no summary column ship" holds. Whether the scoring of a search reads
-the benchmark is a separate question, which #1664 puts to the maintainer.
+The decision "No scorer and no summary column ship" holds. The maintainer chose to take scorers
+against the benchmark (the excess log wealth, the information ratio and the tracking error out of
+sample) to a later enhancement, #1686. The summary of a prediction now reads the same benchmark
+by default (ADR 0165, amendment of 2026-10-13).

@@ -195,11 +195,11 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                                     rd = po.PredictionReturnsResult(; nx = ["P"], X = r,
                                                                     B = B, ts = ts))
         end
-        # Every field of the two results agrees, the `NaN` path length included.
-        function same_regret(x, y)
+        # Every field of the two results agrees, a `NaN` included.
+        function same_fields(x, y)
             return all(f -> isequal(getproperty(x, f), getproperty(y, f)) ||
                             isapprox(getproperty(x, f), getproperty(y, f)),
-                       fieldnames(LogWealthRegretResult))
+                       fieldnames(typeof(x)))
         end
         # The comparator built by hand: a one-asset returns data whose one column is the
         # benchmark series, fit and predicted over the same rows.
@@ -211,20 +211,20 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         b = [0.025, 0.0, 0.03]
         tsh = Date(2024, 1, 1) .+ Day.(0:2)
         reg = log_wealth_regret(bench_prediction(a, b, tsh))
-        @test same_regret(reg,
+        @test same_fields(reg,
                           log_wealth_regret(bare_prediction(a, tsh),
                                             bare_prediction(b, tsh)))
         @test isnan(reg.path_length)
-        @test same_regret(log_wealth_regret(bench_prediction(a, b, tsh); lags = 1),
+        @test same_fields(log_wealth_regret(bench_prediction(a, b, tsh); lags = 1),
                           log_wealth_regret(bare_prediction(a, tsh),
                                             bare_prediction(b, tsh); lags = 1))
         # A population reads its first path and its first benchmark series.
-        @test same_regret(log_wealth_regret(bench_prediction([a, b], [b, a], tsh)), reg)
+        @test same_fields(log_wealth_regret(bench_prediction([a, b], [b, a], tsh)), reg)
         # A multi-period result stacks the benchmark series of its folds.
         mp = MultiPeriodPredictionResult(;
                                          pred = [bench_prediction(a[1:2], b[1:2], tsh[1:2]),
                                                  bench_prediction(a[3:3], b[3:3], tsh[3:3])])
-        @test same_regret(log_wealth_regret(mp), reg)
+        @test same_fields(log_wealth_regret(mp), reg)
         # No benchmark, no comparator; the checks on the lags and the returns still hold.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, tsh))
         @test_throws DomainError log_wealth_regret(bench_prediction(a, b, tsh); lags = 3)
@@ -240,23 +240,52 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         tst = ts[21:T]
         cv = IndexWalkForward(20, 1)
         ewv = cross_val_predict(EqualWeighted(), rdv, cv)
-        @test same_regret(log_wealth_regret(ewv),
+        @test same_fields(log_wealth_regret(ewv),
                           log_wealth_regret(ewv, hand_comparator(Bv[21:T], tst)))
         ewm = cross_val_predict(EqualWeighted(), rdm, cv)
-        @test same_regret(log_wealth_regret(ewm),
+        @test same_fields(log_wealth_regret(ewm),
                           log_wealth_regret(ewm,
                                             hand_comparator(Bm[21:T, :] * fill(1 / N, N),
                                                             tst)))
         ocv = OnlineIndexWalkForward(20, 1)
         ops = po.OnlinePortfolioSelection(; alg = ExponentiatedGradient())
         ov = cross_val_predict(ops, rdv, ocv)
-        @test same_regret(log_wealth_regret(ov),
+        @test same_fields(log_wealth_regret(ov),
                           log_wealth_regret(ov, hand_comparator(Bv[21:T], tst)))
         om = cross_val_predict(ops, rdm, ocv)
         # The head moves its weights at every fold, so the series is collapsed fold by fold.
         bom = [dot(Bm[20 + i, :], p.res.w) for (i, p) in enumerate(om.pred)]
-        @test same_regret(log_wealth_regret(om),
+        @test same_fields(log_wealth_regret(om),
                           log_wealth_regret(om, hand_comparator(bom, tst)))
+
+        # The summary of a prediction reads the same benchmark when no keyword is given,
+        # and `benchmark = nothing` turns the three excess statistics off.
+        for (p, bser) in
+            ((ewv, Bv[21:T]), (ewm, Bm[21:T, :] * fill(1 / N, N)), (ov, Bv[21:T]),
+             (om, bom))
+            ps = performance_summary(p; ppy = 252)
+            @test same_fields(ps, performance_summary(p; ppy = 252, benchmark = bser))
+            @test isfinite(ps.excess_ret) &&
+                  isfinite(ps.tracking_error) &&
+                  isfinite(ps.information_ratio)
+            off = performance_summary(p; ppy = 252, benchmark = nothing)
+            @test isnan(off.excess_ret) &&
+                  isnan(off.tracking_error) &&
+                  isnan(off.information_ratio)
+            for f in
+                (:ann_return, :ann_volatility, :sharpe, :sharpe_stderr, :sortino, :calmar,
+                 :max_drawdown, :cvar, :n_periods, :turnover)
+                @test isequal(getproperty(off, f), getproperty(ps, f))
+            end
+        end
+        # A population reads its first benchmark series, and returns data with no
+        # benchmark give the three as `NaN`, as before.
+        @test same_fields(performance_summary(bench_prediction([a, b], [b, a], tsh)),
+                          performance_summary(a; benchmark = b))
+        ew = performance_summary(cross_val_predict(EqualWeighted(), rd, cv))
+        @test isnan(ew.excess_ret) &&
+              isnan(ew.tracking_error) &&
+              isnan(ew.information_ratio)
     end
 end
 

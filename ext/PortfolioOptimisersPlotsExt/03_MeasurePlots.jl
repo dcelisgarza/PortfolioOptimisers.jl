@@ -187,14 +187,24 @@ end
 # validate it, and renders it through the method above; the four summary keywords go to the
 # summary and the rest to the bars.
 function PortfolioOptimisers.plot_performance_summary(x::Union{<:ArrNum,
-                                                               <:OptimisationResult,
-                                                               <:PortfolioOptimisers.PredRes_MultiPredRes},
+                                                               <:OptimisationResult},
                                                       args...; ppy::Number = 1,
                                                       alpha::Number = 0.05,
                                                       compound::Bool = false,
                                                       benchmark::Option{<:VecNum} = nothing,
                                                       kwargs...)
     ps = performance_summary(x, args...; ppy = ppy, alpha = alpha, compound = compound,
+                             benchmark = benchmark)
+    return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
+end
+# A prediction defaults its benchmark to the `B` of its rows, as its `performance_summary`
+# method does (#1664), so the plot and the summary of one prediction agree.
+function PortfolioOptimisers.plot_performance_summary(pred::PortfolioOptimisers.PredRes_MultiPredRes;
+                                                      ppy::Number = 1, alpha::Number = 0.05,
+                                                      compound::Bool = false,
+                                                      benchmark::Option{<:VecNum} = PortfolioOptimisers.regret_benchmark(pred),
+                                                      kwargs...)
+    ps = performance_summary(pred; ppy = ppy, alpha = alpha, compound = compound,
                              benchmark = benchmark)
     return PortfolioOptimisers.plot_performance_summary(ps; kwargs...)
 end

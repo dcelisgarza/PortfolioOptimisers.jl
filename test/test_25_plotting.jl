@@ -384,6 +384,20 @@
                   (ps_b.excess_ret, ps_b.tracking_error, ps_b.information_ratio,
                    ps_b.turnover))
         @test is_plot(plot_performance_summary(ps_b))
+        # A prediction over returns data with a benchmark draws the three excess bars with
+        # no keyword, as its summary reads them, and `benchmark = nothing` empties them
+        # again (#1664).
+        rd_b = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nb = ["M"],
+                             B = fill(0.001, size(rd.X, 1)))
+        pred_b = cross_val_predict(EqualWeighted(), rd_b, IndexWalkForward(80, 40))
+        ps_d = performance_summary(pred_b)
+        @test all(isfinite, (ps_d.excess_ret, ps_d.tracking_error, ps_d.information_ratio))
+        @test isequal(plot_performance_summary(pred_b).series_list[1][:y],
+                      plot_performance_summary(ps_d).series_list[1][:y])
+        ps_n = performance_summary(pred_b; benchmark = nothing)
+        @test isnan(ps_n.excess_ret)
+        @test isequal(plot_performance_summary(pred_b; benchmark = nothing).series_list[1][:y],
+                      plot_performance_summary(ps_n).series_list[1][:y])
     end
 
     @testset "plot_rolling_drawdowns" begin

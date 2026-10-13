@@ -1224,7 +1224,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The headline performance statistics of a realised return series.
 
-`PerformanceSummaryResult` is what [`performance_summary`](@ref) returns. It carries the eleven numbers [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, and the four inputs that produced them, so a summary can be tabulated, compared across runs, asserted on in a test, or fed to a search without a plotting package installed. The last four numbers read inputs a bare return series does not carry, and each is `NaN` when its input is absent: the three excess statistics need a `benchmark` series, and the turnover needs the weight path of a multi-period prediction result.
+`PerformanceSummaryResult` is what [`performance_summary`](@ref) returns. It carries the eleven numbers [`plot_performance_summary`](@ref) draws, the standard error of the Sharpe ratio, and the four inputs that produced them, so a summary can be tabulated, compared across runs, asserted on in a test, or fed to a search without a plotting package installed. The last four numbers read inputs a bare return series does not carry, and each is `NaN` when its input is absent: the three excess statistics need a `benchmark` series, which a prediction result reads off its own rows when the returns data carried a `B`, and the turnover needs the weight path of a multi-period prediction result.
 
 # Sign convention
 
@@ -1330,13 +1330,15 @@ end
                         kwargs...) -> PerformanceSummaryResult
     performance_summary(res::OptimisationResult, rd::ReturnsResult;
                         kwargs...) -> PerformanceSummaryResult
-    performance_summary(pred::PredRes_MultiPredRes; kwargs...) -> PerformanceSummaryResult
+    performance_summary(pred::PredRes_MultiPredRes;
+                        benchmark::Option{<:VecNum} = regret_benchmark(pred),
+                        kwargs...) -> PerformanceSummaryResult
 
 Summarise a realised return series as a [`PerformanceSummaryResult`](@ref).
 
 The weight-and-returns methods net the returns through [`calc_net_returns`](@ref) first, so a summary of a portfolio accounts for its fees.
 
-Every method takes a `benchmark`, a second return series over the same periods, and answers the three excess statistics against it. Without one the three are `NaN`. The prediction-result method also answers the **turnover** of the held path, the mean trade at a rebalance of a multi-period result; at `test_size = 1` a rebalance is a period. A bare series, a single fold and a one-fold result record no rebalance, so their turnover is `NaN`.
+Every method takes a `benchmark`, a second return series over the same periods, and answers the three excess statistics against it. Without one the three are `NaN`. The prediction-result method defaults `benchmark` to the benchmark of the rows it was scored on, which [`regret_benchmark`](@ref) reads, so a prediction over returns data with a `B` answers the three without a keyword, and `benchmark = nothing` turns them off. A benchmark matrix was collapsed by each fold's weights, as [`collapse_benchmark`](@ref) states, so against it `excess_ret` is the return of ``(\\boldsymbol{X} - \\boldsymbol{B}) \\boldsymbol{w}``, the active return against the same weights held in the benchmark assets, and not the excess over one index. The other methods hold no prediction, and read no `B`. The prediction-result method also answers the **turnover** of the held path, the mean trade at a rebalance of a multi-period result; at `test_size = 1` a rebalance is a period. A bare series, a single fold and a one-fold result record no rebalance, so their turnover is `NaN`.
 
 **The Precomputed-returns contract: the series `ret` must be finite.** No method takes a finiteness check, because every internal caller hands one a finite series: the prediction methods read the fold's own output of [`calc_net_returns`](@ref), and a scan on a long series would be paid by all of them. One non-finite entry makes the mean, the volatility and every ratio non-finite, and the tail figure answers a **finite wrong number** rather than a `NaN`, because `partialsort` orders a `NaN` after every real. A caller who holds a gapped series drops the gaps first with `x[isfinite.(x)]`, and a caller who holds a gapped panel scores it through [`predict(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult)`](@ref) instead, which filters the Held Gaps once.
 
@@ -1401,7 +1403,7 @@ The expression corrects for the third and fourth moments and **not** for serial 
 
 # Algorithm
 
-Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, and reads the turnover of its held path.
+Every method reduces to [`summarise_returns`](@ref), which runs the steps. A method that takes weights nets the returns through [`calc_net_returns`](@ref) first, and the method that takes a prediction result takes the first series when it carries several, defaults the benchmark to the first series of its own `B`, and reads the turnover of its held path.
 
  1. Check `alpha` and `ppy`, as `# Validation` states.
  2. Take `T`, the number of periods, and `m` and `s`, the sample mean and the corrected sample standard deviation of `ret` about `m`. Clamp the mean to the least and the greatest entry of `ret`. The clamp moves nothing in exact arithmetic. The rounded mean of a constant `ret` can differ from its common value, and the clamp makes `m` equal that value, so `s` is exactly zero.
@@ -1426,7 +1428,7 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
   - $(arg_dict[:ps_ppy]) It defaults to `1`, which reports the statistics per period at any frequency of the data.
   - $(arg_dict[:ps_alpha])
   - $(arg_dict[:ps_compound])
-  - `benchmark`: Benchmark return series over the same periods as `ret`, or `nothing` for no excess statistics.
+  - `benchmark`: Benchmark return series over the same periods as `ret`, or `nothing` for no excess statistics. It defaults to `nothing`, and on a prediction result to the benchmark of its rows.
 
 # Validation
 
@@ -1644,9 +1646,11 @@ function performance_summary(res::OptimisationResult, rd::ReturnsResult;
     return performance_summary(w, X, fees; kwargs...)
 end
 function performance_summary(pred::PredRes_MultiPredRes;
+                             benchmark::Option{<:VecNum} = regret_benchmark(pred),
                              kwargs...)::PerformanceSummaryResult
     ret, _ = regret_series(pred)
-    return summarise_returns(ret, held_path_turnover(pred); kwargs...)
+    return summarise_returns(ret, held_path_turnover(pred); benchmark = benchmark,
+                             kwargs...)
 end
 
 export expected_return, expected_ratio, expected_risk_ret_ratio, expected_sric,

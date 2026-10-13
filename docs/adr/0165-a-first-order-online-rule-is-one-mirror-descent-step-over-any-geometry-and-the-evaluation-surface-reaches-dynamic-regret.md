@@ -435,3 +435,22 @@ uniform start holds for one period only under equal price relatives.
   papers are cited by author and year.
 - Issues [#1170](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1170) and
   [#1169](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1169).
+
+## Amendment (2026-10-13)
+
+Issue #1664: the method of `performance_summary` that takes a prediction result defaults
+`benchmark` to the benchmark of the rows the prediction was scored on, `regret_benchmark(pred)`.
+Each fold keeps that series in `pred.rd.B`, and a multi-period result stacks it in `mrd.B`. A
+vector `B` is used as it was given. A matrix `B` was collapsed by each fold's weights, so against
+it `excess_ret` is the return of `(X - B) * w`: the active return against the same weights held
+in the benchmark assets, not the excess over one index. A population reads its first series, as
+the summary reads its first path.
+
+So a prediction over returns data with a `B` answers `excess_ret`, `tracking_error` and
+`information_ratio` with no keyword. Before this amendment the three were `NaN` there. An explicit
+`benchmark` still wins, and `benchmark = nothing` gives the three as `NaN`, as before. Returns data
+with no `B` give `NaN`, as before. The other eight statistics and the turnover do not change.
+
+Only the prediction method reads `B`. The methods over `ret`, over `(w, X)`, over `(w, rd)` and
+over `(res, rd)` keep the default `nothing`: a matrix `B` on raw returns data is one series only
+once a caller gives the weights, and the maintainer chose to keep these methods as they are.
