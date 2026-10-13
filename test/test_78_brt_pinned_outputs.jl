@@ -14,6 +14,13 @@ Some outputs do not read the frame, and their pins record them as they are: the 
 meta head (its `brt` reaches only its own prior and clustering), SPOLC and OLDEM under a vector
 benchmark, and the two scores of #1664, which read the benchmark of a prediction directly.
 
+A graph reader reads `rd.X` by default since #1689, before the migration. A case whose key
+starts with "the default x_src: " spells no source, and compares to the pin of its twin with
+`x_src = :data`. Under a `FactorPrior` the twin with `x_src = :prior` differs, so these cases
+hold the default of a migration to `rd.X`. No pin moved in #1689: every other case at the
+default reads an `EmpiricalPrior`, whose `X` equals the excess data. #1689 added the pins of a
+`ProgrammeAllocationSet` with graph slots under a `FactorPrior`, which read the new default.
+
 Not pinned: the refusals (no benchmark, a data benchmark under `brt`, a frame mismatch in a
 Pipeline), which the decision tickets of the map can change.
 =#
@@ -128,6 +135,12 @@ Pipeline), which the decision tickets of the map can change.
                                                      ple = SemiDefinitePhylogenyEstimator(),
                                                      cte = CentralityConstraint())), r))
         end
+        case!("the default x_src: MeanRisk, phylogeny and centrality constraints, FactorPrior, x_src = :data, $b",
+              :solved,
+              () -> w(MeanRisk(;
+                               opt = excess_jump(; pe = FactorPrior(),
+                                                 ple = SemiDefinitePhylogenyEstimator(),
+                                                 cte = CentralityConstraint())), r))
         case!("RiskBudgeting, $b", :solved,
               () -> w(RiskBudgeting(; opt = excess_jump()), r))
         case!("RiskBudgeting, factor risk budgeting, $b", :solved,
@@ -171,6 +184,17 @@ Pipeline), which the decision tickets of the map can change.
             case!("HierarchicalEqualRiskContribution, $pn, x_src = :$xs, $b", :exact,
                   () -> w(HierarchicalEqualRiskContribution(; opt = ho()), r))
         end
+        hd() = excess_hierarchical(; pe = FactorPrior())
+        case!("the default x_src: HierarchicalRiskParity, FactorPrior, x_src = :data, $b",
+              :exact, () -> w(HierarchicalRiskParity(; opt = hd()), r))
+        case!("the default x_src: SchurComplementHierarchicalRiskParity, FactorPrior, x_src = :data, $b",
+              :exact,
+              () -> w(SchurComplementHierarchicalRiskParity(; opt = hd(),
+                                                            params = SchurComplementParams(;
+                                                                                           gamma = 0.5)),
+                      r))
+        case!("the default x_src: HierarchicalEqualRiskContribution, FactorPrior, x_src = :data, $b",
+              :exact, () -> w(HierarchicalEqualRiskContribution(; opt = hd()), r))
         case!("InverseVolatility, $b", :exact, () -> w(excess_inverse_volatility(), r))
 
         # The meta heads. Their own `brt` changes their own prior and clustering, and no
@@ -327,6 +351,17 @@ Pipeline), which the decision tickets of the map can change.
               () -> quiet(() -> optimise(OnlinePortfolioSelection(;
                                                                   alg = PassiveAggressiveMeanReversion(),
                                                                   set = vset()), r).w))
+        # The graph slots of a set read the rows of the step at the default (#1689), as the
+        # same slots of a JuMP head do. Under its `FactorPrior` the rows differ from `pr.X`.
+        gset() = excess_programme_set(; pe = FactorPrior(),
+                                      wb = WeightBounds(; lb = 0.0, ub = 0.4),
+                                      ple = SemiDefinitePhylogenyEstimator(),
+                                      cte = CentralityConstraint())
+        case!("ProgrammeAllocationSet, phylogeny and centrality constraints, FactorPrior, $b",
+              :solved,
+              () -> quiet(() -> optimise(OnlinePortfolioSelection(;
+                                                                  alg = ExponentiatedGradient(),
+                                                                  set = gset()), r).w))
     end
 
     # The cross-sectional factor prior reads Descriptors, so it fits on the synthetic Asset
@@ -377,6 +412,10 @@ Pipeline), which the decision tickets of the map can change.
           () -> w(HierarchicalRiskParity(;
                                          opt = excess_hierarchical(; pe = FactorPrior(),
                                                                    x_src = :data)), rdvg))
+    case!("the default x_src: a vector benchmark gap, HierarchicalRiskParity, FactorPrior, x_src = :data",
+          :exact,
+          () -> w(HierarchicalRiskParity(; opt = excess_hierarchical(; pe = FactorPrior())),
+                  rdvg))
     case!("a vector benchmark gap, MeanRisk, a centrality constraint, x_src = :data",
           :solved,
           () -> w(MeanRisk(;
@@ -730,6 +769,10 @@ Pipeline), which the decision tickets of the map can change.
                                              [2.094365003e-13, 2.059264098e-13,
                                               0.2265169425, 3.782446104e-13, 0.7734830575,
                                               8.007670099e-13],
+                                         "ProgrammeAllocationSet, phylogeny and centrality constraints, FactorPrior, vector B" =>
+                                             [0.3857172058, 3.197206944e-12,
+                                              3.069346349e-12, 0.2291650155,
+                                              9.300215467e-12, 0.3851177787],
                                          "MeanRisk, matrix B" =>
                                              [0.3454040729, 4.36098608e-9, 5.205926575e-9,
                                               0.05423798722, 0.3819628689, 0.2183950614],
@@ -1048,6 +1091,10 @@ Pipeline), which the decision tickets of the map can change.
                                              [3.556735054e-12, 3.738607992e-12, 0.156935427,
                                               7.438787603e-12, 0.843064573,
                                               1.238477654e-11],
+                                         "ProgrammeAllocationSet, phylogeny and centrality constraints, FactorPrior, matrix B" =>
+                                             [0.2795395589, 3.888780199e-12,
+                                              3.879465287e-12, 1.072079122e-11,
+                                              0.3602314672, 0.3602289738],
                                          "prior, CrossSectionalFactorPrior, vector B" =>
                                              [0.0004917174546, 0.0002342595329,
                                               0.000306925665, 0.0006236643089,
@@ -1302,7 +1349,7 @@ Pipeline), which the decision tickets of the map can change.
                                               0.005672268152])
 
     @testset "$key" for (key, tol, f) in cases
-        pin = pins[replace(key, r"^online: " => "")]
+        pin = pins[replace(key, r"^(online|the default x_src): " => "")]
         v = f()
         @test length(v) == length(pin)
         if tol === :solved

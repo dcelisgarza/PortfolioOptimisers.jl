@@ -35,7 +35,7 @@ The method on a prior result runs these steps.
 
  1. Read `strict` from the current [`ProjectionStep`](@ref).
  2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr`, the rows and the set's `brt`. Otherwise `lcsr` is `lcse`.
- 3. Fit the centrality rows `ctr` and the phylogeny result `plr` on the prior, the rows and the set's `brt`.
+ 3. Fit the centrality rows `ctr` and the phylogeny result `plr` on the rows and the set's `brt`, as a [`JuMPOptimiser`](@ref) does at its default `x_src = :data`. The prior goes to them as `pr`.
  4. Resolve the return floor `ret` against the prior.
  5. Resolve the Calibration Rules of the norm ceilings `l2c`, `linfc` and `lpc`, and of the penalties `l1`, `l2`, `lp` and `linf`, against the prior and the set's solver.
  6. Return the resolved slots and `rd`.

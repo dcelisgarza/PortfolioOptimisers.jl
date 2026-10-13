@@ -764,12 +764,12 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Pick the returns matrix the clustering, phylogeny and centrality estimators read.
 
-Two results can supply asset returns: the prior result and the raw returns result. `x_src` names which one wins — `:prior` takes `pr.X`, `:data` takes `rd.X`. When no returns result is available there is nothing to select between, so `pr.X` is used and `x_src` is inert.
+Two results can supply asset returns: the prior result and the raw returns result. `x_src` names which one wins — `:prior` takes `pr.X`, `:data` takes `rd.X`. The verbs that call it default to `:data`, because under a factor prior `pr.X` is a reconstruction of the rank of the factors, not the returns. When no returns result is available, or the returns result holds no asset returns, there is nothing to select between, so `pr.X` is used and `x_src` is inert.
 
 # Algorithm
 
  1. Check that `x_src` names one of the two results, with [`assert_source_selector`](@ref).
- 2. Return `pr.X` when there is no returns result, or when `x_src` is `:prior`. Otherwise return the returns of `rd` that [`benchmark_relative_returns`](@ref) reads under `brt`: `rd.X`, or `rd.X - rd.B` when `brt` is `true`.
+ 2. Return `pr.X` when there is no returns result, when `rd.X` is `nothing`, or when `x_src` is `:prior`. Otherwise return the returns of `rd` that [`benchmark_relative_returns`](@ref) reads under `brt`: `rd.X`, or `rd.X - rd.B` when `brt` is `true`.
 
 `pr.X` is already in the frame that the prior was fitted in, so `brt` acts on `rd` alone.
 
@@ -799,7 +799,180 @@ Two results can supply asset returns: the prior result and the raw returns resul
 function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Symbol,
                                brt::Bool = false)
     assert_source_selector(x_src, :x_src)
-    return isnothing(rd) || x_src == :prior ? pr.X : benchmark_relative_returns(rd, brt)
+    if isnothing(rd) || isnothing(rd.X) || x_src == :prior
+        return pr.X
+    end
+    return benchmark_relative_returns(rd, brt)
+end
+"""
+    plain_graph_reader(x) -> Bool
+
+Answer whether `x` reads the returns matrix with a plain moment estimator, which refuses a gap in the matrix.
+
+A graph reader, a clustering, network, phylogeny or centrality estimator, computes the correlation of the returns matrix with its `ce`. [`gap_fill_value`](@ref) on `ce` states what the estimator does with a gap. A finite answer marks a plain estimator, which refuses a gapped sample. `NaN` marks a mask-aware estimator, which reads the observed cells. A [`FeatureDistance`](@ref) reads the features of an Asset Panel and not the returns matrix, so a reader that holds one is not plain. A precomputed result reads nothing.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A `Tuple` or a vector: `true` when one of its entries is plain.
+ 2. A [`ClustersEstimator`](@ref) or a [`NetworkEstimator`](@ref): `true` when `gap_fill_value(x.ce)` is finite, and `false` when `x.de` is a [`FeatureDistance`](@ref).
+ 3. An estimator that holds a graph reader: forward to the reader that it holds.
+ 4. Every other value, a precomputed result and `nothing` among them: `false`.
+
+# Arguments
+
+  - `x`: A graph reader, a `Tuple` or a vector of graph readers, or any other value.
+
+# Returns
+
+  - `flag::Bool`: `true` when `x` reads the returns matrix with a plain moment estimator.
+
+# Related
+
+  - [`assert_graph_readable`](@ref)
+  - [`graph_reader_mask`](@ref)
+  - [`gap_fill_value`](@ref)
+"""
+function plain_graph_reader(::Any)
+    return false
+end
+function plain_graph_reader(xs::Union{<:Tuple, <:AbstractVector})
+    return any(plain_graph_reader, xs)
+end
+function plain_graph_reader(x::Union{<:ClustersEstimator, <:NetworkEstimator})
+    return isfinite(gap_fill_value(x.ce))
+end
+function plain_graph_reader(::Union{<:ClustersEstimator{<:Any, <:FeatureDistance},
+                                    <:NetworkEstimator{<:Any, <:FeatureDistance}})
+    return false
+end
+function plain_graph_reader(x::NetworkClustersEstimator)
+    return plain_graph_reader(x.nte)
+end
+function plain_graph_reader(x::Union{<:CentralityEstimator,
+                                     <:SemiDefinitePhylogenyEstimator,
+                                     <:IntegerPhylogenyEstimator})
+    return plain_graph_reader(x.pl)
+end
+function plain_graph_reader(x::CentralityConstraint)
+    return plain_graph_reader(x.A)
+end
+"""
+    graph_gap_remedy
+
+The two remedies for a gap that a plain graph reader meets. The warning of a fit and the refusal of a direct call both append this text, so the two give the same remedies.
+
+A graph reader that states no source reads the returns data, which keep the `NaN` of each gap. A mask-aware prior fills the gap with zero in the returns of the prior only, see [`scenario_fill`](@ref). So the reader can read the observed cells with a mask-aware `ce`, or it can read the returns of the prior.
+
+# Related
+
+  - [`assert_graph_readable`](@ref)
+  - [`graph_reader_mask`](@ref)
+  - [`plain_graph_reader`](@ref)
+"""
+const graph_gap_remedy = "To read the asset, set a `CoveragePolicy` on the `ce` of the graph reader, the same one as on the prior, so that it reads the observed cells, for example `ClustersEstimator(; ce = PortfolioOptimisersCovariance(; ce = Covariance(; cvg = CoveragePolicy())))`. Or state the prior as the source of the reader, `x_src = :prior`, so that it reads the returns of the prior, where a mask-aware prior fills each gap of an asset that it kept."
+"""
+    assert_graph_readable(x, X::MatNum) -> nothing
+
+Refuse a gapped returns matrix in a direct call of a graph verb whose reader is plain.
+
+Inside a fit, [`graph_reader_mask`](@ref) leaves an asset that a plain graph reader cannot read out of the Investable Mask at the entry of the head. A direct call of a graph verb over a prior result has no entry of a fit, so it refuses the gap here. The error names the two remedies of [`graph_gap_remedy`](@ref). A mask-aware reader reads the gap, so this function lets it pass.
+
+# Arguments
+
+  - `x`: The graph reader of the verb.
+  - `X`: The returns matrix that [`returns_matrix_picker`](@ref) picked, `observations × assets`.
+
+# Validation
+
+  - `all(isfinite, X)` when [`plain_graph_reader`](@ref) answers `true` for `x`. Raises an [`IsNonFiniteError`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`plain_graph_reader`](@ref)
+  - [`graph_gap_remedy`](@ref)
+  - [`graph_reader_mask`](@ref)
+  - [`returns_matrix_picker`](@ref)
+"""
+function assert_graph_readable(x, X::MatNum)::Nothing
+    if plain_graph_reader(x)
+        @argcheck(all(isfinite, X),
+                  IsNonFiniteError("a graph reader with a plain moment estimator has no correct answer for a gapped sample, so it refuses one: the returns matrix that it reads holds $(count(!isfinite, X)) non-finite entries, the first at $(findfirst(!isfinite, X)). $(graph_gap_remedy)"))
+    end
+    return nothing
+end
+"""
+    graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult,
+                      rd::ReturnsResult, x_src::Symbol, brt::Bool, strict::Bool)
+        -> Option{BitVector}
+
+Compose the Investable Mask with the assets that the plain graph readers of a fit can read, at the entry of the fit.
+
+A graph reader that reads the returns data meets each gap that a mask-aware prior filled in its own returns only, see [`scenario_fill`](@ref). The `ce` of the reader decides what the gap is. A mask-aware `ce` reads the observed cells, so this function keeps the asset. A plain `ce` has no correct answer for a gapped sample. So this function drops each kept asset that holds a non-finite cell in the rows that the readers read, as a plain estimator over an Asset Panel leaves the asset out of its Coverage Universe. The asset then departs as a non-investable asset: [`investable_reduction`](@ref) announces it, the fit gives it a zero weight, and it is listed on the Non-Investable Axis.
+
+The fit warns once, and the warning names the assets and the two remedies of [`graph_gap_remedy`](@ref). Under `strict = true` the fit refuses the gap instead. A reader that states the prior as its source reads the returns of the prior, where a kept column is finite, so this function keeps every asset for it.
+
+Every fit that calls [`feature_readable_mask`](@ref) calls this function on the mask that it gives. A direct call of a graph verb has no entry of a fit, so it refuses the gap with [`assert_graph_readable`](@ref).
+
+# Algorithm
+
+ 1. Return `imsk` when [`plain_graph_reader`](@ref) answers `false` for `x`.
+ 2. Pick the matrix `X` that the readers read, with [`returns_matrix_picker`](@ref).
+ 3. Find the assets that `imsk` keeps and that hold a non-finite cell in `X`. Return `imsk` when there is none.
+ 4. Refuse under `strict`. Otherwise warn, and return `imsk` with those assets dropped.
+
+# Arguments
+
+  - `x`: A graph reader, or a `Tuple` or a vector of the graph readers of the fit.
+  - `imsk`: The Investable Mask of the prior, or `nothing` when every asset is investable.
+  - `pr`: The prior result of the fit, on the full asset universe.
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src])
+  - $(arg_dict[:brt_read])
+  - `strict`: The `strict` field of the optimiser. `true` refuses a gap in place of the warning.
+
+# Validation
+
+  - Under `strict = true`, no kept asset holds a non-finite cell in `X`. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset stays. Raises an [`IsEmptyError`](@ref).
+
+# Returns
+
+  - `imsk::Option{BitVector}`: The composed mask, or `nothing` when every asset stays.
+
+# Related
+
+  - [`plain_graph_reader`](@ref)
+  - [`graph_gap_remedy`](@ref)
+  - [`feature_readable_mask`](@ref)
+  - [`investable_reduction`](@ref)
+"""
+function graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult,
+                           rd::ReturnsResult, x_src::Symbol, brt::Bool, strict::Bool)
+    if !plain_graph_reader(x)
+        return imsk
+    end
+    gap = .!vec(all(isfinite, returns_matrix_picker(pr, rd, x_src, brt); dims = 1))
+    if !isnothing(imsk)
+        gap .&= imsk
+    end
+    if !any(gap)
+        return imsk
+    end
+    assets = isnothing(rd.nx) ? findall(gap) : rd.nx[gap]
+    msg = "a graph reader of this optimiser reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for $(count(gap)) asset(s) that the prior kept: $(assets). A plain moment estimator has no correct answer for a gapped sample"
+    @argcheck(!strict,
+              IsNonFiniteError("$(msg), and `strict = true` refuses the gap. $(graph_gap_remedy)"))
+    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(graph_gap_remedy) Pass `strict = true` to refuse the gap.")
+    keep = isnothing(imsk) ? .!gap : imsk .& .!gap
+    @argcheck(any(keep),
+              IsEmptyError("every asset that the prior kept holds a gap in the rows that a plain graph reader of this optimiser reads, so the fit has no asset left. $(graph_gap_remedy)"))
+    return keep
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -844,7 +1017,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the clustering result it produces.
 
 # Arguments
@@ -870,9 +1043,10 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - [`clusterise`](@ref)
 """
 function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
-                    rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
+                    rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :data,
                     brt::Bool = false, iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(cle, X)
     return clusterise(cle, X; pr = pr, rd = rd, iv = implied_volatility_picker(X, iv),
                       kwargs..., dims = 1)
 end
@@ -886,7 +1060,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the phylogeny result it produces.
 
 # Arguments
@@ -913,9 +1087,10 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - [`phylogeny_matrix`](@ref)
 """
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                          x_src::Symbol = :prior, brt::Bool = false,
+                          x_src::Symbol = :data, brt::Bool = false,
                           iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(pl, X)
     return phylogeny_matrix(pl, X; pr = pr, rd = rd, iv = implied_volatility_picker(X, iv),
                             kwargs..., dims = 1)
 end
@@ -928,7 +1103,7 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the constraint result it produces.
 
 # Arguments
@@ -954,10 +1129,10 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
   - [`phylogeny_constraints`](@ref)
 """
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
-                               rd::Option{<:ReturnsResult} = nothing,
-                               x_src::Symbol = :prior, brt::Bool = false,
-                               iv::Option{<:MatNum} = nothing, kwargs...)
+                               rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :data,
+                               brt::Bool = false, iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(plc, X)
     return phylogeny_constraints(plc, X; pr = pr, rd = rd,
                                  iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
 end
@@ -970,7 +1145,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the centrality result it produces.
 
 # Arguments
@@ -996,9 +1171,10 @@ Compute the centrality vector for a centrality estimator and prior result.
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
-                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
+                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :data,
                            brt::Bool = false, iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(cte, X)
     return centrality_vector(cte, X; pr = pr, rd = rd,
                              iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
 end
@@ -1012,7 +1188,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the centrality result it produces.
 
 # Arguments
@@ -1040,9 +1216,10 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - [`centrality_vector`](@ref)
 """
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
-                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
+                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :data,
                            brt::Bool = false, iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(pl, X)
     return centrality_vector(pl, ct, X; pr = pr, rd = rd,
                              iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
 end
@@ -1084,7 +1261,7 @@ Compute the weighted average centrality for a network or phylogeny result.
 """
 function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
                             pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                            x_src::Symbol = :prior, kwargs...)
+                            x_src::Symbol = :data, kwargs...)
     return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, x_src = x_src,
                                                kwargs...).X, w)
 end
@@ -1098,7 +1275,7 @@ Compute the weighted average centrality for a centrality estimator.
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the weighted average it produces.
 
 The estimator method picks between the results itself, where the network-and-algorithm method above delegates that to [`centrality_vector`](@ref). The two reach the same selection: `cte` carries `pl` and `ct` in its own fields, so the asset-returns method it calls is the one the other method's step 1 would have reached.
@@ -1127,9 +1304,10 @@ The estimator method picks between the results itself, where the network-and-alg
   - [`average_centrality`](@ref)
 """
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
-                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
+                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :data,
                             brt::Bool = false, iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(cte, X)
     return average_centrality(cte, w, X; pr = pr, rd = rd,
                               iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
 end
@@ -1143,7 +1321,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the score it produces.
 
 # Arguments
@@ -1172,9 +1350,10 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - [`asset_phylogeny`](@ref): The asset-returns methods this one delegates to. They build the phylogeny matrix, add up the gross weight of the related pairs, and divide by the gross weight of every pair. That is where the score's closed form and its numbered steps are stated.
 """
 function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
-                         rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
+                         rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :data,
                          brt::Bool = false, iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(pl, X)
     return asset_phylogeny(pl, w, X; pr = pr, rd = rd,
                            iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
 end
@@ -1187,7 +1366,7 @@ Compute centrality constraints from asset returns in a prior result using a cent
 
 # Algorithm
 
- 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref).
+ 1. Pick the asset returns matrix `X` from the result that `x_src` names, with [`returns_matrix_picker`](@ref). Refuse a gap in `X` that a plain graph reader cannot read, with [`assert_graph_readable`](@ref).
  2. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing both results on as `pr` and `rd` and `dims = 1` last, and return the constraint result it produces.
 
 # Arguments
@@ -1213,9 +1392,10 @@ Compute centrality constraints from asset returns in a prior result using a cent
 """
 function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
                                 rd::Option{<:ReturnsResult} = nothing,
-                                x_src::Symbol = :prior, brt::Bool = false,
+                                x_src::Symbol = :data, brt::Bool = false,
                                 iv::Option{<:MatNum} = nothing, kwargs...)
     X = returns_matrix_picker(pr, rd, x_src, brt)
+    assert_graph_readable(ccs, X)
     return centrality_constraints(ccs, X; pr = pr, rd = rd,
                                   iv = implied_volatility_picker(X, iv), kwargs...,
                                   dims = 1)

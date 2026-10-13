@@ -77,8 +77,11 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask((opt.ple, opt.cte), investable_mask(pr), rd)
+    imsk = graph_reader_mask((opt.ple, opt.cte), imsk, pr, rd, opt.x_src, opt.brt,
+                             opt.strict)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = opt.strict), imsk, pr.X)

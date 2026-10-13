@@ -799,7 +799,9 @@ const REFX10 = Dict(:scaled =>
         Xn[1:20, 5] .= NaN
         cvg = GeodesicShrinkageCovariance(; ce = Covariance(; cvg = CoveragePolicy()),
                                           alpha = 0.3)
-        @test PO.gap_fill_value(cvg) == PO.gap_fill_value(cvg.ce)
+        # The policy reads the gap, so both answer `NaN` (#1694).
+        @test isnan(PO.gap_fill_value(cvg.ce))
+        @test isequal(PO.gap_fill_value(cvg), PO.gap_fill_value(cvg.ce))
         pr = prior(EmpiricalPrior(; ce = cvg), Xn)
         @test isnan.(diag(pr.sigma)) == [false, false, true, false, false]
         @test isposdef(pr.sigma[[1, 2, 4, 5], [1, 2, 4, 5]])

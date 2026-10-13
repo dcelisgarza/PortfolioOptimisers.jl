@@ -524,7 +524,7 @@ $(DocStringExtensions.FIELDS)
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         brt::Bool = false,
-        x_src::Symbol = :prior,
+        x_src::Symbol = :data,
         strict::Bool = false,
         pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
         cache::Option{<:ReturnsBufferState} = nothing
@@ -638,7 +638,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     x_src
     """
-    $(field_dict[:strict_opt])
+    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
     """
@@ -696,7 +696,7 @@ function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                          fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                         x_src::Symbol = :prior, strict::Bool = false,
+                         x_src::Symbol = :data, strict::Bool = false,
                          pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                          cache::Option{<:ReturnsBufferState} = nothing)
     return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, x_src,
@@ -902,8 +902,10 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(nco.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(nco.cle, imsk, pr, rd, nco.x_src, nco.brt, nco.strict)
     fees = investable_fees_view(fees_constraints(nco.fees, nco.sets; datatype = Tf,
                                                  strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit

@@ -167,7 +167,7 @@ HierarchicalEqualRiskContribution
        │       wf ┼ IterativeWeightFinaliser
        │          │   iter ┴ Int64: 100
        │      brt ┼ Bool: false
-       │    x_src ┼ Symbol: :prior
+       │    x_src ┼ Symbol: :data
        │   strict ┴ Bool: false
     ri ┼ Variance
        │    settings ┼ RiskMeasureSettings
@@ -632,8 +632,11 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(hec.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(hec.opt.cle, imsk, pr, rd, hec.opt.x_src, hec.opt.brt,
+                             hec.opt.strict)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)

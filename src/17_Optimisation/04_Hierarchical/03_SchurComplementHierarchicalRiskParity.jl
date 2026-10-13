@@ -649,7 +649,7 @@ SchurComplementHierarchicalRiskParity
          │       wf ┼ IterativeWeightFinaliser
          │          │   iter ┴ Int64: 100
          │      brt ┼ Bool: false
-         │    x_src ┼ Symbol: :prior
+         │    x_src ┼ Symbol: :data
          │   strict ┴ Bool: false
   params ┼ SchurComplementParams
          │       r ┼ Variance
@@ -1274,8 +1274,11 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # variance or a standard deviation, which a fee does not move. The result holds the
     # fee, and the net returns and a fold's forced exit read it there.
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.x_src, sh.opt.brt,
+                             sh.opt.strict)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in
@@ -1346,8 +1349,11 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # variance or a standard deviation, which a fee does not move. The result holds the
     # fee, and the net returns and a fold's forced exit read it there.
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.x_src, sh.opt.brt,
+                             sh.opt.strict)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in

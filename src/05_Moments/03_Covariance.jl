@@ -442,6 +442,33 @@ function show_fields(ce::Covariance)
     return isnothing(ce.cvg) ? (:me, :ce, :alg, :w) : (:me, :ce, :alg, :w, :cvg)
 end
 """
+    gap_fill_value(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy}) -> Float64
+
+Answer `NaN`, so a gapped sample reaches the available-case arm of a [`Covariance`](@ref) with its gaps intact.
+
+A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) fits each pair on the observations at which both of its assets are finite and active, see [`coverage_covariance`](@ref). A finite fill value would make a gapped cell an observation, and the pair would read a return that the asset never had. So the consumer passes the sample as it is, together with the active mask that explains each gap. A [`Covariance`](@ref) with no policy refuses a gap on its own account, so it keeps the fallback of zero.
+
+A wrapper that forwards the sample, such as [`PortfolioOptimisersCovariance`](@ref), answers what this method answers. So the wrapper reads a gapped sample when the `Covariance` inside it carries a policy.
+
+# Arguments
+
+  - `ce`: Covariance estimator with a [`CoveragePolicy`](@ref) in its `cvg` field.
+
+# Returns
+
+  - `fv::Float64`: `NaN`.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`gap_fill_value`](@ref)
+  - [`coverage_covariance`](@ref)
+"""
+function gap_fill_value(::Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy})
+    return NaN
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the centring vector and the inner covariance estimator that a [`Covariance`](@ref) method computes with.

@@ -157,7 +157,7 @@ HierarchicalRiskParity
       │       wf ┼ IterativeWeightFinaliser
       │          │   iter ┴ Int64: 100
       │      brt ┼ Bool: false
-      │    x_src ┼ Symbol: :prior
+      │    x_src ┼ Symbol: :data
       │   strict ┴ Bool: false
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings
@@ -411,8 +411,11 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.x_src, hrp.opt.brt,
+                             hrp.opt.strict)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -576,8 +579,11 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # and every other sample keeps its own type.
     T = float_if_integer(eltype(pr.X))
     # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
-    # Asset Panel departs with the non-investable assets (`feature_readable_mask`).
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.x_src, hrp.opt.brt,
+                             hrp.opt.strict)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)

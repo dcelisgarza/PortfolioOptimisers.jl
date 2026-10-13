@@ -713,10 +713,11 @@ end
     @test_logs (:warn, r"they inflate the denominator") prior(pe5, Xmix, nothing, pnl_mix)
     @test_logs (:warn, r"at `c = 0\.3` a 5% CVaR is a 16\.7% CVaR") prior(pe5, Xmix,
                                                                           nothing, pnl_mix)
-    @test_logs (:warn, r"hierarchical optimiser may branch the asset alone") prior(pe5,
-                                                                                   Xmix,
-                                                                                   nothing,
-                                                                                   pnl_mix)
+    @test_logs (:warn,
+                r"whose graph reader reads the prior, `x_src = :prior`, may branch the asset alone") prior(pe5,
+                                                                                                           Xmix,
+                                                                                                           nothing,
+                                                                                                           pnl_mix)
     @test_logs (:warn, r"entropy pooling view on the asset is calibrated") prior(pe5, Xmix,
                                                                                  nothing,
                                                                                  pnl_mix)
@@ -818,8 +819,11 @@ end
     rd = ReturnsResult(; nx = nx, X = Xmix, pnl = pnl_mix)
     resj = optimise(MeanRisk(; r = ConditionalValueatRisk(),
                              opt = JuMPOptimiser(; pe = pe, slv = slv)), rd)
+    # The clustering states the prior as its source, so it reads the filled matrix too. A
+    # clustering of the returns data meets the gap itself (ADR 0211, decision 8).
     resh = optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk(),
-                                           opt = HierarchicalOptimiser(; pe = pe)), rd)
+                                           opt = HierarchicalOptimiser(; pe = pe,
+                                                                       x_src = :prior)), rd)
     # A scenario measure over a `NaN` column has no answer at all, so both solves are the
     # proof that the fill reached the model.
     @test isa(resj.retcode, PO.OptimisationSuccess)
@@ -838,6 +842,88 @@ end
     keep = [1, 2, 4]
     r = @test_logs (:warn, r"not investable") expected_risk(ConditionalValueatRisk(), w, pr)
     @test r == expected_risk(ConditionalValueatRisk(), w[keep], pr.X[:, keep])
+end
+
+@testset "A graph reader decides a gap with its own moment estimator (#1694)" begin
+    # The prior fills the gap of the young asset `d` in its own returns only. The clustering
+    # reads the returns data, which keep the gap, so its `ce` decides (ADR 0211, decision 8).
+    rd = ReturnsResult(; nx = nx, X = Xmix, pnl = pnl_mix)
+    hrp(; kwargs...) = HierarchicalRiskParity(; r = ConditionalValueatRisk(),
+                                              opt = HierarchicalOptimiser(; pe = pe,
+                                                                          kwargs...))
+    cvg_ce = PortfolioOptimisersCovariance(; ce = Covariance(; cvg = CoveragePolicy()))
+    left_c = (:info, r"left the investable universe.*\[\"c\"\]")
+
+    # A plain clustering leaves `d` out of the Investable Mask at the entry of the head, and
+    # names it with the two remedies.
+    plain = (:warn,
+             r"plain moment estimator, and the rows that it reads hold a gap for 1 asset\(s\) that the prior kept: \[\"d\"\].*`CoveragePolicy`.*`x_src = :prior`")
+    res = @test_logs plain (:info, r"left the investable universe.*\[\"c\", \"d\"\]") optimise(hrp(),
+                                                                                               rd)
+    @test res.imsk == BitVector([1, 1, 0, 0])
+    @test iszero(res.w[4])
+    @test isapprox(sum(res.w), 1)
+    # Under `strict` the head refuses the gap.
+    @test_throws IsNonFiniteError optimise(hrp(; strict = true), rd)
+
+    # A mask-aware clustering reads the observed cells, and the prior source reads the
+    # filled matrix. Both keep `d`, and only the dead asset departs.
+    aware = @test_logs left_c optimise(hrp(; cle = ClustersEstimator(; ce = cvg_ce)), rd)
+    @test aware.imsk == BitVector([1, 1, 0, 1])
+    @test aware.w[4] > 0
+    filled = @test_logs left_c optimise(hrp(; x_src = :prior), rd)
+    @test filled.imsk == aware.imsk
+    @test filled.w[4] > 0
+
+    # The JuMP head narrows on its phylogeny estimator as the hierarchical head does.
+    mr = MeanRisk(;
+                  opt = JuMPOptimiser(; pe = pe, slv = slv,
+                                      ple = SemiDefinitePhylogenyEstimator()))
+    resj = @test_logs plain (:info, r"left the investable universe") match_mode = :any optimise(mr,
+                                                                                                rd)
+    @test resj.imsk == BitVector([1, 1, 0, 0])
+    @test iszero(resj.w[4])
+
+    # Every asset that the prior kept holds a gap, so the plain clustering leaves none.
+    Xall = copy(X0)
+    amsk_all = trues(T, N)
+    for k in 1:N
+        Xall[k, k] = NaN
+        amsk_all[k, k] = false
+    end
+    rd_all = ReturnsResult(; nx = nx, X = Xall, pnl = make_panel(amsk_all))
+    @test isnothing(PO.investable_mask(prior(pe, rd_all)))
+    @test_throws IsEmptyError optimise(hrp(), rd_all)
+
+    # A direct call has no entry of a fit, so it refuses the gap and names the remedies.
+    pr = prior(pe, rd)
+    pr3 = PO.port_opt_view(pr, [1, 2, 4])
+    rd3 = PO.port_opt_view(rd, [1, 2, 4])
+    @test_throws IsNonFiniteError clusterise(ClustersEstimator(), pr3; rd = rd3)
+    @test_throws "x_src = :prior" clusterise(ClustersEstimator(), pr3; rd = rd3)
+    @test isa(clusterise(ClustersEstimator(), pr3; rd = rd3, x_src = :prior),
+              PO.AbstractClusteringResult)
+    @test isa(clusterise(ClustersEstimator(; ce = cvg_ce), pr3; rd = rd3),
+              PO.AbstractClusteringResult)
+
+    # A `ce` is mask-aware when a policy sits anywhere in its tree, so the wrapper reads the
+    # gapped sample as the `Covariance` inside it does.
+    X3 = Xmix[:, [1, 2, 4]]
+    @test isnan(PO.gap_fill_value(cvg_ce))
+    @test iszero(PO.gap_fill_value(PortfolioOptimisersCovariance()))
+    @test cor(cvg_ce, X3) == cor(Covariance(; cvg = CoveragePolicy()), X3)
+
+    # The readers that the heads hold, one method each.
+    @test !PO.plain_graph_reader(nothing)
+    @test PO.plain_graph_reader(ClustersEstimator())
+    @test !PO.plain_graph_reader(ClustersEstimator(; ce = cvg_ce))
+    @test !PO.plain_graph_reader(ClustersEstimator(; ce = ExpWeightedCovariance()))
+    @test !PO.plain_graph_reader(ClustersEstimator(; de = FeatureDistance()))
+    @test PO.plain_graph_reader(NetworkClustersEstimator())
+    @test !PO.plain_graph_reader(SemiDefinitePhylogenyEstimator(;
+                                                                pl = NetworkEstimator(;
+                                                                                      ce = cvg_ce)))
+    @test PO.plain_graph_reader((nothing, [CentralityConstraint()]))
 end
 
 # The panel for a window of `t` observations over `N2` assets, so an expanding walk-forward can

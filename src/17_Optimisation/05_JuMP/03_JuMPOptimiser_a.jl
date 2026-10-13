@@ -489,7 +489,7 @@ $(DocStringExtensions.FIELDS)
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         linf::TD_Option{<:Num_AmbRadCal} = nothing,
         brt::Bool = false,
-        x_src::Symbol = :prior,
+        x_src::Symbol = :data,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing,
     ) -> JuMPOptimiser
@@ -694,7 +694,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     x_src
     """
-    $(field_dict[:strict_opt])
+    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
     """
@@ -920,7 +920,7 @@ function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_Ve
 
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing,
                        linf::TD_Option{<:Num_AmbRadCal} = nothing, brt::Bool = false,
-                       x_src::Symbol = :prior, strict::Bool = false,
+                       x_src::Symbol = :data, strict::Bool = false,
                        cache::Option{<:ReturnsBufferState} = nothing)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
                          sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,

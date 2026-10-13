@@ -220,7 +220,7 @@ MeanRisk
       │        lp ┼ nothing
       │      linf ┼ nothing
       │       brt ┼ Bool: false
-      │     x_src ┼ Symbol: :prior
+      │     x_src ┼ Symbol: :data
       │    strict ┴ Bool: false
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings

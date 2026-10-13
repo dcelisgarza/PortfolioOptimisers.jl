@@ -94,3 +94,7 @@ and on a graph reader. So the default of a graph reader changes from `pr.X` to `
 [0212](0212-a-returns-source-is-a-singleton-type.md) keeps the name `x_src` and replaces the
 `Symbol` with a singleton type: `DataSource()`, `ExcessSource()` or `PriorSource()`. The rule of this
 ADR holds: a source is named, not flagged. `brt` is the flag that the move removes.
+
+The build of #1689 made the change of the default before the move, in the spelling of today:
+`x_src` defaults to `:data` on the three optimisers and on the direct graph verbs. A verb with no
+returns result, or with a returns result that holds no `X`, still reads `pr.X`.

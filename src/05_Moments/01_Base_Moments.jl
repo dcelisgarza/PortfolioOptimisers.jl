@@ -870,7 +870,7 @@ A **finite** answer is written over every gapped cell before the sample is hande
 
 The fallback is zero: a plain moment estimator refuses a gapped sample outright, and zero is the neutral value of a standardised series. A gap-aware estimator answers `NaN` instead, and that one method is the whole cost of adding one.
 
-A covariance estimator nests, so the answer recurses. An estimator that wraps another and forwards the sample and its keywords untouched — [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) — answers what the estimator it wraps answers, so wrapping a gap-aware estimator keeps the gap. One that reads the sample itself before it delegates, as [`Covariance`](@ref) does through its own expected-returns estimator, keeps the fallback: it refuses the gap on its own account, and no answer of its inner estimator changes that.
+A covariance estimator nests, so the answer recurses. An estimator that wraps another and forwards the sample and its keywords untouched — [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) — answers what the estimator it wraps answers, so wrapping a gap-aware estimator keeps the gap. One that reads the sample itself before it delegates, as [`Covariance`](@ref) does through its own expected-returns estimator, keeps the fallback: it refuses the gap on its own account, and no answer of its inner estimator changes that. A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) reads the gap itself, on the observations of each pair, so it answers `NaN`, and a wrapper around it keeps the gap.
 
 # Arguments
 

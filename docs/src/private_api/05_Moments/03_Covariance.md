@@ -48,6 +48,7 @@ PortfolioOptimisers.coverage_covariance(ce::Union{<:GeneralCovariance, <:Covaria
 PortfolioOptimisers.coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment}, cvg::CoveragePolicy, state::CovarianceState)
 PortfolioOptimisers.coverage_correlation
 PortfolioOptimisers.coverage_policy
+gap_fill_value(::Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy})
 ```
 
 ## References

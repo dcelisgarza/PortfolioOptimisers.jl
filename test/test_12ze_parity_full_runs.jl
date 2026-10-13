@@ -285,7 +285,10 @@ end
                        axes(fx.rd.X, 2))
         @test setdiff(axes(fx.rd.X, 2), keep) == 2:5
         rdh = PO.port_opt_view(fx.rd, :, keep)
-        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = est()))
+        # The oracle clusters the fitted rows of the prior (#1689).
+        hrp = HierarchicalRiskParity(;
+                                     opt = HierarchicalOptimiser(; pe = est(),
+                                                                 x_src = :prior))
         res = optimise(hrp, rdh)
         hcv = cross_val_predict(hrp, rdh, wf)
         # Every stage but the leaf ordering is at parity: with the library's leaf order the
@@ -349,8 +352,9 @@ end
         # Better: the oracle refuses a NestedClustersOptimization over this prior and has no
         # subset-resampling optimiser. Each cluster and each subset fits the prior on its own
         # assets, and equals the oracle's MeanRisk on a panel of those assets alone.
-        nco = optimise(NestedClustered(; pe = pec, opti = inner, opto = EqualWeighted()),
-                       fx.rd)
+        # The oracle clusters the fitted rows of the prior (#1689).
+        nco = optimise(NestedClustered(; pe = pec, x_src = :prior, opti = inner,
+                                       opto = EqualWeighted()), fx.rd)
         sr = optimise(SubsetResampling(; subset_size = 20, n_subsets = 4,
                                        rng = StableRNG(9), pe = pec, opt = inner), fx.rd)
         S = load("Ccy", "Subsets")

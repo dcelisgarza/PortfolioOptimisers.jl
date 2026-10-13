@@ -464,7 +464,7 @@ $(DocStringExtensions.FIELDS)
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         brt::Bool = false,
-        x_src::Symbol = :prior,
+        x_src::Symbol = :data,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> HierarchicalOptimiser
@@ -562,7 +562,7 @@ HierarchicalOptimiser
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
      brt ┼ Bool: false
-   x_src ┼ Symbol: :prior
+   x_src ┼ Symbol: :data
   strict ┴ Bool: false
 ```
 
@@ -613,7 +613,7 @@ HierarchicalOptimiser
     """
     x_src
     """
-    $(field_dict[:strict_opt])
+    $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
     """
@@ -646,7 +646,7 @@ function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                                fees::TD_Option{<:FeesE_Fees} = nothing,
                                sets::TD_Option{<:UniverseSets} = nothing,
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
-                               brt::Bool = false, x_src::Symbol = :prior,
+                               brt::Bool = false, x_src::Symbol = :data,
                                strict::Bool = false,
                                cache::Option{<:ReturnsBufferState} = nothing)::HierarchicalOptimiser
     return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,

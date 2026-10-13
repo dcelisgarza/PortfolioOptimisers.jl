@@ -61,12 +61,18 @@ asset enters the universe when it lists. Under that policy the online update giv
 estimate exactly. The two schemes below cut the same windows. An update of the moments adds rows
 and never removes them, so `OnlineIndexWalkForward` sets `expand_train = true`, and a rolling window goes
 on the estimator, as section 2 shows.
+
+The clustering of `HierarchicalRiskParity` reads the returns data, which keep the gap of an asset
+before it lists. So the clustering takes the covariance estimator of the prior, with its policy.
+With no policy, the clustering cannot read the gap, and the optimiser leaves the asset out with a
+warning.
 =#
 
 cvg = CoveragePolicy()
 pe = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
                     ce = PortfolioOptimisersCovariance(; ce = Covariance(; cvg = cvg)))
-hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe))
+cle = ClustersEstimator(; ce = pe.ce)
+hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
 
 batch = IndexWalkForward(100, 40; purged_size = 3, expand_train = true)
 online = OnlineIndexWalkForward(100, 40; purged_size = 3)
@@ -139,7 +145,8 @@ stepped = OnlineIndexWalkForward(103, 40; purged_size = 3)
 hrp_cap = HierarchicalRiskParity(;
                                  opt = HierarchicalOptimiser(;
                                                              pe = Online(pe;
-                                                                         max_history = 100)))
+                                                                         max_history = 100),
+                                                             cle = cle))
 
 weights(cross_val_predict(hrp_cap, rd, stepped)) ==
 weights(cross_val_predict(hrp, rd, rolling))

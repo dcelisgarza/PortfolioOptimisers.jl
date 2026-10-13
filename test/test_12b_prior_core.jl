@@ -1523,9 +1523,13 @@ end
                                                opto = EqualWeighted(), x_src = :typo)
     # The `cle_pr` spelling is gone: a Bool no longer constructs.
     @test_throws Exception HierarchicalOptimiser(; x_src = true)
-    @test HierarchicalOptimiser().x_src == :prior
-    @test JuMPOptimiser(; slv = slv).x_src == :prior
-    @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :prior
+    # The default reads the returns data (#1689, ADR 0211): under a factor prior `pr.X` is a
+    # reconstruction, and a scenario window cuts its rows.
+    @test HierarchicalOptimiser().x_src == :data
+    @test JuMPOptimiser(; slv = slv).x_src == :data
+    @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :data
+    @test phylogeny_matrix(ne, pr; rd = rd_alt).X == phylogeny_matrix(ne, rd_alt.X).X
+    @test phylogeny_matrix(ne, pr).X == phylogeny_matrix(ne, pr.X).X
 end
 
 @testset "A prior that keeps the last rows pairs them with the last rows of iv (#1655)" begin
@@ -1552,21 +1556,23 @@ end
     tail = ReturnsResult(; nx = rdi.nx, X = Xi[(T - n + 1):end, :],
                          iv = ivi[(T - n + 1):end, :], ivpa = 1.1)
     # Each forwarder that reads the prior returns gives the answer of the last rows.
-    clr = clusterise(cle, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa)
+    clr = clusterise(cle, pr; rd = rdi, x_src = :prior, iv = rdi.iv, ivpa = rdi.ivpa)
     clt = clusterise(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa)
     @test clr.res.order == clt.res.order
     @test isapprox(clr.D, clt.D)
-    @test phylogeny_matrix(cle, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
+    @test phylogeny_matrix(cle, pr; rd = rdi, x_src = :prior, iv = rdi.iv,
+                           ivpa = rdi.ivpa).X ==
           phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
     ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)))
-    @test isapprox(centrality_vector(ct, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X,
+    @test isapprox(centrality_vector(ct, pr; rd = rdi, x_src = :prior, iv = rdi.iv,
+                                     ivpa = rdi.ivpa).X,
                    centrality_vector(ct, tail.X; iv = tail.iv, ivpa = tail.ivpa).X)
     # Under `x_src = :data` the clustering reads `rd.X`, whose rows `iv` already pairs.
     @test clusterise(cle, pr; rd = rdi, x_src = :data, iv = rdi.iv, ivpa = rdi.ivpa).res.order ==
           clusterise(cle, rdi.X; iv = rdi.iv, ivpa = rdi.ivpa).res.order
     # An `iv` with fewer rows than the prior returns is still refused.
-    @test_throws DimensionMismatch clusterise(cle, pr; rd = rdi, iv = rdi.iv[1:(n - 1), :],
-                                              ivpa = rdi.ivpa)
+    @test_throws DimensionMismatch clusterise(cle, pr; rd = rdi, x_src = :prior,
+                                              iv = rdi.iv[1:(n - 1), :], ivpa = rdi.ivpa)
 
     # An optimiser that clusters the prior returns now fits, where it raised a
     # `DimensionMismatch` before.
@@ -1574,7 +1580,7 @@ end
                                  opt = HierarchicalOptimiser(;
                                                              pe = EmpiricalPrior(;
                                                                                  max_scenarios = n),
-                                                             cle = cle))
+                                                             cle = cle, x_src = :prior))
     res = optimise(hrp, rdi)
     @test res.clr.res.order == clt.res.order
     @test isapprox(sum(res.w), 1)

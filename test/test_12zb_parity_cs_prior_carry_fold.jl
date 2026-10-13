@@ -227,7 +227,9 @@ PortfolioOptimisers.lookback(::ImpliedVolatilityLevel) = 1
         # Under `x_src = :prior` the clustering reads the fitted rows of the prior, the last
         # rows after the Descriptor warm-up and the exposure lag, and the last rows of the
         # surface pair them (#1655).
-        hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
+        hrp = HierarchicalRiskParity(;
+                                     opt = HierarchicalOptimiser(; pe = pe, cle = cle,
+                                                                 x_src = :prior))
         res = optimise(hrp, rdc)
         @test size(res.pr.X, 1) < size(rdc.X, 1)
         n = size(res.pr.X, 1)

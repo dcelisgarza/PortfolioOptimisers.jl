@@ -552,9 +552,13 @@ end
     # `DenoiseCovariance` are constructors that build a `PortfolioOptimisersCovariance`, so
     # they take the recursion of the type they build.
     ew = ExpWeightedCovariance(; centring = PreCentred())
+    # A `Covariance` with a `CoveragePolicy` reads the gap itself, on the observations of
+    # each pair, so it answers `NaN`, and a composite around it keeps the gap (#1694).
+    pc = Covariance(; cvg = CoveragePolicy())
     for nest in (PortfolioOptimisersCovariance(; ce = ew), ProcessedCovariance(; ce = ew),
                  DenoiseCovariance(; ce = ew), CorrelationCovariance(; ce = ew),
-                 PortfolioOptimisersCovariance(; ce = CorrelationCovariance(; ce = ew)))
+                 PortfolioOptimisersCovariance(; ce = CorrelationCovariance(; ce = ew)), pc,
+                 PortfolioOptimisersCovariance(; ce = pc), CorrelationCovariance(; ce = pc))
         @test isnan(PortfolioOptimisers.gap_fill_value(nest))
     end
     for nest in (Covariance(; ce = ew), GeneralCovariance(; ce = ew),
