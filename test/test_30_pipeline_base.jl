@@ -835,18 +835,111 @@ end
         callable = PipelineStep(; est = ctx -> prior(EmpiricalPrior(), ctx.returns),
                                 reads = (:returns,), writes = :prior)
         @test Pipeline(; steps = (callable, cases[1](true))) isa Pipeline
-        # Only a prior step takes `brt = true`: the wrapper passes it to no other step.
+        # Only a step that reads the returns takes `brt = true` (#1670): the wrapper
+        # passes it to no other step.
         @test step(true).brt && !step(false).brt
         @test PipelineStep(; est = Online(EmpiricalPrior(); max_history = 10),
                            writes = :prior, brt = true).brt
         for (est, slot) in
-            ((MeanRisk(; opt = jo(true)), :opt), (ClustersEstimator(), :phylogeny),
+            ((MeanRisk(; opt = jo(true)), :opt), (WeightBoundsEstimator(), :constraints),
              (ctx -> nothing, :prior))
             @test_throws ArgumentError PipelineStep(; est = est, writes = slot, brt = true)
         end
         # `brt = true` on returns with no benchmark is refused by the step, as by `prior`.
         @test_throws ArgumentError fit(Pipeline(; steps = (step(true), cases[4](true))),
                                        rd0)
+    end
+
+    @testset "every step that reads the returns fits in the frame of the optimiser (#1670)" begin
+        # #1659 gave the prior step a frame. An uncertainty, clustering, phylogeny,
+        # centrality or exposure step read the raw `X` too, and `inject_context` put its
+        # value into an optimiser whose other readers read `X - B`. Each such step now
+        # reads the returns under the `brt` of its PipelineStep, and the Pipeline refuses
+        # a step whose frame differs from the optimiser's. A matched step equals the same
+        # estimator in the field of the optimiser.
+        rng = StableRNG(987654321)
+        F = randn(rng, 60, 2) / 100
+        M = [1.0 0.0; 0.5 0.5; 0.0 1.0; 0.8 0.2; 0.2 0.8]
+        rd = ReturnsResult(; nx = string.("A", 1:5),
+                           X = F * transpose(M) + randn(rng, 60, 5) / 100,
+                           nf = ["MTUM", "VLUE"], F = F, nb = ["BM"],
+                           B = randn(StableRNG(1670), 60) / 100)
+        pstep(brt) = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = brt)
+        sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
+        ue = DeltaUncertaintySet()
+        ple = SemiDefinitePhylogenyEstimator()
+        cte = CentralityConstraint()
+        ece = ExposureConstraintEstimator(;
+                                          lce = LinearConstraintEstimator(;
+                                                                          val = "MTUM <= 0.3"),
+                                          space = FactorSpace(; re = StepwiseRegression()))
+        jo(brt; kw...) = JuMPOptimiser(; pe = EmpiricalPrior(), slv = jopt().slv, brt = brt,
+                                       kw...)
+        ho(brt; kw...) = HierarchicalOptimiser(; brt = brt, x_src = :data, kw...)
+        # (the step, the optimiser that receives it, the optimiser with the estimator)
+        cases = (brt -> (PipelineStep(; est = ue, reads = (:returns,),
+                                      writes = :uncertainty, target = :sigma, brt = brt),
+                         MeanRisk(; r = UncertaintySetVariance(), opt = jo(brt)),
+                         MeanRisk(; r = UncertaintySetVariance(; ucs = ue), opt = jo(brt))),
+                 brt -> (PipelineStep(; est = ClustersEstimator(), writes = :phylogeny,
+                                      brt = brt), HierarchicalRiskParity(; opt = ho(brt)),
+                         HierarchicalRiskParity(; opt = ho(brt; cle = ClustersEstimator()))),
+                 brt -> (PipelineStep(; est = ple, writes = :constraints, brt = brt),
+                         MeanRisk(; opt = jo(brt; x_src = :data)),
+                         MeanRisk(; opt = jo(brt; x_src = :data, ple = ple))),
+                 brt -> (PipelineStep(; est = cte, writes = :constraints, brt = brt),
+                         MeanRisk(; opt = jo(brt; x_src = :data)),
+                         MeanRisk(; opt = jo(brt; x_src = :data, cte = cte))),
+                 brt -> (PipelineStep(; est = ece, writes = :constraints, brt = brt),
+                         MeanRisk(; opt = jo(brt)),
+                         MeanRisk(; opt = jo(brt; lcse = ece, sets = sets))))
+        for mk in cases, brt in (false, true)
+            st, opt, ref = mk(brt)
+            res = fit(Pipeline(; steps = (pstep(brt), st, opt)), rd)
+            @test isapprox(res.w, optimise(ref, rd).w; atol = 1e-6)
+            # A mismatch is refused when the pipeline is built, in both directions.
+            err = try
+                Pipeline(; steps = (pstep(brt), mk(!brt)[1], opt))
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError)
+            @test occursin("brt = $(!brt)", err.msg) && occursin("brt = $brt", err.msg)
+        end
+        # The value of each step is the verb under the frame of the step.
+        res = fit(Pipeline(; steps = (pstep(true), cases[1](true)[1])), rd)
+        @test res.ctx.uncertainty.sigma.ub == sigma_ucs(ue, rd; brt = true).ub
+        @test res.ctx.uncertainty.sigma.ub != sigma_ucs(ue, rd).ub
+        # A bare step reads the raw returns, so it meets `brt = true` with a refusal.
+        @test_throws ArgumentError Pipeline(; steps = (pstep(true), ple, cases[3](true)[2]))
+        # A wrapped nested pipeline states the frame of its last step.
+        nested(brt) = PipelineStep(; est = Pipeline(; steps = (pstep(brt),)),
+                                   writes = :prior)
+        @test_throws ArgumentError Pipeline(; steps = (nested(false), cases[2](true)[2]))
+        @test Pipeline(; steps = (nested(true), cases[2](true)[2])) isa Pipeline
+        # A network step writes a phylogeny matrix that no optimiser receives, so it takes
+        # a frame and is not checked.
+        ne = PipelineStep(; est = NetworkEstimator(), writes = :phylogeny, brt = true)
+        res = fit(Pipeline(; steps = (ne,)), rd)
+        @test res.ctx.phylogeny.X ==
+              phylogeny_matrix(NetworkEstimator(), rd; rd = rd, x_src = :data, brt = true).X
+        @test Pipeline(; steps = (NetworkEstimator(), cases[2](true)[2])) isa Pipeline
+        # An optimiser with no field for `:cle` ignores a clustering, so it is not checked.
+        @test Pipeline(; steps = (ClustersEstimator(), MeanRisk(; opt = jo(true)))) isa
+              Pipeline
+        # A step that reads no returns takes no frame: an uncertainty set that reads the
+        # prior, and an exposure constraint that reads the loadings of the prior.
+        for (est, slot) in ((NormalUncertaintySet(; pe = nothing), :uncertainty),
+                            (ExposureConstraintEstimator(; lce = ece.lce, space = FactorSpace()),
+                             :constraints))
+            @test_throws ArgumentError PipelineStep(; est = est, writes = slot,
+                                                    target = if slot === :uncertainty
+                                                        :sigma
+                                                    else
+                                                        nothing
+                                                    end, brt = true)
+        end
     end
 
     @testset "uncertainty steps and routing" begin

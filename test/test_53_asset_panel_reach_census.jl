@@ -183,9 +183,10 @@ re-derive them:
 
     #=
     The pipeline is where the audit found the defect in `src/`: `run_step` and
-    `constraint_step_value` pass `ctx.returns` in the `pr` slot and never fill `rd`, because
-    the context holds one carrier and there is no second one to pass. Each of the four sites
-    threw before `#666`.
+    `constraint_step_value` passed `ctx.returns` in the `pr` slot and never filled `rd`,
+    because the context holds one carrier and there is no second one to pass. Each of the
+    four sites threw before `#666`. Since #1670 they pass the same carrier as `rd` too, to
+    read the returns under the `brt` of the step.
     =#
     @testset "The four `Pipeline` sites carry the panel" begin
         fde = FeatureDistance(; sel = ["z1", "z3"], strict = true)

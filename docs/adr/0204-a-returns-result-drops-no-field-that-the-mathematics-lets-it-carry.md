@@ -35,7 +35,9 @@ The benchmark census for the online estimators found a third gap
 ([#1659](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1659)). A `Pipeline` prior
 step had no `brt`, and `inject_context` put its Prior Result into the optimiser unchanged, because
 `prior` returns a Prior Result as it is. Under the optimiser's `brt = true` that prior held the
-moments of the raw `X`, while every other reader of the optimiser read `X - B`.
+moments of the raw `X`, while every other reader of the optimiser read `X - B`. The uncertainty-set,
+clustering, phylogeny, centrality and exposure steps had the same gap
+([#1670](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1670)).
 
 The maintainer stated the rule on 2026-10-12: the quantities of a `ReturnsResult` are never dropped,
 unless they truly cannot be carried for mathematical reasons. The maintainer decided #1651 on the
@@ -87,15 +89,21 @@ whatever `X` is in scope.
    alone, ignores them as its batch fit does
    ([#1643](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1643)).
 
-7. **A prior step of a `Pipeline` states its frame in its `PipelineStep`, and the frame must
-   equal the frame of the optimiser that receives the prior** (#1659). A prior estimator holds no
-   `brt`, so `PipelineStep(; est = pe, writes = :prior, brt = true)` fits the step on `X - B`: in
-   batch through `prior(pe, rd; brt)`, and in the online step through `fold_prior` under `brt`,
-   with the raw rows in the Fold Context of the Pipeline, as decision 5 states for an optimiser.
-   `assert_benchmark_frame` refuses a mismatch when the `Pipeline` is built, because the
-   configuration alone decides it. A bare prior step fits on the raw returns, so it meets an
-   optimiser with `brt = true` with that refusal. `brt = true` on a step that wraps no prior is
-   refused too, because the wrapper passes it to no other step.
+7. **A step of a `Pipeline` that reads the returns states its frame in its `PipelineStep`, and
+   the frame must equal the frame of the optimiser that receives the value of the step** (#1659,
+   #1670). A step estimator holds no `brt`, so `PipelineStep(; est = pe, writes = :prior,
+   brt = true)` fits the step on `X - B`: in batch through `prior(pe, rd; brt)`, and in the online
+   step through `fold_prior` under `brt`, with the raw rows in the Fold Context of the Pipeline, as
+   decision 5 states for an optimiser. A clustering, network, uncertainty-set, phylogeny,
+   centrality or exposure step reads the returns as the optimiser reads them under its `brt` and
+   `x_src = :data`. `assert_benchmark_frame` refuses a mismatch when the `Pipeline` is built,
+   because the configuration alone decides it. A bare step fits on the raw returns, so it meets an
+   optimiser with `brt = true` with that refusal. A clustering step is checked against the `brt`
+   of the optimiser, which is also the frame of its prior. A network step writes a phylogeny matrix
+   that no optimiser receives, so it takes a frame and is not checked. `brt = true` on a step that
+   reads no returns is refused too: an uncertainty set that reads the prior, an exposure constraint
+   that reads the loadings of the prior, and every other family, because the wrapper passes `brt`
+   to none of them.
 
 ## Consequences
 
@@ -113,7 +121,8 @@ whatever `X` is in scope.
   `X - B`. A caller who wants that sets `brt = true` on each inner optimiser.
 - The window of the head is views into its buffers, as before, so the step takes no copy.
 - A pipeline that injected a raw prior into an optimiser with `brt = true` now fails when it is
-  built. The caller wraps the prior step with `brt = true`.
+  built. The caller wraps the prior step with `brt = true`. The same holds for a raw uncertainty
+  set, clustering, phylogeny, centrality or exposure step.
 
 ## Alternatives considered
 

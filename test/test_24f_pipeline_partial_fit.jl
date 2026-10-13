@@ -420,6 +420,36 @@ what keeps the JuMP families cheap.
         end
     end
 
+    @testset "A benchmark-relative uncertainty or constraint step reads the excess returns (#1670)" begin
+        # The steps before the owner run over the Fold Context of the Pipeline, which keeps
+        # the raw rows and the benchmark, so each reads the returns under the `brt` of its
+        # PipelineStep, as in batch.
+        Xb = randn(StableRNG(1670), T, N) ./ 100
+        Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(16700), T) ./ 1000
+        rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
+        pstep = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = true)
+        ue = DeltaUncertaintySet()
+        ustep = PipelineStep(; est = ue, reads = (:returns,), writes = :uncertainty,
+                             target = :sigma, brt = true)
+        cstep = PipelineStep(; est = CentralityConstraint(), writes = :constraints,
+                             brt = true)
+        jo = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true, x_src = :data)
+        for pipe in (Pipeline(;
+                              steps = (pstep, ustep,
+                                       MeanRisk(; r = UncertaintySetVariance(), opt = jo))),
+                     Pipeline(; steps = (pstep, cstep, MeanRisk(; opt = jo))))
+            on = fit(stepped(pipe, rdb, blocks))
+            ba = fit(pipe, rows(rdb, 1:80))
+            @test isapprox(on.w, ba.w; atol = weight_tol(pipe))
+            b = cross_val_predict(pipe, rdb, batch_cv)
+            o = cross_val_predict(pipe, rdb, online_cv)
+            @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-5)
+                      for (pb, po_) in zip(b.pred, o.pred))
+        end
+        on = fit(stepped(Pipeline(; steps = (pstep, ustep)), rdb, blocks))
+        @test on.ctx.uncertainty.sigma.ub ≈ sigma_ucs(ue, rows(rdb, 1:80); brt = true).ub
+    end
+
     @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the fold route" begin
         # A statistic fill is window-valued, which the fold route refuses and the refit
         # route admits: every fold is a batch fit over the buffer.

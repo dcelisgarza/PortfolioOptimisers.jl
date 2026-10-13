@@ -21,14 +21,16 @@ pipeline_asset_sets
 add_constraint_result
 ```
 
-## The frame of a prior step
+## The frame of a step
 
-A prior step fits on the raw returns, or on the returns in excess of the benchmark when its [`PipelineStep`](@ref) sets `brt = true`. The optimiser that receives the prior must read it in the same frame, and the [`Pipeline`](@ref) constructor checks this.
+A step that reads the returns fits on the raw returns, or on the returns in excess of the benchmark when its [`PipelineStep`](@ref) sets `brt = true`. Such a step is a prior, clustering, network, uncertainty-set, phylogeny, centrality or exposure step. The optimiser that receives the value of the step must read the returns in the same frame, and the [`Pipeline`](@ref) constructor checks this.
 
 ```@docs
 assert_step_brt
 pipe_prior_brt
-step_prior_brt
+step_reads_returns
+step_brt
+pipe_receives_step
 pipe_terminal_optimiser
 assert_benchmark_frame
 ```

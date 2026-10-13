@@ -799,7 +799,7 @@ end
 
 Folds a block into the row owner of a [`Pipeline`](@ref), and records the own context of the Pipeline where the owner keeps none.
 
-An optimisation owner takes the online step itself. It folds through its own [`partial_fit!`](@ref) under its own `brt`, and the Pipeline records nothing beside it. The `brt` of its step is `false`, because a [`PipelineStep`](@ref) takes `brt = true` for a prior alone. The method refuses an [`OnlinePortfolioSelection`](@ref) head. This is the check of a hand-driven run, as [`assert_online_owner`](@ref) is the check of the fold loop, and that docstring states the reason.
+An optimisation owner takes the online step itself. It folds through its own [`partial_fit!`](@ref) under its own `brt`, and the Pipeline records nothing beside it. The `brt` of its step is `false`, because a [`PipelineStep`](@ref) refuses `brt = true` on an optimiser, which reads no returns through the wrapper. The method refuses an [`OnlinePortfolioSelection`](@ref) head. This is the check of a hand-driven run, as [`assert_online_owner`](@ref) is the check of the fold loop, and that docstring states the reason.
 
 A prior owner folds under the `brt` of its step, as the batch step fits under it ([`run_step`](@ref)). Under `brt` the buffer of the prior holds the excess returns `X - B`, so the context of the Pipeline keeps the raw rows, and `fit(pipe)` with no data rebuilds the raw `ReturnsResult`, as an optimiser does ([`fold_returns`](@ref)).
 

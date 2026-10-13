@@ -361,7 +361,7 @@ Give the steps in the order of execution. Each element is a step estimator or a 
   - A nested pipeline changes no Data Slot that the outer pipeline does not receive, see [`assert_nested_data_slots`](@ref).
   - Each constraint step resolves to one routing target, see [`assert_constraint_targets`](@ref).
   - The last optimiser can receive each target that an earlier step writes, see [`assert_routable`](@ref).
-  - Each prior step fits in the frame of the last optimiser, `brt` for `brt`, see [`assert_benchmark_frame`](@ref).
+  - Each step that reads the returns, and whose value the last optimiser receives, fits in the frame of that optimiser, `brt` for `brt`, see [`assert_benchmark_frame`](@ref).
   - An earlier step writes each slot that a step reads, or the pipeline input fills it with `prices` or `returns`. Raises an `ArgumentError`.
   - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
   - The step names are unique. Raises an `ArgumentError`.
@@ -471,7 +471,8 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
-step_prior_brt(p::Pipeline) = step_prior_brt(p.steps[end])
+step_brt(p::Pipeline) = step_brt(p.steps[end])
+pipe_receives_step(opt, p::Pipeline) = pipe_receives_step(opt, p.steps[end])
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
