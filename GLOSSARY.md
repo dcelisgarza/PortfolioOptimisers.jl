@@ -147,6 +147,10 @@ A covariance forecast evaluation with `brt = true` fits, steps and scores its fo
 An online portfolio selection head with `brt = true` steps on the price relative `1 + r - b` of the Excess Frame, and every reader of the rows inside its rule reads `X - B`. Its rows stay raw, so a leader and the prior of a Risk Loss or of a programme set apply their own `brt`, and `predict` reports the raw wealth of the fund.
 *Avoid*: relative returns, which can also mean a ratio to the benchmark.
 
+**Returns Source**
+The returns that a reader of the returns states that it fits on: the returns data as they arrived, the returns data in the Excess Frame, or the prior. The prior gives its returns in the frame that it fitted in, and gives a regression its loadings. A reader that states no source reads the returns data, and a regression first takes the loadings of the prior. See ADR 0211 and ADR 0212.
+*Avoid*: matrix source, which also names the source of a feature matrix.
+
 **Data Benchmark**
 The benchmark that the returns data carries, `B` of a `ReturnsResult`, as a tracking benchmark: `DataTracking()`. It holds no series of its own. Each reader that holds the returns data binds it to the `B` of its own rows with `bind_data_benchmark`: an optimiser after its view at the Investable Mask, the online step on its buffer, a fold on its training rows, an online portfolio selection head on its rows window, and the value-level `expected_risk` on a `ReturnsResult`. So it follows the rows where a `ReturnsTracking` series, fixed at construction, cannot.
 A vector `B` is the benchmark series. A matrix `B` holds one benchmark per asset, and the series is `B * w`, so the tracking error is that of `(X - B) * w`. A reader in the Excess Frame (`brt = true`) refuses it, because the tracking error would subtract `B` twice.

@@ -20,7 +20,8 @@ The forwarding has a cost that ADR 0204 states: a reader that a later change add
 it reads the raw `X` under `brt = true`. #1651, #1659 and #1670 each found a reader that did not.
 The map "`x_src` takes over `brt`" (#1678) moves the frame into `x_src`, so that each reader states
 which returns it reads, and the excess returns `X - B` are one of the values. This ADR decides where
-`x_src` lives (#1680). The values, their type and their names are #1681. The check of a mix of frames
+`x_src` lives (#1680). The values, their type and their names are #1681, in ADR
+[0212](0212-a-returns-source-is-a-singleton-type.md). The check of a mix of frames
 is #1682. The online step, the outer problem of a meta-optimiser and the covariance forecast
 evaluation are #1683.
 
@@ -91,7 +92,7 @@ The maintainer decided on 2026-10-13.
 - About 30 types gain a field, and each docstring and each printed doctest gains a row.
 - About 20 nesting fields gain a check through one shared helper.
 - A tracking-error `MeanRisk` with a prior, an uncertainty set and a centrality constraint states
-  `:excess` in three places, where `brt = true` was one.
+  `ExcessSource()` in three places, where `brt = true` was one.
 - **The default of a graph reader changes from `pr.X` to `rd.X`.** The clusters of a graph reader
   move under a factor prior, a scenario window or a gap. The parity rule of #1678 says that a
   migration build closes only when the pins of `test/test_78_brt_pinned_outputs.jl` pass unchanged.
@@ -103,14 +104,14 @@ The maintainer decided on 2026-10-13.
 
 ## Alternatives considered
 
-- **A wrapper per family**, for example `SourcedPrior(pe; x_src = :excess)`. The reader types stay
+- **A wrapper per family**, for example `SourcedPrior(pe; x_src = ExcessSource())`. The reader types stay
   unchanged, but each family gets one more type, each bridge unwraps it, and a wrapper can sit in an
   inner slot where it does nothing.
 - **One source field per reader slot on the head**, for example `pe_src` and `cte_src`. An uncertainty
   set inside a risk measure or a constraint has no slot on the head, the direct verbs keep a keyword,
   and the obligation of ADR 0204 stays.
 - **Ignore the field of an inner reader and document it.** No code, but
-  `FactorPrior(; pe = EmpiricalPrior(; x_src = :excess))` fits the raw returns with no error.
+  `FactorPrior(; pe = EmpiricalPrior(; x_src = ExcessSource()))` fits the raw returns with no error.
 - **Let the inner value govern.** The outer reader passes `rd` down. One prior can then fit its
   regression on `X` and its covariance on `X - B`, the defect class of #1651 inside one estimator.
 - **The field on the uncertainty set.** The source is then stated in two places in the type tree, and
@@ -118,7 +119,7 @@ The maintainer decided on 2026-10-13.
 - **`nothing` keeps `pr.X` on a graph reader.** No output changes, but the default reads a
   reconstruction under a factor prior.
 - **`nothing` refits a regression on `rd.X`.** The loadings can disagree with `pr.sigma`.
-- **A default on the head**, `JuMPOptimiser(; x_src = :excess)`, that fills each reader whose field is
+- **A default on the head**, `JuMPOptimiser(; x_src = ExcessSource())`, that fills each reader whose field is
   `nothing`. It is the head-level `brt` under a new name, it needs a rule of precedence, and each head
   forwards the value again.
 - **The field on each online rule.** 21 rule types get it, a rule inside a rule over rules must keep

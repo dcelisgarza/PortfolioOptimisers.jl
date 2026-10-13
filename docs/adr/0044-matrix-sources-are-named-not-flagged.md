@@ -90,6 +90,7 @@ are public and do not pass through an optimiser constructor.
 ADR [0211](0211-each-reader-of-the-returns-states-its-own-source.md) moves `x_src` from the three
 optimisers onto each reader estimator: the priors, the graph readers, the regression estimators and
 the step of `OnlinePortfolioSelection`. Its default becomes `nothing`, which reads `rd.X` on a prior
-and on a graph reader. So the default of a graph reader changes from `pr.X` to `rd.X`. The name stays
-until #1681 decides the values, their type and their names. The rule of this ADR holds: a source is
-named, not flagged. `brt` is the flag that the move removes.
+and on a graph reader. So the default of a graph reader changes from `pr.X` to `rd.X`. ADR
+[0212](0212-a-returns-source-is-a-singleton-type.md) keeps the name `x_src` and replaces the
+`Symbol` with a singleton type: `DataSource()`, `ExcessSource()` or `PriorSource()`. The rule of this
+ADR holds: a source is named, not flagged. `brt` is the flag that the move removes.
