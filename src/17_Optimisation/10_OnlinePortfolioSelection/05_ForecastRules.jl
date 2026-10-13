@@ -165,7 +165,7 @@ With no state, the refit arm:
 
 With a [`ForecasterState`](@ref), the fold arm:
 
- 1. Fold the forecaster `st.me` with [`partial_fit!`](@ref). When `rows` holds the rows, fold the last row of `rows.X` under the mask of [`last_active_mask`](@ref). When `rows` is `nothing`, fold `x .- 1`.
+ 1. Fold the forecaster `st.me` with [`partial_fit!`](@ref). When `rows` holds the rows, fold the last row of their returns in the head's frame, which [`head_frame_returns`](@ref) gives, under the mask of [`last_active_mask`](@ref). When `rows` is `nothing`, fold `x .- 1`, which is in the head's frame too.
  2. Read the expected returns from the state of the folded forecaster.
  3. Return the new [`ForecasterState`](@ref) and one plus the expected returns, through [`flat_where_undefined`](@ref).
 
@@ -205,7 +205,8 @@ function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterSta
 end
 function forecast_relative(::AbstractExpectedReturnsEstimator, st::ForecasterState,
                            x::AbstractVector, rows::ReturnsResult)
-    me = partial_fit!(st.me, view(rows.X, size(rows.X, 1), :);
+    X = head_frame_returns(rows)
+    me = partial_fit!(st.me, view(X, size(X, 1), :);
                       active_mask = last_active_mask(rows.pnl))
     return ForecasterState(me),
            flat_where_undefined(one(eltype(x)) .+ vec(Statistics.mean(me)))
@@ -308,7 +309,7 @@ end
 
 Returns the returns that the refit arm fits a forecaster on, the Asset Panel that explains them, and the implied volatilities of the rows as keywords of `mean`.
 
-When `rows` is a [`ReturnsResult`](@ref), these are its `X`, its `pnl`, and its `iv` and `ivpa`. Without one, they are the current row as a matrix of one row, no panel and no keywords.
+When `rows` is a [`ReturnsResult`](@ref), these are its returns in the head's frame, which [`head_frame_returns`](@ref) gives, its `pnl`, and its `iv` and `ivpa`. The frame is `X - B` when the head's `brt` is `true`, and `X` otherwise. Without a Returns Result, they are the current row as a matrix of one row, no panel and no keywords. The current row is in the head's frame already, because the head forms `x` from it.
 
 The keywords go to every forecaster, as [`prior`](@ref) over a [`ReturnsResult`](@ref) gives them to every member. A [`PriorExpectedReturns`](@ref) gives them to its prior, so a member of the prior that reads them, such as an [`ImpliedVolatility`](@ref) covariance, reads the surface over the same rows. A [`WindowedExpectedReturns`](@ref) cuts `iv` to its window first. Every other forecaster ignores them.
 
@@ -318,7 +319,7 @@ The keywords go to every forecaster, as [`prior`](@ref) over a [`ReturnsResult`]
   - [`scale_relative`](@ref)
 """
 function refit_rows(rows::ReturnsResult, ::AbstractVector)
-    return rows.X, rows.pnl, (; iv = rows.iv, ivpa = rows.ivpa)
+    return head_frame_returns(rows), rows.pnl, (; iv = rows.iv, ivpa = rows.ivpa)
 end
 function refit_rows(::Nothing, x::AbstractVector)
     return reshape(x .- one(eltype(x)), 1, :), nothing, (;)

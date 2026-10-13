@@ -1164,7 +1164,7 @@ A leg that the window does not cover gets a zero gradient, so the loss does not 
 
 # Algorithm
 
-The measure reads the rows `rd` that the prior is fitted on: each [`DataTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The head fits on no Excess Frame of its own, so it binds under `brt = false`.
+The measure reads the rows `rd` that the prior is fitted on: each [`DataTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The prior of the loss fits the raw rows whatever the head's `brt` is, so the measure binds under `brt = false`.
 
 When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the bound measure at `u`. Otherwise it runs these steps.
 

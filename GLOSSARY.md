@@ -143,6 +143,7 @@ Code that builds a `ReturnsResult` from another one carries every field, and dro
 The asset returns that a reader of an optimiser with `brt = true` fits on: `X - B`, which `benchmark_relative_returns` gives as a matrix at the point of use. The readers are the prior, a factor regression, an uncertainty set with a prior of its own, and a clustering, phylogeny or centrality estimator that reads the data. The `ReturnsResult` stays raw: it keeps `X` and `B`, each reader subtracts once, and an inner optimiser, a fallback and the outer problem of a meta-optimiser apply their own `brt`. Returns with no benchmark have no Excess Frame, and the readers refuse them. See ADR 0204.
 A prior step of a `Pipeline` fits in the Excess Frame when its `PipelineStep` sets `brt = true`, and its frame must equal the frame of the optimiser that receives the prior.
 A covariance forecast evaluation with `brt = true` fits, steps and scores its forecast in the Excess Frame, and its Result records the frame.
+An online portfolio selection head with `brt = true` steps on the price relative `1 + r - b` of the Excess Frame, and every reader of the rows inside its rule reads `X - B`. Its rows stay raw, so a leader and the prior of a Risk Loss or of a programme set apply their own `brt`, and `predict` reports the raw wealth of the fund.
 *Avoid*: relative returns, which can also mean a ratio to the benchmark.
 
 **Data Benchmark**

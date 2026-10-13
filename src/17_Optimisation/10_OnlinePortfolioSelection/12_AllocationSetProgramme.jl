@@ -266,8 +266,8 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
                           set.slt, set.sst, set.sglt, set.sgst, set.ss)
     set_allocation_turnover!(model, factory(set.tn, w), bare)
     if !isnothing(set.tr)
-        # The head fits on no Excess Frame of its own, so a data benchmark binds under
-        # `brt = false`.
+        # The set's prior fits the raw rows whatever the head's `brt` is, so a data
+        # benchmark binds under `brt = false`.
         tr = bind_data_benchmark(prefix_tracking_benchmark(factory(set.tr, w),
                                                            size(pr.X, 1)), rd, false)
         set_tracking_error_constraints!(model, pr, tr, set, plr, nothing; prefix = prefix)
@@ -279,8 +279,8 @@ function assemble_allocation_set!(model::JuMP.Model, set::ProgrammeAllocationSet
     set_l2_regularisation!(model, l2)
     set_lp_regularisation!(model, lp)
     set_linf_regularisation!(model, linf)
-    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd, false), set,
-                                 pr, plr; prefix = prefix)
+    set_allocation_risk_ceiling!(model, bind_data_benchmark(factory(set.r, w), rd, false),
+                                 set, pr, plr; prefix = prefix)
     set_allocation_return_floor!(model, ret, pr, bare; rd = rd)
     set_iplg_constraints!(model, plr)
     set_sdp_phylogeny_constraints!(model, plr; prefix = prefix)

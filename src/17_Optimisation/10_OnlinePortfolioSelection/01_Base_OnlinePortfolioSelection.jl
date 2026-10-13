@@ -1276,9 +1276,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Holds the context of one row for every projection of that row: the rows that the head holds, the timestamp of the row, and the Held Steps recorded so far.
+Holds the context of one row for every projection of that row: the rows that the head holds, the timestamp of the row, the head's flags and the Held Steps recorded so far.
 
-The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one set of rows and writes one log. The rows are the ones that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`buffer_returns_result`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
+The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The head's `brt` goes on the step too, because the readers of the rows inside a rule, such as the refit of a forecaster or the row selector of a leader, take the rows through the signature of the Online Update, and that signature has no `brt`. [`head_frame_returns`](@ref) reads it. The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one set of rows and writes one log. The rows are the ones that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`buffer_returns_result`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
 
 # Fields
 
@@ -1289,6 +1289,7 @@ $(DocStringExtensions.FIELDS)
   - [`PROJECTION_STEP`](@ref)
   - [`with_projection_step`](@ref)
   - [`buffer_returns_result`](@ref)
+  - [`head_frame_returns`](@ref)
   - [`HeldStep`](@ref)
   - [`project`](@ref)
 """
@@ -1305,6 +1306,10 @@ $(DocStringExtensions.FIELDS)
     The head's `strict` flag. A programme set reads it when it resolves its rows, so it refuses a name that an exposure row states and the universe does not carry, as the head refuses one.
     """
     strict::Bool
+    """
+    The head's `brt` flag. A rule that reads the returns of the rows reads them in excess of the benchmark when it is `true`, through [`head_frame_returns`](@ref).
+    """
+    brt::Bool
     """
     The Held Steps recorded during this row, in the order in which their projections failed.
     """
@@ -1324,7 +1329,7 @@ const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs `f()` inside a [`ProjectionStep`](@ref) over the rows `rows` at `ts`, with the head's `strict` flag.
+Runs `f()` inside a [`ProjectionStep`](@ref) over the rows `rows` at `ts`, with the head's `strict` and `brt` flags.
 
 It returns `(f(), held)`, the result of the update and the Held Steps that its projections recorded. `held` is empty when every projection met the budget.
 
@@ -1334,8 +1339,9 @@ It returns `(f(), held)`, the result of the update and the Held Steps that its p
   - [`ProjectionStep`](@ref)
   - [`fold_online_selection`](@ref)
 """
-function with_projection_step(f, rows::Option{<:ReturnsResult}, ts; strict::Bool = false)
-    step = ProjectionStep(rows, ts, strict, HeldStep[])
+function with_projection_step(f, rows::Option{<:ReturnsResult}, ts; strict::Bool = false,
+                              brt::Bool = false)
+    step = ProjectionStep(rows, ts, strict, brt, HeldStep[])
     out = Base.ScopedValues.with(f, PROJECTION_STEP => step)
     return out, step.held
 end
@@ -1387,6 +1393,29 @@ function projection_step_strict()
     return isnothing(step) ? false : step.strict
 end
 """
+    head_frame_returns(rows::ReturnsResult)
+
+Returns the returns of the rows that a rule reads, in the frame of the head: in excess of the benchmark when the head's `brt` is `true`, and as they arrived otherwise.
+
+The head's `brt` comes from the current [`ProjectionStep`](@ref), and it is `false` outside a step. The rows themselves stay raw, so a prior or a leader that reads them applies its own `brt`. The function never builds a [`ReturnsResult`](@ref): it gives the matrix of [`benchmark_relative_returns`](@ref).
+
+# Validation
+
+  - The head's `brt` is `false`, or `rows` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
+  - `rows` holds returns, which the rows of the head always do. A `TypeError` is thrown otherwise.
+
+# Related
+
+  - [`ProjectionStep`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+  - [`OnlinePortfolioSelection`](@ref)
+"""
+function head_frame_returns(rows::ReturnsResult)
+    step = PROJECTION_STEP[]
+    # The rows of the head always hold returns, so the frame is a matrix and never `nothing`.
+    return benchmark_relative_returns(rows, isnothing(step) ? false : step.brt)::MatNum
+end
+"""
     assert_rule_admits_set(alg::AbstractOnlinePortfolioSelectionAlgorithm, set::AbstractAllocationSet)
 
 Refuses, when the head is built, a rule and an Allocation Set that cannot work together.
@@ -1422,6 +1451,7 @@ $(DocStringExtensions.FIELDS)
         st = nothing,
         X::Option{<:ReturnsBufferState} = nothing,
         nx::Option{<:VecStr} = nothing,
+        nb::Option{<:VecStr} = nothing,
         pnl::Option{<:AssetPanel} = nothing,
         amsk::Option{<:AbstractVector{<:Bool}} = nothing,
         ts::Option{<:AbstractVector} = nothing,
@@ -1444,6 +1474,7 @@ Keywords correspond to the struct's fields.
   - `w` is sliced and renormalised through [`renormalised_view`](@ref), as a copy. The recursion keeps the full `w`.
   - `st` goes to the view of the state of the rule through [`rule_state_view`](@ref).
   - `X`, `nx`, `pnl` and `amsk` are sliced along the asset axis.
+  - `nb` is sliced along the asset axis when it holds one name per asset, which is the names of a matrix benchmark. A single name is that of a vector benchmark, which every asset shares, so it is copied.
   - `n`, `ts` and `hold` pass through, and `ts` is copied.
 
 # Related
@@ -1476,6 +1507,10 @@ Keywords correspond to the struct's fields.
     """
     nx
     """
+    Names of the benchmark columns, pinned by the first step when the head's `brt` is `true`, or `nothing`. A head under `brt = false` reads no benchmark, so it pins none.
+    """
+    nb
+    """
     The static [`AssetPanel`](@ref) of the universe, pinned by the first step, or `nothing`. The state never holds a time-varying panel here.
     """
     pnl
@@ -1495,6 +1530,7 @@ end
 function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st = nothing,
                                        X::Option{<:ReturnsBufferState} = nothing,
                                        nx::Option{<:VecStr} = nothing,
+                                       nb::Option{<:VecStr} = nothing,
                                        pnl::Option{<:AssetPanel} = nothing,
                                        amsk::Option{<:AbstractVector{<:Bool}} = nothing,
                                        ts::Option{<:AbstractVector} = nothing,
@@ -1512,7 +1548,7 @@ function OnlinePortfolioSelectionState(; n::Integer = 0, w::AbstractVector, st =
         @argcheck(panel_is_static(pnl),
                   ArgumentError("an OnlinePortfolioSelectionState pins a static Asset Panel and never a time-varying one: the masks of a time-varying panel are per-observation, so the state keeps the mask of the last row in `amsk` and the rest beside the rows."))
     end
-    return OnlinePortfolioSelectionState(n, w, st, X, nx, pnl, amsk, ts, hold)
+    return OnlinePortfolioSelectionState(n, w, st, X, nx, nb, pnl, amsk, ts, hold)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1538,7 +1574,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies an [`OnlinePortfolioSelectionState`](@ref) so that the copy shares no array with the original.
 
-The method calls `copy` on `w`, `st`, `X`, `nx`, `amsk` and `ts`. The state of the rule and the rows buffer copy their own arrays through their `Base.copy` methods. `n`, `pnl` and `hold` pass through unchanged.
+The method calls `copy` on `w`, `st`, `X`, `nx`, `nb`, `amsk` and `ts`. The state of the rule and the rows buffer copy their own arrays through their `Base.copy` methods. `n`, `pnl` and `hold` pass through unchanged.
 
 # Related
 
@@ -1548,15 +1584,16 @@ The method calls `copy` on `w`, `st`, `X`, `nx`, `amsk` and `ts`. The state of t
 function Base.copy(x::OnlinePortfolioSelectionState)
     return OnlinePortfolioSelectionState(; n = x.n, w = copy(x.w), st = copy_column(x.st),
                                          X = copy_column(x.X), nx = copy_column(x.nx),
-                                         pnl = x.pnl, amsk = copy_column(x.amsk),
-                                         ts = copy_column(x.ts), hold = x.hold)
+                                         nb = copy_column(x.nb), pnl = x.pnl,
+                                         amsk = copy_column(x.amsk), ts = copy_column(x.ts),
+                                         hold = x.hold)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Slices an [`OnlinePortfolioSelectionState`](@ref) to the selected assets, giving the state of the same observations over those assets.
 
-The method slices `w` and renormalises it. It sends the state of the rule to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`ReturnsBufferState`](@ref). It slices the names, the panel and the mask, and it keeps the count, the timestamps and the hold record. The view is a copy for `optimise(opt)` with no data, and the recursion keeps the full `w`.
+The method slices `w` and renormalises it. It sends the state of the rule to its own view through [`rule_state_view`](@ref), and the rows buffer to the view of [`ReturnsBufferState`](@ref). It slices the names, the panel and the mask, and the benchmark names when there is one name per asset. It keeps the count, the timestamps and the hold record. The view is a copy for `optimise(opt)` with no data, and the recursion keeps the full `w`.
 
 # Arguments
 
@@ -1577,16 +1614,14 @@ The method slices `w` and renormalises it. It sends the state of the rule to its
 function port_opt_view(x::OnlinePortfolioSelectionState, i, args...)
     return OnlinePortfolioSelectionState(; n = x.n, w = renormalised_view(x.w, i),
                                          st = rule_state_view(x.st, i, args...),
-                                         X = if isnothing(x.X)
-                                             nothing
+                                         X = port_opt_view(x.X, i, args...),
+                                         nx = nothing_scalar_array_view(x.nx, i),
+                                         nb = if isnothing(x.nb) || isone(length(x.nb))
+                                             copy_column(x.nb)
                                          else
-                                             port_opt_view(x.X, i, args...)
-                                         end, nx = nothing_scalar_array_view(x.nx, i),
-                                         pnl = if isnothing(x.pnl)
-                                             nothing
-                                         else
-                                             port_opt_view(x.pnl, i)
-                                         end, amsk = nothing_scalar_array_view(x.amsk, i),
+                                             nothing_scalar_array_view(x.nb, i)
+                                         end, pnl = port_opt_view(x.pnl, i),
+                                         amsk = nothing_scalar_array_view(x.amsk, i),
                                          ts = copy_column(x.ts), hold = x.hold)
 end
 """

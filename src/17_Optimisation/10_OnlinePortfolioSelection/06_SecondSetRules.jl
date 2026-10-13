@@ -571,7 +571,7 @@ The negative autocorrelation of an asset raises every claim that the asset takes
  1. Set `T`, the number of rows the head holds, or `0` when `rows` is `nothing`.
  2. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
  3. When `T < 2 * wn`, set `q = wh` and go to step 7.
- 4. Take `Rw`, the last `2 * wn` rows of returns. Replace each return that is not finite with zero, and take `L`, the `log1p` of the result.
+ 4. Take `Rw`, the last `2 * wn` rows of returns in the head's frame, which [`head_frame_returns`](@ref) gives. Replace each return that is not finite with zero, and take `L`, the `log1p` of the result.
  5. Compute `cor` and `mu2` with [`lagged_window_correlation`](@ref) over the first `wn` rows and the last `wn` rows of `L`.
  6. Compute the claims with [`anticorrelation_claims`](@ref), and `q` with [`wealth_transfer`](@ref) from `wh`.
  7. Project `q` onto the Allocation Set with `alg.proj`, from `wh`. Return `st` unchanged, and the projection. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
@@ -740,17 +740,17 @@ end
 function online_update!(alg::AntiCorrelation, st, w::AbstractVector, x::AbstractVector,
                         rows::Option{<:ReturnsResult}, set::AbstractAllocationSet)
     wn = alg.window
-    T = isnothing(rows) ? 0 : size(rows.X, 1)
     # The transfers move the wealth held at the end of the period, the paper's `b̂_t`.
     wh = price_adjusted_allocation(w, x)
-    q = if T < 2 * wn
+    q = if isnothing(rows) || size(rows.X, 1) < 2 * wn
         wh
     else
+        T = size(rows.X, 1)
         # The windows are a kernel over price relatives, so a gap reads as one: the leg
         # sat in cash, as the step reads it (see [`price_relative`](@ref)). The logarithm
         # of that relative is `log1p` of the return, which keeps the precision of a small
         # return that the correlation then cancels.
-        Rw = view(rows.X, (T - 2 * wn + 1):T, :)
+        Rw = view(head_frame_returns(rows), (T - 2 * wn + 1):T, :)
         L = log1p.(ifelse.(isfinite.(Rw), Rw, zero(eltype(Rw))))
         cor, mu2 = lagged_window_correlation(view(L, 1:wn, :),
                                              view(L, (wn + 1):(2 * wn), :))

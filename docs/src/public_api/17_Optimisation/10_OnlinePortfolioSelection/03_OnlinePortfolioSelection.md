@@ -12,7 +12,7 @@ The pages of this group list the rules in the order the library added them. [lih
 OnlinePortfolioSelection
 optimise(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult; dims::Int = 1, kwargs...)
 optimise(opt::OnlinePortfolioSelection; kwargs...)
-PortfolioOptimisers.partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.OnlinePortfolioSelectionState}}, rd::ReturnsResult)
+PortfolioOptimisers.partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.OnlinePortfolioSelectionState}}, rd::ReturnsResult)
 factory(opt::OnlinePortfolioSelection, w::VecNum)
 PortfolioOptimisers.port_opt_view(opt::OnlinePortfolioSelection, i, args...)
 Online(::OnlinePortfolioSelection, args...)

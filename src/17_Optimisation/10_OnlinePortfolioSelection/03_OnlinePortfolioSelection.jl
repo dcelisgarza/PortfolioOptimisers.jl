@@ -15,6 +15,8 @@ A given `w0` is over the pinned names, and the head pins and views it with them.
 
 **The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
+**Under `brt = true` the head selects in the Excess Frame.** The rule's step reads the price relative of the return in excess of the benchmark, `x = 1 + r - b`. Here `b` is the benchmark return of the row, one value that every asset shares for a vector benchmark, and one value per asset for a matrix benchmark. Every reader of the rows inside a rule reads the same frame through [`head_frame_returns`](@ref): the refit and the fold of a forecaster, the scale of a [`ForecastReversion`](@ref), the window of an [`AntiCorrelation`](@ref) and the row selector of a [`FollowTheLeader`](@ref). The rows buffer keeps the raw returns and the benchmark, so a prior of a Risk Loss or of a programme set and a leader read the raw rows and apply their own `brt`. A gap in the benchmark is a gap in the frame, which the step reads as one and the head reports as a Held Gap. `predict(res, rd)` reports the raw wealth of the fund, because the fund holds the assets. Returns data with no benchmark is refused with an `ArgumentError`.
+
 **A non-finite return is kept, and read in two ways.** The rule's step reads `x = 1` there, as if the leg held cash. At an asset that the panel marks inactive, or at one to which the recursion gives no weight, this is silent. At an active asset with a non-zero weight it is a Held Gap, which warns by default and refuses under `strict`. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over price relatives reads the gap as one.
 
 The head never forces a zero into the recursion's allocation, and a relisted asset comes back at the recursion's own weight. A programme set that fits on the rows writes a zero at a leg that its prior cannot price, as a batch head does. It admits the leg again when the prior can price it. Under a time-varying panel, the Investable Mask of the Recursion Result is the active mask of the last folded row. `optimise(opt)` with no data slices the full allocation to that mask and renormalises it, and the Result expands it back with a zero at every non-investable asset.
@@ -52,6 +54,8 @@ Where:
 
 The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
 
+Under `brt = true`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -64,11 +68,12 @@ $(DocStringExtensions.FIELDS)
         w0::Option{<:AbstractVector} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
+        brt::Bool = false,
         strict::Bool = false,
         cache::Option{<:OnlinePortfolioSelectionState} = nothing
     ) -> OnlinePortfolioSelection
 
-Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0` and `strict` are static.
+Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `brt` and `strict` are static.
 
 ## Validation
 
@@ -108,6 +113,7 @@ OnlinePortfolioSelection
       w0 ┼ nothing
     fees ┼ nothing
       fb ┼ nothing
+     brt ┼ Bool: false
   strict ┴ Bool: false
 ```
 
@@ -149,6 +155,10 @@ OnlinePortfolioSelection
     """
     fb
     """
+    Whether the head selects in the Excess Frame. When it is `true`, the price relative of each row and every reader of the rows inside a rule read the returns in excess of the benchmark, through [`benchmark_relative_returns`](@ref) and [`head_frame_returns`](@ref). The rows buffer keeps the raw returns and the benchmark, so a prior, a leader and the fallback apply their own `brt`. Returns data with no benchmark `B` is refused.
+    """
+    brt
+    """
     $(field_dict[:strict_opt]) The flag reaches every constraint of the set, the fee and `optimise(opt)` with no data, and the constraints that a programme set resolves on the rows at each step. It also governs a Held Gap, which warns when it is `false` and raises an error when it is `true`.
     """
     strict
@@ -160,7 +170,7 @@ OnlinePortfolioSelection
                                       set::TD{<:AbstractAllocationSet},
                                       w0::Option{<:AbstractVector},
                                       fees::TD_Option{<:FeesE_Fees},
-                                      fb::TDO_Option{<:OptE_Opt}, strict::Bool,
+                                      fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool,
                                       cache::Option{<:OnlinePortfolioSelectionState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :OnlinePortfolioSelection)
         if !isa(set, TimeDependent)
@@ -178,10 +188,11 @@ OnlinePortfolioSelection
             assert_finite(w0, :w0)
         end
         assert_time_dependent_substitution(OnlinePortfolioSelection,
-                                           (; alg, set, w0, fees, fb, strict),
+                                           (; alg, set, w0, fees, fb, brt, strict),
                                            online_portfolio_selection_td_defaults())
         return new{typeof(alg), typeof(set), typeof(w0), typeof(fees), typeof(fb),
-                   typeof(strict), typeof(cache)}(alg, set, w0, fees, fb, strict, cache)
+                   typeof(brt), typeof(strict), typeof(cache)}(alg, set, w0, fees, fb, brt,
+                                                               strict, cache)
     end
 end
 function OnlinePortfolioSelection(;
@@ -189,10 +200,10 @@ function OnlinePortfolioSelection(;
                                   set::TD{<:AbstractAllocationSet} = BoundedAllocationSet(),
                                   w0::Option{<:AbstractVector} = nothing,
                                   fees::TD_Option{<:FeesE_Fees} = nothing,
-                                  fb::TDO_Option{<:OptE_Opt} = nothing,
+                                  fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
                                   strict::Bool = false,
                                   cache::Option{<:OnlinePortfolioSelectionState} = nothing)::OnlinePortfolioSelection
-    return OnlinePortfolioSelection(alg, set, w0, fees, fb, strict, cache)
+    return OnlinePortfolioSelection(alg, set, w0, fees, fb, brt, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -218,7 +229,7 @@ end
 
 Thread the previous fold's weights into the head's fee and fallback, and nowhere else.
 
-The recursion never reads them, so the method carries `alg`, `set`, `w0` and `cache` unchanged.
+The recursion never reads them, so the method carries `alg`, `set`, `w0`, `brt`, `strict` and `cache` unchanged.
 
 # Related
 
@@ -228,7 +239,7 @@ The recursion never reads them, so the method carries `alg`, `set`, `w0` and `ca
 function factory(opt::OnlinePortfolioSelection, w::VecNum)
     return OnlinePortfolioSelection(; alg = opt.alg, set = opt.set, w0 = opt.w0,
                                     fees = factory(opt.fees, w), fb = factory(opt.fb, w),
-                                    strict = opt.strict, cache = opt.cache)
+                                    brt = opt.brt, strict = opt.strict, cache = opt.cache)
 end
 """
     port_opt_view(opt::OnlinePortfolioSelection, i, args...)
@@ -247,7 +258,7 @@ function port_opt_view(opt::OnlinePortfolioSelection, i, args...)
                                     set = port_opt_view(opt.set, i, args...),
                                     w0 = renormalised_view(opt.w0, i),
                                     fees = port_opt_view(opt.fees, i, args...),
-                                    fb = view_child(opt.fb, i, args...),
+                                    fb = view_child(opt.fb, i, args...), brt = opt.brt,
                                     strict = opt.strict,
                                     cache = port_opt_view(opt.cache, i, args...))
 end
@@ -329,8 +340,8 @@ The uniform start and a given `w0` meet the set in the same way. So the allocati
  3. Seed the state of the rule on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing. Steps 2 and 3 run inside one [`with_projection_step`](@ref) under the head's `strict`, which collects the holds in `held`.
  4. Warn on a hold through [`report_held_steps`](@ref).
  5. Size the rows buffer `X`, a [`ReturnsBufferState`](@ref) that keeps the rows with every other field of the Returns Result, from [`rows_needed`](@ref). A count of `nothing` gives an uncapped buffer, a count of zero gives no buffer, and any other count caps the buffer at that count.
- 6. Keep the panel of `rd` as `pnl` when it is static, and `nothing` otherwise.
- 7. Return the state with no row folded, the allocation `w0`, the state `st` of the rule, the buffer `X`, the names and `pnl`.
+ 6. Keep the panel of `rd` as `pnl` when it is static, and `nothing` otherwise. Keep the benchmark names of `rd` as `nb` when the head's `brt` is `true`, and `nothing` otherwise.
+ 7. Return the state with no row folded, the allocation `w0`, the state `st` of the rule, the buffer `X`, the names, `nb` and `pnl`.
 
 # Arguments
 
@@ -380,6 +391,7 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
     end
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     return OnlinePortfolioSelectionState(; n = 0, w = w0, st = st, X = X, nx = rd.nx,
+                                         nb = ifelse(opt.brt, rd.nb, nothing),
                                          pnl = static ? rd.pnl : nothing, amsk = nothing,
                                          ts = nothing)
 end
@@ -392,11 +404,12 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 
 # Algorithm
 
- 1. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
- 2. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
- 3. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
- 4. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it, with the row viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
- 5. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
+ 1. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `brt` is `true`, and `rd.X` otherwise.
+ 2. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
+ 3. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
+ 4. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
+ 5. Fold each row in order through [`online_selection_row!`](@ref), under the timestamp that [`row_timestamp`](@ref) gives it. The row's returns are its row of `R`, and the row of the raw returns data is viewed as a Returns Result of one observation through [`port_opt_view`](@ref). Each row updates the state `st` of the rule, the allocation `w`, the buffer `X` and the hold record `hold`, and adds one to the row count `n`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
+ 6. Return the state with the new `n`, `w`, `st`, `X` and `hold`, the active mask of the last row, and the timestamps folded so far.
 
 # Arguments
 
@@ -408,6 +421,7 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - The head's `brt` is `false`, or `rd` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
   - Everything [`step_active_mask`](@ref) and [`assert_pinned_context`](@ref) refuse.
   - A non-finite cell at an active asset, under `strict`. An `ArgumentError` is thrown.
 
@@ -427,6 +441,7 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
                                rd::ReturnsResult,
                                set::AbstractAllocationSet = static_allocation_set(opt))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
+    R = benchmark_relative_returns(rd, opt.brt)
     amsk = step_active_mask(rd)
     set = resolve_allocation_set(set, size(rd.X, 2), opt.strict, eltype(rd.X))
     state = online_selection_pin(opt, cache, rd, set)
@@ -434,7 +449,7 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
     last_amsk = state.amsk
     hold = state.hold
     for t in axes(rd.X, 1)
-        row = (; r = vec(rd.X[t, :]), amsk = isnothing(amsk) ? nothing : vec(amsk[t, :]),
+        row = (; r = vec(R[t, :]), amsk = isnothing(amsk) ? nothing : vec(amsk[t, :]),
                ts = row_timestamp(rd.ts, t, n), i = n + 1, rd = port_opt_view(rd, t:t, :))
         st, w, X, hold = online_selection_row!(opt, st, w, X, row, rd.nx, set)
         n += 1
@@ -442,7 +457,7 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
     end
     last_amsk = isnothing(last_amsk) ? nothing : BitVector(last_amsk)
     return OnlinePortfolioSelectionState(; n = n, w = w, st = st, X = X, nx = state.nx,
-                                         pnl = state.pnl, amsk = last_amsk,
+                                         nb = state.nb, pnl = state.pnl, amsk = last_amsk,
                                          ts = fold_column(state.ts, rd.ts, nothing),
                                          hold = hold)
 end
@@ -451,7 +466,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the state that a block folds into.
 
-On the first block the method seeds the state through [`online_selection_seed`](@ref). On every later block it returns the state that the head carries, after the pin-and-check that every estimator runs at its online step. The check compares the names and the static panel with those of the first step, and the width with that of the state. The timestamps must be present at every block or at none.
+On the first block the method seeds the state through [`online_selection_seed`](@ref). On every later block it returns the state that the head carries, after the pin-and-check that every estimator runs at its online step. The check compares the names and the static panel with those of the first step, and the width with that of the state. Under `brt = true` it compares the benchmark names too, because the frame of every row is the excess over that benchmark. The timestamps must be present at every block or at none.
 
 # Validation
 
@@ -467,13 +482,14 @@ function online_selection_pin(opt::OnlinePortfolioSelection, ::Nothing, rd::Retu
                               set::AbstractAllocationSet)
     return online_selection_seed(opt, rd, set)
 end
-function online_selection_pin(::OnlinePortfolioSelection,
+function online_selection_pin(opt::OnlinePortfolioSelection,
                               cache::OnlinePortfolioSelectionState, rd::ReturnsResult,
                               ::AbstractAllocationSet)
     N = size(rd.X, 2)
     @argcheck(length(cache.w) == N,
               DimensionMismatch("the state holds $(length(cache.w)) assets and this block carries $N"))
     assert_pinned_context(cache.nx, rd.nx, :nx)
+    assert_pinned_context(cache.nb, ifelse(opt.brt, rd.nb, nothing), :nb)
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     assert_pinned_context(cache.pnl, static ? rd.pnl : nothing, :pnl)
     if !iszero(cache.n)
@@ -486,17 +502,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Takes one row of the recursion, inside a [`ProjectionStep`](@ref) that gives every projection of the row the rows it reads and a log for its holds.
 
-The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
+The row's returns `r` are in the head's frame, in excess of the benchmark under `brt = true`. The row's Returns Result `rd` is raw. The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
 
 A row with a held projection warns once, with the row's timestamp and each hold, and returns the first [`HeldStep`](@ref) record. A row whose projections all solved returns `nothing`.
 
 # Algorithm
 
  1. Name the Held Gaps of the returns `r` at the row's index `i` through [`report_row_gaps`](@ref).
- 2. Fold the row's Returns Result `rd` into the rows buffer `X` through [`partial_fit!`](@ref), when the tree keeps one. The buffer keeps `r` verbatim with its active mask, and every other field of `rd` beside it.
+ 2. Fold the row's Returns Result `rd` into the rows buffer `X` through [`partial_fit!`](@ref), when the tree keeps one. The buffer keeps the raw returns of `rd` verbatim with its active mask, and every other field of `rd` beside it.
  3. Form the price relative `x` through [`price_relative`](@ref), which is one at a gap.
  4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`buffer_returns_result`](@ref).
- 5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows` and the timestamp `ts` that [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
+ 5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows`, the timestamp `ts` and the head's `strict` and `brt` that [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
  6. Warn on a hold through [`report_held_steps`](@ref), which gives the row's hold record.
 
 # Arguments
@@ -505,7 +521,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
   - `st`: The state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing.
   - `w`: The allocation held during the row's period.
   - `X`: The rows buffer, or `nothing`.
-  - `row`: The row, as a named tuple of five fields. `r` holds its returns verbatim, `amsk` holds its active mask or `nothing`, `ts` holds its timestamp or its index in the fold, `i` holds its index in the fold, and `rd` holds the row as a [`ReturnsResult`](@ref) of one observation.
+  - `row`: The row, as a named tuple of five fields. `r` holds its returns in the head's frame, `amsk` holds its active mask or `nothing`, `ts` holds its timestamp or its index in the fold, `i` holds its index in the fold, and `rd` holds the row as a [`ReturnsResult`](@ref) of one observation.
   - `nx`: The asset names, for the Held Gap message.
   - `set`: The Allocation Set, resolved.
 
@@ -534,7 +550,7 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
     x = price_relative.(r)
     rows = buffer_returns_result(X)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
-                                         rows, ts; strict = opt.strict)
+                                         rows, ts; strict = opt.strict, brt = opt.brt)
     return st, w, X, report_held_steps(held, ts)
 end
 """
@@ -727,7 +743,7 @@ Each row of `rd` is one Online Update, in order, and the state never learns the 
   - [`optimise`](@ref)
 """
 function partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                    <:Any,
+                                                    <:Any, <:Any,
                                                     <:Option{<:OnlinePortfolioSelectionState}},
                       rd::ReturnsResult)
     return rebuild_estimator(opt,
@@ -791,7 +807,7 @@ The head is the one family whose online step is the optimisation. The Constraine
   - [`thread_online_folds!`](@ref)
 """
 function online_step_fold(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                        <:Any,
+                                                        <:Any, <:Any,
                                                         <:Option{<:OnlinePortfolioSelectionState}},
                           ctx::TimeDependentContext, rd::ReturnsResult)
     set = opt.set

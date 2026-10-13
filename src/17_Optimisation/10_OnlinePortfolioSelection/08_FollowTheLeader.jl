@@ -952,7 +952,7 @@ Where:
 The steps of the Online Update:
 
  1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
- 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of `rows`.
+ 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of `rows` in the head's frame, which [`head_frame_returns`](@ref) gives. The leader in step 3 reads the raw rows and applies its own `brt`.
  3. When `idx` holds fewer rows than `leader_min_rows(alg.opt)`, set `wstar` to the uniform portfolio projected onto `set` with `alg.proj`, from `wh`. Otherwise set `wstar` to the result of `leader_allocation` on `alg.opt`, the view of `rows` at `idx`, `wh`, `set` and `rows`.
  4. When `wstar` is `nothing`, the step is a Held Step. Return `st` and a copy of `wh`. `st` is the state of the rule: what the rule keeps from one update to the next, or `nothing` for a rule that keeps nothing. This rule returns it unchanged.
  5. When `alg.gamma` is zero, return `st` and `wstar`.
@@ -1197,7 +1197,7 @@ end
 function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::AbstractVector,
                         rows::ReturnsResult, set::AbstractAllocationSet)
     wh = price_adjusted_allocation(w, x)
-    idx = select_rows(alg.sel, price_relative.(rows.X))
+    idx = select_rows(alg.sel, price_relative.(head_frame_returns(rows)))
     wstar = if length(idx) < leader_min_rows(alg.opt)
         project(alg.proj, set, fill(one(eltype(w)) / length(w), length(w)), wh)
     else

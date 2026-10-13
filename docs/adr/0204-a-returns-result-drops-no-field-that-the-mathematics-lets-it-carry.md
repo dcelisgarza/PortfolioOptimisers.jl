@@ -120,6 +120,17 @@ whatever `X` is in scope.
    evaluations in different frames. An `ImpliedVolatility` reads the surface of the assets beside
    `X - B`, as the prior of an optimiser does under `brt`. The returns data holds no surface of the
    excess returns, so the docstring states this and the verb does not refuse it.
+9. **`OnlinePortfolioSelection(; brt = true)` selects in the Excess Frame** (#1662). The step
+   reads the price relative of the excess return, `1 + r - b`, from
+   `benchmark_relative_returns` over the block. Each reader of the rows inside a rule reads
+   `X - B` through `head_frame_returns`: the refit and the fold of a forecaster, the scale of a
+   `ForecastReversion`, the window of an `AntiCorrelation` and the row selector of a
+   `FollowTheLeader`. These readers take the rows through the signature of `online_update!`, which
+   has no `brt`, so the head puts its `brt` on the `ProjectionStep` of the row beside `rows` and
+   `strict`. The rows stay raw, as decision 2 states. So a leader, the prior of a Risk Loss and the
+   prior of a programme set apply their own `brt`, as decision 4 states for an inner optimiser.
+   The state pins `nb` under `brt = true`, because the frame of every row is the excess over that
+   benchmark. `predict` reports the raw wealth of the fund, because the fund holds the assets.
 
 ## Consequences
 
@@ -139,6 +150,9 @@ whatever `X` is in scope.
 - A caller who evaluated a hand-built `ReturnsResult(; X = X .- B)` passes `rd` and `brt = true`, and
   gets the same diagnostics with `B` kept. A caller who builds a `CovarianceForecastEvaluationResult`
   by position passes `brt` after `target`.
+- Under a vector `B`, the Excess Frame moves a log-wealth rule such as `ExponentiatedGradient`,
+  because `1 + r - b` is not a scaling of `1 + r` by one number. A rule with an absolute threshold
+  or a correlation moves too.
 - A pipeline that injected a raw prior into an optimiser with `brt = true` now fails when it is
   built. The caller wraps the prior step with `brt = true`. The same holds for a raw uncertainty
   set, clustering, phylogeny, centrality or exposure step.
@@ -168,6 +182,13 @@ whatever `X` is in scope.
 - **Let the `brt` of a meta-optimiser pass down to its inner optimisers.** It keeps the weights that
   the rebuild gave, but an inner optimiser that holds no `brt` field cannot take it, and the
   fallback and the corner solves already apply their own `brt`.
+
+- **Select on the relative price relative `(1 + r) / (1 + b)` under the head's `brt`** (the second
+  frame of #1662). It does not change a log-wealth rule under a vector `B`, because
+  `x / <w, x>` does not change when every entry is scaled by one number. It is a second frame
+  beside the `X - B` of every other reader of the library.
+- **Thread `brt` through `online_update!`.** Each of its methods and every rule over other rules
+  would take one more argument that most of them do not read.
 
 ## Related
 

@@ -884,6 +884,87 @@ end
         @test !isapprox(md(pe_iv), md(EmpiricalPrior()); atol = 1e-6)
     end
 
+    @testset "The head selects in the Excess Frame under brt (#1662)" begin
+        # Under `brt = true` the step reads `1 + r - b`, and every reader of the rows inside
+        # a rule reads `X - B`. The rows stay raw. So the head under `brt = true` equals the
+        # head on hand-built excess returns, under a vector and a matrix benchmark.
+        rngb = StableRNG(1662)
+        Bv = 0.01 .* randn(rngb, T)
+        Bm = 0.01 .* randn(rngb, T, N)
+        nbm = nx .* "_b"
+        rdb = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bv, ts = ts)
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nbm, B = Bm, ts = ts)
+        exv = ReturnsResult(; nx = nx, X = R .- Bv, ts = ts)
+        exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
+        # The price relative alone, a refit forecaster, a folded forecaster, a scale and a
+        # correlation window.
+        algs = (ExponentiatedGradient(), PassiveAggressiveMeanReversion(),
+                ForecastReversion(), ForecastReversion(; me = SimpleExpectedReturns()),
+                ForecastReversion(; scale = MovingAverage()), AntiCorrelation(; window = 5))
+        for alg in algs, (b, e) in ((rdb, exv), (rdm, exm)), t in (6, 15, T)
+            @test optimise(OPS(; alg = alg, brt = true), rows(b, 1:t)).w ==
+                  optimise(OPS(; alg = alg), rows(e, 1:t)).w
+        end
+        # The frame moves a rule that is not invariant to it.
+        @test !isapprox(optimise(OPS(; brt = true), rdb).w, optimise(OPS(), rdb).w;
+                        atol = 1e-8)
+        # Online equals batch under `brt`.
+        for alg in algs
+            opt = OPS(; alg = alg, brt = true)
+            o = opt
+            for t in 1:T
+                o = po.partial_fit!(o, rows(rdm, t:t))
+            end
+            @test optimise(o).w == optimise(opt, rdm).w
+        end
+        # Each reader of the rows reads the frame inside a step, and the raw rows outside.
+        win, wine = rows(rdm, 1:12), rows(exm, 1:12)
+        inside(f) = first(po.with_projection_step(f, win, 12; brt = true))
+        @test inside(() -> po.head_frame_returns(win)) == wine.X
+        @test po.head_frame_returns(win) === win.X
+        x12 = 1 .+ wine.X[12, :]
+        me = SimpleExpectedReturns()
+        @test inside(() -> po.forecast_relative(me, nothing, x12, win))[2] ==
+              po.forecast_relative(me, nothing, x12, wine)[2]
+        @test inside(() -> po.forecast_relative(me, po.forecaster_seed(me), x12, win))[2] ==
+              po.forecast_relative(me, po.forecaster_seed(me), x12, wine)[2]
+        @test inside(() -> po.scale_relative(MovingAverage(), x12, win)) ==
+              po.scale_relative(MovingAverage(), x12, wine)
+        # A pattern selector reads the frame, and the leader reads the raw rows, so a
+        # selector that reads no returns does not move.
+        ftl(sel, brt) = Logging.with_logger(Logging.NullLogger()) do
+            return optimise(OPS(; alg = FollowTheLeader(; sel = sel), brt = brt),
+                            rows(rdm, 1:12)).w
+        end
+        @test !isapprox(ftl(CorrelationMatch(), true), ftl(CorrelationMatch(), false);
+                        atol = 1e-6)
+        @test ftl(Prefix(), true) == ftl(Prefix(), false)
+        # The wealth that `predict` reports stays raw: the fund holds the assets.
+        res = optimise(OPS(; brt = true), rdb)
+        @test vec(predict(res, rdb).rd.X) ≈ R * res.w
+        # Returns data with no benchmark is refused.
+        @test_throws ArgumentError optimise(OPS(; brt = true), rd)
+        @test_throws ArgumentError po.partial_fit!(OPS(; brt = true), rows(rd, 1:3))
+        # A gap in the benchmark is a Held Gap.
+        Bg = copy(Bv)
+        Bg[5] = NaN
+        rdg = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bg)
+        @test_throws ArgumentError optimise(OPS(; brt = true, strict = true), rdg)
+        # The state pins the benchmark names under `brt = true` only.
+        o = po.partial_fit!(OPS(; brt = true), rows(rdb, 1:3))
+        @test o.cache.nb == ["BM"]
+        rdb2 = ReturnsResult(; nx = nx, X = R, nb = ["BM2"], B = Bv, ts = ts)
+        @test_throws ArgumentError po.partial_fit!(o, rows(rdb2, 4:5))
+        o0 = po.partial_fit!(OPS(), rows(rdb, 1:3))
+        @test isnothing(o0.cache.nb)
+        @test po.partial_fit!(o0, rows(rdb2, 4:5)).cache.n == 5
+        # A view slices the names of a matrix benchmark and keeps that of a vector one.
+        om = po.partial_fit!(OPS(; brt = true), rows(rdm, 1:3))
+        @test po.port_opt_view(om.cache, [1, 3]).nb == nbm[[1, 3]]
+        @test po.port_opt_view(o.cache, [1, 3]).nb == ["BM"]
+        @test copy(om.cache).nb == nbm
+    end
+
     @testset "Show, docs and the search seam" begin
         opt = po.partial_fit!(OPS(; alg = BuyAndHold()), rows(rd, 1:3))
         s = sprint(show, MIME("text/plain"), opt)
