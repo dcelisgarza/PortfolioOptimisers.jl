@@ -16,4 +16,5 @@ windowed_series_row
 windowed_variance_series
 SeedWindowed
 seed_window_path(::SeedWindowed)
+PortfolioOptimisers.show_fields(est::Union{<:WindowedExpectedReturns, <:WindowedCovariance, <:WindowedVariance, <:WindowedCoskewness, <:WindowedCokurtosis})
 ```

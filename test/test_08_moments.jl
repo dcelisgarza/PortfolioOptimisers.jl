@@ -2461,12 +2461,13 @@ end
     win = 1:50
 
     # Every member of the family carries the same shape: the inner estimator under its
-    # conventional field name, `w`, `window`, `rule` — and nothing else.
-    @test propertynames(WindowedExpectedReturns()) == (:me, :w, :window, :rule)
-    @test propertynames(WindowedCovariance()) == (:ce, :w, :window, :rule)
-    @test propertynames(WindowedVariance()) == (:ve, :w, :window, :rule)
-    @test propertynames(WindowedCoskewness()) == (:ske, :w, :window, :rule)
-    @test propertynames(WindowedCokurtosis()) == (:kte, :w, :window, :rule)
+    # conventional field name, `w`, `window`, `rule`, the partial-fit `cache` — and nothing
+    # else.
+    @test propertynames(WindowedExpectedReturns()) == (:me, :w, :window, :rule, :cache)
+    @test propertynames(WindowedCovariance()) == (:ce, :w, :window, :rule, :cache)
+    @test propertynames(WindowedVariance()) == (:ve, :w, :window, :rule, :cache)
+    @test propertynames(WindowedCoskewness()) == (:ske, :w, :window, :rule, :cache)
+    @test propertynames(WindowedCokurtosis()) == (:kte, :w, :window, :rule, :cache)
 
     # Each answers a different generic, so each must keep its own supertype (ADR 0039).
     @test WindowedExpectedReturns() isa PortfolioOptimisers.AbstractExpectedReturnsEstimator
@@ -2545,9 +2546,9 @@ end
 module WindowedEstimatorProbe
 using Statistics, StatsBase, PortfolioOptimisers
 using PortfolioOptimisers: MatNum, VecNum, Option, Int_VecInt, ObsWeights,
-                           AbstractVarianceEstimator, AbstractWindowRule, arg_dict,
-                           field_dict, ret_dict, val_dict,
-                           assert_nonempty_nonneg_finite_val, factory_child,
+                           AbstractVarianceEstimator, AbstractWindowRule,
+                           AbstractPartialFitState, arg_dict, field_dict, ret_dict,
+                           val_dict, assert_nonempty_nonneg_finite_val, factory_child,
                            windowed_preamble, _wprop, @concrete, @propagatable,
                            @windowed_estimator
 import PortfolioOptimisers: factory, port_opt_view
@@ -2810,7 +2811,7 @@ end
         W = WindowedEstimatorProbe.ProbeWindowedVariance
 
         # One declared field; the macro supplies `w`, `window` and `rule`, and nothing else.
-        @test fieldnames(W) == (:ve, :w, :window, :rule)
+        @test fieldnames(W) == (:ve, :w, :window, :rule, :cache)
         @test W <: PortfolioOptimisers.AbstractVarianceEstimator
         # The generated `export` makes the type reachable from the declaring module.
         @test :ProbeWindowedVariance in names(WindowedEstimatorProbe)

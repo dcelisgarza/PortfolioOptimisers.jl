@@ -26,7 +26,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     KendallCovariance(;
-        ve::AbstractVarianceEstimator = SimpleVariance()
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> KendallCovariance
 
 Keywords correspond to the struct's fields.
@@ -36,12 +37,14 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ve`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -73,13 +76,18 @@ KendallCovariance
     $(field_dict[:ve])
     """
     @fprop @vprop ve
-    function KendallCovariance(ve::AbstractVarianceEstimator)
-        return new{typeof(ve)}(ve)
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
+    function KendallCovariance(ve::AbstractVarianceEstimator,
+                               cache::Option{<:AbstractPartialFitState})
+        return new{typeof(ve), typeof(cache)}(ve, cache)
     end
 end
-function KendallCovariance(;
-                           ve::AbstractVarianceEstimator = SimpleVariance())::KendallCovariance
-    return KendallCovariance(ve)
+function KendallCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                           cache::Option{<:AbstractPartialFitState} = nothing)::KendallCovariance
+    return KendallCovariance(ve, cache)
 end
 """
     Statistics.cor(::KendallCovariance, X::MatNum; dims::Int = 1, kwargs...)
@@ -165,7 +173,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SpearmanCovariance(;
-        ve::AbstractVarianceEstimator = SimpleVariance()
+        ve::AbstractVarianceEstimator = SimpleVariance(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> SpearmanCovariance
 
 Keywords correspond to the struct's fields.
@@ -175,12 +184,14 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ve`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -212,14 +223,42 @@ SpearmanCovariance
     $(field_dict[:ve])
     """
     @fprop @vprop ve
-    function SpearmanCovariance(ve::AbstractVarianceEstimator)
-        return new{typeof(ve)}(ve)
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
+    function SpearmanCovariance(ve::AbstractVarianceEstimator,
+                                cache::Option{<:AbstractPartialFitState})
+        return new{typeof(ve), typeof(cache)}(ve, cache)
     end
 end
-function SpearmanCovariance(;
-                            ve::AbstractVarianceEstimator = SimpleVariance())::SpearmanCovariance
-    return SpearmanCovariance(ve)
+function SpearmanCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
+                            cache::Option{<:AbstractPartialFitState} = nothing)::SpearmanCovariance
+    return SpearmanCovariance(ve, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`KendallCovariance`](@ref) or a [`SpearmanCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:KendallCovariance, true)` to render it.
+
+# Arguments
+
+  - `::Union{<:KendallCovariance, <:SpearmanCovariance}`: Rank covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ve,)`.
+
+# Related
+
+  - [`KendallCovariance`](@ref)
+  - [`SpearmanCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::Union{<:KendallCovariance, <:SpearmanCovariance}) = (:ve,)
 """
     Statistics.cor(::SpearmanCovariance, X::MatNum; dims::Int = 1, kwargs...)
 

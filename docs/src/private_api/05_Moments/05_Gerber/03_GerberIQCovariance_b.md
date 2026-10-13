@@ -1,10 +1,15 @@
 ```@meta
-Description = "Gerber IQ covariance (b), private API of PortfolioOptimisers.jl: iq_crossed, gerber_IQ."
+Description = "Gerber IQ covariance (b), private API of PortfolioOptimisers.jl: show_fields, gerber_IQ_delta, GerberIQKernel, iq_add_neutral, iq_add_diagonal, iq_crossed, …"
 ```
 
 # Gerber IQ covariance (b): private API
 
 ```@docs
+PortfolioOptimisers.show_fields(::GerberIQCovariance)
+gerber_IQ_delta
+GerberIQKernel
+iq_add_neutral
+iq_add_diagonal
 iq_crossed
 gerber_IQ
 ```

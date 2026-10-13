@@ -26,8 +26,8 @@ GeodesicShrinkageCovariance
 cov(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1, kwargs...)
 cov(ce::GeodesicShrinkageCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.supports_partial_fit(ce::GeodesicShrinkageCovariance)
-PortfolioOptimisers.partial_fit!(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1, kwargs...)
-cov(ce::GeodesicShrinkageCovariance; kwargs...)
+PortfolioOptimisers.partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing}, X::MatNum; dims::Int = 1, kwargs...)
+cov(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing}; kwargs...)
 port_opt_view(ce::GeodesicShrinkageCovariance, i, args...)
 ```
 

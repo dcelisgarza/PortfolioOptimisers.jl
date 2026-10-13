@@ -838,3 +838,55 @@ end
         @test size(po.sample_buffer(v)) == (4, 2) && isequal(rows(v).E, S[1:4, :])
     end
 end
+
+using InteractiveUtils: subtypes
+@testset "Every covariance estimator of the library carries a buffer (#1653)" begin
+    po = PortfolioOptimisers
+    X = randn(StableRNG(1653), 120, 5) ./ 100
+    # Each type answers the online step from a buffer of its own, so `Online` wraps it bare
+    # and the read-out with no data is the batch fit over the rows the buffer holds.
+    function stepped(e)
+        o = partial_fit!(po.update_online_estimator(Online(e)), X[1:80, :])
+        for t in 81:120
+            o = partial_fit!(o, X[t, :])
+        end
+        return o
+    end
+    near(a, b) = isa(a, Tuple) ? all(map(near, a, b)) : isapprox(a, b; rtol = 1e-12)
+    covs = (CorrelationCovariance(), DistanceCovariance(), GeodesicShrinkageCovariance(),
+            LowerTailDependenceCovariance(), MutualInfoCovariance(), RankOneCovariance(),
+            WindowedCovariance(; window = 60), GerberCovariance(), GerberIQCovariance(),
+            SmythBrobyCovariance(), KendallCovariance(), SpearmanCovariance())
+    @testset "$(nameof(typeof(e)))" for e in covs
+        o = stepped(e)
+        @test isa(o.cache, po.SampleBufferState) && po.supports_partial_fit(o)
+        @test near(cov(o), cov(e, X)) && near(cor(o), cor(e, X))
+        # The view slices the buffer, and the rendered estimator hides it.
+        v = po.port_opt_view(o, [1, 3])
+        @test size(po.sample_buffer(v.cache)) == (120, 2)
+        @test near(cov(v), cov(e, X[:, [1, 3]]))
+        @test !occursin("cache", sprint(show, MIME"text/plain"(), o))
+    end
+    wv = WindowedVariance(; window = 60)
+    o = stepped(wv)
+    @test near(var(o), var(wv, X)) && near(std(o), std(wv, X))
+    for (e, f) in ((WindowedExpectedReturns(; window = 60), mean),
+                   (WindowedCoskewness(; window = 60), coskewness),
+                   (WindowedCokurtosis(; window = 60), cokurtosis))
+        @test near(f(stepped(e)), f(e, X))
+    end
+    # An unwrapped estimator that folds by composition keeps its own route, and one that
+    # does not fold names the missing state.
+    g = partial_fit!(GeodesicShrinkageCovariance(), X)
+    @test isnothing(g.cache) && near(cov(g), cov(GeodesicShrinkageCovariance(), X))
+    @test_throws ArgumentError cov(GerberCovariance())
+    # Every concrete covariance estimator of the library has a `cache` field.
+    leaves(T) =
+        if isabstracttype(T)
+            reduce(vcat, leaves.(subtypes(T)); init = Any[])
+        else
+            Any[T]
+        end
+    @test all(T -> hasfield(Base.unwrap_unionall(T), :cache),
+              filter(T -> parentmodule(T) === po, leaves(po.AbstractCovarianceEstimator)))
+end

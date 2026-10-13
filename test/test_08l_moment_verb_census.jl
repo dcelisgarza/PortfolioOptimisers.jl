@@ -138,9 +138,8 @@ Every leaf that takes the identity, and why it carries no asset-axis field.
 
 Measured under #667, by building each estimator and taking a `port_opt_view` of it.
 
-  - `MedianExpectedReturns` and `DistanceCovariance` carry `w::Option{<:ObsWeights}` alone. Those
-    are OBSERVATION weights, tagged `@wprop`, and `obs_weights_view` is their verb; the asset axis
-    holds nothing.
+  - `MedianExpectedReturns` carries `w::Option{<:ObsWeights}` alone. Those are OBSERVATION
+    weights, tagged `@wprop`, and `obs_weights_view` is their verb; the asset axis holds nothing.
   - `CustomValueExpectedReturns` defaults to `val = 0.0`, so the shape its default constructor
     gives is the scalar one, and a scalar is universe-independent. Its per-asset shape,
     `CustomValueExpectedReturns{<:VecNum}`, declares its axis with a `port_opt_view` method, and
@@ -151,19 +150,15 @@ Measured under #667, by building each estimator and taking a `port_opt_view` of 
     would still change no answer: no consumer reads the cache, which is the exemption ADR 0106
     grants and the reason ADR 0105 hides the field. `mean`, `var` and `cov` rebuild from the
     sample they are handed, measured equal to the same verb on an estimator carrying no cache.
-  - `RankOneCovariance` carries `shift::Real` alone, the number added to every entry of the rows
-    before the decomposition. A scalar is universe-independent, so a view of the estimator is
-    the estimator.
 
 A name added here must carry its own reason, and a leaf with a genuine per-asset field belongs in
 a `port_opt_view` method instead -- `CustomValueExpectedReturns{<:VecNum}` is the worked example.
 =#
-const VIEW_IDENTITY_ALLOWED = Set([:MedianExpectedReturns, :DistanceCovariance,
-                                   :CustomValueExpectedReturns, :ExpWeightedExpectedReturns,
-                                   :ExpWeightedVariance, :ExpWeightedCovariance,
+const VIEW_IDENTITY_ALLOWED = Set([:MedianExpectedReturns, :CustomValueExpectedReturns,
+                                   :ExpWeightedExpectedReturns, :ExpWeightedVariance,
+                                   :ExpWeightedCovariance,
                                    :RegimeAdjustedExpWeightedVariance,
-                                   :RegimeAdjustedExpWeightedCovariance,
-                                   :RankOneCovariance])
+                                   :RegimeAdjustedExpWeightedCovariance])
 
 @testset "The asset-axis tripwire: a per-asset field is declared, never inferred" begin
     families = moment_families()

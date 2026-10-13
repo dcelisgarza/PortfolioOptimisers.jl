@@ -1069,6 +1069,71 @@ The method of `cokurtosis` that makes the estimate from a Sample Buffer. An esti
 function cokurtosis(kte::CokurtosisEstimator, state::SampleBufferState)
     return cokurtosis(kte, sample_buffer(state); sample_buffer_kwargs(state)...)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Reads the expected returns out of the partial-fit state that an expected returns estimator carries.
+
+This is the call with no data of an estimator that has no such call of its own. It reads the state out of the `cache` field with [`partial_fit_cache`](@ref), and it gives the state to the method of `Statistics.mean` that takes one. A [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, runs the batch verb over the rows of the buffer. A family that folds exactly has a call with no data of its own, so this method serves the estimators that fold by buffering alone, such as [`WindowedExpectedReturns`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:me])
+
+# Validation
+
+  - `me` carries a state. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - $(ret_dict[:mu])
+
+# Related
+
+  - [`partial_fit_cache`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.mean(me::AbstractExpectedReturnsEstimator)
+    return Statistics.mean(me, partial_fit_cache(me))
+end
+"""
+    coskewness(ske::CoskewnessEstimator)
+    cokurtosis(kte::CokurtosisEstimator)
+
+Reads a co-moment out of the partial-fit state that a coskewness or cokurtosis estimator carries.
+
+This is the call with no data of an estimator that has no such call of its own. It reads the state out of the `cache` field with [`partial_fit_cache`](@ref), and it gives the state to the method of the same verb that takes one. A [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, runs the batch verb over the rows of the buffer. A family that folds exactly has a call with no data of its own, so this method serves the estimators that fold by buffering alone, such as [`WindowedCoskewness`](@ref) and [`WindowedCokurtosis`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:ske])
+  - $(arg_dict[:kte])
+
+# Validation
+
+  - The estimator carries a state. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - $(ret_dict[:cskew]) `coskewness` returns it.
+  - $(ret_dict[:cskewV]) `coskewness` returns it.
+  - $(ret_dict[:ckurt]) `cokurtosis` returns it.
+
+# Related
+
+  - [`partial_fit_cache`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function coskewness(ske::CoskewnessEstimator)
+    return coskewness(ske, partial_fit_cache(ske))
+end
+function cokurtosis(kte::CokurtosisEstimator)
+    return cokurtosis(kte, partial_fit_cache(kte))
+end
 
 # A co-moment folds under `FullMoment` with no matrix processing on the way in. The
 # `SemiMoment` arm refuses, for the reason `Covariance` does, and a matrix-processing step

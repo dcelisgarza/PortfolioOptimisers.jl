@@ -1506,7 +1506,7 @@ $(DocStringExtensions.FIELDS)
   - `est` is not an `Online`. An `ArgumentError` is thrown otherwise.
   - `est` is not a cross-validation scheme, because the function constructor of a scheme builds its Online Scheme. An `ArgumentError` naming the constructors is thrown otherwise.
   - `est` is not an [`OnlinePortfolioSelection`](@ref) head, because a refit of a head is a batch walk-forward, and the library runs both settings of the wrapper in other forms. An `ArgumentError` naming those forms is thrown otherwise.
-  - `est` has a `cache` field. An `ArgumentError` is thrown otherwise. A covariance estimator with no such field, such as [`ImpliedVolatility`](@ref), takes the buffer of a [`PortfolioOptimisersCovariance`](@ref) that holds it.
+  - `est` has a `cache` field. An `ArgumentError` is thrown otherwise. Every covariance estimator of the library has one. A covariance estimator with no such field, such as a `StatsBase.CovarianceEstimator` of another package, takes the buffer of a [`PortfolioOptimisersCovariance`](@ref) that holds it.
   - No field of the tree of `est` holds a windowed estimator under [`SeedWindow`](@ref), because the wrapper refits the tree at each step, and a refit has no first fit to remember. [`seed_window_path`](@ref) finds the field, and an `ArgumentError` that names it is thrown otherwise.
   - `max_history > 0` when it is not `nothing`. A `DomainError` is thrown otherwise.
 

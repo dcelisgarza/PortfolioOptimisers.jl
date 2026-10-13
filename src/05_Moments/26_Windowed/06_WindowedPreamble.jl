@@ -449,7 +449,7 @@ function partial_fit!(est::SeedWindowed, X::MatNum; dims::Int = 1, kwargs...)
     win = get_window(est.window, X, dims)
     inner = partial_fit!(inner, windowed_rows(X, win, dims); dims = dims,
                          windowed_keywords(win, dims; kwargs...)...)
-    return typeof(est).name.wrapper(inner, est.w, nothing, est.rule)
+    return typeof(est).name.wrapper(inner, est.w, nothing, est.rule, est.cache)
 end
 function partial_fit!(est::SeedWindowed, x::VecNum; kwargs...)
     kw = map(v -> isa(v, AbstractVector{Bool}) ? permutedims(v) : v, values(kwargs))
@@ -621,4 +621,34 @@ The inner estimator holds the state of the fold, so the method reads it there.
 """
 function cokurtosis(kte::WindowedCokurtosis{<:Any, <:Any, <:Any, <:SeedWindow}; kwargs...)
     return cokurtosis(kte.kte; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a windowed estimator except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:WindowedCovariance, true)` to render it.
+
+# Arguments
+
+  - `est`: Windowed estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, every field name but `:cache`.
+
+# Related
+
+  - [`WindowedExpectedReturns`](@ref)
+  - [`WindowedCovariance`](@ref)
+  - [`WindowedVariance`](@ref)
+  - [`WindowedCoskewness`](@ref)
+  - [`WindowedCokurtosis`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+function show_fields(est::Union{<:WindowedExpectedReturns, <:WindowedCovariance,
+                                <:WindowedVariance, <:WindowedCoskewness,
+                                <:WindowedCokurtosis})
+    return filter(!=(:cache), fieldnames(typeof(est)))
 end

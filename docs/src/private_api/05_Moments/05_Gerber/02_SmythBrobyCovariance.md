@@ -28,6 +28,7 @@ sb_add_pos
 sb_add_neg
 sb_add_neutral
 sb_pair_scores
+PortfolioOptimisers.show_fields(::SmythBrobyCovariance)
 ```
 
 ## References

@@ -541,7 +541,8 @@ $(DocStringExtensions.FIELDS)
         c3::Number = 4,
         n::Number = 2,
         alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-        ex::FLoops.Transducers.Executor = ThreadedEx()
+        ex::FLoops.Transducers.Executor = ThreadedEx(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> SmythBrobyCovariance
 
 Keywords correspond to the struct's fields.
@@ -562,6 +563,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `ve`: Recursively updated via [`factory`](@ref).
   - `me`: Recursively updated via [`factory`](@ref).
   - `alg`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -569,6 +571,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -658,12 +661,17 @@ SmythBrobyCovariance
     $(field_dict[:ex])
     """
     ex
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function SmythBrobyCovariance(ve::StatsBase.CovarianceEstimator,
                                   me::AbstractExpectedReturnsEstimator,
                                   pdm::Option{<:AbstractPosdefEstimator}, c1::Number,
                                   c2::Number, c3::Number, n::Number,
                                   alg::SmythBrobyCovarianceAlgorithm,
-                                  ex::FLoops.Transducers.Executor)
+                                  ex::FLoops.Transducers.Executor,
+                                  cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(c1, :c1)
         assert_nonempty_nonneg_finite_val(c2, :c2)
         assert_nonempty_nonneg_finite_val(c3, :c3)
@@ -672,7 +680,8 @@ SmythBrobyCovariance
                   DomainError((c2, c3),
                               "`SmythBrobyCovariance.c2` is $c2 and `c3` is $c3. `c2` is the inner threshold and `c3` the outer, so the pair must satisfy `c2 < c3`."))
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c1), typeof(c2), typeof(c3),
-                   typeof(n), typeof(alg), typeof(ex)}(ve, me, pdm, c1, c2, c3, n, alg, ex)
+                   typeof(n), typeof(alg), typeof(ex), typeof(cache)}(ve, me, pdm, c1, c2,
+                                                                      c3, n, alg, ex, cache)
     end
 end
 function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
@@ -681,9 +690,32 @@ function SmythBrobyCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVarian
                               c1::Number = 0.5, c2::Number = 0.5, c3::Number = 4,
                               n::Number = 2,
                               alg::SmythBrobyCovarianceAlgorithm = SmythBrobyGerber1(),
-                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::SmythBrobyCovariance
-    return SmythBrobyCovariance(ve, me, pdm, c1, c2, c3, n, alg, ex)
+                              ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                              cache::Option{<:AbstractPartialFitState} = nothing)::SmythBrobyCovariance
+    return SmythBrobyCovariance(ve, me, pdm, c1, c2, c3, n, alg, ex, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`SmythBrobyCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SmythBrobyCovariance, true)` to render it.
+
+# Arguments
+
+  - `::SmythBrobyCovariance`: Smyth-Broby covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ve, :me, :pdm, :c1, :c2, :c3, :n, :alg, :ex)`.
+
+# Related
+
+  - [`SmythBrobyCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::SmythBrobyCovariance) = (:ve, :me, :pdm, :c1, :c2, :c3, :n, :alg, :ex)
 """
     sb_delta(ri::Number, rj::Number, n::Number) -> Number
 

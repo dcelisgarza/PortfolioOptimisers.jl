@@ -246,7 +246,7 @@ end
     forecast_location(ce::GeneralCovariance)
     forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance})
     forecast_location(ce::PortfolioOptimisersCovariance)
-    forecast_location(ce::CorrelationCovariance)
+    forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     forecast_location(ce::AbstractCovarianceEstimator)
     forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false, kwargs...)
     forecast_location(pe::AbstractPriorEstimator; strict::Bool = false, kwargs...)
@@ -370,7 +370,7 @@ end
 function forecast_location(ce::PortfolioOptimisersCovariance)
     return forecast_state_location(ce, ce.cache)
 end
-function forecast_location(ce::CorrelationCovariance)
+function forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     return forecast_location(ce.ce)
 end
 function forecast_location(ce::AbstractCovarianceEstimator)

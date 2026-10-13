@@ -195,7 +195,8 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = Covariance(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-        ppy::Number
+        ppy::Number,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ImpliedVolatility
 
 Keywords correspond to the struct's fields. `ppy` has no default. The implied volatility is annual, and `ppy` converts it to the period of the returns, so no value is right at every data frequency: the caller states it, for example `ppy = 252` for daily returns.
@@ -210,12 +211,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce`: Recursively updated via [`factory`](@ref).
   - `alg`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -281,19 +284,50 @@ ImpliedVolatility
     Periods per year of the returns, which converts the annual implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(ppy)` before the algorithm reads them.
     """
     ppy
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
-                               alg::ImpliedVolatilityAlgorithm, ppy::Number)
+                               alg::ImpliedVolatilityAlgorithm, ppy::Number,
+                               cache::Option{<:AbstractPartialFitState})
         assert_gt0(ppy, :ppy)
-        return new{typeof(ce), typeof(mp), typeof(alg), typeof(ppy)}(ce, mp, alg, ppy)
+        return new{typeof(ce), typeof(mp), typeof(alg), typeof(ppy), typeof(cache)}(ce, mp,
+                                                                                    alg,
+                                                                                    ppy,
+                                                                                    cache)
     end
 end
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-                           ppy::Number)::ImpliedVolatility
-    return ImpliedVolatility(ce, mp, alg, ppy)
+                           ppy::Number,
+                           cache::Option{<:AbstractPartialFitState} = nothing)::ImpliedVolatility
+    return ImpliedVolatility(ce, mp, alg, ppy, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of an [`ImpliedVolatility`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:ImpliedVolatility, true)` to render it.
+
+# Arguments
+
+  - `::ImpliedVolatility`: Implied volatility covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ce, :mp, :alg, :ppy)`.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::ImpliedVolatility) = (:ce, :mp, :alg, :ppy)
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
                  chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,

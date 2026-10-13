@@ -90,11 +90,11 @@ commit = "286953e299"
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { cyc = 5, cog = 8, arg = 6, cyc_sum = 39, cog_sum = 33, arg_sum = 57, macros = ["@propagatable"] }
 "src/05_Moments/03_Covariance.jl" = { cyc = 5, cog = 8, arg = 9, cyc_sum = 68, cog_sum = 41, arg_sum = 153, macros = ["@propagatable"] }
 "src/05_Moments/04_SimpleVariance.jl" = { cyc = 5, cog = 8, arg = 9, cyc_sum = 59, cog_sum = 42, arg_sum = 126, macros = ["@propagatable"] }
-"src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 9, cog_sum = 1, arg_sum = 27, macros = ["@propagatable"] }
-"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 9, cyc_sum = 51, cog_sum = 25, arg_sum = 127, macros = ["@propagatable"] }
-"src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 155, cog_sum = 130, arg_sum = 193, macros = ["@propagatable"] }
-"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { cyc = 9, cog = 7, arg = 7, cyc_sum = 17, cog_sum = 10, arg_sum = 27, macros = [] }
-"src/05_Moments/06_DistanceCovariance.jl" = { cyc = 3, cog = 4, arg = 5, cyc_sum = 17, cog_sum = 9, arg_sum = 40, macros = ["@propagatable"] }
+"src/05_Moments/05_Gerber/01_GerberCovariance.jl" = { cyc = 1, cog = 1, arg = 6, cyc_sum = 10, cog_sum = 1, arg_sum = 29, macros = ["@propagatable"] }
+"src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl" = { cyc = 13, cog = 10, arg = 10, cyc_sum = 52, cog_sum = 25, arg_sum = 129, macros = ["@propagatable"] }
+"src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl" = { cyc = 73, cog = 73, arg = 25, cyc_sum = 146, cog_sum = 126, arg_sum = 150, macros = ["@propagatable"] }
+"src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { cyc = 9, cog = 7, arg = 11, cyc_sum = 27, cog_sum = 14, arg_sum = 73, macros = [] }
+"src/05_Moments/06_DistanceCovariance.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 18, cog_sum = 9, arg_sum = 42, macros = ["@propagatable"] }
 "src/05_Moments/07_LowerTailDependenceCovariance.jl" = { cyc = 6, cog = 10, arg = 4, cyc_sum = 9, cog_sum = 11, arg_sum = 10, macros = ["@propagatable"] }
 "src/05_Moments/08_RankCovariance.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 6, cog_sum = 2, arg_sum = 10, macros = ["@propagatable"] }
 "src/05_Moments/09_Histogram.jl" = { cyc = 4, cog = 7, arg = 6, cyc_sum = 32, cog_sum = 37, arg_sum = 35, macros = [] }

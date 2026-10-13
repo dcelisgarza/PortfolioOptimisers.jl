@@ -358,6 +358,13 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
             for f in columns
                 @test finite_max(getfield(b, f), getfield(o, f)) == 0
             end
+            # The bare estimator carries a buffer of its own, so it steps with no composite
+            # (#1653).
+            ob = cfe(po.Online(ce), r, cvo)
+            @test b.n_valid == ob.n_valid
+            for f in columns
+                @test finite_max(getfield(b, f), getfield(ob, f)) == 0
+            end
         end
         r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = 1.1, ts = ts)
         ce = ImpliedVolatility(; ppy = 252)
@@ -393,8 +400,9 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test isapprox(cov(o1),
                        cov(poc(ce), X[1:(wv + 1), :]; iv = iv[1:(wv + 1), :], ivpa = 1.1);
                        rtol = 1e-12)
-        # The estimator itself carries no buffer, and the refusal names the composite.
-        e = @test_throws ArgumentError po.Online(ce)
+        # A covariance estimator of another package carries no buffer, and the refusal names
+        # the composite.
+        e = @test_throws ArgumentError po.Online(StatsBase.SimpleCovariance())
         @test occursin("PortfolioOptimisersCovariance", e.value.msg)
     end
 

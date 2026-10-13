@@ -1788,7 +1788,7 @@ Build the type docstring of a generated windowed estimator as an interpolation A
  1. Read the inner estimator's own name out of `default`, giving `inner_ref`. A call such as `SimpleVariance()` contributes its head; a bare name contributes itself.
  2. Open `parts` with the live `DocStringExtensions.TYPEDEF` abbreviation, the two summary sentences, the `# Fields` heading, and the live `DocStringExtensions.FIELDS` abbreviation.
  3. Push the `# Constructors` section, the keyword signature built from `name`, `field`, `ftype` and `default`, and the `## Validation` subsection carrying the live `val_dict[:oow]` lookup and the window rule.
- 4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`, each naming `field` and `w` as the tags on the generated struct declare them.
+ 4. Push the three propagation subsections, `## Propagated parameters`, `## View parameters` and `## Observation weight parameters`, each naming `field`, `w` and `cache` as the tags on the generated struct declare them.
  5. Push the `# Examples` section, fencing `doctest` as a `jldoctest` block.
  6. Push the `# Related` heading, the supertype, `inner_ref`, every entry of `methods`, the two window rules, and the four shared functions the type answers: `factory`, `port_opt_view`, `obs_weights_view` and `windowed_preamble`.
  7. Return `parts` wrapped in `Expr(:string, ...)`, so every lookup stays live.
@@ -1820,9 +1820,9 @@ function windowed_type_doc(name::Symbol, super, field::Symbol, ftype, default,
     parts = Any["\n", :(DocStringExtensions.TYPEDEF),
                 "\n\n$(noun) estimator that restricts computation to a rolling or indexed observation window.\n\n`$(name)` wraps another $(lc) estimator and applies it to a subset of observations defined by a window and/or custom observation weights. This enables time-varying or recency-weighted $(lc) estimation.\n\n# Fields\n\n",
                 :(DocStringExtensions.FIELDS),
-                "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing,\n        rule::AbstractWindowRule = RollingWindow()\n    ) -> $(name)\n\nKeywords correspond to the struct's fields.\n\n## Validation\n\n  - ",
+                "\n\n# Constructors\n\n    $(name)(;\n        $(field)::$(ftype) = $(default),\n        w::Option{<:ObsWeights} = nothing,\n        window::Option{<:Int_VecInt} = nothing,\n        rule::AbstractWindowRule = RollingWindow(),\n        cache::Option{<:AbstractPartialFitState} = nothing\n    ) -> $(name)\n\nKeywords correspond to the struct's fields.\n\n## Validation\n\n  - ",
                 :(val_dict[:oow]),
-                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\nWhen [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:\n\n  - `$(field)`: Recursively indexed via [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
+                "\n  - If `window` is provided, it must be nonempty, nonnegative, and finite.\n\n## Propagated parameters\n\nWhen [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:\n\n  - `$(field)`: Recursively updated via [`factory`](@ref).\n  - `w`: Replaced with the incoming [`ObsWeights`](@ref).\n  - `cache`: Carried unchanged via [`factory`](@ref).\n\n## View parameters\n\nWhen [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:\n\n  - `$(field)`: Recursively viewed via [`port_opt_view`](@ref).\n  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).\n\n## Observation weight parameters\n\nWhen [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:\n\n  - `$(field)`: Recursively indexed via [`obs_weights_view`](@ref).\n  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).\n\n# Examples\n\n```jldoctest\n$(strip(doctest))\n```\n\n# Related\n\n  - [`$(super)`](@ref)\n  - [`$(inner_ref)`](@ref)\n"]
     for m in methods
         push!(parts, "  - ", m, "\n")
     end
@@ -1843,7 +1843,7 @@ sub-window of observations and rebinds observation weights to that window, leavi
 estimator's semantics untouched.
 
 One invocation emits the whole family member — the [`@propagatable`](@ref) `@concrete`
-struct (inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, plus `window` and `rule`), both
+struct (inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, plus `window` and `rule`, and a `cache` tagged `@fprop @vprop` that holds a partial-fit state), both
 constructors with their validation, one forwarding method per `forward` entry, one Asset
 Panel method beside each matrix entry, the `export`, and every docstring.
 
@@ -1877,8 +1877,8 @@ rejected at macro-expansion time with a [`did_you_mean`](@ref) suggestion.
  3. Parse every entry of `forward` with [`windowed_parse_forward`](@ref), giving `specs`. Append one `:AssetPanel` copy of each `MatNum` entry, so every matrix generic also gets its Asset Panel method.
  4. Render one cross-reference per entry of `specs` with [`windowed_method_ref`](@ref), giving `refs`.
  5. For each entry of `specs`, build one documented forwarding method: [`windowed_method_doc`](@ref) writes its docstring, and [`windowed_method_def`](@ref) writes its body. Each method's `# Related` section lists the `refs` of its siblings and not its own.
- 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, `window` and `rule`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
- 7. Build `kwctor`, the keyword constructor, whose defaults are `default`, `nothing`, `nothing` and [`RollingWindow`](@ref)`()`.
+ 6. Build `structexpr`, the `@concrete` struct. It declares the inner estimator tagged `@fprop @vprop`, `w` tagged `@wprop`, `window`, `rule` and `cache` tagged `@fprop @vprop`, each with its live [`field_dict`](@ref) lookup, and the inner constructor that validates `w` and `window`.
+ 7. Build `kwctor`, the keyword constructor, whose defaults are `default`, `nothing`, `nothing`, [`RollingWindow`](@ref)`()` and `nothing`.
  8. Write the type's docstring with [`windowed_type_doc`](@ref), and attach it to `structexpr` wrapped in `@propagatable @concrete`.
  9. Return the escaped block: the documented struct, `kwctor`, the forwarding methods, and the `export` of `name`.
 
@@ -1985,20 +1985,22 @@ macro windowed_estimator(head, body)
                                        siblings),
                    windowed_method_def(gen, field, name, input, has_mean)))
     end
+    # The inner estimator and `cache` are both tagged `@fprop @vprop`.
+    tagged(f) = Expr(:macrocall, Symbol("@fprop"), LineNumberNode(@__LINE__),
+                     Expr(:macrocall, Symbol("@vprop"), LineNumberNode(@__LINE__), f))
     structexpr = Expr(:struct, false, Expr(:<:, name, super),
                       Expr(:block, Expr(:string, :(field_dict[$(QuoteNode(field))])),
-                           Expr(:macrocall, Symbol("@fprop"), LineNumberNode(@__LINE__),
-                                Expr(:macrocall, Symbol("@vprop"),
-                                     LineNumberNode(@__LINE__), field)),
-                           Expr(:string, :(field_dict[:oow])),
+                           tagged(field), Expr(:string, :(field_dict[:oow])),
                            Expr(:macrocall, Symbol("@wprop"), LineNumberNode(@__LINE__),
                                 :w), Expr(:string, :(field_dict[:window])), :window,
                            Expr(:string, :(field_dict[:window_rule])), :rule,
+                           Expr(:string, :(field_dict[:pfcache])), tagged(:cache),
                            Expr(:function,
                                 Expr(:call, name, Expr(:(::), field, ftype),
                                      :(w::Option{<:ObsWeights}),
                                      :(window::Option{<:Int_VecInt}),
-                                     :(rule::AbstractWindowRule)),
+                                     :(rule::AbstractWindowRule),
+                                     :(cache::Option{<:AbstractPartialFitState})),
                                 quote
                                     assert_nonempty_nonneg_finite_val(w, :w)
                                     assert_nonempty_nonneg_finite_val(window, :window)
@@ -2006,8 +2008,8 @@ macro windowed_estimator(head, body)
                                                   Expr(:curly, :new,
                                                        Expr(:call, :typeof, field),
                                                        :(typeof(w)), :(typeof(window)),
-                                                       :(typeof(rule))), field, :w, :window,
-                                                  :rule))
+                                                       :(typeof(rule)), :(typeof(cache))),
+                                                  field, :w, :window, :rule, :cache))
                                 end)))
     kwctor = Expr(:function,
                   Expr(:(::),
@@ -2015,9 +2017,10 @@ macro windowed_estimator(head, body)
                             Expr(:parameters, Expr(:kw, Expr(:(::), field, ftype), default),
                                  Expr(:kw, :(w::Option{<:ObsWeights}), nothing),
                                  Expr(:kw, :(window::Option{<:Int_VecInt}), nothing),
-                                 Expr(:kw, :(rule::AbstractWindowRule), :(RollingWindow())))),
-                       name),
-                  Expr(:block, Expr(:return, Expr(:call, name, field, :w, :window, :rule))))
+                                 Expr(:kw, :(rule::AbstractWindowRule), :(RollingWindow())),
+                                 Expr(:kw, :(cache::Option{<:AbstractPartialFitState}),
+                                      nothing))), name),
+                  Expr(:block, :(return $name($field, w, window, rule, cache))))
     return esc(Expr(:block,
                     Expr(:macrocall, GlobalRef(Core, Symbol("@doc")),
                          LineNumberNode(@__LINE__),

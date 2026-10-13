@@ -38,13 +38,28 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    RankOneCovariance(; shift::Real = 1) -> RankOneCovariance
+    RankOneCovariance(;
+        shift::Real = 1,
+        cache::Option{<:AbstractPartialFitState} = nothing
+    ) -> RankOneCovariance
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
   - `isfinite(shift)`. A `DomainError` is thrown otherwise.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged field is automatically propagated:
+
+  - `cache`: Carried unchanged via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged field is automatically subset to the selected indices:
+
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -65,19 +80,46 @@ RankOneCovariance
 
   - $(ref_dict[:lai2020spolc]) Algorithm 1 and equations 42 to 49.
 """
-@concrete struct RankOneCovariance <: AbstractCovarianceEstimator
+@propagatable @concrete struct RankOneCovariance <: AbstractCovarianceEstimator
     """
     Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into price relatives, which the estimate reads, and `0` decomposes the rows as given.
     """
     shift
-    function RankOneCovariance(shift::Real)
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
+    function RankOneCovariance(shift::Real, cache::Option{<:AbstractPartialFitState})
         @argcheck(isfinite(shift), DomainError(shift, "shift must be finite"))
-        return new{typeof(shift)}(shift)
+        return new{typeof(shift), typeof(cache)}(shift, cache)
     end
 end
-function RankOneCovariance(; shift::Real = 1)::RankOneCovariance
-    return RankOneCovariance(shift)
+function RankOneCovariance(; shift::Real = 1,
+                           cache::Option{<:AbstractPartialFitState} = nothing)::RankOneCovariance
+    return RankOneCovariance(shift, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`RankOneCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:RankOneCovariance, true)` to render it.
+
+# Arguments
+
+  - `::RankOneCovariance`: Rank-one covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:shift,)`.
+
+# Related
+
+  - [`RankOneCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::RankOneCovariance) = (:shift,)
 """
     Statistics.cov(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs...)
 

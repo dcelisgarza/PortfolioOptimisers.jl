@@ -1,5 +1,5 @@
 ```@meta
-Description = "Higher-Moment Partial Fit, public API of PortfolioOptimisers.jl: port_opt_view, partial_fit."
+Description = "Higher-Moment Partial Fit, public API of PortfolioOptimisers.jl: port_opt_view, partial_fit, mean, coskewness."
 ```
 
 # [Higher-Moment Partial Fit](@id api-higher-moment-partial-fit)
@@ -13,4 +13,6 @@ port_opt_view(x::PortfolioOptimisers.CoskewnessPartialFitState, i, args...)
 port_opt_view(x::PortfolioOptimisers.CokurtosisPartialFitState, i, args...)
 partial_fit(ske::Coskewness{<:Any, <:Any, <:FullMoment}, args...; kwargs...)
 partial_fit(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, args...; kwargs...)
+mean(me::AbstractExpectedReturnsEstimator)
+coskewness(ske::CoskewnessEstimator)
 ```

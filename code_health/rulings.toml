@@ -605,7 +605,7 @@ metric = "cog"
 rationale = "a-definition-a-file-split-moved-unchanged"
 
 [[exemption]]
-path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_a.jl"
+path = "src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl"
 definition = "iq_add_diagonal"
 metric = "arg"
 rationale = "a-definition-a-file-split-moved-unchanged"
