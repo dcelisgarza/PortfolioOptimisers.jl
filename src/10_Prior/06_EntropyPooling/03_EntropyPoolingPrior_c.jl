@@ -493,7 +493,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # nested result's own `w` is already carried by the fit that answered it, so
         # neither is pushed. A field that reads more rows than the scenarios, under a
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
-        pe = prior_probability_factory(pe, w0, X, F, pnl)
+        pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
@@ -638,7 +638,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
         # nested result's own `w` is already carried by the fit that answered it, so
         # neither is pushed. A field that reads more rows than the scenarios, under a
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
-        pe = prior_probability_factory(pe, w0, X, F, pnl)
+        pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
@@ -751,6 +751,8 @@ end
                      X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_factory(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:MatNum},
                      pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_factory(pe::CrossSectionalFactorPrior, w, X::MatNum, F::Option{<:MatNum},
+                     pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
 
 Return the estimator that an entropy pooling prior refits under its posterior weights `w`.
 
@@ -782,6 +784,7 @@ The method that Julia selects is the algorithm.
  5. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, under [`factory`](@ref) of `pe.w` when the caller set one. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`, and [`factory`](@ref) would give it `w` as its own prior probabilities and solve its views again. This holds for an entropy pooling prior of the factors in step 2 too.
  6. An [`OpinionPoolingPrior`](@ref): pool the opinions on `X` with [`opinion_pooling_weights`](@ref), giving the pooled weights `wp`, under which its own fit fits `pe.pe2`. Return this function of [`factory`](@ref) of `pe.pe2` under `wp`, under `w`. The posterior of the pool is already in the prior probabilities of the entropy pooling prior, so [`factory`](@ref) of the pool under `w` pooled its opinions again from `w`, and a [`FactorPrior`](@ref) around it read the factor moments of other weights.
  7. An [`EmpiricalPrior`](@ref): return [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `X`. A Scenario Cap keeps the last rows as scenarios, and `w` weighs these alone. Its moment estimators read every row, so the rows that the cap removed take a zero weight, and the posterior moments are those of the scenarios under `w`. Without a cap, `w` weighs every row and passes unchanged.
+ 8. A [`CrossSectionalFactorPrior`](@ref): take the factor returns of `pe.pe` with [`cross_sectional_factor_scenarios`](@ref) on `X`, `F` and `pnl`. Replace `pe.pe` with this function of `pe.pe` under `w` on these factor returns alone, as the fit of `pe` fits `pe.pe`, and keep every other field. The regression, the weights of the cross-sectional fit, the residual block and the Return Forecast keep the weights of the fit that the views read, so the scenarios of the refit are the scenarios of that fit. A Scenario Cap in `pe.pe` keeps the last factor returns as scenarios, and step 7 gives a zero weight to the rows that it removed.
 
 Every step recurses through this function and never through [`factory`](@ref) of a prior that reweights scenarios, so no entropy pooling constructor reads `w` and normalises it a second time. Each step gives a nested prior the rows that the fit of `pe` gives it, so a pool computes `wp` on the rows of the fit that the views read. A pool with `pe1` refits on the rows of `pe1`, and no estimator that is fitted on `X` states that model. [`assert_scenario_model`](@ref) refuses such a pool when the entropy pooling prior is built, and [`scenario_prior`](@ref) refits a pool that the entropy pooling prior holds directly.
 
@@ -846,6 +849,8 @@ end
                    X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     scenario_prior(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:MatNum},
                    pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_prior(pe::CrossSectionalFactorPrior, w, X::MatNum, F::Option{<:MatNum},
+                   pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
 
 Refit the prior that an entropy pooling prior embeds, with its scenarios under the posterior weights `w`.
 
@@ -858,6 +863,7 @@ The method that Julia selects is the algorithm.
  1. Any other prior: fit [`scenario_factory`](@ref) of `pe` under `w` on `X`, `F` and `pnl`.
  2. A nested entropy pooling prior: apply this function to the estimator that fits its model, as step 5 of [`scenario_factory`](@ref) does. This method exists because that model can be an [`OpinionPoolingPrior`](@ref).
  3. An [`OpinionPoolingPrior`](@ref): take the rows of `pe.pe1` when it is set, and the returns otherwise, as its own fit does. Pool the opinions on those rows with [`opinion_pooling_weights`](@ref), giving the pooled weights `wp`, under which its own fit fits `pe.pe2`. Apply this function to [`factory`](@ref) of `pe.pe2` under `wp`, under `w`, on those rows. The opinions run for `wp` alone, and their views do not reach the result.
+ 4. A [`CrossSectionalFactorPrior`](@ref): fit the regression once with [`cross_sectional_factor_scenarios`](@ref), giving the factor returns `f` and the stage. Fit [`scenario_factory`](@ref) of `pe.pe` under `w` on `f` with [`cross_sectional_factor_moments`](@ref), and assemble the result from the stage with [`cross_sectional_assemble`](@ref). It is step 1 for this prior, with the regression fitted once and not twice.
 
 # Arguments
 
@@ -891,18 +897,20 @@ function scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingP
 end
 """
     prior_probability_factory(pe::AbstractPriorEstimator, w, X::MatNum,
-                              F::Option{<:MatNum}, pnl::Option{<:AssetPanel})
+                              F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::EmpiricalPrior, w, X::MatNum, F::Option{<:MatNum},
-                              pnl::Option{<:AssetPanel})
+                              pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
-                              X::MatNum, F::MatNum, pnl::Option{<:AssetPanel})
+                              X::MatNum, F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::Union{<:BlackLittermanPrior,
                                         <:BayesianBlackLittermanPrior,
                                         <:EntropyPoolingPrior,
                                         <:MeucciEntropyPoolingPrior}, w, X::MatNum,
-                              F::Option{<:MatNum}, pnl::Option{<:AssetPanel})
+                              F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum, F::MatNum,
-                              pnl::Option{<:AssetPanel})
+                              pnl::Option{<:AssetPanel}; kwargs...)
+    prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
+                              F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
 
 Return [`factory`](@ref) of `pe` under the prior probabilities `w` of the scenarios, with each weighted field on the rows that it reads.
 
@@ -917,6 +925,7 @@ The method that Julia selects is the algorithm.
  3. A [`FactorPrior`](@ref) or a [`FactorBlackLittermanPrior`](@ref): take [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `F`, which the regression and the residual block read. Replace its `pe` with this function of `pe.pe` under `w` on `F` alone.
  4. A [`BlackLittermanPrior`](@ref), a [`BayesianBlackLittermanPrior`](@ref) or a nested entropy pooling prior: take [`factory`](@ref) of `pe` under `w`, and replace its `pe` with this function of `pe.pe` under `w` on `X`, `F` and `pnl`.
  5. An [`AugmentedBlackLittermanPrior`](@ref): take [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `X`. Replace `a_pe` with this function of it on `X` and `pnl`, and `f_pe` with this function of it on `F` alone.
+ 6. A [`CrossSectionalFactorPrior`](@ref): take the factor returns `f` of `pe.pe` with [`cross_sectional_factor_scenarios`](@ref) on `X`, `F` and `pnl`. Take [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `f`, which the regression, the residual block and every other weighted field read. Replace its `pe` with this function of `pe.pe` under `w` on `f` alone.
 
 # Arguments
 
@@ -925,6 +934,7 @@ The method that Julia selects is the algorithm.
   - $(arg_dict[:X])
   - `F`: Optional factor returns matrix, already oriented.
   - $(arg_dict[:pnl_prior])
+  - `kwargs...`: Additional keyword arguments of the fit of `pe`, forwarded where a nested prior reads `X` and `pnl`.
 
 # Validation
 
@@ -942,15 +952,15 @@ The method that Julia selects is the algorithm.
   - [`ep_prior_probabilities`](@ref)
 """
 function prior_probability_factory(pe::AbstractPriorEstimator, w, ::MatNum,
-                                   ::Option{<:MatNum}, ::Option{<:AssetPanel})
+                                   ::Option{<:MatNum}, ::Option{<:AssetPanel}; kwargs...)
     return factory(pe, w)
 end
 function prior_probability_factory(pe::EmpiricalPrior, w, X::MatNum, ::Option{<:MatNum},
-                                   ::Option{<:AssetPanel})
+                                   ::Option{<:AssetPanel}; kwargs...)
     return factory(pe, scenario_weights(w, size(X, 1)))
 end
 function prior_probability_factory(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, w,
-                                   ::MatNum, F::MatNum, ::Option{<:AssetPanel})
+                                   ::MatNum, F::MatNum, ::Option{<:AssetPanel}; kwargs...)
     inner = prior_probability_factory(pe.pe, w, F, nothing, nothing)
     return rebuild_estimator(factory(pe, scenario_weights(w, size(F, 1))), (; pe = inner))
 end
@@ -958,13 +968,14 @@ function prior_probability_factory(pe::Union{<:BlackLittermanPrior,
                                              <:BayesianBlackLittermanPrior,
                                              <:EntropyPoolingPrior,
                                              <:MeucciEntropyPoolingPrior}, w, X::MatNum,
-                                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel})
-    inner = prior_probability_factory(pe.pe, w, X, F, pnl)
+                                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                   kwargs...)
+    inner = prior_probability_factory(pe.pe, w, X, F, pnl; kwargs...)
     return rebuild_estimator(factory(pe, w), (; pe = inner))
 end
 function prior_probability_factory(pe::AugmentedBlackLittermanPrior, w, X::MatNum,
-                                   F::MatNum, pnl::Option{<:AssetPanel})
-    a_pe = prior_probability_factory(pe.a_pe, w, X, nothing, pnl)
+                                   F::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
+    a_pe = prior_probability_factory(pe.a_pe, w, X, nothing, pnl; kwargs...)
     f_pe = prior_probability_factory(pe.f_pe, w, F, nothing, nothing)
     return rebuild_estimator(factory(pe, scenario_weights(w, size(X, 1))),
                              (; a_pe = a_pe, f_pe = f_pe))
@@ -976,6 +987,7 @@ end
                                     <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior})
     assert_scenario_model(pe::AugmentedBlackLittermanPrior)
     assert_scenario_model(pe::OpinionPoolingPrior)
+    assert_scenario_model(pe::CrossSectionalFactorPrior)
 
 Check that [`scenario_factory`](@ref) can state the model of `pe` as one estimator.
 

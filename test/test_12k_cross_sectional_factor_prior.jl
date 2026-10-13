@@ -582,6 +582,55 @@ scenario mean.
             @test isapprox(ps.fpr.mu[1], 0.001; rtol = 1e-5)
         end
     end
+    @testset "The refit under the posterior holds the model and reweights the factor prior" begin
+        # A Scenario Cap in the factor prior keeps the last 30 of the factor returns as
+        # scenarios, and the regression reads every fitted observation. The refit gave the 30
+        # posterior weights to every field and failed with a bare `DimensionMismatch`
+        # (#1685). It now holds the regression and the residual block, as the refit of a
+        # `FactorPrior` does (ADR 0205), and gives the weights to the factor prior alone,
+        # with a zero weight on each factor return that the cap removed (ADR 0209).
+        pec = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                        pe = EmpiricalPrior(; max_scenarios = 30))
+        prc = prior(pec, rd)
+        @test size(prc.X, 1) == 30
+        wu = StatsBase.pweights(fill(inv(30), 30))
+        for wr in (EntropyPoolingPrior(; pe = pec, sets = sets, mu_views = views),
+                   EntropyPoolingPrior(; pe = pec, sets = sets, mu_views = views,
+                                       alg = H0_EntropyPooling()),
+                   EntropyPoolingPrior(; pe = pec, sets = sets, mu_views = views, w = wu),
+                   MeucciEntropyPoolingPrior(; pe = pec, sets = sets, mu_views = views))
+            pw = prior(wr, rd)
+            @test length(pw.w) == 30
+            @test pw.X == prc.X
+            @test isapprox(LinearAlgebra.dot(pw.w, pw.X[:, 1]), 0.002; rtol = 1e-5)
+            @test pw.rr.csr.f == prc.rr.csr.f
+            @test pw.rr.esigma == prc.rr.esigma
+            # The factor mean of the posterior is the mean of the factor scenarios under the
+            # posterior weights.
+            @test isapprox(pw.fpr.mu, transpose(prc.fpr.X) * pw.w; atol = 1e-15)
+        end
+        pw = prior(EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views), rd)
+        @test pw.X == pr.X
+        @test pw.rr.csr.f == pr.rr.csr.f
+        # A pool on the factors refits on the factor returns that the prior gives it. A pool
+        # with `pe1` reads other rows, so the entropy pooling prior refuses it when it is
+        # built.
+        nf = PortfolioOptimisers.cross_sectional_factor_axis(csfp_factors(), rd).nf
+        fsets = UniverseSets(; dict = Dict("nx" => nf))
+        fview = LinearConstraintEstimator(; val = "$(nf[1]) == 0.001")
+        ops = [EntropyPoolingPrior(; sets = fsets, mu_views = fview)]
+        pop = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                        pe = OpinionPoolingPrior(; pes = ops))
+        pp = prior(pop, rd)
+        pw = prior(EntropyPoolingPrior(; pe = pop, sets = sets, mu_views = views), rd)
+        @test pw.X == pp.X
+        @test isapprox(LinearAlgebra.dot(pw.w, pw.X[:, 1]), 0.002; rtol = 1e-5)
+        pop1 = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                         pe = OpinionPoolingPrior(; pe1 = EmpiricalPrior(),
+                                                                  pes = ops))
+        @test_throws ArgumentError EntropyPoolingPrior(; pe = pop1, sets = sets,
+                                                       mu_views = views)
+    end
 end
 
 @testset "A constrained Factor Family re-bases the fit" begin

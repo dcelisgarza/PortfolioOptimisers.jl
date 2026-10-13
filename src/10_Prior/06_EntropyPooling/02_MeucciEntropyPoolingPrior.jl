@@ -841,7 +841,7 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         # nested result's own `w` is already carried by the fit that answered it, so
         # neither is pushed. A field that reads more rows than the scenarios, under a
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
-        pe = prior_probability_factory(pe, w0, X, F, pnl)
+        pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
@@ -1031,7 +1031,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
         # nested result's own `w` is already carried by the fit that answered it, so
         # neither is pushed. A field that reads more rows than the scenarios, under a
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
-        pe = prior_probability_factory(pe, w0, X, F, pnl)
+        pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned

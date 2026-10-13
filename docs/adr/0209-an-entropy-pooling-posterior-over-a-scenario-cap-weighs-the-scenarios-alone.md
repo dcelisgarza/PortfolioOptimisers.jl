@@ -72,7 +72,8 @@ removed, so that observation has the probability zero.
   staged algorithms and `MeucciEntropyPoolingPrior`, with and without a caller's `w`.
 - Under a posterior, a Scenario Cap no longer means "moments over the long window". The moments
   of a capped prior without a posterior are still fitted over every observation.
-- A `CrossSectionalFactorPrior` whose `pe` holds a Scenario Cap still fails under an entropy
-  pooling prior. Its fields read the rows it keeps, and the refit gives them the weights of the
-  capped scenarios. Which fields of that prior take the posterior weights is a separate decision,
-  and [#1685](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1685) records it.
+- A `CrossSectionalFactorPrior` whose `pe` holds a Scenario Cap takes the same rule since
+  [#1685](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1685). Its fields read
+  the factor returns of the rows it keeps. The refit gives the posterior weights to `pe` alone,
+  through `scenario_weights` on those rows, and holds every other field (ADR 0205). A caller's
+  `pe.w` reaches every field through `scenario_weights` on the same rows.

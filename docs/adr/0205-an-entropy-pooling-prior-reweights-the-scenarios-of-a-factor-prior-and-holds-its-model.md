@@ -36,8 +36,12 @@ so the model is held too.
 1. Every refit under the posterior weights goes through `scenario_prior`, which fits the
    estimator of `scenario_factory`. That estimator gives the weights to the estimators that read
    the scenarios, and keeps the rest. A `FactorPrior` and a `FactorBlackLittermanPrior` reweight
-   `pe` alone, and keep `re` and `ve`. An `AugmentedBlackLittermanPrior` reweights `a_pe` and
-   `f_pe`, and keeps `re`. A Black-Litterman wrapper applies the rule to the prior it embeds.
+   `pe` alone, and keep `re` and `ve`. A `CrossSectionalFactorPrior` reweights `pe` alone, on
+   the factor returns that its fit gives `pe`, and keeps its regression, the weights of its
+   cross-sectional fit, its residual block and its Return Forecast
+   ([#1685](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1685)). An
+   `AugmentedBlackLittermanPrior` reweights `a_pe` and `f_pe`, and keeps `re`. A
+   Black-Litterman wrapper applies the rule to the prior it embeds.
    Any other prior takes `factory`: its rows are the returns, which no weight moves. Each of
    these recurses through `scenario_factory`, never through `factory`.
    A prior that reweights scenarios itself is replaced by its model. A nested entropy pooling
@@ -104,8 +108,24 @@ agree to the tolerance of the solver: the weights to 8.9e-11, `mu` to 8.0e-12 an
 - Under `PinnedChoice` and `BatchChoice` alike, every refit reads the regression of the `w0`
   fit, so the two Choice Rules agree in the batch fit of an entropy pooling prior again. The
   exception that #1641 recorded in ADR 0193 is gone.
-- A `CrossSectionalFactorPrior` makes its rows with the idiosyncratic returns in them, so its `D`
-  is zero and it takes `factory`.
+- A `CrossSectionalFactorPrior` takes the rule of a `FactorPrior`
+  ([#1685](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1685)). It took
+  `factory` before, which gave the posterior weights to every field, and a Scenario Cap in its
+  `pe` then failed with a bare `DimensionMismatch`, because its fields read every fitted
+  observation. The number of these observations is known only after the regression, because the
+  Descriptor warm-up and the exposure lag drop rows, so `scenario_factory` and
+  `prior_probability_factory` fit the regression with `cross_sectional_regression_stage` to read
+  the factor returns of `pe`. The refit therefore fits the regression twice. No default field of
+  the prior other than `pe` reads weights through `factory`, so on the panel of
+  `test_12k_cross_sectional_factor_prior.jl` the posterior without a cap is bit-identical to the
+  old one. A field that reads observation weights, such as a `ce` with weights, now keeps the
+  weights of the fit that the views read.
+- The rows of a `CrossSectionalFactorPrior` carry the idiosyncratic returns, and its `mu` is
+  `L f_mu + b`, which sets the mean of the idiosyncratic returns to zero. So a mean view holds on
+  `pr.X' * w`, and the read-out `mu` misses it by the posterior mean of the idiosyncratic part of
+  the rows. On the panel of the test, a view of 0.002 reads out as 0.0015321 without a cap, as
+  before this decision, and as 0.0037980 with a cap of 30 scenarios. `scenario_residual_variances`
+  answers zero for its block, because its rows already carry the residual.
 - A view that only a nested entropy pooling prior states is a belief of the prior of the host,
   not a view of the host. The posterior of the host is the smallest move from it that meets the
   views of the host, so the read-out can leave it, as Meucci's sequential reading states. A

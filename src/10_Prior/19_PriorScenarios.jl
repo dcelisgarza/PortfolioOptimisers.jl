@@ -197,6 +197,200 @@ function scenario_weights(w::ObsWeights, t::Integer)
     return StatsBase.pweights(vcat(zeros(eltype(w), t - s), w))
 end
 """
+    cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatNum,
+                                     F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                     ne = nothing, E = nothing, iv = nothing,
+                                     ivpa = nothing, ts = nothing) -> NamedTuple
+
+Fit the cross-sectional regression of a [`CrossSectionalFactorPrior`](@ref), up to the factor returns that its factor prior reads.
+
+The returns-matrix method of [`prior`](@ref) fits `pe.pe` on the factor returns of this stage and assembles the result. [`scenario_factory`](@ref) and [`prior_probability_factory`](@ref) read the same factor returns, because an entropy pooling prior around `pe` states its probabilities on the scenarios of `pe.pe`. The stage reads no weight of `pe.pe`, so a change of `pe.pe` alone leaves its answer the same.
+
+# Algorithm
+
+ 1. Run the steps 1 to 9 of the returns-matrix method of [`prior`](@ref): the exposure stage, the Neutralisation, the Factor Family Basis, the lag, the eligibility, the regression and the idiosyncratic variance history.
+ 2. Append the observed factors with [`cross_sectional_observed_append`](@ref), giving `ca`.
+ 3. Mark the factors that are not empty in `lv`, on the axis of `ca.f`. An Observed Factor is never empty.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:X])
+  - `F`: Optional factor returns matrix, already oriented. The stage does not read it.
+  - $(arg_dict[:pnl_prior]) This estimator reads it, and refuses without it.
+  - `ne`, `E`, `iv`, `ivpa`, `ts`: As in the returns-matrix method of [`prior`](@ref), with `E` already oriented.
+
+# Validation
+
+  - The rules of the returns-matrix method of [`prior`](@ref), up to the factor prior.
+
+# Returns
+
+  - `ca::NamedTuple`: The output of [`cross_sectional_observed_append`](@ref). `ca.f` holds the factor returns, one row per fitted observation.
+  - `lv::BitVector`: `true` at each factor of `ca.f` that is not empty.
+  - `fit::NamedTuple`: The regression, the weights, the variance history and the rows that [`cross_sectional_assemble`](@ref) reads.
+  - `rde::ReturnsResult`: The returns data that the estimated members read.
+
+# Related
+
+  - [`prior`](@ref)
+  - [`cross_sectional_assemble`](@ref)
+  - [`cross_sectional_factor_moments`](@ref)
+  - [`scenario_factory`](@ref)
+"""
+function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatNum,
+                                          F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                          ne::Option{<:VecStr} = nothing,
+                                          E::Option{<:MatNum} = nothing,
+                                          iv::Option{<:MatNum} = nothing,
+                                          ivpa::Option{<:Num_VecNum} = nothing,
+                                          ts::Option{<:VecDate} = nothing)
+    @argcheck(!isnothing(pnl),
+              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
+    @argcheck(isnothing(ts) || length(ts) == size(X, 1),
+              DimensionMismatch("ts ($(length(something(ts, ())))) must have one entry for each observation of X ($(size(X, 1)))"))
+    st = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv, ivpa = ivpa)
+    (; amsk, emsk, mcap, BW, cc, Xl, rde, Ms, nf, fam, rw) = st
+    Msw = Ms[rw, :, :]
+    Xw = X[rw, :]
+    Xlw = Xl[rw, :]
+    bww = BW[rw, :]
+    mcw = cross_sectional_rows(mcap, rw)
+    cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
+    fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
+    @argcheck(length(rw) > pe.lag,
+              ArgumentError("the exposures lag the returns by lag = $(pe.lag), so a fit needs more than $(pe.lag) observations after the Descriptor warm-up, and $(length(rw)) are left. Give more observations, shorten the warm-up of the Descriptors, or lower lag."))
+    @argcheck(length(rw) - pe.lag >= 2,
+              ArgumentError("the factor prior states a covariance of the factor returns, and a covariance of one observation is not a number, so a fit needs at least two observations after the Descriptor warm-up and the exposure lag of $(pe.lag), and $(length(rw) - pe.lag) is left. Give more observations, or shorten the warm-up of the Descriptors."))
+    r = (pe.lag + 1):length(rw)
+    Zl = fb.Ms[r .- pe.lag, :, :]
+    Xr = Xlw[r, :]
+    cb = cross_sectional_observed_block(cc, rw, r)
+    amr = amsk[rw[r], :]
+    bwr = bww[r, :]
+    msk = cross_sectional_eligible(Xr, Zl, emsk[rw[r], :])
+    mcl = cross_sectional_rows(mcw, r .- pe.lag)
+    cross_sectional_cap_finite!(msk, mcl)
+    assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)), cb)
+    W = cs_weights_initial(pe.wa, mcl, msk)
+    # The Unseen Member rule states the return of a member of a constrained family that no
+    # asset of an observation loads on (#1606).
+    Bl = Msw[r .- pe.lag, :, :]
+    fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
+    ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
+    (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
+    csr = unseen_member_returns(csr, ud.P)
+    assert_cross_sectional_no_intercept(csr)
+    # The idiosyncratic variance is a folding statistic, so it reads both universe masks: it
+    # resets an asset the active mask turns off, and a regime-adjusted estimator measures its
+    # regime over the estimation universe alone (ADR 0172). An estimator that takes no mask
+    # ignores the two keywords.
+    emr = emsk[rw[r], :]
+    if needs_second_pass(pe.wa)
+        W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk; estimation_mask = emr,
+                              active_mask = amr)
+        ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
+        (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
+        csr = unseen_member_returns(csr, ud.P)
+    end
+    vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
+    ca = cross_sectional_observed_append(cb, csr.f, fb.Ms[r[end], :, :], Msw[r, :, :], nf,
+                                         fam, fb.fcb)
+    fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
+           bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing, Sc = nothing,
+           ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],
+           rf = nothing)
+    # An Observed Factor carries the return the caller observed, so it is never empty.
+    return (; ca = ca, lv = vcat(lv, trues(size(ca.f, 2) - length(lv))), fit = fit,
+            rde = rde)
+end
+"""
+    cross_sectional_factor_scenarios(pe::CrossSectionalFactorPrior, X::MatNum,
+                                     F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                     ne = nothing, E = nothing, iv = nothing,
+                                     ivpa = nothing, ts = nothing, kwargs...)
+
+Return the factor returns that the factor prior `pe.pe` of a [`CrossSectionalFactorPrior`](@ref) is fitted on, with the regression stage that gives them.
+
+An entropy pooling prior around `pe` states its probabilities on the scenarios of `pe`, and these are the last rows of the factor returns of `pe.pe`. The Descriptor warm-up and the exposure lag drop rows, so the number of factor returns is known only after the regression. [`scenario_factory`](@ref) and [`prior_probability_factory`](@ref) read these rows, to put the probabilities on the observations that `pe.pe` reads. [`scenario_prior`](@ref) also reads the stage, so the refit runs the regression once.
+
+# Algorithm
+
+ 1. Fit the regression of `pe` with [`cross_sectional_regression_stage`](@ref), giving the stage `rs`, with the factor returns `rs.ca.f` and the mask `rs.lv` of the factors that are not empty.
+ 2. Take the columns of `rs.ca.f` that `rs.lv` marks, as the fit of `pe.pe` reads them.
+ 3. Return them with `rs`, and with the keyword arguments that the stage did not read.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - $(arg_dict[:X])
+  - `F`: Optional factor returns matrix, already oriented.
+  - $(arg_dict[:pnl_prior])
+  - `ne`, `E`, `iv`, `ivpa`, `ts`: As in the returns-matrix method of [`prior`](@ref), with `E` already oriented.
+  - `kwargs...`: The other keyword arguments of the fit. The regression reads none of them.
+
+# Validation
+
+  - The rules of [`cross_sectional_regression_stage`](@ref).
+
+# Returns
+
+  - `f::Matrix`: The factor returns of `pe.pe`, one row per fitted observation.
+  - `rs::NamedTuple`: The output of [`cross_sectional_regression_stage`](@ref).
+  - `kw`: The keyword arguments in `kwargs...`, which the rest of the fit reads.
+
+# Related
+
+  - [`cross_sectional_regression_stage`](@ref)
+  - [`scenario_factory`](@ref)
+  - [`scenario_prior`](@ref)
+  - [`prior_probability_factory`](@ref)
+"""
+function cross_sectional_factor_scenarios(pe::CrossSectionalFactorPrior, X::MatNum,
+                                          F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                          ne::Option{<:VecStr} = nothing,
+                                          E::Option{<:MatNum} = nothing,
+                                          iv::Option{<:MatNum} = nothing,
+                                          ivpa::Option{<:Num_VecNum} = nothing,
+                                          ts::Option{<:VecDate} = nothing, kwargs...)
+    rs = cross_sectional_regression_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                          ivpa = ivpa, ts = ts)
+    return (; f = all(rs.lv) ? rs.ca.f : rs.ca.f[:, rs.lv], rs = rs, kw = kwargs)
+end
+# The refit of a Cross-Sectional Factor Prior under the posterior weights holds its model, as
+# the refit of a `FactorPrior` does (ADR 0205), and gives the weights to `pe` alone, on the
+# factor returns that it reads (#1685). `scenario_factory` documents every method.
+function scenario_factory(pe::CrossSectionalFactorPrior, w, X::MatNum, F::Option{<:MatNum},
+                          pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
+    return rebuild_estimator(pe,
+                             (;
+                              pe = scenario_factory(pe.pe, w, f, nothing, nothing;
+                                                    strict = strict)))
+end
+# The refit of an entropy pooling prior runs the regression stage once, and fits the factor
+# prior of `scenario_factory` on its factor returns. `scenario_prior` documents every method.
+function scenario_prior(pe::CrossSectionalFactorPrior, w, X::MatNum, F::Option{<:MatNum},
+                        pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    (; f, rs, kw) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
+    fpe = scenario_factory(pe.pe, w, f, nothing, nothing; strict = strict)
+    f_pr = cross_sectional_factor_moments(fpe, pe.f_mp, rs.ca.f, rs.lv; strict = strict,
+                                          kw...)
+    return cross_sectional_assemble(pe, f_pr, rs.ca, rs.fit, rs.rde; kw...)
+end
+# A caller's prior probabilities weigh the fit, so every field takes them on the rows of the
+# factor returns, which each field reads (ADR 0209).
+function prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
+                                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                   kwargs...)
+    (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
+    inner = prior_probability_factory(pe.pe, w, f, nothing, nothing)
+    return rebuild_estimator(factory(pe, scenario_weights(w, size(f, 1))), (; pe = inner))
+end
+function assert_scenario_model(pe::CrossSectionalFactorPrior)
+    return assert_scenario_model(pe.pe)
+end
+"""
     scenario_ens(::Nothing, X::MatNum)
     scenario_ens(max_scenarios::Integer, X::MatNum)
 

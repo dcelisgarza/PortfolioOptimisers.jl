@@ -790,6 +790,7 @@ The prior states an entry exactly when the model determines it. An asset of ``\\
   - [`cross_sectional_lift`](@ref)
   - [`cross_sectional_return_forecast`](@ref)
   - [`cross_sectional_forecast_mu`](@ref)
+  - [`cross_sectional_regression_stage`](@ref)
 """
 function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
@@ -797,61 +798,8 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
                iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing,
                ts::Option{<:VecDate} = nothing, strict::Bool = false, kwargs...)
     X, F, E = dims_oriented(dims, X, F, E)
-    @argcheck(!isnothing(pnl),
-              IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and the panel is nothing. Call prior(pe, rd) with a ReturnsResult whose `pnl` is the one asset_panel returns, or hand the panel to this method as its third positional argument."))
-    @argcheck(isnothing(ts) || length(ts) == size(X, 1),
-              DimensionMismatch("ts ($(length(something(ts, ())))) must have one entry for each observation of X ($(size(X, 1)))"))
-    st = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv, ivpa = ivpa)
-    (; amsk, emsk, mcap, BW, cc, Xl, rde, Ms, nf, fam, rw) = st
-    Msw = Ms[rw, :, :]
-    Xw = X[rw, :]
-    Xlw = Xl[rw, :]
-    bww = BW[rw, :]
-    mcw = cross_sectional_rows(mcap, rw)
-    cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
-    fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
-    @argcheck(length(rw) > pe.lag,
-              ArgumentError("the exposures lag the returns by lag = $(pe.lag), so a fit needs more than $(pe.lag) observations after the Descriptor warm-up, and $(length(rw)) are left. Give more observations, shorten the warm-up of the Descriptors, or lower lag."))
-    @argcheck(length(rw) - pe.lag >= 2,
-              ArgumentError("the factor prior states a covariance of the factor returns, and a covariance of one observation is not a number, so a fit needs at least two observations after the Descriptor warm-up and the exposure lag of $(pe.lag), and $(length(rw) - pe.lag) is left. Give more observations, or shorten the warm-up of the Descriptors."))
-    r = (pe.lag + 1):length(rw)
-    Zl = fb.Ms[r .- pe.lag, :, :]
-    Xr = Xlw[r, :]
-    cb = cross_sectional_observed_block(cc, rw, r)
-    amr = amsk[rw[r], :]
-    bwr = bww[r, :]
-    msk = cross_sectional_eligible(Xr, Zl, emsk[rw[r], :])
-    mcl = cross_sectional_rows(mcw, r .- pe.lag)
-    cross_sectional_cap_finite!(msk, mcl)
-    assert_cross_sectional_coverage(msk, cross_sectional_minra(pe, size(Zl, 3)), cb)
-    W = cs_weights_initial(pe.wa, mcl, msk)
-    # The Unseen Member rule states the return of a member of a constrained family that no
-    # asset of an observation loads on (#1606).
-    Bl = Msw[r .- pe.lag, :, :]
-    fbl = cross_sectional_basis_now(fb.fcb, r .- pe.lag)
-    ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
-    (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
-    csr = unseen_member_returns(csr, ud.P)
-    assert_cross_sectional_no_intercept(csr)
-    # The idiosyncratic variance is a folding statistic, so it reads both universe masks: it
-    # resets an asset the active mask turns off, and a regime-adjusted estimator measures its
-    # regime over the estimation universe alone (ADR 0172). An estimator that takes no mask
-    # ignores the two keywords.
-    emr = emsk[rw[r], :]
-    if needs_second_pass(pe.wa)
-        W = cs_weights_refine(pe.wa, W, csr.eps, pe.ve, msk; estimation_mask = emr,
-                              active_mask = amr)
-        ud = unseen_member_design(pe.unseen, fbl, Bl, Zl, W)
-        (; csr, lv) = cross_sectional_live_regression(pe.cre, ud.Z, Xr, W)
-        csr = unseen_member_returns(csr, ud.P)
-    end
-    vs = variance_series(pe.ve, csr.eps; dims = 1, estimation_mask = emr, active_mask = amr)
-    # `strict` reaches the nested factor prior for the reason it reaches `FactorPrior`'s:
-    # the slot admits `BlackLittermanPrior` and `EntropyPoolingPrior`, whose views name
-    # factors on an axis the caller declared, and a name the axis lacks is the caller's
-    # error to hear about under `strict`.
-    ca = cross_sectional_observed_append(cb, csr.f, fb.Ms[r[end], :, :], Msw[r, :, :], nf,
-                                         fam, fb.fcb)
+    rs = cross_sectional_regression_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                          ivpa = ivpa, ts = ts)
     # The factor covariance takes its own estimator for the reason the asset one takes
     # `pe.mp`: they are different matrices. This one is estimated from the factor-return
     # series over a factor axis a constrained Family has already reduced, and
@@ -861,16 +809,14 @@ function prior(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum} = n
     # answering. The default `pdm` is a no-op on a matrix that is already positive definite,
     # so a healthy fit is untouched.
     # An Empty Factor has no return to estimate a variance from, so the factor prior and
-    # `pe.f_mp` read the other factors. An Observed Factor carries the return the caller
-    # observed, so it is never empty.
-    f_pr = cross_sectional_factor_moments(pe.pe, pe.f_mp, ca.f,
-                                          vcat(lv, trues(size(ca.f, 2) - length(lv)));
-                                          strict = strict, kwargs...)
-    fit = (; csr = csr, W = W, vs = vs, cnt = variance_count(pe.ve, csr.eps), amr = amr,
-           bwr = bwr, Xo = Xw[r, :], r = r, hist = nothing, S = nothing, Sc = nothing,
-           ce = nothing, idx = rw[r], ts = isnothing(ts) ? nothing : ts[rw[r]],
-           rf = nothing)
-    return cross_sectional_assemble(pe, f_pr, ca, fit, rde; kwargs...)
+    # `pe.f_mp` read the other factors.
+    # `strict` reaches the nested factor prior for the reason it reaches `FactorPrior`'s:
+    # the slot admits `BlackLittermanPrior` and `EntropyPoolingPrior`, whose views name
+    # factors on an axis the caller declared, and a name the axis lacks is the caller's
+    # error to hear about under `strict`.
+    f_pr = cross_sectional_factor_moments(pe.pe, pe.f_mp, rs.ca.f, rs.lv; strict = strict,
+                                          kwargs...)
+    return cross_sectional_assemble(pe, f_pr, rs.ca, rs.fit, rs.rde; kwargs...)
 end
 """
     cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTuple, ca::NamedTuple,
