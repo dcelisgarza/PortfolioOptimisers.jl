@@ -120,5 +120,7 @@ The maintainer decided on 2026-10-13.
 - ADR 0204: the current rule for `brt`.
 - ADR 0208: `DataTracking`, which refuses the Excess Frame.
 - ADR 0211: the readers that hold `x_src`.
+- ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md): the frame check that
+  `DataSource()` serves (#1682).
 - `returns_matrix_picker`, `benchmark_relative_returns`, `resolve_factor_regression`,
   `head_frame_returns`, `assert_source_selector`.

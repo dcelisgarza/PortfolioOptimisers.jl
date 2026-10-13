@@ -149,6 +149,7 @@ An online portfolio selection head with `brt = true` steps on the price relative
 
 **Returns Source**
 The returns that a reader of the returns states that it fits on: the returns data as they arrived, the returns data in the Excess Frame, or the prior. The prior gives its returns in the frame that it fitted in, and gives a regression its loadings. A reader that states no source reads the returns data, and a regression first takes the loadings of the prior. See ADR 0211 and ADR 0212.
+The readers of one optimiser can state different sources. A reader that states no source and reads the raw returns, beside a reader in the Excess Frame, gets a warning when the optimiser is built, and a stated raw source silences it. See ADR 0214.
 *Avoid*: matrix source, which also names the source of a feature matrix.
 
 **Data Benchmark**

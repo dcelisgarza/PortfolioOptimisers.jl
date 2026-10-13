@@ -134,5 +134,7 @@ The maintainer decided on 2026-10-13.
 - ADR 0208: `DataTracking`, which refuses the Excess Frame.
 - ADR [0213](0213-brt-is-removed-in-one-break.md): `brt` is removed in one break, with no
   deprecation.
+- ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md): the readers of one head
+  can read different frames, and a forgotten raw reader warns (#1682).
 - `returns_matrix_picker`, `benchmark_relative_returns`, `resolve_factor_regression`,
   `head_frame_returns`.
