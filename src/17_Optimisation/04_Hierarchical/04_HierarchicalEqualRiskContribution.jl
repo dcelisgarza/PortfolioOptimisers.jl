@@ -329,6 +329,35 @@ function port_opt_view(hec::HierarchicalEqualRiskContribution, i, X::MatNum,
                                              scao = hec.scao, ex = hec.ex,
                                              fb = view_child(hec.fb, i, X))
 end
+"""
+    bind_data_benchmark(hec::HierarchicalEqualRiskContribution, rd::ReturnsResult)
+
+Bind every [`DataTracking`](@ref) of the inner measures `ri` and the outer measures `ro` to the benchmark of the rows that the optimiser fits on.
+
+The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The optimiser applies its own `brt` to the binding, as [`bind_data_benchmark`](@ref) states.
+
+# Algorithm
+
+ 1. Bind the inner measures `hec.ri` to `rd` under `hec.opt.brt` with [`bind_data_benchmark`](@ref), giving `ri`.
+ 2. Bind the outer measures `hec.ro` the same way, giving `ro`.
+ 3. Return `hec` itself when `ri === hec.ri` and `ro === hec.ro`.
+ 4. Otherwise rebuild `hec` with `ri` and `ro` through its keyword constructor, with [`rebuild_estimator`](@ref).
+
+# Related
+
+  - [`bind_data_benchmark`](@ref)
+  - [`DataTracking`](@ref)
+  - [`HierarchicalEqualRiskContribution`](@ref)
+"""
+function bind_data_benchmark(hec::HierarchicalEqualRiskContribution, rd::ReturnsResult)
+    ri = bind_data_benchmark(hec.ri, rd, hec.opt.brt)
+    ro = bind_data_benchmark(hec.ro, rd, hec.opt.brt)
+    return if ri === hec.ri && ro === hec.ro
+        hec
+    else
+        rebuild_estimator(hec, (; ri = ri, ro = ro))
+    end
+end
 function non_investable_universe(hec::HierarchicalEqualRiskContribution, ni::VecStr)
     return rebuild_estimator(hec, (; opt = non_investable_universe(hec.opt, ni)))
 end
@@ -614,6 +643,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
     _, pr, hec, rd = investable_reduction(imsk, pr, hec, rd)
+    hec = bind_data_benchmark(hec, rd)
     X = pr.X
     N = size(X, 2)
     clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,

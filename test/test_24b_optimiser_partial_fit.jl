@@ -476,6 +476,109 @@ end
                        atol = 1e-6)
     end
 
+    @testset "A data benchmark follows the rows: batch, online, rolling and walk-forward (#1657)" begin
+        # `DataTracking` binds to the `B` of the rows that each reader holds, so it equals
+        # a returns series of exactly those rows, at every step and in every fold.
+        t = 60
+        bw = X * fill(inv(N), N) .+ randn(StableRNG(7), T) ./ 1000
+        Bh = 0.5 .* X .+ randn(StableRNG(11), T, N) ./ 1000
+        rdb = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = bw, ts = ts)
+        rdh = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bh, ts = ts)
+        jopt(tr, err; pe = EmpiricalPrior(), brt = false) = JuMPOptimiser(; pe = pe,
+                                                                          slv = slv,
+                                                                          tr = TrackingError(;
+                                                                                             tr = tr,
+                                                                                             err = err),
+                                                                          brt = brt)
+        te = TrackingRiskMeasure(; tr = DataTracking())
+        b, h = rows(rdb, 1:t), rows(rdh, 1:t)
+        w0 = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)),
+                      b).w
+        # The bound binds: the weights leave the unconstrained minimum and sit on it.
+        err = 0.85 * expected_risk(te, w0, b)
+        mr = MeanRisk(; opt = jopt(DataTracking(), err))
+        wd = optimise(mr, b).w
+        @test isapprox(expected_risk(te, wd, b), err; rtol = 1e-5)
+        @test !isapprox(wd, w0; atol = 1e-3)
+        @test isapprox(wd,
+                       optimise(MeanRisk(; opt = jopt(ReturnsTracking(; w = bw[1:t]), err)),
+                                b).w; atol = 1e-8)
+        # The step binds the rows of its buffer, expanding and under `max_history`.
+        @test isapprox(optimise(step(mr, rdb, t)).w, wd; atol = 1e-6)
+        roll = po.update_online_estimator(MeanRisk(;
+                                                   opt = jopt(DataTracking(), err;
+                                                              pe = po.Online(EmpiricalPrior();
+                                                                             max_history = 30))))
+        @test isapprox(optimise(step(roll, rdb, t)).w,
+                       optimise(mr, rows(rdb, (t - 29):t)).w; atol = 1e-6)
+        # A matrix benchmark bounds the error of (X - B) w, between its minimum and the
+        # error of the unconstrained minimum.
+        mrr(tr) = MeanRisk(; r = TrackingRiskMeasure(; tr = tr),
+                           opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))
+        lo = expected_risk(te, optimise(mrr(DataTracking()), h).w, h)
+        hi = expected_risk(te, w0, h)
+        @test lo < hi
+        mh = MeanRisk(; opt = jopt(DataTracking(), (lo + hi) / 2))
+        wh = optimise(mh, h).w
+        @test isapprox(expected_risk(te, wh, h), (lo + hi) / 2; rtol = 1e-5)
+        @test isapprox(sqrt(sum(abs2, (h.X - h.B) * wh) / (t - 1)), (lo + hi) / 2;
+                       rtol = 1e-5)
+        @test isapprox(optimise(step(mh, rdh, t)).w, wh; atol = 1e-6)
+        # A tracking measure in the objective, and every other head that reads one.
+        rt = ReturnsTracking(; w = bw[1:t])
+        jt(tr) = jopt(tr, 0.002)
+        heads = (mrr, tr -> RiskBudgeting(; opt = jt(tr)),
+                 tr -> RelaxedRiskBudgeting(; opt = jt(tr)),
+                 tr -> NearOptimalCentering(; r = TrackingRiskMeasure(; tr = tr),
+                                            opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                                slv = slv)),
+                 tr -> MeanRisk(;
+                                r = TrackingRiskMeasure(; tr = tr,
+                                                        settings = RiskMeasureSettings(;
+                                                                                       ub = Frontier(;
+                                                                                                     N = 3))),
+                                opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)),
+                 tr -> HierarchicalRiskParity(; r = TrackingRiskMeasure(; tr = tr),
+                                              opt = HierarchicalOptimiser(;
+                                                                          pe = EmpiricalPrior())),
+                 tr -> HierarchicalEqualRiskContribution(;
+                                                         ri = TrackingRiskMeasure(;
+                                                                                  tr = tr),
+                                                         ro = TrackingRiskMeasure(;
+                                                                                  tr = tr),
+                                                         opt = HierarchicalOptimiser(;
+                                                                                     pe = EmpiricalPrior())))
+        for f in heads
+            @test isapprox(optimise(f(DataTracking()), b).w, optimise(f(rt), b).w;
+                           atol = 1e-8)
+        end
+        for f in heads[[1, 6]]
+            @test isapprox(optimise(step(f(DataTracking()), rdb, t)).w,
+                           optimise(f(DataTracking()), b).w; atol = 1e-6)
+        end
+        @test isapprox(optimise(step(mrr(DataTracking()), rdh, t)).w,
+                       optimise(mrr(DataTracking()), h).w; atol = 1e-6)
+        # `brt = true` fits on X - B, and a data benchmark would subtract B twice. Returns
+        # data with no benchmark has none to track.
+        @test_throws ArgumentError optimise(MeanRisk(;
+                                                     opt = jopt(DataTracking(), err;
+                                                                brt = true)), b)
+        @test_throws ArgumentError optimise(mr, rows(rd, 1:t))
+        # The online walk-forward equals the batch expanding one, and a rolling fold, whose
+        # length every fold shares, tracks its own rows (#1669).
+        bcv = IndexWalkForward(40, 20; expand_train = true)
+        pb = cross_val_predict(mrr(DataTracking()), rdb, bcv)
+        pn = cross_val_predict(mrr(DataTracking()), rdb, OnlineIndexWalkForward(40, 20))
+        @test all(isapprox(x.res.w, y.res.w; atol = 1e-6)
+                  for (x, y) in zip(pb.pred, pn.pred))
+        rcv = IndexWalkForward(40, 20)
+        pr = cross_val_predict(mrr(DataTracking()), rdb, rcv)
+        own = [optimise(mrr(ReturnsTracking(; w = bw[tr])), rows(rdb, tr)).w
+               for tr in split(rcv, rdb).train_idx]
+        @test length(own) == length(pr.pred) > 1
+        @test all(isapprox(x.res.w, y; atol = 1e-8) for (x, y) in zip(pr.pred, own))
+    end
+
     @testset "The state merges, copies and slices" begin
         a = step(EqualWeighted(), rdf, 30).cache
         b = step(EqualWeighted(), rows(rdf, 31:60), 30).cache

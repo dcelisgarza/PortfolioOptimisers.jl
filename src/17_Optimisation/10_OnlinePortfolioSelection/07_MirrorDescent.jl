@@ -1072,7 +1072,7 @@ RiskLoss
         @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
         path = returns_tracking_path(r)
         @argcheck(isnothing(path),
-                  ArgumentError("a `RiskLoss` holds a `ReturnsTracking` at `$(tree_path(:r, something(path, "")))`, and the loss reads the rows of the head's buffer, which change at every step. A fixed series cannot follow them. Track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
+                  ArgumentError("a `RiskLoss` holds a `ReturnsTracking` at `$(tree_path(:r, something(path, "")))`, and the loss reads the rows of the head's buffer, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
         return new{T1, T2, T3, T4}(r, window, sca, pe)
     end
 end
@@ -1133,7 +1133,7 @@ The [`LogWealth`](@ref) method returns `-x ./ dot(u, x)`. The [`RiskLoss`](@ref)
  2. View the last `min(window, n)` of the `n` rows of `rows`. The head can hold more rows than the loss reads, because another part of the head can need more.
  3. Fit the prior `pr` of the loss on that view, as a batch prior is fitted, on its returns and its Asset Panel. The prior answers `NaN` at an asset outside its Coverage Universe.
  4. Read the Investable Mask of `pr`.
- 5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref). It is zero at every other leg.
+ 5. Compute the gradient of the measure on that mask with [`investable_risk_gradient`](@ref), against the rows of the view. It is zero at every other leg.
 
 # Related
 
@@ -1150,12 +1150,13 @@ function loss_gradient(obj::RiskLoss, u::AbstractVector, ::AbstractVector,
         return zeros(eltype(u), length(u))
     end
     n = size(rows.X, 1)
-    pr = prior(obj.pe, port_opt_view(rows, (n - min(obj.window, n) + 1):n, :))
-    return investable_risk_gradient(obj, u, pr, investable_mask(pr))
+    window = port_opt_view(rows, (n - min(obj.window, n) + 1):n, :)
+    pr = prior(obj.pe, window)
+    return investable_risk_gradient(obj, u, pr, investable_mask(pr), window)
 end
 """
-    investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::Nothing)
-    investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::BitVector)
+    investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::Nothing, rd::ReturnsResult)
+    investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult, imsk::BitVector, rd::ReturnsResult)
 
 Computes the gradient of a Risk Loss on the Investable Mask of its prior result.
 
@@ -1163,11 +1164,15 @@ A leg that the window does not cover gets a zero gradient, so the loss does not 
 
 # Algorithm
 
-When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the measure at `u`. Otherwise it runs these steps.
+The measure reads the rows `rd` that the prior is fitted on: each [`DataTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The head fits on no Excess Frame of its own, so it binds under `brt = false`.
+
+When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the bound measure at `u`. Otherwise it runs these steps.
 
  1. Find the indices `idx` of the assets on the mask.
  2. Make the zero vector `g` of the length of `u`.
- 3. Write [`risk_gradient`](@ref) of the measure viewed at `idx` with [`port_opt_view`](@ref), at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The view cuts a benchmark, a turnover reference or a moment that the measure holds to the legs on the mask. The slice of `u` is not renormalised.
+ 3. View the measure at `idx` with [`port_opt_view`](@ref). The view cuts a benchmark, a turnover reference or a moment that the measure holds to the legs on the mask.
+ 4. Bind the viewed measure to the rows viewed at `idx`.
+ 5. Write [`risk_gradient`](@ref) of the bound measure at `u[idx]`, against the prior viewed at `idx`, into `g[idx]`. The slice of `u` is not renormalised.
 
 # Related
 
@@ -1176,15 +1181,15 @@ When the mask is `nothing`, every asset is priced, and the method returns [`risk
   - [`investable_mask`](@ref)
 """
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
-                                  ::Nothing)
-    return risk_gradient(obj.r, u, pr; sca = obj.sca)
+                                  ::Nothing, rd::ReturnsResult)
+    return risk_gradient(bind_data_benchmark(obj.r, rd, false), u, pr; sca = obj.sca)
 end
 function investable_risk_gradient(obj::RiskLoss, u::AbstractVector, pr::AbstractPriorResult,
-                                  imsk::BitVector)
+                                  imsk::BitVector, rd::ReturnsResult)
     idx = findall(imsk)
     g = zeros(eltype(u), length(u))
-    g[idx] .= risk_gradient(port_opt_view(obj.r, idx, pr.X), u[idx], port_opt_view(pr, idx);
-                            sca = obj.sca)
+    r = bind_data_benchmark(port_opt_view(obj.r, idx, pr.X), port_opt_view(rd, idx), false)
+    g[idx] .= risk_gradient(r, u[idx], port_opt_view(pr, idx); sca = obj.sca)
     return g
 end
 """

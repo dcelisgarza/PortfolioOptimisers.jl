@@ -308,7 +308,7 @@ Turn the data argument of a value-level function into the measure to evaluate an
 The method depends on the type of `X`.
 
   - A prior result resolves the measure through [`factory`](@ref) and returns `pr.X`. A Deferred Quantity becomes a value, and a slot that the measure leaves unstated takes the field of the prior.
-  - A [`ReturnsResult`](@ref) carries no moments, so the measure stays as it is and the method returns `rd.X`.
+  - A [`ReturnsResult`](@ref) carries no moments, so the method returns `rd.X`. It binds every [`DataTracking`](@ref) of the measure to the benchmark of the rows, `rd.B`, with [`bind_data_benchmark`](@ref), and changes nothing else.
   - A matrix returns the measure and the matrix unchanged.
 
 Each entry point resolves once, not once for each evaluation. So [`risk_contribution`](@ref) fits a deferred covariance once, and not once for each of its `2N` evaluations.
@@ -328,6 +328,7 @@ Each entry point resolves once, not once for each evaluation. So [`risk_contribu
   - [`risk_contribution`](@ref)
   - [`resolve_deferred_quantities`](@ref)
   - [`factory`](@ref)
+  - [`bind_data_benchmark`](@ref)
 """
 function resolve_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum)
     return r, X
@@ -336,7 +337,7 @@ function resolve_risk_inputs(r::BaseRM_VecBaseRM, pr::AbstractPriorResult)
     return factory(r, pr), pr.X
 end
 function resolve_risk_inputs(r::BaseRM_VecBaseRM, rd::ReturnsResult)
-    return r, rd.X
+    return bind_data_benchmark(r, rd, false), rd.X
 end
 """
     original_returns(X::MatNum_Pr)
@@ -696,7 +697,8 @@ function difference_risk(r::Union{<:LoHiOrderMoment, <:Kurtosis, <:TCM_Sk,
 end
 function difference_risk(r::TrackingRiskMeasure, wd::VecNum, w::VecNum, X::MatNum,
                          fees::Fees)
-    return norm_error(r.alg, charge_fees(X * wd, w, fees), tracking_benchmark(r.tr, X),
+    return norm_error(r.alg, charge_fees(X * wd, w, fees),
+                      collapse_benchmark(tracking_benchmark(r.tr, X), wd, nothing),
                       size(X, 1))
 end
 function difference_risk(r::RiskTrackingRiskMeasure{<:Any, <:Any, <:Any,

@@ -766,6 +766,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
     # `rd`. Both are unchanged when every asset is investable.
     mr, rd = investable_view(mr, rd, attrs.pr, attrs.imsk)
+    mr = bind_data_benchmark(mr, rd)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)

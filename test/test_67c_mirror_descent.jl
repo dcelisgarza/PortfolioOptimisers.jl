@@ -787,6 +787,30 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         end
     end
 
+    @testset "A Risk Loss tracks the benchmark of its window (#1657)" begin
+        # A vector benchmark that is the series of a fixed portfolio equals that portfolio
+        # as a fixed `WeightsTracking`. A matrix benchmark binds after the view at the
+        # Investable Mask. The online fold equals the batch fit for both.
+        wb = [0.1, 0.2, 0.3, 0.4]
+        rdv = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = R * wb, ts = ts)
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nx, B = 0.5 .* R, ts = ts)
+        gp(tr) = OPS(;
+                     alg = GradientProjection(; eta = 50,
+                                              obj = RiskLoss(;
+                                                             r = TrackingRiskMeasure(;
+                                                                                     tr = tr),
+                                                             window = 5)))
+        wd = optimise(gp(DataTracking()), rdv).w
+        @test isapprox(wd, optimise(gp(WeightsTracking(; w = wb, fixed = true)), rdv).w;
+                       atol = 1e-8)
+        @test !isapprox(wd, fill(1 / N, N); atol = 1e-2)
+        for r in (rdv, rdm)
+            o = foldl((o, t) -> po.partial_fit!(o, rows(r, t:t)), 1:T;
+                      init = gp(DataTracking()))
+            @test optimise(o).w == optimise(gp(DataTracking()), r).w
+        end
+    end
+
     @testset "The numbers the docstrings state, on the fixtures they name" begin
         # `mixed_relatives`: the scaled floor against the raw mix, at the default rate and
         # alpha = 0.2, over 60 periods of `1 .+ 0.02 .* randn(StableRNG(7), 60, 4)`.

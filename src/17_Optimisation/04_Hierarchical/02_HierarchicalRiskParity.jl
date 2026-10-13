@@ -268,6 +268,29 @@ function port_opt_view(hrp::HierarchicalRiskParity, i, X::MatNum,
     return HierarchicalRiskParity(; r = r, opt = opt, sca = hrp.sca,
                                   fb = view_child(hrp.fb, i, X))
 end
+"""
+    bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
+
+Bind every [`DataTracking`](@ref) of the risk measures `r` to the benchmark of the rows that the optimiser fits on.
+
+The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The optimiser applies its own `brt` to the binding, as [`bind_data_benchmark`](@ref) states.
+
+# Algorithm
+
+ 1. Bind the measures `hrp.r` to `rd` under `hrp.opt.brt` with [`bind_data_benchmark`](@ref), giving `r`.
+ 2. Return `hrp` itself when `r === hrp.r`.
+ 3. Otherwise rebuild `hrp` with `r` through its keyword constructor, with [`rebuild_estimator`](@ref).
+
+# Related
+
+  - [`bind_data_benchmark`](@ref)
+  - [`DataTracking`](@ref)
+  - [`HierarchicalRiskParity`](@ref)
+"""
+function bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
+    r = bind_data_benchmark(hrp.r, rd, hrp.opt.brt)
+    return r === hrp.r ? hrp : rebuild_estimator(hrp, (; r = r))
+end
 function non_investable_universe(hrp::HierarchicalRiskParity,
                                  ni::VecStr)::HierarchicalRiskParity
     return rebuild_estimator(hrp, (; opt = non_investable_universe(hrp.opt, ni)))
@@ -401,6 +424,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
     _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
+    hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
@@ -565,6 +589,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # is chosen on the investable universe. The weights are expanded back in
     # `HierarchicalResult`.
     _, pr, hrp, rd = investable_reduction(imsk, pr, hrp, rd)
+    hrp = bind_data_benchmark(hrp, rd)
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).

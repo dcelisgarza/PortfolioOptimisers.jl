@@ -679,6 +679,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     # `rd`, so the head is reduced before any of them, and before the optimiser is
     # repackaged from the bundle. `_optimise` takes the same view of its own locals.
     noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
+    # A data benchmark binds to the rows of the view, before the corner solves and the
+    # risks of the corners read it.
+    noc = bind_data_benchmark(noc, rd)
+    r = bind_data_benchmark(r, rd, noc.opt.brt)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     # The per-term corner solves need the same unbounded pair the max-return corner uses, so
     # the pair is built whenever a return term declares a frontier bound, even when both

@@ -666,6 +666,7 @@ function _optimise(rrb::RelaxedRiskBudgeting, rd::ReturnsResult = ReturnsResult(
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
     # `rd`. Both are unchanged when every asset is investable.
     rrb, rd = investable_view(rrb, rd, attrs.pr, attrs.imsk)
+    rrb = bind_data_benchmark(rrb, rd)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rrb.opt.sc, rrb.opt.so)

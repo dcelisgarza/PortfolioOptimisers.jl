@@ -85,6 +85,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :w_tn => "`w`: Reference portfolio weight vector. Deviations are measured against it, and it is never the candidate weight vector an optimiser solves for.",#
                  :w_ref => "`w`: Reference portfolio weights vector.",#
                  :w_bm_ret => "`w`: Benchmark portfolio returns vector. It holds `T` returns, one per observation, and **not** `N` weights, so its length must match the number of rows of the return matrix the model is built on.",#
+                 :B_data_tr => "`B`: Benchmark returns of the rows that a reader holds, the `B` field of their [`ReturnsResult`](@ref). A vector `T × 1` is the benchmark series. A matrix `T × N` holds one benchmark per asset, and its series is `B * w`. Every reader that holds the returns data replaces it with the `B` of its own rows through [`bind_data_benchmark`](@ref). It is `nothing` until a reader binds it.",#
                  :fixed => "`fixed`: Whether the estimator is fixed and does not update with new weights.",#
                  # Tracking specification.
                  :tr_spec => "`tr`: Benchmark tracking specification.",#

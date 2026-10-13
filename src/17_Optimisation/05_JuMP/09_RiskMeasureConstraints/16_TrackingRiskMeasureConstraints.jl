@@ -54,7 +54,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
-    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
@@ -65,7 +64,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tr = r.tr
     benchmark = tracking_benchmark(tr, X)
     tracking_r = state_set!(model, prefix, :tracking_r_, i,
-                            JuMP.@expression(model, net_X - benchmark * k))
+                            JuMP.@expression(model,
+                                             net_X -
+                                             tracking_benchmark_expression(model, benchmark,
+                                                                           prefix)))
     state_set!(model, prefix, :ctracking_r_noc_, i,
                JuMP.@constraint(model,
                                 [sc * t_tracking_risk;
@@ -158,7 +160,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
-    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
@@ -170,7 +171,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
     tr = r.tr
     benchmark = tracking_benchmark(tr, X)
     tracking_r = state_set!(model, prefix, :tracking_r_, i,
-                            JuMP.@expression(model, net_X - benchmark * k))
+                            JuMP.@expression(model,
+                                             net_X -
+                                             tracking_benchmark_expression(model, benchmark,
+                                                                           prefix)))
     state_set!(model, prefix, :ctracking_r_soc_, i,
                JuMP.@constraint(model,
                                 [sc * t_tracking_risk;
@@ -211,7 +215,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
               DomainError(r.alg.p,
                           "`LpNorm.p` is $(r.alg.p), and the tracking risk is the `p`-norm of the deviation, which the model states with a power cone of exponent `1 / p`, so `1 < p` must hold. State a value greater than `1`."))
     sc = get_constraint_scale(model)
-    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
@@ -227,7 +230,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                JuMP.@expression(model, t_tracking_risk / scale))
     benchmark = tracking_benchmark(r.tr, X)
     tracking_r = state_set!(model, prefix, :tracking_r_, i,
-                            JuMP.@expression(model, net_X - benchmark * k))
+                            JuMP.@expression(model,
+                                             net_X -
+                                             tracking_benchmark_expression(model, benchmark,
+                                                                           prefix)))
     ctracking_r_pnorm, ctracking_r_pnorm_eq = JuMP.@constraints(model,
                                                                 begin
                                                                     [i = 1:T],
@@ -276,7 +282,6 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     sc = get_constraint_scale(model)
-    k = get_k(model)
     X = pr.X
     net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
     T = length(net_X)
@@ -286,7 +291,10 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                JuMP.@expression(model, t_tracking_risk / scale))
     benchmark = tracking_benchmark(r.tr, X)
     tracking_r = state_set!(model, prefix, :tracking_r_, i,
-                            JuMP.@expression(model, net_X - benchmark * k))
+                            JuMP.@expression(model,
+                                             net_X -
+                                             tracking_benchmark_expression(model, benchmark,
+                                                                           prefix)))
     state_set!(model, prefix, :ctracking_infnorm_, i,
                JuMP.@constraint(model,
                                 [sc * t_tracking_risk;

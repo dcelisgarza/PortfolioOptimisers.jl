@@ -1673,6 +1673,62 @@ end
         @test PortfolioOptimisers.port_opt_view(tm, i).tr.w == wb[i]
     end
 
+    @testset "A data benchmark binds to the B of the rows it reads (#1657)" begin
+        po = PortfolioOptimisers
+        nx = ["A$i" for i in 1:N]
+        bv = X * wb .+ 0.001
+        Bm = 0.5 .* X
+        rdv = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = bv)
+        rdm = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bm)
+        rdn = ReturnsResult(; nx = nx, X = X)
+        dt = DataTracking()
+        @test isnothing(dt.B)
+        # The binding reads the rows, and replaces a benchmark bound earlier.
+        @test po.bind_data_benchmark(dt, rdv, false).B === rdv.B
+        @test po.bind_data_benchmark(po.bind_data_benchmark(dt, rdv, false), rdm, false).B ===
+              rdm.B
+        # An object with no data benchmark, and a reader with no returns data, give the
+        # object itself.
+        tw = TrackingError(; tr = WeightsTracking(; w = wb), err = 0.01)
+        rs = [Variance(), TrackingRiskMeasure(; tr = WeightsTracking(; w = wb))]
+        @test po.bind_data_benchmark(tw, rdv, false) === tw
+        @test po.bind_data_benchmark(rs, rdv, false) === rs
+        @test po.bind_data_benchmark(dt, nothing, false) === dt
+        # A tracking error, a measure, a vector, and the measure that a risk tracker tracks.
+        tm = TrackingRiskMeasure(; tr = dt)
+        @test po.bind_data_benchmark(TrackingError(; tr = dt, err = 0.01), rdv, false).tr.B ===
+              rdv.B
+        @test po.bind_data_benchmark([Variance(), tm], rdv, false)[2].tr.B === rdv.B
+        rtr = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = tm)
+        @test po.bind_data_benchmark(rtr, rdv, false).r.tr.B === rdv.B
+        # The refusals: brt, returns data with no benchmark, and a reader with no rows.
+        @test_throws ArgumentError po.bind_data_benchmark(dt, rdv, true)
+        @test_throws ArgumentError po.bind_data_benchmark(dt, rdn, false)
+        @test_throws ArgumentError tm(w, X)
+        # A vector benchmark is the series, so it equals a returns series of the same rows.
+        bound = po.bind_data_benchmark(tm, rdv, false)
+        @test bound(w, X) == TrackingRiskMeasure(; tr = ReturnsTracking(; w = bv))(w, X)
+        @test expected_risk(tm, w, rdv) == bound(w, X)
+        @test bound(X * w) == bound(w, X)
+        @test po.supports_precomputed_returns(bound)
+        # A matrix benchmark gives the series B * w, so the error is that of (X - B) w.
+        mbound = po.bind_data_benchmark(tm, rdm, false)
+        @test isapprox(mbound(w, X), po.norm_error(L2Norm(), (X - Bm) * w, zeros(T), T))
+        @test expected_risk(tm, w, rdm) == mbound(w, X)
+        @test !po.supports_precomputed_returns(mbound)
+        @test !po.supports_precomputed_returns(tm)
+        @test_throws ArgumentError mbound(X * w)
+        @test_throws ArgumentError tm(X * w)
+        # The benchmark must cover the rows and the assets that the reader holds.
+        @test_throws ArgumentError bound(w, X[1:(T - 1), :])
+        @test_throws ArgumentError mbound(w[1:3], X[:, 1:3])
+        # A view keeps the rows of a vector and views the columns of a matrix.
+        i = [1, 3]
+        @test po.port_opt_view(bound.tr, i) === bound.tr
+        @test po.port_opt_view(mbound.tr, i).B == Bm[:, i]
+        @test po.port_opt_view(dt, i) === dt
+    end
+
     @testset "factory advances the benchmark and resolves the tracked measure" begin
         w1 = [0.1, 0.2, 0.3, 0.4]
         moving = WeightsTracking(; w = wb)

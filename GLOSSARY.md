@@ -144,6 +144,11 @@ The asset returns that a reader of an optimiser with `brt = true` fits on: `X - 
 A prior step of a `Pipeline` fits in the Excess Frame when its `PipelineStep` sets `brt = true`, and its frame must equal the frame of the optimiser that receives the prior.
 *Avoid*: relative returns, which can also mean a ratio to the benchmark.
 
+**Data Benchmark**
+The benchmark that the returns data carries, `B` of a `ReturnsResult`, as a tracking benchmark: `DataTracking()`. It holds no series of its own. Each reader that holds the returns data binds it to the `B` of its own rows with `bind_data_benchmark`: an optimiser after its view at the Investable Mask, the online step on its buffer, a fold on its training rows, an online portfolio selection head on its rows window, and the value-level `expected_risk` on a `ReturnsResult`. So it follows the rows where a `ReturnsTracking` series, fixed at construction, cannot.
+A vector `B` is the benchmark series. A matrix `B` holds one benchmark per asset, and the series is `B * w`, so the tracking error is that of `(X - B) * w`. A reader in the Excess Frame (`brt = true`) refuses it, because the tracking error would subtract `B` twice.
+*Avoid*: a returns benchmark, which names the fixed series of `ReturnsTracking`.
+
 **PricesResult**
 The container of aligned, time-indexed price-level series: the prices-level mirror of `ReturnsResult`, and the input to price Preprocessing Estimators. It also carries the Exogenous Series as level series, which `prices_to_returns` converts with the return rule of the assets.
 

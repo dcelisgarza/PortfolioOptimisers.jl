@@ -515,3 +515,56 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
                          Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
+"""
+    bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
+    bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
+    bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
+
+Bind every [`DataTracking`](@ref) of a JuMP optimiser to the benchmark of the rows it fits on.
+
+Each head calls this function after [`investable_view`](@ref), so the benchmark has the rows and the investable columns of the model. Every builder, every corner solve and every risk of a frontier then reads the bound benchmark. The optimiser applies its own `brt` to the binding, so a data benchmark under `brt = true` is refused.
+
+  - A [`JuMPOptimiser`](@ref) binds its tracking errors `tr`.
+  - A head binds its `opt`. A head with risk measures, a [`RiskJuMPOptimisationEstimator`](@ref), also binds its `r`.
+
+Each rebuilds through its keyword constructor only when a field changes, so a head with no data benchmark comes back as itself.
+
+# Algorithm
+
+ 1. A [`JuMPOptimiser`](@ref) binds `opt.tr` to `rd` under `opt.brt` with [`bind_data_benchmark`](@ref), giving `tr`.
+ 2. A head binds its `est.opt` with step 1, giving `opt`. A [`RiskJuMPOptimisationEstimator`](@ref) also binds `est.r` under `est.opt.brt`, giving `r`.
+ 3. Return the object itself when every bound field is the field it replaces, by `===`.
+ 4. Otherwise rebuild the object with the bound fields through its keyword constructor, with [`rebuild_estimator`](@ref).
+
+# Arguments
+
+  - `opt`, `est`: The optimiser or the head.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - The optimiser or the head with its data benchmarks bound, or itself when it holds none.
+
+# Related
+
+  - [`bind_data_benchmark`](@ref)
+  - [`DataTracking`](@ref)
+  - [`investable_view`](@ref)
+"""
+function bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
+    tr = bind_data_benchmark(opt.tr, rd, opt.brt)
+    return tr === opt.tr ? opt : rebuild_estimator(opt, (; tr = tr))
+end
+function bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
+    opt = bind_data_benchmark(est.opt, rd)
+    return opt === est.opt ? est : rebuild_estimator(est, (; opt = opt))
+end
+function bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
+    opt = bind_data_benchmark(est.opt, rd)
+    r = bind_data_benchmark(est.r, rd, est.opt.brt)
+    return if opt === est.opt && r === est.r
+        est
+    else
+        rebuild_estimator(est, (; opt = opt, r = r))
+    end
+end

@@ -1726,4 +1726,39 @@ end
         end
         @test optimise(o).w == w
     end
+
+    @testset "The set's tracking error and ceiling read the benchmark of the rows (#1657)" begin
+        # When the benchmark of the rows is the series of a fixed portfolio, a data
+        # benchmark equals that portfolio as a fixed `WeightsTracking`, which pays no fee.
+        # Both forms bind, and the online fold equals the batch fit.
+        R = 0.02 .* randn(StableRNG(7), 30, 4)
+        wb = [0.1, 0.2, 0.3, 0.4]
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R, nb = ["BM"], B = R * wb,
+                           ts = Date(2020, 1, 1) .+ Day.(0:29))
+        rows(r, i) = po.port_opt_view(r, i, :)
+        fw = WeightsTracking(; w = wb, fixed = true)
+        sets = (tr -> ProgrammeAllocationSet(; slv = slv,
+                                             tr = TrackingError(; tr = tr, err = 0.003)),
+                tr -> ProgrammeAllocationSet(; slv = slv,
+                                             r = TrackingRiskMeasure(; tr = tr,
+                                                                     settings = RiskMeasureSettings(;
+                                                                                                    ub = 0.004))))
+        free = optimise(OPS(; alg = PassiveAggressiveMeanReversion()), rd).w
+        for set in sets
+            opt = OPS(; alg = PassiveAggressiveMeanReversion(), set = set(DataTracking()))
+            res = (@test_logs (:warn, r"Held Step at 2020-01-01") optimise(opt, rd))
+            @test isa(res.retcode, OptimisationSuccess)
+            ref = (@test_logs (:warn, r"Held Step at 2020-01-01") optimise(OPS(;
+                                                                               alg = PassiveAggressiveMeanReversion(),
+                                                                               set = set(fw)),
+                                                                           rd))
+            @test isapprox(res.w, ref.w; atol = 1e-8)
+            @test !isapprox(res.w, free; atol = 1e-3)
+            o = opt
+            @test_logs (:warn, r"Held Step at 2020-01-01") for t in 1:30
+                o = po.partial_fit!(o, rows(rd, t:t))
+            end
+            @test optimise(o).w == res.w
+        end
+    end
 end

@@ -413,6 +413,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
     # `rd`. Both are unchanged when every asset is investable.
     frc, rd = investable_view(frc, rd, attrs.pr, attrs.imsk)
+    frc = bind_data_benchmark(frc, rd)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)

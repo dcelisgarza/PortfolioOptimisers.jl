@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "4c442f5031"
+commit = "286953e299"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -288,7 +288,7 @@ commit = "4c442f5031"
 "src/16_RiskMeasures/13_NoRisk.jl" = { cyc = 4, cog = 4, arg = 1, cyc_sum = 20, cog_sum = 13, arg_sum = 3, macros = [] }
 "src/16_RiskMeasures/14_Range.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 4, cog_sum = 1, arg_sum = 3, macros = [] }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 6, macros = ["@propagatable"] }
-"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 29, cog_sum = 18, arg_sum = 55, macros = ["@propagatable"] }
+"src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { cyc = 3, cog = 3, arg = 7, cyc_sum = 35, cog_sum = 24, arg_sum = 62, macros = ["@propagatable"] }
 "src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { cyc = 7, cog = 7, arg = 6, cyc_sum = 37, cog_sum = 21, arg_sum = 50, macros = ["@propagatable"] }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 7, cog_sum = 1, arg_sum = 8, macros = ["@propagatable"] }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 8, cog_sum = 4, arg_sum = 9, macros = ["@propagatable"] }
@@ -348,7 +348,7 @@ commit = "4c442f5031"
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 44, cog_sum = 10, arg_sum = 88, macros = [] }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl" = { cyc = 4, cog = 4, arg = 5, cyc_sum = 11, cog_sum = 5, arg_sum = 14, macros = [] }
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_a.jl" = { cyc = 61, cog = 35, arg = 44, cyc_sum = 92, cog_sum = 55, arg_sum = 87, macros = ["@forward_properties"] }
-"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { cyc = 5, cog = 7, arg = 9, cyc_sum = 20, cog_sum = 16, arg_sum = 46, macros = [] }
+"src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { cyc = 5, cog = 7, arg = 10, cyc_sum = 27, cog_sum = 26, arg_sum = 53, macros = [] }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 42, cog_sum = 24, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 21, cog_sum = 16, arg_sum = 34, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { cyc = 12, cog = 14, arg = 14, cyc_sum = 59, cog_sum = 40, arg_sum = 134, macros = ["@propagatable"] }
