@@ -132,5 +132,7 @@ The maintainer decided on 2026-10-13.
 - ADR 0044: the rule that named `x_src`. Amended on 2026-10-13 to point here.
 - ADR 0204: the current rule for `brt`.
 - ADR 0208: `DataTracking`, which refuses the Excess Frame.
+- ADR [0213](0213-brt-is-removed-in-one-break.md): `brt` is removed in one break, with no
+  deprecation.
 - `returns_matrix_picker`, `benchmark_relative_returns`, `resolve_factor_regression`,
   `head_frame_returns`.
