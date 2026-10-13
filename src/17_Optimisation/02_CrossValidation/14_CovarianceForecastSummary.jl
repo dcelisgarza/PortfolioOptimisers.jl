@@ -813,22 +813,23 @@ The test rows are read in the frame of the evaluation, `cfer.brt`, because a for
 
 # Algorithm
 
- 1. Read the returns in the frame of the evaluation with [`benchmark_relative_returns`](@ref) under `cfer.brt`, giving `X`.
- 2. For each step, read the stored forecast and location, and the test rows `X[cfer.test_idx[i], :]`.
- 3. Score them on `w` with the target of the evaluation, through [`covariance_forecast_step`](@ref).
- 4. Put the standardised returns and the portfolio QLIKE losses of the step in its row of each matrix.
+ 1. Drop the observations with a gap in a Shared Series with [`shared_series_view`](@ref) under `cfer.brt`, as the evaluation dropped them before it split the folds.
+ 2. Read the returns in the frame of the evaluation with [`benchmark_relative_returns`](@ref) under `cfer.brt`, giving `X`.
+ 3. For each step, read the stored forecast and location, and the test rows `X[cfer.test_idx[i], :]`.
+ 4. Score them on `w` with the target of the evaluation, through [`covariance_forecast_step`](@ref).
+ 5. Put the standardised returns and the portfolio QLIKE losses of the step in its row of each matrix.
 
 # Arguments
 
   - `cfer`: The evaluation, run with `store_forecasts = true`.
-  - $(arg_dict[:rd]) It must be the returns data that the evaluation ran on, because each step reads its rows through `cfer.test_idx`.
+  - $(arg_dict[:rd]) It must be the returns data that the evaluation ran on, because each step reads its rows through `cfer.test_idx`, which counts the observations that the evaluation kept.
   - `w`: The test portfolios on the full universe, as [`covariance_forecast_evaluation`](@ref) takes them.
 
 # Validation
 
   - `cfer.sigma` is not `nothing`. An `ArgumentError` is thrown otherwise, which names `store_forecasts`.
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - The rules of [`benchmark_relative_returns`](@ref) under `cfer.brt`.
+  - The rules of [`shared_series_view`](@ref) and of [`benchmark_relative_returns`](@ref) under `cfer.brt`.
 
 # Returns
 
@@ -839,6 +840,7 @@ The test rows are read in the frame of the evaluation, `cfer.brt`, because a for
   - [`covariance_forecast_evaluation`](@ref)
   - [`CovarianceForecastEvaluationResult`](@ref)
   - [`covariance_forecast_step`](@ref)
+  - [`shared_series_view`](@ref)
   - [`benchmark_relative_returns`](@ref)
 """
 function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
@@ -846,7 +848,9 @@ function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
     @argcheck(!isnothing(cfer.sigma),
               ArgumentError("the evaluation holds no forecasts to re-project: run `covariance_forecast_evaluation` with `store_forecasts = true`, which keeps every step's forecast and the location it was centred on."))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    X = benchmark_relative_returns(rd, cfer.brt)
+    # `cfer.test_idx` counts the observations that the evaluation kept, so the verb drops the
+    # same gaps of a Shared Series before it indexes.
+    X = benchmark_relative_returns(shared_series_view(rd, cfer.brt, false), cfer.brt)
     steps = [covariance_forecast_step(cfer.sigma[i], view(X, cfer.test_idx[i], :),
                                       cfer.location[i], w, cfer.target)
              for i in eachindex(cfer.sigma)]

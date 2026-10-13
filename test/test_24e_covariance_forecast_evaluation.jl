@@ -466,6 +466,26 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("read different returns", e.value.msg)
     end
 
+    @testset "A gap in a vector benchmark re-projects on the kept rows (#1691)" begin
+        # The evaluation drops the observations with a gap in `B` before it splits the folds,
+        # so `test_idx` counts the kept rows, and the re-projection must drop the same rows.
+        Bv = randn(StableRNG(1658), T) ./ 100
+        Bg = copy(Bv)
+        Bg[[40, 97]] .= NaN
+        keep = setdiff(1:T, [40, 97])
+        wt = [fill(1 / N, N), collect(1.0:N) ./ sum(1:N)]
+        rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bg, ts = ts)
+        rx = ReturnsResult(; nx = nx, X = X[keep, :] .- Bv[keep], ts = ts[keep])
+        for cv in (batch_cv, online_cv)
+            a = cfe(Covariance(), rb, cv; brt = true, store_forecasts = true, w = wt)
+            z = cfe(Covariance(), rx, cv; store_forecasts = true, w = wt)
+            @test isequal(a.standardised_return, z.standardised_return)
+            pa = covariance_forecast_portfolio(a, rb, wt)
+            @test isequal(pa.standardised_return, a.standardised_return)
+            @test isequal(pa.portfolio_qlike, a.portfolio_qlike)
+        end
+    end
+
     @testset "The date form" begin
         bd = DateWalkForward(w, h; period = Day(1), purged_size = p, expand_train = true)
         od = OnlineDateWalkForward(w, h; period = Day(1), purged_size = p)
