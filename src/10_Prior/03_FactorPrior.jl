@@ -626,8 +626,9 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Algorithm
 
  1. Check that `rd` carries asset returns and factor returns.
- 2. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 3. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
+ 2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `brt`. The factor prior, the regression and the reconstruction then read the same observations.
+ 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -657,6 +658,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 function prior(pe::FactorPrior, rd::ReturnsResult; brt::Bool = false, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
+    rd = shared_series_view(rd, brt, true)
     return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; iv = rd.iv,
                  ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, kwargs..., dims = 1)
 end

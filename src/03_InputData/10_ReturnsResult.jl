@@ -735,6 +735,249 @@ function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:
     end
 end
 """
+    shared_series_rows(rd::ReturnsResult, brt::Bool, rf::Bool) -> Option{Vector{Int}}
+
+Find the observations of `rd` that a fit keeps when a Shared Series has a gap.
+
+A Shared Series is a series that every asset reads at the same observation: a vector benchmark under `brt`, and each column of the factor returns of a fit that reads them. A gap in the series of one asset puts that asset outside the Coverage Universe, as [`coverage_mask`](@ref) states. A gap in a Shared Series at observation `t` leaves no asset a value at `t`: an excess return or a factor regression needs the shared value. So the fit drops observation `t` and keeps every asset. The drop removes no value that an asset still had.
+
+The function reads a vector benchmark only under `brt`, and the factor returns only under `rf`, because a fit that does not read a series meets none of its gaps. A matrix benchmark is a series of one asset at each column, so its gaps go through [`benchmark_estimation_mask`](@ref) and the Coverage Universe, never through this function.
+
+# Algorithm
+
+ 1. Take the vector benchmark when `brt` is `true` and `rd.B` is a vector, and the factor returns when `rf` is `true`.
+ 2. Return `nothing` when each of them is absent or finite at every observation.
+ 3. Otherwise keep each observation at which the benchmark is finite and every factor is finite.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:brt_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Returns
+
+  - `rows::Option{Vector{Int}}`: The positions of the kept observations, empty when every observation has a gap, or `nothing` when the fit keeps every observation.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+  - [`coverage_mask`](@ref)
+"""
+function shared_series_rows(rd::ReturnsResult, brt::Bool, rf::Bool)::Option{Vector{Int}}
+    b = brt && isa(rd.B, VecNum) ? rd.B : nothing
+    F = rf ? rd.F : nothing
+    if shared_series_complete(b) && shared_series_complete(F)
+        return nothing
+    end
+    return filter(t -> shared_row_finite(b, t) && shared_row_finite(F, t),
+                  1:shared_series_length(b, F))
+end
+"""
+    shared_series_complete(A::Nothing) -> Bool
+    shared_series_complete(A::VecNum_MatNum) -> Bool
+
+Answer `true` when a Shared Series is absent, or finite at every observation.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_series_complete(::Nothing)
+    return true
+end
+function shared_series_complete(A::VecNum_MatNum)
+    return all(isfinite, A)
+end
+"""
+    shared_row_finite(A::Nothing, t::Integer) -> Bool
+    shared_row_finite(A::VecNum, t::Integer) -> Bool
+    shared_row_finite(A::MatNum, t::Integer) -> Bool
+
+Answer `true` when a Shared Series is absent, or finite at observation `t`. A matrix is finite at `t` when each of its columns is.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_row_finite(::Nothing, ::Integer)
+    return true
+end
+function shared_row_finite(A::VecNum, t::Integer)
+    return isfinite(A[t])
+end
+function shared_row_finite(A::MatNum, t::Integer)
+    return all(isfinite, view(A, t, :))
+end
+"""
+    shared_series_length(b::VecNum, F::Option{<:MatNum}) -> Int
+    shared_series_length(b::Nothing, F::MatNum) -> Int
+
+Return the number of observations of the Shared Series that [`shared_series_rows`](@ref) scans.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_series_length(b::VecNum, ::Option{<:MatNum})
+    return length(b)
+end
+function shared_series_length(::Nothing, F::MatNum)
+    return size(F, 1)
+end
+"""
+    shared_series_view(rd::ReturnsResult, brt::Bool, rf::Bool) -> ReturnsResult
+
+Return the returns data that a fit reads, with the observations of a Shared Series gap dropped.
+
+This is the entry of each fit that reads a Shared Series. [`shared_series_rows`](@ref) finds the observations to keep, and [`port_opt_view`](@ref) cuts every field of `rd` at them: the asset returns, the factor returns, the benchmark, the Exogenous Series, the timestamps, the implied volatilities and the [`AssetPanel`](@ref). So every reader after the entry sees the same observations. A reader that pairs the observations of a prior with the last observations of the returns data stays correct, because the prior and the reader read the same view.
+
+Under `brt`, [`benchmark_estimation_mask`](@ref) then marks a gap of a matrix benchmark in the estimation mask, because the excess return of that cell does not exist.
+
+The function is idempotent. A view with no gap left returns itself, so a meta-optimiser and the optimiser it nests can each call it.
+
+The positions of the row key of a factor model block count the observations of the view, and its timestamps name them exactly.
+
+# Algorithm
+
+ 1. Find the kept observations with [`shared_series_rows`](@ref). View `rd` at them when there is a gap.
+ 2. Refresh the estimation mask with [`benchmark_estimation_mask`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:brt_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Validation
+
+  - At least one observation is kept. An [`IsEmptyError`](@ref) is thrown otherwise.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself when the fit meets no gap, and otherwise its view.
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nb = [\"BM\"],
+                          B = [0.01, NaN, 0.03]);
+
+julia> PortfolioOptimisers.shared_series_view(rd, false, false) === rd  # brt is false
+true
+
+julia> PortfolioOptimisers.shared_series_view(rd, true, false).X
+2×2 view(::Matrix{Float64}, [1, 3], :) with eltype Float64:
+ 0.1  0.2
+ 0.5  0.6
+```
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+  - [`benchmark_estimation_mask`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function shared_series_view(rd::ReturnsResult, brt::Bool, rf::Bool)::ReturnsResult
+    rows = shared_series_rows(rd, brt, rf)
+    @argcheck(isnothing(rows) || !isempty(rows),
+              IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under brt or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or drop them with MissingDataFilter before the conversion to returns."))
+    rd = isnothing(rows) ? rd : port_opt_view(rd, rows, :)
+    return benchmark_estimation_mask(rd, brt)
+end
+"""
+    assert_no_shared_gap(rd::ReturnsResult, brt::Bool, rf::Bool) -> Nothing
+
+Refuse an online step over observations with a gap in a Shared Series.
+
+A batch fit drops such an observation with [`shared_series_view`](@ref). An online step cannot drop it. An optimiser appends each observation to the buffer of its prior and to its Fold Context together, and `optimise(opt)` with no data rebuilds the returns data from both, row by row. A row that one of them skips misaligns the other. A carry fold also adds each observation to running moments, and a gap stays in them. So the step refuses the observation by name, before any buffer moves.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:brt_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Validation
+
+  - No observation of `rd` has a gap in a Shared Series that the fit reads. An [`IsNonFiniteError`](@ref) that names the observations is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_rows`](@ref)
+"""
+function assert_no_shared_gap(rd::ReturnsResult, brt::Bool, rf::Bool)::Nothing
+    rows = shared_series_rows(rd, brt, rf)
+    if isnothing(rows)
+        return nothing
+    end
+    gaps = setdiff(1:shared_series_length(brt && isa(rd.B, VecNum) ? rd.B : nothing,
+                                          rf ? rd.F : nothing), rows)
+    throw(IsNonFiniteError("an online step cannot drop an observation, because the buffer of the prior and the Fold Context are appended to together, and the observation(s) $(first(gaps, 5)) of this step have a gap in a Shared Series, the vector benchmark under brt or the factor returns. A batch fit drops them. Fill the gap with PriceGapFill before the conversion to returns, or drop the observation before the step."))
+    return nothing
+end
+"""
+    benchmark_estimation_mask(rd::ReturnsResult, brt::Bool) -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, B::Option{<:VecNum_MatNum},
+                              pnl::Option{<:AssetPanel}) -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
+                              pnl::AssetPanel{<:Any, <:AbstractMatrix{Bool},
+                                              <:AbstractMatrix{Bool}}) -> ReturnsResult
+
+Mark each gap of a matrix benchmark in the estimation mask of `rd`, for a fit that reads the excess returns.
+
+Under `brt` the fit reads `X - B`. A matrix benchmark holds one series for each asset, so a gap in `B[t, i]` is a gap in the excess return of asset `i` at observation `t`, as a gap in `X[t, i]` is. The `NaN` of the excess return already puts the asset outside the Coverage Universe of a plain estimator. A reader of the estimation mask, a cross-sectional estimate, reads the mask and not the returns, so the function writes the gap into the mask. The ingestion layer derives the mask from `X` alone, because a fit with `brt = false` does not read `B`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `brt` is `false`, the benchmark is not a matrix, or the panel carries no mask: return `rd`.
+ 2. Return `rd` when the benchmark is finite at every cell.
+ 3. Otherwise set the estimation mask to `emsk .& isfinite.(B)`, and rebuild `rd` with that panel.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:brt_read])
+  - `B`: The benchmark of `rd`.
+  - `pnl`: The Asset Panel of `rd`.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself, or `rd` with the refreshed estimation mask.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function benchmark_estimation_mask(rd::ReturnsResult, brt::Bool)::ReturnsResult
+    return brt ? benchmark_estimation_mask(rd, rd.B, rd.pnl) : rd
+end
+function benchmark_estimation_mask(rd::ReturnsResult, ::Option{<:VecNum_MatNum},
+                                   ::Option{<:AssetPanel})
+    return rd
+end
+function benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
+                                   pnl::AssetPanel{<:Any, <:AbstractMatrix{Bool},
+                                                   <:AbstractMatrix{Bool}})
+    if all(isfinite, B)
+        return rd
+    end
+    pnl = AssetPanel(; pf = pnl.pf, amsk = pnl.amsk, emsk = pnl.emsk .& isfinite.(B))
+    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = B,
+                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
+                         pnl = pnl)
+end
+"""
     asset_panel(ape::Nothing, pr, rd::ReturnsResult, X) -> AssetPanel
     asset_panel(ape::Nothing, pr::ReturnsResult, rd::Nothing, X) -> AssetPanel
     asset_panel(ape::Nothing, pr, rd::Nothing, X) -> Union{}

@@ -402,6 +402,97 @@ function coverage_reduced_pair(A::MatNum, B::MatNum, cmsk::BitVector)
     return A[:, cmsk], B[:, cmsk]
 end
 """
+    coverage_keyword_reduction(est, X::MatNum, pnl::Option{<:AssetPanel}, dims::Int,
+                               active_mask::Option{<:AbstractMatrix{<:Bool}}; kwargs...)
+
+Reduce `X` and its per-asset keywords to the Coverage Universe of one fit.
+
+The reduce-and-expand root of a moment verb forwards its keywords to the estimator. A prior gives every moment the implied volatility surface `iv` and the premium `ivpa` as keywords, and both carry one entry for each asset. The root reduces `X`, so it must reduce them too, or a wrapped [`ImpliedVolatility`](@ref) reads `N` columns of `iv` against fewer columns of `X`.
+
+A gap in `iv` puts an asset outside the Coverage Universe only of a fit that reads the surface. So the function narrows the universe by `iv` when [`reads_implied_volatility`](@ref) answers `true` for `est`, through the surface method of [`coverage_mask`](@ref).
+
+# Algorithm
+
+ 1. Choose the active mask with [`coverage_mask_source`](@ref).
+ 2. Derive the Coverage Universe from `X` and the mask, and also from `iv` when `est` reads it and the keywords carry it.
+ 3. Slice `X`, `iv` and `ivpa` onto the Coverage Universe along the asset axis of `dims`. A keyword that the caller did not give stays absent.
+
+# Arguments
+
+  - `est`: The moment estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:pnl_moment])
+  - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
+  - `kwargs...`: The keywords of the call, which can carry `iv` and `ivpa`.
+
+# Validation
+
+  - The rules of [`coverage_mask`](@ref).
+
+# Returns
+
+  - `(cmsk, Xc, kw)`: The Coverage Universe or `nothing`, the reduced `X`, and the keywords with `iv` and `ivpa` reduced.
+
+# Related
+
+  - [`coverage_reduction`](@ref)
+  - [`reads_implied_volatility`](@ref)
+  - [`coverage_reduced_ivpa`](@ref)
+"""
+function coverage_keyword_reduction(est, X::MatNum, pnl::Option{<:AssetPanel}, dims::Int,
+                                    active_mask::Option{<:AbstractMatrix{<:Bool}};
+                                    kwargs...)
+    src = coverage_mask_source(pnl, active_mask, dims)
+    iv = reads_implied_volatility(est) ? get(kwargs, :iv, nothing) : nothing
+    cmsk = coverage_keyword_mask(X, iv, src, dims)
+    kw = values(kwargs)
+    if haskey(kw, :iv)
+        kw = merge(kw, (; iv = coverage_columns(kw.iv, cmsk, dims)))
+    end
+    if haskey(kw, :ivpa)
+        kw = merge(kw, (; ivpa = coverage_reduced_ivpa(kw.ivpa, cmsk)))
+    end
+    return cmsk, coverage_columns(X, cmsk, dims), kw
+end
+"""
+    coverage_keyword_mask(X::MatNum, iv::Nothing, src, dims::Int) -> Option{BitVector}
+    coverage_keyword_mask(X::MatNum, iv::MatNum, src, dims::Int) -> Option{BitVector}
+
+Derive the Coverage Universe of [`coverage_keyword_reduction`](@ref) from `X`, and from `iv` when the fit reads it.
+
+# Related
+
+  - [`coverage_mask`](@ref)
+  - [`coverage_keyword_reduction`](@ref)
+"""
+function coverage_keyword_mask(X::MatNum, ::Nothing, src, dims::Int)
+    return coverage_mask(X, src; dims = dims)
+end
+function coverage_keyword_mask(X::MatNum, iv::MatNum, src, dims::Int)
+    return coverage_mask(X, iv, src; dims = dims)
+end
+"""
+    coverage_columns(A::Nothing, cmsk, dims::Int) -> Nothing
+    coverage_columns(A::MatNum, cmsk::Nothing, dims::Int) -> MatNum
+    coverage_columns(A::MatNum, cmsk::BitVector, dims::Int) -> MatNum
+
+Slice a matrix onto the Coverage Universe along the asset axis that `dims` names. The asset axis is the second axis when `dims` is `1`, and the first axis otherwise.
+
+# Related
+
+  - [`coverage_keyword_reduction`](@ref)
+"""
+function coverage_columns(::Nothing, ::Option{<:BitVector}, ::Int)
+    return nothing
+end
+function coverage_columns(A::MatNum, ::Nothing, ::Int)
+    return A
+end
+function coverage_columns(A::MatNum, cmsk::BitVector, dims::Int)
+    return isone(dims) ? A[:, cmsk] : A[cmsk, :]
+end
+"""
     coverage_nan_frame(A::AbstractArray, sz::Dims) -> AbstractArray
     coverage_nan_frame(frame::AbstractArray) -> AbstractArray
 
@@ -1037,8 +1128,8 @@ A matrix call of a prior gives the active mask as the `active_mask` keyword, wit
 
 # Algorithm
 
- 1. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref), which reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
- 2. Call the plain estimator on the clean block, with the caller's `dims` and the other keywords. Every column of the block is active at every row, so the method does not pass `active_mask` on.
+ 1. Reduce `X` to its Coverage Universe with [`coverage_keyword_reduction`](@ref), which reads `active_mask` in the place of the active mask of `pnl` when the caller gives one. The per-asset keywords `iv` and `ivpa` take the same slice, and a gap in `iv` narrows the Coverage Universe when the estimator tree reads the surface, see [`reads_implied_volatility`](@ref).
+ 2. Call the plain estimator on the clean block, with the caller's `dims` and the reduced keywords. Every column of the block is active at every row, so the method does not pass `active_mask` on.
  3. Expand the result with [`expand_moment`](@ref).
 
 # Arguments
@@ -1073,8 +1164,8 @@ A matrix call of a prior gives the active mask as the `active_mask` keyword, wit
 function Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(Statistics.cov(ce, Xc; dims = dims, kwargs...), cmsk)
+    cmsk, Xc, kw = coverage_keyword_reduction(ce, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(Statistics.cov(ce, Xc; dims = dims, kw...), cmsk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1090,8 +1181,8 @@ The correlation root of the Asset Panel methods of the moment verbs. It is the r
 function Statistics.cor(ce::AbstractCovarianceEstimator, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(Statistics.cor(ce, Xc; dims = dims, kwargs...), cmsk)
+    cmsk, Xc, kw = coverage_keyword_reduction(ce, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(Statistics.cor(ce, Xc; dims = dims, kw...), cmsk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1107,8 +1198,8 @@ The variance root of the Asset Panel methods of the moment verbs. It is the redu
 function Statistics.var(ce::AbstractCovarianceEstimator, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(Statistics.var(ce, Xc; dims = dims, kwargs...), cmsk, dims)
+    cmsk, Xc, kw = coverage_keyword_reduction(ce, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(Statistics.var(ce, Xc; dims = dims, kw...), cmsk, dims)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1124,8 +1215,8 @@ The standard deviation root of the Asset Panel methods of the moment verbs. It i
 function Statistics.std(ce::AbstractCovarianceEstimator, X::MatNum,
                         pnl::Option{<:AssetPanel}; dims::Int = 1,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(Statistics.std(ce, Xc; dims = dims, kwargs...), cmsk, dims)
+    cmsk, Xc, kw = coverage_keyword_reduction(ce, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(Statistics.std(ce, Xc; dims = dims, kw...), cmsk, dims)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1141,8 +1232,8 @@ The expected returns root of the Asset Panel methods of the moment verbs. It is 
 function Statistics.mean(me::AbstractExpectedReturnsEstimator, X::MatNum,
                          pnl::Option{<:AssetPanel}; dims::Int = 1,
                          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(Statistics.mean(me, Xc; dims = dims, kwargs...), cmsk, dims)
+    cmsk, Xc, kw = coverage_keyword_reduction(me, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(Statistics.mean(me, Xc; dims = dims, kw...), cmsk, dims)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1159,8 +1250,8 @@ The coskewness root of the Asset Panel methods of the moment verbs. It is the re
 function coskewness(ske::CoskewnessEstimator, X::MatNum, pnl::Option{<:AssetPanel};
                     dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(coskewness(ske, Xc; dims = dims, kwargs...), cmsk)
+    cmsk, Xc, kw = coverage_keyword_reduction(ske, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(coskewness(ske, Xc; dims = dims, kw...), cmsk)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1177,8 +1268,8 @@ The cokurtosis root of the Asset Panel methods of the moment verbs. It is the re
 function cokurtosis(kte::CokurtosisEstimator, X::MatNum, pnl::Option{<:AssetPanel};
                     dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                     kwargs...)
-    cmsk, Xc = coverage_reduction(X, pnl; dims = dims, active_mask = active_mask)
-    return expand_moment(cokurtosis(kte, Xc; dims = dims, kwargs...), cmsk, Val(:kt))
+    cmsk, Xc, kw = coverage_keyword_reduction(kte, X, pnl, dims, active_mask; kwargs...)
+    return expand_moment(cokurtosis(kte, Xc; dims = dims, kw...), cmsk, Val(:kt))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

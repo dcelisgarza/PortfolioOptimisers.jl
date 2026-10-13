@@ -358,6 +358,42 @@ function _optimise(res::OptimisationResult, args...; kwargs...)
     return res
 end
 """
+    shared_series_args(opt, rd::ReturnsResult, args...) -> Tuple
+    shared_series_args(opt, args...) -> Tuple
+
+Give the data of one solve, with the observations of a Shared Series gap that `opt` reads dropped.
+
+Every reader inside a solve pairs the observations of the Prior Result with the observations of the returns data: the outer problem of a meta-optimiser, the implied volatilities of an [`ImpliedVolatility`](@ref), the probabilities of a scenario. So the drop of [`shared_series_view`](@ref) happens once, before the solve, and every reader sees the same observations. Each attempt of the fallback chain drops by its own rule, because a fallback can hold a different prior or `brt`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`ReturnsResult`](@ref) first: replace it with [`optimiser_shared_series_view`](@ref), which reads the `brt` and the prior of `opt`.
+ 2. Any other data: return it unchanged.
+
+# Arguments
+
+  - `opt`: The estimator of the attempt, or a precomputed result.
+  - $(arg_dict[:optargs])
+
+# Returns
+
+  - `args::Tuple`: The data of the solve.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`optimiser_shared_series_view`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function shared_series_args(opt, rd::ReturnsResult, args...)
+    return (optimiser_shared_series_view(rd, opt), args...)
+end
+function shared_series_args(::Any, args...)
+    return args
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Solve an optimisation estimator, and walk its fallback chain when a solve fails.
@@ -372,7 +408,7 @@ It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) a
 
  1. Refuse an [`Online`](@ref) in the tree of `opt` with [`assert_batch_entry`](@ref).
  2. Reset every time-dependent schedule of `opt` to its fold-less value with [`reset_time_dependent_estimator`](@ref), giving `current_opt`.
- 3. Solve `current_opt` with [`_optimise`](@ref), giving `res`. A precomputed result gives itself.
+ 3. Drop the observations of a Shared Series gap that `current_opt` reads, with [`shared_series_args`](@ref). Solve `current_opt` with [`_optimise`](@ref) on them, giving `res`. A precomputed result gives itself.
  4. Stop when `res.retcode` is an [`OptimisationSuccess`](@ref), when `current_opt` is a precomputed result, or when `current_opt.fb` is `nothing`.
  5. Otherwise record `(current_opt, res)` in the chain `fb`, take `current_opt.fb` as the new `current_opt`, warn that the fallback runs, and return to step 3.
  6. Return `res` when `fb` is empty. Otherwise return `res` rebuilt with `fb` through [`factory`](@ref).
@@ -402,7 +438,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = reset_time_dependent_estimator(opt)
-    res = _optimise(current_opt, args...; kwargs...)
+    res = _optimise(current_opt, shared_series_args(current_opt, args...)...; kwargs...)
     # A precomputed result answers itself and ends the chain: its own `fb` records how it
     # was answered, and is not a fallback to walk on to.
     while !isa(res.retcode, OptimisationSuccess) &&
@@ -411,7 +447,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
         push!(fb, (current_opt, res))
         current_opt = current_opt.fb
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        res = _optimise(current_opt, args...; kwargs...)
+        res = _optimise(current_opt, shared_series_args(current_opt, args...)...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)
 end

@@ -815,7 +815,7 @@ The column filter changes only which assets survive, and a longer window can cha
 # Algorithm
 
  1. Check that `row_thr` is one.
- 2. Count the missing observations of each asset in the block, giving `miss`.
+ 2. Count the missing observations of each asset in the block, the cells of [`asset_gap_cells`](@ref), giving `miss`.
  3. With no state, make a state from the asset names, `miss` and the number of observations of the block. With a state, check that the asset names equal the names that it pinned, and add `miss` and the number of observations to its counts.
  4. Return the step with the new state, and `pr` unchanged.
 
@@ -843,15 +843,15 @@ function partial_fit_transform(mdf::MissingDataFilter, pr::PricesResult)
     @argcheck(isone(mdf.row_thr),
               ArgumentError("a `MissingDataFilter` with `row_thr = $(mdf.row_thr)` has no online form: a row kept at one step is dropped at the next when a column leaves the fitted universe, and the returns either side of it move. Use `row_thr = 1`, or declare a refit with `Online(pipe)`."))
     names = TimeSeries.colnames(pr.X)
-    vals = values(pr.X)
-    miss = vec(count(is_missing_value, vals; dims = 1))
+    cells = asset_gap_cells(pr)
+    miss = vec(count(cells; dims = 1))
     state = mdf.cache
     state = if isnothing(state)
-        MissingDataFilterState(; nx = names, miss = miss, n = size(vals, 1))
+        MissingDataFilterState(; nx = names, miss = miss, n = size(cells, 1))
     else
         assert_pinned_value(state.nx, names, :nx)
         MissingDataFilterState(; nx = names, miss = state.miss .+ miss,
-                               n = state.n + size(vals, 1))
+                               n = state.n + size(cells, 1))
     end
     return rebuild_estimator(mdf, (; cache = state)), pr
 end

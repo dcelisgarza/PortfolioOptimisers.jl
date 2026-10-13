@@ -431,3 +431,71 @@ decision. Each form now gives the answer that it already gave for a non-finite r
 The carry route of `EmpiricalPrior()` and `HighOrderPriorEstimator()` now equals the batch fit to
 the rounding of the recursion, and the refit route equals it exactly. Under a Coverage Policy
 nothing changes.
+
+## Amendment (2026-10-13, #1672)
+
+The Coverage Universe read `X` alone. The benchmark `B`, the implied volatilities `iv` and the
+factor returns `F` had no rule, and one gap in each did more damage than a gap in `X` at the same
+cells. A `NaN` in a vector `B[t]` under `brt = true` made row `t` of every excess return `NaN`, so
+every asset left the Coverage Universe and the prior threw `IsEmptyError`. A `NaN` in `F[t, k]`
+gave factor `k` `NaN` moments and went into the regression. A wrapper that held an
+`ImpliedVolatility` read `N` columns of `iv` against fewer columns of `X`.
+
+### A gap in a Shared Series drops the observation
+
+A **Shared Series** is a series that every asset reads at the same observation: a vector benchmark
+under `brt`, and each column of the factor returns of a fit that reads them. The rule above removes
+an asset because a gap in `X[t, i]` damages the data of asset `i` alone. A gap in a Shared Series at
+`t` leaves no asset a value at `t`, so the fit drops observation `t` and keeps every asset. The drop
+removes no value that an asset still had. The maintainer chose it over the old answer, which failed
+for every input, and over a factor mask carried on the Asset Panel or the `ReturnsResult`: a
+regression needs complete rows, and a mask would cost a field on every carrier for no reader.
+
+`shared_series_view(rd, brt, rf)` makes the drop through `port_opt_view(rd, rows, :)`, so every
+field loses the same observations. It runs once, at the outermost entry that holds the data,
+because about fifteen readers pair the observations of a prior with the last observations of the
+returns data, and a drop inside a prior would misalign each of them. The entries are `prior(pe,
+rd)`, the uncertainty sets over a `ReturnsResult`, `regression(re, rd)`,
+`resolve_factor_regression`, `forecast_location`, the batch entry of every optimiser through
+`shared_series_args`, the uncertainty step of a `Pipeline`, and `covariance_forecast_evaluation`
+under `brt`, before it splits the folds. A fit reads `F` when `needs_factor_returns` answers `true`,
+which `reads_factor_returns` states. A regression on matrices refuses a non-finite factor row with
+`IsNonFiniteError`, because its caller chose the observations.
+
+An online step cannot drop an observation. An optimiser appends each observation to the buffer of
+its prior and to its Fold Context together, and `optimise(opt)` rebuilds the returns data from
+both, row by row. So `fold_prior` and `partial_fit!(pe, rd)` refuse an observation with a Shared
+Series gap through `assert_no_shared_gap`, with an `IsNonFiniteError` that names it. Before this
+amendment the same step failed later, with `NaN` running moments or `NaN` loadings. #1675 records
+the design that would let the step drop it.
+
+The cost is stated here. A fit now deletes an observation, which this ADR and ADR 0130 did not do.
+An estimator that reads observations by position, an exponentially weighted moment or a lagged
+Descriptor, moves each older observation by one step. The positions of the row key of a factor
+model block count the observations of the view, and its timestamps name them exactly.
+
+### A per-asset series acts as `X`
+
+A matrix `B` and `iv` hold one series for each asset, so a gap in them acts as a gap in `X` at the
+same cell.
+
+- Under `brt`, a gap in a matrix `B` is a `NaN` excess return, so it leaves the Coverage Universe
+  through `X - B`. `benchmark_estimation_mask` also writes it into the estimation mask, for a
+  cross-sectional reader. With `brt = false` no fit reads `B`, so the ingestion layer still derives
+  the estimation mask from `X` alone.
+- The reduce-and-expand root of every moment verb reduces the per-asset keywords `iv` and `ivpa`
+  with `X`, through `coverage_keyword_reduction`. A gap in `iv` narrows the Coverage Universe when
+  `reads_implied_volatility` finds an `ImpliedVolatility` in the tree of the estimator, on every
+  route and not only on the panel method of `ImpliedVolatility`.
+- A product with weights reads the cells that the portfolio reads. `benchmark_cells` zeroes a cell
+  of a matrix `B` where `B` or `X` is not finite or the asset is inactive, as `filter_held_gaps`
+  zeroes the cell of `X`. `collapse_rate` reads the finite active cells of `iv`, and the fold of a
+  cross-validation collapses `iv` and `ivpa` through `collapse_fold_rate`, with the active mask and
+  `RenormaliseActive`, as a meta-optimiser does.
+
+### `MissingDataFilter` counts the same gaps
+
+The column decision counts a gap in the implied volatility or in the own column of a per-asset
+benchmark as a missing observation of that asset. The row decision counts a gap in a one-column
+benchmark or in a factor as an observation that misses every asset. The default `row_thr = 1`
+drops no observation, so the default output does not change.

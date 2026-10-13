@@ -1421,8 +1421,9 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Algorithm
 
  1. Check that `rd` carries asset returns.
- 2. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 3. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
+ 2. Drop the observations of a gap of a vector benchmark under `brt` with [`shared_series_view`](@ref). The estimator does not read the factor returns, so a gap in them drops nothing.
+ 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -1454,11 +1455,9 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; brt::Bool = fal
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    rd = shared_series_view(rd, brt, false)
     return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; ne = rd.ne,
                  E = rd.E, iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, kwargs..., dims = 1)
-end
-function refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
-    return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))
 end
 """
     cross_sectional_pin_choice(choice::BatchChoice, pe::CrossSectionalFactorPrior) -> CrossSectionalFactorPrior

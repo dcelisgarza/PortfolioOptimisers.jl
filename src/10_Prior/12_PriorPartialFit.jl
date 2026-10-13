@@ -872,7 +872,8 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
 
 # Algorithm
 
- 1. Fold `rd` into the buffer with [`refit_prior_step`](@ref).
+ 1. Refuse an observation at which a factor return is not finite, when the prior reads the factor returns, with [`assert_no_shared_gap`](@ref). A batch fit drops it, and a step cannot.
+ 2. Fold `rd` into the buffer with [`refit_prior_step`](@ref).
 
 # Arguments
 
@@ -881,7 +882,7 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
 
 # Validation
 
-  - The rules of [`refit_prior_fold`](@ref).
+  - The rules of [`assert_no_shared_gap`](@ref) and [`refit_prior_fold`](@ref).
 
 # Returns
 
@@ -897,6 +898,7 @@ The carry of [`EmpiricalPrior`](@ref) has a method of its own, because its exact
   - [`Online`](@ref)
 """
 function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
+    assert_no_shared_gap(rd, false, reads_factor_returns(pe))
     return refit_prior_step(pe, rd)
 end
 """
@@ -1806,6 +1808,7 @@ This is the forwarding form of the fold of every prior, [`partial_fit!`](@ref) o
   - [`step_active_kwargs`](@ref)
 """
 function partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
+    assert_no_shared_gap(rd, false, reads_factor_returns(pe))
     kw = step_active_kwargs(rd.pnl)
     return rebuild_estimator(pe,
                              (; pe = partial_fit!(pe.pe, rd),
@@ -1813,6 +1816,7 @@ function partial_fit!(pe::HighOrderPriorEstimator, rd::ReturnsResult)
                               ske = fold_member(pe.ske, rd.X; kw...)))
 end
 function partial_fit!(pe::BlackLittermanPrior, rd::ReturnsResult)
+    assert_no_shared_gap(rd, false, reads_factor_returns(pe))
     return rebuild_estimator(pe, (; pe = partial_fit!(pe.pe, rd)))
 end
 """

@@ -24,4 +24,5 @@ PortfolioOptimisers.held_timestamps
 PortfolioOptimisers.batch_without_state
 PortfolioOptimisers.batch_from_state
 PortfolioOptimisers.show_fields(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:EqualWeighted, <:RandomWeighted, <:NestedClustered, <:Stacking, <:SubsetResampling})
+PortfolioOptimisers.optimiser_shared_series_view
 ```

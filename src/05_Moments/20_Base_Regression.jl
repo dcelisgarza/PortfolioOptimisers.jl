@@ -1774,7 +1774,8 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 # Algorithm
 
  1. Check that `rd` carries both matrices, per `# Validation` below.
- 2. Call `regression(re, rd.X, rd.F)`, giving the regression result.
+ 2. Drop the observations at which a factor return is not finite, with [`shared_series_view`](@ref). A regression on such an observation has no regressor for any asset.
+ 3. Call `regression(re, rd.X, rd.F)` on the kept observations, giving the regression result.
 
 # Arguments
 
@@ -1798,7 +1799,40 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
+    rd = shared_series_view(rd, false, true)
     return regression(re, rd.X, rd.F)
+end
+"""
+    assert_finite_factor_rows(F::MatNum) -> Nothing
+
+Refuse a factor returns matrix with a non-finite entry, for a regression on matrices.
+
+A factor return is a regressor of every asset, so a gap at one observation leaves that observation with no regressor for any asset. A fit through a [`ReturnsResult`](@ref) drops such an observation with [`shared_series_view`](@ref) before it reaches a matrix. A caller of a matrix method gives the observations that it chose, so the method refuses a gap rather than answer `NaN` loadings.
+
+# Arguments
+
+  - $(arg_dict[:F])
+
+# Validation
+
+  - Every entry of `F` is finite. An [`IsNonFiniteError`](@ref) that names the first observations with a gap is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`regression`](@ref)
+"""
+function assert_finite_factor_rows(F::MatNum)::Nothing
+    if all(isfinite, F)
+        return nothing
+    end
+    rows = findall(t -> !all(isfinite, view(F, t, :)), axes(F, 1))
+    throw(IsNonFiniteError("a factor return is a regressor of every asset, and the factor returns are not finite at observation(s) $(first(rows, 5)) of $(size(F, 1)), so no asset has a regressor there. Fit through a ReturnsResult, which drops those observations, or drop them from X and F before the call."))
+    return nothing
 end
 """
     pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,

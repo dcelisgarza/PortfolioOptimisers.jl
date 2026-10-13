@@ -1687,9 +1687,9 @@ The fold does not collapse the panel of `rd`. A *square* feature matrix needs th
 
 # Algorithm
 
- 1. Collapse `rd.B` with [`collapse_benchmark`](@ref), from `w` and `hw`.
+ 1. Collapse the cells of `rd.B` that [`benchmark_cells`](@ref) reads with [`collapse_benchmark`](@ref), from `w` and `hw`. A gap in the benchmark or in the returns, or an inactive cell, gives zero, as the portfolio series zeroes it.
  2. When `rd.iv` is given or `rd.ivpa` is a vector, compute the convex weights `cw` of `w` with [`synthetic_asset_weights`](@ref), one vector per member under a population.
- 3. Collapse `rd.iv` to `rd.iv * cw`, and a vector `rd.ivpa` to `dot(rd.ivpa, cw)`. A scalar `ivpa` stays as it is.
+ 3. Collapse `rd.iv` and a vector `rd.ivpa` with [`collapse_fold_rate`](@ref), which reads the active mask of `rd.pnl` and the finite cells, as the collapse of a meta-optimiser does. A scalar `ivpa` stays as it is.
  4. Under a population, repeat a scalar `ivpa` once per member.
  5. Build the [`PredictionReturnsResult`](@ref) from `nx`, `X`, the factor block, `nb`, the collapsed values and `ts`.
 
@@ -1716,7 +1716,7 @@ The fold does not collapse the panel of `rd`. A *square* feature matrix needs th
 function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsResult,
                         X::VecNum, hw::Option{<:HeldWeightsResult} = nothing,
                         w::VecNum_VecVecNum = res.w)
-    B = collapse_benchmark(rd.B, w, hw)
+    B = collapse_benchmark(benchmark_cells(rd), w, hw)
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -1727,10 +1727,10 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         # at the Investable Mask when the fold took one.
         cw = synthetic_asset_weights(w)
         if iv_flag
-            iv = iv * cw
+            iv = collapse_fold_rate(iv, cw, rd.pnl)
         end
         if ivpa_flag
-            ivpa = LinearAlgebra.dot(rd.ivpa, cw)
+            ivpa = collapse_fold_rate(rd.ivpa, cw, rd.pnl)
         end
     end
     return PredictionReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, nb = rd.nb,
@@ -1741,7 +1741,7 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
                         X::VecVecNum, hw::Option{<:HeldWeightsResult} = nothing,
                         w::VecNum_VecVecNum = res.w)
     nb = rd.nb
-    B = collapse_benchmark(rd.B, w, hw)
+    B = collapse_benchmark(benchmark_cells(rd), w, hw)
     iv = rd.iv
     ivpa = rd.ivpa
     iv_flag = !isnothing(iv)
@@ -1751,10 +1751,10 @@ function reconstruct_rd(res::NonFiniteAllocationOptimisationResult, rd::ReturnsR
         # the same weights the series was formed from — see the singular twin above.
         cw = [synthetic_asset_weights(wi) for wi in w]
         if iv_flag
-            iv = [iv * wi for wi in cw]
+            iv = [collapse_fold_rate(iv, wi, rd.pnl) for wi in cw]
         end
         if ivpa_flag
-            ivpa = [LinearAlgebra.dot(ivpa, wi) for wi in cw]
+            ivpa = [collapse_fold_rate(ivpa, wi, rd.pnl) for wi in cw]
         end
     end
     if isa(ivpa, Number)

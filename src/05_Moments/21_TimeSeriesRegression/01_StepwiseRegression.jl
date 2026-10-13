@@ -772,6 +772,7 @@ Each asset takes its own search, so the searches see one another only through th
   - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
 """
 function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
+    assert_finite_factor_rows(F)
     assert_stepwise_included(re.included, X, F)
     cols = size(F, 2) + 1
     N, rows = size(X)

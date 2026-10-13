@@ -591,6 +591,10 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
   - $(arg_dict[:X])
   - $(arg_dict[:F])
 
+# Validation
+
+  - The rules of [`assert_finite_factor_rows`](@ref) for `F`.
+
 # Returns
 
   - `reg::Regression`: Regression result carrying:
@@ -612,6 +616,7 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
   - $(ref_dict[:fekedulegn2002])
 """
 function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
+    assert_finite_factor_rows(F)
     cols = size(F, 2) + 1
     rows = size(X, 2)
     rr = zeros(promote_type(eltype(F), eltype(X)), rows, cols)

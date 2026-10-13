@@ -21,4 +21,7 @@ PortfolioOptimisers.collapse_panel_mask
 PortfolioOptimisers.collapse_categorical_mask
 PortfolioOptimisers.collapse_tensor_mask
 PortfolioOptimisers.collapse_placeholder_mask
+PortfolioOptimisers.finite_read_mask
+PortfolioOptimisers.benchmark_cells
+PortfolioOptimisers.collapse_fold_rate
 ```

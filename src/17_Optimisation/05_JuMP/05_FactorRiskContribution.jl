@@ -429,7 +429,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b, false)
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
-    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)
+    # A factor phylogeny reads the factor returns, so it drops their gaps as the loadings do.
+    frc_plr = phylogeny_constraints(frc.frc_ple, shared_series_view(rd, false, true).F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)

@@ -523,8 +523,9 @@ The method unpacks the container and forwards to the matrix method, so an estima
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 4. Forward to `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
+ 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 5. Forward to `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -554,6 +555,7 @@ function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Bool =
              kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
+    rd = shared_series_view(rd, brt, reads_factor_returns(uc.pe))
     return ucs(uc, benchmark_relative_returns(rd, brt), rd.F; iv = rd.iv, ivpa = rd.ivpa,
                kwargs..., dims = 1)
 end
@@ -569,8 +571,9 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 4. Forward to `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
+ 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 5. Forward to `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -600,6 +603,7 @@ function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Boo
                 kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
+    rd = shared_series_view(rd, brt, reads_factor_returns(uc.pe))
     return mu_ucs(uc, benchmark_relative_returns(rd, brt), rd.F; iv = rd.iv, ivpa = rd.ivpa,
                   kwargs..., dims = 1)
 end
@@ -615,8 +619,9 @@ The method unpacks the container and forwards to the matrix method. An estimator
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 4. Forward to `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
+ 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 5. Forward to `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
@@ -646,6 +651,7 @@ function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult;
                    brt::Bool = false, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
+    rd = shared_series_view(rd, brt, reads_factor_returns(uc.pe))
     return sigma_ucs(uc, benchmark_relative_returns(rd, brt), rd.F; iv = rd.iv,
                      ivpa = rd.ivpa, kwargs..., dims = 1)
 end

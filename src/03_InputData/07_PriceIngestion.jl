@@ -381,7 +381,7 @@ end
 
 Name what the join and the alignment padded, warning by default and refusing under `strict`.
 
-A carried absence raises no error, and the factor, benchmark and implied-volatility axes state no universe that would name it later. So this function names it through [`strict_diagnostic`](@ref), which a Held Gap and [`PriceGapFill`](@ref) also use to report. A caller who runs a walk-forward and sets `strict` knows that the layer padded no covariate.
+A carried absence raises no error later. A fit that reads a padded factor or a padded one-column benchmark drops that observation, and a fit that reads a padded implied volatility or a padded column of a per-asset benchmark drops that asset, see [`shared_series_view`](@ref) and [`coverage_mask`](@ref). Neither drop names its cause. So this function names it through [`strict_diagnostic`](@ref), which a Held Gap and [`PriceGapFill`](@ref) also use to report. A caller who runs a walk-forward and sets `strict` knows that the layer padded no covariate.
 
 # Algorithm
 
@@ -413,7 +413,7 @@ function assert_join_padding(lines::AbstractVector, strict::Bool)::Nothing
     if isempty(kept)
         return nothing
     end
-    strict_diagnostic("the ingestion layer padded the series the join and the alignment found silent on the emitted clock, and a padded observation is an absence carried as `NaN` on an axis that states no universe: " *
+    strict_diagnostic("the ingestion layer padded the series the join and the alignment found silent on the emitted clock, and a padded observation is an absence carried as `NaN`, which a fit drops without a message: the observation of a padded factor or one-column benchmark, and the asset of a padded implied volatility or per-asset benchmark: " *
                       join(kept, "; ") *
                       ". Under `join_method = :left` the asset table states the clock; `:outer` takes the union and `:inner` the intersection, and a caller who wants no padding aligns the series before the call.",
                       strict)
@@ -430,7 +430,7 @@ Because it runs outside the `Pipeline`, the **Span Rule** can read the whole pan
 
 The `PricesResult` holds the derived **Listing Span** in its `span` field. The conversion projects it onto the returns clock and gives the [`ReturnsResult`](@ref) an [`AssetPanel`](@ref) that states the universe. A caller who holds a listing calendar passes it as `span`, and it replaces the Span Rule's answer.
 
-**The asset table states the clock.** It states the universe, so it also states the clock. Under the default `join_method = :left`, the layer aligns the factor, benchmark and implied-volatility series to that clock and pads them where they are silent. The layer names what it padded: the table, the number of observations and the columns. It warns by default and refuses under `strict`, because a carried absence raises no error and those axes state no universe that would name it later.
+**The asset table states the clock.** It states the universe, so it also states the clock. Under the default `join_method = :left`, the layer aligns the factor, benchmark and implied-volatility series to that clock and pads them where they are silent. The layer names what it padded: the table, the number of observations and the columns. It warns by default and refuses under `strict`, because a carried absence raises no error later: a fit drops the observation of a padded factor or one-column benchmark, and the asset of a padded implied volatility or per-asset benchmark, and does not name the cause.
 
 Each field states a fact about the sources that the layer cannot derive. `join_method` states which clock decides, `collapse_args` the frequency the analysis wants, `span` the caller's listing calendar, and `strict` whether a padded covariate is acceptable.
 
@@ -524,7 +524,7 @@ Assemble raw price series into a [`PricesResult`](@ref) and its Listing Span.
 
 The three steps that move the clock run here and not in a [`Pipeline`](@ref), and the **Span Rule** reads the whole panel after them. The result is an ordinary [`PricesResult`](@ref). Its `span` field states which assets are listed at each observation, and [`PricesToReturns`](@ref) projects it onto the returns clock.
 
-The layer spells an absent price `NaN`, the library's one spelling for absence. The conversion carries it into the returns and does not delete the observation or the asset that holds it. Every axis the layer touches carries its absences. If a factor, benchmark or implied-volatility series is silent at an observation of the emitted clock, the layer pads it there and names the padding. It warns by default and refuses under `strict`, because those axes state no universe that would name the padding later.
+The layer spells an absent price `NaN`, the library's one spelling for absence. The conversion carries it into the returns and does not delete the observation or the asset that holds it. Every axis the layer touches carries its absences. If a factor, benchmark or implied-volatility series is silent at an observation of the emitted clock, the layer pads it there and names the padding. It warns by default and refuses under `strict`, because a fit that reads a padded series drops the observation or the asset in silence: a gap in a factor or a one-column benchmark drops the observation, and a gap in an implied volatility or a column of a per-asset benchmark drops the asset.
 
 The caller does not name the value type of the `PricesResult`. The layer promotes the asset, factor and benchmark types to one type, because the join lays them in one table. It then widens that type only as the return arithmetic would widen it. A `Float32` panel stays `Float32`, `Float32` beside `Float64` joins in `Float64`, and an integer panel takes the floating-point type that represents it. The layer throws an error that names a type that cannot spell an absence wherever it might have to spell one: at a `missing` value, before a join that can pad, and when it aligns the implied volatilities. The join and the alignment ask before they know whether they pad a row.
 

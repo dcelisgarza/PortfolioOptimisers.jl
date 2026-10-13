@@ -25,4 +25,5 @@ investable_prior
 investable_universe_names
 held_non_investable
 investable_weights_view
+PortfolioOptimisers.reads_factor_returns
 ```

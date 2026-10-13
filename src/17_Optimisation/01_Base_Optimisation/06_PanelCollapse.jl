@@ -856,7 +856,7 @@ The implied volatilities `iv` and the implied volatility risk premium adjustment
 The method that Julia selects is the algorithm.
 
  1. `nothing` and a scalar stay as they are.
- 2. A matrix collapses through [`collapse_panel_numeric`](@ref), with the divisors of [`active_weight_divisor`](@ref).
+ 2. A matrix collapses through [`collapse_panel_numeric`](@ref), with the divisors of [`active_weight_divisor`](@ref). It reads the cells of [`finite_read_mask`](@ref): an implied volatility that is not finite counts as an inactive member of its row, so a gap in `iv` does not poison the row.
  3. A vector collapses as `transpose(W) * a` with no mask. With a mask, the value of each member that is inactive at the last row of `m` becomes zero, the vector collapses in the same way, and the answer divides by the divisors of that row.
 
 # Arguments
@@ -884,7 +884,8 @@ function collapse_rate(a::Number, ::MatNum, ::Any, ::AbstractPanelCollapseAlgori
 end
 function collapse_rate(a::MatNum, W::MatNum, m::Option{<:AbstractMatrix{Bool}},
                        alg::AbstractPanelCollapseAlgorithm)
-    return collapse_panel_numeric(a, W, m, active_weight_divisor(alg, m, W))
+    r = finite_read_mask(a, m)
+    return collapse_panel_numeric(a, W, r, active_weight_divisor(alg, r, W))
 end
 function collapse_rate(a::VecNum, W::MatNum, ::Nothing, ::AbstractPanelCollapseAlgorithm)
     return collapse_panel_numeric(a, W)
@@ -897,6 +898,102 @@ function collapse_rate(a::VecNum, W::MatNum, m::AbstractMatrix{Bool},
     c = collapse_panel_numeric(ifelse.(view(m, t, :), a, zero(eltype(a))), W)
     d = active_weight_divisor(alg, view(m, t:t, :), W)
     return isnothing(d) ? c : c ./ vec(d)
+end
+"""
+    finite_read_mask(a::MatNum, m::Nothing) -> Option{BitMatrix}
+    finite_read_mask(a::MatNum, m::AbstractMatrix{Bool}) -> AbstractMatrix{Bool}
+
+Return the cells of a per-asset matrix that a collapse reads: the active cells of `m` at which `a` is finite.
+
+A gap in a per-asset series acts as a gap in the returns of that asset, so a collapse reads it as an inactive cell. A complete matrix returns `m` itself, so a panel with no gap collapses as it did before.
+
+# Arguments
+
+  - `a`: The per-asset matrix, `observations × assets`.
+  - `m`: The active mask, or `nothing`.
+
+# Returns
+
+  - The read mask, or `nothing` when `m` is `nothing` and `a` is finite at every cell.
+
+# Related
+
+  - [`collapse_rate`](@ref)
+  - [`benchmark_cells`](@ref)
+"""
+function finite_read_mask(a::MatNum, m::Nothing)
+    return all(isfinite, a) ? m : isfinite.(a)
+end
+function finite_read_mask(a::MatNum, m::AbstractMatrix{Bool})
+    return all(isfinite, a) ? m : m .& isfinite.(a)
+end
+"""
+    benchmark_cells(rd::ReturnsResult) -> Option{<:VecNum_MatNum}
+    benchmark_cells(B::Option{<:VecNum}, X, m) -> Option{<:VecNum}
+    benchmark_cells(B::MatNum, X::MatNum, m::Option{<:AbstractMatrix{Bool}}) -> MatNum
+
+Return the benchmark of `rd` that a product with weights reads, with every cell that the portfolio does not read set to zero.
+
+A matrix benchmark holds one series for each asset, and a product with weights forms the benchmark of a portfolio. The portfolio series reads an asset at the cells where its return is finite: a fold zeroes every other cell once, with [`filter_held_gaps`](@ref). So the benchmark reads the same cells: the active cells at which both the return and the benchmark are finite. A gap in `B[t, i]` then gives zero, as a gap in `X[t, i]` does, and not `NaN`. `NaN * 0` is `NaN`, so without this function a gap at an asset of zero weight poisons the observation. A vector benchmark is a series of the whole portfolio, so it passes through.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - `B`: The benchmark.
+  - `X`: The asset returns.
+  - `m`: The active mask of the Asset Panel, or `nothing`.
+
+# Returns
+
+  - The benchmark with the cells that are not read set to zero, or the benchmark itself when every cell is read.
+
+# Related
+
+  - [`finite_read_mask`](@ref)
+  - [`filter_held_gaps`](@ref)
+  - [`prepare_outer_rd`](@ref)
+  - [`reconstruct_rd`](@ref)
+"""
+function benchmark_cells(rd::ReturnsResult)
+    return benchmark_cells(rd.B, rd.X, first(panel_moment_masks(rd.pnl)))
+end
+function benchmark_cells(B::Option{<:VecNum}, ::Any, ::Any)
+    return B
+end
+function benchmark_cells(B::MatNum, X::MatNum, m::Option{<:AbstractMatrix{Bool}})
+    r = finite_read_mask(X, finite_read_mask(B, m))
+    return isnothing(r) || all(r) ? B : ifelse.(r, B, zero(eltype(B)))
+end
+"""
+    collapse_fold_rate(a::MatNum, w::VecNum, pnl::Option{<:AssetPanel}) -> Vector
+    collapse_fold_rate(a::VecNum, w::VecNum, pnl::Option{<:AssetPanel}) -> Number
+
+Collapse an implied volatility quantity of one fold onto its portfolio, as [`collapse_rate`](@ref) collapses it onto a sub-portfolio of a meta-optimiser.
+
+A fold of a cross-validation forms one portfolio, so it collapses `iv` and a vector `ivpa` against one weight vector. It reads the active mask of `pnl` and the rule [`RenormaliseActive`](@ref), the default of a meta-optimiser, so the two collapses agree. `iv` gives one rate per observation, and `ivpa` gives one rate.
+
+# Arguments
+
+  - `a`: `iv`, `observations × assets`, or a vector `ivpa`.
+  - `w`: The normalised weights of the fold, see [`synthetic_asset_weights`](@ref).
+  - `pnl`: The Asset Panel of the fold, or `nothing`.
+
+# Returns
+
+  - The collapsed rate.
+
+# Related
+
+  - [`collapse_rate`](@ref)
+  - [`reconstruct_rd`](@ref)
+"""
+function collapse_fold_rate(a::MatNum, w::VecNum, pnl::Option{<:AssetPanel})
+    return vec(collapse_rate(a, reshape(w, :, 1), first(panel_moment_masks(pnl)),
+                             RenormaliseActive()))
+end
+function collapse_fold_rate(a::VecNum, w::VecNum, pnl::Option{<:AssetPanel})
+    return only(collapse_rate(a, reshape(w, :, 1), first(panel_moment_masks(pnl)),
+                              RenormaliseActive()))
 end
 
 export RenormaliseActive, InactiveAsCash

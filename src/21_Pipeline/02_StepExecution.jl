@@ -176,7 +176,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Read the slot an uncertainty-set step fits from, as the arguments its verb takes.
 
-An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The asset returns are read with [`benchmark_relative_returns`](@ref) under the `brt` of the step, as the optimiser reads them for its own uncertainty set. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
+An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The observations of a Shared Series gap that the fit reads are dropped first with [`shared_series_view`](@ref): a gap of a vector benchmark under the `brt` of the step, and a gap of the factor returns when the prior of the estimator reads them, as the verb over a [`ReturnsResult`](@ref) drops them. The asset returns are then read with [`benchmark_relative_returns`](@ref) under the `brt` of the step, as the optimiser reads them for its own uncertainty set. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
 
 # Arguments
 
@@ -187,11 +187,11 @@ An estimator that reads a prior result — [`reads_prior_result`](@ref) answers 
 # Validation
 
   - The slot the estimator reads is filled, through [`require_slot`](@ref).
-  - The rules of [`benchmark_relative_returns`](@ref).
+  - The rules of [`benchmark_relative_returns`](@ref) and [`shared_series_view`](@ref).
 
 # Returns
 
-  - `src::Tuple`: `(ctx.prior,)` for a prior-reading estimator, `(X, ctx.returns.F)` otherwise, where `X` is the asset returns in the frame of `brt`.
+  - `src::Tuple`: `(ctx.prior,)` for a prior-reading estimator, `(X, F)` otherwise, where `X` is the asset returns in the frame of `brt` and both hold the observations that the fit keeps.
 
 # Related
 
@@ -206,7 +206,8 @@ function uncertainty_step_source(ue::AbstractUncertaintySetEstimator, ctx::Pipel
         return (ctx.prior,)
     end
     require_slot(ctx, :returns, ue)
-    return (benchmark_relative_returns(ctx.returns, brt), ctx.returns.F)
+    rd = shared_series_view(ctx.returns, brt, reads_factor_returns(ue.pe))
+    return (benchmark_relative_returns(rd, brt), rd.F)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

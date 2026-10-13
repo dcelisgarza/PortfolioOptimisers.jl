@@ -105,8 +105,9 @@ The prior folds the returns that its batch fit reads. Under `brt` these are the 
 
 # Algorithm
 
- 1. Take the observations that the prior folds with [`prior_step_returns`](@ref) under `brt`, giving `rdp`.
- 2. Fold `rdp` into `pe` with [`partial_fit!`](@ref) over the `ReturnsResult`, which refuses by route what the prior cannot honour.
+ 1. Refuse an observation with a Shared Series gap with [`assert_no_shared_gap`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `pe`. A batch fit drops such an observation, and a step cannot. Mark a gap of a matrix benchmark in the estimation mask under `brt` with [`benchmark_estimation_mask`](@ref), as the batch fit marks it.
+ 2. Take the observations that the prior folds with [`prior_step_returns`](@ref) under `brt`, giving `rdp`.
+ 3. Fold `rdp` into `pe` with [`partial_fit!`](@ref) over the `ReturnsResult`, which refuses by route what the prior cannot honour.
 
 # Arguments
 
@@ -133,7 +134,8 @@ The prior folds the returns that its batch fit reads. Under `brt` these are the 
   - [`assert_online_entry`](@ref): refuses a schedule on the prior before the warm-up of the fold loop.
 """
 function fold_prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false)
-    return partial_fit!(pe, prior_step_returns(rd, brt))
+    assert_no_shared_gap(rd, brt, reads_factor_returns(pe))
+    return partial_fit!(pe, prior_step_returns(benchmark_estimation_mask(rd, brt), brt))
 end
 function fold_prior(pe::AbstractPriorResult, ::ReturnsResult; brt::Bool = false)
     return throw(ArgumentError("`pe` holds a fitted `$(typeof(pe))`, which has no state to fold an observation into: a prior result is batch configuration. Hand the optimiser the prior estimator to take the online step, or run `optimise(opt, rd)`."))
@@ -328,6 +330,55 @@ function partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                  <:SubsetResampling}, rd::ReturnsResult)
     assert_step_tracks_no_series(opt)
     return fold_returns(opt, rd)
+end
+"""
+    optimiser_shared_series_view(rd::ReturnsResult,
+                                 opt::Union{<:OptimisationEstimator, <:OptimisationResult})
+    optimiser_shared_series_view(rd::ReturnsResult,
+                                 opt::Union{<:JuMPOptimisationEstimator,
+                                            <:HierarchicalRiskParity,
+                                            <:HierarchicalEqualRiskContribution,
+                                            <:SchurComplementHierarchicalRiskParity})
+    optimiser_shared_series_view(rd::ReturnsResult,
+                                 opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                            <:InverseVolatility, <:NestedClustered,
+                                            <:Stacking, <:SubsetResampling})
+
+Return the returns data that one solve of `opt` reads, with the observations of a Shared Series gap dropped, see [`shared_series_args`](@ref).
+
+The optimisers that hold a prior and `brt` are the ones whose online step folds the prior, so the two unions are the unions of [`partial_fit!`](@ref). An outer estimator reads the configuration that it holds in `opt`. A configuration drops a gap of a vector benchmark under its `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for its prior, with [`shared_series_view`](@ref). An optimiser that holds no prior and reads no benchmark, and a precomputed result, return `rd`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. An optimiser with no prior, or a result: return `rd`.
+ 2. An outer estimator: answer for the configuration in `opt.opt`.
+ 3. A configuration: return `shared_series_view(rd, opt.brt, reads_factor_returns(opt.pe))`.
+
+# Related
+
+  - [`shared_series_args`](@ref)
+  - [`shared_series_view`](@ref)
+  - [`reads_factor_returns`](@ref)
+"""
+function optimiser_shared_series_view(rd::ReturnsResult,
+                                      ::Union{<:OptimisationEstimator,
+                                              <:OptimisationResult})
+    return rd
+end
+function optimiser_shared_series_view(rd::ReturnsResult,
+                                      opt::Union{<:JuMPOptimisationEstimator,
+                                                 <:HierarchicalRiskParity,
+                                                 <:HierarchicalEqualRiskContribution,
+                                                 <:SchurComplementHierarchicalRiskParity})
+    return optimiser_shared_series_view(rd, opt.opt)
+end
+function optimiser_shared_series_view(rd::ReturnsResult,
+                                      opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                                 <:InverseVolatility, <:NestedClustered,
+                                                 <:Stacking, <:SubsetResampling})
+    return shared_series_view(rd, opt.brt, reads_factor_returns(opt.pe))
 end
 function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
                                  <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)

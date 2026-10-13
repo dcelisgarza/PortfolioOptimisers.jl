@@ -263,7 +263,7 @@ Each family has two arities. The data form answers for a batch fit over `X`. The
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
   - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
   - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows each time the estimate is made from the state.
-  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone.
+  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone. A prior whose tree reads the factor returns drops the observations at which a factor return is not finite, with [`shared_series_view`](@ref), before the fit and before the location, so both read the same observations.
 
 The Asset Panel form follows the Asset Panel method of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
 
@@ -378,6 +378,7 @@ function forecast_location(ce::AbstractCovarianceEstimator)
 end
 function forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult;
                            strict::Bool = false, kwargs...)
+    rd = shared_series_view(rd, false, reads_factor_returns(pe))
     return prior_forecast_location(pe, prior(pe, rd; strict = strict, kwargs...), rd;
                                    kwargs...)
 end
@@ -1142,7 +1143,7 @@ The verb runs through the one fold loop of the library. At each fold the callbac
 
 The verb reads none of these settings. So the online run gives the rows of the batch expanding run fold for fold, to the tolerance of the estimator's own fold. The date form, the purge, and a listing or a delisting need no code of their own.
 
-With `brt = true` the verb evaluates a forecast of the returns in excess of the benchmark, `X - B`, which is the covariance that a tracking-error portfolio reads. Every reader of the returns in the evaluation reads this one frame: the fit over a training window, the online step, and the test rows. So the verb gives the fold loop the returns data of [`prior_step_returns`](@ref), which holds `X - B` in `X` and keeps `B` and every other field. A vector `B` is one benchmark, which [`benchmark_relative_returns`](@ref) subtracts from every asset. A matrix `B` holds one benchmark per asset. An [`ImpliedVolatility`](@ref) estimator reads the surface `iv` of the assets beside `X - B`, as the prior of an optimiser does under `brt`, because the returns data holds no surface of the excess returns.
+With `brt = true` the verb evaluates a forecast of the returns in excess of the benchmark, `X - B`, which is the covariance that a tracking-error portfolio reads. Every reader of the returns in the evaluation reads this one frame: the fit over a training window, the online step, and the test rows. So the verb gives the fold loop the returns data of [`prior_step_returns`](@ref), which holds `X - B` in `X` and keeps `B` and every other field. A vector `B` is one benchmark, which [`benchmark_relative_returns`](@ref) subtracts from every asset. A matrix `B` holds one benchmark per asset. An [`ImpliedVolatility`](@ref) estimator reads the surface `iv` of the assets beside `X - B`, as the prior of an optimiser does under `brt`, because the returns data holds no surface of the excess returns. Under `brt` a gap in a vector `B` leaves no asset an excess return at its observation, so the verb drops that observation from the returns data before it splits the folds, with [`shared_series_view`](@ref), as every fit drops it.
 
 The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses an estimator that enters with a state or that cannot fold, with an error that names it. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each estimate made from the state is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
 
@@ -1203,6 +1204,9 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
     @argcheck(!isa(est, Online) || folds_are_stepped(cv),
               ArgumentError("`Online($(typeof(est.est).name.name))` declares a refit from a sample buffer, which only the fold loop's online arm seeds and threads, and this scheme is not an Online Scheme, so every fold would refit the estimator from its training window and the buffer would never exist. Run the evaluation under `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand it the estimator unwrapped."))
     # Every reader of the evaluation reads one frame, so the fold loop folds and scores `X - B`.
+    # A gap in a vector benchmark drops its observation before the split, as every fit drops
+    # it, and every later read of `rd`, the dates included, reads the kept observations.
+    rd = shared_series_view(rd, brt, false)
     rdb = prior_step_returns(rd, brt)
     cv_res = split(cv, rdb)
     (; train_idx, test_idx) = cv_res

@@ -453,7 +453,7 @@ A column of zeros in ``\\mathbf{W}`` gives a column of zeros in ``\\mathbf{V}^{o
 
 # Algorithm
 
- 1. When `rd.B` is a matrix, collapse it, giving `B = rd.B * wi`, and name its columns `nb = ["_b1", …]`. Otherwise keep `rd.B` and `rd.nb`.
+ 1. When `rd.B` is a matrix, collapse the cells that [`benchmark_cells`](@ref) reads, giving `B = benchmark_cells(rd) * wi`, and name its columns `nb = ["_b1", …]`. A gap in the benchmark or in the returns of an asset, or an inactive cell, gives zero and not `NaN`. Otherwise keep `rd.B` and `rd.nb`.
  2. Read the active mask of `rd.pnl`, giving `m`. It is `nothing` with no panel or a static one.
  3. When `rd.iv` is present or `rd.ivpa` is a vector, normalise `wi` with [`synthetic_asset_weights`](@ref), giving `wn`. Collapse `rd.iv` and `rd.ivpa` with [`collapse_rate`](@ref), on `wn`, `m` and `alg`.
  4. Collapse the Asset Panel with [`collapse_asset_panel`](@ref) under `alg`, giving `pnl`.
@@ -489,7 +489,7 @@ function prepare_outer_rd(rd::ReturnsResult, wi::MatNum,
     nb, B = if !isa(rd.B, MatNum)
         rd.nb, rd.B
     else
-        ["_b$(i)" for i in 1:size(wi, 2)], rd.B * wi
+        ["_b$(i)" for i in 1:size(wi, 2)], benchmark_cells(rd) * wi
     end
     iv = rd.iv
     ivpa = rd.ivpa

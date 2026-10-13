@@ -1419,4 +1419,8 @@ function cross_sectional_carry_forecast_returns(pe::CrossSectionalFactorPrior,
     end
     return cross_sectional_forecast_window(pe, st.win, st.der)
 end
+function refit_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult)
+    return cross_sectional_pin_choice(pe.choice, refit_prior_fold(pe, rd))
+end
+
 public carry_folds

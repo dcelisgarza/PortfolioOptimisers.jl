@@ -122,10 +122,10 @@ rd59 = prices_to_returns(ptr59, price_ingestion(PriceIngestion(), X59))
         # the factor is the only line.
         B = TimeArray(collect(ts59), reshape(P59[:, 1], :, 1), ["bm"])
         prb = @test_logs (:warn,
-                          r"universe: `F` at 20 of 40 observations, in every column \(f\)\. Under") price_ingestion(PriceIngestion(),
-                                                                                                                    X59;
-                                                                                                                    F = F,
-                                                                                                                    B = B)
+                          r"benchmark: `F` at 20 of 40 observations, in every column \(f\)\. Under") price_ingestion(PriceIngestion(),
+                                                                                                                     X59;
+                                                                                                                     F = F,
+                                                                                                                     B = B)
         @test TimeSeries.timestamp(prb.B) == TimeSeries.timestamp(prb.X)
         @test size(values(prb.B), 2) == 1
         @test Matrix(prb.span) == Matrix(pr.span)

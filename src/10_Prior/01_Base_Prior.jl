@@ -390,8 +390,9 @@ This method is the entry point every caller uses, and it is written once here. W
 
  1. Check that `rd` carries asset returns, so that the estimator is not handed a `nothing` for `X`.
  2. When `pe` requires factor returns — when [`needs_factor_returns`](@ref) answers `true`, which walks the tree to a factor leaf under an outer estimator whose factor argument is optional — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the leaf's own signature one call later.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`. It is `rd.X`, or `rd.X - rd.B` when `brt` is `true`.
- 4. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne` and `rd.E` as keyword arguments alongside `kwargs`, and return the prior result it produces. A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
+ 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`. It is `rd.X`, or `rd.X - rd.B` when `brt` is `true`.
+ 5. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne` and `rd.E` as keyword arguments alongside `kwargs`, and return the prior result it produces. A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no `ReturnsResult`, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
@@ -407,6 +408,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
   - `!isnothing(rd.X)`.
   - The rules of [`benchmark_relative_returns`](@ref).
   - `!isnothing(rd.F)`, when `needs_factor_returns(pe) === true`.
+  - The rules of [`shared_series_rows`](@ref).
 
 # Returns
 
@@ -424,8 +426,36 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; brt::Bool = false, kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
+    rd = shared_series_view(rd, brt, needs_factor_returns(pe) === true)
     return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; iv = rd.iv,
                  ivpa = rd.ivpa, ne = rd.ne, E = rd.E, kwargs..., dims = 1)
+end
+"""
+    reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online}) -> Bool
+    reads_factor_returns(pe::Union{Nothing, <:AbstractPriorResult, <:AbstractEstimator}) -> Bool
+
+Answer whether a fit through `pe` reads the factor returns, so that a gap in them drops the observation, see [`shared_series_view`](@ref).
+
+A tree reads them when [`needs_factor_returns`](@ref) answers `true`. A tree whose factor argument is optional all the way down answers `nothing`, and it reads no factor return of its own. No prior, and a prior result that a caller computed before, read no factor return in this fit. Any other estimator in the place of a prior is a schedule that the nearest fold loop resolves, and the prior that it resolves to drops its own gaps at its entry, so the answer is `false`.
+
+# Arguments
+
+  - `pe`: The prior estimator, a prior result, or `nothing`.
+
+# Returns
+
+  - `flag::Bool`: `true` when the fit reads the factor returns.
+
+# Related
+
+  - [`needs_factor_returns`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online})
+    return needs_factor_returns(pe) === true
+end
+function reads_factor_returns(::Union{Nothing, <:AbstractPriorResult, <:AbstractEstimator})
+    return false
 end
 """
     prior_regression_remedy

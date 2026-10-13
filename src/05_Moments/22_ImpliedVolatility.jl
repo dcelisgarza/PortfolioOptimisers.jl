@@ -922,6 +922,55 @@ function coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector)
     return ivpa[cmsk]
 end
 """
+    reads_implied_volatility(est::Union{<:AbstractEstimator, <:AbstractCovarianceEstimator}) -> Bool
+    reads_implied_volatility(est::ImpliedVolatility) -> Bool
+    reads_implied_volatility(v::AbstractVector) -> Bool
+    reads_implied_volatility(p::Pair) -> Bool
+    reads_implied_volatility(x) -> Bool
+
+Answer whether an estimator tree holds an [`ImpliedVolatility`](@ref), which reads the implied volatility surface `iv`.
+
+The reduce-and-expand root of a moment verb, [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), reads the answer. A gap in the surface puts an asset outside the Coverage Universe only of a fit that reads the surface. A wrapper that holds an `ImpliedVolatility` and has no panel method of its own reaches the root, so the root must know that the tree reads the surface.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. An `ImpliedVolatility` answers `true`.
+ 2. Any other estimator answers `true` when one of its fields answers `true`. A covariance estimator subtypes `StatsBase.CovarianceEstimator` and not `AbstractEstimator`, so the method takes both roots.
+ 3. A vector of estimators answers `true` when one of its entries answers `true`, and a vector of numbers answers `false`. A `Pair` answers for its value.
+ 4. Everything else answers `false`.
+
+# Arguments
+
+  - `est`: An estimator, or one field of an estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the tree reads the implied volatility surface.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`coverage_keyword_reduction`](@ref)
+"""
+function reads_implied_volatility(est::Union{<:AbstractEstimator,
+                                             <:AbstractCovarianceEstimator})
+    return any(f -> reads_implied_volatility(getfield(est, f)), fieldnames(typeof(est)))
+end
+function reads_implied_volatility(::ImpliedVolatility)
+    return true
+end
+function reads_implied_volatility(v::AbstractVector)
+    return eltype(v) <: Number ? false : any(reads_implied_volatility, v)
+end
+function reads_implied_volatility(p::Pair)
+    return reads_implied_volatility(last(p))
+end
+function reads_implied_volatility(::Any)
+    return false
+end
+"""
     Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
                    dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
                    ivpa::Option{<:Num_VecNum} = nothing,
