@@ -159,7 +159,7 @@ end
 
 Return the residual variance of each asset that `pr.sigma` carries and the scenarios `pr.X` do not.
 
-A time-series factor prior makes its scenarios from the regression, `F * transpose(M) .+ transpose(b)`, and adds the residual block to the covariance alone: [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) under `rsd = true`. The variance of asset ``i`` in `pr.sigma` is then the variance of its scenarios plus ``\\delta_{i}``. An entropy pooling view row reads the scenarios, so a row that states a moment of `pr.sigma` takes ``\\delta_{i}`` off its target, and a row that reads the variance of the scenarios reads ``\\sigma_{i}^{2} - \\delta_{i}``. [`scenario_factory`](@ref) holds the residual block of this fit in the posterior, so the posterior covariance meets the target of the view (#1649).
+A time-series factor prior makes its scenarios from the regression, `F * transpose(M) .+ transpose(b)`, and adds the residual block to the covariance alone: [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) under `rsd = true`. The variance of asset ``i`` in `pr.sigma` is then the variance of its scenarios plus ``\\delta_{i}``. An entropy pooling view row reads the scenarios, so a row that states a moment of `pr.sigma` takes ``\\delta_{i}`` off its target, and a row that reads the variance of the scenarios reads ``\\sigma_{i}^{2} - \\delta_{i}``. [`scenario_factory`](@ref) holds the residual block of this fit in the posterior, so the posterior covariance meets the target of the view.
 
 A prior with no regression, and a cross-sectional factor prior, whose scenarios carry the idiosyncratic returns, add no block beyond the scenarios. Their answer is zero.
 
