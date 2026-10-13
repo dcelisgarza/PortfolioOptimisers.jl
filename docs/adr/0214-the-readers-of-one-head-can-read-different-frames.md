@@ -108,4 +108,6 @@ features are loadings of the raw returns.
 - ADR 0211: the readers that hold `x_src`.
 - ADR 0212: the values of `x_src`, and the reason for `DataSource()`.
 - ADR 0213: `brt` is removed in one break.
+- ADR [0215](0215-the-paths-that-read-the-frame-of-a-head-read-the-source-of-a-reader.md): the group
+  of decision 5 also decides when a head drops a gap of a vector benchmark (#1683).
 - `assert_benchmark_frame`, `pipe_prior_brt`, `asset_panel`, `resolve_factor_regression`.

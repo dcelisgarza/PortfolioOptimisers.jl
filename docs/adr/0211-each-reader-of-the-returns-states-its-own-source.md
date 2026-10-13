@@ -136,5 +136,8 @@ The maintainer decided on 2026-10-13.
   deprecation.
 - ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md): the readers of one head
   can read different frames, and a forgotten raw reader warns (#1682).
+- ADR [0215](0215-the-paths-that-read-the-frame-of-a-head-read-the-source-of-a-reader.md): the online
+  fold, the meta outer problem and the forecast evaluation (#1683). `covariance_forecast_evaluation`
+  takes an `x_src` keyword, the one exception to decision 1.
 - `returns_matrix_picker`, `benchmark_relative_returns`, `resolve_factor_regression`,
   `head_frame_returns`.

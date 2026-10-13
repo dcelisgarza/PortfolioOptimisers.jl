@@ -91,5 +91,7 @@ The maintainer decided on 2026-10-13.
 - ADR 0204: the current rule for `brt`.
 - ADR 0211: the owners that lose `brt`.
 - ADR 0212: the values of `x_src`.
+- ADR [0215](0215-the-paths-that-read-the-frame-of-a-head-read-the-source-of-a-reader.md): the
+  record of `CovarianceForecastEvaluationResult`, which decision 4 waits on (#1683).
 - `docs/src/migration.md`, `CovarianceForecastEvaluationResult`, `covariance_forecast_evaluation`,
   `clusterise`, `sigma_ucs`.
