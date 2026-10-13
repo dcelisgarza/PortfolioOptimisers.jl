@@ -16,7 +16,7 @@ The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). Ther
 The constructor derives the prior probabilities, and validates everything else.
 
  1. When `w` is `nothing`, derive nothing. [`prior`](@ref) builds the uniform weights `1/T` at solve time, one per observation.
- 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. A mutable `w.values` is normalised in place with `LinearAlgebra.normalize!`, and an immutable one is replaced by a new `StatsBase.pweights` over the normalised values.
+ 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. A mutable `w.values` is normalised in place with `LinearAlgebra.normalize!`, and an immutable one is replaced by new weights of the same kind over the normalised values, through [`scenario_probabilities`](@ref). The kind fixes the bias correction of the posterior covariance, see [`ScenarioProbabilities`](@ref).
 
 # Fields
 
@@ -38,7 +38,7 @@ $(DocStringExtensions.FIELDS)
         rho_views::Option{<:LinearConstraintEstimator} = nothing,
         sets::Option{<:UniverseSets} = nothing,
         opt::NonCVaREP = OptimEntropyPooling(),
-        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
+        w::Option{<:ScenarioProbabilities} = nothing,
         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> EntropyPoolingPrior
@@ -263,7 +263,7 @@ EntropyPoolingPrior
                                  cov_views::Option{<:LinearConstraintEstimator},
                                  rho_views::Option{<:LinearConstraintEstimator},
                                  sets::Option{<:UniverseSets}, opt::NonCVaREP,
-                                 w::Option{<:StatsBase.ProbabilityWeights},
+                                 w::Option{<:ScenarioProbabilities},
                                  alg::AbstractEntropyPoolingAlgorithm,
                                  cache::Option{<:AbstractPartialFitState})
         assert_scenario_refit(pe)
@@ -272,7 +272,7 @@ EntropyPoolingPrior
             if ismutable(w.values)
                 LinearAlgebra.normalize!(w, 1)
             else
-                w = StatsBase.pweights(LinearAlgebra.normalize(w, 1))
+                w = scenario_probabilities(w, LinearAlgebra.normalize(w.values, 1))
             end
         end
         if !isnothing(mu_views) ||
@@ -336,7 +336,7 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              rho_views::Option{<:LinearConstraintEstimator} = nothing,
                              sets::Option{<:UniverseSets} = nothing,
                              opt::NonCVaREP = OptimEntropyPooling(),
-                             w::Option{<:StatsBase.ProbabilityWeights} = nothing,
+                             w::Option{<:ScenarioProbabilities} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
                              cache::Option{<:AbstractPartialFitState} = nothing)::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, evar_views, rlvar_views,

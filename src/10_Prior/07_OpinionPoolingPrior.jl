@@ -11,7 +11,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ## Required method name
 
-  - `compute_pooling(alg::OpinionPoolingAlgorithm, ow::VecNum, pw::MatNum) -> StatsBase.ProbabilityWeights`: Aggregate the columns of `pw` into one consensus scenario-weight vector.
+  - `compute_pooling(alg::OpinionPoolingAlgorithm, ow::VecNum, pw::MatNum) -> StatsBase.AnalyticWeights`: Aggregate the columns of `pw` into one consensus scenario-weight vector.
 
 ### Arguments
 
@@ -21,7 +21,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Returns
 
-  - `w::StatsBase.ProbabilityWeights`: ``T \\times 1`` consensus scenario weights, summing to 1.
+  - `w::StatsBase.AnalyticWeights`: ``T \\times 1`` consensus scenario weights, summing to 1. The kind fixes the bias correction of the covariance of the refit, see [`ScenarioProbabilities`](@ref).
 
 ### Examples
 
@@ -30,12 +30,12 @@ julia> struct MedianOpinionPooling <: PortfolioOptimisers.OpinionPoolingAlgorith
 
 julia> function PortfolioOptimisers.compute_pooling(::MedianOpinionPooling, ow, pw)
            w = vec(mapslices(PortfolioOptimisers.Statistics.median, pw; dims = 2))
-           return PortfolioOptimisers.StatsBase.pweights(w / sum(w))
+           return PortfolioOptimisers.StatsBase.aweights(w / sum(w))
        end
 
 julia> PortfolioOptimisers.compute_pooling(MedianOpinionPooling(), [0.5, 0.5],
                                            [0.5 0.25; 0.25 0.25; 0.25 0.5])
-3-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
+3-element AnalyticWeights{Float64, Float64, Vector{Float64}}:
  0.375
  0.25
  0.375
@@ -462,11 +462,11 @@ Under [`LogarithmicOpinionPooling`](@ref):
 
 # Validation
 
-  - The result carries no `Inf` and no `NaN`, checked by `StatsBase.pweights`. Under [`LogarithmicOpinionPooling`](@ref) an opinion probability of exactly `0` against a scenario weight of exactly `0` makes the product `0 * log(0)`, which is `NaN`, and the call raises `ArgumentError`. A zero scenario weight alone is safe: it gives `-Inf`, which exponentiates to a consensus weight of `0`.
+  - The result carries no `Inf` and no `NaN`, checked by `StatsBase.aweights`. Under [`LogarithmicOpinionPooling`](@ref) an opinion probability of exactly `0` against a scenario weight of exactly `0` makes the product `0 * log(0)`, which is `NaN`, and the call raises `ArgumentError`. A zero scenario weight alone is safe: it gives `-Inf`, which exponentiates to a consensus weight of `0`.
 
 # Returns
 
-  - `w::StatsBase.ProbabilityWeights`: Consensus posterior probability weights.
+  - `w::StatsBase.AnalyticWeights`: Consensus posterior probability weights. Their bias correction is the one of reliability weights, see [`ScenarioProbabilities`](@ref).
 
 # Related
 
@@ -475,12 +475,12 @@ Under [`LogarithmicOpinionPooling`](@ref):
   - [`LogarithmicOpinionPooling`](@ref)
 """
 function compute_pooling(::LinearOpinionPooling, ow::VecNum, pw::MatNum)
-    return StatsBase.pweights(pw * ow)
+    return StatsBase.aweights(pw * ow)
 end
 function compute_pooling(::LogarithmicOpinionPooling, ow::VecNum, pw::MatNum)
     u = log.(pw) * ow
     lse = LogExpFunctions.logsumexp(u)
-    return StatsBase.pweights(vec(exp.(u .- lse)))
+    return StatsBase.aweights(vec(exp.(u .- lse)))
 end
 """
     prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing,
@@ -580,7 +580,7 @@ Pools the opinions of an [`OpinionPoolingPrior`](@ref) into the consensus weight
 
 # Returns
 
-  - `w::StatsBase.ProbabilityWeights`: The consensus weights of the observations.
+  - `w::StatsBase.AnalyticWeights`: The consensus weights of the observations.
   - `ow::VecNum`: The penalised opinion probabilities, one entry per column of `pw`.
   - `pw::MatNum`: The weights of each opinion, one column per opinion.
 

@@ -139,6 +139,6 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sc2 => "`sc2`: Scaling parameter for constraint penalties.",#
                  :epalg => "`alg`: Entropy pooling algorithm.",#
                  :epoptalg => "`alg`: Entropy pooling optimisation algorithm.",#
-                 :ep_w => "`w`: Prior observation probability weights, on the observations the wrapped estimator **answers**, which a wrapped estimator that drops rows makes fewer than the observations it is given. If `nothing`, the wrapped result's own `w` is used, and the uniform weights where it carries none.",#
+                 :ep_w => "`w`: Prior observation probability weights, on the observations the wrapped estimator **answers**, which a wrapped estimator that drops rows makes fewer than the observations it is given. If `nothing`, the wrapped result's own `w` is used, and the uniform weights where it carries none. The posterior probabilities take the kind of these weights, `StatsBase.AnalyticWeights` or `StatsBase.ProbabilityWeights`, and the kind fixes the bias correction of the posterior covariance. Without a caller's `w`, the kind is the one of the wrapped result's `w` when it is one of the two, and `StatsBase.AnalyticWeights` otherwise. See [`ScenarioProbabilities`](@ref).",#
                  # Opinion pooling.
                  :opalg => "`alg`: Opinion pooling algorithm.")

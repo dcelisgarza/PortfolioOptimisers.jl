@@ -280,12 +280,13 @@ end
         @test_throws ArgumentError aweights([floatmax(), floatmax()])
         # The kind of the weights is kept where scaling leaves its corrected variance as it
         # was. A count would divide its corrected variance by sum(w) - 1 = 0, so FrequencyWeights
-        # become ProbabilityWeights, as does a kind the function cannot rebuild (#1523).
+        # become AnalyticWeights, as does a kind the function cannot rebuild (#1523, #1687).
         @test sw(aweights([2.0, 1.0, 1.0])) isa StatsBase.AnalyticWeights
         @test sw(StatsBase.weights([2.0, 1.0, 1.0])) isa StatsBase.Weights
-        @test sw(fweights([2, 1, 1])) == pweights([0.5, 0.25, 0.25])
-        @test sw(fweights([2, 1, 1])) isa StatsBase.ProbabilityWeights
-        @test sw(uweights(4)) == pweights(fill(0.25, 4))
+        @test sw(fweights([2, 1, 1])) == aweights([0.5, 0.25, 0.25])
+        @test sw(fweights([2, 1, 1])) isa StatsBase.AnalyticWeights
+        @test sw(uweights(4)) == aweights(fill(0.25, 4))
+        @test sw(uweights(4)) isa StatsBase.AnalyticWeights
         @test sw(pweights(1:4)) == [0.1, 0.2, 0.3, 0.4]
         @test isnothing(sw(nothing))
     end

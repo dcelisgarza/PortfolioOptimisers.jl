@@ -162,7 +162,7 @@ Put the probabilities `w` of the scenarios of a capped Prior Result on the `t` o
  1. A `nothing` `w` returns `nothing`.
  2. Otherwise take `s = length(w)`, and refuse `s > t`.
  3. When `s == t`, the cap removed no row: return `w`.
- 4. Otherwise return the probability weights of `t - s` zeros followed by `w`.
+ 4. Otherwise return `t - s` zeros followed by `w`, through [`scenario_probabilities`](@ref): in the kind of `w` when it is a [`ScenarioProbabilities`](@ref), and as `StatsBase.AnalyticWeights` otherwise.
 
 # Arguments
 
@@ -194,7 +194,7 @@ function scenario_weights(w::ObsWeights, t::Integer)
     if s == t
         return w
     end
-    return StatsBase.pweights(vcat(zeros(eltype(w), t - s), w))
+    return scenario_probabilities(w, vcat(zeros(eltype(w), t - s), w))
 end
 """
     cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatNum,

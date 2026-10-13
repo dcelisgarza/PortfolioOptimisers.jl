@@ -223,7 +223,10 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views), rd)
     r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
                        alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
-    @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
+    # The view pins the uncorrected second moment, and the variance reports the corrected
+    # one, so it lands at the correction of the posterior weights above the target (#1687).
+    @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007 / (1 - sum(abs2, pr.w)),
+                   rtol = 1e-6)
     @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views,
@@ -234,7 +237,7 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views), rd)
     @test isapprox(pr.mu[1], pr0.mu[1] * 1.7, rtol = 5e-6)
-    @test isapprox(pr.sigma[1, 1], 0.0008, rtol = 1e-3)
+    @test isapprox(pr.sigma[1, 1], 0.0008 / (1 - sum(abs2, pr.w)), rtol = 1e-6)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views), rd).w, rtol = 5e-4)
@@ -286,7 +289,10 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views, kt_views = kt_views), rd)
     @test pr.mu[1] <= 1.5 * pr0.mu[1]
-    @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
+    @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1] / (1 - sum(abs2, pr.w)),
+                   rtol = 1e-5)
+    # The staged algorithm fixes the variance at the corrected value of the stage before, so
+    # the kurtosis moves with the correction of the posterior weights, by 5.3e-6 (#1687).
     @test isapprox(HighOrderMoment(; w = pr.w,
                                    alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                      ve = SimpleVariance(;
@@ -302,7 +308,7 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                                                                                          1],
                                                                                                     :,
                                                                                                     1)) *
-                   0.87, rtol = 5e-6)
+                   0.87, rtol = 1e-5)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -1782,7 +1788,7 @@ end
                p -> BayesianBlackLittermanPrior(; pe = FactorPrior(; pe = p), views = fv2,
                                                 sets = sets2))
         pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = mk(fpool)), X, F)
-        ref = prior(mk(PortfolioOptimisers.factory(EmpiricalPrior(), pweights(copy(pr.w)))),
+        ref = prior(mk(PortfolioOptimisers.factory(EmpiricalPrior(), aweights(copy(pr.w)))),
                     X, F)
         @test isapprox(pr.mu, ref.mu, rtol = 1e-10)
         @test isapprox(pr.sigma, ref.sigma, rtol = 1e-10)
@@ -1793,7 +1799,7 @@ end
                                                                      a_views = av,
                                                                      f_views = fv2,
                                                                      sets = sets2)), X, F)
-    ew = PortfolioOptimisers.factory(EmpiricalPrior(), pweights(copy(pr.w)))
+    ew = PortfolioOptimisers.factory(EmpiricalPrior(), aweights(copy(pr.w)))
     ref = prior(AugmentedBlackLittermanPrior(; a_pe = ew, f_pe = ew, a_views = av,
                                              f_views = fv2, sets = sets2), X, F)
     @test isapprox(pr.mu, ref.mu, rtol = 1e-10)
@@ -1985,7 +1991,8 @@ end
     pr1 = prior(factory(EmpiricalPrior(), pr.w), X[21:end, :])
     @test isapprox(pr.mu, pr1.mu; rtol = 1e-12)
     @test isapprox(pr.sigma, pr1.sigma; rtol = 1e-12)
-    @test isapprox(pr.sigma[3, 3], 2.0e-5 * 40 / 39; rtol = 1e-6)
+    # The zero weights add nothing to the Kish count of the posterior weights (#1687).
+    @test isapprox(pr.sigma[3, 3], 2.0e-5 / (1 - sum(abs2, pr.w)); rtol = 1e-6)
     # With no view, a caller's prior probabilities are the posterior.
     pr = prior(EntropyPoolingPrior(; pe = cap, w = w0), X)
     @test pr.w == w0
@@ -2004,4 +2011,63 @@ end
     @test PortfolioOptimisers.scenario_weights(w0, 40) === w0
     @test isnothing(PortfolioOptimisers.scenario_weights(nothing, 60))
     @test_throws DimensionMismatch PortfolioOptimisers.scenario_weights(w0, 30)
+end
+@testset "A posterior covariance takes the correction of reliability weights (#1687)" begin
+    pr0 = prior(EmpiricalPrior(), rd)
+    mu_views = LinearConstraintEstimator(; val = "AAPL == 0.002")
+    # With no caller's `w`, the posterior probabilities are `AnalyticWeights`, whose
+    # correction is `n_eff / (n_eff - 1)` with the Kish count `n_eff = 1 / sum(p .^ 2)`.
+    pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views), rd)
+    @test pr.w isa StatsBase.AnalyticWeights
+    @test isapprox(pr.sigma, StatsBase.cov(pr.X, pr.w, 1; corrected = true); rtol = 1e-12)
+    n_eff = inv(sum(abs2, pr.w))
+    sp = StatsBase.cov(pr.X, StatsBase.pweights(pr.w.values), 1; corrected = true)
+    @test isapprox(pr.sigma ./ sp, fill((n_eff / (n_eff - 1)) / (T / (T - 1)), size(sp));
+                   rtol = 1e-10)
+    @test n_eff < T
+    # Under uniform weights the two corrections are equal, so no view moves no moment.
+    pr = prior(EntropyPoolingPrior(; sets = sets), rd)
+    @test pr.w isa StatsBase.AnalyticWeights
+    @test isapprox(pr.sigma, pr0.sigma; rtol = 1e-12)
+    # A caller's weights keep their kind, and the posterior takes it.
+    for wc in (StatsBase.pweights(fill(1.0, T)), StatsBase.aweights(fill(1.0, T)))
+        pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views, w = wc), rd)
+        @test typeof(pr.w).name.wrapper === typeof(wc).name.wrapper
+        @test isapprox(pr.sigma, StatsBase.cov(pr.X, pr.w, 1; corrected = true);
+                       rtol = 1e-12)
+        pr = prior(MeucciEntropyPoolingPrior(; sets = sets, mu_views = mu_views, w = wc),
+                   rd)
+        @test typeof(pr.w).name.wrapper === typeof(wc).name.wrapper
+    end
+    # The JuMP route, the Meucci prior and an opinion pool answer the same kind.
+    jopt = JuMPEntropyPooling(; slv = slv)
+    for pe in (EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views),
+               MeucciEntropyPoolingPrior(; sets = sets, mu_views = mu_views),
+               OpinionPoolingPrior(;
+                                   pes = [EntropyPoolingPrior(; sets = sets, mu_views = mu_views),
+                                          EntropyPoolingPrior(; sets = sets,
+                                                              mu_views = LinearConstraintEstimator(;
+                                                                                                   val = "MSFT == 0.002"))]))
+        pr = prior(pe, rd)
+        @test pr.w isa StatsBase.AnalyticWeights
+        @test isapprox(pr.sigma, StatsBase.cov(pr.X, pr.w, 1; corrected = true);
+                       rtol = 1e-10)
+    end
+    # The helpers that write the kind.
+    pw = StatsBase.pweights([0.5, 0.5])
+    @test PortfolioOptimisers.scenario_probabilities(nothing, [0.25, 0.75]) isa
+          StatsBase.AnalyticWeights
+    @test PortfolioOptimisers.scenario_probabilities(pw, [0.25, 0.75]) isa
+          StatsBase.ProbabilityWeights
+    @test PortfolioOptimisers.scenario_probabilities(pw) === pw
+    @test PortfolioOptimisers.scenario_probabilities([0.25, 0.75]) isa
+          StatsBase.AnalyticWeights
+    @test PortfolioOptimisers.scenario_weights(pw, 4) isa StatsBase.ProbabilityWeights
+    @test PortfolioOptimisers.scenario_weights(StatsBase.fweights([1, 1]), 4) isa
+          StatsBase.AnalyticWeights
+    @test PortfolioOptimisers.cross_sectional_scenario_weights(StatsBase.fweights([1, 3])) isa
+          StatsBase.AnalyticWeights
+    # A kind whose correction is not usable is refused by the bound of the field.
+    @test_throws TypeError EntropyPoolingPrior(; w = StatsBase.fweights(fill(1, T)))
+    @test_throws TypeError MeucciEntropyPoolingPrior(; w = StatsBase.weights(fill(1.0, T)))
 end

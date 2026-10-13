@@ -206,8 +206,8 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     return nothing
 end
 """
-    ep_prior_probabilities(w::Option{<:StatsBase.ProbabilityWeights},
-                           pr::AbstractPriorResult, Ti::Int)
+    ep_prior_probabilities(w::Option{<:ScenarioProbabilities}, pr::AbstractPriorResult,
+                           Ti::Int)
 
 Return the prior probabilities an entropy pooling fit starts from.
 
@@ -219,8 +219,8 @@ The three sources are read in order. A caller's `pe.w` wins, because it is the o
 
  1. Take `T` as `size(pr.X, 1)`, the observations the nested prior answered.
  2. When `w` is not `nothing`, check its length against `T` and return it.
- 3. When `w` is `nothing` and `pr.w` is not, return `pr.w` as `StatsBase.pweights`.
- 4. Otherwise return the uniform `1/T` as `StatsBase.pweights`.
+ 3. When `w` is `nothing` and `pr.w` is not, return `pr.w` through [`scenario_probabilities`](@ref), which keeps the kind of a [`ScenarioProbabilities`](@ref) and makes any other vector `StatsBase.AnalyticWeights`.
+ 4. Otherwise return the uniform `1/T` as `StatsBase.AnalyticWeights`. Their bias correction is the one of reliability weights, see [`ScenarioProbabilities`](@ref).
 
 # Arguments
 
@@ -234,7 +234,7 @@ The three sources are read in order. A caller's `pe.w` wins, because it is the o
 
 # Returns
 
-  - `w0::StatsBase.ProbabilityWeights`: Prior probabilities, on the rows of `pr.X`.
+  - `w0::ScenarioProbabilities`: Prior probabilities, on the rows of `pr.X`.
 
 # Related
 
@@ -247,13 +247,12 @@ function ep_prior_probabilities(::Nothing, pr::AbstractPriorResult, ::Int)
     return if isnothing(pr.w)
         T = size(pr.X, 1)
         iT = inv(T)
-        StatsBase.pweights(range(iT, iT; length = T))
+        StatsBase.aweights(range(iT, iT; length = T))
     else
-        StatsBase.pweights(pr.w)
+        scenario_probabilities(pr.w)
     end
 end
-function ep_prior_probabilities(w::StatsBase.ProbabilityWeights, pr::AbstractPriorResult,
-                                Ti::Int)
+function ep_prior_probabilities(w::ScenarioProbabilities, pr::AbstractPriorResult, Ti::Int)
     T = size(pr.X, 1)
     @argcheck(length(w) == T,
               DimensionMismatch("length(pe.w) ($(length(w))) must match the $T observations the nested prior answered. The estimator was handed $Ti. A prior that reweights observations states its prior probabilities on the scenarios its nested prior produced, so a nested prior that drops rows moves this axis."))
@@ -313,7 +312,7 @@ Where:
  4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
  5. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
  6. Raise when `Optim.converged` reports that the solve failed.
- 7. Recover the posterior probabilities from the minimiser, and return them as `StatsBase.pweights`.
+ 7. Recover the posterior probabilities from the minimiser, and return them through [`scenario_probabilities`](@ref), in the kind of `w`.
 
 # Arguments
 
@@ -334,7 +333,7 @@ Where:
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -357,7 +356,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     #! over the normalisation row alone: that answers `w` to solver tolerance where this
     #! answers it exactly, and `kld` is zero rather than a rounding of it. See issue #852.
     if isempty(epc)
-        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+        return scenario_probabilities(w)
     end
     T = length(w)
     factor = inv(sqrt(T))
@@ -433,7 +432,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return StatsBase.pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
+    return scenario_probabilities(w, w .* exp.(-transpose(A) * x .- one(eltype(w))))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -443,7 +442,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     #! over the normalisation row alone: that answers `w` to solver tolerance where this
     #! answers it exactly, and `kld` is zero rather than a rounding of it. See issue #852.
     if isempty(epc)
-        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+        return scenario_probabilities(w)
     end
     T = length(w)
     factor = inv(sqrt(T))
@@ -522,7 +521,8 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return StatsBase.pweights(exp.(log_p .- (one(eltype(log_p)) .+ transpose(A) * x)))
+    return scenario_probabilities(w,
+                                  exp.(log_p .- (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
@@ -550,7 +550,7 @@ This method registers no model entry of its own. It is the three-argument shape 
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 

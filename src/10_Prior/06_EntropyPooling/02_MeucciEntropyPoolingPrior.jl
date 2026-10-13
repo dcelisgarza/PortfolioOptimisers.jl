@@ -30,7 +30,7 @@ The comparison operator a view accepts depends on the moment it constrains: `var
 The constructor derives the prior probabilities, and validates everything else.
 
  1. When `w` is `nothing`, derive nothing. [`prior`](@ref) builds the uniform weights `1/T` at solve time, one per observation.
- 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. A mutable `w.values` is normalised in place with `LinearAlgebra.normalize!`, and an immutable one is replaced by a new `StatsBase.pweights` over the normalised values.
+ 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. A mutable `w.values` is normalised in place with `LinearAlgebra.normalize!`, and an immutable one is replaced by new weights of the same kind over the normalised values, through [`scenario_probabilities`](@ref). The kind fixes the bias correction of the posterior covariance, see [`ScenarioProbabilities`](@ref).
 
 # Fields
 
@@ -52,7 +52,7 @@ $(DocStringExtensions.FIELDS)
         ds_opt::Option{<:ConditionalValueatRiskEntropyPooling} = nothing,
         dm_opt::Option{<:OptimEntropyPooling} = nothing,
         opt::NonCVaREP = OptimEntropyPooling(),
-        w::Option{<:StatsBase.ProbabilityWeights} = nothing,
+        w::Option{<:ScenarioProbabilities} = nothing,
         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> MeucciEntropyPoolingPrior
@@ -257,8 +257,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
                                        sets::Option{<:UniverseSets},
                                        ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
                                        dm_opt::Option{<:OptimEntropyPooling},
-                                       opt::NonCVaREP,
-                                       w::Option{<:StatsBase.ProbabilityWeights},
+                                       opt::NonCVaREP, w::Option{<:ScenarioProbabilities},
                                        alg::AbstractEntropyPoolingAlgorithm,
                                        cache::Option{<:AbstractPartialFitState})
         assert_scenario_refit(pe)
@@ -267,7 +266,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
             if ismutable(w.values)
                 LinearAlgebra.normalize!(w, 1)
             else
-                w = StatsBase.pweights(LinearAlgebra.normalize(w, 1))
+                w = scenario_probabilities(w, LinearAlgebra.normalize(w.values, 1))
             end
         end
         if !isnothing(mu_views) ||
@@ -318,7 +317,7 @@ function MeucciEntropyPoolingPrior(;
                                    ds_opt::Option{<:ConditionalValueatRiskEntropyPooling} = nothing,
                                    dm_opt::Option{<:OptimEntropyPooling} = nothing,
                                    opt::NonCVaREP = OptimEntropyPooling(),
-                                   w::Option{<:StatsBase.ProbabilityWeights} = nothing,
+                                   w::Option{<:ScenarioProbabilities} = nothing,
                                    alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
                                    cache::Option{<:AbstractPartialFitState} = nothing)::MeucciEntropyPoolingPrior
     return MeucciEntropyPoolingPrior(pe, mu_views, var_views, cvar_views, sigma_views,
@@ -394,7 +393,7 @@ function ep_cvar_views_setup(cvar_views::Nothing, args...; kwargs...)
 end
 """
     ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
-                        sets::UniverseSets, w::StatsBase.ProbabilityWeights,
+                        sets::UniverseSets, w::ScenarioProbabilities,
                         ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
                         dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
 
@@ -451,7 +450,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once per stag
   - $(ref_dict[:meucciardiakeel2011])
 """
 function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
-                             sets::UniverseSets, w::StatsBase.ProbabilityWeights,
+                             sets::UniverseSets, w::ScenarioProbabilities,
                              ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
                              dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false,
                              ledger::Option{<:AbstractVector} = nothing)
@@ -526,7 +525,7 @@ function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
 end
 """
     ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict,
-                         w::StatsBase.ProbabilityWeights,
+                         w::ScenarioProbabilities,
                          opt::AbstractEntropyPoolingOptimiser)
 
 Solve the entropy pooling problem when no CVaR views are specified.
@@ -547,7 +546,7 @@ Solve the entropy pooling problem when no CVaR views are specified.
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -558,14 +557,13 @@ Solve the entropy pooling problem when no CVaR views are specified.
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
-function ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict,
-                              w::StatsBase.ProbabilityWeights,
+function ep_cvar_views_solve!(cvv::Nothing, epc::AbstractDict, w::ScenarioProbabilities,
                               opt::AbstractEntropyPoolingOptimiser)
     return entropy_pooling(w, epc, opt)
 end
 """
     ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict,
-                         w::StatsBase.ProbabilityWeights,
+                         w::ScenarioProbabilities,
                          opt::AbstractEntropyPoolingOptimiser)
 
 Solve the entropy pooling problem with Conditional Value-at-Risk (CVaR) view constraints.
@@ -624,7 +622,7 @@ Where:
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying CVaR view constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying CVaR view constraints, in the kind of `w`.
 
 # Related
 
@@ -640,8 +638,7 @@ Where:
 
   - $(ref_dict[:meucciardiakeel2011])
 """
-function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict,
-                              w::StatsBase.ProbabilityWeights,
+function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict, w::ScenarioProbabilities,
                               opt::AbstractEntropyPoolingOptimiser)
     (; X, B, alphas, d_opt) = cvv
     N = length(B)

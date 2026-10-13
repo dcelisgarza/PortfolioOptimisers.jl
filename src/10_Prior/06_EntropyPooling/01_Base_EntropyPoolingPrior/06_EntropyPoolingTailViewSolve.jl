@@ -70,7 +70,7 @@ Where:
  5. Re-read every tail view constraint at `w1` with [`ep_refine_tail_view`](@ref), which returns the tail view constraint and whether its surrogate row is tight there. Stop where every tail view constraint is tight.
  6. Solve again with the re-read tail view constraints, giving a new `w1`, and return to step 5. Take at most `iters` re-solves, so the last posterior can hold a slack row when the sequence has not settled.
  7. Check every tail view constraint at `w1` with [`ep_check_tail_window`](@ref), which warns where the window of an integer tail view constraint can bind.
- 8. Return `w1` as `StatsBase.pweights`.
+ 8. Return `w1`, which [`ep_jump_entropy_pooling`](@ref) answers in the kind of `w`.
 
 The re-solves are the sequential convex formulations' half of the work. Each re-read row is tight at the posterior it was read at and still holds there, so that posterior stays feasible and the divergence of the next one is at most its own.
 
@@ -95,7 +95,7 @@ A stop on tight rows means that the sequence reached a fixed point, not that the
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -123,7 +123,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     #! See the twin note in the `OptimEntropyPooling` methods: an empty view set states
     #! nothing, so the posterior is the prior. Issue #852.
     if isempty(epc) && isempty(tvs)
-        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+        return scenario_probabilities(w)
     end
     w1 = ep_jump_entropy_pooling(w, epc, tvs, opt)
     iters = ep_refine_iters(tvs)
@@ -240,7 +240,7 @@ Build and solve the entropy pooling model of one set of tail view constraints, o
  6. Add every view with [`ep_jump_views!`](@ref), which mutates `obj_expr` when a fixed equality is relaxed.
  7. Set the objective to `obj_expr` under [`ExpEntropyPooling`](@ref), and to `obj_expr` less `so` times the inner product of `x` with the prior log-probabilities under [`LogEntropyPooling`](@ref).
  8. Solve with `slv`, and raise when no solver configuration succeeds.
- 9. Clamp the value of `x` at zero, because the solver meets the non-negativity of step 4 to its feasibility tolerance only, and a mixed-integer solve can return an entry slightly below zero. Divide by its sum, and return it as `StatsBase.pweights`.
+ 9. Clamp the value of `x` at zero, because the solver meets the non-negativity of step 4 to its feasibility tolerance only, and a mixed-integer solve can return an entry slightly below zero. Divide by its sum, and return it through [`scenario_probabilities`](@ref), in the kind of `w`.
 
 # JuMP formulation
 
@@ -299,7 +299,7 @@ Where:
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -335,7 +335,7 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
     # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
-    return StatsBase.pweights(LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
+    return scenario_probabilities(w, LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
 end
 function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                                  opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -361,7 +361,7 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
     # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
-    return StatsBase.pweights(LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
+    return scenario_probabilities(w, LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
 end
 """
     ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::VecEPTV,

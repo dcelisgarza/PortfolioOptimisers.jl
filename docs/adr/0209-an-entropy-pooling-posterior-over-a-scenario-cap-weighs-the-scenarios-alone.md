@@ -46,8 +46,9 @@ removed, so that observation has the probability zero.
    scenarios.
 4. A weighted moment with a zero weight equals the same moment over the rows of positive weight.
    On the data of the issue, the refit equals `prior(factory(EmpiricalPrior(), w1), X[21:end, :])`
-   to `1.7e-21` in `sigma`, and to zero in `mu`. The bias correction of `sigma` counts the 40
-   scenarios, as the fit on the last rows does.
+   to `1.7e-21` in `sigma`, and to zero in `mu`. The bias correction of `sigma` reads the 40
+   scenarios alone, as the fit on the last rows does, because a zero weight adds nothing to it
+   (ADR 0210).
 
 ## Alternatives rejected
 

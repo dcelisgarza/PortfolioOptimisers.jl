@@ -964,7 +964,10 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views, opt = opt), rd)
     r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
                        alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
-    @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
+    # The view pins the uncorrected second moment, and the variance reports the corrected
+    # one, so it lands at the correction of the posterior weights above the target (#1687).
+    @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007 / (1 - sum(abs2, pr.w)),
+                   rtol = 1e-6)
     @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views,
@@ -975,7 +978,7 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views, opt = opt), rd)
     @test isapprox(pr.mu[1], pr0.mu[1] * 1.7, rtol = 5e-6)
-    @test isapprox(pr.sigma[1, 1], 0.0008, rtol = 1e-3)
+    @test isapprox(pr.sigma[1, 1], 0.0008 / (1 - sum(abs2, pr.w)), rtol = 1e-6)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views), rd).w, rtol = 5e-4)
@@ -1030,7 +1033,10 @@ end
                                    sigma_views = sigma_views, kt_views = kt_views,
                                    opt = opt), rd)
     @test pr.mu[1] <= 1.5 * pr0.mu[1]
-    @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
+    @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1] / (1 - sum(abs2, pr.w)),
+                   rtol = 1e-5)
+    # The staged algorithm fixes the variance at the corrected value of the stage before, so
+    # the kurtosis moves with the correction of the posterior weights, by 5.3e-6 (#1687).
     @test isapprox(HighOrderMoment(; w = pr.w,
                                    alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
                                                                      ve = SimpleVariance(;
@@ -1046,7 +1052,7 @@ end
                                                                                                          1],
                                                                                                     :,
                                                                                                     1)) *
-                   0.87, rtol = 5.0e-6)
+                   0.87, rtol = 1e-5)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views,

@@ -685,7 +685,7 @@ Divide the scenario weights of the factor prior of a Cross-Sectional Factor Prio
 
 A scenario weight vector states a probability measure over the scenarios only when it sums to one. A ratio estimator, such as the weighted mean ``\\sum_t w_t x_t / \\sum_t w_t``, gives the same answer at every scale of ``w``. A consumer that reads the weights as probabilities, such as a scenario risk measure that forms ``\\sum_t w_t L_t`` and divides by nothing, gives a wrong answer at every other scale. So the prior stores the weights divided by their sum, which every consumer reads correctly. A sum that is zero states no measure, so the function refuses it.
 
-The function keeps the kind of `StatsBase.Weights`, `AnalyticWeights` and `ProbabilityWeights`, as [`nothing_scalar_array_getindex`](@ref) does. The corrected variance of each of these kinds is the same at every scale of the weights. `FrequencyWeights` are counts, so their corrected variance divides by ``\\sum_t w_t - 1``, which is zero after the division. So `FrequencyWeights`, and a kind the function cannot rebuild such as `StatsBase.UnitWeights`, become `StatsBase.ProbabilityWeights`, as the prior probabilities of [`EntropyPoolingPrior`](@ref) do.
+The function keeps the kind of `StatsBase.Weights`, `AnalyticWeights` and `ProbabilityWeights`, as [`nothing_scalar_array_getindex`](@ref) does. The corrected variance of each of these kinds is the same at every scale of the weights. `FrequencyWeights` are counts, so their corrected variance divides by ``\\sum_t w_t - 1``, which is zero after the division. So `FrequencyWeights`, and a kind the function cannot rebuild such as `StatsBase.UnitWeights`, become `StatsBase.AnalyticWeights`, as the prior probabilities of [`EntropyPoolingPrior`](@ref) do by default. [`ScenarioProbabilities`](@ref) states the bias correction of that kind.
 
 # Mathematical definition
 
@@ -705,7 +705,7 @@ Where:
 
  1. `w` is `nothing`: return `nothing`, because no weights means unweighted.
  2. `w` is a `StatsBase.Weights`, `AnalyticWeights` or `ProbabilityWeights`: refuse a sum that is not positive, and return weights of the same kind over `w.values` divided by the sum.
- 3. `w` is any other `StatsBase.AbstractWeights`, `FrequencyWeights` among them: wrap its values in `StatsBase.ProbabilityWeights`, and apply step 2.
+ 3. `w` is any other `StatsBase.AbstractWeights`, `FrequencyWeights` among them: wrap its values in `StatsBase.AnalyticWeights`, and apply step 2.
 
 # Arguments
 
@@ -738,7 +738,7 @@ function cross_sectional_scenario_weights(w::Union{<:StatsBase.Weights,
     return Base.typename(typeof(w)).wrapper(w.values / s)
 end
 function cross_sectional_scenario_weights(w::StatsBase.AbstractWeights)
-    return cross_sectional_scenario_weights(StatsBase.pweights(collect(w)))
+    return cross_sectional_scenario_weights(StatsBase.aweights(collect(w)))
 end
 """
     cross_sectional_variance_counts(cnt::Nothing, csr::CrossSectionalRegression)
