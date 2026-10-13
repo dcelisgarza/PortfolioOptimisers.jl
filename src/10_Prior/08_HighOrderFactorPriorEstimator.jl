@@ -410,6 +410,8 @@ Compute high order factor prior moments for asset returns using a factor model.
 
     This is a consequence of Black-Litterman having no higher-moment update to apply, not of a value being discarded, and it is the same under [`BlackLittermanPrior`](@ref) — where the low order factor block is pre-view too, so the prior result happens to be uniform.
 
+    An entropy pooling prior and an opinion pooling prior differ. They state their views and opinions as the probabilities `w` of the scenarios, and the factor co-moments read `w`, so the views reach every order.
+
 # Mathematical definition
 
 Factor comoments are mapped to asset space through the loadings matrix ``\\mathbf{B}``:
@@ -432,14 +434,14 @@ Where:
   - ``\\hat{\\mathbf{M}}_{3,\\varepsilon}``: Residual coskewness correction from [`coskewness_residuals`](@ref), present only when `rsd` is `true`.
   - ``\\otimes``: Kronecker product.
 
-The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-default `alg` on either replaces its display above. Either estimator set to `nothing` drops its moment from both the asset result and the nested factor block.
+The factor comoments come from `pe.kte` and `pe.ske` fit on `F`. When the low order block answers the probabilities `w` of its scenarios, `w` replaces the observation weights of both estimators, and the fit reads the last `length(w)` rows of `F`, which `w` weighs. The residual corrections read no `w`, because the residuals belong to the model, and the views move the probabilities of the scenarios, not the model. A non-default `alg` on either replaces its display above. Either estimator set to `nothing` drops its moment from both the asset result and the nested factor block.
 
 # Algorithm
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
  2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole prior result to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the prior result, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on `pr` itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
- 3. Compute the factor square cokurtosis `f_kt` with `pe.kte` on `F`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
- 4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `pe.ske` on `F`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
+ 3. Read the probabilities `w = pr.w` of the scenarios, and cut `F` to the rows `Fw` that they weigh with [`scenario_rows`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
+ 4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `factory(pe.ske, w)` on `Fw`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
  5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the **full** asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The asset count is the full one because step 12 expands the co-moments, and the constructor validates the triple against `length(pr.mu)`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
  6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`.
  7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
@@ -487,6 +489,7 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
   - [`assert_factor_residual_config`](@ref): the shape check that runs on that declaration.
   - [`coskewness_residuals`](@ref)
   - [`cokurtosis_residuals`](@ref)
+  - [`scenario_rows`](@ref): the cut of step 3, to the rows of `F` that the probabilities of the scenarios weigh.
 """
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
@@ -531,13 +534,19 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     end
     posterior_X = rpr.X
     M = rpr.rr.M
-    f_kt = cokurtosis(pe.kte, F; kwargs...)
+    # A prior result that answers `w` weighs its scenarios with it, and the rows of `F` pair
+    # with the scenarios, so the factor co-moments read the same distribution as the factor
+    # moments that `mu` and `sigma` lift (#1650). The residual co-moments below stay with
+    # the model, as the residual block of `sigma` does (ADR 0205).
+    w = pr.w
+    Fw = scenario_rows(w, F, nothing)[1]
+    f_kt = cokurtosis(factory(pe.kte, w), Fw; kwargs...)
     if !isnothing(f_kt)
         kM = kron(M, M)
         posterior_kt = kM * f_kt * transpose(kM)
         matrix_processing!(pe.kte.mp, posterior_kt, posterior_X; kwargs...)
     end
-    f_sk, f_V = coskewness(pe.ske, F; kwargs...)
+    f_sk, f_V = coskewness(factory(pe.ske, w), Fw; kwargs...)
     if !isnothing(f_sk)
         if isnothing(kM)
             kM = kron(M, M)

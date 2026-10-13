@@ -118,9 +118,10 @@ agree to the tolerance of the solver: the weights to 8.9e-11, `mu` to 8.0e-12 an
   co-moments through the loadings that the views read. The residual block that it takes off
   `sigma` is read from `rr.esigma`, the block that the prior added under the weights of its
   fit. It was a variance of the residuals under the declared `ve` before, which missed the block
-  by 7.5 % under a caller's `w` and by 1.3 % under an opinion pool. Its factor co-moments still
-  read the weights of its own `kte` and `ske`, not `w1`, which
-  [#1650](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1650) records.
+  by 7.5 % under a caller's `w` and by 1.3 % under an opinion pool. Its factor co-moments read
+  `w1`, and its residual co-moments stay with the model as the residual block does, which
+  [ADR 0206](0206-a-high-order-prior-fits-its-co-moments-under-the-probabilities-of-the-scenarios.md)
+  states.
 - An `OpinionPoolingPrior` on the factors inside a `FactorPrior` re-pooled under `w1` while
   `scenario_factory` saw no data to pool on. On the data of #1652 the view of the host read
   0.0033538 for 0.004, and `mu` missed `X' * w` by 0.0011940. It now meets the view, and the

@@ -1838,3 +1838,106 @@ end
     @test typeof(PortfolioOptimisers.scenario_factory(EmpiricalPrior(), w, X, F, nothing)) ==
           typeof(PortfolioOptimisers.factory(EmpiricalPrior(), w))
 end
+
+@testset "A high order prior fits its co-moments under the posterior weights (#1650)" begin
+    # The data of #1650.
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    fsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["F$i" for i in 1:K]))
+    skv = LinearConstraintEstimator(; val = "A2 == 0.5")
+    ktv = LinearConstraintEstimator(; val = "A3 == 4.0")
+    # The standardised third and fourth moment of column `i` that the co-moments hold.
+    skew_of(h, i) = h.sk[i, (i - 1) * N + i] /
+                    sum(h.pr.w .* (X[:, i] .- sum(h.pr.w .* X[:, i])) .^ 2)^1.5
+    kurt_of(h, i) = h.kt[(i - 1) * N + i, (i - 1) * N + i] /
+                    sum(h.pr.w .* (X[:, i] .- sum(h.pr.w .* X[:, i])) .^ 2)^2
+    h0 = prior(HighOrderPriorEstimator(), X)
+    for ep in (EntropyPoolingPrior(; sets = sets, sk_views = skv, kt_views = ktv),
+               MeucciEntropyPoolingPrior(; sets = sets, sk_views = skv, kt_views = ktv))
+        h = prior(HighOrderPriorEstimator(; pe = ep), X)
+        w1 = h.pr.w
+        @test h.sk ≈ coskewness(factory(Coskewness(), w1), X)[1]
+        @test h.kt ≈ cokurtosis(factory(Cokurtosis(), w1), X)
+        @test !(h.sk ≈ h0.sk)
+        @test !(h.kt ≈ h0.kt)
+        @test isapprox(skew_of(h, 2), 0.5; rtol = 1e-6)
+        @test isapprox(kurt_of(h, 3), 4.0; rtol = 1e-6)
+    end
+    # With no view the posterior is the prior, and the co-moments are the plain ones.
+    h = prior(HighOrderPriorEstimator(; pe = EntropyPoolingPrior()), X)
+    @test isapprox(h.sk, h0.sk; rtol = 1e-12)
+    @test isapprox(h.kt, h0.kt; rtol = 1e-12)
+    # The posterior weights replace the weights of the co-moment estimators. A prior that
+    # answers no `w` leaves them as they are.
+    wu = pweights(collect(range(1, 2; length = size(X, 1))))
+    hw = HighOrderPriorEstimator(; pe = EntropyPoolingPrior(; sets = sets, sk_views = skv),
+                                 kte = Cokurtosis(; w = wu), ske = Coskewness(; w = wu))
+    h = prior(hw, X)
+    @test h.sk ≈ coskewness(factory(Coskewness(), h.pr.w), X)[1]
+    h = prior(HighOrderPriorEstimator(; kte = Cokurtosis(; w = wu)), X)
+    @test h.kt ≈ cokurtosis(Cokurtosis(; w = wu), X)
+    # An opinion pool over a Scenario Cap weighs the last rows alone.
+    op = OpinionPoolingPrior(;
+                             pes = [EntropyPoolingPrior(; sets = sets,
+                                                        mu_views = LinearConstraintEstimator(;
+                                                                                             val = "A2 == 0.002"))],
+                             pe1 = EmpiricalPrior(; max_scenarios = 40))
+    h = prior(HighOrderPriorEstimator(; pe = op), X)
+    @test length(h.pr.w) == 40
+    @test h.kt ≈ cokurtosis(factory(Cokurtosis(), h.pr.w), X[21:end, :])
+    @test h.sk ≈ coskewness(factory(Coskewness(), h.pr.w), X[21:end, :])[1]
+    # The rows cannot be fewer than the probabilities.
+    @test_throws DimensionMismatch PortfolioOptimisers.scenario_rows(h.pr.w, X[1:30, :],
+                                                                     nothing)
+    @test PortfolioOptimisers.scenario_rows(nothing, X, nothing) === (X, nothing)
+    # The online read refits a member that folds under the posterior weights too, because a
+    # state folds under equal weights.
+    ho = HighOrderPriorEstimator(;
+                                 pe = PortfolioOptimisers.Online(EntropyPoolingPrior(;
+                                                                                     sets = sets,
+                                                                                     sk_views = skv)))
+    o = PortfolioOptimisers.update_online_estimator(ho)
+    @test PortfolioOptimisers.supports_partial_fit(o.kte)
+    @test PortfolioOptimisers.supports_partial_fit(o.ske)
+    for i in axes(X, 1)
+        o = partial_fit!(o, view(X, i, :))
+    end
+    po = prior(o)
+    pb = prior(HighOrderPriorEstimator(;
+                                       pe = EntropyPoolingPrior(; sets = sets,
+                                                                sk_views = skv)), X)
+    @test isapprox(po.sk, pb.sk; rtol = 1e-8)
+    @test isapprox(po.kt, pb.kt; rtol = 1e-8)
+    # The factor co-moments read the posterior weights on the factor rows: a view on an asset
+    # over a factor prior, and a view on a factor inside one.
+    h = prior(HighOrderFactorPriorEstimator(;
+                                            pe = EntropyPoolingPrior(; sets = sets,
+                                                                     sk_views = skv,
+                                                                     pe = FactorPrior())),
+              X, F)
+    @test !(h.pr.w ≈ fill(inv(size(X, 1)), size(X, 1)))
+    @test h.fpr.sk ≈ coskewness(factory(Coskewness(), h.pr.w), F)[1]
+    @test h.fpr.kt ≈ cokurtosis(factory(Cokurtosis(), h.pr.w), F)
+    fv = LinearConstraintEstimator(; val = "F1 == 0.4")
+    h = prior(HighOrderFactorPriorEstimator(;
+                                            pe = FactorPrior(;
+                                                             pe = EntropyPoolingPrior(;
+                                                                                      sets = fsets,
+                                                                                      sk_views = fv))),
+              X, F)
+    w = h.pr.w
+    @test h.fpr.sk ≈ coskewness(factory(Coskewness(), w), F)[1]
+    @test isapprox(h.fpr.sk[1, 1] / sum(w .* (F[:, 1] .- sum(w .* F[:, 1])) .^ 2)^1.5, 0.4;
+                   rtol = 1e-6)
+    # With no view the factor co-moments are the plain ones.
+    h = prior(HighOrderFactorPriorEstimator(;
+                                            pe = EntropyPoolingPrior(; pe = FactorPrior())),
+              X, F)
+    hd = prior(HighOrderFactorPriorEstimator(), X, F)
+    @test isapprox(h.kt, hd.kt; rtol = 1e-10)
+    @test isapprox(h.sk, hd.sk; rtol = 1e-10)
+end

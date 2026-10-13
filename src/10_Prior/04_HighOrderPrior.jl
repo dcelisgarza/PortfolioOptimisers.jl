@@ -771,14 +771,17 @@ Where:
 
 `pe.kte` computes `kt` and `pe.ske` computes `sk`, so a non-default `alg` — a semi-comoment, an exponentially weighted one — replaces the displays above rather than refining them. `V` is the negative spectral coskewness of `sk`, and either estimator set to `nothing` drops its moment from the result.
 
+The low order block can answer the probabilities ``\\mathbf{w}`` of its scenarios, as an entropy pooling prior and an opinion pooling prior do. Then the co-moments are those of the same distribution: ``\\mathbf{Z}`` is centred on the mean under ``\\mathbf{w}``, and each ``\\frac{1}{T}`` above becomes ``\\frac{1}{\\boldsymbol{1}^\\intercal \\mathbf{w}} \\mathrm{diag}(\\mathbf{w})`` inside the product. ``\\mathbf{w}`` replaces the observation weights of `pe.kte` and `pe.ske`. A low order block that answers no ``\\mathbf{w}`` leaves them as they are.
+
 # Algorithm
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
  2. Compute the low order block `pr` with `pe.pe`, passing `F` through.
- 3. Compute the square cokurtosis `kt` with `pe.kte`. A `nothing` estimator gives a `nothing` moment.
- 4. Compute the coskewness `sk` and its negative spectral form `V` with `pe.ske`. A `nothing` estimator gives `nothing` for both.
- 5. Build the structure matrices at the asset count `size(pr.X, 2)` with [`dup_elim_sum_matrices`](@ref). Take all three when steps 3 and 4 both produced a moment, take `L2` and `S2` alone when step 3 produced one and step 4 did not, and take none otherwise. `D2` serves `sk` and the pair `L2`, `S2` serves `kt`, which is why the second case leaves `D2` as `nothing`.
- 6. Assemble the [`HighOrderPrior`](@ref) through its keyword constructor, carrying the processor of `pe.ske` from [`coskewness_processor`](@ref) as `skmp` when step 4 produced an `sk`. Every `@argcheck` of the constructor runs on the shapes steps 3 to 5 produced.
+ 3. Read the probabilities `w = pr.w` of its scenarios, and cut `X` and `pnl` to the rows that they weigh with [`scenario_rows`](@ref).
+ 4. Compute the square cokurtosis `kt` with `factory(pe.kte, w)`. A `nothing` estimator gives a `nothing` moment.
+ 5. Compute the coskewness `sk` and its negative spectral form `V` with `factory(pe.ske, w)`. A `nothing` estimator gives `nothing` for both.
+ 6. Build the structure matrices at the asset count `size(pr.X, 2)` with [`dup_elim_sum_matrices`](@ref). Take all three when steps 4 and 5 both produced a moment, take `L2` and `S2` alone when step 4 produced one and step 5 did not, and take none otherwise. `D2` serves `sk` and the pair `L2`, `S2` serves `kt`, which is why the second case leaves `D2` as `nothing`.
+ 7. Assemble the [`HighOrderPrior`](@ref) through its keyword constructor, carrying the processor of `pe.ske` from [`coskewness_processor`](@ref) as `skmp` when step 5 produced an `sk`. Every `@argcheck` of the constructor runs on the shapes steps 4 to 6 produced.
 
 # Arguments
 
@@ -792,6 +795,7 @@ Where:
 # Validation
 
   - `dims in (1, 2)`.
+  - Everything [`scenario_rows`](@ref) refuses.
 
 # Returns
 
@@ -802,6 +806,7 @@ Where:
   - [`HighOrderPriorEstimator`](@ref)
   - [`HighOrderPrior`](@ref)
   - [`prior`](@ref)
+  - [`scenario_rows`](@ref)
 """
 function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = nothing,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
@@ -811,8 +816,13 @@ function prior(pe::HighOrderPriorEstimator, X::MatNum, F::Option{<:MatNum} = not
     # third positional argument, the tensor is fitted on the Coverage Universe, and it is
     # expanded onto the full asset universe. `D2`, `L2` and `S2` are then sized from the full
     # width of `pr.X`, which is what the expanded tensors carry.
-    kt = cokurtosis(pe.kte, X, pnl; kwargs...)
-    sk, V = coskewness(pe.ske, X, pnl; kwargs...)
+    #
+    # A prior result that answers `w` weighs its scenarios with it, so the co-moments are
+    # those of the same distribution as `mu` and `sigma` (#1650).
+    w = pr.w
+    X, pnl = scenario_rows(w, X, pnl)
+    kt = cokurtosis(factory(pe.kte, w), X, pnl; kwargs...)
+    sk, V = coskewness(factory(pe.ske, w), X, pnl; kwargs...)
     return assemble_high_order_prior(pe, pr, kt, sk, V)
 end
 """
@@ -867,6 +877,103 @@ function assemble_high_order_prior(pe::HighOrderPriorEstimator, pr::AbstractPrio
                          skmp = isnothing(sk) ? nothing : coskewness_processor(pe.ske))
     assert_matched_coverage(hop)
     return hop
+end
+"""
+    scenario_rows(w::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
+    scenario_rows(w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel})
+
+Cuts the rows of `X` and of its Asset Panel to the scenarios that the probabilities `w` of a prior result weigh.
+
+A prior result answers `w` on the rows of its own `X`, and these can be fewer than the rows that the caller passed. A Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) drops the rows that its Descriptors warm up over. Both keep the last rows, so `w` weighs the last `length(w)` rows of `X`. A high order estimator fits its co-moments on the caller's `X` under `w`, so it needs these rows. A prior result that answers no `w` weighs every row the same, and the co-moments read every row.
+
+# Algorithm
+
+ 1. A `nothing` `w` returns `X` and `pnl` unchanged.
+ 2. Otherwise take `t = size(X, 1)` and `s = length(w)`, and refuse `s > t`.
+ 3. When `s == t`, return `X` and `pnl` unchanged.
+ 4. Otherwise take the rows `(t - s + 1):t`, and return the view of `X` and the view of `pnl` with [`asset_panel_view`](@ref) over them.
+
+# Arguments
+
+  - `w`: The probabilities of the scenarios of the prior result, or `nothing`.
+  - `X`: The returns that the caller passed (observations × assets), or the factor returns.
+  - $(arg_dict[:pnl_prior])
+
+# Validation
+
+  - `length(w) <= size(X, 1)`. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `X′::MatNum`: The rows of `X` that `w` weighs.
+  - `pnl′::Option{<:AssetPanel}`: The Asset Panel over the same rows, or `nothing`.
+
+# Related
+
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`asset_panel_view`](@ref)
+  - [`read_comoment`](@ref)
+"""
+function scenario_rows(::Nothing, X::MatNum, pnl::Option{<:AssetPanel})
+    return X, pnl
+end
+function scenario_rows(w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel})
+    t = size(X, 1)
+    s = length(w)
+    @argcheck(s <= t,
+              DimensionMismatch("the prior result answers $s scenario probabilities, but the returns hold $t observations. A prior answers `w` on the last rows of the returns it was given, so `w` cannot be longer than the returns."))
+    if s == t
+        return X, pnl
+    end
+    idx = (t - s + 1):t
+    return view(X, idx, :), asset_panel_view(pnl, idx, :, nothing)
+end
+"""
+    read_comoment(f, est, w::Nothing, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
+    read_comoment(f, est, w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
+
+Reads a co-moment of a [`HighOrderPriorEstimator`](@ref) out of its fold, under the probabilities of the scenarios of the embedded prior result.
+
+A prior result that answers no `w` weighs every row the same, so the member answers as [`read_member`](@ref) answers it: from its state where it folded, or by a refit over the rows of the buffer. A prior result that answers a `w`, such as an entropy pooling prior or an opinion pooling prior, weighs its scenarios with it. A state folds the rows under equal weights, and it cannot read `w`, so the member is refitted under `w` in every case, as the batch fit does.
+
+# Algorithm
+
+ 1. A `nothing` `w` reads the member with [`read_member`](@ref).
+ 2. Otherwise cut `X` and `pnl` to the rows that `w` weighs with [`scenario_rows`](@ref).
+ 3. Give `w` to the member with [`factory`](@ref), and call `f` on it over the cut rows. The batch verb does not read the state of the member.
+
+# Arguments
+
+  - `f`: The batch verb of the member, [`cokurtosis`](@ref) or [`coskewness`](@ref).
+  - `est`: The member, or `nothing`.
+  - `w`: The probabilities of the scenarios of the embedded prior result, or `nothing`.
+  - `X`: The rows that the embedded prior folded.
+  - `pnl`: The Asset Panel of the rows, or `nothing`.
+  - `kwargs...`: Additional keyword arguments, forwarded to the verb.
+
+# Validation
+
+  - Everything [`scenario_rows`](@ref) refuses.
+
+# Returns
+
+  - `val`: The co-moment, in the shape that `f` returns.
+
+# Related
+
+  - [`read_member`](@ref)
+  - [`scenario_rows`](@ref)
+  - [`HighOrderPriorEstimator`](@ref)
+"""
+function read_comoment(f::F, est, ::Nothing, X::MatNum, pnl::Option{<:AssetPanel};
+                       kwargs...) where {F}
+    return read_member(f, est, X, pnl; kwargs...)
+end
+function read_comoment(f::F, est, w::ObsWeights, X::MatNum, pnl::Option{<:AssetPanel};
+                       kwargs...) where {F}
+    X, pnl = scenario_rows(w, X, pnl)
+    return f(factory(est, w), X, pnl; dims = 1, kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1031,7 +1138,7 @@ end
 
 Reads a [`HighOrderPriorEstimator`](@ref) out of its fold, with no data matrix.
 
-The embedded prior answers first. A co-moment that folded answers from its state. The method refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
+The embedded prior answers first. A co-moment that folded answers from its state. The method refits a co-moment that did not fold over the rows that the embedded prior folded, which [`prior_returns_buffer`](@ref) reads. When the embedded result answers the probabilities `w` of its scenarios, the method refits both co-moments under `w`, folded or not, because a state cannot read them. [`assemble_high_order_prior`](@ref) then builds the result as the batch method does.
 
 The refit reads the folded rows and not `pr.X`, because `pr.X` holds the scenarios of the embedded prior's result, and these are not always the folded rows. A Scenario Cap on the embedded prior keeps only the last rows, and the scenario fill writes zeros into the early rows of an asset that lists late. The batch method fits both co-moments over every row that the caller passes, `NaN` entries included, so a refit over `pr.X` differs from it in both cases. Under an [`Online`](@ref) window the buffer holds the last `max_history` rows, which is the window that the batch equal of that route fits over. The estimator keeps no copy of the rows, because the embedded prior already holds them.
 
@@ -1056,8 +1163,8 @@ The equality holds for the embedded result and for every co-moment, the ones tha
  1. Read the embedded result `pr` out of `pe.pe` with [`prior`](@ref).
  2. Read the rows that the embedded prior folded with [`prior_returns_buffer`](@ref) and [`sample_buffer`](@ref), giving `X`.
  3. Rebuild the Asset Panel of the rows from the same buffer with [`buffer_asset_panel`](@ref), giving `pnl`, as the batch method gives `rd.pnl` to both co-moments.
- 4. Read `kt` out of `pe.kte` through [`read_member`](@ref), which refits it over `X` and `pnl` where it did not fold.
- 5. Read `sk` and `V` out of `pe.ske` through [`read_member`](@ref), on the same terms.
+ 4. Read `kt` out of `pe.kte` through [`read_comoment`](@ref) under `pr.w`. It refits the member over `X` and `pnl` where it did not fold, and under `pr.w` where `pr.w` is not `nothing`.
+ 5. Read `sk` and `V` out of `pe.ske` through [`read_comoment`](@ref), on the same terms.
  6. Build the result with [`assemble_high_order_prior`](@ref), and return it.
 
 # Arguments
@@ -1069,6 +1176,7 @@ The equality holds for the embedded result and for every co-moment, the ones tha
 
   - Every condition that `prior(pe.pe)` with no data checks.
   - Everything [`prior_returns_buffer`](@ref) refuses.
+  - Everything [`scenario_rows`](@ref) refuses.
 
 # Returns
 
@@ -1078,6 +1186,7 @@ The equality holds for the embedded result and for every co-moment, the ones tha
 
   - [`HighOrderPriorEstimator`](@ref)
   - [`assemble_high_order_prior`](@ref)
+  - [`read_comoment`](@ref)
   - [`read_member`](@ref)
   - [`prior_returns_buffer`](@ref)
   - [`buffer_asset_panel`](@ref)
@@ -1088,8 +1197,8 @@ function prior(pe::HighOrderPriorEstimator; kwargs...)
     buf = prior_returns_buffer(pe.pe)
     X = sample_buffer(buf)
     pnl = buffer_asset_panel(buf)
-    kt = read_member(cokurtosis, pe.kte, X, pnl; kwargs...)
-    sk, V = read_member(coskewness, pe.ske, X, pnl; kwargs...)
+    kt = read_comoment(cokurtosis, pe.kte, pr.w, X, pnl; kwargs...)
+    sk, V = read_comoment(coskewness, pe.ske, pr.w, X, pnl; kwargs...)
     return assemble_high_order_prior(pe, pr, kt, sk, V)
 end
 
