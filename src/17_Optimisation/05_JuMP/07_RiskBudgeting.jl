@@ -925,7 +925,8 @@ Run the Risk Budgeting portfolio optimisation.
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(rb, "`optimise`")
-    return _optimise(rb, rd; str_names = str_names, save = save, kwargs...)
+    return _optimise(rb, shared_series_args(rb, rd)...; str_names = str_names, save = save,
+                     kwargs...)
 end
 
 @pipe_delegates RiskBudgeting opt

@@ -721,7 +721,8 @@ function optimise(hec::HierarchicalEqualRiskContribution{<:Any, <:Any, <:Any, <:
                                                          <:Any, Nothing}, rd::ReturnsResult;
                   branchorder::Symbol = :optimal, kwargs...)
     assert_batch_entry(hec, "`optimise`")
-    return _optimise(hec, rd; branchorder = branchorder, kwargs...)
+    return _optimise(hec, shared_series_args(hec, rd)...; branchorder = branchorder,
+                     kwargs...)
 end
 
 export HierarchicalEqualRiskContribution

@@ -15,8 +15,7 @@ meta head (its `brt` reaches only its own prior and clustering), SPOLC and OLDEM
 benchmark, and the two scores of #1664, which read the benchmark of a prediction directly.
 
 Not pinned: the refusals (no benchmark, a data benchmark under `brt`, a frame mismatch in a
-Pipeline), which the decision tickets of the map can change, and a vector benchmark gap under
-`x_src = :data`, which a head with no fallback refuses today (#1688).
+Pipeline), which the decision tickets of the map can change.
 =#
 @testset "The pinned outputs of the Excess Frame (#1679)" begin
     using Test, PortfolioOptimisers, StableRNGs, Dates, LinearAlgebra, Logging, Clarabel
@@ -368,12 +367,28 @@ Pipeline), which the decision tickets of the map can change, and a vector benchm
           () -> w(MeanRisk(; opt = excess_jump()), rdvg))
     case!("a vector benchmark gap, InverseVolatility", :exact,
           () -> w(excess_inverse_volatility(), rdvg))
-    # Under `x_src = :data` a head with no fallback refuses the gap rows today (#1688), so
-    # the hierarchical gap case reads the prior.
     case!("a vector benchmark gap, HierarchicalRiskParity, FactorPrior", :exact,
           () -> w(HierarchicalRiskParity(;
                                          opt = excess_hierarchical(; pe = FactorPrior(),
                                                                    x_src = :prior)), rdvg))
+    # Before #1688 a head with no fallback refused the gap rows under `x_src = :data`.
+    case!("a vector benchmark gap, HierarchicalRiskParity, FactorPrior, x_src = :data",
+          :exact,
+          () -> w(HierarchicalRiskParity(;
+                                         opt = excess_hierarchical(; pe = FactorPrior(),
+                                                                   x_src = :data)), rdvg))
+    case!("a vector benchmark gap, MeanRisk, a centrality constraint, x_src = :data",
+          :solved,
+          () -> w(MeanRisk(;
+                           opt = excess_jump(; x_src = :data, cte = CentralityConstraint())),
+                  rdvg))
+    for xs in (:prior, :data)
+        case!("a vector benchmark gap, NestedClustered, x_src = :$xs", :solved,
+              () -> w(excess_nested(; x_src = xs,
+                                    opti = MeanRisk(; opt = JuMPOptimiser(; slv = slv)),
+                                    opto = MeanRisk(; opt = JuMPOptimiser(; slv = slv))),
+                      rdvg))
+    end
     case!("a vector benchmark gap, covariance_forecast_evaluation", :exact,
           () -> cfe_columns(excess_cfe(Covariance(), rdvg, cv)))
     case!("a matrix benchmark gap, prior, EmpiricalPrior", :exact,
@@ -1126,6 +1141,18 @@ Pipeline), which the decision tickets of the map can change, and a vector benchm
                                          "a vector benchmark gap, HierarchicalRiskParity, FactorPrior" =>
                                              [0.1725984247, 0.09214020597, 0.1586536586,
                                               0.1404489137, 0.1801456696, 0.2560131274],
+                                         "a vector benchmark gap, HierarchicalRiskParity, FactorPrior, x_src = :data" =>
+                                             [0.1725984247, 0.09214020597, 0.08811564378,
+                                              0.2215346596, 0.1695979386, 0.2560131274],
+                                         "a vector benchmark gap, MeanRisk, a centrality constraint, x_src = :data" =>
+                                             [0.3420578213, 1.872490453e-13, 1.8715585e-13,
+                                              0.04753810905, 0.3917733612, 0.2186307084],
+                                         "a vector benchmark gap, NestedClustered, x_src = :prior" =>
+                                             [0.03370669226, 2.158196201e-9, 3.260282497e-9,
+                                              0.2469397674, 0.7073547925, 0.01199874237],
+                                         "a vector benchmark gap, NestedClustered, x_src = :data" =>
+                                             [0.03370669226, 2.158196201e-9, 3.260282497e-9,
+                                              0.2469397674, 0.7073547925, 0.01199874237],
                                          "a vector benchmark gap, covariance_forecast_evaluation" =>
                                              [-241.7315419, -257.2059513, -233.6965311,
                                               -229.8227483, -250.8981474, -217.0927741,

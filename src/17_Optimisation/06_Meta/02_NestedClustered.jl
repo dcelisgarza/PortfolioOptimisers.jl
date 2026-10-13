@@ -1007,8 +1007,8 @@ function optimise(nco::NestedClustered{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                   branchorder::Symbol = :optimal, str_names::Bool = false,
                   save::Bool = true, kwargs...)
     assert_batch_entry(nco, "`optimise`")
-    return _optimise(nco, rd; branchorder = branchorder, str_names = str_names, save = save,
-                     kwargs...)
+    return _optimise(nco, shared_series_args(nco, rd)...; branchorder = branchorder,
+                     str_names = str_names, save = save, kwargs...)
 end
 
 export NestedClusteredResult, NestedClustered

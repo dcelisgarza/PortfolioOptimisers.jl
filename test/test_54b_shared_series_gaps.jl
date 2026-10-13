@@ -1,4 +1,5 @@
-using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, TimeSeries
+using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, TimeSeries,
+      Clarabel
 
 # Gaps in the benchmark, the implied volatilities and the factor returns, issue #1672, under
 # ADR 0117 amended for #1672.
@@ -53,6 +54,54 @@ keep = setdiff(1:T, gap)
     # A benchmark with a gap at every observation leaves the fit nothing.
     rde = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = fill(NaN, T))
     @test_throws PO.IsEmptyError prior(EmpiricalPrior(), rde; brt = true)
+end
+
+@testset "A head with no fallback drops a vector benchmark gap under x_src = :data" begin
+    # Before #1688 the direct method of a head with `fb = nothing` solved on the raw panel,
+    # so a reader of the data under `x_src = :data` met the gap rows and refused them.
+    rng = StableRNG(1679)
+    Tg, Ng = 120, 6
+    Fg = 0.01 .* randn(rng, Tg, 2)
+    Lg = 0.5 .+ rand(rng, Ng, 2)
+    Xg = Fg * transpose(Lg) .+ 0.008 .* randn(rng, Tg, Ng) .+ 0.0005
+    Bg = 0.9 .* Fg[:, 1] .+ 0.002 .* randn(rng, Tg)
+    kg = setdiff(1:Tg, [10, 47])
+    nxg = ["A$i" for i in 1:Ng]
+    tsg = Date(2020, 1, 1) .+ Day.(0:(Tg - 1))
+    Bn = copy(Bg)
+    Bn[[10, 47]] .= NaN
+    rdg = ReturnsResult(; nx = nxg, X = Xg, nf = nf, F = Fg, nb = ["BM"], B = Bn, ts = tsg)
+    rdh = ReturnsResult(; nx = nxg, X = Xg[kg, :], nf = nf, F = Fg[kg, :], nb = ["BM"],
+                        B = Bg[kg], ts = tsg[kg])
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 check_sol = (; allow_local = true, allow_almost = true),
+                 settings = Dict("verbose" => false))
+    ho(xs, pe) = HierarchicalOptimiser(; pe = pe, x_src = xs, brt = true)
+    jo(xs; kw...) = JuMPOptimiser(; slv = slv, x_src = xs, brt = true, kw...)
+    heads = (("HierarchicalRiskParity, EmpiricalPrior",
+              (xs, fb) -> HierarchicalRiskParity(; opt = ho(xs, EmpiricalPrior()), fb = fb)),
+             ("HierarchicalRiskParity, FactorPrior",
+              (xs, fb) -> HierarchicalRiskParity(; opt = ho(xs, FactorPrior()), fb = fb)),
+             ("HierarchicalEqualRiskContribution",
+              (xs, fb) -> HierarchicalEqualRiskContribution(;
+                                                            opt = ho(xs, EmpiricalPrior()),
+                                                            fb = fb)),
+             ("MeanRisk, a centrality constraint",
+              (xs, fb) -> MeanRisk(; opt = jo(xs; cte = CentralityConstraint()), fb = fb)),
+             ("NestedClustered",
+              (xs, fb) -> NestedClustered(; x_src = xs, brt = true,
+                                          opti = MeanRisk(; opt = jo(xs)),
+                                          opto = MeanRisk(; opt = jo(xs)), fb = fb)))
+    @testset "$name, x_src = :$xs, fb = $(typeof(fb))" for (name, f) in heads,
+                                                           xs in (:prior, :data),
+                                                           fb in
+                                                           (nothing, InverseVolatility())
+
+        res = optimise(f(xs, fb), rdg)
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isnothing(res.fb)
+        @test res.w ≈ optimise(f(xs, fb), rdh).w
+    end
 end
 
 @testset "A covariance forecast evaluation under brt drops the observation" begin
