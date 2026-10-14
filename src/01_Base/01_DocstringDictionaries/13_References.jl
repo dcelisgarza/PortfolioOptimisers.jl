@@ -248,5 +248,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :neweywest1987 => "[neweywest1987](@cite) W. K. Newey and K. D. West. *A simple, positive semi-definite, heteroskedasticity and autocorrelation consistent covariance matrix*. Econometrica 55, 703–708 (1987).",#
                  :angchenxing2006 => "[angchenxing2006](@cite) A. Ang, J. Chen and Y. Xing. *Downside risk*. The Review of Financial Studies 19, 1191–1239 (2006).",#
                  :andrews1991 => "[andrews1991](@cite) D. W. K. Andrews. *Heteroskedasticity and autocorrelation consistent covariance matrix estimation*. Econometrica 59, 817–858 (1991).",#
-                 :demetrescu2026robust => "[demetrescu2026robust](@cite) M. Demetrescu, C. Hanck and R. Kruse-Becher. *Robust fixed-b inference in the presence of time-varying volatility*. Econometrics and Statistics 37, 154–173 (2026).",#
+                 :demetrescu2026robust => "[demetrescu2026robust](@cite) M. Demetrescu, C. Hanck and R. Kruse-Becher. *Robust fixed-b inference in the presence of time-varying volatility*. Econometrics and Statistics 37, 154–173 (2026).",
+                 :golubwelsch1969 => "[golubwelsch1969](@cite) G. H. Golub and J. H. Welsch. *Calculation of Gauss quadrature rules*. Mathematics of Computation 23, 221–230 (1969).",
+                 :trefethen2019 => "[trefethen2019](@cite) L. N. Trefethen. *Approximation Theory and Approximation Practice, Extended Edition*. SIAM (2019). Theorem 19.3.",#
                  :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).")

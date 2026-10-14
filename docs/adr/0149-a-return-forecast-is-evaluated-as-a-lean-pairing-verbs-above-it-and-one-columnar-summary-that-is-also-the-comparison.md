@@ -433,10 +433,23 @@ q = 0.05, min_obs = nothing, min_periods = nothing, rng = Random.default_rng(), 
   0.47 to 0.64.
 - **The kernel** is an extension point, `AbstractLongRunKernel` with `long_run_kernel_weight`. The
   library ships `BartlettKernel` and `QuadraticSpectralKernel`, the kernel of equation 2.7 of
-  `andrews1991`. The Bartlett form reads sums of windows of the series at any real bandwidth, so its
-  cost is linear in the length of the series. Any other kernel reads every pair, and its bootstrap
-  does one matrix product per block of draws. Both paths take the draws in the same order, so they
-  answer the same p-value from the same generator.
+  `andrews1991`. The weight of the quadratic spectral kernel reads its Taylor series for
+  `|z| < 1`, because the closed form cancels there: at a lag of `1e-4` bandwidths it lost nine
+  digits.
+- **The draws** are an extension point, the field `alg`, an `AbstractBootstrapDraws`. Every
+  algorithm draws the same law, and they differ in cost. `ObservationDraws` draws one multiplier per
+  finite entry. Under Bartlett it reads sums of windows, linear in the length of the series, and
+  under any other kernel one matrix product per block of draws, quadratic in it. Every kernel reads
+  its multipliers in one order, so two kernels compare on the same draws. The statistic of a draw
+  reads the multipliers only through the sum of the product and its sums against a factor of the
+  matrix of the weights. These sums are jointly Gaussian, so `QuadratureSumDraws` and
+  `EigenSumDraws` draw them directly. `QuadratureSumDraws` takes the factor from a Gauss-Legendre
+  rule on the band of the quadratic spectral kernel. Its node count depends on `b` alone, is the
+  least whose Bernstein-ellipse bound holds at `tol` (`trefethen2019`, Theorem 19.3), and a caller
+  can give a count. A fixed count is wrong at a small `b`: 32 nodes err by 0.57 at `b = 0.02`.
+  `EigenSumDraws` takes an exact eigen factor, so it reads every kernel. `QuadratureSumDraws` is the
+  default of the quadratic spectral kernel: at 5,000 dates and 9,999 draws a test took 22 s under
+  `ObservationDraws` and 26 ms under it. `ObservationDraws` is the default of every other kernel.
 - **The span** that the bandwidth and the history rule read is `FiniteEntrySpan`, the entries from
   the first finite one to the last, or `FullGridSpan`, every position of the grid. A missing entry
   inside the span keeps its position under both.
@@ -460,14 +473,22 @@ q = 0.05, min_obs = nothing, min_periods = nothing, rng = Random.default_rng(), 
   `resolve_rng`, so a seeded test is reproducible and the series of one summary take different
   draws.
 
-The oracle has the same change under review, with the quadratic spectral kernel at a bandwidth of
-`0.1` of the whole grid, 9,999 draws at a fixed seed, a 95% interval, and `NaN` under 20 dates or
-under 10 holding periods. `WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), b = 0.1,
-span = FullGridSpan(), n_sim = 9_999, seed = 0, min_obs = 20, min_periods = 10)` states each of
-these. Its divisor is not settled, and `ddof` states either one, so the t-statistic agrees with
-either. The two generators differ, so the p-values and the intervals agree in law and not draw
-for draw. Measured at 60 dates, that configuration rejected 5.7% of independent
-series and 7.2% of the AR(1) series, and its power against the same shift was 0.54.
+The oracle has the same test since v1.8.6: the quadratic spectral kernel at a bandwidth of `0.1` of
+the span from the first finite date to the last, the divisor `n`, 9,999 draws at a fixed seed of
+the same Gaussian sums as `QuadratureSumDraws`, and `NaN` under 20 dates, under 10 holding periods
+or for a series of constant value. `WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(),
+b = 0.1, n_sim = 9_999, seed = 0, min_obs = 20, min_periods = 10)` states each of these. On 181
+series of six processes and three lengths, its t-statistic equals the oracle's to `2.4e-13`, and
+the p-values and the intervals agree within the Monte Carlo error of two generators. Over 250 to
+1,000 no-skill series a cell, the sizes of the two agree within that error in every cell. Three
+differences are kept, because each is the
+correct rule. The oracle fixes 32 nodes, which holds at its fixed `b = 0.1` alone. Its interval
+excludes zero when `p < 0.05`, a test of level `499 / 10,000`, where `p <= q` gives the level `q`.
+It calls a series constant when its spread is under `1e-12` of its size, a choice of tolerance,
+where the library answers `NaN` for a series whose finite entries are all equal, exactly. The
+default of the library holds its size better under strong dependence: an AR(1) series of
+coefficient 0.8 at 60 dates is rejected 11.1% of the time against 16.4% for the oracle's rule, at
+a cost of power under weak dependence, 0.61 to 0.66 against 0.71 to 0.74 for independent series.
 
 The rule of 2026-09-19 stays available as `OverlapMeanTest`, with two corrections. The sum of the
 centred products reads deviations from the sample mean, so under the null hypothesis, a moving

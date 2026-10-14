@@ -175,7 +175,7 @@
                           :AbstractStepWeighting, :AbstractSystematicRepair,
                           :AbstractCarryRule, :AbstractUnseenMemberRule,
                           :AbstractMeanTestEstimator, :AbstractLongRunKernel,
-                          :AbstractMeanTestSpan])
+                          :AbstractMeanTestSpan, :AbstractBootstrapDraws])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

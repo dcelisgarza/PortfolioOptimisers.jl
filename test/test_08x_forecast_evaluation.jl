@@ -873,6 +873,12 @@ struct GenericBartlett <: PortfolioOptimisers.AbstractLongRunKernel end
 function PortfolioOptimisers.long_run_kernel_weight(::GenericBartlett, x::Real)
     return max(1 - abs(x), 0)
 end
+# The truncated kernel: its matrix of weights has negative eigenvalues, so an eigen factor of
+# it has a part whose squares subtract.
+struct TruncatedKernel <: PortfolioOptimisers.AbstractLongRunKernel end
+function PortfolioOptimisers.long_run_kernel_weight(::TruncatedKernel, x::Real)
+    return abs(x) <= 1 ? one(x) : zero(x)
+end
 
 @testset "A Mean Test reads the dependence of the series past its overlap" begin
     PO = PortfolioOptimisers
@@ -966,6 +972,20 @@ end
         @test_throws DomainError OverlapMeanTest(; q = 1.5)
         @test_throws DomainError OverlapMeanTest(; min_obs = 0)
         @test isnothing(PO.mean_test_rng(OverlapMeanTest()))
+        # The draws follow the kernel by default, and a kernel with no quadrature features
+        # refuses the quadrature draws.
+        @test mt.alg isa ObservationDraws
+        qs = WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel())
+        @test qs.alg isa QuadratureSumDraws
+        @test isnothing(qs.alg.tol) && isnothing(qs.alg.nodes)
+        @test WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(),
+                                    alg = EigenSumDraws()).alg isa EigenSumDraws
+        @test_throws ConflictingArgumentError WildBootstrapMeanTest(;
+                                                                    alg = QuadratureSumDraws())
+        @test_throws DomainError QuadratureSumDraws(; tol = 0)
+        @test_throws DomainError QuadratureSumDraws(; tol = 1)
+        @test_throws DomainError QuadratureSumDraws(; nodes = 0)
+        @test QuadratureSumDraws(; tol = 1e-10, nodes = 7).nodes == 7
         # A seed gives a private copy, so the caller's generator does not move.
         rng = StableRNG(3)
         r = PO.mean_test_rng(WildBootstrapMeanTest(; rng = rng, seed = 9))
@@ -1002,6 +1022,72 @@ end
                   25 / (12 * pi^2 * x^2) * (sin(z) / z - cos(z))
         end
         @test PO.long_run_kernel_weight(k, 2.0) < 0
+        # The closed form cancels near zero, and the Taylor series does not: against the
+        # integral form in 256-bit arithmetic, on both sides of `|z| = 1`.
+        qsb(x) = (z = 6 * big(pi) * x / 5; 3 * (sin(z) - z * cos(z)) / z^3)
+        for x in (1e-6, 1e-4, 1e-3, 0.05, 0.1, 0.13, 0.1326, 0.1327, 0.2, 0.5)
+            @test abs(PO.long_run_kernel_weight(k, x) - qsb(big(x))) / qsb(big(x)) < 4e-16
+        end
+        @test PO.long_run_kernel_weight(k, 1.0f-3) isa Float32
+    end
+
+    @testset "The quadrature features give the quadratic spectral weights" begin
+        k = QuadraticSpectralKernel()
+        for b in (1.0, 0.4, 0.1, 0.02, 0.01), P in (2, 37, 300)
+            B = b * P
+            Phi = PO.quadrature_kernel_features(k, QuadratureSumDraws(), P, B)
+            @test maximum(abs, Phi * Phi' - PO.kernel_weight_matrix(k, P, B)) < 1e-13
+        end
+        # The count is the least one whose bound holds, and it depends on `b` alone.
+        for b in (1.0, 0.4, 0.1, 0.02), tol in (1e-8, 1e-14)
+            c = 6 * pi / (5 * b)
+            N = PO.quadrature_node_count(c, tol)
+            @test PO.quadrature_error_bound(N, c) <= log(tol)
+            @test N == 1 || PO.quadrature_error_bound(N - 1, c) > log(tol)
+        end
+        # A count overrides the derivation, and a count too small gives a wrong kernel.
+        Phi = PO.quadrature_kernel_features(k, QuadratureSumDraws(; nodes = 4), 300, 30.0)
+        @test size(Phi, 2) == 8
+        @test maximum(abs, Phi * Phi' - PO.kernel_weight_matrix(k, 300, 30.0)) > 1e-3
+        u, w = PO.gauss_legendre_positive_nodes(5, Float64)
+        @test sum(w) ≈ 1
+        @test sum(w .* u .^ 4) ≈ 1 / 5
+    end
+
+    @testset "Every draw algorithm draws the same law of the statistic" begin
+        # A no-skill series of overlapping windows with gaps, and a series with a mean. The
+        # p-values of two algorithms are two Monte Carlo estimates of one probability, so
+        # they agree within the error of their difference.
+        e = randn(StableRNG(21), 184)
+        v = [sum(view(e, t:(t + 4))) / 5 for t in 1:180]
+        v[[1, 40, 41, 42, 133]] .= NaN
+        @test minimum(LinearAlgebra.eigvals(PO.kernel_weight_matrix(TruncatedKernel(), 40,
+                                                                    6.0))) < 0
+        M = 9_999
+        for x in (v, v .+ 0.08)
+            for (k, algs) in ((QuadraticSpectralKernel(),
+                               (ObservationDraws(), QuadratureSumDraws(), EigenSumDraws())),
+                              (BartlettKernel(), (ObservationDraws(), EigenSumDraws())),
+                              (GenericBartlett(), (ObservationDraws(), EigenSumDraws())),
+                              (TruncatedKernel(), (ObservationDraws(), EigenSumDraws())))
+                r = [PO.mean_test(WildBootstrapMeanTest(; kernel = k, alg = a, b = 0.15,
+                                                        n_sim = M), x, 5, StableRNG(j))
+                     for (j, a) in enumerate(algs)]
+                for s in r[2:end]
+                    @test s.t_stat == r[1].t_stat
+                    p = r[1].p_value
+                    @test abs(s.p_value - p) <= 4 * sqrt(2 * p * (1 - p) / M) + 2 / M
+                    @test isapprox(s.mean_ci_upper - s.mean_ci_lower,
+                                   r[1].mean_ci_upper - r[1].mean_ci_lower; rtol = 0.06)
+                end
+            end
+        end
+        # A constant series has no statistic under any algorithm.
+        for a in (QuadratureSumDraws(), EigenSumDraws())
+            mt = WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), alg = a,
+                                       n_sim = 19)
+            @test all(isnan, values(PO.mean_test(mt, fill(0.03, 40), 1, StableRNG(1))))
+        end
     end
 
     @testset "The Bartlett form reads the window sums at every real bandwidth" begin
@@ -1049,7 +1135,8 @@ end
         for k in (BartlettKernel(), QuadraticSpectralKernel(), GenericBartlett()),
             q in (0.05, 0.29)
 
-            mt = WildBootstrapMeanTest(; kernel = k, b = 0.37, n_sim = 199, q = q)
+            mt = WildBootstrapMeanTest(; kernel = k, alg = ObservationDraws(), b = 0.37,
+                                       n_sim = 199, q = q)
             a = PO.mean_test(mt, v, 1, StableRNG(8))
             h = hand_bootstrap(v, 0.37, k, 199, q, StableRNG(8))
             @test a.t_stat ≈ h.t_stat
