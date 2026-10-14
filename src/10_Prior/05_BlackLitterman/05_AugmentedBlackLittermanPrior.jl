@@ -100,7 +100,8 @@ $(DocStringExtensions.FIELDS)
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> AugmentedBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -142,6 +143,8 @@ Each axis is required only by the views that resolve names against it. A [`Black
   - If `a_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
   - If `f_views_conf` is not `nothing`, validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `a_pe`, `f_pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 The **length** of `w` is not validated here. It is a property of the returns matrix, which the constructor never sees, so a wrong length surfaces at [`prior`](@ref) as a `DimensionMismatch` out of [`equilibrium_mu`](@ref) and only when `l` is set.
 
@@ -197,7 +200,8 @@ AugmentedBlackLittermanPrior
                │           me ┼ SimpleExpectedReturns
                │              │   w ┴ nothing
                │      horizon ┼ nothing
-               │   fill_limit ┴ nothing
+               │   fill_limit ┼ nothing
+               │        x_src ┴ nothing
           f_pe ┼ EmpiricalPrior
                │           ce ┼ PortfolioOptimisersCovariance
                │              │   ce ┼ Covariance
@@ -219,7 +223,8 @@ AugmentedBlackLittermanPrior
                │           me ┼ SimpleExpectedReturns
                │              │   w ┴ nothing
                │      horizon ┼ nothing
-               │   fill_limit ┴ nothing
+               │   fill_limit ┼ nothing
+               │        x_src ┴ nothing
             mp ┼ MatrixProcessing
                │     pdm ┼ Posdef
                │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -256,7 +261,8 @@ AugmentedBlackLittermanPrior
              w ┼ nothing
             rf ┼ Float64: 0.0
              l ┼ nothing
-           tau ┴ nothing
+           tau ┼ nothing
+         x_src ┴ nothing
 ```
 
 ## The incremental fit
@@ -339,6 +345,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function AugmentedBlackLittermanPrior(a_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           f_pe::AbstractLowOrderPriorEstimator_A_AF,
                                           mp::AbstractMatrixProcessingEstimator,
@@ -349,7 +359,12 @@ This prior has no exact incremental recursion, so it takes the online step by **
                                           f_views_conf::Option{<:Num_VecNum},
                                           w::Option{<:VecNum}, rf::Number,
                                           l::Option{<:Number}, tau::Option{<:Number},
-                                          cache::Option{<:AbstractPartialFitState})
+                                          cache::Option{<:AbstractPartialFitState},
+                                          x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :AugmentedBlackLittermanPrior)
+        assert_inner_reader(a_pe, :a_pe, :AugmentedBlackLittermanPrior)
+        assert_inner_reader(f_pe, :f_pe, :AugmentedBlackLittermanPrior)
+        assert_inner_reader(re, :re, :AugmentedBlackLittermanPrior)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
@@ -361,8 +376,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
         return new{typeof(a_pe), typeof(f_pe), typeof(mp), typeof(re), typeof(a_views),
                    typeof(f_views), typeof(sets), typeof(a_views_conf),
                    typeof(f_views_conf), typeof(w), typeof(rf), typeof(l), typeof(tau),
-                   typeof(cache)}(a_pe, f_pe, mp, re, a_views, f_views, sets, a_views_conf,
-                                  f_views_conf, w, rf, l, tau, cache)
+                   typeof(cache), typeof(x_src)}(a_pe, f_pe, mp, re, a_views, f_views, sets,
+                                                 a_views_conf, f_views_conf, w, rf, l, tau,
+                                                 cache, x_src)
     end
 end
 function AugmentedBlackLittermanPrior(;
@@ -377,9 +393,11 @@ function AugmentedBlackLittermanPrior(;
                                       w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                       l::Option{<:Number} = nothing,
                                       tau::Option{<:Number} = nothing,
-                                      cache::Option{<:AbstractPartialFitState} = nothing)::AugmentedBlackLittermanPrior
+                                      cache::Option{<:AbstractPartialFitState} = nothing,
+                                      x_src::Option{<:AbstractReturnsSource} = nothing)::AugmentedBlackLittermanPrior
     return AugmentedBlackLittermanPrior(a_pe, f_pe, mp, re, a_views, f_views, sets,
-                                        a_views_conf, f_views_conf, w, rf, l, tau, cache)
+                                        a_views_conf, f_views_conf, w, rf, l, tau, cache,
+                                        x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -404,7 +422,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(::AugmentedBlackLittermanPrior)
     return (:a_pe, :f_pe, :mp, :re, :a_views, :f_views, :sets, :a_views_conf, :f_views_conf,
-            :w, :rf, :l, :tau)
+            :w, :rf, :l, :tau, :x_src)
 end
 # Expose `:me`, `:ce` from the asset prior `a_pe` and (renamed) `:f_me`, `:f_ce` from the
 # factor prior `f_pe` for transparent access (see [`@forward_properties`](@ref)).

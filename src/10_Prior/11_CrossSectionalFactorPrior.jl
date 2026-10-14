@@ -354,7 +354,7 @@ $(DocStringExtensions.FIELDS)
                               ex::FLoops.Transducers.Executor = ThreadedEx(),
                               choice::AbstractChoiceRule = BatchChoice(),
                               carry::AbstractCarryRule = FoldOrRefit(),
-                              cache::Option{<:AbstractPartialFitState} = nothing) -> CrossSectionalFactorPrior
+                              cache::Option{<:AbstractPartialFitState} = nothing, x_src::Option{<:AbstractReturnsSource} = nothing) -> CrossSectionalFactorPrior
 
 Keywords correspond to the struct's fields. `factors`, `neutralise` and `families` also take a dictionary, and the constructor collects each one into a vector of Pairs.
 
@@ -375,6 +375,8 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - A rule in `lambda` or in `c` that reads the Return Forecast history needs a fitted `rfe`, as [`assert_forecast_history_rule`](@ref) states. A rule of the wrong family is refused by the bound of the slot. The number a rule returns is checked when the prior resolves it.
   - [`OrthogonalPartCalibration`](@ref) in `ofit` needs a member that can fit the slope of the orthogonal part, as [`assert_orthogonal_forecast_fit`](@ref) states.
   - Under [`FoldOnly`](@ref) in `carry`, no part makes the cost of a step of the carry fold grow with the stream, as [`assert_carry_rule`](@ref) states.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -544,6 +546,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function CrossSectionalFactorPrior(factors::AbstractVector{<:Pair},
                                        neutralise::Option{<:AbstractVector{<:Pair}},
                                        families::Option{<:AbstractVector{<:Pair}},
@@ -566,7 +572,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        ex::FLoops.Transducers.Executor,
                                        choice::AbstractChoiceRule, carry::AbstractCarryRule,
-                                       cache::Option{<:AbstractPartialFitState})
+                                       cache::Option{<:AbstractPartialFitState},
+                                       x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :CrossSectionalFactorPrior)
+        assert_inner_reader(pe, :pe, :CrossSectionalFactorPrior)
         assert_closed_unit_interval(th, :th)
         assert_finite(bp, :bp)
         assert_nonneg(bp, :bp)
@@ -595,7 +604,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         fs = (factors, neutralise, families, unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp,
               srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,
               choice, carry, cache)
-        return new{map(typeof, fs)...}(fs...)
+        return new{map(typeof, fs)..., typeof(x_src)}(fs..., x_src)
     end
 end
 function CrossSectionalFactorPrior(; factors::Dict_VecPair,
@@ -630,13 +639,14 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                    choice::AbstractChoiceRule = BatchChoice(),
                                    carry::AbstractCarryRule = FoldOrRefit(),
-                                   cache::Option{<:AbstractPartialFitState} = nothing)::CrossSectionalFactorPrior
+                                   cache::Option{<:AbstractPartialFitState} = nothing,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing)::CrossSectionalFactorPrior
     return CrossSectionalFactorPrior(cross_sectional_prior_pairs(factors, :factors),
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families),
                                      unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp, srep, th,
                                      bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx,
-                                     mtx_sqrt, ex, choice, carry, cache)
+                                     mtx_sqrt, ex, choice, carry, cache, x_src)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -1330,7 +1340,7 @@ function cross_sectional_benchmark_stage(pe::CrossSectionalFactorPrior, X::MatNu
     return (; amsk = amsk, emsk = emsk, mcap = mcap, BW = BW, rdb = rdb, Xu = Xu)
 end
 """
-    prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; brt::Bool = false, kwargs...) -> LowOrderPrior
+    prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
 
 Fit a Cross-Sectional Factor Prior from a [`ReturnsResult`](@ref).
 
@@ -1339,15 +1349,14 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Algorithm
 
  1. Check that `rd` carries asset returns.
- 2. Drop the observations of a gap of a vector benchmark under `brt` with [`shared_series_view`](@ref). The estimator does not read the factor returns, so a gap in them drops nothing.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 2. Drop the observations of a gap of a vector benchmark under `pe.x_src = ExcessSource()` with [`shared_series_view`](@ref). The estimator does not read the factor returns, so a gap in them drops nothing.
+ 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
  4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and a time-varying Asset Panel in `rd.pnl`.
-  - $(arg_dict[:brt_read])
   - `kwargs...`: Additional keyword arguments passed to the returns-matrix method.
 
 # Validation
@@ -1367,14 +1376,13 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
   - [`prior`](@ref)
   - [`ReturnsResult`](@ref)
 """
-function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; brt::Bool = false,
-               kwargs...)
+function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X),
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
-    rd = shared_series_view(rd, brt, false)
-    return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; ne = rd.ne,
+    rd = shared_series_view(rd, pe.x_src, false)
+    return prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; ne = rd.ne,
                  E = rd.E, iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, kwargs..., dims = 1)
 end
 """
@@ -1591,7 +1599,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 function show_fields(::CrossSectionalFactorPrior)
     return (:factors, :neutralise, :families, :unseen, :cre, :wa, :pe, :ve, :ce, :pdm,
             :f_mp, :mp, :srep, :th, :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit,
-            :lx, :mtx_sqrt, :ex, :choice, :carry)
+            :lx, :mtx_sqrt, :ex, :choice, :carry, :x_src)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the

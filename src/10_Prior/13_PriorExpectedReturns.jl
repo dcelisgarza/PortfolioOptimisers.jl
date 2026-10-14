@@ -42,6 +42,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `needs_factor_returns(pe) !== true`. An `ArgumentError` is thrown otherwise.
+  - The `x_src` of `pe` is `nothing`, because `pe` reads the returns matrix that the estimator receives, see [`assert_inner_reader`](@ref).
 
 ## View parameters
 
@@ -75,7 +76,8 @@ PriorExpectedReturns
      │           me ┼ SimpleExpectedReturns
      │              │   w ┴ nothing
      │      horizon ┼ nothing
-     │   fill_limit ┴ nothing
+     │   fill_limit ┼ nothing
+     │        x_src ┴ nothing
 ```
 
 # Related
@@ -92,6 +94,7 @@ PriorExpectedReturns
     """
     pe
     function PriorExpectedReturns(pe::AbstractPriorEstimator)
+        assert_inner_reader(pe, :pe, :PriorExpectedReturns)
         @argcheck(needs_factor_returns(pe) !== true,
                   ArgumentError("`$(typeof(pe).name.name)` requires factor returns, and an expected-returns estimator is fitted on returns alone: no `me` slot in the library carries a factor matrix. Hand the adapter a prior that fits on returns, or one whose factor argument is optional."))
         return new{typeof(pe)}(pe)

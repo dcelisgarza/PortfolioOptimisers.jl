@@ -20,7 +20,8 @@ $(DocStringExtensions.FIELDS)
         sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
-        tau::Option{<:Number} = nothing
+        tau::Option{<:Number} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> BlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -44,6 +45,8 @@ The views are applied to the **assets**. The wrapped prior is forwarded whole an
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -106,7 +109,8 @@ BlackLittermanPrior
              │              │    w ┼ nothing
              │              │    l ┴ Int64: 1
              │      horizon ┼ nothing
-             │   fill_limit ┴ nothing
+             │   fill_limit ┼ nothing
+             │        x_src ┴ nothing
           mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -129,7 +133,8 @@ BlackLittermanPrior
              │     dict ┴ Dict{String, Vector{String}}: Dict("nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
-         tau ┴ nothing
+         tau ┼ nothing
+       x_src ┴ nothing
 ```
 
 # Related
@@ -179,14 +184,22 @@ BlackLittermanPrior
     $(field_dict[:tau])
     """
     tau
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function BlackLittermanPrior(pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  mp::AbstractMatrixProcessingEstimator, views::Lc_BLV,
                                  sets::Option{<:UniverseSets},
                                  views_conf::Option{<:Num_VecNum}, rf::Number,
-                                 tau::Option{<:Number})
+                                 tau::Option{<:Number},
+                                 x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :BlackLittermanPrior)
+        assert_inner_reader(pe, :pe, :BlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(mp), typeof(views), typeof(sets), typeof(views_conf),
-                   typeof(rf), typeof(tau)}(pe, mp, views, sets, views_conf, rf, tau)
+                   typeof(rf), typeof(tau), typeof(x_src)}(pe, mp, views, sets, views_conf,
+                                                           rf, tau, x_src)
     end
 end
 function BlackLittermanPrior(;
@@ -195,8 +208,9 @@ function BlackLittermanPrior(;
                              mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                              views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                              views_conf::Option{<:Num_VecNum} = nothing, rf::Number = 0.0,
-                             tau::Option{<:Number} = nothing)::BlackLittermanPrior
-    return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau)
+                             tau::Option{<:Number} = nothing,
+                             x_src::Option{<:AbstractReturnsSource} = nothing)::BlackLittermanPrior
+    return BlackLittermanPrior(pe, mp, views, sets, views_conf, rf, tau, x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

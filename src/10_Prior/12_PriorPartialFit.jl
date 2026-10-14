@@ -879,8 +879,10 @@ A batch fit drops an observation with a gap in a Shared Series that it reads, wi
 
 # Algorithm
 
- 1. Mark the observations at which a factor return is not finite, when the prior reads the factor returns, with [`shared_series_gaps`](@ref).
- 2. Fold `rd` with its marks with [`fold_prior_step`](@ref).
+ 1. Read the source that the prior states with [`returns_source`](@ref), giving `x_src`.
+ 2. Mark the observations with a Shared Series gap with [`shared_series_gaps`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when the prior reads them. Mark a gap of a matrix benchmark in the estimation mask under `ExcessSource()` with [`benchmark_estimation_mask`](@ref), as the batch fit marks it.
+ 3. Take the observations that the prior folds with [`prior_step_returns`](@ref) under `x_src`: `rd`, or `rd` with `X - B` in place of `X` under `ExcessSource()`.
+ 4. Fold them with their marks with [`fold_prior_step`](@ref).
 
 # Arguments
 
@@ -907,7 +909,11 @@ A batch fit drops an observation with a gap in a Shared Series that it reads, wi
   - [`shared_series_gaps`](@ref)
 """
 function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    return fold_prior_step(pe, rd, shared_series_gaps(rd, false, reads_factor_returns(pe)))
+    x_src = returns_source(pe)
+    gaps = shared_series_gaps(rd, x_src, reads_factor_returns(pe))
+    return fold_prior_step(pe,
+                           prior_step_returns(benchmark_estimation_mask(rd, x_src), x_src),
+                           gaps)
 end
 """
     fold_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult, gaps::Option{<:AbstractVector{Bool}})
@@ -915,7 +921,7 @@ end
 
 Takes the step of the refit route of a prior: the fold of [`refit_prior_fold`](@ref), and the work a prior adds around it.
 
-This is the verb of every route of the step of a prior. [`partial_fit!`](@ref) over a `ReturnsResult` marks the Shared Series gaps of the step and calls it, and the online step of an optimiser, [`fold_prior`](@ref), calls it with the marks of its own Shared Series. The step is a function of its own, and not a method of [`partial_fit!`](@ref), for two reasons. The marks are a fact of the fit that reads the prior, and a prior under `brt` reads the excess returns, so the caller finds them and not the prior. And every method of this verb that reads a family state narrows the `cache` of its estimator, so a buffer reaches the refit route alone.
+This is the verb of every route of the step of a prior. [`partial_fit!`](@ref) over a `ReturnsResult` marks the Shared Series gaps of the step and calls it, and the online step of an optimiser, [`fold_prior`](@ref), calls it with the marks of its own Shared Series. The step is a function of its own, and not a method of [`partial_fit!`](@ref), for two reasons. The marks are a fact of the returns data, and a prior at `x_src = ExcessSource()` folds the excess returns, which hold no benchmark, so the caller finds them from the returns data and not the prior. And every method of this verb that reads a family state narrows the `cache` of its estimator, so a buffer reaches the refit route alone.
 
 The marks `gaps` travel into the buffer of the prior, so every fit through it drops the marked observations with [`shared_series_buffer`](@ref). A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref), over the observations that a fit keeps. A [`CrossSectionalFactorPrior`](@ref) applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The carry of [`EmpiricalPrior`](@ref), the carry of [`CrossSectionalFactorPrior`](@ref), [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) have methods of their own.
 

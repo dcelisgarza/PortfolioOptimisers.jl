@@ -491,6 +491,8 @@ The source is a [`NetworkEstimator`](@ref) and never a precomputed [`PhylogenyRe
 
 It reads no prior result, so it is the one producer that runs where no prior exists yet, for example in preselection.
 
+`pl` reads the returns matrix that the reader of the panel picked, so it states no source of its own, and the constructor refuses an `x_src` on it that is not `nothing`, see [`assert_inner_reader`](@ref).
+
 # Examples
 
 ```jldoctest
@@ -546,6 +548,7 @@ PhylogenyPanel
     """
     alg
     function PhylogenyPanel(pl::NwE_ClE, alg::AbstractPhylogenyFeatureAlgorithm)
+        assert_inner_reader(pl, :pl, :PhylogenyPanel)
         return new{typeof(pl), typeof(alg)}(pl, alg)
     end
 end

@@ -24,7 +24,8 @@ $(DocStringExtensions.FIELDS)
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
         tau::Option{<:Number} = nothing,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> BayesianBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -62,6 +63,8 @@ The refusal is not decoration over a failure that would otherwise be visible. Th
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -127,7 +130,8 @@ BayesianBlackLittermanPrior
              │            │              │    w ┼ nothing
              │            │              │    l ┴ Int64: 1
              │            │      horizon ┼ nothing
-             │            │   fill_limit ┴ nothing
+             │            │   fill_limit ┼ nothing
+             │            │        x_src ┴ nothing
              │         mp ┼ MatrixProcessing
              │            │     pdm ┼ Posdef
              │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -150,7 +154,8 @@ BayesianBlackLittermanPrior
              │            │           w ┼ nothing
              │            │   corrected ┴ Bool: true
              │        rsd ┼ Bool: true
-             │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+             │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+             │      x_src ┴ nothing
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -181,7 +186,8 @@ BayesianBlackLittermanPrior
              │     dict ┴ Dict{String, Vector{String}}: Dict("nf" => ["F1", "F2"], "nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
-         tau ┴ nothing
+         tau ┼ nothing
+       x_src ┴ nothing
 ```
 
 ## The incremental fit
@@ -244,20 +250,25 @@ This prior has no exact incremental recursion, so it takes the online step by **
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          f_mp::AbstractMatrixProcessingEstimator,
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Lc_BLV, sets::Option{<:UniverseSets},
                                          views_conf::Option{<:Num_VecNum}, rf::Number,
                                          tau::Option{<:Number},
-                                         cache::Option{<:AbstractPartialFitState})
+                                         cache::Option{<:AbstractPartialFitState},
+                                         x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :BayesianBlackLittermanPrior)
+        assert_inner_reader(pe, :pe, :BayesianBlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(views), typeof(sets),
-                   typeof(views_conf), typeof(rf), typeof(tau), typeof(cache)}(pe, f_mp, mp,
-                                                                               views, sets,
-                                                                               views_conf,
-                                                                               rf, tau,
-                                                                               cache)
+                   typeof(views_conf), typeof(rf), typeof(tau), typeof(cache),
+                   typeof(x_src)}(pe, f_mp, mp, views, sets, views_conf, rf, tau, cache,
+                                  x_src)
     end
 end
 function BayesianBlackLittermanPrior(;
@@ -269,9 +280,10 @@ function BayesianBlackLittermanPrior(;
                                      views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing,
-                                     cache::Option{<:AbstractPartialFitState} = nothing)::BayesianBlackLittermanPrior
+                                     cache::Option{<:AbstractPartialFitState} = nothing,
+                                     x_src::Option{<:AbstractReturnsSource} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, f_mp, mp, views, sets, views_conf, rf, tau,
-                                       cache)
+                                       cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -295,7 +307,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::BayesianBlackLittermanPrior)
-    return (:pe, :f_mp, :mp, :views, :sets, :views_conf, :rf, :tau)
+    return (:pe, :f_mp, :mp, :views, :sets, :views_conf, :rf, :tau, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

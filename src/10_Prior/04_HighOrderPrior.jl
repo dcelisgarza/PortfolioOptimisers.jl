@@ -608,10 +608,16 @@ $(DocStringExtensions.FIELDS)
         ),
         ske::Option{<:CoskewnessEstimator} = Coskewness(;
             alg = FullMoment()
-        )
+        ),
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> HighOrderPriorEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -634,56 +640,58 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 ```jldoctest
 julia> HighOrderPriorEstimator()
 HighOrderPriorEstimator
-   pe ┼ EmpiricalPrior
-      │           ce ┼ PortfolioOptimisersCovariance
-      │              │   ce ┼ Covariance
-      │              │      │    me ┼ SimpleExpectedReturns
-      │              │      │       │   w ┴ nothing
-      │              │      │    ce ┼ GeneralCovariance
-      │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │              │      │       │    w ┴ nothing
-      │              │      │   alg ┼ FullMoment()
-      │              │      │     w ┴ nothing
-      │              │   mp ┼ MatrixProcessing
-      │              │      │     pdm ┼ Posdef
-      │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │              │      │      dn ┼ nothing
-      │              │      │      dt ┼ nothing
-      │              │      │     alg ┼ nothing
-      │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │           me ┼ SimpleExpectedReturns
-      │              │   w ┴ nothing
-      │      horizon ┼ nothing
-      │   fill_limit ┴ nothing
-  kte ┼ Cokurtosis
-      │      me ┼ SimpleExpectedReturns
-      │         │   w ┴ nothing
-      │      mp ┼ MatrixProcessing
-      │         │     pdm ┼ Posdef
-      │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      dn ┼ nothing
-      │         │      dt ┼ nothing
-      │         │     alg ┼ nothing
-      │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │     alg ┼ FullMoment()
-      │       w ┼ nothing
-      │   cache ┴ nothing
-  ske ┼ Coskewness
-      │      me ┼ SimpleExpectedReturns
-      │         │   w ┴ nothing
-      │      mp ┼ MatrixProcessing
-      │         │     pdm ┼ Posdef
-      │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      dn ┼ nothing
-      │         │      dt ┼ nothing
-      │         │     alg ┼ nothing
-      │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │     alg ┼ FullMoment()
-      │       w ┼ nothing
-      │   cache ┴ nothing
+     pe ┼ EmpiricalPrior
+        │           ce ┼ PortfolioOptimisersCovariance
+        │              │   ce ┼ Covariance
+        │              │      │    me ┼ SimpleExpectedReturns
+        │              │      │       │   w ┴ nothing
+        │              │      │    ce ┼ GeneralCovariance
+        │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │              │      │       │    w ┴ nothing
+        │              │      │   alg ┼ FullMoment()
+        │              │      │     w ┴ nothing
+        │              │   mp ┼ MatrixProcessing
+        │              │      │     pdm ┼ Posdef
+        │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │              │      │      dn ┼ nothing
+        │              │      │      dt ┼ nothing
+        │              │      │     alg ┼ nothing
+        │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │           me ┼ SimpleExpectedReturns
+        │              │   w ┴ nothing
+        │      horizon ┼ nothing
+        │   fill_limit ┼ nothing
+        │        x_src ┴ nothing
+    kte ┼ Cokurtosis
+        │      me ┼ SimpleExpectedReturns
+        │         │   w ┴ nothing
+        │      mp ┼ MatrixProcessing
+        │         │     pdm ┼ Posdef
+        │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      dn ┼ nothing
+        │         │      dt ┼ nothing
+        │         │     alg ┼ nothing
+        │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │     alg ┼ FullMoment()
+        │       w ┼ nothing
+        │   cache ┴ nothing
+    ske ┼ Coskewness
+        │      me ┼ SimpleExpectedReturns
+        │         │   w ┴ nothing
+        │      mp ┼ MatrixProcessing
+        │         │     pdm ┼ Posdef
+        │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      dn ┼ nothing
+        │         │      dt ┼ nothing
+        │         │     alg ┼ nothing
+        │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │     alg ┼ FullMoment()
+        │       w ┼ nothing
+        │   cache ┴ nothing
+  x_src ┴ nothing
 ```
 
 # Related
@@ -718,10 +726,17 @@ HighOrderPriorEstimator
     $(field_dict[:ske])
     """
     @fprop @vprop ske
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function HighOrderPriorEstimator(pe::Onl{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                      kte::Option{<:CokurtosisEstimator},
-                                     ske::Option{<:CoskewnessEstimator})
-        return new{typeof(pe), typeof(kte), typeof(ske)}(pe, kte, ske)
+                                     ske::Option{<:CoskewnessEstimator},
+                                     x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :HighOrderPriorEstimator)
+        assert_inner_reader(pe, :pe, :HighOrderPriorEstimator)
+        return new{typeof(pe), typeof(kte), typeof(ske), typeof(x_src)}(pe, kte, ske, x_src)
     end
 end
 function HighOrderPriorEstimator(;
@@ -729,8 +744,9 @@ function HighOrderPriorEstimator(;
                                  kte::Option{<:CokurtosisEstimator} = Cokurtosis(;
                                                                                  alg = FullMoment()),
                                  ske::Option{<:CoskewnessEstimator} = Coskewness(;
-                                                                                 alg = FullMoment()))::HighOrderPriorEstimator
-    return HighOrderPriorEstimator(pe, kte, ske)
+                                                                                 alg = FullMoment()),
+                                 x_src::Option{<:AbstractReturnsSource} = nothing)::HighOrderPriorEstimator
+    return HighOrderPriorEstimator(pe, kte, ske, x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

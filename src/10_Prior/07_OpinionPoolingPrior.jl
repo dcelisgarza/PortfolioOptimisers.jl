@@ -157,7 +157,8 @@ $(DocStringExtensions.FIELDS)
         w::Option{<:VecNum} = nothing,
         alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
         ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> OpinionPoolingPrior
 
 Keywords correspond to the struct's fields. All arguments are validated for type and value consistency.
@@ -168,6 +169,8 @@ Keywords correspond to the struct's fields. All arguments are validated for type
   - If `w` is not `nothing`, `!isempty(w)`, `length(w) == length(pes)`, `all(x -> 0 <= x <= 1, w)`, and `sum(w) <= 1`.
   - The last is an inequality on purpose. When `sum(w) < 1`, [`prior`](@ref) gives the remaining weight to a uniform prior over the observations, which becomes an opinion in its own right: it takes a column of `pw`, and it is pooled and penalised alongside the others.
   - If `p` is not `nothing`, `p > 0`. The bound is strict, so `p = 0` raises; `p = nothing` is how one asks for no penalty.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pes`, `pe1`, `pe2` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -200,36 +203,38 @@ julia> OpinionPoolingPrior(;
                                                                                            val = [\"A == 0.05\",
                                                                                                   \"B + C >= 0.06\"]))])
 OpinionPoolingPrior
-  pes ┼ 2-element Vector{EntropyPoolingPrior}
-      │ EntropyPoolingPrior ⋯
-      │ EntropyPoolingPrior ⋯
-  pe1 ┼ nothing
-  pe2 ┼ EmpiricalPrior
-      │           ce ┼ PortfolioOptimisersCovariance
-      │              │   ce ┼ Covariance
-      │              │      │    me ┼ SimpleExpectedReturns
-      │              │      │       │   w ┴ nothing
-      │              │      │    ce ┼ GeneralCovariance
-      │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │              │      │       │    w ┴ nothing
-      │              │      │   alg ┼ FullMoment()
-      │              │      │     w ┴ nothing
-      │              │   mp ┼ MatrixProcessing
-      │              │      │     pdm ┼ Posdef
-      │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │              │      │      dn ┼ nothing
-      │              │      │      dt ┼ nothing
-      │              │      │     alg ┼ nothing
-      │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │           me ┼ SimpleExpectedReturns
-      │              │   w ┴ nothing
-      │      horizon ┼ nothing
-      │   fill_limit ┴ nothing
-    p ┼ nothing
-    w ┼ nothing
-  alg ┼ LinearOpinionPooling()
-   ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    pes ┼ 2-element Vector{EntropyPoolingPrior}
+        │ EntropyPoolingPrior ⋯
+        │ EntropyPoolingPrior ⋯
+    pe1 ┼ nothing
+    pe2 ┼ EmpiricalPrior
+        │           ce ┼ PortfolioOptimisersCovariance
+        │              │   ce ┼ Covariance
+        │              │      │    me ┼ SimpleExpectedReturns
+        │              │      │       │   w ┴ nothing
+        │              │      │    ce ┼ GeneralCovariance
+        │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │              │      │       │    w ┴ nothing
+        │              │      │   alg ┼ FullMoment()
+        │              │      │     w ┴ nothing
+        │              │   mp ┼ MatrixProcessing
+        │              │      │     pdm ┼ Posdef
+        │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │              │      │      dn ┼ nothing
+        │              │      │      dt ┼ nothing
+        │              │      │     alg ┼ nothing
+        │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │           me ┼ SimpleExpectedReturns
+        │              │   w ┴ nothing
+        │      horizon ┼ nothing
+        │   fill_limit ┼ nothing
+        │        x_src ┴ nothing
+      p ┼ nothing
+      w ┼ nothing
+    alg ┼ LinearOpinionPooling()
+     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+  x_src ┴ nothing
 ```
 
 # Related
@@ -281,13 +286,24 @@ OpinionPoolingPrior
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function OpinionPoolingPrior(pes::VecEP,
                                  pe1::Option{<:AbstractLowOrderPriorEstimator_A_F_AF},
                                  pe2::AbstractLowOrderPriorEstimator_A_F_AF,
                                  p::Option{<:Number}, w::Option{<:VecNum},
                                  alg::OpinionPoolingAlgorithm,
                                  ex::FLoops.Transducers.Executor,
-                                 cache::Option{<:AbstractPartialFitState})
+                                 cache::Option{<:AbstractPartialFitState},
+                                 x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :OpinionPoolingPrior)
+        for p in pes
+            assert_inner_reader(p, :pes, :OpinionPoolingPrior)
+        end
+        assert_inner_reader(pe1, :pe1, :OpinionPoolingPrior)
+        assert_inner_reader(pe2, :pe2, :OpinionPoolingPrior)
         @argcheck(!isempty(pes), IsEmptyError("pes cannot be empty"))
         if !isnothing(p)
             @argcheck(p > zero(p), DomainError(p, "p must be > 0"))
@@ -303,7 +319,8 @@ OpinionPoolingPrior
                                   "`OpinionPoolingPrior.w` sums to $(sum(w)), and the weights of the pooled priors leave the remainder to the uniform prior, so they sum to at most one. State weights with `sum(w) <= 1`."))
         end
         return new{typeof(pes), typeof(pe1), typeof(pe2), typeof(p), typeof(w), typeof(alg),
-                   typeof(ex), typeof(cache)}(pes, pe1, pe2, p, w, alg, ex, cache)
+                   typeof(ex), typeof(cache), typeof(x_src)}(pes, pe1, pe2, p, w, alg, ex,
+                                                             cache, x_src)
     end
 end
 function OpinionPoolingPrior(; pes::VecEP,
@@ -312,8 +329,9 @@ function OpinionPoolingPrior(; pes::VecEP,
                              p::Option{<:Number} = nothing, w::Option{<:VecNum} = nothing,
                              alg::OpinionPoolingAlgorithm = LinearOpinionPooling(),
                              ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
-                             cache::Option{<:AbstractPartialFitState} = nothing)::OpinionPoolingPrior
-    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex, cache)
+                             cache::Option{<:AbstractPartialFitState} = nothing,
+                             x_src::Option{<:AbstractReturnsSource} = nothing)::OpinionPoolingPrior
+    return OpinionPoolingPrior(pes, pe1, pe2, p, w, alg, ex, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -336,7 +354,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::OpinionPoolingPrior) = (:pes, :pe1, :pe2, :p, :w, :alg, :ex)
+show_fields(::OpinionPoolingPrior) = (:pes, :pe1, :pe2, :p, :w, :alg, :ex, :x_src)
 """
     robust_probabilities(ow::VecNum, args...)
     robust_probabilities(ow::VecNum, pw::MatNum, p::Number)

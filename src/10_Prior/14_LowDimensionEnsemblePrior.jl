@@ -64,7 +64,7 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LowDimensionEnsemblePrior(; n_subsystems::Integer = 300, subsystem_size::Integer = 3, sigma::Real = 0.025, pdm::Option{<:Posdef} = Posdef(), rng::Random.AbstractRNG = Random.default_rng(), seed::Option{<:Integer} = nothing) -> LowDimensionEnsemblePrior
+    LowDimensionEnsemblePrior(; n_subsystems::Integer = 300, subsystem_size::Integer = 3, sigma::Real = 0.025, pdm::Option{<:Posdef} = Posdef(), rng::Random.AbstractRNG = Random.default_rng(), seed::Option{<:Integer} = nothing, x_src::Option{<:AbstractReturnsSource} = nothing) -> LowDimensionEnsemblePrior
 
 Keywords correspond to the struct's fields. The defaults are those of Section 5.3 of [xi2023oldem](@cite). [xi2023oldem](@citet) scan ``L`` from 100 to 2000 and find that the mean squared prediction error converges once ``L`` exceeds 300. [xi2023oldem](@citet) set three assets in each subsystem and a kernel bandwidth of `0.025`.
 
@@ -73,6 +73,7 @@ Keywords correspond to the struct's fields. The defaults are those of Section 5.
   - `n_subsystems >= 1`. A `DomainError` is thrown otherwise.
   - `subsystem_size >= 1`. A `DomainError` is thrown otherwise.
   - `sigma > 0` and finite. A `DomainError` is thrown otherwise.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
 
 # Examples
 
@@ -86,7 +87,8 @@ LowDimensionEnsemblePrior
                  │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                  │   kwargs ┴ @NamedTuple{}: NamedTuple()
              rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-            seed ┴ nothing
+            seed ┼ nothing
+           x_src ┴ nothing
 ```
 
 # Related
@@ -127,25 +129,33 @@ LowDimensionEnsemblePrior
     $(field_dict[:seed])
     """
     seed
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function LowDimensionEnsemblePrior(n_subsystems::Integer, subsystem_size::Integer,
                                        sigma::Real, pdm::Option{<:Posdef},
-                                       rng::Random.AbstractRNG, seed::Option{<:Integer})
+                                       rng::Random.AbstractRNG, seed::Option{<:Integer},
+                                       x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :LowDimensionEnsemblePrior)
         @argcheck(n_subsystems >= 1, DomainError(n_subsystems, "n_subsystems must be >= 1"))
         @argcheck(subsystem_size >= 1,
                   DomainError(subsystem_size, "subsystem_size must be >= 1"))
         @argcheck(zero(sigma) < sigma && isfinite(sigma),
                   DomainError(sigma, "sigma must be positive and finite"))
         return new{typeof(n_subsystems), typeof(subsystem_size), typeof(sigma), typeof(pdm),
-                   typeof(rng), typeof(seed)}(n_subsystems, subsystem_size, sigma, pdm, rng,
-                                              seed)
+                   typeof(rng), typeof(seed), typeof(x_src)}(n_subsystems, subsystem_size,
+                                                             sigma, pdm, rng, seed, x_src)
     end
 end
 function LowDimensionEnsemblePrior(; n_subsystems::Integer = 300,
                                    subsystem_size::Integer = 3, sigma::Real = 0.025,
                                    pdm::Option{<:Posdef} = Posdef(),
                                    rng::Random.AbstractRNG = Random.default_rng(),
-                                   seed::Option{<:Integer} = nothing)::LowDimensionEnsemblePrior
-    return LowDimensionEnsemblePrior(n_subsystems, subsystem_size, sigma, pdm, rng, seed)
+                                   seed::Option{<:Integer} = nothing,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing)::LowDimensionEnsemblePrior
+    return LowDimensionEnsemblePrior(n_subsystems, subsystem_size, sigma, pdm, rng, seed,
+                                     x_src)
 end
 function factor_residual_config(::LowDimensionEnsemblePrior)
     # The ensemble estimates the asset covariance directly; there is no factor lift and so no

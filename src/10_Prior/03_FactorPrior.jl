@@ -18,10 +18,16 @@ $(DocStringExtensions.FIELDS)
         ve::AbstractVarianceEstimator = SimpleVariance(),
         rsd::Bool = true,
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> FactorPrior
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -73,7 +79,8 @@ FactorPrior
            │           me ┼ SimpleExpectedReturns
            │              │   w ┴ nothing
            │      horizon ┼ nothing
-           │   fill_limit ┴ nothing
+           │   fill_limit ┼ nothing
+           │        x_src ┴ nothing
         mp ┼ MatrixProcessing
            │     pdm ┼ Posdef
            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -96,7 +103,8 @@ FactorPrior
            │           w ┼ nothing
            │   corrected ┴ Bool: true
        rsd ┼ Bool: true
-  mtx_sqrt ┴ EigenFallbackSquareRoot()
+  mtx_sqrt ┼ EigenFallbackSquareRoot()
+     x_src ┴ nothing
 ```
 
 ## The incremental fit
@@ -153,14 +161,23 @@ This prior has no exact incremental recursion, so it takes the online step by **
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function FactorPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                          mp::AbstractMatrixProcessingEstimator,
                          re::AbstractTimeSeriesRegressionEstimator,
                          ve::AbstractVarianceEstimator, rsd::Bool,
                          mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
-                         cache::Option{<:AbstractPartialFitState})
+                         cache::Option{<:AbstractPartialFitState},
+                         x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :FactorPrior)
+        assert_inner_reader(pe, :pe, :FactorPrior)
+        assert_inner_reader(re, :re, :FactorPrior)
         return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd),
-                   typeof(mtx_sqrt), typeof(cache)}(pe, mp, re, ve, rsd, mtx_sqrt, cache)
+                   typeof(mtx_sqrt), typeof(cache), typeof(x_src)}(pe, mp, re, ve, rsd,
+                                                                   mtx_sqrt, cache, x_src)
     end
 end
 function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(),
@@ -168,8 +185,9 @@ function FactorPrior(; pe::AbstractLowOrderPriorEstimator_A_AF = EmpiricalPrior(
                      re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                      ve::AbstractVarianceEstimator = SimpleVariance(), rsd::Bool = true,
                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
-                     cache::Option{<:AbstractPartialFitState} = nothing)::FactorPrior
-    return FactorPrior(pe, mp, re, ve, rsd, mtx_sqrt, cache)
+                     cache::Option{<:AbstractPartialFitState} = nothing,
+                     x_src::Option{<:AbstractReturnsSource} = nothing)::FactorPrior
+    return FactorPrior(pe, mp, re, ve, rsd, mtx_sqrt, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -192,7 +210,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::FactorPrior) = (:pe, :mp, :re, :ve, :rsd, :mtx_sqrt)
+show_fields(::FactorPrior) = (:pe, :mp, :re, :ve, :rsd, :mtx_sqrt, :x_src)
 # Expose `:me` and `:ce` from the embedded asset prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties FactorPrior begin
@@ -617,7 +635,7 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
                          rr = expand_regression(rr, cmsk), fpr = f_prior)
 end
 """
-    prior(pe::FactorPrior, rd::ReturnsResult; brt::Bool = false, kwargs...) -> LowOrderPrior
+    prior(pe::FactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
 
 Fit a Factor Prior from a [`ReturnsResult`](@ref).
 
@@ -626,15 +644,14 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 # Algorithm
 
  1. Check that `rd` carries asset returns and factor returns.
- 2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `brt`. The factor prior, the regression and the reconstruction then read the same observations.
- 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
+ 2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `pe.x_src = ExcessSource()`. The factor prior, the regression and the reconstruction then read the same observations.
+ 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
  4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
   - `pe`: Factor prior estimator.
   - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and factor returns in `rd.F`.
-  - $(arg_dict[:brt_read])
   - `kwargs...`: Additional keyword arguments passed to the returns-matrix method.
 
 # Validation
@@ -655,11 +672,11 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
   - [`ReturnsResult`](@ref)
   - [`Regression`](@ref)
 """
-function prior(pe::FactorPrior, rd::ReturnsResult; brt::Bool = false, kwargs...)
+function prior(pe::FactorPrior, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
-    rd = shared_series_view(rd, brt, true)
-    return prior(pe, benchmark_relative_returns(rd, brt), rd.F, rd.pnl; iv = rd.iv,
+    rd = shared_series_view(rd, pe.x_src, true)
+    return prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
                  ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, kwargs..., dims = 1)
 end
 

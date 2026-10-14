@@ -199,10 +199,16 @@ $(DocStringExtensions.FIELDS)
         ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = FullMoment()),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         rsd::Bool = true,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> HighOrderFactorPriorEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -223,82 +229,85 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 ```jldoctest
 julia> HighOrderFactorPriorEstimator()
 HighOrderFactorPriorEstimator
-   pe ┼ FactorPrior
-      │         pe ┼ EmpiricalPrior
-      │            │           ce ┼ PortfolioOptimisersCovariance
-      │            │              │   ce ┼ Covariance
-      │            │              │      │    me ┼ SimpleExpectedReturns
-      │            │              │      │       │   w ┴ nothing
-      │            │              │      │    ce ┼ GeneralCovariance
-      │            │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │            │              │      │       │    w ┴ nothing
-      │            │              │      │   alg ┼ FullMoment()
-      │            │              │      │     w ┴ nothing
-      │            │              │   mp ┼ MatrixProcessing
-      │            │              │      │     pdm ┼ Posdef
-      │            │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │            │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │            │              │      │      dn ┼ nothing
-      │            │              │      │      dt ┼ nothing
-      │            │              │      │     alg ┼ nothing
-      │            │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │            │           me ┼ SimpleExpectedReturns
-      │            │              │   w ┴ nothing
-      │            │      horizon ┼ nothing
-      │            │   fill_limit ┴ nothing
-      │         mp ┼ MatrixProcessing
-      │            │     pdm ┼ Posdef
-      │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │            │      dn ┼ nothing
-      │            │      dt ┼ nothing
-      │            │     alg ┼ nothing
-      │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │         re ┼ StepwiseRegression
-      │            │       crit ┼ PValue
-      │            │            │   t ┴ Float64: 0.05
-      │            │        alg ┼ ForwardSelection()
-      │            │        tgt ┼ LinearModel
-      │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │            │     choice ┼ BatchChoice()
-      │            │   included ┴ nothing
-      │         ve ┼ SimpleVariance
-      │            │          me ┼ SimpleExpectedReturns
-      │            │             │   w ┴ nothing
-      │            │           w ┼ nothing
-      │            │   corrected ┴ Bool: true
-      │        rsd ┼ Bool: true
-      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
-  kte ┼ Cokurtosis
-      │      me ┼ SimpleExpectedReturns
-      │         │   w ┴ nothing
-      │      mp ┼ MatrixProcessing
-      │         │     pdm ┼ Posdef
-      │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      dn ┼ nothing
-      │         │      dt ┼ nothing
-      │         │     alg ┼ nothing
-      │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │     alg ┼ FullMoment()
-      │       w ┼ nothing
-      │   cache ┴ nothing
-  ske ┼ Coskewness
-      │      me ┼ SimpleExpectedReturns
-      │         │   w ┴ nothing
-      │      mp ┼ MatrixProcessing
-      │         │     pdm ┼ Posdef
-      │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      dn ┼ nothing
-      │         │      dt ┼ nothing
-      │         │     alg ┼ nothing
-      │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │     alg ┼ FullMoment()
-      │       w ┼ nothing
-      │   cache ┴ nothing
-   ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-  rsd ┴ Bool: true
+     pe ┼ FactorPrior
+        │         pe ┼ EmpiricalPrior
+        │            │           ce ┼ PortfolioOptimisersCovariance
+        │            │              │   ce ┼ Covariance
+        │            │              │      │    me ┼ SimpleExpectedReturns
+        │            │              │      │       │   w ┴ nothing
+        │            │              │      │    ce ┼ GeneralCovariance
+        │            │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │            │              │      │       │    w ┴ nothing
+        │            │              │      │   alg ┼ FullMoment()
+        │            │              │      │     w ┴ nothing
+        │            │              │   mp ┼ MatrixProcessing
+        │            │              │      │     pdm ┼ Posdef
+        │            │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │            │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │            │              │      │      dn ┼ nothing
+        │            │              │      │      dt ┼ nothing
+        │            │              │      │     alg ┼ nothing
+        │            │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │            │           me ┼ SimpleExpectedReturns
+        │            │              │   w ┴ nothing
+        │            │      horizon ┼ nothing
+        │            │   fill_limit ┼ nothing
+        │            │        x_src ┴ nothing
+        │         mp ┼ MatrixProcessing
+        │            │     pdm ┼ Posdef
+        │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │            │      dn ┼ nothing
+        │            │      dt ┼ nothing
+        │            │     alg ┼ nothing
+        │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │         re ┼ StepwiseRegression
+        │            │       crit ┼ PValue
+        │            │            │   t ┴ Float64: 0.05
+        │            │        alg ┼ ForwardSelection()
+        │            │        tgt ┼ LinearModel
+        │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │            │     choice ┼ BatchChoice()
+        │            │   included ┴ nothing
+        │         ve ┼ SimpleVariance
+        │            │          me ┼ SimpleExpectedReturns
+        │            │             │   w ┴ nothing
+        │            │           w ┼ nothing
+        │            │   corrected ┴ Bool: true
+        │        rsd ┼ Bool: true
+        │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+        │      x_src ┴ nothing
+    kte ┼ Cokurtosis
+        │      me ┼ SimpleExpectedReturns
+        │         │   w ┴ nothing
+        │      mp ┼ MatrixProcessing
+        │         │     pdm ┼ Posdef
+        │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      dn ┼ nothing
+        │         │      dt ┼ nothing
+        │         │     alg ┼ nothing
+        │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │     alg ┼ FullMoment()
+        │       w ┼ nothing
+        │   cache ┴ nothing
+    ske ┼ Coskewness
+        │      me ┼ SimpleExpectedReturns
+        │         │   w ┴ nothing
+        │      mp ┼ MatrixProcessing
+        │         │     pdm ┼ Posdef
+        │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      dn ┼ nothing
+        │         │      dt ┼ nothing
+        │         │     alg ┼ nothing
+        │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │     alg ┼ FullMoment()
+        │       w ┼ nothing
+        │   cache ┴ nothing
+     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    rsd ┼ Bool: true
+  x_src ┴ nothing
 ```
 
 # Related
@@ -342,13 +351,20 @@ HighOrderFactorPriorEstimator
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},
                                            ske::Option{<:CoskewnessEstimator},
                                            ex::FLoops.Transducers.Executor, rsd::Bool,
-                                           cache::Option{<:AbstractPartialFitState})
+                                           cache::Option{<:AbstractPartialFitState},
+                                           x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :HighOrderFactorPriorEstimator)
+        assert_inner_reader(pe, :pe, :HighOrderFactorPriorEstimator)
         return new{typeof(pe), typeof(kte), typeof(ske), typeof(ex), typeof(rsd),
-                   typeof(cache)}(pe, kte, ske, ex, rsd, cache)
+                   typeof(cache), typeof(x_src)}(pe, kte, ske, ex, rsd, cache, x_src)
     end
 end
 function HighOrderFactorPriorEstimator(;
@@ -359,8 +375,9 @@ function HighOrderFactorPriorEstimator(;
                                                                                        alg = FullMoment()),
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                        rsd::Bool = true,
-                                       cache::Option{<:AbstractPartialFitState} = nothing)::HighOrderFactorPriorEstimator
-    return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd, cache)
+                                       cache::Option{<:AbstractPartialFitState} = nothing,
+                                       x_src::Option{<:AbstractReturnsSource} = nothing)::HighOrderFactorPriorEstimator
+    return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -383,7 +400,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::HighOrderFactorPriorEstimator) = (:pe, :kte, :ske, :ex, :rsd)
+show_fields(::HighOrderFactorPriorEstimator) = (:pe, :kte, :ske, :ex, :rsd, :x_src)
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties HighOrderFactorPriorEstimator begin

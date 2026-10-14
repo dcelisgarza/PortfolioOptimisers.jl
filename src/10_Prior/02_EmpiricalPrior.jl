@@ -17,7 +17,8 @@ $(DocStringExtensions.FIELDS)
         horizon::Option{<:Number} = nothing,
         fill_limit::Option{<:Real} = nothing,
         max_scenarios::Option{<:Integer} = nothing,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> EmpiricalPrior
 
 Keywords correspond to the struct's fields.
@@ -27,6 +28,7 @@ Keywords correspond to the struct's fields.
   - If `horizon` is not `nothing`, `horizon > 0`.
   - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. Zero is not a value, because `nothing` already means that no fill passes in silence. The fit refuses a value looser than `1 - min_coverage` over the arms that state a coverage floor, because such a value could never fire.
   - If `max_scenarios` is not `nothing`, `max_scenarios > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
 
 ## The incremental fit
 
@@ -82,7 +84,8 @@ EmpiricalPrior
           me ┼ SimpleExpectedReturns
              │   w ┴ nothing
      horizon ┼ nothing
-  fill_limit ┴ nothing
+  fill_limit ┼ nothing
+       x_src ┴ nothing
 ```
 
 # Related
@@ -129,10 +132,16 @@ EmpiricalPrior
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number},
                             fill_limit::Option{<:Real}, max_scenarios::Option{<:Integer},
-                            cache::Option{<:AbstractPartialFitState})
+                            cache::Option{<:AbstractPartialFitState},
+                            x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :EmpiricalPrior)
         if !isnothing(horizon)
             @argcheck(horizon > 0, DomainError(horizon, "horizon must be > 0"))
         end
@@ -147,8 +156,10 @@ EmpiricalPrior
                                   "max_scenarios is the number of observations the result carries as scenarios, so it must be positive. Pass `nothing`, the default, to carry every observation the fit read."))
         end
         return new{typeof(ce), typeof(me), typeof(horizon), typeof(fill_limit),
-                   typeof(max_scenarios), typeof(cache)}(ce, me, horizon, fill_limit,
-                                                         max_scenarios, cache)
+                   typeof(max_scenarios), typeof(cache), typeof(x_src)}(ce, me, horizon,
+                                                                        fill_limit,
+                                                                        max_scenarios,
+                                                                        cache, x_src)
     end
 end
 function EmpiricalPrior(;
@@ -157,8 +168,9 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing,
                         fill_limit::Option{<:Real} = nothing,
                         max_scenarios::Option{<:Integer} = nothing,
-                        cache::Option{<:AbstractPartialFitState} = nothing)::EmpiricalPrior
-    return EmpiricalPrior(ce, me, horizon, fill_limit, max_scenarios, cache)
+                        cache::Option{<:AbstractPartialFitState} = nothing,
+                        x_src::Option{<:AbstractReturnsSource} = nothing)::EmpiricalPrior
+    return EmpiricalPrior(ce, me, horizon, fill_limit, max_scenarios, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -173,7 +185,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:ce, :me, :horizon, :fill_limit)` with no scenario cap and `(:ce, :me, :horizon, :fill_limit, :max_scenarios)` with one.
+  - `fields::Tuple`: The field names to render, which is `(:ce, :me, :horizon, :fill_limit, :x_src)` with no scenario cap and `(:ce, :me, :horizon, :fill_limit, :max_scenarios, :x_src)` with one.
 
 # Related
 
@@ -183,9 +195,9 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(pe::EmpiricalPrior)
     return if isnothing(pe.max_scenarios)
-        (:ce, :me, :horizon, :fill_limit)
+        (:ce, :me, :horizon, :fill_limit, :x_src)
     else
-        (:ce, :me, :horizon, :fill_limit, :max_scenarios)
+        (:ce, :me, :horizon, :fill_limit, :max_scenarios, :x_src)
     end
 end
 """

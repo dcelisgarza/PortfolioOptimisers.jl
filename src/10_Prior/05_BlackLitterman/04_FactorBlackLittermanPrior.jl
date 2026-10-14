@@ -25,7 +25,8 @@ $(DocStringExtensions.FIELDS)
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
         rsd::Bool = true,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> FactorBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -51,6 +52,8 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 `w` is **not** validated here. Its length is a property of the returns matrix, which the constructor never sees, so a wrong length surfaces at [`prior`](@ref) as a `DimensionMismatch` out of [`equilibrium_mu`](@ref) and only when `l` is set. The constructor also accepts an empty `w`, where the sibling [`AugmentedBlackLittermanPrior`](@ref) refuses one.
 
@@ -103,7 +106,8 @@ FactorBlackLittermanPrior
              │           me ┼ SimpleExpectedReturns
              │              │   w ┴ nothing
              │      horizon ┼ nothing
-             │   fill_limit ┴ nothing
+             │   fill_limit ┼ nothing
+             │        x_src ┴ nothing
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -150,7 +154,8 @@ FactorBlackLittermanPrior
           rf ┼ Float64: 0.0
            l ┼ nothing
          tau ┼ nothing
-         rsd ┴ Bool: true
+         rsd ┼ Bool: true
+       x_src ┴ nothing
 ```
 
 ## The incremental fit
@@ -232,6 +237,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
@@ -241,14 +250,28 @@ This prior has no exact incremental recursion, so it takes the online step by **
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool,
-                                       cache::Option{<:AbstractPartialFitState})
+                                       cache::Option{<:AbstractPartialFitState},
+                                       x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :FactorBlackLittermanPrior)
+        assert_inner_reader(pe, :pe, :FactorBlackLittermanPrior)
+        assert_inner_reader(re, :re, :FactorBlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
                    typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
-                   typeof(l), typeof(tau), typeof(rsd), typeof(cache)}(pe, f_mp, mp, re, ve,
-                                                                       views, sets,
-                                                                       views_conf, w, rf, l,
-                                                                       tau, rsd, cache)
+                   typeof(l), typeof(tau), typeof(rsd), typeof(cache), typeof(x_src)}(pe,
+                                                                                      f_mp,
+                                                                                      mp,
+                                                                                      re,
+                                                                                      ve,
+                                                                                      views,
+                                                                                      sets,
+                                                                                      views_conf,
+                                                                                      w, rf,
+                                                                                      l,
+                                                                                      tau,
+                                                                                      rsd,
+                                                                                      cache,
+                                                                                      x_src)
     end
 end
 function FactorBlackLittermanPrior(;
@@ -262,9 +285,10 @@ function FactorBlackLittermanPrior(;
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
                                    tau::Option{<:Number} = nothing, rsd::Bool = true,
-                                   cache::Option{<:AbstractPartialFitState} = nothing)::FactorBlackLittermanPrior
+                                   cache::Option{<:AbstractPartialFitState} = nothing,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
-                                     l, tau, rsd, cache)
+                                     l, tau, rsd, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -288,7 +312,8 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::FactorBlackLittermanPrior)
-    return (:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd)
+    return (:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd,
+            :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

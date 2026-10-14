@@ -1484,57 +1484,217 @@ end
     @test isnothing(pooled.fpr.w)
 end
 
-@testset "Returns source selector (x_src)" begin
-    # `x_src` picks which of the two asset-returns carriers the clustering, phylogeny and
-    # centrality bridges read: `:prior` takes `pr.X`, `:data` takes `rd.X`. It replaced the
-    # `cle_pr::Bool` flag in ADR 0044, whose name and documented meaning were both wrong.
+# A prior that a caller defines, with no `x_src` field and no `returns_source` method.
+struct MyPriorEstimator1697 <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A end
+@testset "Each reader states its own returns source (x_src, ADR 0211)" begin
+    # `x_src` is a field of each reader, and its values are singleton types (ADR 0212). The
+    # picker reads the source that a graph reader states, and a prior reads its own field.
     pr = prior(EmpiricalPrior(), rd)
     rd_alt = ReturnsResult(; nx = reverse(rd.nx), X = reverse(rd.X; dims = 2))
     @test pr.X !== rd_alt.X
+    rng = StableRNG(1697)
+    Xb = 0.01 .* randn(rng, 120, 4)
+    Bb = 0.01 .* randn(rng, 120)
+    Fb = 0.01 .* randn(rng, 120, 2)
+    rdb = ReturnsResult(; nx = string.('a':'d'), X = Xb, nb = ["bm"], B = Bb,
+                        nf = ["f1", "f2"], F = Fb)
+    rde = ReturnsResult(; nx = rdb.nx, X = Xb .- Bb, nf = rdb.nf, F = Fb)
 
-    # The picker is the single point where the decision is made; all eight bridge sites
-    # delegate to it.
-    @test PortfolioOptimisers.returns_matrix_picker(pr, nothing, :prior) === pr.X
-    @test PortfolioOptimisers.returns_matrix_picker(pr, rd_alt, :prior) === pr.X
-    @test PortfolioOptimisers.returns_matrix_picker(pr, rd_alt, :data) === rd_alt.X
-    # Without a returns result there is nothing to select between, so `x_src` is inert.
-    @test PortfolioOptimisers.returns_matrix_picker(pr, nothing, :data) === pr.X
-
-    # A `Bool` could not be wrong; a `Symbol` can, so the typo throws where it was written.
-    for src in (:Prior, :data_, :returns, :pr)
-        @test_throws ArgumentError PortfolioOptimisers.returns_matrix_picker(pr, rd_alt,
-                                                                             src)
+    @testset "The picker reads one source per method" begin
+        pick = PortfolioOptimisers.returns_matrix_picker
+        # `nothing` reads the returns data, and `pr.X` when the call holds none.
+        @test pick(pr, rd_alt, nothing) === rd_alt.X
+        @test pick(pr, nothing, nothing) === pr.X
+        @test pick(rd_alt, nothing, nothing) === rd_alt.X
+        @test pick(pr, rd_alt, DataSource()) === rd_alt.X
+        @test pick(pr, rd_alt, PriorSource()) === pr.X
+        @test pick(pr, rdb, ExcessSource()) == Xb .- Bb
+        # Returns data in `pr` are the returns data of the call.
+        @test pick(rdb, nothing, ExcessSource()) == Xb .- Bb
+        # `ExcessSource()` on returns data with no benchmark refuses (ADR 0212, decision 8).
+        @test_throws ArgumentError pick(pr, rd_alt, ExcessSource())
+        # A stated source that the call cannot give warns, then reads `pr.X` (decision 7).
+        @test (@test_logs (:warn, r"no returns data") pick(pr, nothing, DataSource())) ===
+              pr.X
+        @test (@test_logs (:warn, r"no returns data") pick(pr, nothing, ExcessSource())) ===
+              pr.X
+        @test (@test_logs (:warn, r"no prior result") pick(rd_alt, nothing, PriorSource())) ===
+              rd_alt.X
+        # A `Symbol` or a `Bool` is no source.
+        @test_throws MethodError pick(pr, rd_alt, :data)
+        @test_throws MethodError pick(pr, rd_alt, true)
     end
 
-    # The kwarg is wired through the bridge under its new name.
-    ne = NetworkEstimator(;)
-    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :data).X ==
-          phylogeny_matrix(ne, rd_alt.X).X
-    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :prior).X ==
-          phylogeny_matrix(ne, pr.X).X
-    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :data).X !=
-          phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :prior).X
-    @test_throws ArgumentError phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :Prior)
+    @testset "A graph verb reads the source of its reader" begin
+        ne = NetworkEstimator()
+        @test phylogeny_matrix(ne, pr; rd = rd_alt).X == phylogeny_matrix(ne, rd_alt.X).X
+        @test phylogeny_matrix(ne, pr).X == phylogeny_matrix(ne, pr.X).X
+        # The source is a field of the reader: the verb takes no `x_src` keyword.
+        nep = NetworkEstimator(; x_src = PriorSource())
+        @test phylogeny_matrix(nep, pr; rd = rd_alt).X == phylogeny_matrix(ne, pr.X).X
+        @test phylogeny_matrix(NetworkEstimator(; x_src = DataSource()), pr; rd = rd_alt).X ==
+              phylogeny_matrix(ne, rd_alt.X).X
+        # The constraints of one vector can state different sources (ADR 0214): each one reads
+        # its own matrix, and the rows join in the order of the vector.
+        ccd = CentralityConstraint(; B = MinValue(), comp = >=)
+        ccp = CentralityConstraint(; B = MinValue(), comp = >=, x_src = PriorSource())
+        both = centrality_constraints([ccd, ccp], pr; rd = rd_alt)
+        one = PortfolioOptimisers.merge_linear_constraints([centrality_constraints(ccd, pr;
+                                                                                   rd = rd_alt),
+                                                            centrality_constraints(ccp, pr;
+                                                                                   rd = rd_alt)])
+        @test both.ineq.A == one.ineq.A
+        @test both.ineq.B == one.ineq.B
+        @test both.ineq.A[1, :] == centrality_constraints(ccd, rd_alt.X).ineq.A[1, :]
+        @test both.ineq.A[2, :] == centrality_constraints(ccd, pr.X).ineq.A[1, :]
+    end
 
-    # Every optimiser carrying `x_src` validates it at construction.
-    @test_throws ArgumentError HierarchicalOptimiser(; x_src = :typo)
-    @test_throws ArgumentError JuMPOptimiser(; slv = slv, x_src = :typo)
-    @test_throws ArgumentError NestedClustered(; opti = EqualWeighted(),
-                                               opto = EqualWeighted(), x_src = :typo)
-    # The `cle_pr` spelling is gone: a Bool no longer constructs.
-    @test_throws Exception HierarchicalOptimiser(; x_src = true)
-    # The default reads the returns data (#1689, ADR 0211): under a factor prior `pr.X` is a
-    # reconstruction, and a scenario window cuts its rows.
-    @test HierarchicalOptimiser().x_src == :data
-    @test JuMPOptimiser(; slv = slv).x_src == :data
-    @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :data
-    @test phylogeny_matrix(ne, pr; rd = rd_alt).X == phylogeny_matrix(ne, rd_alt.X).X
-    @test phylogeny_matrix(ne, pr).X == phylogeny_matrix(ne, pr.X).X
+    @testset "The gaps of a fit are found reader by reader" begin
+        Xg = copy(rd.X)
+        Xg[1:5, 2] .= NaN
+        rdg = ReturnsResult(; nx = rd.nx, X = Xg)
+        cle = ClustersEstimator()
+        gaps = PortfolioOptimisers.graph_reader_gaps
+        expected = [j == 2 for j in axes(Xg, 2)]
+        @test gaps(cle, pr, rdg) == expected
+        @test gaps((cle, nothing, [cle]), pr, rdg) == expected
+        @test isnothing(gaps((nothing,), pr, rdg))
+        mask = PortfolioOptimisers.graph_reader_mask
+        @test (@test_logs (:warn, r"plain moment estimator") mask(cle, nothing, pr, rdg,
+                                                                  false)) == .!expected
+        @test_throws IsNonFiniteError mask(cle, nothing, pr, rdg, true)
+        # A reader at `PriorSource()` reads `pr.X`, where the prior kept no gap.
+        @test isnothing(gaps(ClustersEstimator(; x_src = PriorSource()), pr, rdg)) ||
+              !any(gaps(ClustersEstimator(; x_src = PriorSource()), pr, rdg))
+    end
+
+    @testset "A prior reads its own source" begin
+        @test prior(EmpiricalPrior(), rdb).mu ≈ vec(sum(Xb; dims = 1)) ./ 120
+        @test prior(EmpiricalPrior(; x_src = ExcessSource()), rdb).mu ≈
+              vec(sum(Xb .- Bb; dims = 1)) ./ 120
+        @test prior(EmpiricalPrior(; x_src = DataSource()), rdb).sigma ≈
+              prior(EmpiricalPrior(), rdb).sigma
+        @test prior(FactorPrior(; x_src = ExcessSource()), rdb).X ≈
+              prior(FactorPrior(), rde).X
+        # A gap of a vector benchmark drops the observation under `ExcessSource()` only.
+        Bg = copy(Bb)
+        Bg[3] = NaN
+        rdg = ReturnsResult(; nx = rdb.nx, X = Xb, nb = ["bm"], B = Bg)
+        @test prior(EmpiricalPrior(; x_src = ExcessSource()), rdg).mu ≈
+              vec(sum((Xb .- Bb)[setdiff(1:120, 3), :]; dims = 1)) ./ 119
+        @test prior(EmpiricalPrior(), rdg).mu ≈ vec(sum(Xb; dims = 1)) ./ 120
+    end
+
+    @testset "Each prior holds the field, and admits the data sources only" begin
+        views = LinearConstraintEstimator(; val = ["a == 0.001"])
+        fviews = LinearConstraintEstimator(; val = ["f1 == 0.001"])
+        bsets = UniverseSets(; dict = Dict("nx" => rdb.nx, "nf" => rdb.nf))
+        makers = [(; kw...) -> EmpiricalPrior(; kw...), (; kw...) -> FactorPrior(; kw...),
+                  (; kw...) -> HighOrderPriorEstimator(; kw...),
+                  (; kw...) -> HighOrderFactorPriorEstimator(; kw...),
+                  (; kw...) -> LowDimensionEnsemblePrior(; kw...),
+                  (; kw...) -> EntropyPoolingPrior(; kw...),
+                  (; kw...) -> MeucciEntropyPoolingPrior(; kw...),
+                  (; kw...) -> OpinionPoolingPrior(;
+                                                   pes = [EntropyPoolingPrior(),
+                                                          EntropyPoolingPrior()], kw...),
+                  (; kw...) -> BlackLittermanPrior(; views = views, sets = bsets, kw...),
+                  (; kw...) -> BayesianBlackLittermanPrior(; views = fviews, sets = bsets,
+                                                           kw...),
+                  (; kw...) -> FactorBlackLittermanPrior(; views = fviews, sets = bsets,
+                                                         kw...),
+                  (; kw...) -> AugmentedBlackLittermanPrior(; a_views = views,
+                                                            f_views = fviews, sets = bsets,
+                                                            kw...),
+                  (; kw...) -> CrossSectionalFactorPrior(;
+                                                         factors = ["mkt" =>
+                                                                        ConstantExposure()],
+                                                         kw...)]
+        # The loadings decide the walk: a prior that gives no loadings lets a
+        # regression reader at `nothing` refit on the raw returns (ADR 0214, decision 4).
+        refits = [true, false, true, false, true, true, true, true, true, false, false,
+                  false, false]
+        rs = PortfolioOptimisers.returns_source
+        frames = PortfolioOptimisers.reader_frames
+        for (make, refit) in zip(makers, refits)
+            pe = make(; x_src = ExcessSource())
+            @test isnothing(rs(make()))
+            @test rs(pe) === ExcessSource()
+            @test rs(make(; x_src = DataSource())) === DataSource()
+            @test_throws ArgumentError make(; x_src = PriorSource())
+            @test_throws TypeError make(; x_src = :data)
+            # `factory` and a view carry the source.
+            @test rs(PortfolioOptimisers.factory(pe, nothing)) === ExcessSource()
+            @test rs(PortfolioOptimisers.port_opt_view(pe, 1:2)) === ExcessSource()
+            # The printed estimator shows the source.
+            @test occursin("x_src", sprint(show, pe))
+            # The frame walk: an outermost prior at `nothing` reads the raw returns.
+            @test frames(pe, "pe", false).excess
+            @test frames(make(), "pe", false).raw == ["pe"]
+            @test isempty(frames(make(; x_src = DataSource()), "pe", false).raw)
+            @test PortfolioOptimisers.refits_regression(make()) == refit
+        end
+        # A wrapper answers for the prior that gives its loadings.
+        @test PortfolioOptimisers.refits_regression(EntropyPoolingPrior())
+        @test !PortfolioOptimisers.refits_regression(EntropyPoolingPrior(;
+                                                                         pe = FactorPrior()))
+        @test !PortfolioOptimisers.refits_regression(OpinionPoolingPrior(;
+                                                                         pes = [EntropyPoolingPrior()],
+                                                                         pe2 = FactorPrior()))
+        # A prior that a caller defines states no source, and reads the raw returns.
+        @test isnothing(PortfolioOptimisers.returns_source(MyPriorEstimator1697()))
+    end
+
+    @testset "An inner reader states no source (ADR 0211, decision 3)" begin
+        ex = EmpiricalPrior(; x_src = ExcessSource())
+        @test_throws ArgumentError FactorPrior(; pe = ex)
+        @test_throws ArgumentError FactorPrior(;
+                                               re = StepwiseRegression(;
+                                                                       x_src = ExcessSource()))
+        @test_throws ArgumentError HighOrderPriorEstimator(; pe = ex)
+        @test_throws ArgumentError EntropyPoolingPrior(; pe = ex)
+        @test_throws ArgumentError OpinionPoolingPrior(;
+                                                       pes = [EntropyPoolingPrior(),
+                                                              EntropyPoolingPrior(;
+                                                                                  x_src = ExcessSource())])
+        @test_throws ArgumentError OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                       pe1 = ex)
+        @test_throws ArgumentError OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                       pe2 = ex)
+        @test_throws ArgumentError PriorExpectedReturns(; pe = ex)
+        err = try
+            FactorPrior(; pe = ex)
+        catch e
+            e
+        end
+        @test occursin("the `pe` of `FactorPrior`", err.msg)
+        # A source of the outer prior is not a source of the inner one.
+        @test FactorPrior(; x_src = ExcessSource()).x_src === ExcessSource()
+        @test_throws ArgumentError PhylogenyPanel(;
+                                                  pl = NetworkEstimator(;
+                                                                        x_src = ExcessSource()))
+    end
+
+    @testset "The partial fit of a prior reads its own source" begin
+        online(est) = PortfolioOptimisers.update_online_estimator(Online(est))
+        for pe0 in (EmpiricalPrior(; x_src = ExcessSource()),
+                    online(EmpiricalPrior(; x_src = ExcessSource())),
+                    online(FactorPrior(; x_src = ExcessSource())))
+            pe = PortfolioOptimisers.partial_fit!(pe0, rdb)
+            pb = prior(pe0, rdb)
+            pp = prior(pe)
+            @test pp.mu ≈ pb.mu
+            @test pp.sigma ≈ pb.sigma
+            @test PortfolioOptimisers.returns_source(pe) === ExcessSource()
+        end
+        pe = PortfolioOptimisers.partial_fit!(EmpiricalPrior(), rdb)
+        @test prior(pe).mu ≈ prior(EmpiricalPrior(), rdb).mu
+    end
 end
 
 @testset "A prior that keeps the last rows pairs them with the last rows of iv (#1655)" begin
     # A Scenario Cap keeps the last rows of the observations in `pr.X`, and the returns data
-    # keeps every row of `iv`. Under `x_src = :prior` the clustering reads `pr.X`, so it must
+    # keeps every row of `iv`. Under `x_src = PriorSource()` the clustering reads `pr.X`, so it must
     # read the rows of `iv` of the same observations.
     rng = StableRNG(1655)
     T, N, n = 200, 8, 120
@@ -1551,28 +1711,28 @@ end
     @test pick(Xi, ivi[1:n, :]) == ivi[1:n, :]
 
     cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
+    clp = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252), x_src = PriorSource())
     pr = prior(EmpiricalPrior(; max_scenarios = n), rdi)
     @test size(pr.X, 1) == n
     tail = ReturnsResult(; nx = rdi.nx, X = Xi[(T - n + 1):end, :],
                          iv = ivi[(T - n + 1):end, :], ivpa = 1.1)
     # Each forwarder that reads the prior returns gives the answer of the last rows.
-    clr = clusterise(cle, pr; rd = rdi, x_src = :prior, iv = rdi.iv, ivpa = rdi.ivpa)
+    clr = clusterise(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa)
     clt = clusterise(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa)
     @test clr.res.order == clt.res.order
     @test isapprox(clr.D, clt.D)
-    @test phylogeny_matrix(cle, pr; rd = rdi, x_src = :prior, iv = rdi.iv,
-                           ivpa = rdi.ivpa).X ==
+    @test phylogeny_matrix(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
           phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
-    ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)))
-    @test isapprox(centrality_vector(ct, pr; rd = rdi, x_src = :prior, iv = rdi.iv,
-                                     ivpa = rdi.ivpa).X,
+    ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)),
+                             x_src = PriorSource())
+    @test isapprox(centrality_vector(ct, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X,
                    centrality_vector(ct, tail.X; iv = tail.iv, ivpa = tail.ivpa).X)
-    # Under `x_src = :data` the clustering reads `rd.X`, whose rows `iv` already pairs.
-    @test clusterise(cle, pr; rd = rdi, x_src = :data, iv = rdi.iv, ivpa = rdi.ivpa).res.order ==
+    # Under `x_src = nothing` the clustering reads `rd.X`, whose rows `iv` already pairs.
+    @test clusterise(cle, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).res.order ==
           clusterise(cle, rdi.X; iv = rdi.iv, ivpa = rdi.ivpa).res.order
     # An `iv` with fewer rows than the prior returns is still refused.
-    @test_throws DimensionMismatch clusterise(cle, pr; rd = rdi, x_src = :prior,
-                                              iv = rdi.iv[1:(n - 1), :], ivpa = rdi.ivpa)
+    @test_throws DimensionMismatch clusterise(clp, pr; rd = rdi, iv = rdi.iv[1:(n - 1), :],
+                                              ivpa = rdi.ivpa)
 
     # An optimiser that clusters the prior returns now fits, where it raised a
     # `DimensionMismatch` before.
@@ -1580,7 +1740,7 @@ end
                                  opt = HierarchicalOptimiser(;
                                                              pe = EmpiricalPrior(;
                                                                                  max_scenarios = n),
-                                                             cle = cle, x_src = :prior))
+                                                             cle = clp))
     res = optimise(hrp, rdi)
     @test res.clr.res.order == clt.res.order
     @test isapprox(sum(res.w), 1)

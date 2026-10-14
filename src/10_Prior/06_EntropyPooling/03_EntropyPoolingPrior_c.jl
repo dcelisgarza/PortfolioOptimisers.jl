@@ -40,7 +40,8 @@ $(DocStringExtensions.FIELDS)
         opt::NonCVaREP = OptimEntropyPooling(),
         w::Option{<:ScenarioProbabilities} = nothing,
         alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> EntropyPoolingPrior
 
 Keywords correspond to the struct's fields.
@@ -52,6 +53,8 @@ Keywords correspond to the struct's fields.
   - If a view field is a vector, it must not be empty.
   - If `w` is not `nothing`, it must be non-empty and match the number of observations.
   - The refit under the posterior weights can state the model of `pe`, through [`assert_scenario_refit`](@ref). An [`OpinionPoolingPrior`](@ref) with `pe1` inside a factor prior or a Black-Litterman prior of `pe` is refused.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -129,7 +132,8 @@ EntropyPoolingPrior
               │           me ┼ SimpleExpectedReturns
               │              │   w ┴ nothing
               │      horizon ┼ nothing
-              │   fill_limit ┴ nothing
+              │   fill_limit ┼ nothing
+              │        x_src ┴ nothing
      mu_views ┼ LinearConstraintEstimator
               │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
               │   key ┴ nothing
@@ -159,7 +163,8 @@ EntropyPoolingPrior
               │      alg ┼ ExpEntropyPooling()
               │      err ┴ nothing
             w ┼ nothing
-          alg ┴ H1_EntropyPooling()
+          alg ┼ H1_EntropyPooling()
+        x_src ┴ nothing
 ```
 
 # Related
@@ -251,6 +256,10 @@ EntropyPoolingPrior
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function EntropyPoolingPrior(pe::AbstractLowOrderPriorEstimator_A_F_AF,
                                  mu_views::Option{<:LinearConstraintEstimator},
                                  var_views::Option{<:VV_VecVV},
@@ -265,7 +274,10 @@ EntropyPoolingPrior
                                  sets::Option{<:UniverseSets}, opt::NonCVaREP,
                                  w::Option{<:ScenarioProbabilities},
                                  alg::AbstractEntropyPoolingAlgorithm,
-                                 cache::Option{<:AbstractPartialFitState})
+                                 cache::Option{<:AbstractPartialFitState},
+                                 x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :EntropyPoolingPrior)
+        assert_inner_reader(pe, :pe, :EntropyPoolingPrior)
         assert_scenario_refit(pe)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
@@ -306,21 +318,10 @@ EntropyPoolingPrior
         return new{typeof(pe), typeof(mu_views), typeof(var_views), typeof(cvar_views),
                    typeof(evar_views), typeof(rlvar_views), typeof(sigma_views),
                    typeof(sk_views), typeof(kt_views), typeof(cov_views), typeof(rho_views),
-                   typeof(sets), typeof(opt), typeof(w), typeof(alg), typeof(cache)}(pe,
-                                                                                     mu_views,
-                                                                                     var_views,
-                                                                                     cvar_views,
-                                                                                     evar_views,
-                                                                                     rlvar_views,
-                                                                                     sigma_views,
-                                                                                     sk_views,
-                                                                                     kt_views,
-                                                                                     cov_views,
-                                                                                     rho_views,
-                                                                                     sets,
-                                                                                     opt, w,
-                                                                                     alg,
-                                                                                     cache)
+                   typeof(sets), typeof(opt), typeof(w), typeof(alg), typeof(cache),
+                   typeof(x_src)}(pe, mu_views, var_views, cvar_views, evar_views,
+                                  rlvar_views, sigma_views, sk_views, kt_views, cov_views,
+                                  rho_views, sets, opt, w, alg, cache, x_src)
     end
 end
 function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = EmpiricalPrior(),
@@ -338,10 +339,11 @@ function EntropyPoolingPrior(; pe::AbstractLowOrderPriorEstimator_A_F_AF = Empir
                              opt::NonCVaREP = OptimEntropyPooling(),
                              w::Option{<:ScenarioProbabilities} = nothing,
                              alg::AbstractEntropyPoolingAlgorithm = H1_EntropyPooling(),
-                             cache::Option{<:AbstractPartialFitState} = nothing)::EntropyPoolingPrior
+                             cache::Option{<:AbstractPartialFitState} = nothing,
+                             x_src::Option{<:AbstractReturnsSource} = nothing)::EntropyPoolingPrior
     return EntropyPoolingPrior(pe, mu_views, var_views, cvar_views, evar_views, rlvar_views,
                                sigma_views, sk_views, kt_views, cov_views, rho_views, sets,
-                               opt, w, alg, cache)
+                               opt, w, alg, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -367,7 +369,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 function show_fields(::EntropyPoolingPrior)
     return (:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views,
             :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w,
-            :alg)
+            :alg, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).

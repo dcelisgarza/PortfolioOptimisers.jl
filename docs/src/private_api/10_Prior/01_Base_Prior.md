@@ -17,12 +17,6 @@ prior_regression_remedy
 prior_field_values
 prior_result_property_pool
 bound_field_is_stale
-returns_matrix_picker
-plain_graph_reader
-graph_gap_remedy
-assert_graph_readable
-graph_reader_mask
-implied_volatility_picker
 investable_mask
 investable_views
 investable_prior

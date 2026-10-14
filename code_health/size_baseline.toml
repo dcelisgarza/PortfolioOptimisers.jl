@@ -257,6 +257,7 @@ commit = "f39f2da0ea"
 "src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { code = 234, doc = 577, comment = 0, blank = 262, total = 1073 }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { code = 45, doc = 43, comment = 0, blank = 24, total = 112 }
 "src/10_Prior/19_PriorScenarios.jl" = { code = 91, doc = 163, comment = 3, blank = 86, total = 343 }
+"src/10_Prior/20_PriorReturnsSource.jl" = { code = 230, doc = 461, comment = 0, blank = 220, total = 911 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { code = 320, doc = 1074, comment = 5, blank = 515, total = 1914 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { code = 65, doc = 269, comment = 2, blank = 94, total = 430 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { code = 335, doc = 1008, comment = 2, blank = 374, total = 1719 }
