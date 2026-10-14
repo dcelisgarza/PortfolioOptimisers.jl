@@ -1,7 +1,7 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the sorting networks that [`IterativeOrderedWeightsArray`](@ref) relaxes.
+Abstract supertype for the sorting networks that [`SortingNetworkOrderedWeightsArray`](@ref) relaxes.
 
 A sorting network is a fixed list of comparators. Each comparator reads two positions and writes the smaller value to the first position and the larger value to the second. [goemans2015](@citet) shows that the relaxation of any sorting network is an extended formulation of the permutahedron, so every subtype gives the exact OWA risk. The network sets the number of rows of the model and the cost of one solver iteration.
 
@@ -42,7 +42,7 @@ julia> PortfolioOptimisers.sorting_network(MySortingNetworkMerge(), 3)
 
   - [`OddEvenMerge`](@ref)
   - [`BitonicMerge`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
 
 # References
 
@@ -68,7 +68,7 @@ OddEvenMerge()
 
   - [`AbstractSortingNetworkMerge`](@ref)
   - [`BitonicMerge`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
 
 # References
 
@@ -93,7 +93,7 @@ BitonicMerge()
 
   - [`AbstractSortingNetworkMerge`](@ref)
   - [`OddEvenMerge`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
 
 # References
 
@@ -304,7 +304,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the orders of the network variables of [`IterativeOrderedWeightsArray`](@ref).
+Abstract supertype for the orders of the network variables of [`SortingNetworkOrderedWeightsArray`](@ref).
 
 The order changes the columns of the model, not the risk. A solver that permutes the system before it factorises it gives the same cost for every order.
 
@@ -345,7 +345,7 @@ julia> PortfolioOptimisers.sorting_network_columns(MySortingNetworkOrdering(), [
 
   - [`ComparatorOrdering`](@ref)
   - [`WireOrdering`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
 """
 abstract type AbstractSortingNetworkOrdering <: AbstractAlgorithm end
 """
@@ -366,7 +366,7 @@ ComparatorOrdering()
 
   - [`AbstractSortingNetworkOrdering`](@ref)
   - [`WireOrdering`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
 """
 struct ComparatorOrdering <: AbstractSortingNetworkOrdering end
 """
@@ -387,7 +387,7 @@ WireOrdering()
 
   - [`AbstractSortingNetworkOrdering`](@ref)
   - [`ComparatorOrdering`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
 """
 struct WireOrdering <: AbstractSortingNetworkOrdering end
 """
@@ -508,18 +508,18 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    IterativeOrderedWeightsArray(;
+    SortingNetworkOrderedWeightsArray(;
         merge::AbstractSortingNetworkMerge = BitonicMerge(),
         ordering::AbstractSortingNetworkOrdering = ComparatorOrdering()
-    ) -> IterativeOrderedWeightsArray
+    ) -> SortingNetworkOrderedWeightsArray
 
 Keywords correspond to the struct's fields.
 
 # Examples
 
 ```jldoctest
-julia> IterativeOrderedWeightsArray()
-IterativeOrderedWeightsArray
+julia> SortingNetworkOrderedWeightsArray()
+SortingNetworkOrderedWeightsArray
      merge ┼ BitonicMerge()
   ordering ┴ ComparatorOrdering()
 ```
@@ -539,7 +539,7 @@ IterativeOrderedWeightsArray
   - $(ref_dict[:goemans2015])
   - $(ref_dict[:batcher1968])
 """
-@concrete struct IterativeOrderedWeightsArray <: OrderedWeightsArrayFormulation
+@concrete struct SortingNetworkOrderedWeightsArray <: OrderedWeightsArrayFormulation
     """
     $(field_dict[:merge_owa])
     """
@@ -548,14 +548,15 @@ IterativeOrderedWeightsArray
     $(field_dict[:ordering_owa])
     """
     ordering
-    function IterativeOrderedWeightsArray(merge::AbstractSortingNetworkMerge,
-                                          ordering::AbstractSortingNetworkOrdering)
+    function SortingNetworkOrderedWeightsArray(merge::AbstractSortingNetworkMerge,
+                                               ordering::AbstractSortingNetworkOrdering)
         return new{typeof(merge), typeof(ordering)}(merge, ordering)
     end
 end
-function IterativeOrderedWeightsArray(; merge::AbstractSortingNetworkMerge = BitonicMerge(),
-                                      ordering::AbstractSortingNetworkOrdering = ComparatorOrdering())
-    return IterativeOrderedWeightsArray(merge, ordering)
+function SortingNetworkOrderedWeightsArray(;
+                                           merge::AbstractSortingNetworkMerge = BitonicMerge(),
+                                           ordering::AbstractSortingNetworkOrdering = ComparatorOrdering())
+    return SortingNetworkOrderedWeightsArray(merge, ordering)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -579,14 +580,14 @@ The relaxed sorting network lets a comparator raise its larger value and lower i
 
 # Related
 
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
   - [`OrderedWeightsArrayRange`](@ref)
 """
-function assert_owa_formulation_weights(::IterativeOrderedWeightsArray, w::VecNum)
+function assert_owa_formulation_weights(::SortingNetworkOrderedWeightsArray, w::VecNum)
     @argcheck(issorted(w),
               DomainError(w,
-                          "IterativeOrderedWeightsArray needs a nondecreasing weight vector. The relaxed sorting network has no minimum for a weight vector that decreases."))
+                          "SortingNetworkOrderedWeightsArray needs a nondecreasing weight vector. The relaxed sorting network has no minimum for a weight vector that decreases."))
     return nothing
 end
 """
@@ -636,7 +637,7 @@ Keywords correspond to the struct's fields.
   - If `w1` is a `VecNum`: `!isempty(w1)`.
   - If `w2` is a `VecNum`: `!isempty(w2)`.
   - If both `w1` and `w2` are `VecNum`: `length(w1) == length(w2)`.
-  - If both `w1` and `w2` are `VecNum` and `alg` is an [`IterativeOrderedWeightsArray`](@ref): `issorted(w1 - w2)`, with `w2` reversed. Raises a `DomainError`. A callable is checked when the model is built.
+  - If both `w1` and `w2` are `VecNum` and `alg` is a [`SortingNetworkOrderedWeightsArray`](@ref): `issorted(w1 - w2)`, with `w2` reversed. Raises a `DomainError`. A callable is checked when the model is built.
 
 # Functor
 
@@ -669,7 +670,7 @@ OrderedWeightsArrayRange
   - [`OrderedWeightsArray`](@ref)
   - [`OrderedWeightsArrayFormulation`](@ref)
   - [`ExactOrderedWeightsArray`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`RiskMeasureSettings`](@ref)
 
@@ -818,6 +819,6 @@ risk_input_kind(::OrderedWeightsArrayRange) = NetReturnsInput()
 # shape, so no separate verb is promoted alongside it.
 
 export OrderedWeightsArrayRange, OddEvenMerge, BitonicMerge, ComparatorOrdering,
-       WireOrdering, IterativeOrderedWeightsArray
+       WireOrdering, SortingNetworkOrderedWeightsArray
 public AbstractSortingNetworkMerge, sorting_network, AbstractSortingNetworkOrdering,
        sorting_network_columns

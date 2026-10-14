@@ -39,13 +39,16 @@ the order of the comparators, 44.1 s in the order of the positions, 44.4 s in a 
 
 The maintainer decided on 2026-10-14.
 
-1. **The formulation is `IterativeOrderedWeightsArray`**, the third subtype of
+1. **The formulation is `SortingNetworkOrderedWeightsArray`**, the third subtype of
    `OrderedWeightsArrayFormulation`. It serves `OrderedWeightsArray`, and it fuses the two tails
-   of `OrderedWeightsArrayRange` into one network over `w1 - w2`, as the exact form does.
+   of `OrderedWeightsArrayRange` into one network over `w1 - w2`, as the exact form does. The
+   name states the structure that the formulation builds. It replaced the first name,
+   `IterativeOrderedWeightsArray`, before the formulation was released. The keys of the Model
+   State take the prefix `sowa`, as the keys of `ApproxOrderedWeightsArray` take `aowa`.
 2. **`ApproxOrderedWeightsArray` stays the default** of both measures and of every alias. It is
    the fastest of the three by a wide margin.
-3. **`IterativeOrderedWeightsArray` replaces `ExactOrderedWeightsArray` as the recommended exact
-   formulation for a long sample.** `ExactOrderedWeightsArray` stays, for a short sample.
+3. **`SortingNetworkOrderedWeightsArray` replaces `ExactOrderedWeightsArray` as the recommended
+   exact formulation for a long sample.** `ExactOrderedWeightsArray` stays, for a short sample.
 4. **The type has two axes, one field each.** `merge::AbstractSortingNetworkMerge` picks the
    network: `OddEvenMerge` or `BitonicMerge`. `ordering::AbstractSortingNetworkOrdering` picks
    the order of the network variables: `ComparatorOrdering` or `WireOrdering`. Both abstract types

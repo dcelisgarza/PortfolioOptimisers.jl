@@ -1,11 +1,11 @@
 ```@meta
-Description = "OWA risk measures (b), public API of PortfolioOptimisers.jl: IterativeOrderedWeightsArray, AbstractSortingNetworkMerge, OddEvenMerge, BitonicMerge, …"
+Description = "OWA risk measures (b), public API of PortfolioOptimisers.jl: SortingNetworkOrderedWeightsArray, AbstractSortingNetworkMerge, OddEvenMerge, BitonicMerge, …"
 ```
 
 # OWA risk measures (b)
 
 ```@docs
-IterativeOrderedWeightsArray
+SortingNetworkOrderedWeightsArray
 PortfolioOptimisers.AbstractSortingNetworkMerge
 OddEvenMerge
 BitonicMerge

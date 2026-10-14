@@ -8,7 +8,7 @@ Description = "OWA risk measures (b), private API of PortfolioOptimisers.jl: odd
 odd_even_merge_pass!
 bitonic_sort!
 bitonic_merge!
-assert_owa_formulation_weights(::IterativeOrderedWeightsArray, w::VecNum)
+assert_owa_formulation_weights(::SortingNetworkOrderedWeightsArray, w::VecNum)
 resolve_deferred_quantities(x::ComposedFunction{typeof(reverse), <:AbstractOrderedWeightsArrayFunction}, pr::AbstractPriorResult)
 ```
 

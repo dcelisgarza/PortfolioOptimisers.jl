@@ -3,7 +3,7 @@
     PO = PortfolioOptimisers
 
     #=
-    `IterativeOrderedWeightsArray` relaxes a sorting network. Each comparator becomes three
+    `SortingNetworkOrderedWeightsArray` relaxes a sorting network. Each comparator becomes three
     linear rows, and for a nondecreasing weight vector the minimum of the weighted outputs
     is the OWA risk, so the formulation must agree with `ExactOrderedWeightsArray` to the
     solver tolerance for every convex weight builder, on both axes: the network (`merge`)
@@ -37,9 +37,9 @@
         cols = PO.sorting_network_columns(WireOrdering(), c)
         wire = collect(Iterators.flatten(c))
         @test issorted(wire[invperm(cols)])
-        @test IterativeOrderedWeightsArray() ===
-              IterativeOrderedWeightsArray(; merge = BitonicMerge(),
-                                           ordering = ComparatorOrdering())
+        @test SortingNetworkOrderedWeightsArray() ===
+              SortingNetworkOrderedWeightsArray(; merge = BitonicMerge(),
+                                                ordering = ComparatorOrdering())
     end
 
     slv = Solver(; name = :c, solver = Clarabel.Optimizer,
@@ -50,9 +50,9 @@
     rd = ReturnsResult(; nx = string.('A':'F'), X = X)
     pr = prior(EmpiricalPrior(), rd)
     opt = JuMPOptimiser(; pe = pr, slv = slv)
-    algs = (IterativeOrderedWeightsArray(),
-            IterativeOrderedWeightsArray(; merge = OddEvenMerge(),
-                                         ordering = WireOrdering()))
+    algs = (SortingNetworkOrderedWeightsArray(),
+            SortingNetworkOrderedWeightsArray(; merge = OddEvenMerge(),
+                                              ordering = WireOrdering()))
 
     @testset "Exact risk for every convex weight builder" begin
         ws = [owa_gmd, owa_cvar, owa_tg, owa_wr, owa_rg, owa_cvarrg, owa_tgrg,
@@ -67,7 +67,7 @@
             f = OrderedWeightsArray(; w = w)
             @test isapprox(f(X * ri.w), f(X * re.w); rtol = 1e-6)
             # The model's risk is the risk of its own weights, so it is exact, not a bound.
-            @test isapprox(JuMP.value(ri.model[:iowa_risk_1]), f(X * ri.w); rtol = 1e-6)
+            @test isapprox(JuMP.value(ri.model[:sowa_risk_1]), f(X * ri.w); rtol = 1e-6)
         end
     end
 
@@ -75,17 +75,17 @@
         w = owa_l_moment(10, 4)
         @test !issorted(w)
         @test_throws DomainError OrderedWeightsArray(; w = w,
-                                                     alg = IterativeOrderedWeightsArray())
+                                                     alg = SortingNetworkOrderedWeightsArray())
         # The range checks `w1 - reverse(w2)`, which here is a decreasing vector.
         @test !issorted(reverse(owa_tg(10)) - reverse(zeros(10)))
         @test_throws DomainError OrderedWeightsArrayRange(; w1 = reverse(owa_tg(10)),
                                                           w2 = zeros(10),
-                                                          alg = IterativeOrderedWeightsArray())
+                                                          alg = SortingNetworkOrderedWeightsArray())
         # The exact formulation still takes the vector, so only the network refuses it.
         @test OrderedWeightsArray(; w = w, alg = ExactOrderedWeightsArray()).w === w
         # A callable is checked when the model is built.
         r = OrderedWeightsArray(; w = T -> owa_l_moment(T, 4),
-                                alg = IterativeOrderedWeightsArray())
+                                alg = SortingNetworkOrderedWeightsArray())
         err = try
             optimise(MeanRisk(; r = r, obj = MinimumRisk(), opt = opt))
             nothing
@@ -138,7 +138,7 @@
                                     obj = MinimumRisk(), opt = opt))
             g = OrderedWeightsArrayRange()
             @test isapprox(g(X * rg.w), g(X * rge.w); rtol = 1e-6)
-            @test isapprox(JuMP.value(rg.model[:iowa_range_risk_1]), g(X * rg.w);
+            @test isapprox(JuMP.value(rg.model[:sowa_range_risk_1]), g(X * rg.w);
                            rtol = 1e-6)
         end
     end

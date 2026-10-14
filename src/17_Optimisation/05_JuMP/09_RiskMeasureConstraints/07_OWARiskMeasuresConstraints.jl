@@ -42,7 +42,7 @@ Add Ordered Weights Array (OWA) risk constraints to `model` using the exact form
 The exact formulation is the linear programme that is dual to the assignment problem which
 sorts the sample. It adds two `T × 1` auxiliary variables and one `T × T` block of linear
 constraints, and the risk is the sum of the two auxiliary variables. The block costs
-``T^{2}`` constraints. For a long sample, [`IterativeOrderedWeightsArray`](@ref) gives the
+``T^{2}`` constraints. For a long sample, [`SortingNetworkOrderedWeightsArray`](@ref) gives the
 same exact risk at ``O(T \\log^{2} T)`` rows.
 
 The programme pairs the largest weight with the largest sorted return, so it attains
@@ -235,7 +235,7 @@ precision.
 The gap was measured here against the functor at `T = 100`, `N = 8` with the default `p`. The
 Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range
 is 0.37 % high. A fourth-order L-moment weight vector, which is not linear, is 4.5 % high, so
-prefer [`IterativeOrderedWeightsArray`](@ref) for a weight vector that is far from a line.
+prefer [`SortingNetworkOrderedWeightsArray`](@ref) for a weight vector that is far from a line.
 
 # Mathematical definition
 
@@ -423,7 +423,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add the relaxed sorting network of an [`IterativeOrderedWeightsArray`](@ref) to `model`, and return the OWA risk expression of the weight vector `owa_w`.
+Add the relaxed sorting network of a [`SortingNetworkOrderedWeightsArray`](@ref) to `model`, and return the OWA risk expression of the weight vector `owa_w`.
 
 The network reads the `owa` variable of [`set_owa_constraints!`](@ref), so the fees and the costs enter as they do for [`ExactOrderedWeightsArray`](@ref). The inputs are divided by the largest absolute asset return and the risk is multiplied by it, which keeps the network values near one. The OWA risk is positively homogeneous, so the scale does not change it.
 
@@ -455,7 +455,7 @@ The network reads the `owa` variable of [`set_owa_constraints!`](@ref), so the f
 
 # Related
 
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`sorting_network`](@ref)
   - [`sorting_network_columns`](@ref)
   - [`set_owa_constraints!`](@ref)
@@ -464,7 +464,7 @@ The network reads the `owa` variable of [`set_owa_constraints!`](@ref), so the f
 
   - $(ref_dict[:goemans2015])
 """
-function set_sorting_network_owa!(model::JuMP.Model, alg::IterativeOrderedWeightsArray,
+function set_sorting_network_owa!(model::JuMP.Model, alg::SortingNetworkOrderedWeightsArray,
                                   X::MatNum, owa_w::VecNum; prefix::Symbol = Symbol(""))
     assert_owa_formulation_weights(alg, owa_w)
     sc = get_constraint_scale(model)
@@ -532,7 +532,7 @@ Where:
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::OrderedWeightsArray{<:Any, <:Any, <:IterativeOrderedWeightsArray}`: The OWA risk
+  - `r::OrderedWeightsArray{<:Any, <:Any, <:SortingNetworkOrderedWeightsArray}`: The OWA risk
     measure with the sorting-network formulation.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
@@ -547,12 +547,12 @@ Where:
 
 # Returns
 
-  - `iowa_risk`: The OWA risk expression added to the model.
+  - `sowa_risk`: The OWA risk expression added to the model.
 
 # Related
 
   - [`OrderedWeightsArray`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`set_sorting_network_owa!`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 
@@ -562,20 +562,20 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,
-                                                      <:IterativeOrderedWeightsArray},
+                                                      <:SortingNetworkOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
     owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w; prefix = prefix)
-    state_set!(model, prefix, :iowa_z_, i, net.z)
-    state_set!(model, prefix, :ciowa_eq_, i, net.c_eq)
-    state_set!(model, prefix, :ciowa_a_, i, net.c_a)
-    state_set!(model, prefix, :ciowa_b_, i, net.c_b)
-    iowa_risk = state_set!(model, prefix, :iowa_risk_, i, net.risk)
-    set_risk_bounds_and_expression!(model, opt, iowa_risk, r.settings, :iowa_risk_, i;
+    state_set!(model, prefix, :sowa_z_, i, net.z)
+    state_set!(model, prefix, :csowa_eq_, i, net.c_eq)
+    state_set!(model, prefix, :csowa_a_, i, net.c_a)
+    state_set!(model, prefix, :csowa_b_, i, net.c_b)
+    sowa_risk = state_set!(model, prefix, :sowa_risk_, i, net.risk)
+    set_risk_bounds_and_expression!(model, opt, sowa_risk, r.settings, :sowa_risk_, i;
                                     prefix = prefix)
-    return iowa_risk
+    return sowa_risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -606,7 +606,7 @@ Where:
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:IterativeOrderedWeightsArray}`: The
+  - `r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:SortingNetworkOrderedWeightsArray}`: The
     OWA range risk measure with the sorting-network formulation.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
@@ -621,12 +621,12 @@ Where:
 
 # Returns
 
-  - `iowa_range_risk`: The OWA range risk expression added to the model.
+  - `sowa_range_risk`: The OWA range risk expression added to the model.
 
 # Related
 
   - [`OrderedWeightsArrayRange`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`set_sorting_network_owa!`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 
@@ -636,19 +636,19 @@ Where:
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
-                                                           <:IterativeOrderedWeightsArray},
+                                                           <:SortingNetworkOrderedWeightsArray},
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
     T = get_T(model)
     owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
     owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
     net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w1 - owa_w2; prefix = prefix)
-    state_set!(model, prefix, :iowa_range_z_, i, net.z)
-    state_set!(model, prefix, :ciowa_range_eq_, i, net.c_eq)
-    state_set!(model, prefix, :ciowa_range_a_, i, net.c_a)
-    state_set!(model, prefix, :ciowa_range_b_, i, net.c_b)
-    iowa_range_risk = state_set!(model, prefix, :iowa_range_risk_, i, net.risk)
-    set_risk_bounds_and_expression!(model, opt, iowa_range_risk, r.settings,
-                                    :iowa_range_risk_, i; prefix = prefix)
-    return iowa_range_risk
+    state_set!(model, prefix, :sowa_range_z_, i, net.z)
+    state_set!(model, prefix, :csowa_range_eq_, i, net.c_eq)
+    state_set!(model, prefix, :csowa_range_a_, i, net.c_a)
+    state_set!(model, prefix, :csowa_range_b_, i, net.c_b)
+    sowa_range_risk = state_set!(model, prefix, :sowa_range_risk_, i, net.risk)
+    set_risk_bounds_and_expression!(model, opt, sowa_range_risk, r.settings,
+                                    :sowa_range_risk_, i; prefix = prefix)
+    return sowa_range_risk
 end

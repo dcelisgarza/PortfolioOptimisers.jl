@@ -1856,7 +1856,7 @@ Determines whether OWA weights are computed exactly or approximately.
 # Related
 
   - [`ExactOrderedWeightsArray`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
   - [`OrderedWeightsArrayRange`](@ref)
@@ -1874,14 +1874,14 @@ $(DocStringExtensions.TYPEDEF)
 
 OWA formulation that computes the exact OWA risk by solving a linear programme.
 
-It adds two vector variables `a` and `b` of length `T` and the `T × T` block of constraints ``y_{i} w_{j} \\leq a_{j} + b_{i}``, and the risk is ``\\sum_{t} (a_{t} + b_{t})``. This is the dual of the assignment problem that orders the sample. It costs `T^2` constraints. For a long sample, [`IterativeOrderedWeightsArray`](@ref) gives the same exact risk at ``O(T \\log^{2} T)`` rows, and [`ApproxOrderedWeightsArray`](@ref) gives an upper bound at a lower cost.
+It adds two vector variables `a` and `b` of length `T` and the `T × T` block of constraints ``y_{i} w_{j} \\leq a_{j} + b_{i}``, and the risk is ``\\sum_{t} (a_{t} + b_{t})``. This is the dual of the assignment problem that orders the sample. It costs `T^2` constraints. For a long sample, [`SortingNetworkOrderedWeightsArray`](@ref) gives the same exact risk at ``O(T \\log^{2} T)`` rows, and [`ApproxOrderedWeightsArray`](@ref) gives an upper bound at a lower cost.
 
 The programme pairs the largest weight with the largest sorted return, so it attains ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This is the OWA risk when, and only when, the weight vector is monotonic non-decreasing, which is also the condition for the risk measure to be convex. Every weight builder in this package returns such a vector. A weight vector supplied out of order is sorted by the programme, so the model and the functor then disagree.
 
 # Related
 
   - [`OrderedWeightsArrayFormulation`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
 
@@ -1899,7 +1899,7 @@ OWA formulation that approximates the OWA risk using a set of p-norm parameters.
 
 It relaxes the dual representation of the OWA risk, replacing the `T × T` constraint block of [`ExactOrderedWeightsArray`](@ref) by one p-norm constraint for each entry of `p`. It keeps only the properties of the weight vector that a reordering leaves unchanged: the minimum, the maximum, the sum, and one p-norm for each entry of `p`. Every reordering of the weight vector meets those properties, so the risk is an upper bound on the exact OWA risk, and the gap closes as the weight vector approaches a line.
 
-[owa3](@citet) studies the linear case. For the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations, [owa3](@cite) reports the same objective value as the exact formulation, to the printed precision. Measured against the functor at `T = 100`, `N = 8` with the default `p`, the Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range is 0.37 % high. A fourth-order L-moment weight vector, which is not linear, is 4.5 % high. This formulation is the fastest of the three. For a weight vector that is far from a line, prefer an exact formulation: [`IterativeOrderedWeightsArray`](@ref) for a long sample, and [`ExactOrderedWeightsArray`](@ref) for a short one.
+[owa3](@citet) studies the linear case. For the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations, [owa3](@cite) reports the same objective value as the exact formulation, to the printed precision. Measured against the functor at `T = 100`, `N = 8` with the default `p`, the Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range is 0.37 % high. A fourth-order L-moment weight vector, which is not linear, is 4.5 % high. This formulation is the fastest of the three. For a weight vector that is far from a line, prefer an exact formulation: [`SortingNetworkOrderedWeightsArray`](@ref) for a long sample, and [`ExactOrderedWeightsArray`](@ref) for a short one.
 
 # Fields
 
@@ -1929,7 +1929,7 @@ ApproxOrderedWeightsArray
 
   - [`OrderedWeightsArrayFormulation`](@ref)
   - [`ExactOrderedWeightsArray`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`OrderedWeightsArray`](@ref)
 
 # References
@@ -2015,7 +2015,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `w` is a `VecNum`: `!isempty(w)`.
-  - If `w` is a `VecNum` and `alg` is an [`IterativeOrderedWeightsArray`](@ref): `issorted(w)`. Raises a `DomainError`. A callable `w` is checked when the model is built.
+  - If `w` is a `VecNum` and `alg` is a [`SortingNetworkOrderedWeightsArray`](@ref): `issorted(w)`. Raises a `DomainError`. A callable `w` is checked when the model is built.
 
 # Functor
 
@@ -2046,7 +2046,7 @@ OrderedWeightsArray
   - [`OrderedWeightsArrayRange`](@ref)
   - [`OrderedWeightsArrayFormulation`](@ref)
   - [`ExactOrderedWeightsArray`](@ref)
-  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`SortingNetworkOrderedWeightsArray`](@ref)
   - [`ApproxOrderedWeightsArray`](@ref)
   - [`RiskMeasureSettings`](@ref)
 

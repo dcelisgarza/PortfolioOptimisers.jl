@@ -11,8 +11,8 @@ set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArrayRange{<:A
 set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArray{<:Any, <:Any, <:ApproxOrderedWeightsArray}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:ApproxOrderedWeightsArray}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_sorting_network_owa!
-set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArray{<:Any, <:Any, <:IterativeOrderedWeightsArray}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
-set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:IterativeOrderedWeightsArray}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArray{<:Any, <:Any, <:SortingNetworkOrderedWeightsArray}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_risk_constraints!(model::JuMP.Model, i::Any, r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:SortingNetworkOrderedWeightsArray}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```
 
 ## References

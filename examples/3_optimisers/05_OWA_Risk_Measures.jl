@@ -30,7 +30,7 @@ This page covers three points about OWA measures.
 !!! note "Exact and approximate formulations"
     [`OrderedWeightsArray`](@ref) has three formulations. `ExactOrderedWeightsArray` is a
     linear programme that adds `T × T` constraints for `T` observations, so it grows fast
-    with the length of the sample. `IterativeOrderedWeightsArray` gives the same exact risk
+    with the length of the sample. `SortingNetworkOrderedWeightsArray` gives the same exact risk
     through a relaxed sorting network of `O(T log² T)` linear constraints, so it is the exact
     formulation for a long sample. The approximate one, `ApproxOrderedWeightsArray`, is the
     default and the fastest. It replaces those constraints with one p-norm constraint for
@@ -157,7 +157,7 @@ same.
 
 Use the approximate formulation when the time of the solve matters most. When the weights are far
 from linear in rank, the approximation is less close, so use an exact formulation:
-`IterativeOrderedWeightsArray` for a long sample, and `ExactOrderedWeightsArray` for a short one.
+`SortingNetworkOrderedWeightsArray` for a long sample, and `ExactOrderedWeightsArray` for a short one.
 =#
 
 r_approx = OrderedWeightsArray()
