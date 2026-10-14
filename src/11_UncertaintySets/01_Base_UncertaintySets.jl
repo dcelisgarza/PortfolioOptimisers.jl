@@ -512,27 +512,25 @@ function expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing,
     return set
 end
 """
-    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Bool = false,
-        kwargs...)
+    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
 
 Fits both uncertainty sets in one pass from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method, so an estimator that shares a prior or a simulation between the two axes computes it once.
+The method unpacks the container and forwards to the matrix method, so an estimator that shares a prior or a simulation between the two axes computes it once. It takes no keyword: the container carries every input of the fit, and the prior of the set states the source of the returns, so an unknown keyword is a `MethodError` and is not ignored.
 
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
- 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 5. Forward to `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
+ 3. Read the source that `uc.pe` states with [`returns_source`](@ref), giving `x_src`. The set holds no source of its own: it gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
+ 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
+ 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Forward to `ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, giving the pair of fitted sets. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
   - `uc`: Uncertainty set estimator. Used to construct the uncertainty set.
   - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
-  - $(arg_dict[:brt_read])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Validation
 
@@ -551,36 +549,34 @@ The method unpacks the container and forwards to the matrix method, so an estima
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Bool = false,
-             kwargs...)
+function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
-    rd = shared_series_view(rd, brt, reads_factor_returns(uc.pe))
-    return ucs(uc, benchmark_relative_returns(rd, brt), rd.F; iv = rd.iv, ivpa = rd.ivpa,
-               kwargs..., dims = 1)
+    x_src = returns_source(uc.pe)
+    rd = shared_series_view(rd, x_src, reads_factor_returns(uc.pe))
+    return ucs(uc, benchmark_relative_returns(rd, x_src), rd.F; iv = rd.iv, ivpa = rd.ivpa,
+               dims = 1)
 end
 """
-    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Bool = false,
-           kwargs...)
+    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
 
 Fits the mean uncertainty set from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method. A caller that needs both axes calls [`ucs`](@ref) instead, which fits them in one pass.
+The method unpacks the container and forwards to the matrix method. A caller that needs both axes calls [`ucs`](@ref) instead, which fits them in one pass. It takes no keyword, as [`ucs`](@ref) states.
 
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
- 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 5. Forward to `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
+ 3. Read the source that `uc.pe` states with [`returns_source`](@ref), giving `x_src`. The set holds no source of its own: it gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
+ 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
+ 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Forward to `mu_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, giving the fitted mean set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
   - `uc`: Uncertainty set estimator. Used to construct the expected returns uncertainty set.
   - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
-  - $(arg_dict[:brt_read])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Validation
 
@@ -599,36 +595,34 @@ The method unpacks the container and forwards to the matrix method. A caller tha
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Bool = false,
-                kwargs...)
+function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
-    rd = shared_series_view(rd, brt, reads_factor_returns(uc.pe))
-    return mu_ucs(uc, benchmark_relative_returns(rd, brt), rd.F; iv = rd.iv, ivpa = rd.ivpa,
-                  kwargs..., dims = 1)
+    x_src = returns_source(uc.pe)
+    rd = shared_series_view(rd, x_src, reads_factor_returns(uc.pe))
+    return mu_ucs(uc, benchmark_relative_returns(rd, x_src), rd.F; iv = rd.iv,
+                  ivpa = rd.ivpa, dims = 1)
 end
 """
-    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; brt::Bool = false,
-              kwargs...)
+    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
 
 Fits the covariance uncertainty set from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method. An estimator with no covariance analogue raises there, as [`CharacteristicUncertaintySet`](@ref) does.
+The method unpacks the container and forwards to the matrix method. An estimator with no covariance analogue raises there, as [`CharacteristicUncertaintySet`](@ref) does. It takes no keyword, as [`ucs`](@ref) states.
 
 # Algorithm
 
  1. Check that `rd.X` is not `nothing`, and raise otherwise.
  2. When `uc.pe`'s estimator tree requires factor returns — when [`needs_factor_returns`](@ref) answers `true` — check that `rd.F` is not `nothing`, and raise otherwise. A factor leaf reads the factor returns, wherever it sits in the tree, and no other prior does.
- 3. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `brt`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
- 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`.
- 5. Forward to `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` comes last, because a `ReturnsResult` holds its observations along the rows.
+ 3. Read the source that `uc.pe` states with [`returns_source`](@ref), giving `x_src`. The set holds no source of its own: it gives the returns to its prior, and the prior states the source. A set with `pe = nothing` reads `rd.X`.
+ 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for `uc.pe`.
+ 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Forward to `sigma_ucs(uc, X, rd.F; iv = rd.iv, ivpa = rd.ivpa, dims = 1)`, giving the fitted covariance set. The implied volatility fields travel with the returns, because a prior that reads them takes them by keyword. `dims = 1` states that a `ReturnsResult` holds its observations along the rows.
 
 # Arguments
 
   - `uc`: Uncertainty set estimator. Used to construct the covariance uncertainty set.
   - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
-  - $(arg_dict[:brt_read])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Validation
 
@@ -647,13 +641,13 @@ The method unpacks the container and forwards to the matrix method. An estimator
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult;
-                   brt::Bool = false, kwargs...)
+function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
-    rd = shared_series_view(rd, brt, reads_factor_returns(uc.pe))
-    return sigma_ucs(uc, benchmark_relative_returns(rd, brt), rd.F; iv = rd.iv,
-                     ivpa = rd.ivpa, kwargs..., dims = 1)
+    x_src = returns_source(uc.pe)
+    rd = shared_series_view(rd, x_src, reads_factor_returns(uc.pe))
+    return sigma_ucs(uc, benchmark_relative_returns(rd, x_src), rd.F; iv = rd.iv,
+                     ivpa = rd.ivpa, dims = 1)
 end
 """
     ucs(ue::AbstractPriorUncertaintySetEstimator, ::AbstractPriorResult; kwargs...)
@@ -731,6 +725,37 @@ function reads_prior_result(::Option{<:AbstractUncertaintySetResult})::Bool
     return false
 end
 """
+    reader_frames(ue::AbstractUncertaintySetEstimator, path::AbstractString, refit::Bool)
+    reader_frames(ue::AbstractPriorUncertaintySetEstimator, path::AbstractString, refit::Bool)
+
+Return the frames that the prior of an uncertainty set adds to the group of the optimiser that holds the set.
+
+An uncertainty set holds no source of its own. It gives the returns to its `pe`, and that prior states the source, so the walk passes through to `pe` at the path `"<path>.pe"`. The warning of [`warn_raw_readers`](@ref) then names the prior of a set as, for example, `"r.ucs.pe"`. A set with `pe = nothing` reads the Prior Result of the optimiser, so it adds no frames. An [`AbstractPriorUncertaintySetEstimator`](@ref) holds no prior, and a built set reads no returns, so both add no frames.
+
+# Arguments
+
+  - `ue`: The uncertainty set estimator.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the prior of the set.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`reads_prior_result`](@ref)
+  - [`ucs`](@ref)
+"""
+function reader_frames(ue::AbstractUncertaintySetEstimator, path::AbstractString,
+                       refit::Bool)
+    return reader_frames(ue.pe, join_path(path, :pe), refit)
+end
+function reader_frames(::AbstractPriorUncertaintySetEstimator, ::AbstractString, ::Bool)
+    return ReturnsFrames()
+end
+"""
     ucs_prior(pe::AbstractLowOrderPriorEstimator, X::MatNum,
               F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     ucs_prior(::Nothing, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
@@ -769,8 +794,7 @@ function ucs_prior(::Nothing, ::MatNum, ::Option{<:MatNum} = nothing; kwargs...)
     return throw(ArgumentError("this uncertainty set holds no prior estimator of its own (`pe = nothing`), so it is calibrated on a prior result it is handed and cannot be fitted from returns data. Call `ucs(ue, pr)`, `mu_ucs(ue, pr)` or `sigma_ucs(ue, pr)` with the fitted prior, or set `pe` to fit one from the returns."))
 end
 """
-    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult;
-        brt::Bool = false, kwargs...)
+    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult)
 
 Fits both uncertainty sets from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
 
@@ -787,10 +811,8 @@ The prior is dropped rather than checked on the first row. An estimator that car
 # Arguments
 
   - `uc`: Uncertainty set estimator, built pair, or `nothing`.
-  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, and dropped by a prior-reading one.
+  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, under the source that its `pe` states, and dropped by a prior-reading one. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
   - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by one with a `pe` of its own.
-  - $(arg_dict[:brt_read]) Read only by an estimator with a `pe` of its own. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
 
@@ -804,16 +826,15 @@ The prior is dropped rather than checked on the first row. An estimator that car
   - [`AbstractPriorUncertaintySetEstimator`](@ref)
 """
 function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
-             pr::AbstractPriorResult; brt::Bool = false, kwargs...)
+             pr::AbstractPriorResult)
     return if reads_prior_result(uc)
-        ucs(uc, pr; rd = rd, kwargs...)
+        ucs(uc, pr; rd = rd)
     else
-        ucs(uc, rd; brt = brt, kwargs...)
+        ucs(uc, rd)
     end
 end
 """
-    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult;
-           brt::Bool = false, kwargs...)
+    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult)
 
 Fits the mean uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
 
@@ -822,10 +843,8 @@ This is the form the robust-return builder calls. The routing table of [`ucs`](@
 # Arguments
 
   - `uc`: Uncertainty set estimator, built set, or `nothing`.
-  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, and dropped by a prior-reading one.
+  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, under the source that its `pe` states, and dropped by a prior-reading one. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
   - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by one with a `pe` of its own.
-  - $(arg_dict[:brt_read]) Read only by an estimator with a `pe` of its own. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
 
@@ -839,16 +858,15 @@ This is the form the robust-return builder calls. The routing table of [`ucs`](@
   - [`AbstractPriorUncertaintySetEstimator`](@ref)
 """
 function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
-                pr::AbstractPriorResult; brt::Bool = false, kwargs...)
+                pr::AbstractPriorResult)
     return if reads_prior_result(uc)
-        mu_ucs(uc, pr; rd = rd, kwargs...)
+        mu_ucs(uc, pr; rd = rd)
     else
-        mu_ucs(uc, rd; brt = brt, kwargs...)
+        mu_ucs(uc, rd)
     end
 end
 """
-    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult;
-              brt::Bool = false, kwargs...)
+    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult, pr::AbstractPriorResult)
 
 Fits the covariance uncertainty set from an estimator that is handed the returns data **and** the prior result the optimisation is solving on.
 
@@ -857,10 +875,8 @@ This is the form the uncertainty set variance builder calls. The routing table o
 # Arguments
 
   - `uc`: Uncertainty set estimator, built set, or `nothing`.
-  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, and dropped by a prior-reading one.
+  - `rd`: [`ReturnsResult`](@ref). Read by an estimator with a `pe` of its own, under the source that its `pe` states, and dropped by a prior-reading one. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
   - `pr`: [`AbstractPriorResult`](@ref). Read by a prior-reading estimator, and dropped by one with a `pe` of its own.
-  - $(arg_dict[:brt_read]) Read only by an estimator with a `pe` of its own. A prior-reading estimator reads `pr`, which is already in the frame that the prior was fitted in.
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
 
 # Returns
 
@@ -874,11 +890,11 @@ This is the form the uncertainty set variance builder calls. The routing table o
   - [`AbstractPriorUncertaintySetEstimator`](@ref)
 """
 function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult,
-                   pr::AbstractPriorResult; brt::Bool = false, kwargs...)
+                   pr::AbstractPriorResult)
     return if reads_prior_result(uc)
-        sigma_ucs(uc, pr; rd = rd, kwargs...)
+        sigma_ucs(uc, pr; rd = rd)
     else
-        sigma_ucs(uc, rd; brt = brt, kwargs...)
+        sigma_ucs(uc, rd)
     end
 end
 """

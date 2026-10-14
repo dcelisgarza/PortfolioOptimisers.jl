@@ -21,4 +21,5 @@ vec_quantile_bounds
 ucs_dimension
 ellipsoidal_set
 box_quantile_bounds
+PortfolioOptimisers.reader_frames(::AbstractUncertaintySetEstimator, ::AbstractString, ::Bool)
 ```

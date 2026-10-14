@@ -892,7 +892,8 @@ UncertaintySetVariance
             │          │           me ┼ SimpleExpectedReturns
             │          │              │   w ┴ nothing
             │          │      horizon ┼ nothing
-            │          │   fill_limit ┴ nothing
+            │          │   fill_limit ┼ nothing
+            │          │        x_src ┴ nothing
             │      alg ┼ BoxUncertaintySetAlgorithm()
             │    n_sim ┼ Int64: 3000
             │        q ┼ Float64: 0.05
@@ -1297,7 +1298,7 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
                                   corner = r.corner)
 end
 """
-    ucs_risk_measure(r, rd::ReturnsResult; brt::Bool = false)
+    ucs_risk_measure(r, rd::ReturnsResult)
 
 Fit the uncertainty set of an [`UncertaintySetVariance`](@ref) on the returns data `rd`, so that the set becomes an [`AbstractUncertaintySetResult`](@ref).
 
@@ -1305,7 +1306,7 @@ Fit the uncertainty set of an [`UncertaintySetVariance`](@ref) on the returns da
 
 Three inputs return unchanged. A measure of another type returns unchanged. A set that is already a result passes through [`sigma_ucs`](@ref) unchanged. An estimator that reads a prior result, one for which [`reads_prior_result`](@ref) is `true`, returns unchanged too. Such an estimator is an [`AbstractPriorUncertaintySetEstimator`](@ref), or an estimator of returns data with `pe = nothing`. It is fitted on the prior of the optimisation, and no prior exists when this method runs, so each solve fits it later from its own prior. A vector of measures is fitted element by element.
 
-The set reads the returns of `rd` that [`benchmark_relative_returns`](@ref) gives under `brt`, so a [`NearOptimalCentering`](@ref) that optimises in excess of its benchmark fits the set on `X - B`, as its prior is fitted.
+The set reads the returns of `rd` under the source that its own `pe` states, see [`sigma_ucs`](@ref). A set whose prior states `x_src = ExcessSource()` fits on `X - B`, whatever the source of the prior of the optimiser is.
 
 # Related
 
@@ -1314,7 +1315,7 @@ The set reads the returns of `rd` that [`benchmark_relative_returns`](@ref) give
   - [`reads_prior_result`](@ref)
   - [`near_optimal_centering_setup`](@ref)
 """
-function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult; brt::Bool = false)
+function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult)
     # The pre-fit runs before any prior exists. An estimator that is calibrated on the
     # optimisation's own prior result has nothing to fit here, so it passes through unchanged
     # and each corner solve fits it inside its own builder, from the prior that solve was
@@ -1322,17 +1323,42 @@ function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult; brt::Boo
     return if reads_prior_result(r.ucs)
         r
     else
-        UncertaintySetVariance(; settings = r.settings,
-                               ucs = sigma_ucs(r.ucs, rd; brt = brt), sigma = r.sigma,
-                               mtx_sqrt = r.mtx_sqrt, ratio_alg = r.ratio_alg,
-                               corner = r.corner)
+        UncertaintySetVariance(; settings = r.settings, ucs = sigma_ucs(r.ucs, rd),
+                               sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
+                               ratio_alg = r.ratio_alg, corner = r.corner)
     end
 end
-function ucs_risk_measure(r::Any, ::ReturnsResult; brt::Bool = false)
+function ucs_risk_measure(r::Any, ::ReturnsResult)
     return r
 end
-function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult; brt::Bool = false)
-    return ucs_risk_measure.(rs, Ref(rd); brt = brt)
+function ucs_risk_measure(rs::VecBaseRM, rd::ReturnsResult)
+    return ucs_risk_measure.(rs, Ref(rd))
+end
+"""
+    reader_frames(r::UncertaintySetVariance, path::AbstractString, refit::Bool)
+
+Return the frames that the uncertainty set of an [`UncertaintySetVariance`](@ref) adds to the group of the optimiser that holds the measure.
+
+The measure holds its reader in `ucs`, so the walk passes through to the set at the path `"<path>.ucs"`, and the set passes through to its own prior. A built set, `nothing` and a set that reads the Prior Result add no frames.
+
+# Arguments
+
+  - `r`: The risk measure.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the uncertainty set of the measure.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+  - [`ucs_risk_measure`](@ref)
+"""
+function reader_frames(r::UncertaintySetVariance, path::AbstractString, refit::Bool)
+    return reader_frames(r.ucs, join_path(path, :ucs), refit)
 end
 function port_opt_view(r::UncertaintySetVariance, i, args...)
     ucs = port_opt_view(r.ucs, i)

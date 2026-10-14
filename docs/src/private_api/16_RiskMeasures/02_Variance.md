@@ -18,4 +18,5 @@ _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
 _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, Nothing})
 ucs_risk_measure
 ucs_variance
+PortfolioOptimisers.reader_frames(::UncertaintySetVariance, ::AbstractString, ::Bool)
 ```

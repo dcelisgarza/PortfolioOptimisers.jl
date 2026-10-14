@@ -1684,35 +1684,35 @@ end
         dt = DataBenchmarkTracking()
         @test isnothing(dt.B)
         # The binding reads the rows, and replaces a benchmark bound earlier.
-        @test po.bind_data_benchmark(dt, rdv, false).B === rdv.B
-        @test po.bind_data_benchmark(po.bind_data_benchmark(dt, rdv, false), rdm, false).B ===
-              rdm.B
+        @test po.bind_data_benchmark(dt, rdv).B === rdv.B
+        @test po.bind_data_benchmark(po.bind_data_benchmark(dt, rdv), rdm).B === rdm.B
         # An object with no data benchmark, and a reader with no returns data, give the
         # object itself.
         tw = TrackingError(; tr = WeightsTracking(; w = wb), err = 0.01)
         rs = [Variance(), TrackingRiskMeasure(; tr = WeightsTracking(; w = wb))]
-        @test po.bind_data_benchmark(tw, rdv, false) === tw
-        @test po.bind_data_benchmark(rs, rdv, false) === rs
-        @test po.bind_data_benchmark(dt, nothing, false) === dt
+        @test po.bind_data_benchmark(tw, rdv) === tw
+        @test po.bind_data_benchmark(rs, rdv) === rs
+        @test po.bind_data_benchmark(dt, nothing) === dt
         # A tracking error, a measure, a vector, and the measure that a risk tracker tracks.
         tm = TrackingRiskMeasure(; tr = dt)
-        @test po.bind_data_benchmark(TrackingError(; tr = dt, err = 0.01), rdv, false).tr.B ===
+        @test po.bind_data_benchmark(TrackingError(; tr = dt, err = 0.01), rdv).tr.B ===
               rdv.B
-        @test po.bind_data_benchmark([Variance(), tm], rdv, false)[2].tr.B === rdv.B
+        @test po.bind_data_benchmark([Variance(), tm], rdv)[2].tr.B === rdv.B
         rtr = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = wb), r = tm)
-        @test po.bind_data_benchmark(rtr, rdv, false).r.tr.B === rdv.B
-        # The refusals: brt, returns data with no benchmark, and a reader with no rows.
-        @test_throws ArgumentError po.bind_data_benchmark(dt, rdv, true)
-        @test_throws ArgumentError po.bind_data_benchmark(dt, rdn, false)
+        @test po.bind_data_benchmark(rtr, rdv).r.tr.B === rdv.B
+        # The refusals: returns data with no benchmark, and a reader with no rows. The bind
+        # takes no `brt`: the frame of a prior is refused in the constructor of its holder.
+        @test_throws MethodError po.bind_data_benchmark(dt, rdv, true)
+        @test_throws ArgumentError po.bind_data_benchmark(dt, rdn)
         @test_throws ArgumentError tm(w, X)
         # A vector benchmark is the series, so it equals a returns series of the same rows.
-        bound = po.bind_data_benchmark(tm, rdv, false)
+        bound = po.bind_data_benchmark(tm, rdv)
         @test bound(w, X) == TrackingRiskMeasure(; tr = ReturnsTracking(; w = bv))(w, X)
         @test expected_risk(tm, w, rdv) == bound(w, X)
         @test bound(X * w) == bound(w, X)
         @test po.supports_precomputed_returns(bound)
         # A matrix benchmark gives the series B * w, so the error is that of (X - B) w.
-        mbound = po.bind_data_benchmark(tm, rdm, false)
+        mbound = po.bind_data_benchmark(tm, rdm)
         @test isapprox(mbound(w, X), po.norm_error(L2Norm(), (X - Bm) * w, zeros(T), T))
         @test expected_risk(tm, w, rdm) == mbound(w, X)
         @test !po.supports_precomputed_returns(mbound)
@@ -2436,6 +2436,56 @@ end
         @test PO.ucs_risk_measure(UncertaintySetVariance(; ucs = est), rd).ucs === est
         rs = PO.ucs_risk_measure([UncertaintySetVariance(; ucs = box), Variance()], rd)
         @test rs[1].ucs === box && rs[2] isa Variance
+    end
+
+    @testset "An uncertainty set reads the source of its own prior (#1700)" begin
+        Bv = 0.5 .* X[:, 1]
+        rdb = ReturnsResult(; X = X, nx = string.("A", 1:N), nb = ["BM"], B = Bv)
+        ux = DeltaUncertaintySet(; pe = EmpiricalPrior(; x_src = ExcessSource()))
+        ud = DeltaUncertaintySet(; pe = EmpiricalPrior(; x_src = DataSource()))
+        un = DeltaUncertaintySet(; pe = EmpiricalPrior())
+        # The set gives the returns to its prior, and the prior states the source.
+        @test sigma_ucs(ux, rdb).ub == sigma_ucs(un, X .- Bv).ub
+        @test mu_ucs(ux, rdb).ub == mu_ucs(un, X .- Bv).ub
+        @test ucs(ux, rdb)[2].ub == sigma_ucs(ux, rdb).ub
+        @test sigma_ucs(ud, rdb).ub == sigma_ucs(un, rdb).ub == sigma_ucs(un, X).ub
+        @test sigma_ucs(ux, rdb).ub != sigma_ucs(un, rdb).ub
+        # The three-argument form and the pre-fit of the measure read the same source.
+        @test sigma_ucs(ux, rdb, pr).ub == sigma_ucs(ux, rdb).ub
+        @test mu_ucs(ux, rdb, pr).ub == mu_ucs(ux, rdb).ub
+        @test ucs(ux, rdb, pr)[1].ub == mu_ucs(ux, rdb).ub
+        @test PO.ucs_risk_measure(UncertaintySetVariance(; ucs = ux), rdb).ucs.ub ==
+              sigma_ucs(ux, rdb).ub
+        # An excess prior refuses returns data with no benchmark.
+        @test_throws ArgumentError sigma_ucs(ux, rd)
+        # No verb takes `brt`, and no `kwargs...` sink swallows it.
+        for f in (ucs, mu_ucs, sigma_ucs)
+            @test_throws MethodError f(un, rdb; brt = true)
+            @test_throws MethodError f(un, rdb, pr; brt = true)
+        end
+        @test_throws MethodError PO.ucs_risk_measure(UncertaintySetVariance(; ucs = un),
+                                                     rdb; brt = true)
+        # The walk passes through the measure and the set to the prior of the set.
+        @test PO.reader_frames(ux, "ucs", false).excess
+        @test isempty(PO.reader_frames(ux, "ucs", false).raw)
+        @test PO.reader_frames(un, "ucs", false).raw == ["ucs.pe"]
+        noframes(fr) = !fr.excess && isempty(fr.raw)
+        @test noframes(PO.reader_frames(ud, "ucs", false))
+        usv = UncertaintySetVariance(; ucs = un)
+        @test PO.reader_frames(usv, "r", false).raw == ["r.ucs.pe"]
+        @test PO.reader_frames([Variance(), usv], "r", false).raw == ["r[2].ucs.pe"]
+        rtr = RiskTrackingRiskMeasure(; tr = WeightsTracking(; w = w), r = usv)
+        @test PO.reader_frames(rtr, "r", false).raw == ["r.r.ucs.pe"]
+        rte = PO.RiskTrackingError(; tr = WeightsTracking(; w = w), r = usv, err = 0.01)
+        @test PO.reader_frames(rte, "tr", false).raw == ["tr.r.ucs.pe"]
+        # A set that reads the Prior Result, a built set and a tracker with no reader add
+        # no frames.
+        for x in
+            (DeltaUncertaintySet(; pe = nothing), box, UncertaintySetVariance(; ucs = box),
+             TrackingRiskMeasure(; tr = WeightsTracking(; w = w)),
+             TrackingError(; tr = WeightsTracking(; w = w)))
+            @test noframes(PO.reader_frames(x, "x", false))
+        end
     end
 
     @testset "Validation" begin

@@ -311,7 +311,7 @@ TrackingRiskMeasure
   - [`RiskMeasureSettings`](@ref)
   - [`TurnoverRiskMeasure`](@ref)
   - [`RiskTrackingRiskMeasure`](@ref)
-  - [`AbstractTrackingAlgorithm`](@ref)
+  - [`AbstractTrackingAlgorithm`](@ref): The table of the series that each form tracks under the source of the prior.
   - [`NormError`](@ref)
   - [`norm_error`](@ref)
   - [`port_opt_view`](@ref)
@@ -696,8 +696,8 @@ function supports_precomputed_returns(r::TrackingRiskMeasure{<:Any,
     return isa(r.tr.B, VecNum)
 end
 """
-    bind_data_benchmark(r::TrackingRiskMeasure, rd, brt::Bool)
-    bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd, brt::Bool)
+    bind_data_benchmark(r::TrackingRiskMeasure, rd)
+    bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd)
 
 Bind the [`DataBenchmarkTracking`](@ref) that a tracking measure holds to the benchmark `B` of the returns data `rd`.
 
@@ -715,14 +715,41 @@ A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@r
   - [`DataBenchmarkTracking`](@ref)
   - [`TrackingRiskMeasure`](@ref)
 """
-function bind_data_benchmark(r::TrackingRiskMeasure, rd, brt::Bool)
-    tr = bind_data_benchmark(r.tr, rd, brt)
+function bind_data_benchmark(r::TrackingRiskMeasure, rd)
+    tr = bind_data_benchmark(r.tr, rd)
     return tr === r.tr ? r : rebuild_estimator(r, (; tr = tr))
 end
-function bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd,
-                             brt::Bool)
-    inner = bind_data_benchmark(r.r, rd, brt)
+function bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd)
+    inner = bind_data_benchmark(r.r, rd)
     return inner === r.r ? r : rebuild_estimator(r, (; r = inner))
+end
+"""
+    reader_frames(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure},
+                  path::AbstractString, refit::Bool)
+
+Return the frames that the tracked measure of a risk tracker adds to the group of the optimiser that holds the tracker.
+
+A [`RiskTrackingError`](@ref) and a [`RiskTrackingRiskMeasure`](@ref) hold the measure that they track in `r`, so the walk passes through to it at the path `"<path>.r"`. A measure that holds a reader, such as an [`UncertaintySetVariance`](@ref) with a prior of its own, adds the frames of that reader. A [`TrackingError`](@ref) and a [`TrackingRiskMeasure`](@ref) hold no reader, so they add no frames.
+
+# Arguments
+
+  - `r`: The risk tracker.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the tracked measure.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`RiskTrackingError`](@ref)
+  - [`RiskTrackingRiskMeasure`](@ref)
+"""
+function reader_frames(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure},
+                       path::AbstractString, refit::Bool)
+    return reader_frames(r.r, join_path(path, :r), refit)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
