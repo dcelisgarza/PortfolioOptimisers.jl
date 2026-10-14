@@ -337,7 +337,7 @@ function resolve_risk_inputs(r::BaseRM_VecBaseRM, pr::AbstractPriorResult)
     return factory(r, pr), pr.X
 end
 function resolve_risk_inputs(r::BaseRM_VecBaseRM, rd::ReturnsResult)
-    return bind_data_benchmark(r, rd, false), rd.X
+    return bind_data_benchmark(r, rd), rd.X
 end
 """
     original_returns(X::MatNum_Pr)
@@ -398,37 +398,88 @@ function resolve_factor_risk_inputs(r::BaseRM_VecBaseRM, X::MatNum_Pr)
     return first(resolve_risk_inputs(r, X)), original_returns(X)
 end
 """
-    resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
-                              pr::Option{<:AbstractPriorResult} = nothing;
-                              brt::Bool = false)
+    source_loadings(x_src::Option{<:AbstractReturnsSource},
+                    rr::Option{<:AbstractLoadingsRegressionResult},
+                    re::AbstractTimeSeriesRegressionEstimator)
+
+Return the loadings of the prior that a regression reader takes under its source, or `nothing` when the reader fits its own.
+
+The source of the reader decides, by the table of [`AbstractReturnsSource`](@ref). A stated source that reads the returns data overrides the loadings of the prior, so a caller can fit the regression in a frame that differs from the frame of the prior.
+
+The method that Julia selects is the algorithm.
+
+ 1. `nothing`: return `rr`. The reader fits its own loadings only when the prior holds none.
+ 2. [`PriorSource`](@ref): return `rr`, and refuse `rr === nothing`.
+ 3. Every other source, [`DataSource`](@ref) and [`ExcessSource`](@ref) included: return `nothing`. The reader fits its loadings on the matrix that [`benchmark_relative_returns`](@ref) gives for its source.
+
+# Arguments
+
+  - `x_src`: The source of the regression reader, `returns_source(re)`.
+  - `rr`: The loadings of the prior, or `nothing` when the prior holds none or the call gives no prior.
+  - `re`: The regression reader, for the message of the refusal.
+
+# Validation
+
+  - Under `PriorSource()`, `!isnothing(rr)`. Throws an `ArgumentError` that names the three sources that fit the loadings on the returns data.
+
+# Returns
+
+  - `rr::Option{<:AbstractLoadingsRegressionResult}`: The loadings to take, or `nothing` to fit `re`.
+
+# Related
+
+  - [`resolve_factor_regression`](@ref)
+  - [`factor_space_regression`](@ref)
+  - [`returns_source`](@ref)
+"""
+function source_loadings(::Nothing, rr::Option{<:AbstractLoadingsRegressionResult},
+                         ::AbstractTimeSeriesRegressionEstimator)
+    return rr
+end
+function source_loadings(::AbstractReturnsSource,
+                         ::Option{<:AbstractLoadingsRegressionResult},
+                         ::AbstractTimeSeriesRegressionEstimator)
+    return nothing
+end
+function source_loadings(::PriorSource, rr::Option{<:AbstractLoadingsRegressionResult},
+                         re::AbstractTimeSeriesRegressionEstimator)
+    @argcheck(!isnothing(rr),
+              ArgumentError("`x_src = PriorSource()` makes the `$(nameof(typeof(re)))` take the loadings of the Prior Result only, and the call gives no Prior Result that holds them. State `x_src = nothing`, `x_src = DataSource()` or `x_src = ExcessSource()` on the regression to fit the loadings on the returns data, or give a prior that holds loadings, for example a `FactorPrior`."))
+    return rr
+end
+"""
+    resolve_factor_regression(re::AbstractLoadingsRegressionResult, rd::ReturnsResult,
+                              pr::Option{<:AbstractPriorResult} = nothing)
+    resolve_factor_regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult,
+                              pr::Option{<:AbstractPriorResult} = nothing)
 
 Pick the factor loadings that a factor attribution decomposes against, from the three arguments `re`, `pr` and `rd` that can supply them.
 
-The order of precedence is fixed. A precomputed result is an answer that the caller states, so it needs no data. The loadings of a prior were fitted on `pr.original_X`, which is the matrix that the attribution measures the risk on, so the loadings and the returns agree.
+A precomputed result is an answer that the caller states, so it needs no data. A regression estimator states the source of its loadings in its `x_src` field, and [`source_loadings`](@ref) reads that source. At `x_src = nothing`, the default, the loadings of a prior take precedence over a fit. They were fitted on `pr.original_X`, which is the matrix that the attribution measures the risk on, so the loadings and the returns agree. A stated source that reads the returns data always fits `re`.
 
-!!! warning
-
-    A prior that carries loadings takes precedence over a regression estimator in `re`. The function fits `re` only when the prior carries no loadings. To replace the loadings of a factor prior, pass them as a precomputed [`Regression`](@ref). To fit `re`, pass the returns matrix in place of the prior.
+| `re.x_src`             | The function returns                            |
+|:---------------------- |:----------------------------------------------- |
+| `nothing`              | `pr.rr`, else a fit on `rd.X`                   |
+| [`DataSource`](@ref)   | a fit on `rd.X`                                 |
+| [`ExcessSource`](@ref) | a fit on `rd.X - rd.B`, the Excess Frame        |
+| [`PriorSource`](@ref)  | `pr.rr`, and it refuses a prior that holds none |
 
 # Algorithm
 
  1. When `re` is an `AbstractLoadingsRegressionResult`, return `re`.
- 2. When `pr` is a prior result and `pr.rr` is not `nothing`, return `pr.rr`.
- 3. Check that `rd.X` and `rd.F` are present.
- 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `brt`.
- 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `brt`, giving `X`. Fit and return `regression(re, X, rd.F)`.
+ 2. Return the loadings that [`source_loadings`](@ref) takes from `pr.rr` under the source of `re`, which [`returns_source`](@ref) reads, when they are not `nothing`.
+ 3. Otherwise fit `re` with [`refit_factor_regression`](@ref).
 
 # Arguments
 
   - `re::RegE_Reg`: Regression result or estimator.
   - `rd::ReturnsResult`: Returns result carrying `X` and `F`.
   - `pr::Option{<:AbstractPriorResult}`: Prior result, or `nothing` when the caller passed a bare matrix.
-  - $(arg_dict[:brt_read]) Read only when the function fits `re`.
 
 # Validation
 
-  - When none of the three arms applies, throws an [`IsNothingError`](@ref) naming all three.
-  - The rules of [`benchmark_relative_returns`](@ref), when the function fits `re`.
+  - The rule of [`source_loadings`](@ref): under `PriorSource()`, a call with no prior loadings throws an `ArgumentError`.
+  - The rules of [`refit_factor_regression`](@ref), when the function fits `re`.
 
 # Returns
 
@@ -439,20 +490,63 @@ The order of precedence is fixed. A precomputed result is an answer that the cal
   - [`factor_risk_contribution`](@ref)
   - [`set_factor_risk_contribution_constraints!`](@ref)
   - [`regression`](@ref)
+  - [`source_loadings`](@ref)
+  - [`refit_factor_regression`](@ref)
+  - [`AbstractReturnsSource`](@ref)
 """
-function resolve_factor_regression(re::RegE_Reg, rd::ReturnsResult,
-                                   pr::Option{<:AbstractPriorResult} = nothing;
-                                   brt::Bool = false)
-    if isa(re, AbstractLoadingsRegressionResult)
-        return re
-    end
-    if !isnothing(pr) && !isnothing(pr.rr)
-        return pr.rr
-    end
+function resolve_factor_regression(re::AbstractLoadingsRegressionResult, ::ReturnsResult,
+                                   ::Option{<:AbstractPriorResult} = nothing)
+    return re
+end
+function resolve_factor_regression(re::AbstractTimeSeriesRegressionEstimator,
+                                   rd::ReturnsResult,
+                                   pr::Option{<:AbstractPriorResult} = nothing)
+    rr = source_loadings(returns_source(re), isnothing(pr) ? nothing : pr.rr, re)
+    return isnothing(rr) ? refit_factor_regression(re, rd, pr) : rr
+end
+"""
+    refit_factor_regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult,
+                            pr::Option{<:AbstractPriorResult} = nothing)
+
+Fit the factor loadings of a regression reader on the returns that its source names.
+
+[`resolve_factor_regression`](@ref) and [`factor_space_regression`](@ref) call it when the source of `re` takes no loadings of a prior. The source `x_src = returns_source(re)` picks the matrix, as [`benchmark_relative_returns`](@ref) states: `rd.X` under `nothing` and [`DataSource`](@ref), and `rd.X - rd.B` under [`ExcessSource`](@ref).
+
+# Algorithm
+
+ 1. Check that `rd.X` and `rd.F` are present.
+ 2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref) under `x_src`: a gap of the factor returns, and a gap of a vector benchmark under `ExcessSource()`.
+ 3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. Fit and return `regression(re, X, rd.F)`.
+
+# Arguments
+
+  - `re::AbstractTimeSeriesRegressionEstimator`: Regression reader to fit.
+  - `rd::ReturnsResult`: Returns result carrying `X` and `F`.
+  - `pr::Option{<:AbstractPriorResult}`: Prior result of the caller, or `nothing`. Only the message of the refusal reads it.
+
+# Validation
+
+  - `!isnothing(rd.X)` and `!isnothing(rd.F)`. Throws an [`IsNothingError`](@ref) that names the three arguments `re`, `pr` and `rd` that can supply loadings.
+  - The rules of [`benchmark_relative_returns`](@ref).
+
+# Returns
+
+  - `rr::AbstractLoadingsRegressionResult`: The fitted loadings.
+
+# Related
+
+  - [`resolve_factor_regression`](@ref)
+  - [`factor_space_regression`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function refit_factor_regression(re::AbstractTimeSeriesRegressionEstimator,
+                                 rd::ReturnsResult,
+                                 pr::Option{<:AbstractPriorResult} = nothing)
+    x_src = returns_source(re)
     @argcheck(!isnothing(rd.X) && !isnothing(rd.F),
               IsNothingError("a factor decomposition needs loadings, and none of the three arguments `re`, `pr` and `rd` holds any. `re` is an estimator (`$(nameof(typeof(re)))`), so it must fit them from `rd.X` and `rd.F`; the prior carries no factor block to read them from instead.\nSupply the data as `rd`, or pass a precomputed `Regression` as `re`, or pass a prior fitted through a factor model (e.g. `FactorPrior`), which carries its own loadings in `rr`.\nGot\nisnothing(rd.X) => $(isnothing(rd.X))\nisnothing(rd.F) => $(isnothing(rd.F))\nisnothing(pr) => $(isnothing(pr))"))
-    rd = shared_series_view(rd, brt, true)
-    return regression(re, benchmark_relative_returns(rd, brt), rd.F)
+    rd = shared_series_view(rd, x_src, true)
+    return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
 end
 # The prior route of the value-level `expected_risk`. A non-investable asset carries `NaN`
 # in `mu`, on the diagonal of `sigma` and down its column of `pr.X`, so the figure is `NaN`

@@ -236,7 +236,8 @@ $(DocStringExtensions.FIELDS)
         drtgt::DimensionReductionTarget = PCA(),
         retgt::AbstractRegressionTarget = LinearModel(),
         choice::AbstractChoiceRule = BatchChoice(),
-        proj::Option{<:MatNum} = nothing
+        proj::Option{<:MatNum} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> DimensionReductionRegression
 
 Keywords correspond to the struct's fields.
@@ -246,6 +247,7 @@ Keywords correspond to the struct's fields.
   - `retgt` states its observation weights through [`regression_target_weights`](@ref), which returns `retgt.kwargs.weights` for a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref). A caller's own target without that method is refused with an `ArgumentError`.
   - If `regression_target_weights(retgt)` is not `nothing`, it must be an `ObsWeights` and, when it is a vector, not empty.
   - If `proj` is not `nothing`, `!isempty(proj)`, and every entry of `proj` is finite, as [`assert_nonempty_finite_val`](@ref) checks.
+  - `x_src in ALL_RETURNS_SOURCES`, as [`assert_returns_source`](@ref) checks. A regression reader admits every source.
 
 ## Propagated parameters
 
@@ -276,7 +278,8 @@ DimensionReductionRegression
    retgt ┼ LinearModel
          │   kwargs ┴ @NamedTuple{}: NamedTuple()
   choice ┼ BatchChoice()
-    proj ┴ nothing
+    proj ┼ nothing
+   x_src ┴ nothing
 ```
 
 # Related
@@ -289,6 +292,8 @@ DimensionReductionRegression
   - [`StepwiseRegression`](@ref)
   - [`Regression`](@ref)
   - [`PinnedChoice`](@ref)
+  - [`AbstractReturnsSource`](@ref)
+  - [`resolve_factor_regression`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
 
@@ -319,11 +324,16 @@ DimensionReductionRegression
     Components as linear combinations of the original factors, `factors × components`, or `nothing`. Column `k` holds the weight of each factor in component `k`, after the mean of the factors is subtracted. A matrix makes the fit regress each asset on these components and make no reduction. `nothing` makes the fit reduce the factors with `drtgt`.
     """
     proj
+    """
+    $(field_dict[:x_src_re])
+    """
+    x_src
     function DimensionReductionRegression(ve::AbstractVarianceEstimator,
                                           drtgt::DimensionReductionTarget,
                                           retgt::AbstractRegressionTarget,
                                           choice::AbstractChoiceRule,
-                                          proj::Option{<:MatNum})
+                                          proj::Option{<:MatNum},
+                                          x_src::Option{<:AbstractReturnsSource})
         w = regression_target_weights(retgt)
         if !isnothing(w)
             @argcheck(isa(w, ObsWeights),
@@ -333,19 +343,18 @@ DimensionReductionRegression
             end
         end
         assert_nonempty_finite_val(proj, :proj)
-        return new{typeof(ve), typeof(drtgt), typeof(retgt), typeof(choice), typeof(proj)}(ve,
-                                                                                           drtgt,
-                                                                                           retgt,
-                                                                                           choice,
-                                                                                           proj)
+        return new{typeof(ve), typeof(drtgt), typeof(retgt), typeof(choice), typeof(proj),
+                   typeof(x_src)}(ve, drtgt, retgt, choice, proj, x_src)
     end
 end
 function DimensionReductionRegression(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                       drtgt::DimensionReductionTarget = PCA(),
                                       retgt::AbstractRegressionTarget = LinearModel(),
                                       choice::AbstractChoiceRule = BatchChoice(),
-                                      proj::Option{<:MatNum} = nothing)::DimensionReductionRegression
-    return DimensionReductionRegression(ve, drtgt, retgt, choice, proj)
+                                      proj::Option{<:MatNum} = nothing,
+                                      x_src::Option{<:AbstractReturnsSource} = nothing)::DimensionReductionRegression
+    assert_returns_source(x_src, ALL_RETURNS_SOURCES, :DimensionReductionRegression)
+    return DimensionReductionRegression(ve, drtgt, retgt, choice, proj, x_src)
 end
 """
     prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Any, Nothing},
@@ -674,6 +683,59 @@ function pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:
     end
     _, Vp, _, sigma = prep_dim_red_reg(isnothing(w) ? re : factory(re, w), F)
     return rebuild_estimator(re, (; proj = Vp ./ sigma))
+end
+"""
+    returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
+
+Return the source that a regression reader states, its `x_src` field.
+
+A prior that holds a regression reads the returns data and gives the regression a matrix. So the prior refuses a regression whose source is not `nothing`, through [`assert_inner_reader`](@ref), which reads the source with this method.
+
+# Arguments
+
+  - `re`: Regression reader of the returns.
+
+# Returns
+
+  - `x_src::Option{<:AbstractReturnsSource}`: The source of the regression.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`assert_inner_reader`](@ref)
+"""
+function returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
+    return re.x_src
+end
+"""
+    reader_frames(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
+                  path::AbstractString, refit::Bool)
+
+Return the frames that a regression reader adds to the group of the optimiser that holds it.
+
+A regression reader at `x_src = nothing` takes the loadings of the Prior Result when it holds them, and then it reads the frame of the prior. It fits on the raw returns `rd.X` only when the Prior Result holds none. So it counts as a raw reader only when `refit` is `true`, which [`refits_regression`](@ref) answers from the prior estimator of the optimiser. A regression reader is outermost when it sits in a constraint space or in a factor risk optimiser. A regression inside a prior keeps `nothing`, and the prior counts for it.
+
+# Arguments
+
+  - `re`: Regression reader of the returns.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of `re`, from [`source_frames`](@ref) with `raw = refit`.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`source_frames`](@ref)
+  - [`refits_regression`](@ref)
+  - [`resolve_factor_regression`](@ref)
+"""
+function reader_frames(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
+                       path::AbstractString, refit::Bool)
+    return source_frames(re.x_src, path, refit)
 end
 
 export PCA, PPCA, DimensionReductionRegression

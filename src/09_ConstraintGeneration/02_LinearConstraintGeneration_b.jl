@@ -1130,25 +1130,25 @@ end
                        datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
+                       rd::Option{<:ReturnsResult} = nothing)
     linear_constraints(lcs::VecLcE, sets::UniverseSets;
                        datatype::DataType = Float64, strict::Bool = false,
                        bl_flag::Bool = false,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
+                       rd::Option{<:ReturnsResult} = nothing)
 
 Parse the equations a [`LinearConstraintEstimator`](@ref) carries, against the universe key that estimator names.
 
 The method reads `val` and `key` from the estimator and gives both to the equation method, so a single estimator and a vector of estimators have one interface. A vector gives a vector of the same length, one result per element.
 
-The method takes `rr`, so that a caller that holds loadings, such as [`processed_jump_optimiser_attributes`](@ref), can pass them to the value of `lcse` with no check of its type. A bare [`LinearConstraintEstimator`](@ref) ignores them. The asset frame is the absence of a re-basis, and an estimator that re-based itself because loadings were available makes the space depend on the prior and not on what the user wrote. Only a wrapper [`ExposureConstraintEstimator`](@ref) asks for a re-basis. The method takes `rd` for the same reason and ignores it for a stronger one. Only a constraint space can ask for a refit, and a bare estimator has no space. The method takes `brt`, the frame of that refit, and ignores it with `rd`.
+The method takes `rr`, so that a caller that holds loadings, such as [`processed_jump_optimiser_attributes`](@ref), can pass them to the value of `lcse` with no check of its type. A bare [`LinearConstraintEstimator`](@ref) ignores them. The asset frame is the absence of a re-basis, and an estimator that re-based itself because loadings were available makes the space depend on the prior and not on what the user wrote. Only a wrapper [`ExposureConstraintEstimator`](@ref) asks for a re-basis. The method takes `rd` for the same reason and ignores it for a stronger one. Only a constraint space can ask for a refit, and a bare estimator has no space.
 
 # Algorithm
 
  1. Read `val` and `key` from `lcs`.
- 2. Ignore `rr`, `rd` and `brt`, for the reason that the paragraph above gives.
+ 2. Ignore `rr` and `rd`, for the reason that the paragraph above gives.
  3. Return the [`LinearConstraint`](@ref) that the equation method builds from `val`, `sets` and `key`.
- 4. Apply steps 1 to 3 to each element, and return the vector of results, when `lcs` is a vector. `rr`, `rd` and `brt` reach every element, and every element ignores them.
+ 4. Apply steps 1 to 3 to each element, and return the vector of results, when `lcs` is a vector. `rr` and `rd` reach every element, and every element ignores them.
 
 # Arguments
 
@@ -1159,7 +1159,6 @@ The method takes `rr`, so that a caller that holds loadings, such as [`processed
   - `bl_flag`: If `true`, a group expands to the mean over its members, as the Black-Litterman views need. If `false`, it expands to the sum.
   - `rr`: Accepted and dropped. A bare estimator never re-bases.
   - `rd`: Accepted and dropped. A bare estimator never asks for a refit.
-  - `brt`: Accepted and dropped with `rd`.
 
 # Returns
 
@@ -1176,18 +1175,16 @@ function linear_constraints(lcs::LinearConstraintEstimator, sets::UniverseSets;
                             datatype::DataType = Float64, strict::Bool = false,
                             bl_flag::Bool = false,
                             rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                            rd::Option{<:ReturnsResult} = nothing,
-                            brt::Bool = false)::Option{<:LinearConstraint}
+                            rd::Option{<:ReturnsResult} = nothing)::Option{<:LinearConstraint}
     return linear_constraints(lcs.val, sets, lcs.key; datatype = datatype, strict = strict,
                               bl_flag = bl_flag)
 end
 function linear_constraints(lcs::VecLcE, sets::UniverseSets; datatype::DataType = Float64,
                             strict::Bool = false, bl_flag::Bool = false,
                             rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                            rd::Option{<:ReturnsResult} = nothing, brt::Bool = false)
+                            rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
-                               bl_flag = bl_flag, rr = rr, rd = rd, brt = brt)
-            for lc in lcs]
+                               bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
 end
 
 export LinearConstraintEstimator, parse_equation, replace_group_by_assets,

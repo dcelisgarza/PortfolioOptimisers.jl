@@ -110,7 +110,8 @@ $(DocStringExtensions.FIELDS)
         alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
         tgt::AbstractRegressionTarget = LinearModel(),
         choice::AbstractChoiceRule = BatchChoice(),
-        included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing
+        included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> StepwiseRegression
 
 Keywords correspond to the struct's fields.
@@ -121,6 +122,7 @@ Keywords correspond to the struct's fields.
   - If `crit` is `Val(:adjr2)`, `tgt` is a [`GeneralisedLinearModel`](@ref) and `tgt.variant` is set, `tgt.variant in ADJUSTED_PSEUDO_R2_VARIANTS`.
   - If `tgt` is a [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref) and `tgt.kwargs` carries a `weights` entry, it must be an `ObsWeights` and, when it is a vector, `!isempty(tgt.kwargs.weights)`. A caller's own target is not checked here: the fit reads its weights through its own `factory` and `StatsAPI.fit` methods, and the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states the methods the fit reads.
   - The rules of [`assert_stepwise_included`](@ref) for `included` alone. An entry can be empty: the asset then gets an intercept-only model.
+  - `x_src in ALL_RETURNS_SOURCES`, as [`assert_returns_source`](@ref) checks. A regression reader admits every source.
 
 ## Propagated parameters
 
@@ -145,7 +147,8 @@ StepwiseRegression
        tgt ┼ LinearModel
            │   kwargs ┴ @NamedTuple{}: NamedTuple()
     choice ┼ BatchChoice()
-  included ┴ nothing
+  included ┼ nothing
+     x_src ┴ nothing
 ```
 
 # Related
@@ -156,6 +159,8 @@ StepwiseRegression
   - [`Regression`](@ref)
   - [`DimensionReductionRegression`](@ref)
   - [`PinnedChoice`](@ref)
+  - [`AbstractReturnsSource`](@ref)
+  - [`resolve_factor_regression`](@ref)
   - [`factory`](@ref)
 
 # References
@@ -184,11 +189,16 @@ StepwiseRegression
     Factor set of each asset, one entry per column of the returns, or `nothing`. An entry holds the indices of the factors that the fit of that asset uses, in the order that the search added them, and the fit runs no search for that asset. An entry of `nothing` makes the fit search for that asset.
     """
     @vprop included
+    """
+    $(field_dict[:x_src_re])
+    """
+    x_src
     function StepwiseRegression(crit::Union{MinMaxValStepwiseRegressionCriterion,
                                             AbstractStepwiseRegressionCriterion},
                                 alg::AbstractStepwiseRegressionAlgorithm,
                                 tgt::AbstractRegressionTarget, choice::AbstractChoiceRule,
-                                included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}})
+                                included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}},
+                                x_src::Option{<:AbstractReturnsSource})
         if isa(crit, Val{:adjr2}) &&
            isa(tgt, GeneralisedLinearModel) &&
            !isnothing(tgt.variant)
@@ -204,8 +214,8 @@ StepwiseRegression
             end
         end
         assert_stepwise_included(included)
-        return new{typeof(crit), typeof(alg), typeof(tgt), typeof(choice),
-                   typeof(included)}(crit, alg, tgt, choice, included)
+        return new{typeof(crit), typeof(alg), typeof(tgt), typeof(choice), typeof(included),
+                   typeof(x_src)}(crit, alg, tgt, choice, included, x_src)
     end
 end
 function StepwiseRegression(;
@@ -214,13 +224,15 @@ function StepwiseRegression(;
                             alg::AbstractStepwiseRegressionAlgorithm = ForwardSelection(),
                             tgt::AbstractRegressionTarget = LinearModel(),
                             choice::AbstractChoiceRule = BatchChoice(),
-                            included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing)::StepwiseRegression
+                            included::Option{<:AbstractVector{<:Option{<:AbstractVector{<:Integer}}}} = nothing,
+                            x_src::Option{<:AbstractReturnsSource} = nothing)::StepwiseRegression
+    assert_returns_source(x_src, ALL_RETURNS_SOURCES, :StepwiseRegression)
     if isa(crit, Symbol)
         @argcheck(crit in STEPWISE_REGRESSION_CRITERIA,
                   "crit must be one of $STEPWISE_REGRESSION_CRITERIA. Got\ncrit => $crit")
         crit = Val(crit)
     end
-    return StepwiseRegression(crit, alg, tgt, choice, included)
+    return StepwiseRegression(crit, alg, tgt, choice, included, x_src)
 end
 """
     add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,

@@ -12,7 +12,9 @@ resolve_risk_inputs
 difference_risk
 original_returns
 resolve_factor_risk_inputs
+source_loadings
 resolve_factor_regression
+refit_factor_regression
 supports_precomputed_returns(r::RkRatioRM)
 supports_precomputed_returns(r::MeanReturnRiskRatio)
 adjusted_risk

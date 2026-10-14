@@ -2686,3 +2686,162 @@ end
                                                                                                    :],
                                                                                             b = zeros(N)))
 end
+
+#=
+Each regression reader states its own source (#1699, ADR 0211, ADR 0212, ADR 0214).
+
+`resolve_factor_regression` reads only `pr.rr` of a prior result, so a stub prior result that
+holds a chosen `rr` isolates the table of ADR 0212, decision 1, from the prior pieces of the
+migration. The stub lives at top level because `@testset` cannot hold a `struct`.
+=#
+struct SourceStubPrior{T} <: PortfolioOptimisers.AbstractPriorResult
+    rr::T
+end
+@testset "Each regression reader states its own source (#1699)" begin
+    PO = PortfolioOptimisers
+    T, N, K = 60, 3, 2
+    Fm = [sin(0.3 * t + k) + 0.05 * t / T for t in 1:T, k in 1:K]
+    Xm = Fm * [0.5 1.0 -0.4; 0.8 -0.3 0.6] .+
+         [0.01 * cos(1.7 * t + j) for t in 1:T, j in 1:N]
+    Bv = [0.02 * sin(0.9 * t) for t in 1:T]
+    rd = PO.ReturnsResult(; nx = ["A", "B", "C"], X = Xm, nf = ["f1", "f2"], F = Fm,
+                          nb = ["BM"], B = Bv)
+    rdn = PO.ReturnsResult(; nx = ["A", "B", "C"], X = Xm, nf = ["f1", "f2"], F = Fm)
+    held = PO.Regression(; M = [1.0 2.0; 3.0 4.0; 5.0 6.0])
+    pr_rr = SourceStubPrior(held)
+    pr_none = SourceStubPrior(nothing)
+    types = (PO.StepwiseRegression, PO.DimensionReductionRegression)
+
+    @testset "The field, its default and its admitted set" begin
+        for R in types
+            @test isnothing(R().x_src)
+            for x_src in PO.ALL_RETURNS_SOURCES
+                re = R(; x_src = x_src)
+                @test re.x_src === x_src
+                @test PO.returns_source(re) === x_src
+            end
+            @test_throws Union{MethodError, TypeError} R(; x_src = true)
+            @test_throws Union{MethodError, TypeError} R(; x_src = :data)
+        end
+        # The online pin rebuilds the estimator through its keyword constructor, so it
+        # keeps the source.
+        sw = PO.StepwiseRegression(; choice = PO.PinnedChoice(), x_src = PO.ExcessSource())
+        @test PO.pin_regression_choice(sw, Xm, Fm).x_src === PO.ExcessSource()
+        dr = PO.DimensionReductionRegression(; choice = PO.PinnedChoice(),
+                                             x_src = PO.DataSource())
+        @test PO.pin_regression_choice(dr, Xm, Fm).x_src === PO.DataSource()
+        # A holder refuses an inner regression that states a source.
+        @test isnothing(PO.assert_inner_reader(PO.StepwiseRegression(), :re, :FactorPrior))
+        @test_throws ArgumentError PO.assert_inner_reader(PO.StepwiseRegression(;
+                                                                                x_src = PO.DataSource()),
+                                                          :re, :FactorPrior)
+    end
+
+    @testset "resolve_factor_regression reads the table of ADR 0212" begin
+        for R in types
+            re0 = R()
+            raw = PO.regression(re0, Xm, Fm)
+            excess = PO.regression(re0, Xm .- Bv, Fm)
+            # A precomputed result needs no source.
+            @test PO.resolve_factor_regression(held, rd, pr_none) === held
+            # `nothing`: the loadings of the prior, else a fit on `rd.X`.
+            @test PO.resolve_factor_regression(re0, rd, pr_rr) === held
+            @test PO.resolve_factor_regression(re0, rd, pr_none).M ≈ raw.M
+            @test PO.resolve_factor_regression(re0, rd).M ≈ raw.M
+            # `DataSource()` and `ExcessSource()` always fit, over the loadings of a prior.
+            red = R(; x_src = PO.DataSource())
+            @test PO.resolve_factor_regression(red, rd, pr_rr).M ≈ raw.M
+            ree = R(; x_src = PO.ExcessSource())
+            @test PO.resolve_factor_regression(ree, rd, pr_rr).M ≈ excess.M
+            @test PO.resolve_factor_regression(ree, rd).M ≈ excess.M
+            @test !(PO.resolve_factor_regression(ree, rd).M ≈ raw.M)
+            # `ExcessSource()` on data that carries no benchmark throws.
+            @test_throws ArgumentError PO.resolve_factor_regression(ree, rdn)
+            # `PriorSource()`: the loadings of the prior only.
+            rep = R(; x_src = PO.PriorSource())
+            @test PO.resolve_factor_regression(rep, rd, pr_rr) === held
+            @test_throws ArgumentError PO.resolve_factor_regression(rep, rd, pr_none)
+            @test_throws ArgumentError PO.resolve_factor_regression(rep, rd)
+        end
+        msg = try
+            PO.resolve_factor_regression(PO.StepwiseRegression(; x_src = PO.PriorSource()),
+                                         rd)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("`x_src = PriorSource()`", msg)
+        @test occursin("StepwiseRegression", msg)
+        @test occursin("`x_src = DataSource()`", msg)
+    end
+
+    @testset "ExcessSource drops the gap rows of a vector benchmark" begin
+        Bg = copy(Bv)
+        Bg[7] = NaN
+        rdg = PO.ReturnsResult(; nx = ["A", "B", "C"], X = Xm, nf = ["f1", "f2"], F = Fm,
+                               nb = ["BM"], B = Bg)
+        keep = setdiff(1:T, 7)
+        ree = PO.StepwiseRegression(; x_src = PO.ExcessSource())
+        @test PO.resolve_factor_regression(ree, rdg).M ≈
+              PO.regression(PO.StepwiseRegression(), Xm[keep, :] .- Bg[keep], Fm[keep, :]).M
+        # A raw source reads no benchmark, so it keeps every row.
+        red = PO.StepwiseRegression(; x_src = PO.DataSource())
+        @test PO.resolve_factor_regression(red, rdg).M ≈
+              PO.regression(PO.StepwiseRegression(), Xm, Fm).M
+    end
+
+    @testset "factor_space_regression reads the source of the space" begin
+        raw = PO.regression(PO.StepwiseRegression(), Xm, Fm)
+        @test PO.factor_space_regression(nothing, held, rd) === held
+        @test isnothing(PO.factor_space_regression(nothing, nothing, rd))
+        @test PO.factor_space_regression(held, nothing, nothing) === held
+        @test PO.factor_space_regression(PO.StepwiseRegression(), held, nothing) === held
+        red = PO.StepwiseRegression(; x_src = PO.DataSource())
+        @test PO.factor_space_regression(red, held, rd).M ≈ raw.M
+        @test_throws PO.IsNothingError PO.factor_space_regression(red, held, nothing)
+        rep = PO.StepwiseRegression(; x_src = PO.PriorSource())
+        @test PO.factor_space_regression(rep, held, nothing) === held
+        @test_throws ArgumentError PO.factor_space_regression(rep, nothing, rd)
+        # The keyword `brt` is gone from every constraint route.
+        sets = PO.UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["f1", "f2"]),
+                               tfkey = "nf")
+        ece = PO.ExposureConstraintEstimator(;
+                                             lce = PO.LinearConstraintEstimator(;
+                                                                                val = "f1 <= 0.3"),
+                                             space = PO.FactorSpace(; re = red))
+        @test vec(PO.linear_constraints(ece, sets; rd = rd).ineq.A) ≈ raw.M[:, 1]
+        @test_throws MethodError PO.linear_constraints(ece, sets; rd = rd, brt = true)
+        @test_throws MethodError PO.linear_constraints(ece.lce, sets; brt = true)
+        @test_throws MethodError PO.constraint_space_basis(ece.space, sets, nothing, rd;
+                                                           brt = true)
+    end
+
+    @testset "The frame walk of a regression reader (ADR 0214, decision 4)" begin
+        for R in types
+            # At `nothing` a regression reader is raw only when it refits.
+            @test PO.reader_frames(R(), "re", true).raw == ["re"]
+            @test isempty(PO.reader_frames(R(), "re", false).raw)
+            @test !PO.reader_frames(R(), "re", true).excess
+            fe = PO.reader_frames(R(; x_src = PO.ExcessSource()), "re", false)
+            @test fe.excess && isempty(fe.raw)
+            for x_src in (PO.DataSource(), PO.PriorSource())
+                f = PO.reader_frames(R(; x_src = x_src), "re", true)
+                @test !f.excess && isempty(f.raw)
+            end
+        end
+        # A constraint space walks its reader at its own path.
+        lce = PO.LinearConstraintEstimator(; val = "f1 <= 0.3")
+        ece(re) = PO.ExposureConstraintEstimator(; lce = lce,
+                                                 space = PO.FactorSpace(; re = re))
+        @test PO.reader_frames(ece(PO.StepwiseRegression()), "lcse", true).raw ==
+              ["lcse.space.re"]
+        @test PO.reader_frames([lce, ece(PO.StepwiseRegression())], "lcse", true).raw ==
+              ["lcse[2].space.re"]
+        @test PO.reader_frames(ece(PO.StepwiseRegression(; x_src = PO.ExcessSource())),
+                               "lcse", true).excess
+        # A precomputed basis and `re = nothing` hold no reader.
+        for re in (nothing, held)
+            f = PO.reader_frames(ece(re), "lcse", true)
+            @test !f.excess && isempty(f.raw)
+        end
+    end
+end
