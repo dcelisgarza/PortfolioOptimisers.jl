@@ -61,6 +61,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test_throws DomainError NearestNeighbourMatch(; neighbours = 1.0)
         @test_throws DomainError CorrelationMatch(; rho = 1.5)
         @test_throws DomainError ClusterMatch(; window = 0)
+        # The clusterer reads the windows of the selector, in the frame of the step, so it
+        # is an inner reader and states no source (ADR 0211, decisions 3 and 7).
+        @test_throws ArgumentError ClusterMatch(;
+                                                clusterer = ClustersEstimator(;
+                                                                              x_src = ExcessSource()))
         @test isnothing(po.rows_needed(Prefix()))
         @test po.rows_needed(LastRows(; W = 7)) == 7
         @test isnothing(po.rows_needed(CorrelationMatch()))
@@ -315,16 +320,17 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                        w30; atol = 1e-8)
     end
 
-    @testset "A leader with brt = true fits the excess returns its rows carry (#1646)" begin
+    @testset "A leader in the Excess Frame fits the excess returns its rows carry (#1646)" begin
         # The rows buffer of the head keeps every field of the rows, the benchmark among
         # them, so the leader picks `X - B` as a batch fit over the same window does
         # (ADR 0204).
         Bv = 0.01 .* randn(StableRNG(1646), T)
         rdB = ReturnsResult(; nx = nx, X = R, ts = ts, nb = ["BM"], B = Bv)
-        minv(; kw...) = MeanRisk(; obj = MinimumRisk(),
-                                 opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
-                                                     kw...))
-        lead = minv(; brt = true)
+        minv(xs = nothing) = MeanRisk(; obj = MinimumRisk(),
+                                      opt = JuMPOptimiser(;
+                                                          pe = EmpiricalPrior(; x_src = xs),
+                                                          slv = slv))
+        lead = minv(ExcessSource())
         ftl = OPS(; alg = FollowTheLeader(; opt = lead))
         win = po.buffer_returns_result(po.partial_fit!(ftl, rows(rdB, 1:8)).cache.X)
         @test win.X == R[1:8, :] &&
@@ -342,24 +348,31 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test !isapprox(optimise(ftl, rows(rdB, 1:12)).w,
                         optimise(OPS(; alg = FollowTheLeader(; opt = minv())),
                                  rows(rdB, 1:12)).w; atol = 1e-2)
-        # A leader with brt = true on rows with no benchmark refuses: no excess return
+        # A leader in the Excess Frame on rows with no benchmark refuses: no excess return
         # exists without one.
         @test_throws ArgumentError optimise(ftl, rows(rd, 1:8))
     end
 
-    @testset "The built-in programmes take the leader's brt (#1663)" begin
-        # SPOLC and OLDEM give their `brt` to the `MeanRisk` they build, so each equals the
+    @testset "The built-in programmes take the source of the leader's prior (#1663)" begin
+        # SPOLC and OLDEM give their prior to the `MeanRisk` they build, so each equals the
         # walk-forward of its own leader over the window of its selector, fold for fold. The
         # turnover fee of OLDEM measures from the head's book, and that of a walk-forward
         # from its own last weights, so the parity takes `xi = 0`.
         Bm = 0.01 .* randn(StableRNG(1663), T, N)
         rdm = ReturnsResult(; nx = nx, X = R, ts = ts, nb = nx .* "_b", B = Bm)
-        sp(brt) = ShortTermLossControlPortfolio(; slv = slv, brt = brt)
-        ld(brt; xi = 0.002) = LowDimensionEnsemblePortfolio(; N = N, slv = slv, brt = brt,
-                                                            xi = xi)
-        @test sp(true).opt.opt.brt && !sp(false).opt.opt.brt
-        @test ld(true).opt.opt.brt && !ld(false).opt.opt.brt
-        for (alg, k) in ((sp(true), 5), (ld(true; xi = 0.0), 6))
+        sp(xs) = ShortTermLossControlPortfolio(; slv = slv,
+                                               pe = EmpiricalPrior(;
+                                                                   ce = RankOneCovariance(),
+                                                                   x_src = xs))
+        ld(xs; xi = 0.002) = LowDimensionEnsemblePortfolio(; N = N, slv = slv,
+                                                           pe = LowDimensionEnsemblePrior(;
+                                                                                          x_src = xs),
+                                                           xi = xi)
+        @test po.returns_source(sp(ExcessSource()).opt.opt.pe) === ExcessSource()
+        @test isnothing(po.returns_source(sp(nothing).opt.opt.pe))
+        @test po.returns_source(ld(ExcessSource()).opt.opt.pe) === ExcessSource()
+        @test isnothing(po.returns_source(ld(nothing).opt.opt.pe))
+        for (alg, k) in ((sp(ExcessSource()), 5), (ld(ExcessSource(); xi = 0.0), 6))
             ftl = OPS(; alg = alg)
             pred = cross_val_predict(alg.opt, rdm, IndexWalkForward(k, 1))
             for i in 1:6
@@ -369,8 +382,8 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         end
         # The benchmark moves the leader.
         for alg in (sp, ld)
-            @test !isapprox(optimise(OPS(; alg = alg(true)), rows(rdm, 1:16)).w,
-                            optimise(OPS(; alg = alg(false)), rows(rdm, 1:16)).w;
+            @test !isapprox(optimise(OPS(; alg = alg(ExcessSource())), rows(rdm, 1:16)).w,
+                            optimise(OPS(; alg = alg(nothing)), rows(rdm, 1:16)).w;
                             atol = 0.5)
         end
     end

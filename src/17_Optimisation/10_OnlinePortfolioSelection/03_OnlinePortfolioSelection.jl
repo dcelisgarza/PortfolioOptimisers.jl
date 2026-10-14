@@ -15,7 +15,7 @@ A given `w0` is over the pinned names, and the head pins and views it with them.
 
 **The Online Update reads the recursion's own allocation, and no flag changes that.** The previous weights of the loop reach the head through [`factory`](@ref) alone. They go into `fees` and `fb`, and never into the recursion. The fund's held book is the one base against which a turnover fee on this family measures a trade. So the online arm of the fold loop refuses a head whose `fees` carry a `tn` term when the Previous-Weights Source of the walk-forward is `nothing`. It throws an `ArgumentError` before any fold, and `pws = DriftedWeights()` is the whole configuration. A head with no `tn` fee is not checked.
 
-**Under `brt = true` the head selects in the Excess Frame.** The rule's step reads the price relative of the return in excess of the benchmark, `x = 1 + r - b`. Here `b` is the benchmark return of the row, one value that every asset shares for a vector benchmark, and one value per asset for a matrix benchmark. Every reader of the rows inside a rule reads the same frame through [`head_frame_returns`](@ref): the refit and the fold of a forecaster, the scale of a [`ForecastReversion`](@ref), the window of an [`AntiCorrelation`](@ref) and the row selector of a [`FollowTheLeader`](@ref). The rows buffer keeps the raw returns and the benchmark, so a prior of a Risk Loss or of a programme set and a leader read the raw rows and apply their own `brt`. A gap in the benchmark is a gap in the frame, which the step reads as one and the head reports as a Held Gap. `predict(res, rd)` reports the raw wealth of the fund, because the fund holds the assets. Returns data with no benchmark is refused with an `ArgumentError`.
+**Under `x_src = ExcessSource()` the head selects in the Excess Frame.** The rule's step reads the price relative of the return in excess of the benchmark, `x = 1 + r - b`. Here `b` is the benchmark return of the row, one value that every asset shares for a vector benchmark, and one value per asset for a matrix benchmark. Every reader of the rows inside a rule reads the same frame through [`head_frame_returns`](@ref): the refit and the fold of a forecaster, the scale of a [`ForecastReversion`](@ref), the window of an [`AntiCorrelation`](@ref) and the row selector of a [`FollowTheLeader`](@ref). The rows buffer keeps the raw returns and the benchmark, so the prior of a Risk Loss, the prior and each graph or exposure slot of a programme set, and a leader read the raw rows and state their own source. The source of the step, the readers of a Risk Loss and the readers of a programme set form one group (ADR 0214, decision 5). When one of them states `ExcessSource()` and another states no source and reads the raw rows, the head warns once, see [`warn_raw_readers`](@ref). A leader and the fallback are heads with their own groups. A gap in the benchmark is a gap in the frame, which the step reads as one and the head reports as a Held Gap. `predict(res, rd)` reports the raw wealth of the fund, because the fund holds the assets. Returns data with no benchmark is refused with an `ArgumentError`.
 
 **A non-finite return is kept, and read in two ways.** The rule's step reads `x = 1` there, as if the leg held cash. At an asset that the panel marks inactive, or at one to which the recursion gives no weight, this is silent. At an active asset with a non-zero weight it is a Held Gap, which warns by default and refuses under `strict`. The rows buffer keeps the cell as `NaN`, with the row's active mask beside it. Every statistic over the rows reads them as the batch verb reads a Returns Result, and reduces to its own Coverage Universe. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. A plain estimator drops an asset with a gap anywhere in its window. A mask-aware estimator answers the asset from the rows it has. A kernel over price relatives reads the gap as one.
 
@@ -54,7 +54,7 @@ Where:
 
 The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
 
-Under `brt = true`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
+Under `x_src = ExcessSource()`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
 
 # Fields
 
@@ -68,12 +68,12 @@ $(DocStringExtensions.FIELDS)
         w0::Option{<:AbstractVector} = nothing,
         fees::TD_Option{<:FeesE_Fees} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        brt::Bool = false,
+        x_src::Option{<:AbstractReturnsSource} = nothing,
         strict::Bool = false,
         cache::Option{<:OnlinePortfolioSelectionState} = nothing
     ) -> OnlinePortfolioSelection
 
-Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `brt` and `strict` are static.
+Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`TimeDependent`](@ref) per-fold schedule. `alg`, `w0`, `x_src` and `strict` are static.
 
 ## Validation
 
@@ -82,6 +82,8 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
   - Everything [`assert_geometry_admits_set`](@ref) refuses: a negative lower bound under an entropic, Tsallis or log-barrier rule. A schedule on `set` is held to it per entry.
   - Everything [`assert_rule_admits_set`](@ref) refuses: a solver-free leader under a programme set. A schedule on `set` is held to it per entry.
   - `fb` schedules: `bind !== :nearest`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref). The step reads no prior, so it refuses `PriorSource()`.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -113,7 +115,7 @@ OnlinePortfolioSelection
       w0 ┼ nothing
     fees ┼ nothing
       fb ┼ nothing
-     brt ┼ Bool: false
+   x_src ┼ nothing
   strict ┴ Bool: false
 ```
 
@@ -155,9 +157,9 @@ OnlinePortfolioSelection
     """
     fb
     """
-    Whether the head selects in the Excess Frame. When it is `true`, the price relative of each row and every reader of the rows inside a rule read the returns in excess of the benchmark, through [`benchmark_relative_returns`](@ref) and [`head_frame_returns`](@ref). The rows buffer keeps the raw returns and the benchmark, so a prior, a leader and the fallback apply their own `brt`. Returns data with no benchmark `B` is refused.
+    $(field_dict[:x_src_ops])
     """
-    brt
+    x_src
     """
     $(field_dict[:strict_opt]) The flag reaches every constraint of the set, the fee and `optimise(opt)` with no data, and the constraints that a programme set resolves on the rows at each step. It also governs a Held Gap, which warns when it is `false` and raises an error when it is `true`.
     """
@@ -170,9 +172,11 @@ OnlinePortfolioSelection
                                       set::TD{<:AbstractAllocationSet},
                                       w0::Option{<:AbstractVector},
                                       fees::TD_Option{<:FeesE_Fees},
-                                      fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool,
+                                      fb::TDO_Option{<:OptE_Opt},
+                                      x_src::Option{<:AbstractReturnsSource}, strict::Bool,
                                       cache::Option{<:OnlinePortfolioSelectionState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :OnlinePortfolioSelection)
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :OnlinePortfolioSelection)
         if !isa(set, TimeDependent)
             # A schedule holds no set of its own, so the two set refusals and the fee's
             # read of `set.sets` run per entry, in the substitution pass below.
@@ -188,11 +192,13 @@ OnlinePortfolioSelection
             assert_finite(w0, :w0)
         end
         assert_time_dependent_substitution(OnlinePortfolioSelection,
-                                           (; alg, set, w0, fees, fb, brt, strict),
+                                           (; alg, set, w0, fees, fb, x_src, strict),
                                            online_portfolio_selection_td_defaults())
-        return new{typeof(alg), typeof(set), typeof(w0), typeof(fees), typeof(fb),
-                   typeof(brt), typeof(strict), typeof(cache)}(alg, set, w0, fees, fb, brt,
-                                                               strict, cache)
+        opt = new{typeof(alg), typeof(set), typeof(w0), typeof(fees), typeof(fb),
+                  typeof(x_src), typeof(strict), typeof(cache)}(alg, set, w0, fees, fb,
+                                                                x_src, strict, cache)
+        warn_raw_readers(opt)
+        return opt
     end
 end
 function OnlinePortfolioSelection(;
@@ -200,10 +206,46 @@ function OnlinePortfolioSelection(;
                                   set::TD{<:AbstractAllocationSet} = BoundedAllocationSet(),
                                   w0::Option{<:AbstractVector} = nothing,
                                   fees::TD_Option{<:FeesE_Fees} = nothing,
-                                  fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
+                                  fb::TDO_Option{<:OptE_Opt} = nothing,
+                                  x_src::Option{<:AbstractReturnsSource} = nothing,
                                   strict::Bool = false,
                                   cache::Option{<:OnlinePortfolioSelectionState} = nothing)::OnlinePortfolioSelection
-    return OnlinePortfolioSelection(alg, set, w0, fees, fb, brt, strict, cache)
+    return OnlinePortfolioSelection(alg, set, w0, fees, fb, x_src, strict, cache)
+end
+"""
+    group_frames(opt::OnlinePortfolioSelection) -> ReturnsFrames
+    reader_frames(alg::AbstractOnlinePortfolioSelectionAlgorithm, path::AbstractString,
+                  refit::Bool) -> ReturnsFrames
+
+Walk the group of an [`OnlinePortfolioSelection`](@ref) head, for the warning of a forgotten raw reader and the benchmark names that the state pins.
+
+The group is the source of the step, the readers of each [`RiskLoss`](@ref) in the rule tree, and the readers of a [`ProgrammeAllocationSet`](@ref) on `set` (ADR 0214, decision 5). The step is the outermost reader of the rows, so at `x_src = nothing` it reads the raw returns data, and the walk names it by the type of the head. [`field_frames`](@ref) walks every field of the head and of each rule. A rule over rules walks its sub-rules, and a vector of rules walks each one. The walk stops at a leader and at the fallback, because each is a head with its own group. It stops at a forecaster and at a sample selector too: these read the frame of the step through [`head_frame_returns`](@ref), so they are inner readers and state no source (ADR 0211, decision 7). A Risk Loss and a programme set walk their own fields under the refit rule of their own prior, see [`refits_regression`](@ref).
+
+# Arguments
+
+  - `opt`: The head.
+  - `alg`: An Online Selection Rule.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the group of `opt`, or the frames that `alg` adds.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`source_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+  - [`group_source`](@ref)
+"""
+function group_frames(opt::OnlinePortfolioSelection)
+    return merge_frames(source_frames(opt.x_src, "OnlinePortfolioSelection", true),
+                        field_frames(opt, "", false))
+end
+function reader_frames(alg::AbstractOnlinePortfolioSelectionAlgorithm, path::AbstractString,
+                       refit::Bool)
+    return field_frames(alg, path, refit)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -229,7 +271,7 @@ end
 
 Thread the previous fold's weights into the head's fee and fallback, and nowhere else.
 
-The recursion never reads them, so the method carries `alg`, `set`, `w0`, `brt`, `strict` and `cache` unchanged.
+The recursion never reads them, so the method carries `alg`, `set`, `w0`, `x_src`, `strict` and `cache` unchanged.
 
 # Related
 
@@ -239,7 +281,8 @@ The recursion never reads them, so the method carries `alg`, `set`, `w0`, `brt`,
 function factory(opt::OnlinePortfolioSelection, w::VecNum)
     return OnlinePortfolioSelection(; alg = opt.alg, set = opt.set, w0 = opt.w0,
                                     fees = factory(opt.fees, w), fb = factory(opt.fb, w),
-                                    brt = opt.brt, strict = opt.strict, cache = opt.cache)
+                                    x_src = opt.x_src, strict = opt.strict,
+                                    cache = opt.cache)
 end
 """
     port_opt_view(opt::OnlinePortfolioSelection, i, args...)
@@ -258,7 +301,7 @@ function port_opt_view(opt::OnlinePortfolioSelection, i, args...)
                                     set = port_opt_view(opt.set, i, args...),
                                     w0 = renormalised_view(opt.w0, i),
                                     fees = port_opt_view(opt.fees, i, args...),
-                                    fb = view_child(opt.fb, i, args...), brt = opt.brt,
+                                    fb = view_child(opt.fb, i, args...), x_src = opt.x_src,
                                     strict = opt.strict,
                                     cache = port_opt_view(opt.cache, i, args...))
 end
@@ -340,7 +383,7 @@ The uniform start and a given `w0` meet the set in the same way. So the allocati
  3. Seed the state of the rule on `w0` and `set` through [`rule_state_seed`](@ref), giving `st`. `st` is the state of the rule: what the rule keeps from one update to the next, such as a Gram matrix or a belief covariance, or `nothing` for a rule that keeps nothing. Steps 2 and 3 run inside one [`with_projection_step`](@ref) under the head's `strict`, which collects the holds in `held`.
  4. Warn on a hold through [`report_held_steps`](@ref).
  5. Size the rows buffer `X`, a [`ReturnsBufferState`](@ref) that keeps the rows with every other field of the Returns Result, from [`rows_needed`](@ref). A count of `nothing` gives an uncapped buffer, a count of zero gives no buffer, and any other count caps the buffer at that count.
- 6. Keep the panel of `rd` as `pnl` when it is static, and `nothing` otherwise. Keep the benchmark names of `rd` as `nb` when the head's `brt` is `true`, and `nothing` otherwise.
+ 6. Keep the panel of `rd` as `pnl` when it is static, and `nothing` otherwise. Keep the benchmark names of `rd` as `nb` when a reader of the head's group states [`ExcessSource`](@ref), and `nothing` otherwise, through [`pinned_benchmark_names`](@ref).
  7. Return the state with no row folded, the allocation `w0`, the state `st` of the rule, the buffer `X`, the names, `nb` and `pnl`.
 
 # Arguments
@@ -391,7 +434,7 @@ function online_selection_seed(opt::OnlinePortfolioSelection, rd::ReturnsResult,
     end
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     return OnlinePortfolioSelectionState(; n = 0, w = w0, st = st, X = X, nx = rd.nx,
-                                         nb = ifelse(opt.brt, rd.nb, nothing),
+                                         nb = pinned_benchmark_names(opt, rd),
                                          pnl = static ? rd.pnl : nothing, amsk = nothing,
                                          ts = nothing)
 end
@@ -404,7 +447,7 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 
 # Algorithm
 
- 1. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `brt` is `true`, and `rd.X` otherwise.
+ 1. Read the returns of the block in the head's frame through [`benchmark_relative_returns`](@ref), giving `R`. `R` is `rd.X - rd.B` when the head's `x_src` is [`ExcessSource`](@ref), and `rd.X` otherwise.
  2. Read the active mask of `rd` through [`step_active_mask`](@ref), giving `amsk`.
  3. Resolve the Allocation Set over the pinned universe through [`resolve_allocation_set`](@ref), giving `set`.
  4. Seed the state on the first block, or pin and check the carried state, through [`online_selection_pin`](@ref), giving `state`.
@@ -421,7 +464,7 @@ This is the Block Step, and a fold of the whole Returns Result from no state is 
 # Validation
 
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - The head's `brt` is `false`, or `rd` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
+  - The head's `x_src` is not [`ExcessSource`](@ref), or `rd` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
   - Everything [`step_active_mask`](@ref) and [`assert_pinned_context`](@ref) refuse.
   - A non-finite cell at an active asset, under `strict`. An `ArgumentError` is thrown.
 
@@ -441,7 +484,7 @@ function fold_online_selection(opt::OnlinePortfolioSelection,
                                rd::ReturnsResult,
                                set::AbstractAllocationSet = static_allocation_set(opt))
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
-    R = benchmark_relative_returns(rd, opt.brt)
+    R = benchmark_relative_returns(rd, opt.x_src)
     amsk = step_active_mask(rd)
     set = resolve_allocation_set(set, size(rd.X, 2), opt.strict, eltype(rd.X))
     state = online_selection_pin(opt, cache, rd, set)
@@ -466,7 +509,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the state that a block folds into.
 
-On the first block the method seeds the state through [`online_selection_seed`](@ref). On every later block it returns the state that the head carries, after the pin-and-check that every estimator runs at its online step. The check compares the names and the static panel with those of the first step, and the width with that of the state. Under `brt = true` it compares the benchmark names too, because the frame of every row is the excess over that benchmark. The timestamps must be present at every block or at none.
+On the first block the method seeds the state through [`online_selection_seed`](@ref). On every later block it returns the state that the head carries, after the pin-and-check that every estimator runs at its online step. The check compares the names and the static panel with those of the first step, and the width with that of the state. When a reader of the head's group states [`ExcessSource`](@ref), it compares the benchmark names too, because that reader reads the excess over that benchmark. The timestamps must be present at every block or at none.
 
 # Validation
 
@@ -489,7 +532,7 @@ function online_selection_pin(opt::OnlinePortfolioSelection,
     @argcheck(length(cache.w) == N,
               DimensionMismatch("the state holds $(length(cache.w)) assets and this block carries $N"))
     assert_pinned_context(cache.nx, rd.nx, :nx)
-    assert_pinned_context(cache.nb, ifelse(opt.brt, rd.nb, nothing), :nb)
+    assert_pinned_context(cache.nb, pinned_benchmark_names(opt, rd), :nb)
     static = isnothing(rd.pnl) || panel_is_static(rd.pnl)
     assert_pinned_context(cache.pnl, static ? rd.pnl : nothing, :pnl)
     if !iszero(cache.n)
@@ -500,9 +543,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Returns the benchmark names that the state of the head pins: the names of `rd` when a reader of the head's group states [`ExcessSource`](@ref), and `nothing` otherwise.
+
+A reader of the Excess Frame reads the excess over the benchmark of the rows, so the names of that benchmark must stay the same from one block to the next. The reader can be the step, the prior of a [`RiskLoss`](@ref), or a reader of a [`ProgrammeAllocationSet`](@ref). A group that reads no benchmark pins no names, so a change of benchmark between two blocks passes.
+
+# Related
+
+  - [`online_selection_seed`](@ref)
+  - [`online_selection_pin`](@ref)
+  - [`group_source`](@ref)
+"""
+function pinned_benchmark_names(opt::OnlinePortfolioSelection, rd::ReturnsResult)
+    return isnothing(group_source(opt)) ? nothing : rd.nb
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Takes one row of the recursion, inside a [`ProjectionStep`](@ref) that gives every projection of the row the rows it reads and a log for its holds.
 
-The row's returns `r` are in the head's frame, in excess of the benchmark under `brt = true`. The row's Returns Result `rd` is raw. The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
+The row's returns `r` are in the head's frame, in excess of the benchmark under `x_src = ExcessSource()`. The row's Returns Result `rd` is raw. The row reads a gap in two ways, and each reader gets the reading that the rest of the library gives it. The Online Update and every kernel over the price relatives read one at a gap, as if the leg held cash, which is the reading of a Held Gap. So the recursion stays over the full pinned universe and never carries a forced zero. Every statistic over the rows reads them as a batch verb reads a Returns Result, with `NaN` where there was no return and the active mask beside it. Such a statistic is the mean of a forecaster, the prior of a Risk Loss or of a programme set, or the re-solve of a leader. It reduces to its own Coverage Universe. So a window over an unlisted span never meets a constant column, and returns that never happened never dilute the statistic of a relisted asset.
 
 A row with a held projection warns once, with the row's timestamp and each hold, and returns the first [`HeldStep`](@ref) record. A row whose projections all solved returns `nothing`.
 
@@ -512,7 +571,7 @@ A row with a held projection warns once, with the row's timestamp and each hold,
  2. Fold the row's Returns Result `rd` into the rows buffer `X` through [`partial_fit!`](@ref), when the tree keeps one. The buffer keeps the raw returns of `rd` verbatim with its active mask, and every other field of `rd` beside it.
  3. Form the price relative `x` through [`price_relative`](@ref), which is one at a gap.
  4. Read the buffer out as `rows`, a [`ReturnsResult`](@ref) of the rows that the head holds, through [`buffer_returns_result`](@ref).
- 5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows`, the timestamp `ts` and the head's `strict` and `brt` that [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
+ 5. Take the Online Update through [`online_update!`](@ref), inside a projection step over `rows`, the timestamp `ts`, the head's `strict` and the source `x_src` of its step, which [`with_projection_step`](@ref) opens. This gives the new state `st` of the rule, the allocation `w` and the log of holds `held`.
  6. Warn on a hold through [`report_held_steps`](@ref), which gives the row's hold record.
 
 # Arguments
@@ -550,7 +609,7 @@ function online_selection_row!(opt::OnlinePortfolioSelection, st, w::AbstractVec
     x = price_relative.(r)
     rows = buffer_returns_result(X)
     (st, w), held = with_projection_step(() -> online_update!(opt.alg, st, w, x, rows, set),
-                                         rows, ts; strict = opt.strict, brt = opt.brt)
+                                         rows, ts; strict = opt.strict, x_src = opt.x_src)
     return st, w, X, report_held_steps(held, ts)
 end
 """
@@ -559,7 +618,7 @@ end
 
 Reads the rows buffer out as the Returns Result that the Online Update gets.
 
-The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names, with every other field that the folded rows carried: the factor returns, the benchmark, the Exogenous Series, the timestamps and the implied volatilities of the rows, and the pinned names and `ivpa`. So a leader whose `brt` is `true` subtracts the benchmark that the rows carry, as it does in batch. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. Otherwise the result carries the static panel that the buffer pinned. The method returns `nothing` when the tree keeps no rows.
+The result is a [`ReturnsResult`](@ref) of the buffer's rows verbatim, under the pinned names, with every other field that the folded rows carried: the factor returns, the benchmark, the Exogenous Series, the timestamps and the implied volatilities of the rows, and the pinned names and `ivpa`. So a leader whose prior states `x_src = ExcessSource()` subtracts the benchmark that the rows carry, as it does in batch. When the buffer records active masks, [`buffer_panel`](@ref) makes them a time-varying Asset Panel on that Returns Result. Otherwise the result carries the static panel that the buffer pinned. The method returns `nothing` when the tree keeps no rows.
 
 Every statistic over the rows reads this Returns Result, and the batch verbs read the same type. So `prior(pe, rd)`, `mean(me, rd.X, rd.pnl)` and `optimise(opt, rd)` reduce to the Coverage Universe of the window exactly as they do on a Returns Result that the ingestion layer built. The method takes no copy, because every array of the Returns Result views the valid region of its buffer. A Returns Result that carries rows carries their names by its own contract, so the refusal of a buffer with no pinned names never meets the head.
 

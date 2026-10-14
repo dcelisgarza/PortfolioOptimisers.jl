@@ -884,10 +884,11 @@ end
         @test !isapprox(md(pe_iv), md(EmpiricalPrior()); atol = 1e-6)
     end
 
-    @testset "The head selects in the Excess Frame under brt (#1662)" begin
-        # Under `brt = true` the step reads `1 + r - b`, and every reader of the rows inside
-        # a rule reads `X - B`. The rows stay raw. So the head under `brt = true` equals the
-        # head on hand-built excess returns, under a vector and a matrix benchmark.
+    @testset "The head selects in the Excess Frame under x_src = ExcessSource() (#1662)" begin
+        # Under `x_src = ExcessSource()` the step reads `1 + r - b`, and every reader of the
+        # rows inside a rule reads `X - B`. The rows stay raw. So the head in the Excess Frame
+        # equals the head on hand-built excess returns, under a vector and a matrix benchmark.
+        xs = ExcessSource()
         rngb = StableRNG(1662)
         Bv = 0.01 .* randn(rngb, T)
         Bm = 0.01 .* randn(rngb, T, N)
@@ -902,15 +903,20 @@ end
                 ForecastReversion(), ForecastReversion(; me = SimpleExpectedReturns()),
                 ForecastReversion(; scale = MovingAverage()), AntiCorrelation(; window = 5))
         for alg in algs, (b, e) in ((rdb, exv), (rdm, exm)), t in (6, 15, T)
-            @test optimise(OPS(; alg = alg, brt = true), rows(b, 1:t)).w ==
+            @test optimise(OPS(; alg = alg, x_src = xs), rows(b, 1:t)).w ==
                   optimise(OPS(; alg = alg), rows(e, 1:t)).w
         end
         # The frame moves a rule that is not invariant to it.
-        @test !isapprox(optimise(OPS(; brt = true), rdb).w, optimise(OPS(), rdb).w;
+        @test !isapprox(optimise(OPS(; x_src = xs), rdb).w, optimise(OPS(), rdb).w;
                         atol = 1e-8)
-        # Online equals batch under `brt`.
+        # `DataSource()` reads the raw rows, as `nothing` does.
+        @test optimise(OPS(; x_src = DataSource()), rdb).w == optimise(OPS(), rdb).w
+        # The step reads no prior, so it refuses `PriorSource()`, and a `Bool` builds no head.
+        @test_throws ArgumentError OPS(; x_src = PriorSource())
+        @test_throws TypeError OPS(; x_src = true)
+        # Online equals batch in the Excess Frame.
         for alg in algs
-            opt = OPS(; alg = alg, brt = true)
+            opt = OPS(; alg = alg, x_src = xs)
             o = opt
             for t in 1:T
                 o = po.partial_fit!(o, rows(rdm, t:t))
@@ -919,7 +925,7 @@ end
         end
         # Each reader of the rows reads the frame inside a step, and the raw rows outside.
         win, wine = rows(rdm, 1:12), rows(exm, 1:12)
-        inside(f) = first(po.with_projection_step(f, win, 12; brt = true))
+        inside(f) = first(po.with_projection_step(f, win, 12; x_src = xs))
         @test inside(() -> po.head_frame_returns(win)) == wine.X
         @test po.head_frame_returns(win) === win.X
         x12 = 1 .+ wine.X[12, :]
@@ -932,43 +938,56 @@ end
               po.scale_relative(MovingAverage(), x12, wine)
         # A pattern selector reads the frame, and the leader reads the raw rows, so a
         # selector that reads no returns does not move.
-        ftl(sel, brt) = Logging.with_logger(Logging.NullLogger()) do
-            return optimise(OPS(; alg = FollowTheLeader(; sel = sel), brt = brt),
+        ftl(sel, x_src) = Logging.with_logger(Logging.NullLogger()) do
+            return optimise(OPS(; alg = FollowTheLeader(; sel = sel), x_src = x_src),
                             rows(rdm, 1:12)).w
         end
-        @test !isapprox(ftl(CorrelationMatch(), true), ftl(CorrelationMatch(), false);
+        @test !isapprox(ftl(CorrelationMatch(), xs), ftl(CorrelationMatch(), nothing);
                         atol = 1e-6)
-        @test ftl(Prefix(), true) == ftl(Prefix(), false)
+        @test ftl(Prefix(), xs) == ftl(Prefix(), nothing)
         # The wealth that `predict` reports stays raw: the fund holds the assets.
-        res = optimise(OPS(; brt = true), rdb)
+        res = optimise(OPS(; x_src = xs), rdb)
         @test vec(predict(res, rdb).rd.X) ≈ R * res.w
         # Returns data with no benchmark is refused.
-        @test_throws ArgumentError optimise(OPS(; brt = true), rd)
-        @test_throws ArgumentError po.partial_fit!(OPS(; brt = true), rows(rd, 1:3))
+        @test_throws ArgumentError optimise(OPS(; x_src = xs), rd)
+        @test_throws ArgumentError po.partial_fit!(OPS(; x_src = xs), rows(rd, 1:3))
         # A gap in the benchmark is a Held Gap.
         Bg = copy(Bv)
         Bg[5] = NaN
         rdg = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bg)
-        @test_throws ArgumentError optimise(OPS(; brt = true, strict = true), rdg)
-        # The state pins the benchmark names under `brt = true` only.
-        o = po.partial_fit!(OPS(; brt = true), rows(rdb, 1:3))
+        @test_throws ArgumentError optimise(OPS(; x_src = xs, strict = true), rdg)
+        # The state pins the benchmark names only when a reader of the group states
+        # `ExcessSource()`.
+        o = po.partial_fit!(OPS(; x_src = xs), rows(rdb, 1:3))
         @test o.cache.nb == ["BM"]
         rdb2 = ReturnsResult(; nx = nx, X = R, nb = ["BM2"], B = Bv, ts = ts)
         @test_throws ArgumentError po.partial_fit!(o, rows(rdb2, 4:5))
         o0 = po.partial_fit!(OPS(), rows(rdb, 1:3))
         @test isnothing(o0.cache.nb)
         @test po.partial_fit!(o0, rows(rdb2, 4:5)).cache.n == 5
+        # A Risk Loss whose prior reads the Excess Frame is a reader of the group, so its
+        # head pins the names, whatever the source of the step is.
+        ol = OPS(; x_src = DataSource(),
+                 alg = MirrorDescent(;
+                                     obj = RiskLoss(; window = 2,
+                                                    pe = EmpiricalPrior(; x_src = xs))))
+        ol = po.partial_fit!(ol, rows(rdb, 1:3))
+        @test ol.cache.nb == ["BM"]
+        @test_throws ArgumentError po.partial_fit!(ol, rows(rdb2, 4:5))
         # A view slices the names of a matrix benchmark and keeps that of a vector one.
-        om = po.partial_fit!(OPS(; brt = true), rows(rdm, 1:3))
+        om = po.partial_fit!(OPS(; x_src = xs), rows(rdm, 1:3))
         @test po.port_opt_view(om.cache, [1, 3]).nb == nbm[[1, 3]]
         @test po.port_opt_view(o.cache, [1, 3]).nb == ["BM"]
         @test copy(om.cache).nb == nbm
     end
 
-    @testset "A Risk Loss fits its prior in the Excess Frame under its own brt (#1663)" begin
-        # The rows stay raw, so the loss applies its own `brt`: under `brt = true` its
-        # gradient equals that of the same loss on hand-built `X - B` rows, under a vector
-        # and a matrix benchmark, and a Variance loss becomes a tracking variance.
+    @testset "A Risk Loss fits its prior in the frame that its prior states (#1663)" begin
+        # The rows stay raw, and the loss gives them to its prior, which reads its own
+        # source: under `x_src = ExcessSource()` the gradient equals that of the same loss on
+        # hand-built `X - B` rows, under a vector and a matrix benchmark, and a Variance loss
+        # becomes a tracking variance.
+        xs = ExcessSource()
+        loss(src; kw...) = RiskLoss(; window = 8, pe = EmpiricalPrior(; x_src = src), kw...)
         rngb = StableRNG(1663)
         Bv = 0.01 .* randn(rngb, T)
         Bm = 0.01 .* randn(rngb, T, N)
@@ -977,32 +996,68 @@ end
         exv = ReturnsResult(; nx = nx, X = R .- Bv, ts = ts)
         exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
         u = [0.1, 0.2, 0.3, 0.4]
-        grad(brt, r) = po.loss_gradient(RiskLoss(; window = 8, brt = brt), u, ones(N), r)
+        grad(src, r) = po.loss_gradient(loss(src), u, ones(N), r)
         for (b, e) in ((rdb, exv), (rdm, exm)), t in (2, 8, 30)
-            @test grad(true, rows(b, 1:t)) == grad(false, rows(e, 1:t))
-            @test !isapprox(grad(true, rows(b, 1:t)), grad(false, rows(b, 1:t)))
+            @test grad(xs, rows(b, 1:t)) == grad(nothing, rows(e, 1:t))
+            @test !isapprox(grad(xs, rows(b, 1:t)), grad(nothing, rows(b, 1:t)))
         end
-        # The head: the loss's `brt` and the head's `brt` together equal the plain head on
-        # `X - B`. The loss's `brt` alone moves the head, and online equals batch.
-        md(brt) = MirrorDescent(; eta = 50.0, obj = RiskLoss(; window = 8, brt = brt))
-        @test optimise(OPS(; alg = md(true), brt = true), rdm).w ==
-              optimise(OPS(; alg = md(false)), exm).w
-        w = optimise(OPS(; alg = md(true)), rdm).w
-        @test !isapprox(w, optimise(OPS(; alg = md(false)), rdm).w; atol = 1e-6)
-        o = OPS(; alg = md(true))
+        # The head: the loss's prior and the step in the Excess Frame together equal the
+        # plain head on `X - B`. The loss's prior alone moves the head, and online equals
+        # batch. The step states `DataSource()`, so the mix is stated and silent.
+        md(src) = MirrorDescent(; eta = 50.0, obj = loss(src))
+        @test optimise(OPS(; alg = md(xs), x_src = xs), rdm).w ==
+              optimise(OPS(; alg = md(nothing)), exm).w
+        w = optimise(OPS(; alg = md(xs), x_src = DataSource()), rdm).w
+        @test !isapprox(w, optimise(OPS(; alg = md(nothing)), rdm).w; atol = 1e-6)
+        o = OPS(; alg = md(xs), x_src = DataSource())
         for t in 1:T
             o = po.partial_fit!(o, rows(rdm, t:t))
         end
         @test optimise(o).w == w
-        @test po.factory(RiskLoss(; brt = true), u).brt
-        # Rows with no benchmark are refused, and so is a data benchmark under `brt = true`,
-        # which would subtract the benchmark twice.
-        @test_throws ArgumentError optimise(OPS(; alg = md(true)), rows(rd, 1:10))
-        @test_throws ArgumentError po.partial_fit!(OPS(; alg = md(true)), rows(rd, 1:10))
-        dtl = RiskLoss(; window = 8, brt = true,
-                       r = TrackingRiskMeasure(; tr = DataBenchmarkTracking()))
-        @test_throws ArgumentError optimise(OPS(; alg = MirrorDescent(; obj = dtl)),
-                                            rows(rdb, 1:10))
+        @test po.factory(loss(xs), u).pe.x_src === xs
+        # Rows with no benchmark are refused.
+        @test_throws ArgumentError optimise(OPS(; alg = md(xs), x_src = DataSource()),
+                                            rows(rd, 1:10))
+        @test_throws ArgumentError po.partial_fit!(OPS(; alg = md(xs),
+                                                       x_src = DataSource()),
+                                                   rows(rd, 1:10))
+        # A data benchmark under a prior of the Excess Frame would subtract the benchmark
+        # twice, so the constructor refuses it (ADR 0208, decision 3). Under a raw prior the
+        # loss builds.
+        dtr = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        @test_throws ArgumentError loss(xs; r = dtr)
+        @test_throws ArgumentError loss(xs; r = [Variance(), dtr])
+        @test loss(DataSource(); r = dtr).r === dtr
+    end
+
+    @testset "The source of the step and the readers of a Risk Loss form one group (ADR 0214)" begin
+        # A step at `nothing` reads the raw rows. Beside a prior of the Excess Frame it is a
+        # reader that the caller can have forgotten, so the head warns once and builds.
+        xs = ExcessSource()
+        md(src) = MirrorDescent(; obj = RiskLoss(; pe = EmpiricalPrior(; x_src = src)))
+        raw_step = r"`OnlinePortfolioSelection` holds a reader that states `x_src = ExcessSource\(\)`.*: `OnlinePortfolioSelection`\."
+        @test_logs (:warn, raw_step) OPS(; alg = md(xs))
+        # A prior at `nothing` beside a step of the Excess Frame warns with its path.
+        raw_loss = r"read the raw returns data: `alg.obj.pe`\."
+        @test_logs (:warn, raw_loss) OPS(; alg = md(nothing), x_src = xs)
+        # The paths of a rule over rules name each expert.
+        mix = ExpertMixture(; experts = [md(nothing), md(xs)])
+        @test_logs (:warn, r"`alg.experts\[1\].obj.pe`\.") OPS(; alg = mix)
+        # A stated mix is silent, and so is a group with no reader of the Excess Frame.
+        @test_logs OPS(; alg = md(xs), x_src = DataSource())
+        @test_logs OPS(; alg = md(DataSource()), x_src = xs)
+        @test_logs OPS(; alg = md(nothing))
+        fr = po.group_frames(OPS(; alg = md(nothing), x_src = xs))
+        @test fr.excess && fr.raw == ["alg.obj.pe"]
+        @test po.group_source(OPS(; alg = md(xs), x_src = DataSource())) === xs
+        @test isnothing(po.group_source(OPS()))
+        # A leader is a head with its own group, so the walk stops at it.
+        lead = MeanRisk(;
+                        opt = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = xs),
+                                            slv = Solver(; solver = nothing)))
+        @test po.group_frames(OPS(; alg = FollowTheLeader(; opt = lead))).raw ==
+              ["OnlinePortfolioSelection"]
+        @test !po.group_frames(OPS(; alg = FollowTheLeader(; opt = lead))).excess
     end
 
     @testset "Show, docs and the search seam" begin

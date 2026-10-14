@@ -13,4 +13,5 @@ PortfolioOptimisers.barrier_projection
 PortfolioOptimisers.barrier_upper_bracket
 PortfolioOptimisers.assert_barrier_raw_step
 PortfolioOptimisers.assert_geometry_admits_set
+PortfolioOptimisers.reader_frames(::ProgrammeAllocationSet, ::AbstractString, ::Bool)
 ```

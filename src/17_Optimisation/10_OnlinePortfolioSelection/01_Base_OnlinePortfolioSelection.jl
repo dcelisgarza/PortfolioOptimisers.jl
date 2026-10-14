@@ -1278,7 +1278,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the context of one row for every projection of that row: the rows that the head holds, the timestamp of the row, the head's flags and the Held Steps recorded so far.
 
-The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The head's `brt` goes on the step too, because the readers of the rows inside a rule, such as the refit of a forecaster or the row selector of a leader, take the rows through the signature of the Online Update, and that signature has no `brt`. [`head_frame_returns`](@ref) reads it. The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one set of rows and writes one log. The rows are the ones that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`buffer_returns_result`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
+The projection of the Online Update is `project(proj, set, q, w)`, with four arguments and no more. Two things must reach it outside that signature. The covariance cone and the tracking error of a programme set read the head's rows, and the head must see the record of a Held Step. Both go on the task-scoped [`PROJECTION_STEP`](@ref). The source of the head's step, its `x_src`, goes on the step too, because the readers of the rows inside a rule, such as the refit of a forecaster or the row selector of a leader, take the rows through the signature of the Online Update, and that signature has no source. [`head_frame_returns`](@ref) reads it. The head opens one step for each row through [`with_projection_step`](@ref), around the whole Online Update. So every projection of that row, those of a mixture's experts and that of its blend, reads one set of rows and writes one log. The rows are the ones that the update gets, a [`ReturnsResult`](@ref) of the rows as they arrived, under the pinned names and the Asset Panel of the buffer. So a programme set fits its prior through [`buffer_returns_result`](@ref), as a batch head does. Outside a step, a projection reads no rows and reports a hold as a warning.
 
 # Fields
 
@@ -1307,9 +1307,9 @@ $(DocStringExtensions.FIELDS)
     """
     strict::Bool
     """
-    The head's `brt` flag. A rule that reads the returns of the rows reads them in excess of the benchmark when it is `true`, through [`head_frame_returns`](@ref).
+    The source of the head's step, `nothing` or an [`AbstractReturnsSource`](@ref). A rule that reads the returns of the rows reads them in excess of the benchmark when it is [`ExcessSource`](@ref), through [`head_frame_returns`](@ref).
     """
-    brt::Bool
+    x_src
     """
     The Held Steps recorded during this row, in the order in which their projections failed.
     """
@@ -1329,7 +1329,7 @@ const PROJECTION_STEP = ScopedValue{Union{Nothing, ProjectionStep}}(nothing)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Runs `f()` inside a [`ProjectionStep`](@ref) over the rows `rows` at `ts`, with the head's `strict` and `brt` flags.
+Runs `f()` inside a [`ProjectionStep`](@ref) over the rows `rows` at `ts`, with the head's `strict` flag and the source `x_src` of its step.
 
 It returns `(f(), held)`, the result of the update and the Held Steps that its projections recorded. `held` is empty when every projection met the budget.
 
@@ -1340,8 +1340,8 @@ It returns `(f(), held)`, the result of the update and the Held Steps that its p
   - [`fold_online_selection`](@ref)
 """
 function with_projection_step(f, rows::Option{<:ReturnsResult}, ts; strict::Bool = false,
-                              brt::Bool = false)
-    step = ProjectionStep(rows, ts, strict, brt, HeldStep[])
+                              x_src::Option{<:AbstractReturnsSource} = nothing)
+    step = ProjectionStep(rows, ts, strict, x_src, HeldStep[])
     out = Base.ScopedValues.with(f, PROJECTION_STEP => step)
     return out, step.held
 end
@@ -1395,13 +1395,13 @@ end
 """
     head_frame_returns(rows::ReturnsResult)
 
-Returns the returns of the rows that a rule reads, in the frame of the head: in excess of the benchmark when the head's `brt` is `true`, and as they arrived otherwise.
+Returns the returns of the rows that a rule reads, in the frame of the head: in excess of the benchmark when the head's `x_src` is [`ExcessSource`](@ref), and as they arrived otherwise.
 
-The head's `brt` comes from the current [`ProjectionStep`](@ref), and it is `false` outside a step. The rows themselves stay raw, so a prior or a leader that reads them applies its own `brt`. The function never builds a [`ReturnsResult`](@ref): it gives the matrix of [`benchmark_relative_returns`](@ref).
+The head's `x_src` comes from the current [`ProjectionStep`](@ref), and it is `nothing` outside a step. The rows themselves stay raw, so a prior or a leader that reads them reads its own source. The function never builds a [`ReturnsResult`](@ref): it gives the matrix of [`benchmark_relative_returns`](@ref).
 
 # Validation
 
-  - The head's `brt` is `false`, or `rows` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
+  - The head's `x_src` is not [`ExcessSource`](@ref), or `rows` carries a benchmark. An `ArgumentError` is thrown otherwise, through [`benchmark_relative_returns`](@ref).
   - `rows` holds returns, which the rows of the head always do. A `TypeError` is thrown otherwise.
 
 # Related
@@ -1413,7 +1413,7 @@ The head's `brt` comes from the current [`ProjectionStep`](@ref), and it is `fal
 function head_frame_returns(rows::ReturnsResult)
     step = PROJECTION_STEP[]
     # The rows of the head always hold returns, so the frame is a matrix and never `nothing`.
-    return benchmark_relative_returns(rows, isnothing(step) ? false : step.brt)::MatNum
+    return benchmark_relative_returns(rows, isnothing(step) ? nothing : step.x_src)::MatNum
 end
 """
     assert_rule_admits_set(alg::AbstractOnlinePortfolioSelectionAlgorithm, set::AbstractAllocationSet)
@@ -1507,7 +1507,7 @@ Keywords correspond to the struct's fields.
     """
     nx
     """
-    Names of the benchmark columns, pinned by the first step when the head's `brt` is `true`, or `nothing`. A head under `brt = false` reads no benchmark, so it pins none.
+    Names of the benchmark columns, pinned by the first step when a reader of the head's group states [`ExcessSource`](@ref), see [`group_source`](@ref), or `nothing`. A head whose group reads no benchmark pins none.
     """
     nb
     """

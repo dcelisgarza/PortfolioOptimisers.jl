@@ -14,6 +14,7 @@ PortfolioOptimisers.played_allocation
 PortfolioOptimisers.mixed_relatives
 PortfolioOptimisers.reprojection
 PortfolioOptimisers.investable_risk_gradient
+PortfolioOptimisers.reader_frames(::RiskLoss, ::AbstractString, ::Bool)
 ```
 
 ## References

@@ -953,7 +953,7 @@ end
                                           ret = ArithmeticReturn(;
                                                                  settings = JuMPReturnsSettings(;
                                                                                                 lb = 0.0)))
-            @test fieldnames(typeof(full))[1:4] == (:pe, :brt, :slv, :r)
+            @test fieldnames(typeof(full))[1:4] == (:pe, :slv, :r, :wb)
             @test isnothing(po.rows_needed(full))
             @test po.rows_needed(ProgrammeAllocationSet(; slv = slv, sbgt = 0.2,
                                                         wb = WeightBounds(; lb = -0.2,
@@ -1775,9 +1775,11 @@ end
         end
     end
 
-    @testset "The set fits its prior in the Excess Frame under its own brt (#1663)" begin
-        # The rows stay raw, so the set applies its own `brt`. Under `brt = true` a Variance
-        # ceiling is a ceiling on the tracking variance against the benchmark of the rows.
+    @testset "The set fits its prior in the frame that its prior states (#1663)" begin
+        # The rows stay raw, and the set gives them to its prior, which reads its own source.
+        # Under `x_src = ExcessSource()` a Variance ceiling is a ceiling on the tracking
+        # variance against the benchmark of the rows.
+        xs = ExcessSource()
         rng = StableRNG(1663)
         T, N = 40, 4
         R = 0.02 .* randn(rng, T, N)
@@ -1788,7 +1790,7 @@ end
         rdm = ReturnsResult(; nx = nx, X = R, nb = nx .* "_b", B = Bm, ts = ts)
         exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
         rows(r, i) = po.port_opt_view(r, i, :)
-        vset(brt) = ProgrammeAllocationSet(; slv = slv, brt = brt,
+        vset(src) = ProgrammeAllocationSet(; slv = slv, pe = EmpiricalPrior(; x_src = src),
                                            r = Variance(;
                                                         settings = RiskMeasureSettings(;
                                                                                        ub = 2e-4)))
@@ -1801,36 +1803,81 @@ end
                                                                     resolve(set, N),
                                                                     [1.0, 0.0, 0.0, 0.0],
                                                                     fill(0.25, N)), r, 20))
-        wx = pj(vset(true), win)
+        wx = pj(vset(xs), win)
         @test dot(wx, S, wx) ≈ 2e-4 rtol = 1e-8
-        @test isapprox(wx, pj(vset(false), wine); atol = 1e-6)
-        @test !isapprox(wx, pj(vset(false), win); atol = 1e-2)
-        # The head: the set's `brt` and the head's `brt` together equal the plain head on
-        # `X - B`. The set's `brt` alone moves the head, and online equals batch.
-        mk(brt, hbrt) = OPS(; alg = PassiveAggressiveMeanReversion(), brt = hbrt,
-                            set = vset(brt))
+        @test isapprox(wx, pj(vset(nothing), wine); atol = 1e-6)
+        @test !isapprox(wx, pj(vset(nothing), win); atol = 1e-2)
+        # The head: the set's prior and the step in the Excess Frame together equal the
+        # plain head on `X - B`. The set's prior alone moves the head, and online equals
+        # batch. The step states `DataSource()`, so the mix is stated and silent.
+        mk(src, hsrc) = OPS(; alg = PassiveAggressiveMeanReversion(), x_src = hsrc,
+                            set = vset(src))
         held = r"Held Step at 2020-01-01"
-        w2 = (@test_logs (:warn, held) optimise(mk(false, false), exm)).w
-        @test isapprox((@test_logs (:warn, held) optimise(mk(true, true), rdm)).w, w2;
+        w2 = (@test_logs (:warn, held) optimise(mk(nothing, nothing), exm)).w
+        @test isapprox((@test_logs (:warn, held) optimise(mk(xs, xs), rdm)).w, w2;
                        atol = 1e-6)
-        w = (@test_logs (:warn, held) optimise(mk(true, false), rdm)).w
-        @test !isapprox(w, (@test_logs (:warn, held) optimise(mk(false, false), rdm)).w;
+        w = (@test_logs (:warn, held) optimise(mk(xs, DataSource()), rdm)).w
+        @test !isapprox(w, (@test_logs (:warn, held) optimise(mk(nothing, nothing), rdm)).w;
                         atol = 1e-2)
-        o = mk(true, false)
+        o = mk(xs, DataSource())
         @test_logs (:warn, held) for t in 1:T
             o = po.partial_fit!(o, rows(rdm, t:t))
         end
         @test optimise(o).w == w
-        # A view keeps the set's `brt`, and so does the resolution of a fold.
-        @test po.port_opt_view(vset(true), [1, 2]).brt
-        @test resolve(vset(true), N).brt
-        # Rows with no benchmark are refused, and so is a data benchmark under `brt = true`.
+        # A view keeps the source of the set's prior, and so does the resolution of a fold.
+        @test po.port_opt_view(vset(xs), [1, 2]).pe.x_src === xs
+        @test resolve(vset(xs), N).pe.x_src === xs
+        # Rows with no benchmark are refused.
         rd0 = ReturnsResult(; nx = nx, X = R, ts = ts)
-        @test_throws ArgumentError optimise(mk(true, false), rows(rd0, 1:10))
-        dts = ProgrammeAllocationSet(; slv = slv, brt = true,
-                                     tr = TrackingError(; tr = DataBenchmarkTracking(),
-                                                        err = 0.01))
-        @test_throws ArgumentError optimise(OPS(; alg = PassiveAggressiveMeanReversion(),
-                                                set = dts), rows(rdm, 1:10))
+        @test_throws ArgumentError optimise(mk(xs, DataSource()), rows(rd0, 1:10))
+        # A data benchmark under a prior of the Excess Frame would subtract the benchmark
+        # twice, so the constructor refuses it, in the tracking errors and in the ceilings
+        # (ADR 0208, decision 3). Under a raw prior the set builds.
+        dtr = TrackingError(; tr = DataBenchmarkTracking(), err = 0.01)
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          pe = EmpiricalPrior(; x_src = xs),
+                                                          tr = dtr)
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          pe = EmpiricalPrior(; x_src = xs),
+                                                          r = TrackingRiskMeasure(;
+                                                                                  tr = DataBenchmarkTracking(),
+                                                                                  settings = RiskMeasureSettings(;
+                                                                                                                 ub = 0.01)))
+        @test ProgrammeAllocationSet(; slv = slv,
+                                     pe = EmpiricalPrior(; x_src = DataSource()),
+                                     tr = dtr).tr === dtr
+    end
+
+    @testset "Each reader of the set joins the group of the head (ADR 0214)" begin
+        # The set holds no source. Its prior, each graph slot and the regression of each
+        # exposure slot state their own, and each one joins the group of the head.
+        xs = ExcessSource()
+        sets4 = UniverseSets(;
+                             dict = Dict("nx" => ["A", "B", "C", "D"],
+                                         "nf" => ["F1", "F2"]))
+        gset(; kw...) = ProgrammeAllocationSet(; slv = slv,
+                                               pe = EmpiricalPrior(; x_src = xs),
+                                               sets = sets4, kw...)
+        raw = r"read the raw returns data: `set.cte`, `set.ple`\."
+        @test_logs (:warn, raw) OPS(; x_src = xs,
+                                    set = gset(; cte = CentralityConstraint(),
+                                               ple = SemiDefinitePhylogenyEstimator()))
+        @test_logs OPS(; x_src = xs,
+                       set = gset(; cte = CentralityConstraint(; x_src = DataSource()),
+                                  ple = SemiDefinitePhylogenyEstimator(; x_src = xs)))
+        # A regression reader at `nothing` counts only when the set's prior gives no
+        # loadings and it refits on the raw rows (ADR 0214, decision 4).
+        space = FactorSpace(; re = StepwiseRegression())
+        ece = ExposureConstraintEstimator(; space = space,
+                                          lce = LinearConstraintEstimator(;
+                                                                          val = "F1 <= 1"))
+        fr = po.group_frames(OPS(; x_src = xs, set = gset(; lcse = ece)))
+        @test fr.excess && fr.raw == ["set.lcse.space.re"]
+        fr = po.group_frames(OPS(; x_src = xs,
+                                 set = gset(; pe = FactorPrior(; x_src = xs), lcse = ece)))
+        @test fr.excess && isempty(fr.raw)
+        # A schedule of sets walks each entry.
+        td = TimeDependent([gset(), gset(; pe = EmpiricalPrior())])
+        @test po.group_frames(OPS(; x_src = xs, set = td)).raw == ["set.val[2].pe"]
     end
 end

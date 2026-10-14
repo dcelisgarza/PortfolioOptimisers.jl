@@ -309,7 +309,7 @@ end
 
 Returns the returns that the refit arm fits a forecaster on, the Asset Panel that explains them, and the implied volatilities of the rows as keywords of `mean`.
 
-When `rows` is a [`ReturnsResult`](@ref), these are its returns in the head's frame, which [`head_frame_returns`](@ref) gives, its `pnl`, and its `iv` and `ivpa`. The frame is `X - B` when the head's `brt` is `true`, and `X` otherwise. Without a Returns Result, they are the current row as a matrix of one row, no panel and no keywords. The current row is in the head's frame already, because the head forms `x` from it.
+When `rows` is a [`ReturnsResult`](@ref), these are its returns in the head's frame, which [`head_frame_returns`](@ref) gives, its `pnl`, and its `iv` and `ivpa`. The frame is `X - B` when the head's `x_src` is [`ExcessSource`](@ref), and `X` otherwise. Without a Returns Result, they are the current row as a matrix of one row, no panel and no keywords. The current row is in the head's frame already, because the head forms `x` from it.
 
 The keywords go to every forecaster, as [`prior`](@ref) over a [`ReturnsResult`](@ref) gives them to every member. A [`PriorExpectedReturns`](@ref) gives them to its prior, so a member of the prior that reads them, such as an [`ImpliedVolatility`](@ref) covariance, reads the surface over the same rows. A [`WindowedExpectedReturns`](@ref) cuts `iv` to its window first. Every other forecaster ignores them.
 

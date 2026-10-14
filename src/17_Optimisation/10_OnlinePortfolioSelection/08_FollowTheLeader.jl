@@ -770,6 +770,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `window >= 1`. A `DomainError` is thrown otherwise.
+  - `returns_source(clusterer) === nothing`: the clustering reads the windows that the selector lays out, in the frame of the head's step, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Examples
 
@@ -801,6 +802,7 @@ julia> ClusterMatch(; clusterer = ClustersEstimator()).window
     clusterer
     function ClusterMatch(window::Integer, clusterer::AbstractClustersEstimator)
         assert_pattern_window(window)
+        assert_inner_reader(clusterer, :clusterer, :ClusterMatch)
         return new{typeof(window), typeof(clusterer)}(window, clusterer)
     end
 end
@@ -952,7 +954,7 @@ Where:
 The steps of the Online Update:
 
  1. Compute `wh`, the Price-Adjusted Allocation of `w` over `x`.
- 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of `rows` in the head's frame, which [`head_frame_returns`](@ref) gives. The leader in step 3 reads the raw rows and applies its own `brt`.
+ 2. Select `idx`, the rows of the sample, with `select_rows` on `alg.sel` and the price relatives of `rows` in the head's frame, which [`head_frame_returns`](@ref) gives. The leader in step 3 reads the raw rows, and its prior states its own source.
  3. When `idx` holds fewer rows than `leader_min_rows(alg.opt)`, set `wstar` to the uniform portfolio projected onto `set` with `alg.proj`, from `wh`. Otherwise set `wstar` to the result of `leader_allocation` on `alg.opt`, the view of `rows` at `idx`, `wh`, `set` and `rows`.
  4. When `wstar` is `nothing`, the step is a Held Step. Return `st` and a copy of `wh`. `st` is the state of the rule: what the rule keeps from one update to the next, or `nothing` for a rule that keeps nothing. This rule returns it unchanged.
  5. When `alg.gamma` is zero, return `st` and `wstar`.
@@ -1213,7 +1215,7 @@ function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::Abstract
     return st, blend_projection(alg.proj, set, mix, wh)
 end
 """
-    ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025, slv::Slv_VecSlv, pe::AbstractPriorEstimator = EmpiricalPrior(; ce = RankOneCovariance()), brt::Bool = false, proj::EuclideanProjection = EuclideanProjection())
+    ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025, slv::Slv_VecSlv, pe::AbstractPriorEstimator = EmpiricalPrior(; ce = RankOneCovariance()), proj::EuclideanProjection = EuclideanProjection())
 
 Builds the short-term portfolio optimisation with loss control (SPOLC).
 
@@ -1248,8 +1250,7 @@ This is Equation 51 of [lai2020spolc](@cite) at period ``t``. On the simplex ``\
   - `window`: ``w`` in [lai2020spolc](@cite), the number of periods of the window.
   - `gamma`: ``\\gamma`` in [lai2020spolc](@cite), the weight of the variance against the worst increasing factor.
   - `slv`: The solver of the programme.
-  - `pe`: The prior estimator of the programme, whose covariance is the rank-one estimate.
-  - `brt`: The `brt` of the programme's [`MeanRisk`](@ref). When it is `true`, the leader fits on the returns in excess of the benchmark that the head's rows carry, so the programme bounds the worst excess return and the tracking variance.
+  - `pe`: The prior estimator of the programme, whose covariance is the rank-one estimate. When it states `x_src = ExcessSource()`, the leader fits on the returns in excess of the benchmark that the head's rows carry, so the programme bounds the worst excess return and the tracking variance.
   - `proj`: The geometry of the damped mix. The rule's `gamma = 0` does not read it.
 
 # Validation
@@ -1291,26 +1292,23 @@ function ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.02
                                        slv::Slv_VecSlv,
                                        pe::AbstractPriorEstimator = EmpiricalPrior(;
                                                                                    ce = RankOneCovariance()),
-                                       brt::Bool = false,
                                        proj::EuclideanProjection = EuclideanProjection())::FollowTheLeader
     @argcheck(gamma >= zero(gamma), DomainError(gamma, "gamma must be non-negative"))
     return FollowTheLeader(; sel = LastRows(; W = window),
-                           opt = loss_control_programme(gamma, slv, pe; brt = brt),
-                           proj = proj)
+                           opt = loss_control_programme(gamma, slv, pe), proj = proj)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the programme of the short-term portfolio optimisation with loss control.
 
-The programme is [`MeanRisk`](@ref) under [`MinimumRisk`](@ref) over [`WorstRealisation`](@ref) plus [`Variance`](@ref) scaled by `gamma` under [`QuadRiskExpr`](@ref), with the `brt` of its optimiser set to `brt`. The method is typed on the solver and the prior, so the optimiser that it builds is concrete for them.
+The programme is [`MeanRisk`](@ref) under [`MinimumRisk`](@ref) over [`WorstRealisation`](@ref) plus [`Variance`](@ref) scaled by `gamma` under [`QuadRiskExpr`](@ref). Its prior states its own source. The method is typed on the solver and the prior, so the optimiser that it builds is concrete for them.
 
 # Arguments
 
   - `gamma`: The weight of the variance.
   - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme.
-  - `brt`: The `brt` of the programme's optimiser.
 
 # Returns
 
@@ -1320,18 +1318,17 @@ The programme is [`MeanRisk`](@ref) under [`MinimumRisk`](@ref) over [`WorstReal
 
   - [`ShortTermLossControlPortfolio`](@ref)
 """
-function loss_control_programme(gamma::Real, slv::T1, pe::T2;
-                                brt::Bool = false) where {T1 <: Slv_VecSlv,
-                                                          T2 <: AbstractPriorEstimator}
+function loss_control_programme(gamma::Real, slv::T1,
+                                pe::T2) where {T1 <: Slv_VecSlv,
+                                               T2 <: AbstractPriorEstimator}
     return MeanRisk(;
                     r = [WorstRealisation(),
                          Variance(; alg = QuadRiskExpr(),
                                   settings = RiskMeasureSettings(; scale = gamma))],
-                    obj = MinimumRisk(),
-                    opt = JuMPOptimiser(; pe = pe, slv = slv, brt = brt))
+                    obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pe, slv = slv))
 end
 """
-    LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5, gamma::Real = 0.25, xi::Real = 0.002, slv::Slv_VecSlv, pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(), brt::Bool = false, proj::EuclideanProjection = EuclideanProjection())
+    LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5, gamma::Real = 0.25, xi::Real = 0.002, slv::Slv_VecSlv, pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(), proj::EuclideanProjection = EuclideanProjection())
 
 Builds the online low-dimension ensemble method (OLDEM).
 
@@ -1371,8 +1368,7 @@ This is Equation 14 of [xi2023oldem](@cite), with one change. [xi2023oldem](@cit
   - `gamma`: ``\\gamma`` in [xi2023oldem](@cite), the risk aversion over the predictive variance.
   - `xi`: ``\\xi`` in [xi2023oldem](@cite), the rate of the linear turnover fee.
   - `slv`: The solver of the programme.
-  - `pe`: The prior estimator of the programme, the ensemble by default. Any prior gives the two moments that the programme reads.
-  - `brt`: The `brt` of the programme's [`MeanRisk`](@ref). When it is `true`, the leader fits on the returns in excess of the benchmark that the head's rows carry, so the programme maximises the forecast excess return less the tracking variance.
+  - `pe`: The prior estimator of the programme, the ensemble by default. Any prior gives the two moments that the programme reads. When it states `x_src = ExcessSource()`, the leader fits on the returns in excess of the benchmark that the head's rows carry, so the programme maximises the forecast excess return less the tracking variance.
   - `proj`: The geometry of the damped mix. The rule's `gamma = 0` does not read it.
 
 # Validation
@@ -1425,7 +1421,6 @@ function LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5,
                                        gamma::Real = 0.25, xi::Real = 0.002,
                                        slv::Slv_VecSlv,
                                        pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(),
-                                       brt::Bool = false,
                                        proj::EuclideanProjection = EuclideanProjection())::FollowTheLeader
     @argcheck(N >= 1, DomainError(N, "N must be at least 1"))
     @argcheck(window >= 2,
@@ -1438,14 +1433,14 @@ function LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5,
                            opt = ensemble_programme(gamma,
                                                     Fees(;
                                                          tn = Turnover(; w = w, val = xi)),
-                                                    slv, pe; brt = brt), proj = proj)
+                                                    slv, pe), proj = proj)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the programme of the online low-dimension ensemble method.
 
-The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), it charges `fees`, and the `brt` of its optimiser is `brt`. The method is typed on the solver and the prior, so the optimiser that it builds is concrete for them.
+The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk aversion `gamma` over [`Variance`](@ref) under [`QuadRiskExpr`](@ref), and it charges `fees`. Its prior states its own source. The method is typed on the solver and the prior, so the optimiser that it builds is concrete for them.
 
 # Arguments
 
@@ -1453,7 +1448,6 @@ The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk a
   - `fees`: The fees of the programme, a [`Turnover`](@ref) fee for the rule.
   - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme.
-  - `brt`: The `brt` of the programme's optimiser.
 
 # Returns
 
@@ -1463,12 +1457,11 @@ The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk a
 
   - [`LowDimensionEnsemblePortfolio`](@ref)
 """
-function ensemble_programme(gamma::Real, fees::Fees, slv::T1, pe::T2;
-                            brt::Bool = false) where {T1 <: Slv_VecSlv,
-                                                      T2 <: AbstractPriorEstimator}
+function ensemble_programme(gamma::Real, fees::Fees, slv::T1,
+                            pe::T2) where {T1 <: Slv_VecSlv, T2 <: AbstractPriorEstimator}
     return MeanRisk(; r = Variance(; alg = QuadRiskExpr()),
                     obj = MaximumUtility(; l = gamma),
-                    opt = JuMPOptimiser(; pe = pe, slv = slv, fees = fees, brt = brt))
+                    opt = JuMPOptimiser(; pe = pe, slv = slv, fees = fees))
 end
 """
 $(DocStringExtensions.TYPEDEF)
