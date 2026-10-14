@@ -35,6 +35,30 @@ At `T = 500` the `T × T` form solved in 40.6 s and `ApproxOrderedWeightsArray` 
 the order of the comparators, 44.1 s in the order of the positions, 44.4 s in a random order, all
 23 iterations. Clarabel permutes the KKT system before it factorises it.
 
+Research #1708 found the cost of one iteration. One interior-point iteration is one LDL
+factorisation of the KKT matrix, and that factorisation is 83 to 95 % of the solve. Clarabel's
+default QDLDL is a simplicial factorisation: it works on one column at a time, at about 1.5 s per
+10⁹ flops. The fill of the factor sets the flops, and the AMD order of QDLDL sets the fill. Bitonic
+merge was faster than odd-even merge above because AMD orders its KKT matrix to 59 % of the flops.
+Under a METIS order the three networks (odd-even, bitonic, and the pairwise network) have almost
+the same flops.
+
+A supernodal factorisation of the same matrix works on dense blocks. Bitonic merge, the same data,
+one thread:
+
+| Setup | `T = 500` (s) | `T = 1000` (s) |
+| --- | --- | --- |
+| Clarabel, QDLDL (the default) | 26.5 to 30.5 | 298.5 |
+| Clarabel, `direct_solve_method = :mkl` after `using Pardiso` | 4.50 to 4.72 | 28.4 (odd-even merge: 22.2) |
+| Tulip, `KKT_System = Tulip.KKT.K1()`, `KKT_Backend = Tulip.KKT.TlpCholmod.Backend()`, tolerances `1e-9` | 6.28 | 39.9 |
+| `ExactOrderedWeightsArray`, Clarabel with `:mkl` | 30.4 | |
+
+The iterations and the risk do not change. MKL Pardiso needs `using Pardiso`, runs on x86-64
+only, and orders by METIS. Tulip with `K1` factorises the normal equations with the supernodal
+Cholesky of CHOLMOD and needs no other binary. Under MKL at `T = 500` the three networks are
+within the noise of the machine, about ±30 %. At `T = 1000` odd-even merge was the fastest, near
+the edge of that noise.
+
 ## Decision
 
 The maintainer decided on 2026-10-14.
@@ -53,9 +77,12 @@ The maintainer decided on 2026-10-14.
    network: `OddEvenMerge` or `BitonicMerge`. `ordering::AbstractSortingNetworkOrdering` picks
    the order of the network variables: `ComparatorOrdering` or `WireOrdering`. Both abstract types
    are extension points, with the verbs `sorting_network` and `sorting_network_columns`.
-5. **The defaults are `BitonicMerge()` and `ComparatorOrdering()`.** Bitonic merge was two times
-   faster at `T = 500` although it has more comparators. The order had no measured effect, so the
-   default is the plain one.
+5. **The defaults are `BitonicMerge()` and `ComparatorOrdering()`.** Bitonic merge is two times
+   faster at `T = 500` under QDLDL, the default solver, although it has more comparators. The
+   cause is the AMD order of QDLDL, not the network. Under a supernodal factorisation no network
+   wins past the noise. The maintainer kept bitonic merge on 2026-10-14 after #1708, because the
+   default serves a user who sets up no solver. The order had no measured effect, under any solver,
+   so the default is the plain one.
 6. **A weight vector that is not nondecreasing is refused**, with a `DomainError`: in the
    constructor when the weights are a vector, and when the model is built when they are a callable.
    `ExactOrderedWeightsArray` still takes such a vector.
@@ -63,11 +90,19 @@ The maintainer decided on 2026-10-14.
    enter as they do for the exact form. The inputs are divided by the largest absolute asset
    return, and the risk is multiplied by it. The returns are not centred, because a shift changes
    the risk of a weight vector whose sum is not zero.
-8. **Why the cost of one iteration is high is a research question**, filed apart from this
-   decision as #1708. The fill of the factorisation of the KKT system sets it, not the row count.
+8. **The documentation names a supernodal factorisation for a long sample.** The fill of the
+   LDL factorisation of the KKT matrix sets the cost of one iteration, not the row count, and
+   QDLDL factorises one column at a time. The docstring of `SortingNetworkOrderedWeightsArray` and
+   the OWA example name Clarabel with `direct_solve_method = :mkl` and Tulip with `K1`, with their
+   measured times (#1711). The library and its tests take no new dependency for it. A QDLDL with a
+   METIS order, registered as a new Clarabel `direct_solve_method`, cut the flops by 45 to 54 %
+   for odd-even and pairwise merge, but MKL Pardiso already orders by METIS and is four to six
+   times faster again, so it is not built.
 
 ## Consequences
 
 - A long sample gets the exact risk at `O(T log² T)` rows. The time of the solve stays well above
-  the time of `ApproxOrderedWeightsArray`.
+  the time of `ApproxOrderedWeightsArray`. A supernodal factorisation cuts it by 83 to 90 %.
+- Under a supernodal factorisation the network beats `ExactOrderedWeightsArray` by 6.4 to 6.8
+  times at `T = 500`, so decision 3 holds more strongly than under QDLDL.
 - A new network or a new order is one subtype and one method.

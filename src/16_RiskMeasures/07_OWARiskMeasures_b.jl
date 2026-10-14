@@ -479,6 +479,13 @@ The formulation runs the net portfolio returns through a sorting network, and re
 
 The formulation needs a nondecreasing weight vector, which is also the condition for the risk measure to be convex. On any other vector the relaxed network has no minimum, so the constructor of the risk measure refuses such a vector.
 
+One interior-point iteration costs one factorisation of the KKT matrix, and the fill of that factorisation sets the time of the solve, not the row count. QDLDL, the default linear solver of Clarabel, factorises the matrix one column at a time. A supernodal factorisation of the same matrix cuts the time of one iteration by 83 to 85 % at ``T = 500`` and by 90 % at ``T = 1000``. The iterations and the risk do not change.
+
+Two setups give a supernodal factorisation. The times below are for the minimum risk of the Gini mean difference weights, `owa_gmd`, on eight assets, with the default network, one thread and tolerances of `1e-9`.
+
+  - Clarabel with the setting `direct_solve_method = :mkl` factorises with MKL Pardiso. It needs `using Pardiso`, and it runs on x86-64 only. It solved ``T = 500`` in 4.5 to 4.7 s against 26.5 to 30.5 s with QDLDL, and ``T = 1000`` in 28.4 s against 298.5 s.
+  - Tulip with `KKT_System = Tulip.KKT.K1()` and `KKT_Backend = Tulip.KKT.TlpCholmod.Backend()` factorises the normal equations with the supernodal Cholesky factorisation of CHOLMOD. It needs no binary past CHOLMOD. It solved ``T = 500`` in 6.3 s and ``T = 1000`` in 39.9 s.
+
 # Mathematical definition
 
 ```math
