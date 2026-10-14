@@ -118,7 +118,8 @@ The maintainer decided on 2026-10-13.
 
 - ADR 0044: the rule that named `x_src`.
 - ADR 0204: the current rule for `brt`.
-- ADR 0208: `DataTracking`, which refuses the Excess Frame.
+- ADR 0208: the data benchmark, which refuses a prior in the Excess Frame (#1692), and its new
+  name `DataBenchmarkTracking`.
 - ADR 0211: the readers that hold `x_src`.
 - ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md): the frame check that
   `DataSource()` serves (#1682).

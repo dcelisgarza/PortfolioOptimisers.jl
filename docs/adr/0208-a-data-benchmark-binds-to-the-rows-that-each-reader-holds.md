@@ -19,7 +19,9 @@ it. [#1657](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1657) a
 
 ## Decision
 
-The maintainer decided three questions on 2026-10-13.
+The maintainer decided decisions 1 and 2 on 2026-10-13. Decisions 3, 4 and 5 came on 2026-10-14
+([#1692](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1692)), after ADR
+[0211](0211-each-reader-of-the-returns-states-its-own-source.md) took `brt` off every head.
 
 1. **A new type.** `DataTracking()` is a new `AbstractTrackingAlgorithm`, not a sentinel in
    `ReturnsTracking`. It holds no series of its own. Its field `B` is `nothing` until a reader binds
@@ -30,8 +32,63 @@ The maintainer decided three questions on 2026-10-13.
    every JuMP form stays conic. It is the rule that `collapse_benchmark` applies to a prediction with
    no Held Weights. The path on a precomputed portfolio series refuses a matrix, because it has no
    weights.
-3. **`brt = true` refuses a data benchmark.** A reader in the Excess Frame fits on `X - B`, and a
-   tracking error against `B` would subtract the benchmark twice.
+3. **A data benchmark refuses a prior in the Excess Frame.** Every tracking form compares
+   `pr.X * w` with its benchmark series, so the prior that the measure reads decides the frame. That
+   prior is `opt.pe` of a head, the `pe` of a `RiskLoss` and the `pe` of a `ProgrammeAllocationSet`.
+   When it states `x_src = ExcessSource()`, the series is `(X - B) * w - B`, and the benchmark is
+   subtracted two times.
+   - The refusal is an `ArgumentError` in the constructor that holds the tracking part and the
+     prior: `JuMPOptimiser` for `tr`, each `RiskJuMPOptimisationEstimator` for `r`,
+     `HierarchicalRiskParity`, `HierarchicalEqualRiskContribution`, `RiskLoss` and
+     `ProgrammeAllocationSet`. The configuration alone decides it. A rebuild through the keyword
+     constructor checks again.
+   - The error names the field and the prior. It gives two remedies: `DataSource()` or `nothing` on
+     the prior, or a plain risk measure on the excess prior. It states that the two series differ
+     for a vector `B` when `sum(w) ≠ 1`.
+   - The `Pipeline` constructor refuses a prior step that states `ExcessSource()` when the
+     optimiser that receives the value of the step holds a data benchmark. The optimiser
+     constructor cannot see the source of that step.
+   - A graph reader or a regression reader in the Excess Frame does not count, because no tracking
+     form reads its matrix. The mix of ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md)
+     stays legal.
+   - A precomputed Prior Result holds no source, so it reads as raw and does not refuse, as in ADR
+     0214, decision 4, and ADR 0215, decision 3.
+   - Each inner head and each outer head of a meta-optimiser, and each fallback, checks its own
+     prior.
+   - `bind_data_benchmark` loses its `brt` argument. It keeps the refusal of returns data with no
+     `B`, because that check needs the data.
+4. **The type is renamed `DataBenchmarkTracking`.** "Data" alone does not say what the type tracks.
+   The new name is the glossary term Data Benchmark and the verb `bind_data_benchmark`, word for
+   word. The type never reached `main`, so the rename has no deprecated alias.
+5. **Two forms document their meaning under an excess prior.** No check can find a wrong use of
+   them, so the docstrings state it.
+   - `ReturnsTracking` tracks `(X - B) * w` against its series, so the series must be in the Excess
+     Frame. A series equal to `B` subtracts the benchmark two times.
+   - `WeightsTracking` with a vector `B` tracks `X * (w - w_b) - B * (sum(w) - sum(w_b))`. It equals
+     the raw form only when the two budgets are equal.
+6. **The user docs carry the table of combinations below.** The docstring of
+   `AbstractTrackingAlgorithm` holds it, and the docstrings of `TrackingError` and
+   `TrackingRiskMeasure` link to it. The build that gives the priors their `x_src` writes it,
+   because the table names the values of that field.
+
+### The combinations under the source of the prior
+
+`s = sum(w)`. A raw prior is `nothing` or `DataSource()`.
+
+| Prior | Form | Vector `B` | Matrix `B` | Status |
+| --- | --- | --- | --- | --- |
+| raw | plain measure | `X * w` | `X * w` | absolute risk |
+| excess | plain measure | `X * w - B * s` | `(X - B) * w` | active risk |
+| raw | `WeightsTracking` | `X * (w - w_b)` | `X * (w - w_b)` | valid |
+| excess | `WeightsTracking` | `X * (w - w_b) - B * (s - s_b)` | `(X - B) * (w - w_b)` | valid, decision 5 |
+| raw | `ReturnsTracking` | `X * w - b` | `X * w - b` | valid |
+| excess | `ReturnsTracking` | `X * w - B * s - b` | `(X - B) * w - b` | valid if `b` is excess, decision 5 |
+| raw | data benchmark | `X * w - B` | `(X - B) * w` | valid |
+| excess | data benchmark | `X * w - B * (s + 1)` | `(X - 2B) * w` | refused, decision 3 |
+
+A raw prior with a data benchmark and an excess prior with a plain measure can track the same
+series. They are different models: the excess prior also moves `pr.mu`, `pr.sigma` and every other
+measure of the head, and the raw prior keeps the objective absolute.
 
 Each reader that holds the returns data binds the data benchmark to the `B` of its own rows, with
 `bind_data_benchmark`, and rebuilds an object through its keyword constructor only when a part
@@ -71,6 +128,17 @@ session that built it chose the four details below, and the maintainer accepted 
 
 ## Considered options
 
+- **Any reader of the group of ADR 0214 puts the head in the Excess Frame.** Rejected (#1692). It
+  refuses a raw prior beside a clustering on `X - B`, which tracks `X * w - B` correctly.
+- **The prior refuses, and the group warns.** Rejected (#1692). The warning fires on a legal mix
+  that ADR 0214 already checks.
+- **Warn, then run.** Rejected (#1692). The pair has no correct use, unlike a mix of frames.
+- **Refuse at the bind.** Rejected (#1692). The configuration alone decides the refusal, so it
+  waits for no data.
+- **No check in a `Pipeline`.** Rejected (#1692). A prior step in the Excess Frame then reaches the
+  optimiser with no error.
+- **`BenchmarkTracking`, `RowBenchmarkTracking`, or keep `DataTracking`.** Rejected (#1692). Every
+  tracking form tracks a benchmark, a row benchmark is a new term, and "data" is vague.
 - **Refuse at every fold count.** Rejected. It refuses one fold, which is one batch fit and aligns.
 - **Refuse in each fold, or in the online arm too.** Rejected. A check in each fold runs on the
   workers after the first solves, and the online step already refuses a series.
@@ -104,6 +172,10 @@ session that built it chose the four details below, and the maintainer accepted 
 - A result keeps its risk measures bound to the rows of the fit, as it keeps them resolved against
   the prior of the fit. A value-level call on a `ReturnsResult` binds them again.
 - A data benchmark pays no fee. A `WeightsTracking` benchmark keeps its own `fees`.
+- Until the migration builds of map #1678 land, the bind refuses `brt = true` on the holder, as
+  before. Decision 3 replaces that check when `brt` goes.
+- A data benchmark beside a precomputed Prior Result in the Excess Frame is not refused, because
+  the result does not show its source.
 - The online selection head has no `brt` of its own yet, so it binds under `brt = false`.
   [#1662](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1662) and
   [#1663](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1663) add it.

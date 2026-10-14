@@ -168,7 +168,8 @@ decision 5 (#1689) met a gapped panel.
 
 - ADR 0044: the rule that named `x_src`. Amended on 2026-10-13 to point here.
 - ADR 0204: the current rule for `brt`.
-- ADR 0208: `DataTracking`, which refuses the Excess Frame.
+- ADR 0208: the data benchmark, which refuses a prior in the Excess Frame (#1692), and its new
+  name `DataBenchmarkTracking`.
 - ADR [0213](0213-brt-is-removed-in-one-break.md): `brt` is removed in one break, with no
   deprecation.
 - ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md): the readers of one head
