@@ -387,28 +387,28 @@ what keeps the JuMP families cheap.
         end
     end
 
-    @testset "A benchmark-relative prior step folds the excess returns (#1659)" begin
-        # The prior step of the online pipeline folds under the `brt` of its PipelineStep,
-        # as the prior of an optimiser folds under the optimiser's `brt`, and the Fold
-        # Context of the Pipeline keeps the raw rows. So the read-out equals the batch fit
+    @testset "A benchmark-relative prior step folds the excess returns (#1659, #1702)" begin
+        # The prior step of the online pipeline folds from the source of its own prior, as
+        # the prior of an optimiser folds from its own source, and the Fold Context of the
+        # Pipeline keeps the raw rows. So the read-out equals the batch fit
         # field by field, and online equals batch fold for fold.
         Xb = randn(StableRNG(1659), T, N) ./ 100
         Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(16590), T) ./ 1000
         rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
-        pstep = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = true)
-        mrb = MeanRisk(;
-                       opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true))
+        pex = EmpiricalPrior(; x_src = ExcessSource())
+        pstep = PipelineStep(; est = pex, writes = :prior)
+        mrb = MeanRisk(; opt = JuMPOptimiser(; pe = pex, slv = slv))
         hrpb = HierarchicalRiskParity(;
-                                      opt = HierarchicalOptimiser(; pe = EmpiricalPrior(),
-                                                                  brt = true,
-                                                                  x_src = :data))
+                                      opt = HierarchicalOptimiser(; pe = pex,
+                                                                  cle = ClustersEstimator(;
+                                                                                          x_src = ExcessSource())))
         for opt in (mrb, hrpb)
             pipe = Pipeline(; steps = (pstep, opt))
             on = fit(stepped(pipe, rdb, blocks))
             ba = fit(pipe, rows(rdb, 1:80))
             @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
             @test on.ctx.prior.sigma ≈ ba.ctx.prior.sigma
-            @test on.ctx.prior.mu ≈ prior(EmpiricalPrior(), rows(rdb, 1:80); brt = true).mu
+            @test on.ctx.prior.mu ≈ prior(pex, rows(rdb, 1:80)).mu
             # The rebuilt returns data is raw, as the caller gave it.
             @test isequal(Matrix(on.ctx.returns.X), Matrix(ba.ctx.returns.X))
             @test isequal(collect(on.ctx.returns.B), collect(ba.ctx.returns.B))
@@ -420,20 +420,21 @@ what keeps the JuMP families cheap.
         end
     end
 
-    @testset "A benchmark-relative uncertainty or constraint step reads the excess returns (#1670)" begin
+    @testset "A benchmark-relative uncertainty or constraint step reads the excess returns (#1670, #1702)" begin
         # The steps before the owner run over the Fold Context of the Pipeline, which keeps
-        # the raw rows and the benchmark, so each reads the returns under the `brt` of its
-        # PipelineStep, as in batch.
+        # the raw rows and the benchmark, so each reads the returns from the source of its
+        # own reader, as in batch.
         Xb = randn(StableRNG(1670), T, N) ./ 100
         Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(16700), T) ./ 1000
         rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
-        pstep = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = true)
-        ue = DeltaUncertaintySet()
+        pex = EmpiricalPrior(; x_src = ExcessSource())
+        pstep = PipelineStep(; est = pex, writes = :prior)
+        ue = DeltaUncertaintySet(; pe = pex)
         ustep = PipelineStep(; est = ue, reads = (:returns,), writes = :uncertainty,
-                             target = :sigma, brt = true)
-        cstep = PipelineStep(; est = CentralityConstraint(), writes = :constraints,
-                             brt = true)
-        jo = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true, x_src = :data)
+                             target = :sigma)
+        cstep = PipelineStep(; est = CentralityConstraint(; x_src = ExcessSource()),
+                             writes = :constraints)
+        jo = JuMPOptimiser(; pe = pex, slv = slv)
         for pipe in (Pipeline(;
                               steps = (pstep, ustep,
                                        MeanRisk(; r = UncertaintySetVariance(), opt = jo))),
@@ -447,7 +448,7 @@ what keeps the JuMP families cheap.
                       for (pb, po_) in zip(b.pred, o.pred))
         end
         on = fit(stepped(Pipeline(; steps = (pstep, ustep)), rdb, blocks))
-        @test on.ctx.uncertainty.sigma.ub ≈ sigma_ucs(ue, rows(rdb, 1:80); brt = true).ub
+        @test on.ctx.uncertainty.sigma.ub ≈ sigma_ucs(ue, rows(rdb, 1:80)).ub
     end
 
     @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the fold route" begin

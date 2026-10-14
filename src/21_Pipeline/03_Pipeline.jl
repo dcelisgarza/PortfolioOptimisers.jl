@@ -361,10 +361,12 @@ Give the steps in the order of execution. Each element is a step estimator or a 
   - A nested pipeline changes no Data Slot that the outer pipeline does not receive, see [`assert_nested_data_slots`](@ref).
   - Each constraint step resolves to one routing target, see [`assert_constraint_targets`](@ref).
   - The last optimiser can receive each target that an earlier step writes, see [`assert_routable`](@ref).
-  - Each step that reads the returns, and whose value the last optimiser receives, fits in the frame of that optimiser, `brt` for `brt`, see [`assert_benchmark_frame`](@ref).
+  - A prior step that states `x_src = ExcessSource()` does not feed an optimiser that tracks a [`DataBenchmarkTracking`](@ref), see [`assert_pipeline_data_benchmark`](@ref).
   - An earlier step writes each slot that a step reads, or the pipeline input fills it with `prices` or `returns`. Raises an `ArgumentError`.
   - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
   - The step names are unique. Raises an `ArgumentError`.
+
+The steps whose values the last optimiser receives join the group of that optimiser. When a reader of the group states `x_src = ExcessSource()`, and a reader at `x_src = nothing` reads the raw returns data, the constructor logs one warning that names the path of that reader, see [`warn_raw_readers`](@ref) and [`pipeline_frames`](@ref). The pipeline then builds as configured.
 
 # Online form
 
@@ -434,7 +436,7 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
     assert_nested_data_slots(ests)
     assert_constraint_targets(ests)
     assert_routable(ests)
-    assert_benchmark_frame(ests)
+    assert_pipeline_data_benchmark(ests)
     slots = Symbol[pipe_writes(e) for e in ests]
     avail = Set{Symbol}(PIPELINE_DATA_SLOTS)
     written = Dict{Symbol, Any}()
@@ -467,12 +469,45 @@ function Pipeline(; steps::Union{<:Tuple, <:AbstractVector},
             string(s, '_', seen[s])
         end
     end
-    return Pipeline(Tuple(names), Tuple(ests), cache)
+    pipe = Pipeline(Tuple(names), Tuple(ests), cache)
+    warn_raw_readers(pipe)
+    return pipe
 end
 pipe_writes(p::Pipeline) = pipe_writes(p.steps[end])
 pipe_reads(p::Pipeline) = pipe_reads(p.steps[1])
-step_brt(p::Pipeline) = step_brt(p.steps[end])
-pipe_receives_step(opt, p::Pipeline) = pipe_receives_step(opt, p.steps[end])
+step_prior(p::Pipeline) = step_prior(p.steps[end])
+pipe_step_targets(p::Pipeline) = pipe_step_targets(p.steps[end])
+"""
+    group_frames(pipe::Pipeline) -> ReturnsFrames
+    reader_frames(p::Pipeline, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+The frame walk of a [`Pipeline`](@ref).
+
+A `Pipeline` joins the group of its last optimiser, see [`pipeline_frames`](@ref), and its constructor warns on that group with [`warn_raw_readers`](@ref). A nested `Pipeline` is a step of an outer one, and the outer optimiser receives the value of its last step, so it adds the frames of that step.
+
+# Arguments
+
+  - `pipe`, `p`: The pipeline.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the group of `pipe`, or the frames of the last step of `p` at the path `"<path>.steps[n]"`.
+
+# Related
+
+  - [`pipeline_frames`](@ref)
+  - [`group_frames`](@ref)
+  - [`reader_frames`](@ref)
+"""
+function group_frames(pipe::Pipeline)
+    return pipeline_frames(pipe.steps)
+end
+function reader_frames(p::Pipeline, path::AbstractString, refit::Bool)
+    n = length(p.steps)
+    return reader_frames(p.steps[n], string(join_path(path, :steps), "[", n, "]"), refit)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

@@ -27,6 +27,14 @@ assert_routable
 assert_constraint_targets
 ```
 
+## The group of a pipeline
+
+A `Pipeline` joins the group of its last optimiser, so its constructor warns on a reader that states no source beside a reader of the Excess Frame. A nested `Pipeline` adds the frames of its last step to the outer group.
+
+```@docs
+group_frames(::Pipeline)
+```
+
 ## Prediction
 
 To predict with a fitted pipeline, the pipeline applies its fitted preprocessing steps to the new data window. The steps keep what they learned on the training window: the universe, the imputation parameters and the conversion to returns. The pipeline then predicts with the same functions as an optimisation result. Cross-validation also accepts price data, through [`Prices_RR`](@ref). Each fold then fits the whole pipeline on its own training window, so no preprocessing step learns anything from the test window.

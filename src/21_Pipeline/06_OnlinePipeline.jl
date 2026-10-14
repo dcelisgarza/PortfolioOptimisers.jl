@@ -174,7 +174,7 @@ A [`PipelineStep`](@ref) keeps its reads, its writes and its target, and a bare 
 """
 rewrap_step(::Any, est) = est
 function rewrap_step(ps::PipelineStep, est)
-    return PipelineStep(est, ps.reads, ps.writes, ps.target, ps.brt)
+    return PipelineStep(est, ps.reads, ps.writes, ps.target)
 end
 """
     is_data_step(step) -> Bool
@@ -543,7 +543,7 @@ function update_online_step(ps::PipelineStep)
     if isa(ps.est, Function)
         return ps
     end
-    return PipelineStep(update_online_step(ps.est), ps.reads, ps.writes, ps.target, ps.brt)
+    return PipelineStep(update_online_step(ps.est), ps.reads, ps.writes, ps.target)
 end
 """
     update_online_estimator(p::Pipeline)
@@ -600,7 +600,7 @@ function copy_step_states(ps::PipelineStep)
     if isa(ps.est, Function)
         return ps
     end
-    return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target, ps.brt)
+    return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target)
 end
 """
     held_timestamps(p::Pipeline)
@@ -787,30 +787,29 @@ function fold_pipeline(pipe::Pipeline, cache::Option{<:ReturnsBufferState}, data
     @argcheck(isa(block, ReturnsResult),
               ArgumentError("the rows reach the `$(pipe.names[k])` step, the row owner, as a `$(typeof(block).name.name)`, and a prior or an optimiser folds a `ReturnsResult`: put a `PricesToReturns` step before it."))
     owner = step_estimator(steps[k])
-    brt = isa(steps[k], PipelineStep) ? steps[k].brt : false
-    owner, cache = fold_pipeline_owner(owner, cache, block, brt)
+    owner, cache = fold_pipeline_owner(owner, cache, block)
     steps[k] = rewrap_step(steps[k], owner)
     return Pipeline(pipe.names, Tuple(steps), cache)
 end
 """
-    fold_pipeline_owner(pe::AbstractPriorEstimator, cache, rd::ReturnsResult, brt::Bool)
-    fold_pipeline_owner(opt::OptimisationEstimator, cache, rd::ReturnsResult, brt::Bool)
-    fold_pipeline_owner(opt::OnlinePortfolioSelection, cache, rd::ReturnsResult, brt::Bool)
+    fold_pipeline_owner(pe::AbstractPriorEstimator, cache, rd::ReturnsResult)
+    fold_pipeline_owner(opt::OptimisationEstimator, cache, rd::ReturnsResult)
+    fold_pipeline_owner(opt::OnlinePortfolioSelection, cache, rd::ReturnsResult)
 
 Folds a block into the row owner of a [`Pipeline`](@ref), and records the own context of the Pipeline where the owner keeps none.
 
-An optimisation owner takes the online step itself. It folds through its own [`partial_fit!`](@ref) under its own `brt`, and the Pipeline records nothing beside it. The `brt` of its step is `false`, because a [`PipelineStep`](@ref) refuses `brt = true` on an optimiser, which reads no returns through the wrapper. The method refuses an [`OnlinePortfolioSelection`](@ref) head. This is the check of a hand-driven run, as [`assert_online_owner`](@ref) is the check of the fold loop, and that docstring states the reason.
+An optimisation owner takes the online step itself. It folds through its own [`partial_fit!`](@ref), whose prior reads its own source, and the Pipeline records nothing beside it. The method refuses an [`OnlinePortfolioSelection`](@ref) head. This is the check of a hand-driven run, as [`assert_online_owner`](@ref) is the check of the fold loop, and that docstring states the reason.
 
-A prior owner folds under the `brt` of its step, as the batch step fits under it ([`run_step`](@ref)). Under `brt` the buffer of the prior holds the excess returns `X - B`, so the context of the Pipeline keeps the raw rows, and `fit(pipe)` with no data rebuilds the raw `ReturnsResult`, as an optimiser does ([`fold_returns`](@ref)).
+A prior owner folds from the source that its own `x_src` states, as the batch step fits from it ([`run_step`](@ref)). Under `ExcessSource()` the buffer of the prior holds the excess returns `X - B`, so the context of the Pipeline keeps the raw rows, and `fit(pipe)` with no data rebuilds the raw `ReturnsResult`, as an optimiser does ([`fold_returns`](@ref)).
 
 # Algorithm
 
 For a prior owner:
 
- 1. Fold `rd` into the prior through [`fold_prior`](@ref) under `brt`, giving `pe`. This goes first, because the context takes its cap from the buffer that the prior seeds, as the context of an optimiser does ([`fold_returns`](@ref)).
+ 1. Fold `rd` into the prior through [`fold_prior`](@ref), which reads the source of the prior, giving `pe`. This goes first, because the context takes its cap from the buffer that the prior seeds, as the context of an optimiser does ([`fold_returns`](@ref)).
  2. Read the buffer of the prior through [`prior_returns_buffer`](@ref), giving `rows`.
  3. Set `own_factors` when [`needs_factor_returns`](@ref) answers `false` for `pe`. The context keeps the factor columns only then, so the rebuilt `ReturnsResult` holds each factor column once. Set `own_exogenous` when [`reads_exogenous_series`](@ref) answers `false` for `pe`, on the same terms for the Exogenous Series.
- 4. Fold `rd` into the context of the Pipeline through [`fold_context`](@ref) under the cap `rows.max_history`, giving `cache`. The context keeps the raw returns when `brt` is `true`.
+ 4. Fold `rd` into the context of the Pipeline through [`fold_context`](@ref) under the cap `rows.max_history`, giving `cache`. The context keeps the raw returns when the prior states `x_src = ExcessSource()`.
  5. Return `pe` and `cache`.
 
 # Arguments
@@ -818,7 +817,6 @@ For a prior owner:
   - `pe`, `opt`: The row owner, without its [`PipelineStep`](@ref) wrapper.
   - `cache`: The Fold Context of the Pipeline, or `nothing` before the first step.
   - `rd`: The block of returns that reaches the owner.
-  - $(arg_dict[:brt_read]) It is the `brt` of the step of the owner. Only a prior owner reads it.
 
 # Validation
 
@@ -832,20 +830,19 @@ For a prior owner:
   - [`fold_context`](@ref)
 """
 function fold_pipeline_owner(pe::AbstractPriorEstimator,
-                             cache::Option{<:ReturnsBufferState}, rd::ReturnsResult,
-                             brt::Bool)
-    pe = fold_prior(pe, rd; brt = brt)
+                             cache::Option{<:ReturnsBufferState}, rd::ReturnsResult)
+    pe = fold_prior(pe, rd)
     rows = prior_returns_buffer(pe)
     own_factors = needs_factor_returns(pe) === false
+    own_returns = isa(returns_source(pe), ExcessSource)
     return pe,
-           fold_context(cache, rd, rows.max_history, brt, own_factors,
+           fold_context(cache, rd, rows.max_history, own_returns, own_factors,
                         !reads_exogenous_series(pe))
 end
-function fold_pipeline_owner(opt::OptimisationEstimator, ::Nothing, rd::ReturnsResult,
-                             ::Bool)
+function fold_pipeline_owner(opt::OptimisationEstimator, ::Nothing, rd::ReturnsResult)
     return partial_fit!(opt, rd), nothing
 end
-function fold_pipeline_owner(::OnlinePortfolioSelection, ::Nothing, ::ReturnsResult, ::Bool)
+function fold_pipeline_owner(::OnlinePortfolioSelection, ::Nothing, ::ReturnsResult)
     return throw(ArgumentError("an `OnlinePortfolioSelection` head owns the rows of this `Pipeline`, because no prior step precedes it, and a head cannot own them: its call with no data answers its own recursion, so `fit(pipe)` is left with no `ReturnsResult` to reconstitute the universe steps over, and a view of a recursion is not the recursion over the columns a universe step keeps. Put a prior step before the head, whose rows `fit(pipe)` reads, or declare a refit with `Online(pipe)`, which fits every step over the observations folded so far. The fold loop names the same two routes in its own entry check."))
 end
 """

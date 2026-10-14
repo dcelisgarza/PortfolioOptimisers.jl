@@ -146,7 +146,7 @@ function update_time_dependent_step(ps::PipelineStep, ctx::TimeDependentContext,
     return if newest === est
         ps
     else
-        PipelineStep(newest, ps.reads, ps.writes, ps.target, ps.brt)
+        PipelineStep(newest, ps.reads, ps.writes, ps.target)
     end
 end
 """
@@ -219,7 +219,7 @@ function reset_time_dependent_step(ps::PipelineStep)
     return if newest === est
         ps
     else
-        PipelineStep(newest, ps.reads, ps.writes, ps.target, ps.brt)
+        PipelineStep(newest, ps.reads, ps.writes, ps.target)
     end
 end
 """
@@ -270,7 +270,7 @@ function pipeline_step_factory(ps::PipelineStep, w)
     return if newest === est
         ps
     else
-        PipelineStep(newest, ps.reads, ps.writes, ps.target, ps.brt)
+        PipelineStep(newest, ps.reads, ps.writes, ps.target)
     end
 end
 """

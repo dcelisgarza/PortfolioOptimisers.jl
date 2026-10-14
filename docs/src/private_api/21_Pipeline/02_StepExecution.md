@@ -1,5 +1,5 @@
 ```@meta
-Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, run_step_under, require_slot, set_slot, run_uncertainty_step, uncertainty_step_source, …"
+Description = "Step execution, private API of PortfolioOptimisers.jl: run_step, require_slot, set_slot, run_uncertainty_step, uncertainty_step_source, run_constraint_step, …"
 ```
 
 # Step execution: private API
@@ -10,7 +10,6 @@ The estimators do not depend on the pipeline code, and their docstrings are with
 
 ```@docs
 run_step
-run_step_under
 require_slot
 set_slot
 run_uncertainty_step
@@ -23,16 +22,23 @@ add_constraint_result
 
 ## The frame of a step
 
-A step that reads the returns fits on the raw returns, or on the returns in excess of the benchmark when its [`PipelineStep`](@ref) sets `brt = true`. Such a step is a prior, clustering, network, uncertainty-set, phylogeny, centrality or exposure step. The optimiser that receives the value of the step must read the returns in the same frame, and the [`Pipeline`](@ref) constructor checks this.
+A step that reads the returns reads them from the source that its own reader states in its `x_src` field. A [`PipelineStep`](@ref) holds no source. The steps whose values the last optimiser receives join the group of that optimiser, and the readers that those values replace leave it. The [`Pipeline`](@ref) constructor warns on that group, and it refuses a prior step in the Excess Frame that feeds an optimiser with a data benchmark.
 
 ```@docs
-assert_step_brt
-pipe_prior_brt
-step_reads_returns
-step_brt
-pipe_receives_step
+reader_frames(::PipelineStep, ::AbstractString, ::Bool)
+step_prior
+pipe_step_targets
+pipe_target_paths
+pipe_config_paths
+pipe_prior_estimator
+cut_frames
+cut_children
 pipe_terminal_optimiser
-assert_benchmark_frame
+pipeline_frames
+pipeline_refits
+terminal_frames
+pipe_data_benchmark_path
+assert_pipeline_data_benchmark
 ```
 
 A [`TrainTestSplit`](@ref) is the one step whose written slot does not follow from its type. It narrows whichever data slot the pipeline input filled, the prices or the returns. [`pipe_writes`](@ref) returns `:split` for it, which is not a slot, so the pipeline treats the step as one that writes nothing. The docstrings of `run_step`, [`pipe_reads`](@ref) and [`pipe_writes`](@ref) cover the `run_step` method of the split and its slot declarations.

@@ -773,90 +773,163 @@ end
         @test ew2 === EqualWeighted()
     end
 
-    @testset "a prior step fits in the frame of the optimiser (#1659)" begin
+    @testset "a prior step reads the source of its own prior (#1659, #1702)" begin
         # `inject_context` puts the Prior Result of a prior step into the optimiser
-        # unchanged, so the optimiser's `brt` never reached it. Under `brt = true` the
-        # other readers of the optimiser read `X - B`, and a prior on the raw `X` mixed two
-        # frames with no error. The PipelineStep wrapper now carries the frame, and the
-        # Pipeline refuses a prior step whose frame differs from the optimiser's.
+        # unchanged. The prior states its own source, so the step fits in the frame that
+        # its `x_src` names, as the same prior does in the field `pe` of the optimiser.
         rd0 = make_returns()
         rd = ReturnsResult(; nx = rd0.nx, X = rd0.X, nb = ["BM"],
                            B = randn(StableRNG(1659), size(rd0.X, 1)) / 100)
-        step(brt) = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = brt)
-        jo(brt) = JuMPOptimiser(;
+        step(src) = PipelineStep(; est = EmpiricalPrior(; x_src = src), writes = :prior)
+        pe(src) = EmpiricalPrior(; x_src = src)
+        jo(src) = JuMPOptimiser(; pe = pe(src),
                                 slv = Solver(; name = :Clarabel,
                                              solver = Clarabel.Optimizer,
-                                             settings = Dict("verbose" => false)),
-                                brt = brt)
-        ho(brt) = HierarchicalOptimiser(; brt = brt, x_src = :data)
-        cases = (brt -> MeanRisk(; opt = jo(brt)),
-                 brt -> PipelineStep(; est = MeanRisk(; opt = jo(brt)), reads = (:returns,),
+                                             settings = Dict("verbose" => false)))
+        ho(src) = HierarchicalOptimiser(; pe = pe(src),
+                                        cle = ClustersEstimator(; x_src = src))
+        cases = (src -> MeanRisk(; opt = jo(src)),
+                 src -> PipelineStep(; est = MeanRisk(; opt = jo(src)), reads = (:returns,),
                                      writes = :opt),
-                 brt -> HierarchicalRiskParity(; opt = ho(brt)),
-                 brt -> InverseVolatility(; brt = brt),
-                 brt -> NestedClustered(; brt = brt, opti = InverseVolatility(),
+                 src -> HierarchicalRiskParity(; opt = ho(src)),
+                 src -> InverseVolatility(; pe = pe(src)),
+                 src -> NestedClustered(; pe = pe(src),
+                                        cle = ClustersEstimator(; x_src = src),
+                                        opti = InverseVolatility(),
                                         opto = InverseVolatility()))
-        for mk in cases, brt in (false, true)
-            # A matched frame equals the optimiser with no prior step, which fits its own
-            # prior under its own `brt`.
-            res = fit(Pipeline(; steps = (step(brt), mk(brt))), rd)
-            ref = fit(Pipeline(; steps = (mk(brt),)), rd)
-            @test isapprox(res.w, ref.w; atol = 1e-6)
-            @test res.ctx.prior.mu ≈ prior(EmpiricalPrior(), rd; brt = brt).mu
+        for mk in cases, src in (nothing, ExcessSource())
+            # A step in the frame of the optimiser's own prior equals the optimiser with no
+            # prior step.
+            opt = mk(src)
+            pipe = @test_logs min_level = Logging.Warn Pipeline(; steps = (step(src), opt))
+            res = fit(pipe, rd)
+            ref = fit(Pipeline(; steps = (opt,)), rd)
+            if isa(opt, NestedClustered) && isa(src, ExcessSource)
+                # The outer problem of a meta-optimiser reads a Prior Result in `pe` as
+                # raw until a Prior Result records its source, which is the work of
+                # "Build: the last piece of the brt migration (pins, docs, merge to dev)"
+                # (#1705). That piece turns this into `@test`.
+                @test_broken isapprox(res.w, ref.w; atol = 1e-6)
+            else
+                @test isapprox(res.w, ref.w; atol = 1e-6)
+            end
+            @test res.ctx.prior.mu ≈ prior(pe(src), rd).mu
             # The returns data keeps its raw `X` and its `B`.
             @test res.ctx.returns === rd
-            # A mismatch is refused when the pipeline is built, in both directions.
+        end
+        # The prior of the step replaces the prior of the optimiser, so the reader at
+        # `nothing` in `pe` leaves the group, and a mix that the caller stated is silent.
+        @test_logs min_level = Logging.Warn Pipeline(;
+                                                     steps = (step(ExcessSource()),
+                                                              cases[1](nothing)))
+        hdata = HierarchicalRiskParity(;
+                                       opt = HierarchicalOptimiser(;
+                                                                   cle = ClustersEstimator(;
+                                                                                           x_src = DataSource())))
+        @test_logs min_level = Logging.Warn Pipeline(;
+                                                     steps = (step(ExcessSource()), hdata))
+        # A reader that states no source beside a step of the Excess Frame warns once, with
+        # its path from the pipeline, and the pipeline builds.
+        hraw = HierarchicalRiskParity(; opt = HierarchicalOptimiser())
+        @test_logs (:warn, r"^`Pipeline` holds a reader .*: `steps\[2\]\.opt\.cle`\.") Pipeline(;
+                                                                                                steps = (step(ExcessSource()),
+                                                                                                         hraw))
+        hexc = HierarchicalRiskParity(;
+                                      opt = HierarchicalOptimiser(;
+                                                                  cle = ClustersEstimator(;
+                                                                                          x_src = ExcessSource())))
+        @test_logs (:warn, r": `steps\[1\]`\.") Pipeline(; steps = (EmpiricalPrior(), hexc))
+        @test_logs (:warn, r": `steps\[1\]\.est`\.") Pipeline(;
+                                                              steps = (step(nothing), hexc))
+        # The prior of a nested pipeline is the prior of its last step.
+        @test_logs (:warn, r": `steps\[1\]\.steps\[1\]\.est`\.") Pipeline(;
+                                                                          steps = (Pipeline(;
+                                                                                            steps = (step(nothing),)),
+                                                                                   hexc))
+        @test_logs min_level = Logging.Warn Pipeline(;
+                                                     steps = (Pipeline(;
+                                                                       steps = (step(ExcessSource()),)),
+                                                              hexc))
+        # The pipeline did not read the benchmark itself: the batch fit equals a prior on
+        # the excess returns.
+        rdx = ReturnsResult(; nx = rd.nx,
+                            X = benchmark_relative_returns(rd, ExcessSource()))
+        @test isapprox(fit(Pipeline(; steps = (step(ExcessSource()), InverseVolatility())),
+                           rd).w, optimise(InverseVolatility(), rdx).w)
+        # An optimiser that reads no prior, and a callable prior step, state no source.
+        @test Pipeline(; steps = (step(ExcessSource()), EqualWeighted())) isa Pipeline
+        callable = PipelineStep(; est = ctx -> prior(EmpiricalPrior(), ctx.returns),
+                                reads = (:returns,), writes = :prior)
+        @test Pipeline(; steps = (callable, cases[1](ExcessSource()))) isa Pipeline
+        # The wrapper holds no source: `brt` is gone with no deprecated keyword (ADR 0213).
+        @test !hasfield(PipelineStep, :brt)
+        @test_throws MethodError PipelineStep(; est = EmpiricalPrior(), writes = :prior,
+                                              brt = true)
+        # `ExcessSource()` on returns with no benchmark is refused by the step, as by
+        # `prior`.
+        @test_throws ArgumentError fit(Pipeline(;
+                                                steps = (step(ExcessSource()),
+                                                         InverseVolatility())), rd0)
+    end
+
+    @testset "a prior step in the Excess Frame refuses a data benchmark (#1692, #1702)" begin
+        # The optimiser receives the Prior Result of the step, so its own constructor
+        # cannot see the source of the step. The `Pipeline` constructor refuses the pair,
+        # because the tracking series would be `(X - B) * w - B`.
+        slv = Solver(; name = :Clarabel, solver = Clarabel.Optimizer,
+                     settings = Dict("verbose" => false))
+        step(src) = PipelineStep(; est = EmpiricalPrior(; x_src = src), writes = :prior)
+        dbt = DataBenchmarkTracking()
+        opts = ((MeanRisk(;
+                          opt = JuMPOptimiser(; slv = slv,
+                                              tr = TrackingError(; tr = dbt, err = 0.01))),
+                 "`opt.tr.tr`"),
+                (MeanRisk(; r = TrackingRiskMeasure(; tr = dbt),
+                          opt = JuMPOptimiser(; slv = slv)), "`r.tr`"),
+                (MeanRisk(; r = [Variance(), TrackingRiskMeasure(; tr = dbt)],
+                          opt = JuMPOptimiser(; slv = slv)), "`r[2].tr`"))
+        for (opt, path) in opts
             err = try
-                Pipeline(; steps = (step(!brt), mk(brt)))
+                Pipeline(; steps = (step(ExcessSource()), opt))
                 nothing
             catch e
                 e
             end
             @test isa(err, ArgumentError)
-            @test occursin("brt = $(!brt)", err.msg) && occursin("brt = $brt", err.msg)
+            @test occursin("step 1 of 2", err.msg) && occursin(path, err.msg)
+            # The prior of a nested pipeline and a wrapped optimiser are seen through.
+            @test_throws ArgumentError Pipeline(;
+                                                steps = (Pipeline(;
+                                                                  steps = (step(ExcessSource()),)),
+                                                         PipelineStep(; est = opt,
+                                                                      reads = (:returns,),
+                                                                      writes = :opt)))
+            # A raw prior step, and a callable prior step, which states no source, build.
+            for st in (step(nothing), step(DataSource()), EmpiricalPrior(),
+                       PipelineStep(; est = ctx -> prior(EmpiricalPrior(), ctx.returns),
+                                    reads = (:returns,), writes = :prior))
+                @test Pipeline(; steps = (st, opt)) isa Pipeline
+            end
+            # The last prior step is the one whose Prior Result the optimiser receives.
+            @test Pipeline(; steps = (step(ExcessSource()), step(nothing), opt)) isa
+                  Pipeline
         end
-        # A bare prior estimator fits on the raw returns, so it meets `brt = true` with a
-        # refusal, and it composes with `brt = false` as before.
-        @test_throws ArgumentError Pipeline(; steps = (EmpiricalPrior(), cases[1](true)))
-        @test Pipeline(; steps = (EmpiricalPrior(), cases[1](false))) isa Pipeline
-        # The prior of a nested pipeline is the prior of its last step.
-        @test_throws ArgumentError Pipeline(;
-                                            steps = (Pipeline(; steps = (step(false),)),
-                                                     cases[3](true)))
-        @test Pipeline(; steps = (Pipeline(; steps = (step(true),)), cases[3](true))) isa
-              Pipeline
-        # The pipeline did not read the benchmark itself: the batch fit equals a prior on
-        # the excess returns.
-        rdx = ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, true))
-        @test isapprox(fit(Pipeline(; steps = (step(true), cases[4](true))), rd).w,
-                       optimise(InverseVolatility(), rdx).w)
-        # An optimiser that reads no prior, and a callable prior step, declare no frame.
-        @test Pipeline(; steps = (step(true), EqualWeighted())) isa Pipeline
-        callable = PipelineStep(; est = ctx -> prior(EmpiricalPrior(), ctx.returns),
-                                reads = (:returns,), writes = :prior)
-        @test Pipeline(; steps = (callable, cases[1](true))) isa Pipeline
-        # Only a step that reads the returns takes `brt = true` (#1670): the wrapper
-        # passes it to no other step.
-        @test step(true).brt && !step(false).brt
-        @test PipelineStep(; est = Online(EmpiricalPrior(); max_history = 10),
-                           writes = :prior, brt = true).brt
-        for (est, slot) in
-            ((MeanRisk(; opt = jo(true)), :opt), (WeightBoundsEstimator(), :constraints),
-             (ctx -> nothing, :prior))
-            @test_throws ArgumentError PipelineStep(; est = est, writes = slot, brt = true)
-        end
-        # `brt = true` on returns with no benchmark is refused by the step, as by `prior`.
-        @test_throws ArgumentError fit(Pipeline(; steps = (step(true), cases[4](true))),
-                                       rd0)
+        # A plain measure beside the excess prior step builds.
+        @test Pipeline(;
+                       steps = (step(ExcessSource()),
+                                MeanRisk(;
+                                         r = TrackingRiskMeasure(;
+                                                                 tr = WeightsTracking(;
+                                                                                      w = fill(0.2,
+                                                                                               5))),
+                                         opt = JuMPOptimiser(; slv = slv)))) isa Pipeline
     end
 
-    @testset "every step that reads the returns fits in the frame of the optimiser (#1670)" begin
-        # #1659 gave the prior step a frame. An uncertainty, clustering, phylogeny,
-        # centrality or exposure step read the raw `X` too, and `inject_context` put its
-        # value into an optimiser whose other readers read `X - B`. Each such step now
-        # reads the returns under the `brt` of its PipelineStep, and the Pipeline refuses
-        # a step whose frame differs from the optimiser's. A matched step equals the same
-        # estimator in the field of the optimiser.
+    @testset "every step that reads the returns reads its own source (#1670, #1702)" begin
+        # An uncertainty, clustering, phylogeny, centrality or exposure step reads the
+        # returns from the source of its own reader, and `inject_context` puts its value
+        # into the optimiser. A step equals the same estimator in the field of the
+        # optimiser.
         rng = StableRNG(987654321)
         F = randn(rng, 60, 2) / 100
         M = [1.0 0.0; 0.5 0.5; 0.0 1.0; 0.8 0.2; 0.2 0.8]
@@ -864,82 +937,87 @@ end
                            X = F * transpose(M) + randn(rng, 60, 5) / 100,
                            nf = ["MTUM", "VLUE"], F = F, nb = ["BM"],
                            B = randn(StableRNG(1670), 60) / 100)
-        pstep(brt) = PipelineStep(; est = EmpiricalPrior(), writes = :prior, brt = brt)
+        pe(src) = EmpiricalPrior(; x_src = src)
+        pstep(src) = PipelineStep(; est = pe(src), writes = :prior)
         sets = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => rd.nf))
-        ue = DeltaUncertaintySet()
-        ple = SemiDefinitePhylogenyEstimator()
-        cte = CentralityConstraint()
-        ece = ExposureConstraintEstimator(;
-                                          lce = LinearConstraintEstimator(;
-                                                                          val = "MTUM <= 0.3"),
-                                          space = FactorSpace(; re = StepwiseRegression()))
-        jo(brt; kw...) = JuMPOptimiser(; pe = EmpiricalPrior(), slv = jopt().slv, brt = brt,
-                                       kw...)
-        ho(brt; kw...) = HierarchicalOptimiser(; brt = brt, x_src = :data, kw...)
+        ue(src) = DeltaUncertaintySet(; pe = pe(src))
+        ple(src) = SemiDefinitePhylogenyEstimator(; x_src = src)
+        cte(src) = CentralityConstraint(; x_src = src)
+        lce = LinearConstraintEstimator(; val = "MTUM <= 0.3")
+        ece(src) = ExposureConstraintEstimator(; lce = lce,
+                                               space = FactorSpace(;
+                                                                   re = StepwiseRegression(;
+                                                                                           x_src = src)))
+        jo(src; kw...) = JuMPOptimiser(; pe = pe(src), slv = jopt().slv, kw...)
+        ho(src; kw...) = HierarchicalOptimiser(; pe = pe(src), kw...)
         # (the step, the optimiser that receives it, the optimiser with the estimator)
-        cases = (brt -> (PipelineStep(; est = ue, reads = (:returns,),
-                                      writes = :uncertainty, target = :sigma, brt = brt),
-                         MeanRisk(; r = UncertaintySetVariance(), opt = jo(brt)),
-                         MeanRisk(; r = UncertaintySetVariance(; ucs = ue), opt = jo(brt))),
-                 brt -> (PipelineStep(; est = ClustersEstimator(), writes = :phylogeny,
-                                      brt = brt), HierarchicalRiskParity(; opt = ho(brt)),
-                         HierarchicalRiskParity(; opt = ho(brt; cle = ClustersEstimator()))),
-                 brt -> (PipelineStep(; est = ple, writes = :constraints, brt = brt),
-                         MeanRisk(; opt = jo(brt; x_src = :data)),
-                         MeanRisk(; opt = jo(brt; x_src = :data, ple = ple))),
-                 brt -> (PipelineStep(; est = cte, writes = :constraints, brt = brt),
-                         MeanRisk(; opt = jo(brt; x_src = :data)),
-                         MeanRisk(; opt = jo(brt; x_src = :data, cte = cte))),
-                 brt -> (PipelineStep(; est = ece, writes = :constraints, brt = brt),
-                         MeanRisk(; opt = jo(brt)),
-                         MeanRisk(; opt = jo(brt; lcse = ece, sets = sets))))
-        for mk in cases, brt in (false, true)
-            st, opt, ref = mk(brt)
-            res = fit(Pipeline(; steps = (pstep(brt), st, opt)), rd)
-            @test isapprox(res.w, optimise(ref, rd).w; atol = 1e-6)
-            # A mismatch is refused when the pipeline is built, in both directions.
-            err = try
-                Pipeline(; steps = (pstep(brt), mk(!brt)[1], opt))
-                nothing
-            catch e
-                e
+        cases = (src -> (PipelineStep(; est = ue(src), reads = (:returns,),
+                                      writes = :uncertainty, target = :sigma),
+                         MeanRisk(; r = UncertaintySetVariance(), opt = jo(src)),
+                         MeanRisk(; r = UncertaintySetVariance(; ucs = ue(src)),
+                                  opt = jo(src))),
+                 src -> (PipelineStep(; est = ClustersEstimator(; x_src = src),
+                                      writes = :phylogeny),
+                         HierarchicalRiskParity(; opt = ho(src)),
+                         HierarchicalRiskParity(;
+                                                opt = ho(src;
+                                                         cle = ClustersEstimator(;
+                                                                                 x_src = src)))),
+                 src -> (PipelineStep(; est = ple(src), writes = :constraints),
+                         MeanRisk(; opt = jo(src)),
+                         MeanRisk(; opt = jo(src; ple = ple(src)))),
+                 src -> (PipelineStep(; est = cte(src), writes = :constraints),
+                         MeanRisk(; opt = jo(src)),
+                         MeanRisk(; opt = jo(src; cte = cte(src)))),
+                 src -> (PipelineStep(; est = ece(src), writes = :constraints),
+                         MeanRisk(; opt = jo(src)),
+                         MeanRisk(; opt = jo(src; lcse = ece(src), sets = sets))))
+        for mk in cases
+            for src in (nothing, ExcessSource())
+                st, opt, ref = mk(src)
+                # The value of the step replaces the slot that holds the default reader of
+                # the optimiser, so the group of a matched step is silent.
+                pipe = @test_logs min_level = Logging.Warn Pipeline(;
+                                                                    steps = (pstep(src), st,
+                                                                             opt))
+                res = fit(pipe, rd)
+                @test isapprox(res.w, optimise(ref, rd).w; atol = 1e-6)
             end
-            @test isa(err, ArgumentError)
-            @test occursin("brt = $(!brt)", err.msg) && occursin("brt = $brt", err.msg)
+            # A step that states no source beside a prior of the Excess Frame warns, with
+            # its path, and the pipeline builds.
+            opt = mk(ExcessSource())[2]
+            @test_logs (:warn, r"`steps\[2\]\.est") Pipeline(;
+                                                             steps = (pstep(ExcessSource()),
+                                                                      mk(nothing)[1], opt))
         end
-        # The value of each step is the verb under the frame of the step.
-        res = fit(Pipeline(; steps = (pstep(true), cases[1](true)[1])), rd)
-        @test res.ctx.uncertainty.sigma.ub == sigma_ucs(ue, rd; brt = true).ub
-        @test res.ctx.uncertainty.sigma.ub != sigma_ucs(ue, rd).ub
-        # A bare step reads the raw returns, so it meets `brt = true` with a refusal.
-        @test_throws ArgumentError Pipeline(; steps = (pstep(true), ple, cases[3](true)[2]))
-        # A wrapped nested pipeline states the frame of its last step.
-        nested(brt) = PipelineStep(; est = Pipeline(; steps = (pstep(brt),)),
-                                   writes = :prior)
-        @test_throws ArgumentError Pipeline(; steps = (nested(false), cases[2](true)[2]))
-        @test Pipeline(; steps = (nested(true), cases[2](true)[2])) isa Pipeline
-        # A network step writes a phylogeny matrix that no optimiser receives, so it takes
-        # a frame and is not checked.
-        ne = PipelineStep(; est = NetworkEstimator(), writes = :phylogeny, brt = true)
+        # The value of each step is the verb under the source of its reader.
+        res = fit(Pipeline(; steps = (pstep(ExcessSource()), cases[1](ExcessSource())[1])),
+                  rd)
+        @test res.ctx.uncertainty.sigma.ub == sigma_ucs(ue(ExcessSource()), rd).ub
+        @test res.ctx.uncertainty.sigma.ub != sigma_ucs(ue(nothing), rd).ub
+        # A bare step that states no source warns in the same way.
+        opt = cases[3](ExcessSource())[2]
+        @test_logs (:warn, r": `steps\[2\]`\.") Pipeline(;
+                                                         steps = (pstep(ExcessSource()),
+                                                                  ple(nothing), opt))
+        # A network step writes a phylogeny matrix that no optimiser receives, so it reads
+        # its own source and stays out of the group.
+        ne = PipelineStep(; est = NetworkEstimator(; x_src = ExcessSource()),
+                          writes = :phylogeny)
         res = fit(Pipeline(; steps = (ne,)), rd)
         @test res.ctx.phylogeny.X ==
-              phylogeny_matrix(NetworkEstimator(), rd; rd = rd, x_src = :data, brt = true).X
-        @test Pipeline(; steps = (NetworkEstimator(), cases[2](true)[2])) isa Pipeline
-        # An optimiser with no field for `:cle` ignores a clustering, so it is not checked.
-        @test Pipeline(; steps = (ClustersEstimator(), MeanRisk(; opt = jo(true)))) isa
-              Pipeline
-        # A step that reads no returns takes no frame: an uncertainty set that reads the
-        # prior, and an exposure constraint that reads the loadings of the prior.
-        for (est, slot) in ((NormalUncertaintySet(; pe = nothing), :uncertainty),
-                            (ExposureConstraintEstimator(; lce = ece.lce, space = FactorSpace()),
-                             :constraints))
-            @test_throws ArgumentError PipelineStep(; est = est, writes = slot,
-                                                    target = if slot === :uncertainty
-                                                        :sigma
-                                                    else
-                                                        nothing
-                                                    end, brt = true)
-        end
+              phylogeny_matrix(NetworkEstimator(; x_src = ExcessSource()), rd; rd = rd).X
+        hexc = HierarchicalRiskParity(;
+                                      opt = ho(ExcessSource();
+                                               cle = ClustersEstimator(;
+                                                                       x_src = ExcessSource())))
+        @test_logs min_level = Logging.Warn Pipeline(; steps = (NetworkEstimator(), hexc))
+        # An optimiser with no field for `:cle` ignores a clustering, so the clustering
+        # stays out of the group.
+        @test_logs min_level = Logging.Warn Pipeline(;
+                                                     steps = (ClustersEstimator(),
+                                                              MeanRisk(;
+                                                                       opt = jo(ExcessSource()))))
     end
 
     @testset "uncertainty steps and routing" begin
