@@ -42,7 +42,8 @@ The census at `89e8d37a72` found these facts.
 
 ## Decision
 
-The maintainer decided on 2026-10-13.
+The maintainer decided on 2026-10-13. Decision 8 came on 2026-10-14 (#1694), when the build of
+decision 5 (#1689) met a gapped panel.
 
 1. **Each reader estimator holds an `x_src` field, and the default is `nothing`.** A verb reads the
    field of its estimator, so `prior(pe, rd)` reads `pe.x_src`. No head forwards a source, and no
@@ -84,6 +85,26 @@ The maintainer decided on 2026-10-13.
    frame. The experts of an `ExpertMixture` therefore earn comparable returns. This is not a default
    for other readers: a leader, a `RiskLoss` and a `ProgrammeAllocationSet` read the rows as returns
    data, so their priors state their own source.
+8. **On a gapped panel, the moment estimator of a graph reader decides what a gap is (#1694).** A
+   mask-aware prior keeps a young asset whose early rows are `NaN` in `rd.X`, and it fills them with
+   zero in `pr.X` only (ADR 0118). Mask awareness is a property of a moment estimator, not of a
+   prior: it is the `cvg` field of the estimator, or the algorithm of the exponentially weighted
+   family. So the `ce` of the graph reader is one more moment estimator of the fit, and it states
+   its own policy.
+   - The default `ce` stays plain, because every moment estimator defaults to `cvg = nothing`.
+   - Inside a fit, a plain graph reader narrows the Investable Mask at the entry of the head, beside
+     `feature_readable_mask`. The head drops each kept asset that has a non-finite cell in the rows
+     that the reader reads, as a plain estimator over an Asset Panel leaves the asset out of its
+     Coverage Universe. The head warns once per fit, as `HighOrderPrior` does when its orders
+     disagree. The warning names the assets and the two remedies: the same `CoveragePolicy` on the
+     `ce` of the reader, or the prior as the source of the reader. Under `strict = true` the head
+     refuses.
+   - A direct call of a graph verb on a gapped matrix has no entry of a fit, so it refuses with
+     `IsNonFiniteError`, as the matrix method of ADR 0117 does.
+   - A mask-aware `ce` reads the observed cells, so no invented cell reaches the dendrogram. A `ce`
+     is mask-aware when a `cvg` sits anywhere in its tree, so a `PortfolioOptimisersCovariance` that
+     wraps a `Covariance` with a policy counts.
+   - The Scenario Fill reaches a graph reader only when the reader states the prior as its source.
 
 ## Consequences
 
@@ -97,6 +118,11 @@ The maintainer decided on 2026-10-13.
   move under a factor prior, a scenario window or a gap. The parity rule of #1678 says that a
   migration build closes only when the pins of `test/test_78_brt_pinned_outputs.jl` pass unchanged.
   So this change is its own build with new pins, and it lands before the migration builds.
+- On a gapped panel, a hierarchical head with a mask-aware prior and the default `cle` drops each
+  young asset that the prior kept, and warns. A caller who wants the asset states the same
+  `CoveragePolicy` on the `ce` of the clustering. The dendrogram then reads the observed cells and
+  not the Scenario Fill, which ADR 0118 names as the one consequence of the fill that moves capital.
+  ADR 0118 is amended to say so.
 - The estimators of a covariance forecast evaluation receive a matrix, so they get no field. #1683
   decides where the verb gets the frame.
 - ADR 0204 describes the head-level `brt` that this decision removes. The map supersedes it when the
@@ -124,6 +150,17 @@ The maintainer decided on 2026-10-13.
   forwards the value again.
 - **The field on each online rule.** 21 rule types get it, a rule inside a rule over rules must keep
   `nothing`, and the source is stated where it cannot differ from its sub-rules.
+- **On a gapped panel, a plain graph reader refuses inside a fit.** The universe never changes, but
+  the first young asset stops a walk-forward until the caller states a policy on the clustering.
+- **On a gapped panel, a plain graph reader narrows the mask in silence.** The asset that the prior
+  admitted gets a zero weight, and nothing says why.
+- **A mask-aware default `ce` for a graph reader.** Every finite panel pays the available-case path,
+  and the default disagrees with every other moment estimator of the library.
+- **The source switches on finiteness:** `rd.X` when the kept columns are finite, `pr.X` when they
+  hold a gap. The source then changes with the data, with no notice.
+- **A new carrier on each prior result for the observed returns after its gap policy.** A field on
+  about 13 prior results, and the clustering reads the Scenario Fill that ADR 0118 calls harmful
+  to the dendrogram.
 - **The field on each inner reader of an online rule.** These readers receive a matrix, so `rd` must
   pass down, and the step still needs a frame of its own.
 
@@ -139,5 +176,9 @@ The maintainer decided on 2026-10-13.
 - ADR [0215](0215-the-paths-that-read-the-frame-of-a-head-read-the-source-of-a-reader.md): the online
   fold, the meta outer problem and the forecast evaluation (#1683). `covariance_forecast_evaluation`
   takes an `x_src` keyword, the one exception to decision 1.
+- ADR [0117](0117-a-prior-reduces-to-the-coverage-universe-and-a-plain-moment-estimator-refuses-a-non-finite-sample.md):
+  the Coverage Universe of a plain moment estimator, and the Coverage Policy.
+- ADR [0118](0118-a-fold-zeroes-a-held-gap-once-and-a-value-level-verb-reduces-to-the-investable-mask.md):
+  the Scenario Fill. Amended on 2026-10-14 for decision 8 (#1694).
 - `returns_matrix_picker`, `benchmark_relative_returns`, `resolve_factor_regression`,
   `head_frame_returns`.

@@ -395,3 +395,25 @@ So the per-asset share of this ADR is the oracle's denominator, and `fill_limit 
 oracle's decision to warn or to stay silent. The differences that remain are ours alone: the limit
 derives from the coverage floor, the exponentially weighted family names every fill, and `strict`
 refuses any fill. The maintainer kept all three. The decision of this ADR does not change.
+
+## Amendment (2026-10-14)
+
+([#1694](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1694), on map
+[#1678](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1678)). The Decision above names
+the clustering of a hierarchical optimiser as a consumer of the Scenario Fill, because `clusterise`
+read `pr.X`. Decision 5 of ADR
+[0211](0211-each-reader-of-the-returns-states-its-own-source.md) moves the default of a graph reader
+to `rd.X`, the returns data, which keep the `NaN` of each gap. Decision 8 of ADR 0211 states what a
+graph reader does with that gap:
+
+- The fill reaches a graph reader only when the reader states the prior as its source.
+- A graph reader with a mask-aware `ce` reads the observed cells, so the dendrogram sees no invented
+  cell. The consequence that this ADR calls the one that "moves capital" then does not happen.
+- Inside a fit, a graph reader with a plain `ce` narrows the Investable Mask at the entry of the head.
+  It drops each kept asset with a non-finite cell in the rows that it reads, and it warns, or
+  refuses under `strict = true`. The warning names the same `CoveragePolicy` on the `ce` of the
+  reader as the remedy.
+
+So the notice of the fill names the dendrogram only for a graph reader that reads the prior. The
+entropy-pooling view resolvers and the meta-optimisers still read the fill. The rest of the decision
+of this ADR does not change.
