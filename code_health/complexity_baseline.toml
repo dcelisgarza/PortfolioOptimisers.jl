@@ -214,13 +214,13 @@ commit = "afc70e40b5"
 "src/08_Phylogeny/12_AssetPhylogeny.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 2, arg_sum = 11, macros = [] }
 "src/09_ConstraintGeneration/01_Base_ConstraintGeneration.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 12, cog_sum = 8, arg_sum = 6, macros = [] }
 "src/09_ConstraintGeneration/02_LinearConstraintGeneration_a.jl" = { cyc = 15, cog = 27, arg = 6, cyc_sum = 110, cog_sum = 110, arg_sum = 66, macros = ["@forward_properties"] }
-"src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { cyc = 20, cog = 47, arg = 7, cyc_sum = 73, cog_sum = 101, arg_sum = 28, macros = [] }
+"src/09_ConstraintGeneration/02_LinearConstraintGeneration_b.jl" = { cyc = 20, cog = 47, arg = 8, cyc_sum = 73, cog_sum = 101, arg_sum = 29, macros = [] }
 "src/09_ConstraintGeneration/03_RiskBudgetConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 0, cyc_sum = 9, cog_sum = 4, arg_sum = 0, macros = ["@propagatable"] }
 "src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl" = { cyc = 13, cog = 21, arg = 5, cyc_sum = 37, cog_sum = 32, arg_sum = 31, macros = [] }
 "src/09_ConstraintGeneration/05_WeightBoundsConstraintGeneration.jl" = { cyc = 7, cog = 6, arg = 3, cyc_sum = 27, cog_sum = 12, arg_sum = 9, macros = ["@propagatable"] }
 "src/09_ConstraintGeneration/06_AssetSetsMatrix.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 23, cog_sum = 15, arg_sum = 53, macros = [] }
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 3, macros = ["@propagatable"] }
-"src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 20, cog_sum = 15, arg_sum = 26, macros = [] }
+"src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 20, cog_sum = 15, arg_sum = 30, macros = [] }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 5, arg = 3, cyc_sum = 15, cog_sum = 8, arg_sum = 11, macros = [] }
 "src/10_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 11, cyc_sum = 110, cog_sum = 84, arg_sum = 142, macros = ["@forward_properties"] }
 "src/10_Prior/02_EmpiricalPrior.jl" = { cyc = 4, cog = 3, arg = 7, cyc_sum = 12, cog_sum = 7, arg_sum = 26, macros = ["@propagatable"] }
