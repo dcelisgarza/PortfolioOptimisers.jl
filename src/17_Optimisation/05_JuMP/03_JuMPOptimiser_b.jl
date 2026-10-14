@@ -67,10 +67,10 @@ processing happens exactly once per `optimise` call.
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              kwargs...)
-    # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns takes
-    # `opt.brt` and subtracts the benchmark itself, at the point of use.
+    # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns states its
+    # own source, and subtracts the benchmark itself, at the point of use.
     assert_universe_axis_order(opt.sets, rd)
-    pr = prior(opt.pe, rd; brt = opt.brt)
+    pr = prior(opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -80,8 +80,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask((opt.ple, opt.cte), investable_mask(pr), rd)
-    imsk = graph_reader_mask((opt.ple, opt.cte), imsk, pr, rd, opt.x_src, opt.brt,
-                             opt.strict)
+    imsk = graph_reader_mask((opt.ple, opt.cte), imsk, pr, rd, opt.strict)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = opt.strict), imsk, pr.X)
@@ -98,10 +97,9 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lt = threshold_constraints(opt.lt, opt.sets; datatype = datatype, strict = opt.strict)
     st = threshold_constraints(opt.st, opt.sets; datatype = datatype, strict = opt.strict)
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
-                              rr = pr.rr, rd = rd, brt = opt.brt)
+                              rr = pr.rr, rd = rd)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 x_src = opt.x_src, brt = opt.brt, strict = opt.strict,
-                                 kwargs...)
+                                 strict = opt.strict, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
     # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
@@ -139,8 +137,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                      strict = opt.strict)
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
-    plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                x_src = opt.x_src, brt = opt.brt, kwargs...)
+    plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd, kwargs...)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,
@@ -340,7 +337,6 @@ fees: unconstrained [`NearOptimalCentering`](@ref) did exactly that while it inl
   - `fees`: Fees result passed to risk builders.
   - $(arg_dict[:b1_opt])
   - `rd`: Returns result forwarded as a keyword argument to risk builders.
-  - $(arg_dict[:brt_read]) Forwarded with `rd` to the risk builders, where an uncertainty set with a prior of its own reads it.
 
 # Returns
 
@@ -363,9 +359,8 @@ function set_risk_and_scalarise!(::JuMP.Model, ::Nothing, optimiser, opt, pr, pl
     return nothing
 end
 function set_risk_and_scalarise!(model::JuMP.Model, r, optimiser, opt, pr, pl,
-                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; rd,
-                                 brt::Bool = false)
-    set_risk_constraints!(model, r, optimiser, pr, pl, fees, b1; rd = rd, brt = brt)
+                                 fees::Option{<:Fees}, b1::Option{<:MatNum} = nothing; rd)
+    set_risk_constraints!(model, r, optimiser, pr, pl, fees, b1; rd = rd)
     scalarise_risk_expression!(model, opt.sca)
     return nothing
 end
@@ -477,9 +472,8 @@ function assemble_jump_model!(model::JuMP.Model, optimiser::JuMPOptimisationEsti
     set_linf_regularisation!(model,
                              resolve_calibration_slot(opt.linf, :linf, pr, pr.w, opt.slv))
     set_non_fixed_fees!(model, fees)
-    set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd,
-                            brt = opt.brt)
-    set_return_constraints!(model, ret, obj, pr; rd = rd, brt = opt.brt)
+    set_risk_and_scalarise!(model, r, optimiser, opt, pr, plr, fees, b1; rd = rd)
+    set_return_constraints!(model, ret, obj, pr; rd = rd)
     # After the return constraints, so a `MaximumRatio` has chosen its form, and before
     # every semidefinite phylogeny, including a programme set's in `add_custom_constraint!`.
     mark_risk_minimised!(model, obj)
@@ -519,13 +513,48 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
 """
+    reader_frames(opt::JuMPOptimiser, path::AbstractString, refit::Bool) -> ReturnsFrames
+    group_frames(opt::JuMPOptimiser) -> ReturnsFrames
+    group_frames(est::JuMPOptimisationEstimator) -> ReturnsFrames
+
+Walk the readers of a JuMP head, for the warning of a forgotten raw reader and the gap rule of the head.
+
+The group of a JuMP head is the head, the configuration that it holds in `opt`, and every reader in their slots: the prior `opt.pe`, the graph readers `opt.cte` and `opt.ple`, the regressions of `opt.lcse`, and the readers inside the risk measures, the tracking errors and the return terms. [`field_frames`](@ref) walks every field. The walk stops at a fallback, because it is a head with its own group. A configuration that takes an online step with no head answers for its own slots. A regression reader at `x_src = nothing` counts as raw only when the prior `opt.pe` gives no loadings, see [`refits_regression`](@ref).
+
+# Arguments
+
+  - `opt`: The configuration of a JuMP head.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+  - `est`: The JuMP head.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the slots of `opt`, at `path` or from the configuration itself, or of the group of `est`.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+  - [`group_source`](@ref)
+"""
+function reader_frames(opt::JuMPOptimiser, path::AbstractString, refit::Bool)
+    return field_frames(opt, path, refit)
+end
+function group_frames(opt::JuMPOptimiser)
+    return field_frames(opt, "", refits_regression(opt.pe))
+end
+function group_frames(est::JuMPOptimisationEstimator)
+    return field_frames(est, "", refits_regression(est.opt.pe))
+end
+"""
     bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
     bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
     bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
 
 Bind every [`DataBenchmarkTracking`](@ref) of a JuMP optimiser to the benchmark of the rows it fits on.
 
-Each head calls this function after [`investable_view`](@ref), so the benchmark has the rows and the investable columns of the model. Every builder, every corner solve and every risk of a frontier then reads the bound benchmark. The optimiser applies its own `brt` to the binding, so a data benchmark under `brt = true` is refused.
+Each head calls this function after [`investable_view`](@ref), so the benchmark has the rows and the investable columns of the model. Every builder, every corner solve and every risk of a frontier then reads the bound benchmark. The constructor of each holder already refused a data benchmark beside a prior that states `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
   - A [`JuMPOptimiser`](@ref) binds its tracking errors `tr`.
   - A head binds its `opt`. A head with risk measures, a [`RiskJuMPOptimisationEstimator`](@ref), also binds its `r`.
@@ -534,8 +563,8 @@ Each rebuilds through its keyword constructor only when a field changes, so a he
 
 # Algorithm
 
- 1. A [`JuMPOptimiser`](@ref) binds `opt.tr` to `rd` under `opt.brt` with [`bind_data_benchmark`](@ref), giving `tr`.
- 2. A head binds its `est.opt` with step 1, giving `opt`. A [`RiskJuMPOptimisationEstimator`](@ref) also binds `est.r` under `est.opt.brt`, giving `r`.
+ 1. A [`JuMPOptimiser`](@ref) binds `opt.tr` to `rd` with [`bind_data_benchmark`](@ref), giving `tr`.
+ 2. A head binds its `est.opt` with step 1, giving `opt`. A [`RiskJuMPOptimisationEstimator`](@ref) also binds `est.r`, giving `r`.
  3. Return the object itself when every bound field is the field it replaces, by `===`.
  4. Otherwise rebuild the object with the bound fields through its keyword constructor, with [`rebuild_estimator`](@ref).
 
@@ -555,7 +584,7 @@ Each rebuilds through its keyword constructor only when a field changes, so a he
   - [`investable_view`](@ref)
 """
 function bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
-    tr = bind_data_benchmark(opt.tr, rd, opt.brt)
+    tr = bind_data_benchmark(opt.tr, rd)
     return tr === opt.tr ? opt : rebuild_estimator(opt, (; tr = tr))
 end
 function bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
@@ -564,7 +593,7 @@ function bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
 end
 function bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
     opt = bind_data_benchmark(est.opt, rd)
-    r = bind_data_benchmark(est.r, rd, est.opt.brt)
+    r = bind_data_benchmark(est.r, rd)
     return if opt === est.opt && r === est.r
         est
     else

@@ -139,20 +139,23 @@ end
     end
 
     @testset "A benchmark-relative step folds X - B into the prior (#1645, #1651)" begin
-        # With `brt = true` the batch prior fits `X - B`. The step folds `X - B` into the
-        # prior, and the Fold Context keeps the raw rows, so the read-out rebuilds the raw
-        # returns data and each reader subtracts the benchmark itself (ADR 0204).
+        # A prior that states `x_src = ExcessSource()` fits `X - B` in batch. The step folds
+        # `X - B` into the prior, and the Fold Context keeps the raw rows, so the read-out
+        # rebuilds the raw returns data and each reader subtracts the benchmark itself
+        # (ADR 0215, decision 1).
         t = 80
+        epx = EmpiricalPrior(; x_src = ExcessSource())
+        clx = ClustersEstimator(; x_src = ExcessSource())
         jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
-        jbrt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)
-        hbrt = HierarchicalOptimiser(; pe = EmpiricalPrior(), brt = true)
-        fams = (MeanRisk(; opt = jbrt), HierarchicalRiskParity(; opt = hbrt),
-                HierarchicalEqualRiskContribution(; opt = hbrt),
-                InverseVolatility(; brt = true),
-                NestedClustered(; opti = MeanRisk(; opt = jopt),
-                                opto = MeanRisk(; opt = jopt), brt = true),
-                SubsetResampling(; opt = MeanRisk(; opt = jopt), seed = 3, n_subsets = 3,
-                                 subset_size = 5, brt = true))
+        jexc = JuMPOptimiser(; pe = epx, slv = slv)
+        hexc = HierarchicalOptimiser(; pe = epx, cle = clx)
+        fams = (MeanRisk(; opt = jexc), HierarchicalRiskParity(; opt = hexc),
+                HierarchicalEqualRiskContribution(; opt = hexc),
+                InverseVolatility(; pe = epx),
+                NestedClustered(; pe = epx, cle = clx, opti = MeanRisk(; opt = jopt),
+                                opto = MeanRisk(; opt = jopt)),
+                SubsetResampling(; pe = epx, opt = MeanRisk(; opt = jopt), seed = 3,
+                                 n_subsets = 3, subset_size = 5))
         for r in (rdf, rdv), opt in fams
             b = rows(r, 1:t)
             o = step(opt, r, t)
@@ -164,13 +167,13 @@ end
             @test isapprox(optimise(o).w, optimise(opt, b).w; atol = solved ? 1e-5 : 1e-10)
         end
         # The subtraction is what the step honours: the weights differ from those over `X`.
-        o = step(InverseVolatility(; brt = true), rdv, t)
+        o = step(InverseVolatility(; pe = epx), rdv, t)
         @test !isapprox(optimise(o).w, optimise(InverseVolatility(), rows(rdv, 1:t)).w;
                         atol = 1e-6)
-        # `brt = true` with no benchmark refuses at the first step, as in batch.
-        @test_throws ArgumentError partial_fit!(InverseVolatility(; brt = true),
+        # The Excess Frame with no benchmark refuses at the first step, as in batch.
+        @test_throws ArgumentError partial_fit!(InverseVolatility(; pe = epx),
                                                 rows(rd, 1:1))
-        @test_throws ArgumentError optimise(InverseVolatility(; brt = true), rows(rd, 1:t))
+        @test_throws ArgumentError optimise(InverseVolatility(; pe = epx), rows(rd, 1:t))
     end
 
     @testset "A factor prior folds both matrices, and a wrapping prior forwards" begin
@@ -484,12 +487,9 @@ end
         Bh = 0.5 .* X .+ randn(StableRNG(11), T, N) ./ 1000
         rdb = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = bw, ts = ts)
         rdh = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bh, ts = ts)
-        jopt(tr, err; pe = EmpiricalPrior(), brt = false) = JuMPOptimiser(; pe = pe,
-                                                                          slv = slv,
-                                                                          tr = TrackingError(;
-                                                                                             tr = tr,
-                                                                                             err = err),
-                                                                          brt = brt)
+        jopt(tr, err; pe = EmpiricalPrior()) = JuMPOptimiser(; pe = pe, slv = slv,
+                                                             tr = TrackingError(; tr = tr,
+                                                                                err = err))
         te = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
         b, h = rows(rdb, 1:t), rows(rdh, 1:t)
         w0 = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)),
@@ -558,11 +558,11 @@ end
         end
         @test isapprox(optimise(step(mrr(DataBenchmarkTracking()), rdh, t)).w,
                        optimise(mrr(DataBenchmarkTracking()), h).w; atol = 1e-6)
-        # `brt = true` fits on X - B, and a data benchmark would subtract B twice. Returns
-        # data with no benchmark has none to track.
-        @test_throws ArgumentError optimise(MeanRisk(;
-                                                     opt = jopt(DataBenchmarkTracking(),
-                                                                err; brt = true)), b)
+        # A prior in the Excess Frame fits on X - B, and a data benchmark would subtract B
+        # twice, so the constructor refuses the pair (ADR 0208, decision 3). Returns data
+        # with no benchmark has none to track.
+        @test_throws ArgumentError jopt(DataBenchmarkTracking(), err;
+                                        pe = EmpiricalPrior(; x_src = ExcessSource()))
         @test_throws ArgumentError optimise(mr, rows(rd, 1:t))
         # The online walk-forward equals the batch expanding one, and a rolling fold, whose
         # length every fold shares, tracks its own rows (#1669).

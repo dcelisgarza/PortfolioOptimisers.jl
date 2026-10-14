@@ -229,7 +229,6 @@ $(DocStringExtensions.FIELDS)
         rng::Random.AbstractRNG = Random.default_rng(),
         seed::Option{<:Integer} = nothing,
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        brt::Bool = false,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> SubsetResampling
@@ -252,6 +251,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
   - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
   - `max_comb > 0` and finite.
   - A schedule in `opt` or `fb` has `bind !== :nearest`. Each entry of a schedule passes the check of its field.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -338,10 +338,6 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     @fprop fb
     """
-    $(field_dict[:brt])
-    """
-    brt
-    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -356,7 +352,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                               subset_size::TD{<:SubsetSizeE},
                               n_subsets::TD{<:NumberSubsetsE}, max_comb::Integer,
                               rng::Random.AbstractRNG, seed::Option{<:Integer},
-                              fb::TDO_Option{<:OptE_Opt}, brt::Bool, strict::Bool,
+                              fb::TDO_Option{<:OptE_Opt}, strict::Bool,
                               cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(opt, :opt, :SubsetResampling)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :SubsetResampling)
@@ -378,14 +374,15 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
         assert_time_dependent_substitution(SubsetResampling,
                                            (; pe, wb, fees, sets, opt, wf, ex, subset_size,
-                                            n_subsets, max_comb, rng, seed, fb, brt,
-                                            strict), subset_resampling_td_defaults())
-        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
-                   typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
-                   typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(brt),
-                   typeof(strict), typeof(cache)}(pe, wb, fees, sets, opt, wf, ex,
-                                                  subset_size, n_subsets, max_comb, rng,
-                                                  seed, fb, brt, strict, cache)
+                                            n_subsets, max_comb, rng, seed, fb, strict),
+                                           subset_resampling_td_defaults())
+        est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(opt),
+                  typeof(wf), typeof(ex), typeof(subset_size), typeof(n_subsets),
+                  typeof(max_comb), typeof(rng), typeof(seed), typeof(fb), typeof(strict),
+                  typeof(cache)}(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
+                                 max_comb, rng, seed, fb, strict, cache)
+        warn_raw_readers(est)
+        return est
     end
 end
 function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -399,11 +396,10 @@ function SubsetResampling(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                           max_comb::Integer = 1_000_000_000,
                           rng::Random.AbstractRNG = Random.default_rng(),
                           seed::Option{<:Integer} = nothing,
-                          fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                          strict::Bool = false,
+                          fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                           cache::Option{<:ReturnsBufferState} = nothing)::SubsetResampling
     return SubsetResampling(pe, wb, fees, sets, opt, wf, ex, subset_size, n_subsets,
-                            max_comb, rng, seed, fb, brt, strict, cache)
+                            max_comb, rng, seed, fb, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -541,7 +537,7 @@ function port_opt_view(sr::SubsetResampling, i, X::MatNum, args...)::SubsetResam
     return SubsetResampling(; pe = pe, wb = wb, fees = fees, sets = sets, opt = opt,
                             wf = sr.wf, ex = sr.ex, subset_size = sr.subset_size,
                             n_subsets = sr.n_subsets, max_comb = sr.max_comb, rng = sr.rng,
-                            seed = sr.seed, fb = view_child(sr.fb, i, X), brt = sr.brt,
+                            seed = sr.seed, fb = view_child(sr.fb, i, X),
                             strict = sr.strict, cache = port_opt_view(sr.cache, i))
 end
 function non_investable_universe(sr::SubsetResampling, ni::VecStr)::SubsetResampling
@@ -663,7 +659,7 @@ end
 function _optimise(sr::SubsetResampling, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     sr = reset_time_dependent_estimator(sr)
-    pr = prior(sr.pe, rd; brt = sr.brt)
+    pr = prior(sr.pe, rd)
     # A weight and a fee are fractions, so integer returns take a floating point type.
     Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -721,7 +717,7 @@ A `SubsetResampling` with a fallback goes through the generic [`optimise`](@ref)
 
  1. Refuse an [`Online`](@ref) in the tree of `sr` with [`assert_batch_entry`](@ref).
  2. Reset the schedules of `sr` with [`reset_time_dependent_estimator`](@ref).
- 3. Fit the prior `sr.pe` on `rd` under `sr.brt` with [`prior`](@ref), giving `pr`, and read its investable mask with [`investable_mask`](@ref), giving `imsk`. `rd` keeps its raw returns, and the subset optimisers apply their own `brt`.
+ 3. Fit the prior `sr.pe` on `rd` with [`prior`](@ref), giving `pr`, and read its investable mask with [`investable_mask`](@ref), giving `imsk`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the readers of the subset optimisers state their own sources.
  4. Resolve the fees on the full asset universe with [`fees_constraints`](@ref), and put them on the investable universe with [`investable_fees_view`](@ref), giving `fees`.
  5. Reduce `pr`, `sr` and `rd` to the investable universe with [`investable_reduction`](@ref), giving `rdr`. `N` is the number of investable assets.
  6. Resolve `subset_size` and `n_subsets` on `pr` with [`get_subset_size`](@ref) and [`get_n_subsets`](@ref).
@@ -762,6 +758,34 @@ function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
     assert_batch_entry(sr, "`optimise`")
     return _optimise(sr, shared_series_args(sr, rd)...; branchorder = branchorder,
                      str_names = str_names, save = save, kwargs...)
+end
+"""
+    group_frames(opt::NestedClustered) -> ReturnsFrames
+    group_frames(opt::Union{<:Stacking, <:SubsetResampling}) -> ReturnsFrames
+
+Walk the readers of a meta-optimiser, for the warning of a forgotten raw reader and the gap rule of the head.
+
+The group of a meta-optimiser is the head and every reader in its own slots: the prior `pe`, and the clustering `cle` of a [`NestedClustered`](@ref). [`field_frames`](@ref) walks every field. The walk stops at the inner optimisers, the outer optimiser and the fallback, because each one is a head with its own group (ADR 0204, decision 4).
+
+# Arguments
+
+  - `opt`: The meta-optimiser.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the group of `opt`.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+  - [`group_source`](@ref)
+"""
+function group_frames(opt::NestedClustered)
+    return field_frames(opt, "", refits_regression(opt.pe))
+end
+function group_frames(opt::Union{<:Stacking, <:SubsetResampling})
+    return field_frames(opt, "", refits_regression(opt.pe))
 end
 
 export SubsetResamplingResult, SubsetResampling

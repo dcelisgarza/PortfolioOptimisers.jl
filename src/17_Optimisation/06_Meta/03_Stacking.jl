@@ -284,7 +284,6 @@ $(DocStringExtensions.FIELDS)
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        brt::Bool = false,
         strict::Bool = false,
         pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
         cache::Option{<:ReturnsBufferState} = nothing
@@ -310,6 +309,7 @@ Keywords correspond to the struct's fields.
   - `opto` passes [`assert_external_optimiser`](@ref), and every element of `opti` passes it when `cv !== nothing`. The constructor throws an `ArgumentError` otherwise. Such an optimiser runs on the synthetic assets or on the training rows of a fold, which it does not know in advance. So it cannot hold a precomputed prior or a precomputed constraint.
   - When `wb` is a [`WeightBoundsEstimator`](@ref) or `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`. The constructor throws an `IsNothingError` otherwise.
   - Each entry and the `default` of each schedule give a valid `Stacking`. [`assert_time_dependent_substitution`](@ref) runs the constructor on each of them.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -392,10 +392,6 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     @fprop fb
     """
-    $(field_dict[:brt])
-    """
-    brt
-    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -413,7 +409,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                       opti::Union{<:VecOptE_Opt_TD, <:TD_VecOptE_Opt}, opto::OptE_TD,
                       cv::Option{<:OptimisationCrossValidation}, wf::TD{<:WeightFinaliser},
                       ex::FLoops.Transducers.Executor, fb::TDO_Option{<:OptE_Opt},
-                      brt::Bool, strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
+                      strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
                       cache::Option{<:ReturnsBufferState})
         if isa(opti, TimeDependent)
             @argcheck(opti.bind !== :nearest,
@@ -446,25 +442,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(Stacking,
                                            (; pe, wb, fees, sets, scale, opti, opto, cv, wf,
-                                            ex, fb, brt, strict, pcol),
-                                           stacking_td_defaults())
-        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
-                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(strict), typeof(pcol), typeof(cache)}(pe,
-                                                                                         wb,
-                                                                                         fees,
-                                                                                         sets,
-                                                                                         scale,
-                                                                                         opti,
-                                                                                         opto,
-                                                                                         cv,
-                                                                                         wf,
-                                                                                         ex,
-                                                                                         fb,
-                                                                                         brt,
-                                                                                         strict,
-                                                                                         pcol,
-                                                                                         cache)
+                                            ex, fb, strict, pcol), stacking_td_defaults())
+        est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(scale),
+                  typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
+                  typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe, wb, fees,
+                                                                           sets, scale,
+                                                                           opti, opto, cv,
+                                                                           wf, ex, fb,
+                                                                           strict, pcol,
+                                                                           cache)
+        warn_raw_readers(est)
+        return est
     end
 end
 function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -476,12 +464,11 @@ function Stacking(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                   cv::Option{<:OptimisationCrossValidation} = nothing,
                   wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                   ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                  fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                  strict::Bool = false,
+                  fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                   pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                   cache::Option{<:ReturnsBufferState} = nothing)::Stacking
     return Stacking(pe, wb, fees, sets, scale, narrow_optimiser_vector(opti), opto, cv, wf,
-                    ex, fb, brt, strict, pcol, cache)
+                    ex, fb, strict, pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -683,8 +670,8 @@ function port_opt_view(st::Stacking, i, X::MatNum, args...)::Stacking
     opto = port_opt_view(st.opto, i, X)
     return Stacking(; pe = pe, wb = wb, fees = fees, sets = sets, scale = st.scale,
                     opti = opti, opto = opto, cv = st.cv, wf = st.wf, ex = st.ex,
-                    fb = view_child(st.fb, i, X), brt = st.brt, strict = st.strict,
-                    pcol = st.pcol, cache = port_opt_view(st.cache, i))
+                    fb = view_child(st.fb, i, X), strict = st.strict, pcol = st.pcol,
+                    cache = port_opt_view(st.cache, i))
 end
 function non_investable_universe(st::Stacking, ni::VecStr)::Stacking
     return rebuild_estimator(st, (; sets = non_investable_sets(st.sets, ni)))
@@ -699,7 +686,7 @@ Run the stacking optimisation.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `st` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Fit the prior `pr` with `st.pe` on `rd` under `st.brt`, and take the element type `Tf` of the weights, fees and bounds from `pr.X` with [`float_if_integer`](@ref). `rd` keeps its raw returns, and the inner and outer optimisers apply their own `brt`.
+ 2. Fit the prior `pr` with `st.pe` on `rd`, and take the element type `Tf` of the weights, fees and bounds from `pr.X` with [`float_if_integer`](@ref). The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the readers of the inner and outer optimisers state their own sources.
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk` with [`investable_fees_view`](@ref).
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the returns of the synthetic assets pay.
  5. Reduce `pr`, `st` and `rd` to the assets of `imsk` with [`investable_reduction`](@ref), giving `rdr`. `X` is the returns matrix of the reduced `pr`.
@@ -734,7 +721,7 @@ Run the stacking optimisation.
 function _optimise(st::Stacking, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     st = reset_time_dependent_estimator(st)
-    pr = prior(st.pe, rd; brt = st.brt)
+    pr = prior(st.pe, rd)
     # A weight and a fee are fractions, so integer returns take a floating point type.
     Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.

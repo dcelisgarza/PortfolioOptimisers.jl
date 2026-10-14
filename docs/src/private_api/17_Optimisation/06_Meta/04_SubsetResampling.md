@@ -18,4 +18,5 @@ subset_resampling_td_defaults
 ```@bibliography
 Pages = [@__FILE__]
 Canonical = false
+PortfolioOptimisers.group_frames(::NestedClustered)
 ```

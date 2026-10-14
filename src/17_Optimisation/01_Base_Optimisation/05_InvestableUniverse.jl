@@ -363,13 +363,13 @@ end
 
 Give the data of one solve, with the observations of a Shared Series gap that `opt` reads dropped.
 
-Every reader inside a solve pairs the observations of the Prior Result with the observations of the returns data: the outer problem of a meta-optimiser, the implied volatilities of an [`ImpliedVolatility`](@ref), the probabilities of a scenario. So the drop of [`shared_series_view`](@ref) happens once, before the solve, and every reader sees the same observations. Each attempt of the fallback chain drops by its own rule, because a fallback can hold a different prior or `brt`.
+Every reader inside a solve pairs the observations of the Prior Result with the observations of the returns data: the outer problem of a meta-optimiser, the implied volatilities of an [`ImpliedVolatility`](@ref), the probabilities of a scenario. So the drop of [`shared_series_view`](@ref) happens once, before the solve, and every reader sees the same observations. Each attempt of the fallback chain drops by its own rule, because a fallback is a head with its own group and prior.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A [`ReturnsResult`](@ref) first: replace it with [`optimiser_shared_series_view`](@ref), which reads the `brt` and the prior of `opt`.
+ 1. A [`ReturnsResult`](@ref) first: replace it with [`optimiser_shared_series_view`](@ref), which reads the group of `opt` and its prior, see [`group_source`](@ref).
  2. Any other data: return it unchanged.
 
 # Arguments

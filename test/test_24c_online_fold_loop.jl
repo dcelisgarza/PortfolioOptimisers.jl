@@ -86,16 +86,17 @@ assets is what keeps the JuMP families cheap.
     end
 
     @testset "A benchmark-relative walk fits X - B at every fold (#1645, #1651)" begin
-        # With `brt = true` every fold fits `X - B`. The step folds `X - B` into the prior
-        # and keeps the raw rows, so the online walk reaches the batch weights fold for fold
-        # (ADR 0204).
+        # A prior that states `x_src = ExcessSource()` fits `X - B` at every fold. The step
+        # folds `X - B` into the prior and keeps the raw rows, so the online walk reaches the
+        # batch weights fold for fold (ADR 0215, decision 1).
         Bv = randn(StableRNG(1645), T) ./ 100
         rdb = ReturnsResult(; nx = nx, X = X, ts = ts, nb = ["BM"], B = Bv)
-        for opt in (MeanRisk(;
-                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)),
+        epx = EmpiricalPrior(; x_src = ExcessSource())
+        for opt in (MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = slv)),
                     HierarchicalRiskParity(;
-                                           opt = HierarchicalOptimiser(; pe = EmpiricalPrior(),
-                                                                       brt = true)))
+                                           opt = HierarchicalOptimiser(; pe = epx,
+                                                                       cle = ClustersEstimator(;
+                                                                                               x_src = ExcessSource()))))
             b = cross_val_predict(opt, rdb, batch_cv)
             o = cross_val_predict(opt, rdb, online_cv)
             @test length(o.pred) == length(b.pred)

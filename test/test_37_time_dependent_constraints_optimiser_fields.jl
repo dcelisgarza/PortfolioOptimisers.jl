@@ -586,7 +586,7 @@ end
     @testset "Problem-definition fields of the meta-optimisers" begin
         # The metas' own non-optimiser problem definition — prior, sets, weight finaliser,
         # and NestedClustered's clustering estimator — takes schedules like any other
-        # host's; `cv`, `ex`, `brt`, `x_src` and `strict` stay static.
+        # host's; `cv`, `ex` and `strict` stay static.
         ew, iv = EqualWeighted(), InverseVolatility()
         mr0 = MeanRisk(; opt = JuMPOptimiser(; slv = slv))
         cvw = IndexWalkForward(100, 50)

@@ -434,6 +434,29 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
     return FactorRiskBudgeting(re, rkb, sets, flag, hedge)
 end
 """
+    reader_frames(rba::FactorRiskBudgeting, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Return the frames of the regression reader of `rba`, at `"path.re"`, for the frame walk of a [`RiskBudgeting`](@ref) head.
+
+# Arguments
+
+  - `rba`: The factor risk budgeting algorithm.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of `rba.re`.
+
+# Related
+
+  - [`FactorRiskBudgeting`](@ref)
+  - [`reader_frames`](@ref)
+"""
+function reader_frames(rba::FactorRiskBudgeting, path::AbstractString, refit::Bool)
+    return reader_frames(rba.re, join_path(path, :re), refit)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`RiskBudgeting`](@ref) fields that may hold a [`TimeDependent`](@ref).
@@ -477,6 +500,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
   - `fb` schedules: `bind !== :nearest`.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 # Mathematical definition
 
@@ -616,8 +641,11 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(RiskBudgeting, (; opt, r, rba, wi, fb),
                                            risk_budgeting_td_defaults())
-        return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
-                                                                                wi, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :RiskBudgeting, "opt.pe")
+        est = new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
+                                                                               wi, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function RiskBudgeting(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
@@ -811,8 +839,7 @@ function set_risk_budgeting_constraints!(model::JuMP.Model,
                                          rd::ReturnsResult)
     b1, _, rr = set_factor_risk_contribution_constraints!(model, rb.rba.re, rd, pr,
                                                           rb.rba.flag, rb.wi;
-                                                          hedge = rb.rba.hedge,
-                                                          brt = rb.opt.brt)
+                                                          hedge = rb.rba.hedge)
     rkb = _set_risk_budgeting_constraints!(model, rb, shared_get(model, :w1);
                                            strict = rb.opt.strict)
     set_weight_constraints!(model, wb, rb.opt)

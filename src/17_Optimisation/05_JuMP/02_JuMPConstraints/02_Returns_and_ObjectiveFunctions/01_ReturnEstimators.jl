@@ -316,6 +316,29 @@ end
 # Quantity, so it is not declared here. The declaration is what carries this slot into the
 # containers that hold a return term — `ExpectedReturn` and `ExpectedReturnRiskRatio`.
 deferred_slots(rt::ArithmeticReturn) = (; mu = rt.mu)
+"""
+    reader_frames(rt::ArithmeticReturn, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Return the frames of the uncertainty set of `rt`, at `"path.ucs"`, for the frame walk of a head. The set gives the returns data to its own prior, so the prior of the set is a reader of the group of the head.
+
+# Arguments
+
+  - `rt`: The return estimator.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of `rt.ucs`.
+
+# Related
+
+  - [`ArithmeticReturn`](@ref)
+  - [`reader_frames`](@ref)
+"""
+function reader_frames(rt::ArithmeticReturn, path::AbstractString, refit::Bool)
+    return reader_frames(rt.ucs, join_path(path, :ucs), refit)
+end
 function factory(rt::ArithmeticReturn, pr::AbstractPriorResult, ::Any,
                  ucs::Option{<:UcSE_UcS} = nothing, args...; kwargs...)
     rt = resolve_deferred_quantities(rt, pr)

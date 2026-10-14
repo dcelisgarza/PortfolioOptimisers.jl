@@ -138,6 +138,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
   - If `wi` is provided: `!isempty(wi)`.
   - `fb` schedules: `bind !== :nearest`.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 # Mathematical definition
 
@@ -298,8 +299,10 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(RelaxedRiskBudgeting, (; opt, rba, wi, alg, fb),
                                            relaxed_risk_budgeting_td_defaults())
-        return new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb),
-                   typeof(mtx_sqrt)}(opt, rba, wi, alg, fb, mtx_sqrt)
+        est = new{typeof(opt), typeof(rba), typeof(wi), typeof(alg), typeof(fb),
+                  typeof(mtx_sqrt)}(opt, rba, wi, alg, fb, mtx_sqrt)
+        warn_raw_readers(est)
+        return est
     end
 end
 function RelaxedRiskBudgeting(; opt::JuMPOptimiser,
@@ -622,8 +625,7 @@ function set_relaxed_risk_budgeting_constraints!(model::JuMP.Model,
                                                  rd::ReturnsResult)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, rrb.rba.re, rd, pr,
                                                            rrb.rba.flag, rrb.wi;
-                                                           hedge = rrb.rba.hedge,
-                                                           brt = rrb.opt.brt)
+                                                           hedge = rrb.rba.hedge)
     w1 = shared_get(model, :w1)
     rkb = if isnothing(b2)
         sigma_f = Matrix(LinearAlgebra.Symmetric(rr.L \ pr.sigma * b1))

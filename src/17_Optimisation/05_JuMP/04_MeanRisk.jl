@@ -118,6 +118,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
     [`MaximumRatio`](@ref). Every feasible portfolio is optimal under the first, and the second
     is unbounded. A [`NoRisk`](@ref) measure and `settings.rke = false` on every measure are
     the two routes to it.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -163,7 +165,8 @@ MeanRisk
       │           │           me ┼ SimpleExpectedReturns
       │           │              │   w ┴ nothing
       │           │      horizon ┼ nothing
-      │           │   fill_limit ┴ nothing
+      │           │   fill_limit ┼ nothing
+      │           │        x_src ┴ nothing
       │       slv ┼ Solver
       │           │          name ┼ String: ""
       │           │        solver ┼ nothing
@@ -219,8 +222,6 @@ MeanRisk
       │        l2 ┼ nothing
       │        lp ┼ nothing
       │      linf ┼ nothing
-      │       brt ┼ Bool: false
-      │     x_src ┼ Symbol: :data
       │    strict ┴ Bool: false
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings
@@ -328,8 +329,11 @@ Where:
         end
         assert_time_dependent_substitution(MeanRisk, (; opt, r, obj, wi, fb),
                                            mean_risk_td_defaults())
-        return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
-                                                                                wi, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :MeanRisk, "opt.pe")
+        est = new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
+                                                                               wi, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function MeanRisk(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),

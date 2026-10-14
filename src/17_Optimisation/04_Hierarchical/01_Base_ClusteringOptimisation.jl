@@ -463,17 +463,14 @@ $(DocStringExtensions.FIELDS)
         fees::TD_Option{<:FeesE_Fees} = nothing,
         sets::TD_Option{<:UniverseSets} = nothing,
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
-        brt::Bool = false,
-        x_src::Symbol = :data,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> HierarchicalOptimiser
 
-Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule, one value per fold, in place of a static value. A cross-validation fold loop resolves the schedule on each fold, and a fold-less `optimise` runs with the field at its static default. These fields are the problem definition: the prior estimator, the clustering estimator, the weight bounds, the fees, the asset sets and the weight finaliser. The fields `slv`, `brt`, `x_src` and `strict` control the execution, and they are always static.
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TD_Option`](@ref) can hold a [`TimeDependent`](@ref) schedule, one value per fold, in place of a static value. A cross-validation fold loop resolves the schedule on each fold, and a fold-less `optimise` runs with the field at its static default. These fields are the problem definition: the prior estimator, the clustering estimator, the weight bounds, the fees, the asset sets and the weight finaliser. The fields `slv` and `strict` control the execution, and they are always static.
 
 ## Validation
 
-  - `x_src in (:prior, :data)`.
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If a field holds a [`TimeDependent`](@ref) schedule: the constructor runs again with each value of the schedule in that field, so a value that the constructor refuses raises here and not in a later fold.
 
@@ -520,39 +517,41 @@ HierarchicalOptimiser
          │           me ┼ SimpleExpectedReturns
          │              │   w ┴ nothing
          │      horizon ┼ nothing
-         │   fill_limit ┴ nothing
+         │   fill_limit ┼ nothing
+         │        x_src ┴ nothing
      cle ┼ ClustersEstimator
-         │    ce ┼ PortfolioOptimisersCovariance
-         │       │   ce ┼ Covariance
-         │       │      │    me ┼ SimpleExpectedReturns
-         │       │      │       │   w ┴ nothing
-         │       │      │    ce ┼ GeneralCovariance
-         │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │       │      │       │    w ┴ nothing
-         │       │      │   alg ┼ FullMoment()
-         │       │      │     w ┴ nothing
-         │       │   mp ┼ MatrixProcessing
-         │       │      │     pdm ┼ Posdef
-         │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │       │      │      dn ┼ nothing
-         │       │      │      dt ┼ nothing
-         │       │      │     alg ┼ nothing
-         │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │    de ┼ Distance
-         │       │   power ┼ nothing
-         │       │     alg ┴ CanonicalDistance()
-         │   alg ┼ HClustAlgorithm
-         │       │   linkage ┴ Symbol: :ward
-         │   onc ┼ OptimalNumberClusters
-         │       │   max_k ┼ nothing
-         │       │     alg ┼ SecondOrderDifference
-         │       │         │   alg ┼ StandardisedValue
-         │       │         │       │   mv ┼ MeanValue
-         │       │         │       │      │   w ┴ nothing
-         │       │         │       │   sv ┼ StdValue
-         │       │         │       │      │           w ┼ nothing
-         │       │         │       │      │   corrected ┴ Bool: true
+         │      ce ┼ PortfolioOptimisersCovariance
+         │         │   ce ┼ Covariance
+         │         │      │    me ┼ SimpleExpectedReturns
+         │         │      │       │   w ┴ nothing
+         │         │      │    ce ┼ GeneralCovariance
+         │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │         │      │       │    w ┴ nothing
+         │         │      │   alg ┼ FullMoment()
+         │         │      │     w ┴ nothing
+         │         │   mp ┼ MatrixProcessing
+         │         │      │     pdm ┼ Posdef
+         │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │         │      │      dn ┼ nothing
+         │         │      │      dt ┼ nothing
+         │         │      │     alg ┼ nothing
+         │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │      de ┼ Distance
+         │         │   power ┼ nothing
+         │         │     alg ┴ CanonicalDistance()
+         │     alg ┼ HClustAlgorithm
+         │         │   linkage ┴ Symbol: :ward
+         │     onc ┼ OptimalNumberClusters
+         │         │   max_k ┼ nothing
+         │         │     alg ┼ SecondOrderDifference
+         │         │         │   alg ┼ StandardisedValue
+         │         │         │       │   mv ┼ MeanValue
+         │         │         │       │      │   w ┴ nothing
+         │         │         │       │   sv ┼ StdValue
+         │         │         │       │      │           w ┼ nothing
+         │         │         │       │      │   corrected ┴ Bool: true
+         │   x_src ┴ nothing
      slv ┼ nothing
       wb ┼ WeightBounds
          │   lb ┼ Float64: 0.0
@@ -561,8 +560,6 @@ HierarchicalOptimiser
     sets ┼ nothing
       wf ┼ IterativeWeightFinaliser
          │   iter ┴ Int64: 100
-     brt ┼ Bool: false
-   x_src ┼ Symbol: :data
   strict ┴ Bool: false
 ```
 
@@ -605,14 +602,6 @@ HierarchicalOptimiser
     """
     wf
     """
-    $(field_dict[:brt])
-    """
-    brt
-    """
-    $(field_dict[:x_src])
-    """
-    x_src
-    """
     $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
@@ -624,19 +613,19 @@ HierarchicalOptimiser
                                    slv::Option{<:Slv_VecSlv}, wb::TD_Option{<:WbE_Wb},
                                    fees::TD_Option{<:FeesE_Fees},
                                    sets::TD_Option{<:UniverseSets},
-                                   wf::TD{<:WeightFinaliser}, brt::Bool, x_src::Symbol,
-                                   strict::Bool, cache::Option{<:ReturnsBufferState})
-        assert_source_selector(x_src, :x_src)
+                                   wf::TD{<:WeightFinaliser}, strict::Bool,
+                                   cache::Option{<:ReturnsBufferState})
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets), IsNothingError("sets cannot be nothing"))
         end
         assert_time_dependent_substitution(HierarchicalOptimiser,
-                                           (; pe, cle, slv, wb, fees, sets, wf, brt, x_src,
-                                            strict), hierarchical_optimiser_td_defaults())
+                                           (; pe, cle, slv, wb, fees, sets, wf, strict),
+                                           hierarchical_optimiser_td_defaults())
         return new{typeof(pe), typeof(cle), typeof(slv), typeof(wb), typeof(fees),
-                   typeof(sets), typeof(wf), typeof(brt), typeof(x_src), typeof(strict),
-                   typeof(cache)}(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,
-                                  cache)
+                   typeof(sets), typeof(wf), typeof(strict), typeof(cache)}(pe, cle, slv,
+                                                                            wb, fees, sets,
+                                                                            wf, strict,
+                                                                            cache)
     end
 end
 function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -646,14 +635,47 @@ function HierarchicalOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                                fees::TD_Option{<:FeesE_Fees} = nothing,
                                sets::TD_Option{<:UniverseSets} = nothing,
                                wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
-                               brt::Bool = false, x_src::Symbol = :data,
                                strict::Bool = false,
                                cache::Option{<:ReturnsBufferState} = nothing)::HierarchicalOptimiser
-    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, brt, x_src, strict,
-                                 cache)
+    return HierarchicalOptimiser(pe, cle, slv, wb, fees, sets, wf, strict, cache)
 end
 function non_investable_universe(opt::HierarchicalOptimiser, ni::VecStr)
     return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))
+end
+"""
+    reader_frames(opt::HierarchicalOptimiser, path::AbstractString, refit::Bool) -> ReturnsFrames
+    group_frames(opt::HierarchicalOptimiser) -> ReturnsFrames
+    group_frames(est::ClusteringOptimisationEstimator) -> ReturnsFrames
+
+Walk the readers of a hierarchical head, for the warning of a forgotten raw reader and the gap rule of the head.
+
+The group of a hierarchical head is the head, the configuration that it holds in `opt`, and every reader in their slots: the prior `opt.pe`, the clustering `opt.cle`, and the readers inside the risk measures. [`field_frames`](@ref) walks every field. The walk stops at a fallback, because it is a head with its own group. A configuration that takes an online step with no head answers for its own slots. [`NestedClustered`](@ref) holds its prior in `pe` and has a method of its own.
+
+# Arguments
+
+  - `opt`: The configuration of a hierarchical head.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+  - `est`: The hierarchical head.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the slots of `opt`, at `path` or from the configuration itself, or of the group of `est`.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+  - [`group_source`](@ref)
+"""
+function reader_frames(opt::HierarchicalOptimiser, path::AbstractString, refit::Bool)
+    return field_frames(opt, path, refit)
+end
+function group_frames(opt::HierarchicalOptimiser)
+    return field_frames(opt, "", refits_regression(opt.pe))
+end
+function group_frames(est::ClusteringOptimisationEstimator)
+    return field_frames(est, "", refits_regression(est.opt.pe))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

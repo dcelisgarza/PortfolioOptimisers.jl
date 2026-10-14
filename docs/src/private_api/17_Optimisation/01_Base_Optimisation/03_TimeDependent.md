@@ -46,4 +46,5 @@ reset_time_dependent_estimator(td::TD_OptE_Opt)
 reset_time_dependent_fields
 assert_no_nearest_bind_optimiser_schedule(x, field::Symbol, host::Symbol)
 entitled
+PortfolioOptimisers.reader_frames(::TimeDependent, ::AbstractString, ::Bool)
 ```

@@ -1292,6 +1292,53 @@ function time_dependent_entries(td::TimeDependent)
     end
     return entries
 end
+"""
+    reader_frames(td::TimeDependent, path::AbstractString, refit::Bool) -> ReturnsFrames
+    refits_regression(td::TimeDependent) -> Bool
+
+Walk the values of a [`TimeDependent`](@ref) that are known before any fold runs, for the frame walk of a head.
+
+A schedule gives one value to each fold, so the group of the head can read the frame of any entry. A function schedule gives no entry before it runs, so it adds nothing. A regression reader at `nothing` refits when the prior of any entry gives no loadings.
+
+# Algorithm
+
+ 1. Walk the entries of a vector schedule at `"path.val[i]"` with [`reader_frames`](@ref), giving `fv`. A function schedule gives no frames.
+ 2. Walk the `default` at `"path.default"`, giving `fd`. [`NoDefault`](@ref) gives no frames.
+ 3. Join `fv` and `fd` with [`merge_frames`](@ref).
+
+# Arguments
+
+  - `td`: The schedule.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the entries, joined with [`merge_frames`](@ref).
+  - `refit::Bool`: Whether [`refits_regression`](@ref) answers `true` for an entry.
+
+# Related
+
+  - [`time_dependent_entries`](@ref)
+  - [`reader_frames`](@ref)
+  - [`group_frames`](@ref)
+"""
+function reader_frames(td::TimeDependent, path::AbstractString, refit::Bool)
+    fv = if isa(td.val, AbstractVector)
+        reader_frames(td.val, join_path(path, :val), refit)
+    else
+        ReturnsFrames()
+    end
+    fd = if isa(td.default, NoDefault)
+        ReturnsFrames()
+    else
+        reader_frames(td.default, join_path(path, :default), refit)
+    end
+    return merge_frames(fv, fd)
+end
+function refits_regression(td::TimeDependent)
+    return any(refits_regression, time_dependent_entries(td))
+end
 function returns_tracking_path(td::TimeDependent)
     # Entry `i` of a schedule is the value of fold `i` alone, so its series can align with
     # the rows of that fold. The default is one value that every solve with no fold reads.

@@ -97,13 +97,14 @@
               s2 .^ -0.5 / sum(s2 .^ -0.5)
         @test_throws ArgumentError po.assert_external_optimiser(InverseVolatility(;
                                                                                   pe = prx))
-        # `brt` fits the prior on the returns in excess of the benchmark.
+        # A prior that states `x_src = ExcessSource()` fits on the returns in excess of the
+        # benchmark.
         Bm = repeat(0.005 .* randn(StableRNG(2), T), 1, N)
         rdb = ReturnsResult(; nx = nx, X = X, ts = ts, nb = nx, B = Bm)
         sb = LinearAlgebra.diag(prior(EmpiricalPrior(),
                                       ReturnsResult(; nx = nx, X = X - Bm, ts = ts)).sigma)
-        @test optimise(InverseVolatility(; brt = true), rdb).w ≈
-              sb .^ -0.5 / sum(sb .^ -0.5)
+        @test optimise(InverseVolatility(; pe = EmpiricalPrior(; x_src = ExcessSource())),
+                       rdb).w ≈ sb .^ -0.5 / sum(sb .^ -0.5)
         # A `ReturnsResult` is observations × assets, so a `dims` has no effect (#1348).
         @test optimise(InverseVolatility(), rdx; dims = 2).w ≈
               optimise(InverseVolatility(), rdx).w

@@ -13,4 +13,5 @@ no_bounds_returns_estimator(r::ArithmeticReturn, flag::Bool)
 no_bounds_returns_settings
 unit_scale_returns_estimator
 no_bounds_optimiser
+PortfolioOptimisers.reader_frames(::ArithmeticReturn, ::AbstractString, ::Bool)
 ```

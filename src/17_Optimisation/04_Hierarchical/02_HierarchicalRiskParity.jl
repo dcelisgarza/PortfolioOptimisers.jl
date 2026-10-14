@@ -70,6 +70,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
   - If `r` is a vector: `!isempty(r)`. The constructor throws an `IsEmptyError` otherwise.
   - `r` holds no [`NoRisk`](@ref), alone or in a vector. The constructor throws an `ArgumentError` otherwise, through [`assert_risk_measure_required`](@ref), because a zero risk leaves the split factor undefined.
   - `fb` schedules: `bind !== :nearest`. The constructor throws an `ArgumentError` otherwise.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -115,39 +117,41 @@ HierarchicalRiskParity
       │          │           me ┼ SimpleExpectedReturns
       │          │              │   w ┴ nothing
       │          │      horizon ┼ nothing
-      │          │   fill_limit ┴ nothing
+      │          │   fill_limit ┼ nothing
+      │          │        x_src ┴ nothing
       │      cle ┼ ClustersEstimator
-      │          │    ce ┼ PortfolioOptimisersCovariance
-      │          │       │   ce ┼ Covariance
-      │          │       │      │    me ┼ SimpleExpectedReturns
-      │          │       │      │       │   w ┴ nothing
-      │          │       │      │    ce ┼ GeneralCovariance
-      │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │          │       │      │       │    w ┴ nothing
-      │          │       │      │   alg ┼ FullMoment()
-      │          │       │      │     w ┴ nothing
-      │          │       │   mp ┼ MatrixProcessing
-      │          │       │      │     pdm ┼ Posdef
-      │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │          │       │      │      dn ┼ nothing
-      │          │       │      │      dt ┼ nothing
-      │          │       │      │     alg ┼ nothing
-      │          │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │          │    de ┼ Distance
-      │          │       │   power ┼ nothing
-      │          │       │     alg ┴ CanonicalDistance()
-      │          │   alg ┼ HClustAlgorithm
-      │          │       │   linkage ┴ Symbol: :ward
-      │          │   onc ┼ OptimalNumberClusters
-      │          │       │   max_k ┼ nothing
-      │          │       │     alg ┼ SecondOrderDifference
-      │          │       │         │   alg ┼ StandardisedValue
-      │          │       │         │       │   mv ┼ MeanValue
-      │          │       │         │       │      │   w ┴ nothing
-      │          │       │         │       │   sv ┼ StdValue
-      │          │       │         │       │      │           w ┼ nothing
-      │          │       │         │       │      │   corrected ┴ Bool: true
+      │          │      ce ┼ PortfolioOptimisersCovariance
+      │          │         │   ce ┼ Covariance
+      │          │         │      │    me ┼ SimpleExpectedReturns
+      │          │         │      │       │   w ┴ nothing
+      │          │         │      │    ce ┼ GeneralCovariance
+      │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │          │         │      │       │    w ┴ nothing
+      │          │         │      │   alg ┼ FullMoment()
+      │          │         │      │     w ┴ nothing
+      │          │         │   mp ┼ MatrixProcessing
+      │          │         │      │     pdm ┼ Posdef
+      │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │          │         │      │      dn ┼ nothing
+      │          │         │      │      dt ┼ nothing
+      │          │         │      │     alg ┼ nothing
+      │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │          │      de ┼ Distance
+      │          │         │   power ┼ nothing
+      │          │         │     alg ┴ CanonicalDistance()
+      │          │     alg ┼ HClustAlgorithm
+      │          │         │   linkage ┴ Symbol: :ward
+      │          │     onc ┼ OptimalNumberClusters
+      │          │         │   max_k ┼ nothing
+      │          │         │     alg ┼ SecondOrderDifference
+      │          │         │         │   alg ┼ StandardisedValue
+      │          │         │         │       │   mv ┼ MeanValue
+      │          │         │         │       │      │   w ┴ nothing
+      │          │         │         │       │   sv ┼ StdValue
+      │          │         │         │       │      │           w ┼ nothing
+      │          │         │         │       │      │   corrected ┴ Bool: true
+      │          │   x_src ┴ nothing
       │      slv ┼ nothing
       │       wb ┼ WeightBounds
       │          │   lb ┼ Float64: 0.0
@@ -156,8 +160,6 @@ HierarchicalRiskParity
       │     sets ┼ nothing
       │       wf ┼ IterativeWeightFinaliser
       │          │   iter ┴ Int64: 100
-      │      brt ┼ Bool: false
-      │    x_src ┼ Symbol: :data
       │   strict ┴ Bool: false
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings
@@ -219,7 +221,10 @@ HierarchicalRiskParity
         assert_risk_measure_required(r, :HierarchicalRiskParity)
         assert_time_dependent_substitution(HierarchicalRiskParity, (; opt, r, sca, fb),
                                            hierarchical_risk_parity_td_defaults())
-        return new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :HierarchicalRiskParity, "opt.pe")
+        est = new{typeof(opt), typeof(r), typeof(sca), typeof(fb)}(opt, r, sca, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function HierarchicalRiskParity(; opt::HierarchicalOptimiser = HierarchicalOptimiser(),
@@ -275,11 +280,11 @@ end
 
 Bind every [`DataBenchmarkTracking`](@ref) of the risk measures `r` to the benchmark of the rows that the optimiser fits on.
 
-The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The optimiser applies its own `brt` to the binding, as [`bind_data_benchmark`](@ref) states.
+The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The constructor already refused a data benchmark beside a prior that states `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 # Algorithm
 
- 1. Bind the measures `hrp.r` to `rd` under `hrp.opt.brt` with [`bind_data_benchmark`](@ref), giving `r`.
+ 1. Bind the measures `hrp.r` to `rd` with [`bind_data_benchmark`](@ref), giving `r`.
  2. Return `hrp` itself when `r === hrp.r`.
  3. Otherwise rebuild `hrp` with `r` through its keyword constructor, with [`rebuild_estimator`](@ref).
 
@@ -290,7 +295,7 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
   - [`HierarchicalRiskParity`](@ref)
 """
 function bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
-    r = bind_data_benchmark(hrp.r, rd, hrp.opt.brt)
+    r = bind_data_benchmark(hrp.r, rd)
     return r === hrp.r ? hrp : rebuild_estimator(hrp, (; r = r))
 end
 function non_investable_universe(hrp::HierarchicalRiskParity,
@@ -376,7 +381,7 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `hrp` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Fit the prior `pr` with `opt.pe` on `rd` under `opt.brt`, so that it reads the returns in excess of the benchmark when `opt.brt` is `true`. `rd` keeps its raw returns, and the clustering reads `opt.brt` too.
+ 2. Fit the prior `pr` with `opt.pe` on `rd`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the clustering reads the frame that its own `x_src` states.
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  5. Reduce `pr`, `hrp` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`.
@@ -401,7 +406,7 @@ Run the Hierarchical Risk Parity optimisation for a single risk measure.
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
-    pr = prior(hrp.opt.pe, rd; brt = hrp.opt.brt)
+    pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -414,8 +419,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.x_src, hrp.opt.brt,
-                             hrp.opt.strict)
+    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.strict)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -433,8 +437,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:OptimisationRiskMeasure}
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = hrp.opt.x_src, brt = hrp.opt.brt)
+    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)
@@ -569,7 +572,7 @@ Run the Hierarchical Risk Parity optimisation for a vector of risk measures, sca
 function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     hrp = reset_time_dependent_estimator(hrp)
-    pr = prior(hrp.opt.pe, rd; brt = hrp.opt.brt)
+    pr = prior(hrp.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -582,8 +585,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(hrp.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.x_src, hrp.opt.brt,
-                             hrp.opt.strict)
+    imsk = graph_reader_mask(hrp.opt.cle, imsk, pr, rd, hrp.opt.strict)
     fees = investable_fees_view(fees_constraints(hrp.opt.fees, hrp.opt.sets;
                                                  strict = hrp.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -601,8 +603,7 @@ function _optimise(hrp::HierarchicalRiskParity{<:Any, <:VecOptRM},
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = hrp.opt.x_src, brt = hrp.opt.brt)
+    clr = clusterise(hrp.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     r = factory(hrp.r, pr, hrp.opt.slv)
     wu = Matrix{T}(undef, size(X, 2), 2)

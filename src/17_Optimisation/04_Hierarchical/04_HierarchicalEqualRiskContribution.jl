@@ -78,6 +78,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref) or [`TDO_O
   - If `ri` is a vector: `!isempty(ri)`. If `ro` is a vector: `!isempty(ro)`. The constructor throws an `IsEmptyError` otherwise.
   - `ri` and `ro` hold no [`NoRisk`](@ref), alone or in a vector. The constructor throws an `ArgumentError` otherwise, through [`assert_risk_measure_required`](@ref), because a zero risk leaves the split factor undefined.
   - `fb` schedules: `bind !== :nearest`. The constructor throws an `ArgumentError` otherwise.
+  - If `ri` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - If `ro` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -125,39 +128,41 @@ HierarchicalEqualRiskContribution
        │          │           me ┼ SimpleExpectedReturns
        │          │              │   w ┴ nothing
        │          │      horizon ┼ nothing
-       │          │   fill_limit ┴ nothing
+       │          │   fill_limit ┼ nothing
+       │          │        x_src ┴ nothing
        │      cle ┼ ClustersEstimator
-       │          │    ce ┼ PortfolioOptimisersCovariance
-       │          │       │   ce ┼ Covariance
-       │          │       │      │    me ┼ SimpleExpectedReturns
-       │          │       │      │       │   w ┴ nothing
-       │          │       │      │    ce ┼ GeneralCovariance
-       │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │          │       │      │       │    w ┴ nothing
-       │          │       │      │   alg ┼ FullMoment()
-       │          │       │      │     w ┴ nothing
-       │          │       │   mp ┼ MatrixProcessing
-       │          │       │      │     pdm ┼ Posdef
-       │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │          │       │      │      dn ┼ nothing
-       │          │       │      │      dt ┼ nothing
-       │          │       │      │     alg ┼ nothing
-       │          │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-       │          │    de ┼ Distance
-       │          │       │   power ┼ nothing
-       │          │       │     alg ┴ CanonicalDistance()
-       │          │   alg ┼ HClustAlgorithm
-       │          │       │   linkage ┴ Symbol: :ward
-       │          │   onc ┼ OptimalNumberClusters
-       │          │       │   max_k ┼ nothing
-       │          │       │     alg ┼ SecondOrderDifference
-       │          │       │         │   alg ┼ StandardisedValue
-       │          │       │         │       │   mv ┼ MeanValue
-       │          │       │         │       │      │   w ┴ nothing
-       │          │       │         │       │   sv ┼ StdValue
-       │          │       │         │       │      │           w ┼ nothing
-       │          │       │         │       │      │   corrected ┴ Bool: true
+       │          │      ce ┼ PortfolioOptimisersCovariance
+       │          │         │   ce ┼ Covariance
+       │          │         │      │    me ┼ SimpleExpectedReturns
+       │          │         │      │       │   w ┴ nothing
+       │          │         │      │    ce ┼ GeneralCovariance
+       │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+       │          │         │      │       │    w ┴ nothing
+       │          │         │      │   alg ┼ FullMoment()
+       │          │         │      │     w ┴ nothing
+       │          │         │   mp ┼ MatrixProcessing
+       │          │         │      │     pdm ┼ Posdef
+       │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+       │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+       │          │         │      │      dn ┼ nothing
+       │          │         │      │      dt ┼ nothing
+       │          │         │      │     alg ┼ nothing
+       │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+       │          │      de ┼ Distance
+       │          │         │   power ┼ nothing
+       │          │         │     alg ┴ CanonicalDistance()
+       │          │     alg ┼ HClustAlgorithm
+       │          │         │   linkage ┴ Symbol: :ward
+       │          │     onc ┼ OptimalNumberClusters
+       │          │         │   max_k ┼ nothing
+       │          │         │     alg ┼ SecondOrderDifference
+       │          │         │         │   alg ┼ StandardisedValue
+       │          │         │         │       │   mv ┼ MeanValue
+       │          │         │         │       │      │   w ┴ nothing
+       │          │         │         │       │   sv ┼ StdValue
+       │          │         │         │       │      │           w ┼ nothing
+       │          │         │         │       │      │   corrected ┴ Bool: true
+       │          │   x_src ┴ nothing
        │      slv ┼ nothing
        │       wb ┼ WeightBounds
        │          │   lb ┼ Float64: 0.0
@@ -166,8 +171,6 @@ HierarchicalEqualRiskContribution
        │     sets ┼ nothing
        │       wf ┼ IterativeWeightFinaliser
        │          │   iter ┴ Int64: 100
-       │      brt ┼ Bool: false
-       │    x_src ┼ Symbol: :data
        │   strict ┴ Bool: false
     ri ┼ Variance
        │    settings ┼ RiskMeasureSettings
@@ -268,8 +271,14 @@ HierarchicalEqualRiskContribution
         assert_time_dependent_substitution(HierarchicalEqualRiskContribution,
                                            (; opt, ri, ro, scai, scao, ex, fb),
                                            herc_td_defaults())
-        return new{typeof(opt), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
-                   typeof(ex), typeof(fb)}(opt, ri, ro, scai, scao, ex, fb)
+        assert_data_benchmark_prior(ri, opt.pe, :ri, :HierarchicalEqualRiskContribution,
+                                    "opt.pe")
+        assert_data_benchmark_prior(ro, opt.pe, :ro, :HierarchicalEqualRiskContribution,
+                                    "opt.pe")
+        est = new{typeof(opt), typeof(ri), typeof(ro), typeof(scai), typeof(scao),
+                  typeof(ex), typeof(fb)}(opt, ri, ro, scai, scao, ex, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function HierarchicalEqualRiskContribution(;
@@ -338,11 +347,11 @@ end
 
 Bind every [`DataBenchmarkTracking`](@ref) of the inner measures `ri` and the outer measures `ro` to the benchmark of the rows that the optimiser fits on.
 
-The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The optimiser applies its own `brt` to the binding, as [`bind_data_benchmark`](@ref) states.
+The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The constructor already refused a data benchmark beside a prior that states `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 # Algorithm
 
- 1. Bind the inner measures `hec.ri` to `rd` under `hec.opt.brt` with [`bind_data_benchmark`](@ref), giving `ri`.
+ 1. Bind the inner measures `hec.ri` to `rd` with [`bind_data_benchmark`](@ref), giving `ri`.
  2. Bind the outer measures `hec.ro` the same way, giving `ro`.
  3. Return `hec` itself when `ri === hec.ri` and `ro === hec.ro`.
  4. Otherwise rebuild `hec` with `ri` and `ro` through its keyword constructor, with [`rebuild_estimator`](@ref).
@@ -354,8 +363,8 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
   - [`HierarchicalEqualRiskContribution`](@ref)
 """
 function bind_data_benchmark(hec::HierarchicalEqualRiskContribution, rd::ReturnsResult)
-    ri = bind_data_benchmark(hec.ri, rd, hec.opt.brt)
-    ro = bind_data_benchmark(hec.ro, rd, hec.opt.brt)
+    ri = bind_data_benchmark(hec.ri, rd)
+    ro = bind_data_benchmark(hec.ro, rd)
     return if ri === hec.ri && ro === hec.ro
         hec
     else
@@ -600,7 +609,7 @@ Run the Hierarchical Equal Risk Contribution optimisation.
 # Algorithm
 
  1. Resolve every [`TimeDependent`](@ref) field of `hec` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Fit the prior `pr` with `opt.pe` on `rd` under `opt.brt`, so that it reads the returns in excess of the benchmark when `opt.brt` is `true`. `rd` keeps its raw returns, and the clustering reads `opt.brt` too.
+ 2. Fit the prior `pr` with `opt.pe` on `rd`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the clustering reads the frame that its own `x_src` states.
  3. Find the Investable Mask `imsk` of `pr`. Resolve the fees `fees` on the full universe, and place them on the assets of `imsk`.
  4. Remove the two liquidation charges, `lq` and `flq`, from `fees`, giving `cfees`, the fees that the risks read.
  5. Reduce `pr`, `hec` and `rd` to the assets of `imsk`, with [`investable_reduction`](@ref). `X` is the returns matrix of the reduced `pr`, and `N` its number of assets.
@@ -622,7 +631,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
                    rd::ReturnsResult = ReturnsResult(); branchorder::Symbol = :optimal,
                    kwargs...)
     hec = reset_time_dependent_estimator(hec)
-    pr = prior(hec.opt.pe, rd; brt = hec.opt.brt)
+    pr = prior(hec.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
     # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
@@ -635,8 +644,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(hec.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(hec.opt.cle, imsk, pr, rd, hec.opt.x_src, hec.opt.brt,
-                             hec.opt.strict)
+    imsk = graph_reader_mask(hec.opt.cle, imsk, pr, rd, hec.opt.strict)
     fees = investable_fees_view(fees_constraints(hec.opt.fees, hec.opt.sets;
                                                  strict = hec.opt.strict, datatype = T),
                                 imsk, pr.X)
@@ -654,7 +662,7 @@ function _optimise(hec::HierarchicalEqualRiskContribution,
     X = pr.X
     N = size(X, 2)
     clr = clusterise(hec.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     branchorder = branchorder, x_src = hec.opt.x_src, brt = hec.opt.brt)
+                     branchorder = branchorder)
     assert_clustering_universe(clr, N)
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]

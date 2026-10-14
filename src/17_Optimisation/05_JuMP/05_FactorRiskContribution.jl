@@ -200,6 +200,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - A risk expression that is identically zero is refused. The problem is stated in the
     factor basis, so a model with no risk term bounds nothing. A [`NoRisk`](@ref) measure and
     `settings.rke = false` on every measure are the two routes to it.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - Each estimator of `frc_ple` states no source, because it reads the factor returns that the head picks, see [`assert_inner_reader`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -292,10 +295,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         assert_time_dependent_substitution(FactorRiskContribution,
                                            (; opt, re, r, obj, frc_ple, sets, wi, flag, fb),
                                            factor_risk_contribution_td_defaults())
-        return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
-                   typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,
-                                                                       frc_ple, sets, wi,
-                                                                       flag, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :FactorRiskContribution, "opt.pe")
+        # The factor phylogeny reads the factor returns that the head picks, so each of its
+        # estimators is an inner reader.
+        foreach(x -> assert_inner_reader(x, :frc_ple, :FactorRiskContribution),
+                vcat(frc_ple))
+        est = new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
+                  typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,
+                                                                      frc_ple, sets, wi,
+                                                                      flag, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser,
@@ -339,8 +349,7 @@ function port_opt_view(frc::FactorRiskContribution, i, X::MatNum,
                                   flag = frc.flag, fb = view_child(frc.fb, i, X))
 end
 """
-    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false,
-                                              brt = false)
+    set_factor_risk_contribution_constraints!(model, re, rd, pr, flag, wi; hedge = false)
 
 Add factor risk contribution constraints to the JuMP model.
 
@@ -363,7 +372,6 @@ The loadings come from [`resolve_factor_regression`](@ref), which is the same pr
   - `flag`: Whether to add the off-factor weight block.
   - `wi`: Optional initial factor weights.
   - `hedge`: Whether to add the hedge rows. Read only when `flag` is `true`, and then `pr` must carry `sigma`.
-  - $(arg_dict[:brt_read]) Read only when the loadings are refitted from `rd`.
 
 # Returns
 
@@ -379,8 +387,8 @@ function set_factor_risk_contribution_constraints!(model::JuMP.Model, re::RegE_R
                                                    rd::ReturnsResult,
                                                    pr::Option{<:AbstractPriorResult},
                                                    flag::Bool, wi::Option{<:VecNum};
-                                                   hedge::Bool = false, brt::Bool = false)
-    rr = resolve_factor_regression(re, rd, pr; brt = brt)
+                                                   hedge::Bool = false)
+    rr = resolve_factor_regression(re, rd, pr)
     Bt = transpose(rr.L)
     b1 = LinearAlgebra.pinv(Bt)
     Nf = size(b1, 2)
@@ -421,8 +429,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_maximum_ratio_factor_variables!(model, frc.obj)
     set_sdp_lift_corner!(model, frc.obj, attrs.pr)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
-                                                           frc.flag, frc.wi;
-                                                           brt = frc.opt.brt)
+                                                           frc.flag, frc.wi)
     # The risk builders read the basis of the whole decision vector, so a variance under
     # `flag = true` prices the off-factor weights too (#1350).
     b = isnothing(b2) ? b1 : hcat(b1, b2)
@@ -431,7 +438,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
     # A factor phylogeny reads the factor returns, so it drops their gaps as the loadings do.
-    frc_plr = phylogeny_constraints(frc.frc_ple, shared_series_view(rd, false, true).F)
+    frc_plr = phylogeny_constraints(frc.frc_ple, shared_series_view(rd, nothing, true).F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)

@@ -535,7 +535,7 @@ A part of two or three leaves has a half ``C_1`` of one leaf, and the recursion 
 
 The fit of [`optimise`](@ref) runs these steps.
 
- 1. Resolve every [`TimeDependent`](@ref) field to its static default, and pick the returns `rd` that `opt.brt` selects.
+ 1. Resolve every [`TimeDependent`](@ref) field to its static default.
  2. Compute the prior `pr` with `opt.pe`, and the investable mask `imsk` of the prior.
  3. Resolve the fees `fees` on the full asset universe.
  4. Reduce `pr`, the estimator and `rd` to the investable universe.
@@ -564,6 +564,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TDO_
 
   - If `params` is a vector: `!isempty(params)`.
   - `fb` schedules: `bind !== :nearest`.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -607,39 +608,41 @@ SchurComplementHierarchicalRiskParity
          │          │           me ┼ SimpleExpectedReturns
          │          │              │   w ┴ nothing
          │          │      horizon ┼ nothing
-         │          │   fill_limit ┴ nothing
+         │          │   fill_limit ┼ nothing
+         │          │        x_src ┴ nothing
          │      cle ┼ ClustersEstimator
-         │          │    ce ┼ PortfolioOptimisersCovariance
-         │          │       │   ce ┼ Covariance
-         │          │       │      │    me ┼ SimpleExpectedReturns
-         │          │       │      │       │   w ┴ nothing
-         │          │       │      │    ce ┼ GeneralCovariance
-         │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │          │       │      │       │    w ┴ nothing
-         │          │       │      │   alg ┼ FullMoment()
-         │          │       │      │     w ┴ nothing
-         │          │       │   mp ┼ MatrixProcessing
-         │          │       │      │     pdm ┼ Posdef
-         │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │          │       │      │      dn ┼ nothing
-         │          │       │      │      dt ┼ nothing
-         │          │       │      │     alg ┼ nothing
-         │          │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │          │    de ┼ Distance
-         │          │       │   power ┼ nothing
-         │          │       │     alg ┴ CanonicalDistance()
-         │          │   alg ┼ HClustAlgorithm
-         │          │       │   linkage ┴ Symbol: :ward
-         │          │   onc ┼ OptimalNumberClusters
-         │          │       │   max_k ┼ nothing
-         │          │       │     alg ┼ SecondOrderDifference
-         │          │       │         │   alg ┼ StandardisedValue
-         │          │       │         │       │   mv ┼ MeanValue
-         │          │       │         │       │      │   w ┴ nothing
-         │          │       │         │       │   sv ┼ StdValue
-         │          │       │         │       │      │           w ┼ nothing
-         │          │       │         │       │      │   corrected ┴ Bool: true
+         │          │      ce ┼ PortfolioOptimisersCovariance
+         │          │         │   ce ┼ Covariance
+         │          │         │      │    me ┼ SimpleExpectedReturns
+         │          │         │      │       │   w ┴ nothing
+         │          │         │      │    ce ┼ GeneralCovariance
+         │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │          │         │      │       │    w ┴ nothing
+         │          │         │      │   alg ┼ FullMoment()
+         │          │         │      │     w ┴ nothing
+         │          │         │   mp ┼ MatrixProcessing
+         │          │         │      │     pdm ┼ Posdef
+         │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │          │         │      │      dn ┼ nothing
+         │          │         │      │      dt ┼ nothing
+         │          │         │      │     alg ┼ nothing
+         │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │          │      de ┼ Distance
+         │          │         │   power ┼ nothing
+         │          │         │     alg ┴ CanonicalDistance()
+         │          │     alg ┼ HClustAlgorithm
+         │          │         │   linkage ┴ Symbol: :ward
+         │          │     onc ┼ OptimalNumberClusters
+         │          │         │   max_k ┼ nothing
+         │          │         │     alg ┼ SecondOrderDifference
+         │          │         │         │   alg ┼ StandardisedValue
+         │          │         │         │       │   mv ┼ MeanValue
+         │          │         │         │       │      │   w ┴ nothing
+         │          │         │         │       │   sv ┼ StdValue
+         │          │         │         │       │      │           w ┼ nothing
+         │          │         │         │       │      │   corrected ┴ Bool: true
+         │          │   x_src ┴ nothing
          │      slv ┼ nothing
          │       wb ┼ WeightBounds
          │          │   lb ┼ Float64: 0.0
@@ -648,8 +651,6 @@ SchurComplementHierarchicalRiskParity
          │     sets ┼ nothing
          │       wf ┼ IterativeWeightFinaliser
          │          │   iter ┴ Int64: 100
-         │      brt ┼ Bool: false
-         │    x_src ┼ Symbol: :data
          │   strict ┴ Bool: false
   params ┼ SchurComplementParams
          │       r ┼ Variance
@@ -723,7 +724,9 @@ SchurComplementHierarchicalRiskParity
         assert_time_dependent_substitution(SchurComplementHierarchicalRiskParity,
                                            (; opt, params, fb),
                                            schur_complement_hrp_td_defaults())
-        return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
+        est = new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function SchurComplementHierarchicalRiskParity(;
@@ -1268,7 +1271,7 @@ Fit a Schur complement allocation with one bundle.
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
-    pr = prior(sh.opt.pe, rd; brt = sh.opt.brt)
+    pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The result holds the
@@ -1277,8 +1280,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.x_src, sh.opt.brt,
-                             sh.opt.strict)
+    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in
@@ -1296,8 +1298,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = sh.opt.x_src, brt = sh.opt.brt)
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
@@ -1343,7 +1344,7 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
-    pr = prior(sh.opt.pe, rd; brt = sh.opt.brt)
+    pr = prior(sh.opt.pe, rd)
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
     # variance or a standard deviation, which a fee does not move. The result holds the
@@ -1352,8 +1353,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.x_src, sh.opt.brt,
-                             sh.opt.strict)
+    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in
@@ -1371,8 +1371,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = sh.opt.x_src, brt = sh.opt.brt)
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),

@@ -4,7 +4,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, T
 # Gaps in the benchmark, the implied volatilities and the factor returns, issue #1672, under
 # ADR 0117 amended for #1672. The online step drops the same observations, issue #1675.
 #
-# A gap in a Shared Series, a vector benchmark under `brt` or a factor return that the fit
+# A gap in a Shared Series, a vector benchmark in the Excess Frame or a factor return that the fit
 # reads, drops the observation at the entry of the fit, and keeps every asset. A gap in a
 # per-asset series, a matrix benchmark or the implied volatilities, acts as a gap in `X` at
 # the same cell.
@@ -27,38 +27,44 @@ nf = ["f1", "f2"]
 gap = 17
 keep = setdiff(1:T, gap)
 
-@testset "A gap in a vector benchmark under brt drops the observation" begin
+@testset "A gap in a vector benchmark in the Excess Frame drops the observation" begin
     Bg = copy(Bv0)
     Bg[gap] = NaN
     rdg = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg, ts = ts0)
     rdh = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep],
                         ts = ts0[keep])
     # Before #1672 every asset left the Coverage Universe and the prior threw.
-    p1 = prior(EmpiricalPrior(), rdg; brt = true)
-    p2 = prior(EmpiricalPrior(), rdh; brt = true)
+    epx = EmpiricalPrior(; x_src = ExcessSource())
+    p1 = prior(epx, rdg)
+    p2 = prior(epx, rdh)
     @test all(isfinite, p1.sigma)
     @test p1.mu ≈ p2.mu
     @test p1.sigma ≈ p2.sigma
     # A fit that does not read the benchmark keeps every observation.
     @test size(prior(EmpiricalPrior(), rdg).X, 1) == T
     # The optimiser drops the observation once, before every reader.
-    opt = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; brt = true))
+    opt = HierarchicalRiskParity(;
+                                 opt = HierarchicalOptimiser(; pe = epx,
+                                                             cle = ClustersEstimator(;
+                                                                                     x_src = ExcessSource())))
     @test optimise(opt, rdg).w ≈ optimise(opt, rdh).w
-    @test optimise(InverseVolatility(; brt = true), rdg).w ≈
-          optimise(InverseVolatility(; brt = true), rdh).w
+    @test optimise(InverseVolatility(; pe = epx), rdg).w ≈
+          optimise(InverseVolatility(; pe = epx), rdh).w
     # The view cuts every field at the same observations, and is idempotent.
-    v = PO.shared_series_view(rdg, true, false)
+    v = PO.shared_series_view(rdg, ExcessSource(), false)
     @test v.ts == ts0[keep]
-    @test PO.shared_series_view(v, true, false) === v
-    @test PO.shared_series_view(rdg, false, false) === rdg
+    @test PO.shared_series_view(v, ExcessSource(), false) === v
+    @test PO.shared_series_view(rdg, nothing, false) === rdg
     # A benchmark with a gap at every observation leaves the fit nothing.
     rde = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = fill(NaN, T))
-    @test_throws PO.IsEmptyError prior(EmpiricalPrior(), rde; brt = true)
+    @test_throws PO.IsEmptyError prior(epx, rde)
 end
 
-@testset "A head with no fallback drops a vector benchmark gap under x_src = :data" begin
+@testset "A head with no fallback drops a vector benchmark gap for a graph reader" begin
     # Before #1688 the direct method of a head with `fb = nothing` solved on the raw panel,
-    # so a reader of the data under `x_src = :data` met the gap rows and refused them.
+    # so a graph reader of the data met the gap rows and refused them. Since #1701 the
+    # graph reader states its own source: `ExcessSource()` reads `X - B` from the data, and
+    # `PriorSource()` reads the prior, which states `ExcessSource()`.
     rng = StableRNG(1679)
     Tg, Ng = 120, 6
     Fg = 0.01 .* randn(rng, Tg, 2)
@@ -76,26 +82,31 @@ end
     slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false))
-    ho(xs, pe) = HierarchicalOptimiser(; pe = pe, x_src = xs, brt = true)
-    jo(xs; kw...) = JuMPOptimiser(; slv = slv, x_src = xs, brt = true, kw...)
+    epx = EmpiricalPrior(; x_src = ExcessSource())
+    ho(xs, pe) = HierarchicalOptimiser(; pe = pe, cle = ClustersEstimator(; x_src = xs))
+    jo(; kw...) = JuMPOptimiser(; pe = epx, slv = slv, kw...)
     heads = (("HierarchicalRiskParity, EmpiricalPrior",
-              (xs, fb) -> HierarchicalRiskParity(; opt = ho(xs, EmpiricalPrior()), fb = fb)),
+              (xs, fb) -> HierarchicalRiskParity(; opt = ho(xs, epx), fb = fb)),
              ("HierarchicalRiskParity, FactorPrior",
-              (xs, fb) -> HierarchicalRiskParity(; opt = ho(xs, FactorPrior()), fb = fb)),
+              (xs, fb) -> HierarchicalRiskParity(;
+                                                 opt = ho(xs,
+                                                          FactorPrior(;
+                                                                      x_src = ExcessSource())),
+                                                 fb = fb)),
              ("HierarchicalEqualRiskContribution",
-              (xs, fb) -> HierarchicalEqualRiskContribution(;
-                                                            opt = ho(xs, EmpiricalPrior()),
-                                                            fb = fb)),
+              (xs, fb) -> HierarchicalEqualRiskContribution(; opt = ho(xs, epx), fb = fb)),
              ("MeanRisk, a centrality constraint",
-              (xs, fb) -> MeanRisk(; opt = jo(xs; cte = CentralityConstraint()), fb = fb)),
+              (xs, fb) -> MeanRisk(; opt = jo(; cte = CentralityConstraint(; x_src = xs)),
+                                   fb = fb)),
              ("NestedClustered",
-              (xs, fb) -> NestedClustered(; x_src = xs, brt = true,
-                                          opti = MeanRisk(; opt = jo(xs)),
-                                          opto = MeanRisk(; opt = jo(xs)), fb = fb)))
-    @testset "$name, x_src = :$xs, fb = $(typeof(fb))" for (name, f) in heads,
-                                                           xs in (:prior, :data),
-                                                           fb in
-                                                           (nothing, InverseVolatility())
+              (xs, fb) -> NestedClustered(; pe = epx, cle = ClustersEstimator(; x_src = xs),
+                                          opti = MeanRisk(; opt = jo()),
+                                          opto = MeanRisk(; opt = jo()), fb = fb)))
+    @testset "$name, x_src = $xs, fb = $(typeof(fb))" for (name, f) in heads,
+                                                          xs in
+                                                          (PriorSource(), ExcessSource()),
+                                                          fb in
+                                                          (nothing, InverseVolatility())
 
         res = optimise(f(xs, fb), rdg)
         @test isa(res.retcode, OptimisationSuccess)
@@ -104,15 +115,15 @@ end
     end
 end
 
-@testset "A covariance forecast evaluation under brt drops the observation" begin
+@testset "A covariance forecast evaluation in the Excess Frame drops the observation" begin
     Bg = copy(Bv0)
     Bg[gap] = NaN
     rdg = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg, ts = ts0)
     rdh = ReturnsResult(; nx = nx, X = X0[keep, :], nb = ["BM"], B = Bv0[keep],
                         ts = ts0[keep])
     cv = IndexWalkForward(20, 5)
-    a = covariance_forecast_evaluation(Covariance(), rdg, cv; brt = true)
-    b = covariance_forecast_evaluation(Covariance(), rdh, cv; brt = true)
+    a = covariance_forecast_evaluation(Covariance(), rdg, cv; x_src = ExcessSource())
+    b = covariance_forecast_evaluation(Covariance(), rdh, cv; x_src = ExcessSource())
     @test all(isfinite, a.mahalanobis_ratio)
     @test isequal(a.mahalanobis_ratio, b.mahalanobis_ratio)
     @test a.dates == b.dates
@@ -136,17 +147,19 @@ end
     rdg = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = Bg, ts = ts0)
     rdh = ReturnsResult(; nx = nx, X = X0[k30, :], nb = ["BM"], B = Bv0[k30], ts = ts0[k30])
 
-    @testset "A gap of a vector benchmark under brt, per family" begin
+    @testset "A gap of a vector benchmark in the Excess Frame, per family" begin
+        epx = EmpiricalPrior(; x_src = ExcessSource())
+        clx = ClustersEstimator(; x_src = ExcessSource())
         jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
-        jbrt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = true)
-        hbrt = HierarchicalOptimiser(; pe = EmpiricalPrior(), brt = true)
-        fams = (MeanRisk(; opt = jbrt), HierarchicalRiskParity(; opt = hbrt),
-                HierarchicalEqualRiskContribution(; opt = hbrt),
-                InverseVolatility(; brt = true),
-                NestedClustered(; opti = MeanRisk(; opt = jopt),
-                                opto = MeanRisk(; opt = jopt), brt = true),
-                SubsetResampling(; opt = MeanRisk(; opt = jopt), seed = 3, n_subsets = 3,
-                                 subset_size = 2, brt = true))
+        jexc = JuMPOptimiser(; pe = epx, slv = slv)
+        hexc = HierarchicalOptimiser(; pe = epx, cle = clx)
+        fams = (MeanRisk(; opt = jexc), HierarchicalRiskParity(; opt = hexc),
+                HierarchicalEqualRiskContribution(; opt = hexc),
+                InverseVolatility(; pe = epx),
+                NestedClustered(; pe = epx, cle = clx, opti = MeanRisk(; opt = jopt),
+                                opto = MeanRisk(; opt = jopt)),
+                SubsetResampling(; pe = epx, opt = MeanRisk(; opt = jopt), seed = 3,
+                                 n_subsets = 3, subset_size = 2))
         for opt in fams
             o = step(opt, rdg, t)
             solved = !isa(opt,
@@ -162,20 +175,18 @@ end
         end
         # The refit route marks the row in its buffer, and a rolling window counts every
         # row, as the training window of a batch walk-forward does.
-        o = step(PO.update_online_estimator(InverseVolatility(;
-                                                              pe = PO.Online(EmpiricalPrior()),
-                                                              brt = true)), rdg, t)
+        o = step(PO.update_online_estimator(InverseVolatility(; pe = PO.Online(epx))), rdg,
+                 t)
         @test PO.buffer_gap_marks(o.pe.cache) == ((1:t) .== gap)
         @test PO.buffer_fit_count(o.pe.cache) == t - 1
-        @test isapprox(optimise(o).w, optimise(InverseVolatility(; brt = true), rdh).w;
+        @test isapprox(optimise(o).w, optimise(InverseVolatility(; pe = epx), rdh).w;
                        atol = 1e-12)
         for w in (20, 10)
             iw = PO.update_online_estimator(InverseVolatility(;
-                                                              pe = PO.Online(EmpiricalPrior();
-                                                                             max_history = w),
-                                                              brt = true))
+                                                              pe = PO.Online(epx;
+                                                                             max_history = w)))
             @test isapprox(optimise(step(iw, rdg, t)).w,
-                           optimise(InverseVolatility(; brt = true),
+                           optimise(InverseVolatility(; pe = epx),
                                     rows(rdg, (t - w + 1):t)).w; atol = 1e-12)
         end
         # A scenario risk measure pairs the rows of the prior with the last rows of the
@@ -183,9 +194,9 @@ end
         mk() = MeanRisk(;
                         opt = JuMPOptimiser(;
                                             pe = HighOrderPriorEstimator(;
-                                                                         pe = EmpiricalPrior()),
-                                            slv = slv, brt = true),
-                        r = ConditionalValueatRisk())
+                                                                         pe = EmpiricalPrior(),
+                                                                         x_src = ExcessSource()),
+                                            slv = slv), r = ConditionalValueatRisk())
         @test isapprox(optimise(step(mk(), rdg, t)).w, optimise(mk(), rdh).w; atol = 1e-8)
         # A first step whose every row has a gap folds nothing into the moments.
         B1 = copy(Bv0)
@@ -193,9 +204,10 @@ end
         rd1 = ReturnsResult(; nx = nx, X = X0, nb = ["BM"], B = B1, ts = ts0)
         rh1 = ReturnsResult(; nx = nx, X = X0[2:t, :], nb = ["BM"], B = Bv0[2:t],
                             ts = ts0[2:t])
-        @test isapprox(optimise(step(InverseVolatility(; brt = true), rd1, t)).w,
-                       optimise(InverseVolatility(; brt = true), rh1).w; atol = 1e-12)
-        # Without brt the step does not read the benchmark, so it marks nothing.
+        @test isapprox(optimise(step(InverseVolatility(; pe = epx), rd1, t)).w,
+                       optimise(InverseVolatility(; pe = epx), rh1).w; atol = 1e-12)
+        # A group with no reader in the Excess Frame does not read the benchmark, so the
+        # step marks nothing.
         o = step(PO.update_online_estimator(InverseVolatility(;
                                                               pe = PO.Online(EmpiricalPrior()))),
                  rdg, t)
@@ -302,18 +314,19 @@ end
     amsk = trues(T, N)
     pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk))
     rdg = ReturnsResult(; nx = nx, X = X0, nb = nx, B = Bg, ts = ts0, pnl = pnl)
-    # With brt = false no fit reads the benchmark, so it changes nothing.
+    # A raw prior reads no benchmark, so it changes nothing.
     @test prior(EmpiricalPrior(), rdg).sigma ≈
           prior(EmpiricalPrior(), ReturnsResult(; nx = nx, X = X0)).sigma
-    # Under brt the cell leaves the Coverage Universe as a gap in X does: the asset is out,
-    # and the other assets equal the fit without it.
-    p1 = prior(EmpiricalPrior(), rdg; brt = true)
+    # In the Excess Frame the cell leaves the Coverage Universe as a gap in X does: the
+    # asset is out, and the other assets equal the fit without it.
+    epx = EmpiricalPrior(; x_src = ExcessSource())
+    p1 = prior(epx, rdg)
     rdh = ReturnsResult(; nx = nx[1:2], X = X0[:, 1:2], nb = nx[1:2], B = Bm0[:, 1:2])
-    p2 = prior(EmpiricalPrior(), rdh; brt = true)
+    p2 = prior(epx, rdh)
     @test all(isnan, p1.sigma[3, :])
     @test p1.sigma[1:2, 1:2] ≈ p2.sigma
-    # Under brt the estimation mask marks the cell, for a cross-sectional reader.
-    v = PO.shared_series_view(rdg, true, false)
+    # In the Excess Frame the estimation mask marks the cell, for a cross-sectional reader.
+    v = PO.shared_series_view(rdg, ExcessSource(), false)
     @test !v.pnl.emsk[gap, 3]
     @test count(!, v.pnl.emsk) == 1
     @test v.pnl.amsk == amsk
@@ -428,7 +441,7 @@ end
     @test fit_preprocessing(mdf).nx == [:A]
 end
 
-@testset "A Cross-Sectional Factor Prior carry drops a benchmark gap under brt (#1675)" begin
+@testset "A Cross-Sectional Factor Prior carry drops a benchmark gap in the Excess Frame (#1675)" begin
     # The carry computes its exposures, its histories and its lags from the observations
     # that the batch fit keeps, and its buffer keeps every row with its mark.
     include(joinpath(@__DIR__, "parity_harness.jl"))
@@ -438,7 +451,8 @@ end
                                  outlier = nothing, scoring = nothing, family = "style")
     factors = ["market" => ConstantExposure(), "style1" => mpass("style1"),
                "style2" => mpass("style2")]
-    est() = CrossSectionalFactorPrior(; lambda = 1, factors = factors, minra = 5)
+    est() = CrossSectionalFactorPrior(; lambda = 1, factors = factors, minra = 5,
+                                      x_src = ExcessSource())
     Bp = randn(StableRNG(16750001), 120) ./ 200
     # One gap inside a block and one at the first row of a block.
     Bp[60] = NaN
@@ -446,11 +460,11 @@ end
     rdb = ReturnsResult(; nx = rdp.nx, X = rdp.X, nf = rdp.nf, F = rdp.F, nb = ["BM"],
                         B = Bp, ne = rdp.ne, E = rdp.E, ts = rdp.ts, iv = rdp.iv,
                         ivpa = rdp.ivpa, pnl = rdp.pnl)
-    pe = foldl((p, (a, b)) -> PO.fold_prior(p, rows(rdb, a:b); brt = true),
+    pe = foldl((p, (a, b)) -> PO.fold_prior(p, rows(rdb, a:b)),
                ((1, 50), (51, 90), (91, 120)); init = est())
     @test PO.buffer_fit_count(pe.cache.buf) == 118
     p = prior(pe)
-    q = prior(est(), rdb; brt = true)
+    q = prior(est(), rdb)
     @test isequal(isnan.(p.sigma), isnan.(q.sigma))
     @test isapprox(filter(isfinite, p.sigma), filter(isfinite, q.sigma); atol = 1e-12)
     @test isapprox(filter(isfinite, p.mu), filter(isfinite, q.mu); atol = 1e-12)

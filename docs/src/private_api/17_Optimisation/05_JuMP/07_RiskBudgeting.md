@@ -15,4 +15,5 @@ risk_budget_universe_key
 _set_risk_budgeting_constraints!(model::JuMP.Model, rb::RiskBudgeting, w::VecJuMPScalar; strict::Bool = false)
 set_risk_budgeting_constraints!
 set_rb_mip_w!
+PortfolioOptimisers.reader_frames(::FactorRiskBudgeting, ::AbstractString, ::Bool)
 ```

@@ -488,17 +488,14 @@ $(DocStringExtensions.FIELDS)
         l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         linf::TD_Option{<:Num_AmbRadCal} = nothing,
-        brt::Bool = false,
-        x_src::Symbol = :data,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing,
     ) -> JuMPOptimiser
 
-Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `brt`, `x_src`, `strict`) stays static.
+Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or [`TD`](@ref) may hold a [`TimeDependent`](@ref) per-fold schedule instead of a static value; a cross-validation fold loop resolves it per fold, and a fold-less `optimise` runs with the field at its static default. The problem definition — the prior estimator, returns model, scalariser and asset sets as much as the constraints — may therefore vary over folds; execution control (`slv`, `sc`, `so`, `strict`) stays static.
 
 ## Validation
 
-  - `x_src in (:prior, :data)`.
   - If `slv` is a vector: `!isempty(slv)`.
   - If `bgt` is a number: `isfinite(bgt)`.
   - If `bgt` is a `BudgetCostEstimator`: `isnothing(sbgt)`.
@@ -508,6 +505,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
   - If `cte` is a vector: `!isempty(cte)`.
   - If `card` is provided: `card > 0` and finite.
   - If `tn` or `tr` is a vector: each must be non-empty.
+  - If `tr` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
   - If `l2c`, `linfc`, `l1`, or `linf` is provided as a number: each must be `> 0` and finite. `l1` and `linf` also take an ambiguity-radius rule, and `l2c` and `linfc` a norm-ceiling rule. A rule states no number here, so the check runs on the number the rule returns, in [`assemble_jump_model!`](@ref).
   - The rule in each [`LpRegularisation`](@ref) is checked against the field that holds it: `lp` is a penalty, so it refuses a norm-ceiling rule, and `lpc` is a constraint, so it refuses an ambiguity-radius rule. The term itself carries one bound for both readings, so this is the point at which the reading is known.
   - If `l2`, `lp` or `lpc` is a vector: each must be non-empty. An empty vector builds no term, which is what `nothing` already spells.
@@ -686,14 +684,6 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     linf
     """
-    $(field_dict[:brt])
-    """
-    brt
-    """
-    $(field_dict[:x_src])
-    """
-    x_src
-    """
     $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
@@ -727,9 +717,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            linfc::TD_Option{<:Num_NormCeilCal},
                            l1::TD_Option{<:Num_AmbRadCal}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            lp::TD_Option{<:LpReg_VecLpReg},
-                           linf::TD_Option{<:Num_AmbRadCal}, brt::Bool, x_src::Symbol,
-                           strict::Bool, cache::Option{<:ReturnsBufferState})
-        assert_source_selector(x_src, :x_src)
+                           linf::TD_Option{<:Num_AmbRadCal}, strict::Bool,
+                           cache::Option{<:ReturnsBufferState})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
         end
@@ -758,6 +747,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
         if isa(tr, AbstractVector)
             @argcheck(!isempty(tr), IsEmptyError("tr cannot be empty"))
         end
+        assert_data_benchmark_prior(tr, pe, :tr, :JuMPOptimiser)
         if !isnothing(l2c) && !isa(l2c, TimeDependent)
             assert_nonempty_gt0_finite_val(l2c, :l2c)
         end
@@ -828,8 +818,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                                             lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt,
                                             sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
                                             sca, ccnt, cobj, sc, so, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, lp, linf, brt, x_src,
-                                            strict), jump_optimiser_td_defaults())
+                                            lpc, linfc, l1, l2, lp, linf, strict),
+                                           jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
                    typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
                    typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
@@ -838,50 +828,15 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                    typeof(ret), typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc),
                    typeof(so), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
                    typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(lp),
-                   typeof(linf), typeof(brt), typeof(x_src), typeof(strict), typeof(cache)}(pe,
-                                                                                            slv,
-                                                                                            wb,
-                                                                                            bgt,
-                                                                                            sbgt,
-                                                                                            gbgt,
-                                                                                            xbgt,
-                                                                                            lt,
-                                                                                            st,
-                                                                                            lcse,
-                                                                                            cte,
-                                                                                            gcarde,
-                                                                                            sgcarde,
-                                                                                            smtx,
-                                                                                            sgmtx,
-                                                                                            slt,
-                                                                                            sst,
-                                                                                            sglt,
-                                                                                            sgst,
-                                                                                            tn,
-                                                                                            fees,
-                                                                                            sets,
-                                                                                            tr,
-                                                                                            ple,
-                                                                                            ret,
-                                                                                            sca,
-                                                                                            ccnt,
-                                                                                            cobj,
-                                                                                            sc,
-                                                                                            so,
-                                                                                            ss,
-                                                                                            card,
-                                                                                            scard,
-                                                                                            l2c,
-                                                                                            lpc,
-                                                                                            linfc,
-                                                                                            l1,
-                                                                                            l2,
-                                                                                            lp,
-                                                                                            linf,
-                                                                                            brt,
-                                                                                            x_src,
-                                                                                            strict,
-                                                                                            cache)
+                   typeof(linf), typeof(strict), typeof(cache)}(pe, slv, wb, bgt, sbgt,
+                                                                gbgt, xbgt, lt, st, lcse,
+                                                                cte, gcarde, sgcarde, smtx,
+                                                                sgmtx, slt, sst, sglt, sgst,
+                                                                tn, fees, sets, tr, ple,
+                                                                ret, sca, ccnt, cobj, sc,
+                                                                so, ss, card, scard, l2c,
+                                                                lpc, linfc, l1, l2, lp,
+                                                                linf, strict, cache)
     end
 end
 function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_VecSlv,
@@ -919,13 +874,12 @@ function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_Ve
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
 
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linf::TD_Option{<:Num_AmbRadCal} = nothing, brt::Bool = false,
-                       x_src::Symbol = :data, strict::Bool = false,
+                       linf::TD_Option{<:Num_AmbRadCal} = nothing, strict::Bool = false,
                        cache::Option{<:ReturnsBufferState} = nothing)::JuMPOptimiser
     return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
                          sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,
                          ple, ret, sca, ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
-                         linfc, l1, l2, lp, linf, brt, x_src, strict, cache)
+                         linfc, l1, l2, lp, linf, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1013,8 +967,7 @@ function factory(opt::JuMPOptimiser, w::AbstractVector)::JuMPOptimiser
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
                          scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
                          l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
-                         brt = opt.brt, x_src = opt.x_src, strict = opt.strict,
-                         cache = opt.cache)
+                         strict = opt.strict, cache = opt.cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1097,8 +1050,7 @@ function port_opt_view(opt::JuMPOptimiser, i, X::MatNum, args...)::JuMPOptimiser
                          sc = opt.sc, so = opt.so, ss = opt.ss, card = opt.card,
                          scard = opt.scard, l2c = opt.l2c, lpc = opt.lpc, linfc = opt.linfc,
                          l1 = opt.l1, l2 = opt.l2, lp = opt.lp, linf = opt.linf,
-                         brt = opt.brt, x_src = opt.x_src, strict = opt.strict,
-                         cache = port_opt_view(opt.cache, i))
+                         strict = opt.strict, cache = port_opt_view(opt.cache, i))
 end
 function non_investable_universe(opt::JuMPOptimiser, ni::VecStr)::JuMPOptimiser
     return rebuild_estimator(opt, (; sets = non_investable_sets(opt.sets, ni)))

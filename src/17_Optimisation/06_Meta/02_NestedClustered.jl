@@ -523,8 +523,6 @@ $(DocStringExtensions.FIELDS)
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
-        brt::Bool = false,
-        x_src::Symbol = :data,
         strict::Bool = false,
         pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
         cache::Option{<:ReturnsBufferState} = nothing
@@ -540,13 +538,13 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
 
 ## Validation
 
-  - `x_src` is `:prior` or `:data`.
   - `opto` passes [`assert_external_optimiser`](@ref) and [`assert_special_nco_requirements`](@ref). A schedule passes when its entries and its `default` pass.
   - When `opti` is not `opto`, `opti` passes [`assert_internal_optimiser`](@ref) and `assert_special_nco_requirements`.
   - When `cv` is present, `opti` passes `assert_external_optimiser`.
   - A schedule in `opto` or `fb` does not bind `:nearest`. A schedule in `opti` that binds `:nearest` has an explicit `default`, and `cv` is present.
   - A `WeightBoundsEstimator` in `wb`, or a `FeesEstimator` in `fees`, needs `sets`. The constructor throws an `IsNothingError` otherwise.
   - A vector schedule holds no precomputed result, see [`assert_time_dependent_substitution`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -630,14 +628,6 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
     """
     @fprop fb
     """
-    $(field_dict[:brt])
-    """
-    brt
-    """
-    $(field_dict[:x_src])
-    """
-    x_src
-    """
     $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
@@ -654,10 +644,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                              sets::TD_Option{<:UniverseSets}, opti::OptE_TD, opto::OptE_TD,
                              cv::Option{<:OptimisationCrossValidation},
                              wf::TD{<:WeightFinaliser}, ex::FLoops.Transducers.Executor,
-                             fb::TDO_Option{<:OptE_Opt}, brt::Bool, x_src::Symbol,
-                             strict::Bool, pcol::AbstractPanelCollapseAlgorithm,
+                             fb::TDO_Option{<:OptE_Opt}, strict::Bool,
+                             pcol::AbstractPanelCollapseAlgorithm,
                              cache::Option{<:ReturnsBufferState})
-        assert_source_selector(x_src, :x_src)
         assert_nearest_optimiser_schedule(opti, :opti, cv, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(opto, :opto, :NestedClustered)
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :NestedClustered)
@@ -678,13 +667,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(NestedClustered,
                                            (; pe, cle, wb, fees, sets, opti, opto, cv, wf,
-                                            ex, fb, brt, x_src, strict, pcol),
+                                            ex, fb, strict, pcol),
                                            nested_clustered_td_defaults())
-        return new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
-                   typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
-                   typeof(fb), typeof(brt), typeof(x_src), typeof(strict), typeof(pcol),
-                   typeof(cache)}(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt,
-                                  x_src, strict, pcol, cache)
+        est = new{typeof(pe), typeof(cle), typeof(wb), typeof(fees), typeof(sets),
+                  typeof(opti), typeof(opto), typeof(cv), typeof(wf), typeof(ex),
+                  typeof(fb), typeof(strict), typeof(pcol), typeof(cache)}(pe, cle, wb,
+                                                                           fees, sets, opti,
+                                                                           opto, cv, wf, ex,
+                                                                           fb, strict, pcol,
+                                                                           cache)
+        warn_raw_readers(est)
+        return est
     end
 end
 function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -695,12 +688,11 @@ function NestedClustered(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                          opto::OptE_TD, cv::Option{<:OptimisationCrossValidation} = nothing,
                          wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                          ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
-                         fb::TDO_Option{<:OptE_Opt} = nothing, brt::Bool = false,
-                         x_src::Symbol = :data, strict::Bool = false,
+                         fb::TDO_Option{<:OptE_Opt} = nothing, strict::Bool = false,
                          pcol::AbstractPanelCollapseAlgorithm = RenormaliseActive(),
                          cache::Option{<:ReturnsBufferState} = nothing)
-    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, brt, x_src,
-                           strict, pcol, cache)
+    return NestedClustered(pe, cle, wb, fees, sets, opti, opto, cv, wf, ex, fb, strict,
+                           pcol, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -835,9 +827,8 @@ function port_opt_view(nco::NestedClustered, i, X::MatNum, args...)
     opto = port_opt_view(nco.opto, i, X)
     return NestedClustered(; pe = pe, cle = nco.cle, wb = wb, fees = fees, sets = sets,
                            opti = opti, opto = opto, cv = nco.cv, wf = nco.wf, ex = nco.ex,
-                           fb = view_child(nco.fb, i, X), brt = nco.brt, x_src = nco.x_src,
-                           strict = nco.strict, pcol = nco.pcol,
-                           cache = port_opt_view(nco.cache, i))
+                           fb = view_child(nco.fb, i, X), strict = nco.strict,
+                           pcol = nco.pcol, cache = port_opt_view(nco.cache, i))
 end
 function non_investable_universe(nco::NestedClustered, ni::VecStr)::NestedClustered
     return rebuild_estimator(nco, (; sets = non_investable_sets(nco.sets, ni)))
@@ -893,7 +884,7 @@ end
 function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol = :optimal,
                    str_names::Bool = false, save::Bool = true, kwargs...)
     nco = reset_time_dependent_estimator(nco)
-    pr = prior(nco.pe, rd; brt = nco.brt)
+    pr = prior(nco.pe, rd)
     # A weight and a fee are fractions, so integer returns take a floating point type.
     Tf = float_if_integer(eltype(pr.X))
     # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
@@ -905,7 +896,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
     # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
     imsk = feature_readable_mask(nco.cle, investable_mask(pr), rd)
-    imsk = graph_reader_mask(nco.cle, imsk, pr, rd, nco.x_src, nco.brt, nco.strict)
+    imsk = graph_reader_mask(nco.cle, imsk, pr, rd, nco.strict)
     fees = investable_fees_view(fees_constraints(nco.fees, nco.sets; datatype = Tf,
                                                  strict = nco.strict), imsk, pr.X)
     # A forced exit is charged once, against the full-universe weight vector the fit
@@ -922,7 +913,7 @@ function _optimise(nco::NestedClustered, rd::ReturnsResult; branchorder::Symbol 
     _, pr, nco, rdr = investable_reduction(imsk, pr, nco, rd)
     X = pr.X
     clr = clusterise(nco.cle, pr; rd = rdr, iv = rdr.iv, ivpa = rdr.ivpa,
-                     branchorder = branchorder, x_src = nco.x_src, brt = nco.brt)
+                     branchorder = branchorder)
     assert_clustering_universe(clr, size(X, 2))
     idx = assignments(clr)
     cls = [findall(x -> x == i, idx) for i in 1:(clr.k)]
@@ -965,7 +956,7 @@ The `# Mathematical definition` of [`NestedClustered`](@ref) states the weights 
 # Algorithm
 
  1. Replace the schedules in the fields of `nco` with their static defaults, through [`reset_time_dependent_estimator`](@ref).
- 2. Fit the prior of `nco.pe` to `rd` under `nco.brt`, giving `pr`. It reads the returns in excess of the benchmark when `nco.brt` is `true`. `rd` keeps its raw returns, and the clustering reads `nco.brt` too. The inner and outer optimisers apply their own `brt`.
+ 2. Fit the prior of `nco.pe` to `rd`, giving `pr`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns, and the clustering reads the frame that its own `x_src` states. The readers of the inner and outer optimisers state their own sources.
  3. Take the element type of the weights, the fees and the weight bounds from `pr.X` with [`float_if_integer`](@ref), giving `Tf`. Integer returns take a floating point type, because a weight and a fee are fractions.
  4. Read the investable mask of `pr` with [`investable_mask`](@ref), giving `imsk`.
  5. Resolve the fees of `nco.fees` over the universe of the caller with [`fees_constraints`](@ref), and place them on the investable assets with [`investable_fees_view`](@ref), giving `fees`.

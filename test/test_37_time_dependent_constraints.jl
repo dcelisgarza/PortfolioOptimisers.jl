@@ -769,8 +769,8 @@ end
         # The whole problem definition varies over folds, not just the constraints: the
         # prior estimator, returns model, scalariser and asset sets of a `JuMPOptimiser`,
         # and the prior, clustering estimator, sets and weight finaliser of a
-        # `HierarchicalOptimiser`. Execution control (`slv`, `sc`, `so`, `brt`, `x_src`,
-        # `strict`) stays static.
+        # `HierarchicalOptimiser`. Execution control (`slv`, `sc`, `so`, `strict`) stays
+        # static.
         cvw = IndexWalkForward(100, 50)
         pe_semi = EmpiricalPrior(;
                                  ce = PortfolioOptimisersCovariance(;
@@ -919,7 +919,7 @@ end
         # The concrete estimators' own problem definition varies over folds too: the risk
         # measure, objective, budgeting algorithm, warm starts and the fallback itself.
         # Execution control (`bins`, `ucs_flag`, `alg` variants, `flag`, `ex`, `sq`, `rng`,
-        # `seed`, `brt`, `strict`) stays static.
+        # `seed`, `strict`) stays static.
         cvw = IndexWalkForward(100, 50)
         jopt = JuMPOptimiser(; slv = slv)
         ctx2 = TimeDependentContext(; i = 2, n = 2, rd = rd, train_idx = 1:150,

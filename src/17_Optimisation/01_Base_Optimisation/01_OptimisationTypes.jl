@@ -483,6 +483,174 @@ end
 function OptimisationFailure(; res = nothing)
     return OptimisationFailure(res)
 end
+"""
+    field_frames(x, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Return the frames that the fields of `x` add to the group of a head, for the frame walk.
+
+A head and the configuration that it holds walk every field of their type with [`reader_frames`](@ref), at the path that [`join_path`](@ref) gives. A field that holds no reader adds nothing through the default method of `reader_frames`. An inner optimiser and a fallback have no method either, so the walk stops at them, because each one is a head with its own group. A new slot that holds a reader therefore joins the group with no edit here.
+
+# Arguments
+
+  - $(arg_dict[:frame_x])
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the fields of `x`, joined with [`merge_frames`](@ref).
+
+# Related
+
+  - [`group_frames`](@ref)
+  - [`reader_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+"""
+function field_frames(x, path::AbstractString, refit::Bool)
+    return merge_frames(map(f -> reader_frames(getfield(x, f), join_path(path, f),
+                                               refit)::ReturnsFrames,
+                            fieldnames(typeof(x)))...)
+end
+"""
+    reader_frames(v::AbstractVector{<:Number}, path::AbstractString, refit::Bool) -> ReturnsFrames
+    reader_frames(o::Online, path::AbstractString, refit::Bool) -> ReturnsFrames
+    refits_regression(o::Online) -> Bool
+    returns_source(o::Online) -> Option{<:AbstractReturnsSource}
+
+The frame walk through two values that a slot of a head can hold.
+
+A vector of numbers, such as initial weights, holds no reader, so it adds nothing, and the walk does not visit each number. An [`Online`](@ref) wrapper of a prior answers for the prior that it wraps, because the wrapper only seeds the buffer of the prior. So the walk, the refit rule of a regression reader and the source of the prior see through it before the warm-up resolves it.
+
+# Arguments
+
+  - `v`: A vector of numbers.
+  - `o`: An `Online` wrapper.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`reader_frames`](@ref)
+  - [`refits_regression`](@ref)
+  - [`returns_source`](@ref)
+"""
+function reader_frames(::AbstractVector{<:Number}, ::AbstractString, ::Bool)
+    return ReturnsFrames()
+end
+function reader_frames(o::Online, path::AbstractString, refit::Bool)
+    return reader_frames(o.est, path, refit)
+end
+function refits_regression(o::Online)
+    return refits_regression(o.est)
+end
+function returns_source(o::Online)
+    return returns_source(o.est)
+end
+"""
+    data_benchmark_path(x) -> Option{<:String}
+
+Return the path of the first [`DataBenchmarkTracking`](@ref) in the tree of `x`, or `nothing` when `x` holds none.
+
+The walk has the shape of [`returns_tracking_path`](@ref). It enters every field of an estimator, a result and an algorithm, and every element of a vector. A vector of numbers and the state of a partial fit hold no tracking algorithm, so the walk does not enter them.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`DataBenchmarkTracking`](@ref): return `""`.
+ 2. An estimator, a result or an algorithm: walk each field in order, giving `paths`, and join the name of the first field that gives a path to that path with [`tree_path`](@ref).
+ 3. A vector that is not a vector of numbers: walk each element with [`element_path`](@ref).
+ 4. A vector of numbers, the state of a partial fit, and any other value: return `nothing`.
+
+# Arguments
+
+  - `x`: A tracking algorithm, a tracking error, a risk measure, or a vector of them.
+
+# Returns
+
+  - `path::Option{<:String}`: The path of the first data benchmark below `x`, `""` when `x` is itself one, or `nothing`.
+
+# Related
+
+  - [`assert_data_benchmark_prior`](@ref)
+  - [`returns_tracking_path`](@ref)
+  - [`tree_path`](@ref)
+"""
+function data_benchmark_path(est::Union{<:AbstractEstimator, <:AbstractResult,
+                                        <:AbstractAlgorithm})
+    paths = map(f -> data_benchmark_path(getfield(est, f)), fieldnames(typeof(est)))
+    i = findfirst(!isnothing, paths)
+    return if isnothing(i)
+        nothing
+    else
+        tree_path(fieldname(typeof(est), i), something(paths[i]))
+    end
+end
+function data_benchmark_path(::DataBenchmarkTracking)
+    return ""
+end
+function data_benchmark_path(::AbstractPartialFitState)
+    return nothing
+end
+function data_benchmark_path(v::AbstractVector)
+    return eltype(v) <: Number ? nothing : element_path(data_benchmark_path, v)
+end
+function data_benchmark_path(::Any)
+    return nothing
+end
+"""
+    assert_data_benchmark_prior(x, pe, field::Sym_Str, holder::Sym_Str,
+                                pe_field::Sym_Str = :pe) -> Nothing
+
+Refuse a [`DataBenchmarkTracking`](@ref) in `x` when the prior `pe` that its measure reads states `x_src = ExcessSource()`.
+
+Every tracking form compares `pr.X * w` with its benchmark series. Under a prior in the Excess Frame `pr.X` holds `X - B`, so a data benchmark gives the series `(X - B) * w - B`, and the benchmark is subtracted two times. No use of the pair is correct, so the constructor of each holder of the tracking part and the prior refuses it. The configuration alone decides the refusal. A precomputed Prior Result states no source, so it reads as raw and passes. A graph reader or a regression reader in the Excess Frame does not count, because no tracking form reads its matrix.
+
+# Algorithm
+
+ 1. Return when `x` or `pe` is a [`TimeDependent`](@ref) schedule, or when [`reader_frames`](@ref) finds that `pe` does not state [`ExcessSource`](@ref).
+ 2. Find the path of the first data benchmark in `x` with [`data_benchmark_path`](@ref), giving `path`.
+ 3. Refuse when `path` is not `nothing`.
+
+# Arguments
+
+  - `x`: The field that can hold a data benchmark: a tracking error or a risk measure, or a vector of them.
+  - `pe`: The prior that the measure reads: a prior estimator, a Prior Result, or an [`Online`](@ref) wrapper of a prior estimator. A [`TimeDependent`](@ref) schedule in `x` or in `pe` passes, because the constructor checks each of its entries, and the rebuild of each fold checks the pair of that fold.
+  - `field`: The name of the field that holds `x`, for the error message.
+  - `holder`: The name of the type that holds `x` and `pe`, for the error message.
+  - `pe_field`: The path of `pe` from `holder`, for the error message.
+
+# Validation
+
+  - `pe` does not state `x_src = ExcessSource()`, or `x` holds no [`DataBenchmarkTracking`](@ref). An `ArgumentError` that names the field, the prior and the two remedies is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`DataBenchmarkTracking`](@ref)
+  - [`ExcessSource`](@ref)
+  - [`data_benchmark_path`](@ref)
+  - [`bind_data_benchmark`](@ref)
+"""
+function assert_data_benchmark_prior(x, pe, field::Sym_Str, holder::Sym_Str,
+                                     pe_field::Sym_Str = :pe)::Nothing
+    # A schedule pairs its entries fold by fold. The substitution pass of the constructor
+    # checks each entry against the static fields, and the rebuild of each fold checks the
+    # pair of that fold.
+    if isa(x, TimeDependent) ||
+       isa(pe, TimeDependent) ||
+       !reader_frames(pe, "", false).excess
+        return nothing
+    end
+    path = data_benchmark_path(x)
+    @argcheck(isnothing(path),
+              ArgumentError("the `$(tree_path(field, something(path, "")))` of `$holder` tracks the benchmark `B` of the returns data with `DataBenchmarkTracking`, and its prior `$pe_field` states `x_src = ExcessSource()`. Every tracking form compares `pr.X * w` with its benchmark series, so the series would be `(X - B) * w - B`, and the benchmark would be subtracted two times. State `x_src = DataSource()` or `nothing` on `$pe_field` to track `X * w - B`, or replace the data benchmark with a plain risk measure on the excess prior. The two models differ: for a vector `B` the plain measure reads `X * w - B * sum(w)`, which equals `X * w - B` only when `sum(w) == 1`."))
+    return nothing
+end
 
 export OptimisationSuccess, OptimisationFailure
 public BaseOptimisationEstimator, OptimisationAlgorithm, OptimisationResult,

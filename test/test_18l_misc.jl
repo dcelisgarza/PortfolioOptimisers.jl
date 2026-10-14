@@ -555,12 +555,12 @@ end
 end
 
 @testset "Benchmark tracking" begin
-    opt = JuMPOptimiser(; slv = slv, brt = true)
+    opt = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()), slv = slv)
     mr = MeanRisk(; opt = opt)
     res1 = optimise(mr, rd)
 
-    prb = prior(EmpiricalPrior(), benchmark_relative_returns(rd, true))
-    opt = JuMPOptimiser(; pe = prb, slv = slv, brt = true)
+    prb = prior(EmpiricalPrior(), benchmark_relative_returns(rd, ExcessSource()))
+    opt = JuMPOptimiser(; pe = prb, slv = slv)
     mr = MeanRisk(; opt = opt)
     res2 = optimise(mr, rd)
 
@@ -575,75 +575,278 @@ end
                     0.02919805117977965, 0.015023246357866301], rtol = 1e-6)
 end
 
-@testset "brt = true subtracts the benchmark in every reader of the returns (#1651)" begin
-    # Each reader takes `brt` and reads `X - B` at the point of use, so an optimiser over
-    # `rd` with `brt = true` equals the same optimiser with `brt = false` over returns data
-    # whose `X` is the excess return. Before #1651 the uncertainty sets and the refitted
-    # loadings of the JuMP heads read the raw `X`.
+@testset "ExcessSource() subtracts the benchmark in every reader of the returns (#1651)" begin
+    # Each reader states its own source and reads `X - B` at the point of use, so an
+    # optimiser over `rd` whose readers state `x_src = ExcessSource()` equals the same
+    # optimiser with raw readers over returns data whose `X` is the excess return. Before
+    # #1651 the uncertainty sets and the refitted loadings of the JuMP heads read the raw
+    # `X`. Since #1701 no head holds a source, so each case states it on every reader.
     Fm = randn(StableRNG(16510), size(rd.X, 1), 3) ./ 100
     nf = ["f1", "f2", "f3"]
     rdf = ReturnsResult(; nx = rd.nx, X = rd.X, nf = nf, F = Fm, nb = rd.nb, B = rd.B,
                         ts = rd.ts)
-    rdx = ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, true), nf = nf,
-                        F = Fm, ts = rd.ts)
-    jo(brt) = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv, brt = brt)
-    ho(brt) = HierarchicalOptimiser(; pe = EmpiricalPrior(), brt = brt, x_src = :data)
-    usv = UncertaintySetVariance(; ucs = DeltaUncertaintySet(; pe = EmpiricalPrior()))
-    cases = (brt -> MeanRisk(; obj = MaximumRatio(),
-                             opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
-                                                 brt = brt,
-                                                 ret = ArithmeticReturn(;
-                                                                        ucs = NormalUncertaintySet(;
-                                                                                                   pe = EmpiricalPrior(),
-                                                                                                   rng = StableRNG(1651),
-                                                                                                   alg = BoxUncertaintySetAlgorithm())))),
-             brt -> MeanRisk(; r = usv, opt = jo(brt)),
-             brt -> NearOptimalCentering(; r = usv, opt = jo(brt)),
-             brt -> RiskBudgeting(;
-                                  rba = FactorRiskBudgeting(;
-                                                            re = DimensionReductionRegression()),
-                                  opt = jo(brt)),
-             brt -> HierarchicalRiskParity(; opt = ho(brt)),
-             brt -> HierarchicalEqualRiskContribution(; opt = ho(brt)),
-             brt -> SchurComplementHierarchicalRiskParity(; opt = ho(brt)),
-             brt -> InverseVolatility(; brt = brt),
-             brt -> SubsetResampling(; opt = MeanRisk(; opt = jo(brt)), seed = 3,
-                                     n_subsets = 3, subset_size = 5))
+    rdx = ReturnsResult(; nx = rd.nx, X = benchmark_relative_returns(rd, ExcessSource()),
+                        nf = nf, F = Fm, ts = rd.ts)
+    xs = ExcessSource()
+    jo(s) = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = s), slv = slv)
+    ho(s) = HierarchicalOptimiser(; pe = EmpiricalPrior(; x_src = s),
+                                  cle = ClustersEstimator(; x_src = s))
+    usv(s) = UncertaintySetVariance(;
+                                    ucs = DeltaUncertaintySet(;
+                                                              pe = EmpiricalPrior(;
+                                                                                  x_src = s)))
+    cases = (s -> MeanRisk(; obj = MaximumRatio(),
+                           opt = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = s),
+                                               slv = slv,
+                                               ret = ArithmeticReturn(;
+                                                                      ucs = NormalUncertaintySet(;
+                                                                                                 pe = EmpiricalPrior(;
+                                                                                                                     x_src = s),
+                                                                                                 rng = StableRNG(1651),
+                                                                                                 alg = BoxUncertaintySetAlgorithm())))),
+             s -> MeanRisk(; r = usv(s), opt = jo(s)),
+             s -> NearOptimalCentering(; r = usv(s), opt = jo(s)),
+             s -> RiskBudgeting(;
+                                rba = FactorRiskBudgeting(;
+                                                          re = DimensionReductionRegression(;
+                                                                                            x_src = s)),
+                                opt = jo(s)), s -> HierarchicalRiskParity(; opt = ho(s)),
+             s -> HierarchicalEqualRiskContribution(; opt = ho(s)),
+             s -> SchurComplementHierarchicalRiskParity(; opt = ho(s)),
+             s -> InverseVolatility(; pe = EmpiricalPrior(; x_src = s)),
+             s -> SubsetResampling(; opt = MeanRisk(; opt = jo(s)), seed = 3, n_subsets = 3,
+                                   subset_size = 5))
     for mk in cases
-        w1 = optimise(mk(true), rdf).w
-        @test isapprox(w1, optimise(mk(false), rdx).w; atol = 1e-9)
+        w1 = optimise(mk(xs), rdf).w
+        @test isapprox(w1, optimise(mk(nothing), rdx).w; atol = 1e-9)
         # The benchmark moves the weights, so the test above reads the subtraction.
-        @test !isapprox(w1, optimise(mk(false), rdf).w; atol = 1e-3)
+        @test !isapprox(w1, optimise(mk(nothing), rdf).w; atol = 1e-3)
         # The returns data keeps its raw `X` and its `B`.
         @test rdf.X === rd.X && rdf.B === rd.B
     end
 
     # A factor space that refits its loadings regresses `X - B` on the factors.
     sets_f = UniverseSets(; dict = Dict("nx" => rd.nx, "nf" => nf))
-    ece = ExposureConstraintEstimator(;
-                                      lce = LinearConstraintEstimator(; val = "f1 <= 0.3"),
-                                      space = FactorSpace(;
-                                                          re = DimensionReductionRegression()))
-    lc1 = linear_constraints(ece, sets_f; rd = rdf, brt = true)
+    ece_s(s) = ExposureConstraintEstimator(;
+                                           lce = LinearConstraintEstimator(;
+                                                                           val = "f1 <= 0.3"),
+                                           space = FactorSpace(;
+                                                               re = DimensionReductionRegression(;
+                                                                                                 x_src = s)))
+    ece = ece_s(nothing)
+    lc1 = linear_constraints(ece_s(xs), sets_f; rd = rdf)
     @test lc1.ineq.A == linear_constraints(ece, sets_f; rd = rdx).ineq.A
     @test lc1.ineq.A != linear_constraints(ece, sets_f; rd = rdf).ineq.A
 
-    # The `brt` of a meta-optimiser changes its own prior and clustering, and reaches no
+    # The source of the prior of a meta-optimiser changes that prior alone, and reaches no
     # inner or outer optimiser. The outer problem reads the raw returns of the
-    # sub-portfolios, in the path without folds and in the cross-validated path.
+    # sub-portfolios, in the path without folds and in the cross-validated path
+    # (ADR 0215, decision 3).
     for cv in (nothing, OptimisationCrossValidation(; cv = KFold(; n = 5))),
-        mk in (brt -> Stacking(; brt = brt, cv = cv,
-                               opti = [MeanRisk(; opt = jo(false)), InverseVolatility()],
-                               opto = MeanRisk(; opt = jo(false))),
-               brt -> SubsetResampling(; brt = brt, opt = MeanRisk(; opt = jo(false)), seed = 3,
-                                       n_subsets = 3, subset_size = 5))
+        mk in (s -> Stacking(; pe = EmpiricalPrior(; x_src = s), cv = cv,
+                             opti = [MeanRisk(; opt = jo(nothing)), InverseVolatility()],
+                             opto = MeanRisk(; opt = jo(nothing))),
+               s -> SubsetResampling(; pe = EmpiricalPrior(; x_src = s),
+                                     opt = MeanRisk(; opt = jo(nothing)), seed = 3, n_subsets = 3,
+                                     subset_size = 5))
 
-        @test isapprox(optimise(mk(true), rdf).w, optimise(mk(false), rdf).w; atol = 1e-9)
+        @test isapprox(optimise(mk(xs), rdf).w, optimise(mk(nothing), rdf).w; atol = 1e-9)
     end
-    # The outer returns of the path without folds add the benchmark back to the prior.
-    prb = prior(EmpiricalPrior(), rdf; brt = true)
-    @test isapprox(PortfolioOptimisers.outer_returns_source(prb, rdf, true), rdf.X)
-    @test PortfolioOptimisers.outer_returns_source(prb, rdf, false) === prb
+    # The outer returns of the path without folds add the benchmark back to a prior in the
+    # Excess Frame. A raw prior and a precomputed Prior Result read as raw.
+    prb = prior(EmpiricalPrior(; x_src = xs), rdf)
+    @test isapprox(PortfolioOptimisers.outer_returns_source(prb, rdf, xs), rdf.X)
+    @test PortfolioOptimisers.outer_returns_source(prb, rdf, nothing) === prb
+    @test PortfolioOptimisers.outer_returns_source(prb, rdf, DataSource()) === prb
+    @test PortfolioOptimisers.returns_source(prb) === nothing
+end
+
+@testset "The group of a head reads the source of each reader (#1701)" begin
+    PO = PortfolioOptimisers
+    xs = ExcessSource()
+    epx = EmpiricalPrior(; x_src = xs)
+    eraw = EmpiricalPrior(; x_src = DataSource())
+    s1 = first(slv)
+    noframes(f) = !f.excess && isempty(f.raw)
+    # The walk names each raw reader by its path from the head, and stops at a fallback
+    # and an inner optimiser, which are heads with their own groups (ADR 0214).
+    frc = FactorRiskContribution(; opt = JuMPOptimiser(; pe = epx, slv = s1),
+                                 fb = MeanRisk(; opt = JuMPOptimiser(; slv = s1)))
+    @test PO.group_frames(frc).excess
+    @test PO.group_frames(frc).raw == ["re"]
+    @test PO.group_frames(MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1))).raw == []
+    hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = epx))
+    @test PO.group_frames(hrp).raw == ["opt.cle"]
+    @test PO.group_source(hrp) === xs
+    @test PO.group_frames(HierarchicalRiskParity()).raw == ["opt.pe", "opt.cle"]
+    @test PO.group_source(HierarchicalRiskParity()) === nothing
+    nco = NestedClustered(; pe = eraw, cle = ClustersEstimator(; x_src = DataSource()),
+                          opti = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)),
+                          opto = MeanRisk(; opt = JuMPOptimiser(; slv = s1)))
+    @test noframes(PO.group_frames(nco))
+    @test PO.group_source(nco) === nothing
+    st = Stacking(; pe = epx, opti = [InverseVolatility()], opto = InverseVolatility())
+    @test PO.group_frames(st).excess && isempty(PO.group_frames(st).raw)
+    sr = SubsetResampling(; opt = MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = s1)))
+    @test PO.group_source(sr) === nothing
+    @test PO.group_frames(InverseVolatility(; pe = epx)).excess
+    @test PO.group_frames(JuMPOptimiser(; pe = epx, slv = s1, cte = CentralityConstraint())).raw ==
+          ["cte"]
+    @test PO.group_frames(HierarchicalOptimiser(; pe = epx)).raw == ["cle"]
+    rb = RiskBudgeting(; opt = JuMPOptimiser(; pe = eraw, slv = s1),
+                       rba = FactorRiskBudgeting(; re = StepwiseRegression(; x_src = xs)))
+    @test PO.group_frames(rb).excess
+    # A regression reader at `nothing` counts only when the prior gives no loadings.
+    @test PO.group_frames(FactorRiskContribution(;
+                                                 opt = JuMPOptimiser(;
+                                                                     pe = FactorPrior(;
+                                                                                      x_src = xs),
+                                                                     slv = s1))).raw == []
+    # A schedule and an `Online` wrapper answer for the values that they hold.
+    td = TimeDependent([epx, EmpiricalPrior()]; default = eraw)
+    @test PO.reader_frames(td, "pe", true).raw == ["pe.val[2]"]
+    @test PO.reader_frames(td, "pe", true).excess
+    @test PO.refits_regression(td)
+    @test !PO.refits_regression(TimeDependent(ctx -> epx))
+    @test noframes(PO.reader_frames(TimeDependent(ctx -> epx), "pe", true))
+    @test PO.reader_frames(TimeDependent([eraw]; default = EmpiricalPrior()), "pe", true).raw ==
+          ["pe.default"]
+    @test PO.reader_frames(PO.Online(epx), "pe", true).excess
+    @test PO.refits_regression(PO.Online(EmpiricalPrior()))
+    @test PO.returns_source(PO.Online(epx)) === xs
+    @test noframes(PO.reader_frames([0.5, 0.5], "wi", true))
+    @test noframes(PO.reader_frames(ArithmeticReturn(), "ret", true))
+
+    # A forgotten raw reader beside a reader of the Excess Frame warns at construction, and
+    # names the head and the path. A stated mix is silent.
+    @test_logs (:warn,
+                r"`HierarchicalRiskParity` holds a reader that states `x_src = ExcessSource\(\)`.*`opt.cle`") HierarchicalRiskParity(;
+                                                                                                                                     opt = HierarchicalOptimiser(;
+                                                                                                                                                                 pe = epx))
+    @test_logs HierarchicalRiskParity(;
+                                      opt = HierarchicalOptimiser(; pe = epx,
+                                                                  cle = ClustersEstimator(;
+                                                                                          x_src = DataSource())))
+    for mk in (opt -> InverseVolatility(; pe = epx), opt -> MeanRisk(; opt = opt),
+               opt -> NearOptimalCentering(; opt = opt), opt -> RiskBudgeting(; opt = opt),
+               opt -> RelaxedRiskBudgeting(; opt = opt),
+               opt -> HierarchicalEqualRiskContribution(),
+               opt -> SchurComplementHierarchicalRiskParity(),
+               opt -> NestedClustered(; opti = InverseVolatility(), opto = InverseVolatility()),
+               opt -> Stacking(; opti = [InverseVolatility()], opto = InverseVolatility()),
+               opt -> SubsetResampling(; opt = InverseVolatility()))
+        @test_logs mk(JuMPOptimiser(; pe = epx, slv = s1))
+    end
+
+    # A data benchmark refuses a prior in the Excess Frame in each holder of the pair
+    # (ADR 0208, decision 3). The error names the field, the prior and both remedies.
+    dbt = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+    jx = JuMPOptimiser(; pe = epx, slv = s1)
+    hx = HierarchicalOptimiser(; pe = epx)
+    err = try
+        MeanRisk(; opt = jx, r = [Variance(), dbt])
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError)
+    msg = sprint(showerror, err)
+    @test occursin("`r[2].tr` of `MeanRisk`", msg)
+    @test occursin("its prior `opt.pe` states `x_src = ExcessSource()`", msg)
+    @test occursin("`x_src = DataSource()` or `nothing`", msg)
+    @test occursin("`sum(w) == 1`", msg)
+    @test_throws "`tr.tr` of `JuMPOptimiser`" JuMPOptimiser(; pe = epx, slv = s1,
+                                                            tr = TrackingError(;
+                                                                               tr = DataBenchmarkTracking()))
+    @test_throws "`tr[1].tr` of `JuMPOptimiser`" JuMPOptimiser(; pe = epx, slv = s1,
+                                                               tr = [TrackingError(;
+                                                                                   tr = DataBenchmarkTracking())])
+    @test_throws "of `FactorRiskContribution`" FactorRiskContribution(; opt = jx, r = dbt)
+    @test_throws "of `NearOptimalCentering`" NearOptimalCentering(; opt = jx, r = dbt)
+    @test_throws "of `RiskBudgeting`" RiskBudgeting(; opt = jx, r = dbt)
+    @test_throws "`r.tr` of `HierarchicalRiskParity`" HierarchicalRiskParity(; opt = hx,
+                                                                             r = dbt)
+    @test_throws "`ri.tr` of `HierarchicalEqualRiskContribution`" HierarchicalEqualRiskContribution(;
+                                                                                                    opt = hx,
+                                                                                                    ri = dbt)
+    @test_throws "`ro.tr` of `HierarchicalEqualRiskContribution`" HierarchicalEqualRiskContribution(;
+                                                                                                    opt = hx,
+                                                                                                    ro = dbt)
+    @test_throws "of `MeanRisk`" MeanRisk(;
+                                          opt = JuMPOptimiser(; pe = PO.Online(epx),
+                                                              slv = s1), r = dbt)
+    # The factor phylogeny reads the factor returns that the head picks, so it is an inner
+    # reader and states no source (ADR 0211, decision 3).
+    plx = SemiDefinitePhylogenyEstimator(; x_src = xs)
+    @test_throws "the `frc_ple` of `FactorRiskContribution`" FactorRiskContribution(;
+                                                                                    opt = JuMPOptimiser(;
+                                                                                                        slv = s1),
+                                                                                    frc_ple = plx)
+    @test_throws "the `frc_ple` of `FactorRiskContribution`" FactorRiskContribution(;
+                                                                                    opt = JuMPOptimiser(;
+                                                                                                        slv = s1),
+                                                                                    frc_ple = [SemiDefinitePhylogenyEstimator(),
+                                                                                               plx])
+    # A raw prior, a precomputed Prior Result and a schedule pass. A graph reader or a
+    # regression reader in the Excess Frame does not count.
+    @test_logs MeanRisk(; opt = JuMPOptimiser(; pe = eraw, slv = s1), r = dbt)
+    @test_logs MeanRisk(; opt = JuMPOptimiser(; pe = prior(epx, rd), slv = s1), r = dbt)
+    @test_logs MeanRisk(;
+                        opt = JuMPOptimiser(; pe = eraw, slv = s1,
+                                            cte = CentralityConstraint(; x_src = xs)),
+                        r = dbt)
+    @test isnothing(PO.assert_data_benchmark_prior(TimeDependent([dbt]; default = dbt), epx,
+                                                   :r, :MeanRisk))
+    @test isnothing(PO.assert_data_benchmark_prior(dbt, TimeDependent([epx]), :r,
+                                                   :MeanRisk))
+    @test isnothing(PO.data_benchmark_path(Variance()))
+    @test isnothing(PO.data_benchmark_path([1.0, 2.0]))
+    @test PO.data_benchmark_path(DataBenchmarkTracking()) == ""
+    @test PO.data_benchmark_path(TrackingError(; tr = DataBenchmarkTracking())) == "tr"
+    @test isnothing(PO.data_benchmark_path(PO.ReturnsBufferState()))
+
+    # The online step folds the frame of the prior, and the gap rule reads the group.
+    rdg = ReturnsResult(; nx = rd.nx, X = rd.X, nb = rd.nb, B = rd.B, ts = rd.ts)
+    @test PO.prior_step_returns(rdg, nothing) === rdg
+    @test PO.prior_step_returns(rdg, DataSource()) === rdg
+    @test PO.prior_step_returns(rdg, xs).X ≈ rd.X .- rd.B
+    @test_throws ArgumentError PO.prior_step_returns(rdg, PriorSource())
+    @test_throws ArgumentError PO.fold_prior(prior(EmpiricalPrior(), rdg), rdg)
+    @test_throws ArgumentError PO.fold_prior(TimeDependent([EmpiricalPrior()]), rdg)
+end
+
+@testset "A raw prior beside an excess reader drops a benchmark gap (#1701)" begin
+    # A head drops the gap rows of a vector benchmark when any reader of its group states
+    # `ExcessSource()`, so a raw prior loses them too, and every reader pairs the same
+    # observations (ADR 0215, decision 2). The online step marks the rows by the same rule.
+    PO = PortfolioOptimisers
+    rows(r, i) = PO.port_opt_view(r, i, :)
+    step(opt, r, t) = foldl((o, i) -> partial_fit!(o, rows(r, i:i)), 1:t; init = opt)
+    t = 120
+    Bg = Vector{Float64}(rd.B)
+    Bg[[30, 77]] .= NaN
+    keep = setdiff(1:t, [30, 77])
+    rdg = ReturnsResult(; nx = rd.nx, X = rd.X, nb = rd.nb, B = Bg, ts = rd.ts)
+    rdh = rows(rdg, keep)
+    pe = EmpiricalPrior(; x_src = DataSource())
+    mr = MeanRisk(;
+                  opt = JuMPOptimiser(; pe = pe, slv = first(slv),
+                                      cte = CentralityConstraint(; x_src = ExcessSource())))
+    @test PO.group_source(mr) === ExcessSource()
+    b = rows(rdg, 1:t)
+    @test size(PO.optimiser_shared_series_view(b, mr).X, 1) == t - 2
+    @test size(PO.optimiser_shared_series_view(b, mr.opt).X, 1) == t - 2
+    @test size(PO.optimiser_shared_series_view(b,
+                                               MeanRisk(;
+                                                        opt = JuMPOptimiser(; pe = pe,
+                                                                            slv = first(slv)))).X,
+               1) == t
+    @test isapprox(optimise(mr, b).w, optimise(mr, rdh).w; atol = 1e-6)
+    o = step(mr, rdg, t)
+    @test isapprox(optimise(o).w, optimise(mr, b).w; atol = 1e-6)
+    # The prior folds the raw rows, so the context keeps no copy of the returns, and the
+    # rebuilt returns data holds every row that the step folded.
+    @test isnothing(o.opt.cache.X)
+    @test PO.returns_result(o).ts == rd.ts[1:t]
 end
 
 @testset "The MIP quantile gain tail counts its own exceedances (#351)" begin
