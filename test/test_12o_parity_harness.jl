@@ -376,7 +376,7 @@ end
         rp = PO.prior_step_returns(rd, true)
         @test rp.pnl === rd.pnl
         @test isequal(rp.X, rd.X .- rd.B)
-        @test isequal(benchmark_relative_returns(rd, true), rd.X .- rd.B)
+        @test isequal(benchmark_relative_returns(rd, ExcessSource()), rd.X .- rd.B)
         rv = prices_to_returns(PO.port_opt_view(pr, timestamp(ic.X)[5:12], :))
         @test panel_field(rv.pnl, "shares").vals == sh.vals[5:11, :]
     end

@@ -1799,7 +1799,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
-    rd = shared_series_view(rd, false, true)
+    rd = shared_series_view(rd, nothing, true)
     return regression(re, rd.X, rd.F)
 end
 """

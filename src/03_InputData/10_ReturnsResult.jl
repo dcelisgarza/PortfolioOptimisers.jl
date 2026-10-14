@@ -646,13 +646,15 @@ Fold generation needs only an observation count, from [`cv_nobs`](@ref), and a t
 """
 const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 """
-    benchmark_relative_returns(rd::ReturnsResult, brt::Bool) -> Option{<:MatNum}
+    benchmark_relative_returns(rd::ReturnsResult, x_src::Option{<:DataSource}) -> Option{<:MatNum}
+    benchmark_relative_returns(rd::ReturnsResult, x_src::ExcessSource) -> Option{<:MatNum}
+    benchmark_relative_returns(rd::ReturnsResult, x_src::PriorSource)
 
-Return the asset returns that a reader of `rd` fits on, in excess of the benchmark when `brt` is `true`.
+Return the asset returns of `rd` that a reader with the source `x_src` fits on.
 
-Every reader of the returns that takes `brt` calls this function at the point of use: the prior, the factor regression of an exposure constraint or of a factor risk contribution, an uncertainty set with a prior of its own, and a clustering, phylogeny or centrality estimator that reads the data. The function returns a matrix and never builds a [`ReturnsResult`](@ref), so `rd` keeps its raw `X` and its `B`, and every other reader sees the returns data as the caller gave it.
+Every reader of the returns calls this function at the point of use with its own `x_src`: the prior, the factor regression of an exposure constraint or of a factor risk contribution, a clustering, phylogeny or centrality estimator that reads the data, and the step of [`OnlinePortfolioSelection`](@ref). The function returns a matrix and never builds a [`ReturnsResult`](@ref), so `rd` keeps its raw `X` and its `B`, and every other reader sees the returns data as the caller gave it.
 
-`brt = true` on returns that carry no benchmark is a refusal and not a pass-through, because no excess return exists without a benchmark.
+[`ExcessSource`](@ref) on returns that carry no benchmark is a refusal and not a pass-through, because no excess return exists without a benchmark. [`PriorSource`](@ref) reads the Prior Result, which `rd` does not hold, so a reader at `PriorSource()` picks its matrix before it reaches this function.
 
 # Mathematical definition
 
@@ -675,24 +677,28 @@ A gap in the benchmark gives a `NaN` excess return.
 
 # Algorithm
 
- 1. `brt` is `false`. Return `rd.X`.
- 2. `brt` is `true` and `rd` holds no returns, because its `X` field is `nothing`. Return `nothing`, because there is nothing to subtract from.
- 3. `brt` is `true` and `rd` carries no benchmark, because its `B` field is `nothing`. Throw an `ArgumentError`.
- 4. Subtract the benchmark from the asset returns. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`. A matrix benchmark subtracts elementwise, `rd.X - rd.B`. The function does not modify `rd`.
+The method that Julia selects is the algorithm.
+
+ 1. `x_src` is `nothing` or [`DataSource`](@ref). Return `rd.X`.
+ 2. `x_src` is [`ExcessSource`](@ref) and `rd` holds no returns, because its `X` field is `nothing`. Return `nothing`, because there is nothing to subtract from.
+ 3. `x_src` is [`ExcessSource`](@ref) and `rd` carries no benchmark, because its `B` field is `nothing`. Throw an `ArgumentError`.
+ 4. `x_src` is [`ExcessSource`](@ref). Subtract the benchmark from the asset returns. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`. A matrix benchmark subtracts elementwise, `rd.X - rd.B`. The function does not modify `rd`.
+ 5. `x_src` is [`PriorSource`](@ref). Throw an `ArgumentError`.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the benchmark returns. When it carries a benchmark, it also holds `X`.
-  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them.
+  - $(arg_dict[:x_src_read])
 
 # Validation
 
-  - `brt` is `false`, or `rd` carries a benchmark, or `rd` holds no returns. An `ArgumentError` is thrown otherwise.
-  - When `rd` carries a benchmark, `rd.X` is a matrix and `brt` is a `Bool`. Otherwise no method matches, and the call raises a `MethodError`.
+  - `x_src` is not [`ExcessSource`](@ref), or `rd` carries a benchmark, or `rd` holds no returns. An `ArgumentError` is thrown otherwise.
+  - `x_src` is not [`PriorSource`](@ref). An `ArgumentError` is thrown otherwise.
+  - When `rd` carries a benchmark, `rd.X` is a matrix. Otherwise no method matches, and the call raises a `MethodError`. A value of `x_src` that is not `nothing` and not an [`AbstractReturnsSource`](@ref) raises a `MethodError`.
 
 # Returns
 
-  - `X::Option{<:MatNum}`: The excess returns when `brt` is `true`, a new matrix. Otherwise `rd.X` itself, which is `nothing` when `rd` holds no returns.
+  - `X::Option{<:MatNum}`: The excess returns when `x_src` is [`ExcessSource`](@ref), a new matrix. Otherwise `rd.X` itself, which is `nothing` when `rd` holds no returns.
 
 # Examples
 
@@ -700,10 +706,10 @@ A gap in the benchmark gives a `NaN` excess return.
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.10 0.20; 0.30 0.40], nb = [\"BM\"],
                           B = [0.01; 0.02]);
 
-julia> benchmark_relative_returns(rd, false) === rd.X  # no change when brt is false
+julia> benchmark_relative_returns(rd, DataSource()) === rd.X  # no change for the raw returns
 true
 
-julia> benchmark_relative_returns(rd, true) == rd.X .- rd.B
+julia> benchmark_relative_returns(rd, ExcessSource()) == rd.X .- rd.B
 true
 
 julia> rd.B  # rd keeps its benchmark
@@ -715,44 +721,46 @@ julia> rd.B  # rd keeps its benchmark
 # Related
 
   - [`ReturnsResult`](@ref)
+  - [`AbstractReturnsSource`](@ref)
   - [`prior`](@ref)
   - [`returns_matrix_picker`](@ref)
 """
+function benchmark_relative_returns(rd::ReturnsResult, ::Option{<:DataSource})
+    return rd.X
+end
 function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                      Nothing}, brt::Bool)
-    @argcheck(!brt || isnothing(rd.X),
-              ArgumentError("brt = true asks for the returns in excess of a benchmark, and this ReturnsResult carries no benchmark: its `B` is `nothing`, so no excess return exists. Pass returns data that carries `nb` and `B`, or set `brt = false` to optimise over the asset returns as they are."))
+                                                      Nothing}, ::ExcessSource)
+    @argcheck(isnothing(rd.X),
+              ArgumentError("`x_src = ExcessSource()` asks for the returns in excess of a benchmark, and this ReturnsResult carries no benchmark: its `B` is `nothing`, so no excess return exists. Pass returns data that carries `nb` and `B`, or set `x_src = DataSource()` to read the asset returns as they are."))
     return rd.X
 end
 function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
-                                                      <:VecNum_MatNum}, brt::Bool)
-    return if !brt
-        rd.X
-    elseif isa(rd.B, VecNum)
-        rd.X .- rd.B
-    else
-        rd.X - rd.B
-    end
+                                                      <:VecNum_MatNum}, ::ExcessSource)
+    return isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
+end
+function benchmark_relative_returns(::ReturnsResult, ::PriorSource)
+    return throw(ArgumentError("`x_src = PriorSource()` reads the Prior Result, and returns data holds no Prior Result. A reader at `PriorSource()` reads the `X` of its Prior Result, so it does not read the returns of `rd`."))
 end
 """
-    shared_series_rows(rd::ReturnsResult, brt::Bool, rf::Bool) -> Option{Vector{Int}}
+    shared_series_rows(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
+        -> Option{Vector{Int}}
 
 Find the observations of `rd` that a fit keeps when a Shared Series has a gap.
 
-A Shared Series is a series that every asset reads at the same observation: a vector benchmark under `brt`, and each column of the factor returns of a fit that reads them. A gap in the series of one asset puts that asset outside the Coverage Universe, as [`coverage_mask`](@ref) states. A gap in a Shared Series at observation `t` leaves no asset a value at `t`: an excess return or a factor regression needs the shared value. So the fit drops observation `t` and keeps every asset. The drop removes no value that an asset still had.
+A Shared Series is a series that every asset reads at the same observation: a vector benchmark under [`ExcessSource`](@ref), and each column of the factor returns of a fit that reads them. A gap in the series of one asset puts that asset outside the Coverage Universe, as [`coverage_mask`](@ref) states. A gap in a Shared Series at observation `t` leaves no asset a value at `t`: an excess return or a factor regression needs the shared value. So the fit drops observation `t` and keeps every asset. The drop removes no value that an asset still had.
 
-The function reads a vector benchmark only under `brt`, and the factor returns only under `rf`, because a fit that does not read a series meets none of its gaps. A matrix benchmark is a series of one asset at each column, so its gaps go through [`benchmark_estimation_mask`](@ref) and the Coverage Universe, never through this function.
+The function reads a vector benchmark only under [`ExcessSource`](@ref), and the factor returns only under `rf`, because a fit that does not read a series meets none of its gaps. An optimiser passes the source of its group, see [`group_source`](@ref), so a raw reader of a group that reads the Excess Frame loses the same observations. A matrix benchmark is a series of one asset at each column, so its gaps go through [`benchmark_estimation_mask`](@ref) and the Coverage Universe, never through this function.
 
 # Algorithm
 
- 1. Take the vector benchmark when `brt` is `true` and `rd.B` is a vector, and the factor returns when `rf` is `true`.
+ 1. Take the vector benchmark when `x_src` is [`ExcessSource`](@ref) and `rd.B` is a vector, see [`shared_benchmark`](@ref), and the factor returns when `rf` is `true`.
  2. Return `nothing` when each of them is absent or finite at every observation.
  3. Otherwise keep each observation at which the benchmark is finite and every factor is finite.
 
 # Arguments
 
   - $(arg_dict[:rd])
-  - $(arg_dict[:brt_read])
+  - $(arg_dict[:x_src_read])
   - `rf`: `true` when the fit reads the factor returns of `rd`.
 
 # Returns
@@ -765,14 +773,47 @@ The function reads a vector benchmark only under `brt`, and the factor returns o
   - [`benchmark_relative_returns`](@ref)
   - [`coverage_mask`](@ref)
 """
-function shared_series_rows(rd::ReturnsResult, brt::Bool, rf::Bool)::Option{Vector{Int}}
-    b = brt && isa(rd.B, VecNum) ? rd.B : nothing
+function shared_series_rows(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                            rf::Bool)::Option{Vector{Int}}
+    b = shared_benchmark(rd.B, x_src)
     F = rf ? rd.F : nothing
     if shared_series_complete(b) && shared_series_complete(F)
         return nothing
     end
     return filter(t -> shared_row_finite(b, t) && shared_row_finite(F, t),
                   1:shared_series_length(b, F))
+end
+"""
+    shared_benchmark(B::VecNum, x_src::ExcessSource) -> VecNum
+    shared_benchmark(B, x_src::Option{<:AbstractReturnsSource}) -> Nothing
+
+Return the benchmark of `rd` that is a Shared Series of the fit: a vector benchmark under [`ExcessSource`](@ref), and `nothing` otherwise.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A vector benchmark under [`ExcessSource`](@ref): return `B`.
+ 2. Any other benchmark, or any other source: return `nothing`. A matrix benchmark is a series of one asset at each column, and a fit at another source does not read the benchmark.
+
+# Arguments
+
+  - `B`: The benchmark of `rd`.
+  - $(arg_dict[:x_src_read])
+
+# Returns
+
+  - `b::Option{<:VecNum}`: The vector benchmark, or `nothing`.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_benchmark(B::VecNum, ::ExcessSource)
+    return B
+end
+function shared_benchmark(::Any, ::Option{<:AbstractReturnsSource})
+    return nothing
 end
 """
     shared_series_complete(A::Nothing) -> Bool
@@ -827,13 +868,16 @@ function shared_series_length(::Nothing, F::MatNum)
     return size(F, 1)
 end
 """
-    shared_series_view(rd::ReturnsResult, brt::Bool, rf::Bool) -> ReturnsResult
+    shared_series_view(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
+        -> ReturnsResult
 
 Return the returns data that a fit reads, with the observations of a Shared Series gap dropped.
 
 This is the entry of each fit that reads a Shared Series. [`shared_series_rows`](@ref) finds the observations to keep, and [`port_opt_view`](@ref) cuts every field of `rd` at them: the asset returns, the factor returns, the benchmark, the Exogenous Series, the timestamps, the implied volatilities and the [`AssetPanel`](@ref). So every reader after the entry sees the same observations. A reader that pairs the observations of a prior with the last observations of the returns data stays correct, because the prior and the reader read the same view.
 
-Under `brt`, [`benchmark_estimation_mask`](@ref) then marks a gap of a matrix benchmark in the estimation mask, because the excess return of that cell does not exist.
+Under [`ExcessSource`](@ref), [`benchmark_estimation_mask`](@ref) then marks a gap of a matrix benchmark in the estimation mask, because the excess return of that cell does not exist.
+
+An optimiser calls the function one time, before the solve, with the source of its group, see [`group_source`](@ref). A prior, a regression and an uncertainty set that receive the returns data call it with their own source, and the view of the optimiser has no gap left for them.
 
 The function is idempotent. A view with no gap left returns itself, so a meta-optimiser and the optimiser it nests can each call it.
 
@@ -847,7 +891,7 @@ The positions of the row key of a factor model block count the observations of t
 # Arguments
 
   - $(arg_dict[:rd])
-  - $(arg_dict[:brt_read])
+  - $(arg_dict[:x_src_read])
   - `rf`: `true` when the fit reads the factor returns of `rd`.
 
 # Validation
@@ -864,10 +908,10 @@ The positions of the row key of a factor model block count the observations of t
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nb = [\"BM\"],
                           B = [0.01, NaN, 0.03]);
 
-julia> PortfolioOptimisers.shared_series_view(rd, false, false) === rd  # brt is false
+julia> PortfolioOptimisers.shared_series_view(rd, DataSource(), false) === rd  # no benchmark read
 true
 
-julia> PortfolioOptimisers.shared_series_view(rd, true, false).X
+julia> PortfolioOptimisers.shared_series_view(rd, ExcessSource(), false).X
 2×2 view(::Matrix{Float64}, [1, 3], :) with eltype Float64:
  0.1  0.2
  0.5  0.6
@@ -880,15 +924,17 @@ julia> PortfolioOptimisers.shared_series_view(rd, true, false).X
   - [`benchmark_relative_returns`](@ref)
   - [`port_opt_view`](@ref)
 """
-function shared_series_view(rd::ReturnsResult, brt::Bool, rf::Bool)::ReturnsResult
-    rows = shared_series_rows(rd, brt, rf)
+function shared_series_view(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                            rf::Bool)::ReturnsResult
+    rows = shared_series_rows(rd, x_src, rf)
     @argcheck(isnothing(rows) || !isempty(rows),
-              IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under brt or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or drop them with MissingDataFilter before the conversion to returns."))
+              IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under `x_src = ExcessSource()` or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or drop them with MissingDataFilter before the conversion to returns."))
     rd = isnothing(rows) ? rd : port_opt_view(rd, rows, :)
-    return benchmark_estimation_mask(rd, brt)
+    return benchmark_estimation_mask(rd, x_src)
 end
 """
-    shared_series_gaps(rd::ReturnsResult, brt::Bool, rf::Bool) -> Option{BitVector}
+    shared_series_gaps(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
+        -> Option{BitVector}
 
 Mark the observations of `rd` that have a gap in a Shared Series that the fit reads, for an online step.
 
@@ -897,7 +943,7 @@ A batch fit drops such an observation with [`shared_series_view`](@ref). An onli
 # Arguments
 
   - $(arg_dict[:rd])
-  - $(arg_dict[:brt_read])
+  - $(arg_dict[:x_src_read])
   - `rf`: `true` when the fit reads the factor returns of `rd`.
 
 # Returns
@@ -910,8 +956,9 @@ A batch fit drops such an observation with [`shared_series_view`](@ref). An onli
   - [`shared_series_view`](@ref)
   - [`shared_series_buffer`](@ref)
 """
-function shared_series_gaps(rd::ReturnsResult, brt::Bool, rf::Bool)::Option{BitVector}
-    rows = shared_series_rows(rd, brt, rf)
+function shared_series_gaps(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                            rf::Bool)::Option{BitVector}
+    rows = shared_series_rows(rd, x_src, rf)
     if isnothing(rows)
         return nothing
     end
@@ -956,7 +1003,9 @@ function shared_series_step(rd::ReturnsResult, gaps::AbstractVector{Bool})
     return isempty(rows) ? nothing : port_opt_view(rd, rows, :)
 end
 """
-    benchmark_estimation_mask(rd::ReturnsResult, brt::Bool) -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, x_src::ExcessSource) -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource})
+        -> ReturnsResult
     benchmark_estimation_mask(rd::ReturnsResult, B::Option{<:VecNum_MatNum},
                               pnl::Option{<:AssetPanel}) -> ReturnsResult
     benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
@@ -965,20 +1014,20 @@ end
 
 Mark each gap of a matrix benchmark in the estimation mask of `rd`, for a fit that reads the excess returns.
 
-Under `brt` the fit reads `X - B`. A matrix benchmark holds one series for each asset, so a gap in `B[t, i]` is a gap in the excess return of asset `i` at observation `t`, as a gap in `X[t, i]` is. The `NaN` of the excess return already puts the asset outside the Coverage Universe of a plain estimator. A reader of the estimation mask, a cross-sectional estimate, reads the mask and not the returns, so the function writes the gap into the mask. The ingestion layer derives the mask from `X` alone, because a fit with `brt = false` does not read `B`.
+Under [`ExcessSource`](@ref) the fit reads `X - B`. A matrix benchmark holds one series for each asset, so a gap in `B[t, i]` is a gap in the excess return of asset `i` at observation `t`, as a gap in `X[t, i]` is. The `NaN` of the excess return already puts the asset outside the Coverage Universe of a plain estimator. A reader of the estimation mask, a cross-sectional estimate, reads the mask and not the returns, so the function writes the gap into the mask. The ingestion layer derives the mask from `X` alone, because a fit at another source does not read `B`.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `brt` is `false`, the benchmark is not a matrix, or the panel carries no mask: return `rd`.
+ 1. `x_src` is not [`ExcessSource`](@ref), the benchmark is not a matrix, or the panel carries no mask: return `rd`.
  2. Return `rd` when the benchmark is finite at every cell.
  3. Otherwise set the estimation mask to `emsk .& isfinite.(B)`, and rebuild `rd` with that panel.
 
 # Arguments
 
   - $(arg_dict[:rd])
-  - $(arg_dict[:brt_read])
+  - $(arg_dict[:x_src_read])
   - `B`: The benchmark of `rd`.
   - `pnl`: The Asset Panel of `rd`.
 
@@ -991,8 +1040,12 @@ The method that Julia selects is the algorithm.
   - [`shared_series_view`](@ref)
   - [`AssetPanel`](@ref)
 """
-function benchmark_estimation_mask(rd::ReturnsResult, brt::Bool)::ReturnsResult
-    return brt ? benchmark_estimation_mask(rd, rd.B, rd.pnl) : rd
+function benchmark_estimation_mask(rd::ReturnsResult, ::ExcessSource)::ReturnsResult
+    return benchmark_estimation_mask(rd, rd.B, rd.pnl)
+end
+function benchmark_estimation_mask(rd::ReturnsResult,
+                                   ::Option{<:AbstractReturnsSource})::ReturnsResult
+    return rd
 end
 function benchmark_estimation_mask(rd::ReturnsResult, ::Option{<:VecNum_MatNum},
                                    ::Option{<:AssetPanel})

@@ -17,6 +17,7 @@ check_names_and_returns_matrix
 check_exogenous_series
 PortfolioOptimisers.assert_asset_panel_supplied
 PortfolioOptimisers.shared_series_rows
+PortfolioOptimisers.shared_benchmark
 PortfolioOptimisers.shared_series_complete
 PortfolioOptimisers.shared_row_finite
 PortfolioOptimisers.shared_series_length

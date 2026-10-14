@@ -384,7 +384,7 @@ A head that holds no prior keeps the active mask of a time-varying panel and not
 
   - `state`: The state to fold into.
   - `rd`: The returns data of one or more observations, `observations × assets`.
-  - `own_returns`: Whether the state keeps the returns. It is `true` for a head that holds no prior, and for an optimiser whose prior folds the returns in excess of the benchmark under `brt`. It is `false` otherwise.
+  - `own_returns`: Whether the state keeps the returns. It is `true` for a head that holds no prior, and for an optimiser whose prior states `x_src = ExcessSource()` and so folds the returns in excess of the benchmark. It is `false` otherwise.
   - `own_factors`: Whether the state keeps the factor column. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads `F`, and `false` otherwise.
   - `own_exogenous`: Whether the state keeps the Exogenous Series and its names. It is `true` for a head that holds no prior and for an optimiser whose prior's tree never reads the series, and `false` otherwise.
 
@@ -528,8 +528,8 @@ function returns_result(state::ReturnsBufferState, rows::SampleBufferState)
     n = context_count(state)
     @argcheck(iszero(n) || n == rows.n,
               DimensionMismatch("the fold context and the returns buffer are appended to together, so they hold one number of observations, but the context holds $n and the returns buffer holds $(rows.n)."))
-    # A context that keeps the returns holds the raw rows. Under `brt` the buffer of the
-    # prior holds the excess returns, and the rebuilt returns data is raw.
+    # A context that keeps the returns holds the raw rows. Under `x_src = ExcessSource()`
+    # the buffer of the prior holds the excess returns, and the rebuilt returns data is raw.
     X = Matrix(sample_buffer(isnothing(state.X) ? rows : state.X))
     pnl = something(buffer_asset_panel(rows), Some(state.pnl))
     F = isnothing(state.F) ? column_matrix(factor_buffer(rows)) : column_matrix(state.F)
