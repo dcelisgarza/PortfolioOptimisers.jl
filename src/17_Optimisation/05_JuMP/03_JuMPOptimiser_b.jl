@@ -520,7 +520,7 @@ pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
     bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
     bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
 
-Bind every [`DataTracking`](@ref) of a JuMP optimiser to the benchmark of the rows it fits on.
+Bind every [`DataBenchmarkTracking`](@ref) of a JuMP optimiser to the benchmark of the rows it fits on.
 
 Each head calls this function after [`investable_view`](@ref), so the benchmark has the rows and the investable columns of the model. Every builder, every corner solve and every risk of a frontier then reads the bound benchmark. The optimiser applies its own `brt` to the binding, so a data benchmark under `brt = true` is refused.
 
@@ -548,7 +548,7 @@ Each rebuilds through its keyword constructor only when a field changes, so a he
 # Related
 
   - [`bind_data_benchmark`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`investable_view`](@ref)
 """
 function bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)

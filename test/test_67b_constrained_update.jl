@@ -1745,7 +1745,8 @@ end
                                                                                                     ub = 0.004))))
         free = optimise(OPS(; alg = PassiveAggressiveMeanReversion()), rd).w
         for set in sets
-            opt = OPS(; alg = PassiveAggressiveMeanReversion(), set = set(DataTracking()))
+            opt = OPS(; alg = PassiveAggressiveMeanReversion(),
+                      set = set(DataBenchmarkTracking()))
             res = (@test_logs (:warn, r"Held Step at 2020-01-01") optimise(opt, rd))
             @test isa(res.retcode, OptimisationSuccess)
             ref = (@test_logs (:warn, r"Held Step at 2020-01-01") optimise(OPS(;
@@ -1827,7 +1828,8 @@ end
         rd0 = ReturnsResult(; nx = nx, X = R, ts = ts)
         @test_throws ArgumentError optimise(mk(true, false), rows(rd0, 1:10))
         dts = ProgrammeAllocationSet(; slv = slv, brt = true,
-                                     tr = TrackingError(; tr = DataTracking(), err = 0.01))
+                                     tr = TrackingError(; tr = DataBenchmarkTracking(),
+                                                        err = 0.01))
         @test_throws ArgumentError optimise(OPS(; alg = PassiveAggressiveMeanReversion(),
                                                 set = dts), rows(rdm, 1:10))
     end

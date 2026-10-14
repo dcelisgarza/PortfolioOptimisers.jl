@@ -477,7 +477,7 @@ end
     end
 
     @testset "A data benchmark follows the rows: batch, online, rolling and walk-forward (#1657)" begin
-        # `DataTracking` binds to the `B` of the rows that each reader holds, so it equals
+        # `DataBenchmarkTracking` binds to the `B` of the rows that each reader holds, so it equals
         # a returns series of exactly those rows, at every step and in every fold.
         t = 60
         bw = X * fill(inv(N), N) .+ randn(StableRNG(7), T) ./ 1000
@@ -490,13 +490,13 @@ end
                                                                                              tr = tr,
                                                                                              err = err),
                                                                           brt = brt)
-        te = TrackingRiskMeasure(; tr = DataTracking())
+        te = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
         b, h = rows(rdb, 1:t), rows(rdh, 1:t)
         w0 = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)),
                       b).w
         # The bound binds: the weights leave the unconstrained minimum and sit on it.
         err = 0.85 * expected_risk(te, w0, b)
-        mr = MeanRisk(; opt = jopt(DataTracking(), err))
+        mr = MeanRisk(; opt = jopt(DataBenchmarkTracking(), err))
         wd = optimise(mr, b).w
         @test isapprox(expected_risk(te, wd, b), err; rtol = 1e-5)
         @test !isapprox(wd, w0; atol = 1e-3)
@@ -506,7 +506,7 @@ end
         # The step binds the rows of its buffer, expanding and under `max_history`.
         @test isapprox(optimise(step(mr, rdb, t)).w, wd; atol = 1e-6)
         roll = po.update_online_estimator(MeanRisk(;
-                                                   opt = jopt(DataTracking(), err;
+                                                   opt = jopt(DataBenchmarkTracking(), err;
                                                               pe = po.Online(EmpiricalPrior();
                                                                              max_history = 30))))
         @test isapprox(optimise(step(roll, rdb, t)).w,
@@ -515,10 +515,10 @@ end
         # error of the unconstrained minimum.
         mrr(tr) = MeanRisk(; r = TrackingRiskMeasure(; tr = tr),
                            opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))
-        lo = expected_risk(te, optimise(mrr(DataTracking()), h).w, h)
+        lo = expected_risk(te, optimise(mrr(DataBenchmarkTracking()), h).w, h)
         hi = expected_risk(te, w0, h)
         @test lo < hi
-        mh = MeanRisk(; opt = jopt(DataTracking(), (lo + hi) / 2))
+        mh = MeanRisk(; opt = jopt(DataBenchmarkTracking(), (lo + hi) / 2))
         wh = optimise(mh, h).w
         @test isapprox(expected_risk(te, wh, h), (lo + hi) / 2; rtol = 1e-5)
         @test isapprox(sqrt(sum(abs2, (h.X - h.B) * wh) / (t - 1)), (lo + hi) / 2;
@@ -549,30 +549,31 @@ end
                                                          opt = HierarchicalOptimiser(;
                                                                                      pe = EmpiricalPrior())))
         for f in heads
-            @test isapprox(optimise(f(DataTracking()), b).w, optimise(f(rt), b).w;
+            @test isapprox(optimise(f(DataBenchmarkTracking()), b).w, optimise(f(rt), b).w;
                            atol = 1e-8)
         end
         for f in heads[[1, 6]]
-            @test isapprox(optimise(step(f(DataTracking()), rdb, t)).w,
-                           optimise(f(DataTracking()), b).w; atol = 1e-6)
+            @test isapprox(optimise(step(f(DataBenchmarkTracking()), rdb, t)).w,
+                           optimise(f(DataBenchmarkTracking()), b).w; atol = 1e-6)
         end
-        @test isapprox(optimise(step(mrr(DataTracking()), rdh, t)).w,
-                       optimise(mrr(DataTracking()), h).w; atol = 1e-6)
+        @test isapprox(optimise(step(mrr(DataBenchmarkTracking()), rdh, t)).w,
+                       optimise(mrr(DataBenchmarkTracking()), h).w; atol = 1e-6)
         # `brt = true` fits on X - B, and a data benchmark would subtract B twice. Returns
         # data with no benchmark has none to track.
         @test_throws ArgumentError optimise(MeanRisk(;
-                                                     opt = jopt(DataTracking(), err;
-                                                                brt = true)), b)
+                                                     opt = jopt(DataBenchmarkTracking(),
+                                                                err; brt = true)), b)
         @test_throws ArgumentError optimise(mr, rows(rd, 1:t))
         # The online walk-forward equals the batch expanding one, and a rolling fold, whose
         # length every fold shares, tracks its own rows (#1669).
         bcv = IndexWalkForward(40, 20; expand_train = true)
-        pb = cross_val_predict(mrr(DataTracking()), rdb, bcv)
-        pn = cross_val_predict(mrr(DataTracking()), rdb, OnlineIndexWalkForward(40, 20))
+        pb = cross_val_predict(mrr(DataBenchmarkTracking()), rdb, bcv)
+        pn = cross_val_predict(mrr(DataBenchmarkTracking()), rdb,
+                               OnlineIndexWalkForward(40, 20))
         @test all(isapprox(x.res.w, y.res.w; atol = 1e-6)
                   for (x, y) in zip(pb.pred, pn.pred))
         rcv = IndexWalkForward(40, 20)
-        pr = cross_val_predict(mrr(DataTracking()), rdb, rcv)
+        pr = cross_val_predict(mrr(DataBenchmarkTracking()), rdb, rcv)
         own = [optimise(mrr(ReturnsTracking(; w = bw[tr])), rows(rdb, tr)).w
                for tr in split(rcv, rdb).train_idx]
         @test length(own) == length(pr.pred) > 1
@@ -586,7 +587,8 @@ end
             e
         end
         @test isa(refusal, ArgumentError)
-        @test occursin("at `r.tr`", refusal.msg) && occursin("DataTracking", refusal.msg)
+        @test occursin("at `r.tr`", refusal.msg) &&
+              occursin("DataBenchmarkTracking", refusal.msg)
         tds = TimeDependent([TrackingRiskMeasure(; tr = ReturnsTracking(; w = bw[tr]))
                              for tr in split(rcv, rdb).train_idx])
         pt = cross_val_predict(MeanRisk(; r = tds,

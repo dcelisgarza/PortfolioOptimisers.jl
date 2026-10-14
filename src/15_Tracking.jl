@@ -98,7 +98,7 @@ julia> PortfolioOptimisers.tracking_benchmark(tr, X)
   - [`AbstractAlgorithm`](@ref)
   - [`WeightsTracking`](@ref)
   - [`ReturnsTracking`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`TrackingError`](@ref)
 """
 abstract type AbstractTrackingAlgorithm <: AbstractAlgorithm end
@@ -437,7 +437,7 @@ Carries the benchmark return series itself, for a benchmark whose weights are un
 
 [`tracking_benchmark`](@ref) returns the `w` field unchanged, so no return matrix is read and no fee is applied. This is the case the book states first: an index whose published series is all the caller has. Use [`WeightsTracking`](@ref) when the benchmark allocation is known.
 
-The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on, and [`tracking_benchmark`](@ref) refuses a mismatch. The series is fixed, so it cannot follow rows that change: the online step of an optimiser refuses it, and so do the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref). A batch cross-validation with more than one fold refuses it too, through [`assert_folds_track_no_series`](@ref), because each fold refits on rows of its own. Use [`DataTracking`](@ref) to track the benchmark that the returns data carries, which follows the rows.
+The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on, and [`tracking_benchmark`](@ref) refuses a mismatch. The series is fixed, so it cannot follow rows that change: the online step of an optimiser refuses it, and so do the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref). A batch cross-validation with more than one fold refuses it too, through [`assert_folds_track_no_series`](@ref), because each fold refits on rows of its own. Use [`DataBenchmarkTracking`](@ref) to track the benchmark that the returns data carries, which follows the rows.
 
 # Fields
 
@@ -466,7 +466,7 @@ ReturnsTracking
 # Related
 
   - [`WeightsTracking`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`TrackingError`](@ref)
   - [`AbstractTrackingAlgorithm`](@ref)
   - [`tracking_benchmark`](@ref)
@@ -498,7 +498,7 @@ Return the benchmark portfolio returns for a returns-based tracking algorithm.
 
 **No return matrix is read, and no fee is applied.** The form with `X` reads only the number of rows of `X`. The series holds one return per row, so the form refuses a matrix whose number of rows is not `length(tr.w)`. Every reader of a tracking error subtracts the series from a series of the same rows. Without the check, a three-entry `w` against a seven-row matrix fails inside the reader with a `DimensionMismatch`, or, when the lengths agree by chance, gives a tracking error against the wrong rows.
 
-The series is fixed at construction, so it does not follow the rows of an online step. The online step of an optimiser refuses it, see [`partial_fit!`](@ref). Use [`DataTracking`](@ref) to track the benchmark that the returns data carries, or [`WeightsTracking`](@ref) to track a benchmark whose weights are known. Both read the rows that the reader holds.
+The series is fixed at construction, so it does not follow the rows of an online step. The online step of an optimiser refuses it, see [`partial_fit!`](@ref). Use [`DataBenchmarkTracking`](@ref) to track the benchmark that the returns data carries, or [`WeightsTracking`](@ref) to track a benchmark whose weights are known. Both read the rows that the reader holds.
 
 # Algorithm
 
@@ -546,7 +546,7 @@ end
 function tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)
     T = size(X, 1)
     @argcheck(length(tr.w) == T,
-              ArgumentError("a `ReturnsTracking` series holds one benchmark return per row of the returns it is compared with, but `w` has $(length(tr.w)) entries and the returns have $(T) rows. The series is fixed at construction, so give it the benchmark returns of exactly these rows, track the benchmark that the returns data carries with `DataTracking`, or track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
+              ArgumentError("a `ReturnsTracking` series holds one benchmark return per row of the returns it is compared with, but `w` has $(length(tr.w)) entries and the returns have $(T) rows. The series is fixed at construction, so give it the benchmark returns of exactly these rows, track the benchmark that the returns data carries with `DataBenchmarkTracking`, or track a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
     return tr.w
 end
 """
@@ -554,7 +554,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Tracks the benchmark that the returns data carries, so the benchmark follows the rows that each reader holds.
 
-A [`ReturnsTracking`](@ref) series is fixed at construction, so it aligns with the rows of one fit only. `DataTracking` reads the `B` field of the [`ReturnsResult`](@ref) instead. Every reader that holds the returns data binds it to the `B` of its own rows with [`bind_data_benchmark`](@ref): an optimiser to the rows it fits on, the online step to the rows of its buffer, a fold of a cross-validation to the rows of the fold, and an online portfolio selection head to the rows of its window. It is a returns series that updates itself.
+A [`ReturnsTracking`](@ref) series is fixed at construction, so it aligns with the rows of one fit only. `DataBenchmarkTracking` reads the `B` field of the [`ReturnsResult`](@ref) instead. Every reader that holds the returns data binds it to the `B` of its own rows with [`bind_data_benchmark`](@ref): an optimiser to the rows it fits on, the online step to the rows of its buffer, a fold of a cross-validation to the rows of the fold, and an online portfolio selection head to the rows of its window. It is a returns series that updates itself.
 
 # Mathematical definition
 
@@ -583,9 +583,9 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    DataTracking(;
+    DataBenchmarkTracking(;
         B::Option{<:VecNum_MatNum} = nothing
-    ) -> DataTracking
+    ) -> DataBenchmarkTracking
 
 Keywords correspond to the struct's fields.
 
@@ -596,15 +596,15 @@ Keywords correspond to the struct's fields.
 # Examples
 
 ```jldoctest
-julia> DataTracking()
-DataTracking
+julia> DataBenchmarkTracking()
+DataBenchmarkTracking
   B ┴ nothing
 
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.01 0.03; 0.02 -0.01], nb = [\"BM\"],
                           B = [0.02, 0.0]);
 
-julia> PortfolioOptimisers.bind_data_benchmark(DataTracking(), rd, false)
-DataTracking
+julia> PortfolioOptimisers.bind_data_benchmark(DataBenchmarkTracking(), rd, false)
+DataBenchmarkTracking
   B ┴ Vector{Float64}: [0.02, 0.0]
 ```
 
@@ -622,22 +622,22 @@ DataTracking
 
   - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
 """
-@concrete struct DataTracking <: AbstractTrackingAlgorithm
+@concrete struct DataBenchmarkTracking <: AbstractTrackingAlgorithm
     """
     $(field_dict[:B_data_tr])
     """
     B
-    function DataTracking(B::Option{<:VecNum_MatNum})
+    function DataBenchmarkTracking(B::Option{<:VecNum_MatNum})
         return new{typeof(B)}(B)
     end
 end
-function DataTracking(; B::Option{<:VecNum_MatNum} = nothing)
-    return DataTracking(B)
+function DataBenchmarkTracking(; B::Option{<:VecNum_MatNum} = nothing)
+    return DataBenchmarkTracking(B)
 end
 """
-    tracking_benchmark(tr::DataTracking, X::VecNum_MatNum)
+    tracking_benchmark(tr::DataBenchmarkTracking, X::VecNum_MatNum)
 
-Return the benchmark returns that a [`DataTracking`](@ref) holds, after the check that they cover the rows of `X`.
+Return the benchmark returns that a [`DataBenchmarkTracking`](@ref) holds, after the check that they cover the rows of `X`.
 
 A vector is the benchmark series. A matrix holds one benchmark per asset, and the reader forms the series ``\\mathbf{B}\\boldsymbol{w}`` against its own weights. No fee is applied.
 
@@ -650,7 +650,7 @@ A vector is the benchmark series. A matrix holds one benchmark per asset, and th
 
 # Arguments
 
-  - `tr`: [`DataTracking`](@ref) bound to the benchmark of the rows.
+  - `tr`: [`DataBenchmarkTracking`](@ref) bound to the benchmark of the rows.
   - `X`: The asset return matrix, or the portfolio return series, that the benchmark is compared with. Only its size is read.
 
 # Validation
@@ -665,7 +665,7 @@ A vector is the benchmark series. A matrix holds one benchmark per asset, and th
 # Examples
 
 ```jldoctest
-julia> tr = DataTracking(; B = [0.01, 0.02]);
+julia> tr = DataBenchmarkTracking(; B = [0.01, 0.02]);
 
 julia> PortfolioOptimisers.tracking_benchmark(tr, zeros(2, 3)) === tr.B
 true
@@ -673,23 +673,23 @@ true
 
 # Related
 
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`bind_data_benchmark`](@ref)
   - [`tracking_benchmark(tr::ReturnsTracking, X::VecNum_MatNum)`](@ref): The sibling, whose series is fixed at construction.
 """
-function tracking_benchmark(::DataTracking{Nothing}, ::VecNum_MatNum)
-    return throw(ArgumentError("a `DataTracking` reads the benchmark `B` of the returns data, and no returns data bound it. Optimise with a `ReturnsResult` that carries `B`, or evaluate with `expected_risk(r, w, rd)`, which binds it to `rd.B`."))
+function tracking_benchmark(::DataBenchmarkTracking{Nothing}, ::VecNum_MatNum)
+    return throw(ArgumentError("a `DataBenchmarkTracking` reads the benchmark `B` of the returns data, and no returns data bound it. Optimise with a `ReturnsResult` that carries `B`, or evaluate with `expected_risk(r, w, rd)`, which binds it to `rd.B`."))
 end
-function tracking_benchmark(tr::DataTracking, X::VecNum_MatNum)
+function tracking_benchmark(tr::DataBenchmarkTracking, X::VecNum_MatNum)
     B = tr.B
     @argcheck(size(B, 1) == size(X, 1),
-              ArgumentError("a `DataTracking` holds one benchmark return per row of the returns it is compared with, but `B` has $(size(B, 1)) rows and the returns have $(size(X, 1)). Bind it to the returns data of these rows."))
+              ArgumentError("a `DataBenchmarkTracking` holds one benchmark return per row of the returns it is compared with, but `B` has $(size(B, 1)) rows and the returns have $(size(X, 1)). Bind it to the returns data of these rows."))
     @argcheck(ndims(B) == 1 || size(B, 2) == size(X, 2),
-              ArgumentError("a matrix `B` of a `DataTracking` holds one benchmark per asset, but `B` has $(size(B, 2)) columns and the returns have $(size(X, 2))."))
+              ArgumentError("a matrix `B` of a `DataBenchmarkTracking` holds one benchmark per asset, but `B` has $(size(B, 2)) columns and the returns have $(size(X, 2))."))
     return B
 end
-function port_opt_view(tr::DataTracking{<:MatNum}, i, args...)
-    return DataTracking(; B = view(tr.B, :, i))
+function port_opt_view(tr::DataBenchmarkTracking{<:MatNum}, i, args...)
+    return DataBenchmarkTracking(; B = view(tr.B, :, i))
 end
 """
     returns_tracking_path(est)
@@ -789,7 +789,7 @@ One fold is one batch fit, so a series of its training rows aligns, and the func
 # Related
 
   - [`ReturnsTracking`](@ref)
-  - [`DataTracking`](@ref): The form that follows the rows, because each fold binds it to the benchmark of its training rows.
+  - [`DataBenchmarkTracking`](@ref): The form that follows the rows, because each fold binds it to the benchmark of its training rows.
   - [`returns_tracking_path`](@ref)
   - [`fold_loop`](@ref)
 """
@@ -797,7 +797,7 @@ function assert_folds_track_no_series(est, n::Integer)
     if n > 1
         path = returns_tracking_path(est)
         @argcheck(isnothing(path),
-                  ArgumentError("`$(typeof(est).name.name)` runs $n folds of a batch cross-validation holding a `ReturnsTracking` at `$(path)`, and a fixed series covers the rows of one fold at most: each fold refits on its own training rows, and when the folds share one training length, the series passes the length check at every fold and misaligns with no error. Track the benchmark that the returns data carries with `DataTracking`, which binds to the `B` of the training rows of each fold, track a benchmark portfolio with `WeightsTracking`, or give each fold its own series in a `TimeDependent` schedule."))
+                  ArgumentError("`$(typeof(est).name.name)` runs $n folds of a batch cross-validation holding a `ReturnsTracking` at `$(path)`, and a fixed series covers the rows of one fold at most: each fold refits on its own training rows, and when the folds share one training length, the series passes the length check at every fold and misaligns with no error. Track the benchmark that the returns data carries with `DataBenchmarkTracking`, which binds to the `B` of the training rows of each fold, track a benchmark portfolio with `WeightsTracking`, or give each fold its own series in a `TimeDependent` schedule."))
     end
     return nothing
 end
@@ -974,12 +974,12 @@ function needs_previous_weights(tr::VecTr)
 end
 """
     bind_data_benchmark(x, rd, brt::Bool)
-    bind_data_benchmark(tr::DataTracking, rd::ReturnsResult, brt::Bool)
+    bind_data_benchmark(tr::DataBenchmarkTracking, rd::ReturnsResult, brt::Bool)
     bind_data_benchmark(tr::TrackingError, rd, brt::Bool)
     bind_data_benchmark(v::VecNum, rd, brt::Bool)
     bind_data_benchmark(v::AbstractVector, rd, brt::Bool)
 
-Bind every [`DataTracking`](@ref) that `x` holds to the benchmark `B` of the returns data `rd`.
+Bind every [`DataBenchmarkTracking`](@ref) that `x` holds to the benchmark `B` of the returns data `rd`.
 
 A data benchmark has no series of its own, so each reader that holds the returns data binds it to the rows it reads: an optimiser at its entry, the value-level [`expected_risk`](@ref) on a [`ReturnsResult`](@ref), and an online portfolio selection head on its rows window. The binding replaces a `B` bound earlier, so a benchmark never reads the rows of another reader.
 
@@ -988,7 +988,7 @@ The function rebuilds an object through its keyword constructor only when a part
 # Algorithm
 
  1. A value that holds no data benchmark, or `rd` that is not a [`ReturnsResult`](@ref), returns `x` unchanged. A data benchmark that a reader with no returns data reads stays unbound, and [`tracking_benchmark`](@ref) refuses it there.
- 2. A [`DataTracking`](@ref) refuses `brt = true`, and refuses `rd` that carries no benchmark. Otherwise it returns a new `DataTracking` that holds `rd.B`.
+ 2. A [`DataBenchmarkTracking`](@ref) refuses `brt = true`, and refuses `rd` that carries no benchmark. Otherwise it returns a new `DataBenchmarkTracking` that holds `rd.B`.
  3. A [`TrackingError`](@ref) binds its `tr` field.
  4. A vector of numbers returns unchanged. Any other vector binds each element, and returns itself when no element changes.
 
@@ -1000,8 +1000,8 @@ The function rebuilds an object through its keyword constructor only when a part
 
 # Validation
 
-  - A [`DataTracking`](@ref) with `brt = true`. An `ArgumentError` is thrown: the reader fits on `X - B`, and a tracking error against `B` would subtract the benchmark twice.
-  - A [`DataTracking`](@ref) with `rd.B === nothing`. An `ArgumentError` is thrown.
+  - A [`DataBenchmarkTracking`](@ref) with `brt = true`. An `ArgumentError` is thrown: the reader fits on `X - B`, and a tracking error against `B` would subtract the benchmark twice.
+  - A [`DataBenchmarkTracking`](@ref) with `rd.B === nothing`. An `ArgumentError` is thrown.
 
 # Returns
 
@@ -1013,7 +1013,7 @@ The function rebuilds an object through its keyword constructor only when a part
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.01 0.03; 0.02 -0.01], nb = [\"BM\"],
                           B = [0.02, 0.0]);
 
-julia> te = TrackingError(; tr = DataTracking(), err = 0.01);
+julia> te = TrackingError(; tr = DataBenchmarkTracking(), err = 0.01);
 
 julia> PortfolioOptimisers.bind_data_benchmark(te, rd, false).tr.B === rd.B
 true
@@ -1026,7 +1026,7 @@ true
 
 # Related
 
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`TrackingError`](@ref)
   - [`tracking_benchmark`](@ref)
   - [`ReturnsResult`](@ref)
@@ -1035,12 +1035,12 @@ true
 function bind_data_benchmark(x::Any, ::Any, ::Bool)
     return x
 end
-function bind_data_benchmark(::DataTracking, rd::ReturnsResult, brt::Bool)
+function bind_data_benchmark(::DataBenchmarkTracking, rd::ReturnsResult, brt::Bool)
     @argcheck(!brt,
-              ArgumentError("a `DataTracking` tracks the benchmark `B` of the returns data, and `brt = true` fits the optimiser on the returns in excess of `B`. A tracking error against `B` would then subtract the benchmark twice. Set `brt = false` on the optimiser that holds the data benchmark."))
+              ArgumentError("a `DataBenchmarkTracking` tracks the benchmark `B` of the returns data, and `brt = true` fits the optimiser on the returns in excess of `B`. A tracking error against `B` would then subtract the benchmark twice. Set `brt = false` on the optimiser that holds the data benchmark."))
     @argcheck(!isnothing(rd.B),
-              ArgumentError("a `DataTracking` tracks the benchmark `B` of the returns data, and the returns data carries none. Give the returns data a benchmark `B`, or track a fixed series with `ReturnsTracking` or a benchmark portfolio with `WeightsTracking`."))
-    return DataTracking(; B = rd.B)
+              ArgumentError("a `DataBenchmarkTracking` tracks the benchmark `B` of the returns data, and the returns data carries none. Give the returns data a benchmark `B`, or track a fixed series with `ReturnsTracking` or a benchmark portfolio with `WeightsTracking`."))
+    return DataBenchmarkTracking(; B = rd.B)
 end
 function bind_data_benchmark(tr::TrackingError, rd, brt::Bool)
     bound = bind_data_benchmark(tr.tr, rd, brt)
@@ -1055,5 +1055,5 @@ function bind_data_benchmark(v::AbstractVector, rd, brt::Bool)
 end
 
 export IndependentVariableTracking, DependentVariableTracking, WeightsTracking,
-       ReturnsTracking, DataTracking, TrackingError
+       ReturnsTracking, DataBenchmarkTracking, TrackingError
 public AbstractTrackingAlgorithm, tracking_benchmark

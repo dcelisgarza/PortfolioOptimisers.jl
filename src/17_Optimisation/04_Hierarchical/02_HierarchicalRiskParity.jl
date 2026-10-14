@@ -271,7 +271,7 @@ end
 """
     bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)
 
-Bind every [`DataTracking`](@ref) of the risk measures `r` to the benchmark of the rows that the optimiser fits on.
+Bind every [`DataBenchmarkTracking`](@ref) of the risk measures `r` to the benchmark of the rows that the optimiser fits on.
 
 The optimiser calls it after [`investable_reduction`](@ref), so the benchmark has the rows and the investable columns of the prior. The optimiser applies its own `brt` to the binding, as [`bind_data_benchmark`](@ref) states.
 
@@ -284,7 +284,7 @@ The optimiser calls it after [`investable_reduction`](@ref), so the benchmark ha
 # Related
 
   - [`bind_data_benchmark`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`HierarchicalRiskParity`](@ref)
 """
 function bind_data_benchmark(hrp::HierarchicalRiskParity, rd::ReturnsResult)

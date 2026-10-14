@@ -953,7 +953,7 @@ The Risk Loss replaces log wealth as the objective. `r` is one risk measure or a
 
 `sca` scalarises a vector of measures at the `settings.scale` of each measure. So `[MeanReturn(), Variance()]`, with a negative scale on the mean, gives one step on the mean-variance utility.
 
-**Under `brt = true` the loss reads the returns in excess of the benchmark.** The prior fits the window on `X - B`, which [`benchmark_relative_returns`](@ref) gives, so a [`Variance`](@ref) becomes the tracking variance against the benchmark `B` that the rows carry. The head's rows keep the raw returns and the benchmark, so the loss applies its own `brt`, whatever the `brt` of the head is. A [`DataTracking`](@ref) in `r` refuses `brt = true`, because it would subtract the benchmark twice.
+**Under `brt = true` the loss reads the returns in excess of the benchmark.** The prior fits the window on `X - B`, which [`benchmark_relative_returns`](@ref) gives, so a [`Variance`](@ref) becomes the tracking variance against the benchmark `B` that the rows carry. The head's rows keep the raw returns and the benchmark, so the loss applies its own `brt`, whatever the `brt` of the head is. A [`DataBenchmarkTracking`](@ref) in `r` refuses `brt = true`, because it would subtract the benchmark twice.
 
 A prior fitted on one row has no covariance. So the loss starts when the head holds two rows, and the step before that leaves the iterate unchanged. The loss reads the last `window` rows that the head holds, so the first `window - 1` steps read a shorter window. The head can hold more rows, because its Allocation Set or another rule can need more, and the loss does not read them.
 
@@ -1080,7 +1080,7 @@ RiskLoss
         @argcheck(window >= 2, DomainError(window, "window must be at least 2"))
         path = returns_tracking_path(r)
         @argcheck(isnothing(path),
-                  ArgumentError("a `RiskLoss` holds a `ReturnsTracking` at `$(tree_path(:r, something(path, "")))`, and the loss reads the rows of the head's buffer, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
+                  ArgumentError("a `RiskLoss` holds a `ReturnsTracking` at `$(tree_path(:r, something(path, "")))`, and the loss reads the rows of the head's buffer, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataBenchmarkTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
         return new{T1, T2, T3, T4, Bool}(r, window, sca, pe, brt)
     end
 end
@@ -1173,7 +1173,7 @@ A leg that the window does not cover gets a zero gradient, so the loss does not 
 
 # Algorithm
 
-The measure reads the rows `rd` that the prior is fitted on: each [`DataTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The prior of the loss fits the rows under the loss's own `brt`, whatever the head's `brt` is, so the measure binds under the loss's `brt`. A data benchmark refuses `brt = true`.
+The measure reads the rows `rd` that the prior is fitted on: each [`DataBenchmarkTracking`](@ref) of the measure binds to their benchmark with [`bind_data_benchmark`](@ref), after the view at the mask. The prior of the loss fits the rows under the loss's own `brt`, whatever the head's `brt` is, so the measure binds under the loss's `brt`. A data benchmark refuses `brt = true`.
 
 When the mask is `nothing`, every asset is priced, and the method returns [`risk_gradient`](@ref) of the bound measure at `u`. Otherwise it runs these steps.
 

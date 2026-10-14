@@ -308,7 +308,7 @@ Turn the data argument of a value-level function into the measure to evaluate an
 The method depends on the type of `X`.
 
   - A prior result resolves the measure through [`factory`](@ref) and returns `pr.X`. A Deferred Quantity becomes a value, and a slot that the measure leaves unstated takes the field of the prior.
-  - A [`ReturnsResult`](@ref) carries no moments, so the method returns `rd.X`. It binds every [`DataTracking`](@ref) of the measure to the benchmark of the rows, `rd.B`, with [`bind_data_benchmark`](@ref), and changes nothing else.
+  - A [`ReturnsResult`](@ref) carries no moments, so the method returns `rd.X`. It binds every [`DataBenchmarkTracking`](@ref) of the measure to the benchmark of the rows, `rd.B`, with [`bind_data_benchmark`](@ref), and changes nothing else.
   - A matrix returns the measure and the matrix unchanged.
 
 Each entry point resolves once, not once for each evaluation. So [`risk_contribution`](@ref) fits a deferred covariance once, and not once for each of its `2N` evaluations.

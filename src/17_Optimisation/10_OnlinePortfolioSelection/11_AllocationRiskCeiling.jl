@@ -39,7 +39,7 @@ function assert_risk_ceiling(r::RiskMeasure)::Nothing
               ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet is its `settings.ub`, a finite non-negative number; got `$ub`"))
     path = returns_tracking_path(r)
     @argcheck(isnothing(path),
-              ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet holds a `ReturnsTracking` at `$(path)`, and the ceiling reads every row the head holds, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves, or bound the tracking error with the set's `tr`, which cuts its series to the rows."))
+              ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet holds a `ReturnsTracking` at `$(path)`, and the ceiling reads every row the head holds, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataBenchmarkTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves, or bound the tracking error with the set's `tr`, which cuts its series to the rows."))
     return nothing
 end
 function assert_risk_ceiling(rs::VecRM)::Nothing

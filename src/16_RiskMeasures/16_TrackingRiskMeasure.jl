@@ -236,7 +236,7 @@ Where:
   - $(math_dict[:X_returns])
   - $(math_dict[:w_port])
   - $(math_dict[:F_fee_series])
-  - ``\\boldsymbol{b}``: Benchmark return series ``T \\times 1``, from [`tracking_benchmark`](@ref) on `tr`. A [`WeightsTracking`](@ref) gives ``\\boldsymbol{b} = \\mathbf{X}\\boldsymbol{w}_b - F_b(\\boldsymbol{w}_b)``, with the fee ``F_b`` of its own `fees` field. A [`DataTracking`](@ref) gives the benchmark ``\\mathbf{B}`` of the rows, or ``\\mathbf{B}\\boldsymbol{w}`` when ``\\mathbf{B}`` holds one benchmark per asset.
+  - ``\\boldsymbol{b}``: Benchmark return series ``T \\times 1``, from [`tracking_benchmark`](@ref) on `tr`. A [`WeightsTracking`](@ref) gives ``\\boldsymbol{b} = \\mathbf{X}\\boldsymbol{w}_b - F_b(\\boldsymbol{w}_b)``, with the fee ``F_b`` of its own `fees` field. A [`DataBenchmarkTracking`](@ref) gives the benchmark ``\\mathbf{B}`` of the rows, or ``\\mathbf{B}\\boldsymbol{w}`` when ``\\mathbf{B}`` holds one benchmark per asset.
   - $(math_dict[:w_b_track])
   - ``\\mathrm{TE}_{L_2}``, ``\\mathrm{TE}_{L_2^2}``, ``\\mathrm{TE}_{L_1}``, ``\\mathrm{TE}_{L_p}``, ``\\mathrm{TE}_{L_\\infty}``: Tracking error under [`L2Norm`](@ref), [`SquaredL2Norm`](@ref), [`L1Norm`](@ref), [`LpNorm`](@ref) and [`LInfNorm`](@ref).
   - $(math_dict[:T])
@@ -282,12 +282,12 @@ Computes the tracking error of the portfolio weights `w` on the returns matrix `
 ## Precomputed portfolio returns
 
     (r::TrackingRiskMeasure{<:Any, <:ReturnsTracking})(x::VecNum)
-    (r::TrackingRiskMeasure{<:Any, <:DataTracking})(x::VecNum)
+    (r::TrackingRiskMeasure{<:Any, <:DataBenchmarkTracking})(x::VecNum)
 
 Computes the tracking error of a portfolio return series `x` (``T \\times 1``) that the caller already holds.
-A [`ReturnsTracking`](@ref) measure supports this, and so does a [`DataTracking`](@ref) measure bound to a vector benchmark, because each benchmark is a return
-series. A [`WeightsTracking`](@ref) measure builds its benchmark from the asset returns, and a [`DataTracking`](@ref) bound to a matrix forms it against the weights, so both
-need the portfolio weights. On a series they throw an `ArgumentError`, and so does an unbound [`DataTracking`](@ref). See
+A [`ReturnsTracking`](@ref) measure supports this, and so does a [`DataBenchmarkTracking`](@ref) measure bound to a vector benchmark, because each benchmark is a return
+series. A [`WeightsTracking`](@ref) measure builds its benchmark from the asset returns, and a [`DataBenchmarkTracking`](@ref) bound to a matrix forms it against the weights, so both
+need the portfolio weights. On a series they throw an `ArgumentError`, and so does an unbound [`DataBenchmarkTracking`](@ref). See
 [`supports_precomputed_returns`](@ref).
 
 # Examples
@@ -354,9 +354,9 @@ function (r::TrackingRiskMeasure{<:Any, <:ReturnsTracking})(x::VecNum)
     benchmark = tracking_benchmark(r.tr, x)
     return norm_error(r.alg, x, benchmark, length(x))
 end
-function (r::TrackingRiskMeasure{<:Any, <:DataTracking})(x::VecNum)
+function (r::TrackingRiskMeasure{<:Any, <:DataBenchmarkTracking})(x::VecNum)
     @argcheck(!isa(r.tr.B, MatNum),
-              ArgumentError("`TrackingRiskMeasure` with a `DataTracking` bound to a matrix benchmark cannot be computed from a precomputed portfolio return series, because the benchmark of the portfolio is `B * w` and needs the portfolio weights. Call `r(w, X, fees)` with the weights and the asset returns matrix."))
+              ArgumentError("`TrackingRiskMeasure` with a `DataBenchmarkTracking` bound to a matrix benchmark cannot be computed from a precomputed portfolio return series, because the benchmark of the portfolio is `B * w` and needs the portfolio weights. Call `r(w, X, fees)` with the weights and the asset returns matrix."))
     return norm_error(r.alg, x, tracking_benchmark(r.tr, x), length(x))
 end
 function (r::TrackingRiskMeasure{<:Any, <:WeightsTracking})(::VecNum)
@@ -679,7 +679,7 @@ supports_precomputed_returns(::TrackingRiskMeasure{<:Any, <:ReturnsTracking})::B
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return `true` for a [`TrackingRiskMeasure`](@ref) whose [`DataTracking`](@ref) benchmark is bound to a vector.
+Return `true` for a [`TrackingRiskMeasure`](@ref) whose [`DataBenchmarkTracking`](@ref) benchmark is bound to a vector.
 
 A vector benchmark is a return series, so the tracking error is a function of the net portfolio return series alone. A matrix benchmark forms the series ``\\mathbf{B}\\boldsymbol{w}`` against the portfolio weights, and an unbound benchmark has no series, so both return `false`.
 
@@ -687,16 +687,17 @@ A vector benchmark is a return series, so the tracking error is a function of th
 
   - [`supports_precomputed_returns`](@ref)
   - [`TrackingRiskMeasure`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
 """
-function supports_precomputed_returns(r::TrackingRiskMeasure{<:Any, <:DataTracking})::Bool
+function supports_precomputed_returns(r::TrackingRiskMeasure{<:Any,
+                                                             <:DataBenchmarkTracking})::Bool
     return isa(r.tr.B, VecNum)
 end
 """
     bind_data_benchmark(r::TrackingRiskMeasure, rd, brt::Bool)
     bind_data_benchmark(r::Union{<:RiskTrackingError, <:RiskTrackingRiskMeasure}, rd, brt::Bool)
 
-Bind the [`DataTracking`](@ref) that a tracking measure holds to the benchmark `B` of the returns data `rd`.
+Bind the [`DataBenchmarkTracking`](@ref) that a tracking measure holds to the benchmark `B` of the returns data `rd`.
 
 A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@ref) and a [`RiskTrackingRiskMeasure`](@ref) track a benchmark portfolio, so they bind the measure `r` that they track. Each rebuilds through its keyword constructor only when the field changes, as [`bind_data_benchmark`](@ref) states.
 
@@ -709,7 +710,7 @@ A [`TrackingRiskMeasure`](@ref) binds its `tr` field. A [`RiskTrackingError`](@r
 # Related
 
   - [`bind_data_benchmark`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`TrackingRiskMeasure`](@ref)
 """
 function bind_data_benchmark(r::TrackingRiskMeasure, rd, brt::Bool)

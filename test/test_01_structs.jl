@@ -2742,9 +2742,9 @@ end
             e
         end
         @test isa(err, ArgumentError)
-        @test occursin("at `tr`", err.msg) && occursin("DataTracking", err.msg)
+        @test occursin("at `tr`", err.msg) && occursin("DataBenchmarkTracking", err.msg)
         @test isnothing(PO.assert_folds_track_no_series(TrackingRiskMeasure(;
-                                                                            tr = DataTracking()),
+                                                                            tr = DataBenchmarkTracking()),
                                                         2))
     end
 

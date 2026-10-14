@@ -800,14 +800,14 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                                                              r = TrackingRiskMeasure(;
                                                                                      tr = tr),
                                                              window = 5)))
-        wd = optimise(gp(DataTracking()), rdv).w
+        wd = optimise(gp(DataBenchmarkTracking()), rdv).w
         @test isapprox(wd, optimise(gp(WeightsTracking(; w = wb, fixed = true)), rdv).w;
                        atol = 1e-8)
         @test !isapprox(wd, fill(1 / N, N); atol = 1e-2)
         for r in (rdv, rdm)
             o = foldl((o, t) -> po.partial_fit!(o, rows(r, t:t)), 1:T;
-                      init = gp(DataTracking()))
-            @test optimise(o).w == optimise(gp(DataTracking()), r).w
+                      init = gp(DataBenchmarkTracking()))
+            @test optimise(o).w == optimise(gp(DataBenchmarkTracking()), r).w
         end
     end
 

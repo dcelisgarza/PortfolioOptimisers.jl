@@ -280,7 +280,7 @@ Return the benchmark return series that a tracking constraint subtracts from the
 The model states the weights scaled by the budget variable ``k``, so both forms carry that scale and stay linear in the weights.
 
   - A series is fixed, so it scales with the budget variable: ``\\boldsymbol{b}k``.
-  - A matrix holds one benchmark per asset, the bound benchmark of a [`DataTracking`](@ref), so the series is ``\\mathbf{B}\\boldsymbol{w}`` on the weights of the model under `prefix`. These are the weights of the net portfolio returns under the same `prefix`, and they carry the scale already.
+  - A matrix holds one benchmark per asset, the bound benchmark of a [`DataBenchmarkTracking`](@ref), so the series is ``\\mathbf{B}\\boldsymbol{w}`` on the weights of the model under `prefix`. These are the weights of the net portfolio returns under the same `prefix`, and they carry the scale already.
 
 # Arguments
 
@@ -295,7 +295,7 @@ The model states the weights scaled by the budget variable ``k``, so both forms 
 # Related
 
   - [`set_tracking_error_constraints!`](@ref)
-  - [`DataTracking`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
   - [`collapse_benchmark`](@ref): The same rule on a numeric weight vector.
 """
 function tracking_benchmark_expression(model::JuMP.Model, b::VecNum, ::Symbol)

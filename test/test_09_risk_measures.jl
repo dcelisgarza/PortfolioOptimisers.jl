@@ -1681,7 +1681,7 @@ end
         rdv = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = bv)
         rdm = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bm)
         rdn = ReturnsResult(; nx = nx, X = X)
-        dt = DataTracking()
+        dt = DataBenchmarkTracking()
         @test isnothing(dt.B)
         # The binding reads the rows, and replaces a benchmark bound earlier.
         @test po.bind_data_benchmark(dt, rdv, false).B === rdv.B

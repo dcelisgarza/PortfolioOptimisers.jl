@@ -10,7 +10,7 @@ IndependentVariableTracking
 DependentVariableTracking
 WeightsTracking
 ReturnsTracking
-DataTracking
+DataBenchmarkTracking
 TrackingError
 factory(tr::WeightsTracking, w::VecNum)
 tracking_benchmark

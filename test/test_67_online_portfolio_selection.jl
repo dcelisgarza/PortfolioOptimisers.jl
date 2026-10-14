@@ -1000,7 +1000,7 @@ end
         @test_throws ArgumentError optimise(OPS(; alg = md(true)), rows(rd, 1:10))
         @test_throws ArgumentError po.partial_fit!(OPS(; alg = md(true)), rows(rd, 1:10))
         dtl = RiskLoss(; window = 8, brt = true,
-                       r = TrackingRiskMeasure(; tr = DataTracking()))
+                       r = TrackingRiskMeasure(; tr = DataBenchmarkTracking()))
         @test_throws ArgumentError optimise(OPS(; alg = MirrorDescent(; obj = dtl)),
                                             rows(rdb, 1:10))
     end

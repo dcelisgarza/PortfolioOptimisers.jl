@@ -23,7 +23,7 @@ The maintainer decided decisions 1 and 2 on 2026-10-13. Decisions 3, 4 and 5 cam
 ([#1692](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1692)), after ADR
 [0211](0211-each-reader-of-the-returns-states-its-own-source.md) took `brt` off every head.
 
-1. **A new type.** `DataTracking()` is a new `AbstractTrackingAlgorithm`, not a sentinel in
+1. **A new type.** `DataBenchmarkTracking()` is a new `AbstractTrackingAlgorithm`, not a sentinel in
    `ReturnsTracking`. It holds no series of its own. Its field `B` is `nothing` until a reader binds
    it.
 2. **A matrix `B` gives the series `B * w`.** A vector `B` is the benchmark series. A matrix `B` holds
@@ -112,13 +112,13 @@ session that built it chose the four details below, and the maintainer accepted 
 
 1. **The batch arms refuse once, before the folds run.** The fold loop calls
    `assert_folds_track_no_series` next to `assert_batch_entry`, so the error comes before any solve
-   and does not repeat on each worker. The error names the field and points at `DataTracking`. The
+   and does not repeat on each worker. The error names the field and points at `DataBenchmarkTracking`. The
    online arm gets no new check, because its step already refuses a series.
 2. **One fold passes.** One fold is one batch fit, so a series of its training rows aligns, and the
    length check catches a wrong length.
 3. **The series of an online selection head is refused.** The head cuts the series to its first rows.
    Each fold of a batch walk-forward restarts the head at its first training row, so the cut aligns
-   only with a fold that starts at the first row. A `DataTracking` set follows the rows of each fold.
+   only with a fold that starts at the first row. A `DataBenchmarkTracking` set follows the rows of each fold.
    The walk, `returns_tracking_path`, enters an algorithm as well as an estimator and a Result,
    because the programme set is an algorithm.
 4. **A `TimeDependent` schedule answers through its `default` only.** Entry `i` is the value of fold
@@ -143,7 +143,7 @@ session that built it chose the four details below, and the maintainer accepted 
 - **Refuse in each fold, or in the online arm too.** Rejected. A check in each fold runs on the
   workers after the first solves, and the online step already refuses a series.
 - **Let the series of the head through.** Rejected. Every fold after the first misaligns with no
-  error, the defect of #1669. `DataTracking` in the set covers the case.
+  error, the defect of #1669. `DataBenchmarkTracking` in the set covers the case.
 - **Refuse every part of a schedule.** Rejected. It refuses a schedule of one series for each fold,
   which aligns. test_24b holds that it equals the batch fit of each fold.
 - **Let every part of a schedule through.** Rejected. The `default` is one series that more than one
@@ -162,7 +162,7 @@ session that built it chose the four details below, and the maintainer accepted 
   schedule of one series for each fold passes the online step too.
 - The online step of a meta-optimiser that holds a head with a series in its set refuses it too,
   because the step reads the same walk.
-- Two refusals are stricter than the defect needs. Each has `DataTracking` as the way around it, and
+- Two refusals are stricter than the defect needs. Each has `DataBenchmarkTracking` as the way around it, and
   each is the first place to look if a refusal is reported as wrong:
   - a batch loop refuses the `default` of a schedule under `bind = :outermost`, which the loop never
     reads;

@@ -154,7 +154,7 @@ A graph reader that reads the returns data meets each gap that the prior filled,
 *Avoid*: matrix source, which also names the source of a feature matrix.
 
 **Data Benchmark**
-The benchmark that the returns data carries, `B` of a `ReturnsResult`, as a tracking benchmark: `DataTracking()`. It holds no series of its own. Each reader that holds the returns data binds it to the `B` of its own rows with `bind_data_benchmark`: an optimiser after its view at the Investable Mask, the online step on its buffer, a fold on its training rows, an online portfolio selection head on its rows window, and the value-level `expected_risk` on a `ReturnsResult`. So it follows the rows where a `ReturnsTracking` series, fixed at construction, cannot.
+The benchmark that the returns data carries, `B` of a `ReturnsResult`, as a tracking benchmark: `DataBenchmarkTracking()`. It holds no series of its own. Each reader that holds the returns data binds it to the `B` of its own rows with `bind_data_benchmark`: an optimiser after its view at the Investable Mask, the online step on its buffer, a fold on its training rows, an online portfolio selection head on its rows window, and the value-level `expected_risk` on a `ReturnsResult`. So it follows the rows where a `ReturnsTracking` series, fixed at construction, cannot.
 A vector `B` is the benchmark series. A matrix `B` holds one benchmark per asset, and the series is `B * w`, so the tracking error is that of `(X - B) * w`. A prior in the Excess Frame refuses it, because the tracking error would subtract `B` twice. Only the prior whose returns the measure reads counts, so a clustering in the Excess Frame does not. A plain risk measure on a prior in the Excess Frame gives the active risk instead.
 *Avoid*: a returns benchmark, which names the fixed series of `ReturnsTracking`.
 
@@ -937,7 +937,7 @@ A post-solve adjustment forcing weights into the feasible region at the budget t
 The change in the portfolio relative to a reference, either the previous weights or a static target. Usable as a soft penalty or a hard constraint.
 
 **Tracking Error**
-The closeness of the portfolio to a benchmark or target: `WeightsTracking` against a reference weight vector, `ReturnsTracking` against a benchmark return series, and the Data Benchmark against the benchmark that the returns data carries.
+The closeness of the portfolio to a benchmark or target: `WeightsTracking` against a reference weight vector, `ReturnsTracking` against a benchmark return series, and `DataBenchmarkTracking` against the benchmark that the returns data carries.
 
 ### 4.5 Meta-optimisers
 

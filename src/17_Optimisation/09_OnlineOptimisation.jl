@@ -261,12 +261,12 @@ A returns series is fixed at construction, and each step changes the rows that a
   - [`partial_fit!`](@ref)
   - [`returns_tracking_path`](@ref)
   - [`WeightsTracking`](@ref)
-  - [`DataTracking`](@ref): The form that follows the rows, because each step binds it to the benchmark of the buffer.
+  - [`DataBenchmarkTracking`](@ref): The form that follows the rows, because each step binds it to the benchmark of the buffer.
 """
 function assert_step_tracks_no_series(opt)
     path = returns_tracking_path(opt)
     @argcheck(isnothing(path),
-              ArgumentError("`$(typeof(opt).name.name)` takes an online step holding a `ReturnsTracking` at `$(path)`, and a fixed series cannot follow the rows: each step adds rows, and a window under `max_history` drops the oldest, so the series covers the rows of no more than one step, and a rolling window misaligns it with no error. Track the benchmark that the returns data carries with `DataTracking`, which binds to the `B` of the rows at each step, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
+              ArgumentError("`$(typeof(opt).name.name)` takes an online step holding a `ReturnsTracking` at `$(path)`, and a fixed series cannot follow the rows: each step adds rows, and a window under `max_history` drops the oldest, so the series covers the rows of no more than one step, and a rolling window misaligns it with no error. Track the benchmark that the returns data carries with `DataBenchmarkTracking`, which binds to the `B` of the rows at each step, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves."))
     return nothing
 end
 """
