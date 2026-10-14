@@ -1,5 +1,5 @@
 ```@meta
-Description = "Variance, public API of PortfolioOptimisers.jl: QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, SOCRiskExpr, Variance, StandardDeviation, …"
+Description = "Variance, public API of PortfolioOptimisers.jl: QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, SOCRiskExpr, SquareRootRatio, LinearRatio, Variance, …"
 ```
 
 # Variance
