@@ -54,7 +54,9 @@ RiskRatio
      │       chol ┼ nothing
      │         rc ┼ nothing
      │        alg ┼ SquaredSOCRiskExpr()
-     │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+     │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+     │       lift ┼ ConstantCornerLift()
+     │     corner ┴ nothing
   r2 ┼ ConditionalValueatRisk
      │   settings ┼ RiskMeasureSettings
      │            │   scale ┼ Float64: 1.0
@@ -162,7 +164,9 @@ NonOptimisationRiskRatio
            │       chol ┼ nothing
            │         rc ┼ nothing
            │        alg ┼ SquaredSOCRiskExpr()
-           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+           │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │       lift ┼ ConstantCornerLift()
+           │     corner ┴ nothing
       sca1 ┼ SumScalariser()
         r2 ┼ ConditionalValueatRisk
            │   settings ┼ RiskMeasureSettings

@@ -242,6 +242,13 @@
         @test haskey(m, :sdp_plg_p_1) == haskey(m, :sr_risk)
         m = build([Variance()]; obj = MaximumRatio(; rf = 1))
         @test haskey(m, :sr_risk) && haskey(m, :sdp_plg_p_1)
+        # Under `MaximumRatio` the term reads the lift with a constant corner, which belongs
+        # to the weights as `W` does. Without a bound the model builds no `W` (#1676).
+        m = build([Variance()]; obj = MaximumRatio(; rf = 0))
+        @test reads(m, :lift_variance_risk_1, :lift_W)
+        @test haskey(m, :W) == haskey(m, :sr_risk)
+        m = build([Variance(), dv(Variance())]; obj = MaximumRatio(; rf = 0))
+        @test !haskey(m, :tr_dv_2_lift_W)
 
         # The constraint twin, a dependent `RiskTrackingError`, records the owner as well, so
         # its inner variance reads the head's `W` and builds no second one.

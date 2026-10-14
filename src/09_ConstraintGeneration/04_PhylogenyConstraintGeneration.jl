@@ -247,7 +247,7 @@ Where:
   - ``\\mathbb{S}^{N}``: Set of real symmetric ``N \\times N`` matrices.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-A [`Variance`](@ref) in a model that holds this constraint takes the constraint form, whatever its `alg` says. The trace has degree one in the weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+A [`Variance`](@ref) in a model that holds this constraint takes the constraint form, whatever its `alg` says. Under [`MaximumRatio`](@ref) the `lift` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule. The rows then read the lift of the objective, [`set_sdp_phylogeny_constraints!`](@ref).
 
 # Fields
 

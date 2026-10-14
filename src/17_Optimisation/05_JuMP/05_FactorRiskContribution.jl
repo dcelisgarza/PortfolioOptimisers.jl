@@ -118,7 +118,7 @@ The asset weights are recovered from the exposures through the factor loadings, 
 
 Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. With `flag = true` the lift covers the off-factor weights ``\\tilde{\\boldsymbol{y}}_{af}`` too, so the variance is that of the returned weights, and each row states the Euler contribution of a factor as a share of the whole variance, as [`factor_risk_contribution`](@ref) reports it. [`set_risk_constraints!`](@ref) states the formulation. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
 
-A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Its trace has degree one in the factor weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Under [`MaximumRatio`](@ref) the `lift` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio, and [`ScaleCornerLift`](@ref) gives the excess return per unit of variance. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule, and [`set_sdp_frc_objective_lift!`](@ref) states the lift.
 
 # Mathematical definition
 
@@ -419,6 +419,7 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
+    set_sdp_lift_corner!(model, frc.obj, attrs.pr)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
                                                            frc.flag, frc.wi;
                                                            brt = frc.opt.brt)

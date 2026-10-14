@@ -497,7 +497,9 @@ RiskTrackingRiskMeasure
            │       chol ┼ nothing
            │         rc ┼ nothing
            │        alg ┼ SquaredSOCRiskExpr()
-           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+           │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │       lift ┼ ConstantCornerLift()
+           │     corner ┴ nothing
        alg ┴ IndependentVariableTracking()
 ```
 

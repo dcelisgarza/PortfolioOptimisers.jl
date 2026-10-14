@@ -23,6 +23,10 @@ const SHARED_STATE = Set{Symbol}([# Pure functions of the prior `pr`: identical 
                                   # registered beside `:sc` and `:so` by the head itself, so
                                   # every builder may rely on it whatever the model carries.
                                   :sc, :so, :T, :k, :w, :ret, :risk, :fees, :unit_budget,
+                                  # The corner that a lifted variance derives under
+                                  # `MaximumRatio`, a number the head registers beside
+                                  # `:k` from the objective and the prior alone.
+                                  :sdp_corner,
                                   # The fee spine, established once by the fee builder and
                                   # read by the return and the net-series builders. `:fees`
                                   # holds the per period terms and `:one_time_fees` the

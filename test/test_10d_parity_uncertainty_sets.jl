@@ -432,10 +432,11 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             JuMP.optimize!(model)
             return JuMP.objective_value(model)
         end
-        # Under `MaximumRatio` the lifted variance has degree one in the homogenised
-        # variables, so both sides maximise the excess return over the variance, not over
-        # its square root (#1321).
-        function nbobjective(obj, um, uc, w)
+        # Under `MaximumRatio` the default lift of the objective has degree two in the
+        # homogenised variables, so both sides maximise the excess return over the square root
+        # of the worst-case variance (#1676). `ScaleCornerLift` keeps the lift of degree one,
+        # which divides by the variance itself (#1321).
+        function nbobjective(obj, um, uc, w, lift = ConstantCornerLift())
             risk = isnothing(uc) ? dot(w, pr5.sigma, w) : lifted(uc, w)
             ret = dot(pr5.mu, w)
             if !isnothing(um)
@@ -443,29 +444,34 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
             end
             isa(obj, MinimumRisk) && return -risk
             isa(obj, MaximumUtility) && return ret - 4 * risk
-            return ret / risk
+            return isa(lift, ScaleCornerLift) ? ret / risk : ret / sqrt(risk)
         end
+        # Case 10 is the oracle at v1.8.5, which states the objective term on a lift with the
+        # corner 1. Case 11 is the oracle at v1.8.3, whose lift had the corner `k`.
         NB_CASES = [(util, nbm(2), nothing), (util, nbm(1), nothing),
                     (util, nbm(3), nothing), (util, nbm(Inf), nothing),
                     (MinimumRisk(), nothing, nbc(2)), (MinimumRisk(), nothing, nbc(1)),
                     (MinimumRisk(), nothing, nbc(Inf)), (util, nothing, nbc(2)),
-                    (util, nbm(2), nbc(2)), (MaximumRatio(), nothing, nbc(2))]
+                    (util, nbm(2), nbc(2)), (MaximumRatio(), nothing, nbc(2)),
+                    (MaximumRatio(), nothing, nbc(2), ScaleCornerLift())]
         W = load("NormBallMeanRisk", "Empirical", "Weights")
         slvs = Solver(; name = :clarabel_1390_sdp, solver = Clarabel.Optimizer,
                       check_sol = (; allow_local = true, allow_almost = true),
                       settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
                                       "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10,
                                       "max_iter" => 500))
-        for (k, (obj, um, uc)) in enumerate(NB_CASES)
+        for (k, case) in enumerate(NB_CASES)
+            obj, um, uc = case
+            lift = length(case) == 4 ? case[4] : ConstantCornerLift()
             ret = isnothing(um) ? ArithmeticReturn() : ArithmeticReturn(; ucs = um)
-            r = isnothing(uc) ? Variance() : UncertaintySetVariance(; ucs = uc)
+            r = isnothing(uc) ? Variance() : UncertaintySetVariance(; ucs = uc, lift = lift)
             # Case 9 holds a set on each axis. Both builders registered their epigraph under
             # one name, and the model refused to build (fixed in #1390).
             res = optimise(MeanRisk(; r = r, obj = obj,
                                     opt = JuMPOptimiser(; pe = pr5, slv = slvs, ret = ret)))
             @test isa(res.retcode, PO.OptimisationSuccess)
-            fj = nbobjective(obj, um, uc, res.w)
-            fo = nbobjective(obj, um, uc, W[:, k])
+            fj = nbobjective(obj, um, uc, res.w, lift)
+            fo = nbobjective(obj, um, uc, W[:, k], lift)
             # Measured 1.3e-8 at most on the mean terms, and 3.7e-7 on the lifted variance,
             # the accuracy of the semidefinite evaluation itself. The weights: 6.8e-5 at
             # most, at `p = Inf`, where the objective is flat.

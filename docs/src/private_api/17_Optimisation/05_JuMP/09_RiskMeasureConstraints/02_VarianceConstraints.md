@@ -21,6 +21,7 @@ set_sdp_variance_risk!
 variance_risk_bounds_expr
 rc_variance_constraints!
 set_ucs_variance_risk!
+sdp_lifted_set
 ucs_variance_risk_bounds!
 ```
 

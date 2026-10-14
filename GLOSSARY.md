@@ -850,7 +850,7 @@ One term of the objective's return expression: `ArithmeticReturn` (dot-product) 
 
 **Objective Functions**
 `MinimumRisk`, `MaximumUtility`, `MaximumRatio` (Sharpe-type), `MaximumReturn`.
-`MaximumRatio` divides the excess return by the risk raised to `1/d`, where `d` is the degree of the risk expression in the homogenised weights and `k`. So the SOC and quadratic `Variance` give the Sharpe ratio, and the semidefinite `Variance` (risk-contribution rows, a semidefinite phylogeny, `FactorRiskContribution`) gives the excess return per unit of variance. This is a property of the formulation. Issue #1321.
+`MaximumRatio` divides the excess return by the risk raised to `1/d`, where `d` is the degree of the risk expression in the homogenised weights and `k`. So the SOC and quadratic `Variance` give the Sharpe ratio. A variance on a lifted weight matrix (the semidefinite `Variance`, and the box, ellipsoid and norm-ball `UncertaintySetVariance`) reads the corner of the lift: under `ConstantCornerLift`, the default, its objective term reads a second lift with a constant corner, has degree two and gives the Sharpe ratio; under `ScaleCornerLift` it reads the lift with the corner `k`, has degree one and gives the excess return per unit of variance. A bound reads the corner-`k` lift under both. Issues #1321, #1676, ADR 0217.
 
 **Solver**
 A wrapper around a single external backend (Clarabel, HiGHS, …): its module, settings, name, and the checks that validate a returned solution.

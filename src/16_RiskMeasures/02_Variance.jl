@@ -199,15 +199,127 @@ const QuadSecondMomentFormulations = Union{<:NSkeQuadFormulations, <:RSOCRiskExp
 """
 $(DocStringExtensions.TYPEDEF)
 
+Abstract supertype for the lift that the objective term of a variance reads under [`MaximumRatio`](@ref).
+
+A variance that the model states on a lifted weight matrix, the semidefinite [`Variance`](@ref) and the box, the ellipsoid and the norm ball of [`UncertaintySetVariance`](@ref), reads the corner of the bordered matrix of its lift. The corner sets the degree of the term in the homogenised weights and ``k``, and the degree sets the ratio that [`MaximumRatio`](@ref) maximises. The lift acts only on a term of the objective under [`MaximumRatio`](@ref). A bound, every other objective, and a formulation that lifts nothing ignore it.
+
+All concrete types that select the lift of the objective term should subtype `SemiDefiniteLift`.
+
+# Related
+
+  - [`ConstantCornerLift`](@ref)
+  - [`ScaleCornerLift`](@ref)
+  - [`set_sdp_objective_lift!`](@ref)
+"""
+abstract type SemiDefiniteLift <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+States the objective term of a lifted variance on a lift with a constant corner, so the term has degree two and [`MaximumRatio`](@ref) maximises the excess return per unit of the square root of the variance.
+
+It is the default. The model adds a second lifted matrix for the objective term, with a constant corner ``c`` in place of ``k``, and keeps the lift with the corner ``k`` for the bound. A plain variance then gives the Sharpe ratio, as the second-order cone formulation does, and a worst-case variance gives the excess return per unit of the worst-case standard deviation.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\begin{bmatrix} \\mathbf{W}_c & \\boldsymbol{y} \\\\ \\boldsymbol{y}^\\intercal & c \\end{bmatrix} \\succeq 0 \\quad&\\Rightarrow\\quad c\\,\\mathbf{W}_c \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal\\,, \\\\
+\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W}_c) &\\geq \\frac{\\boldsymbol{y}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{y}}{c} = \\frac{k^{2} \\sigma^{2}(\\boldsymbol{w})}{c}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathbf{W}_c``: The lifted matrix of the objective term, symmetric ``N \\times N``.
+  - ``c``: The corner, the `corner` of the measure, or the corner that [`set_sdp_lift_corner!`](@ref) derives when it is `nothing`.
+  - $(math_dict[:y_homog])
+  - $(math_dict[:k_budget])
+  - ``\\mathbf{\\Sigma}``: The covariance matrix of the variance.
+  - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation.
+
+``c`` is a constant, so the term has degree two in ``(\\boldsymbol{y}, k)`` at every ``c``, and the corner does not change the weights. It changes the scale of ``\\mathbf{W}_c``, which is ``k^{2} / c`` times a matrix of rank one, and the scale of the term. A corner near the ``k`` of the solution keeps both near their scale at ``k = 1``, and so keeps the solve well conditioned. The term is ``1 / c`` times the variance of ``\\boldsymbol{y}``, so beside a risk term of another degree its weight in the objective changes with ``c``, as the weight of a term of degree two changes with `ohf`.
+
+# Related
+
+  - [`SemiDefiniteLift`](@ref)
+  - [`ScaleCornerLift`](@ref)
+  - [`set_sdp_objective_lift!`](@ref)
+  - [`MaximumRatio`](@ref)
+"""
+struct ConstantCornerLift <: SemiDefiniteLift end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+States the objective term of a lifted variance on the lift with the corner ``k``, so the term has degree one and [`MaximumRatio`](@ref) maximises the excess return per unit of the variance.
+
+The objective term and the bound read one lifted matrix, [`set_sdp_constraints!`](@ref). The objective ``(\\mathrm{ret} - r_f) / \\sigma^{2}(\\boldsymbol{w})`` is a valid objective, but it is not the Sharpe ratio, and the set of a worst-case variance changes it: a compact set states its worst case on the weights, with degree two, under this lift too.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\begin{bmatrix} \\mathbf{W} & \\boldsymbol{y} \\\\ \\boldsymbol{y}^\\intercal & k \\end{bmatrix} \\succeq 0 \\quad&\\Rightarrow\\quad k\\,\\mathbf{W} \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal\\,, \\\\
+\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W}) &\\geq \\frac{\\boldsymbol{y}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{y}}{k} = k \\sigma^{2}(\\boldsymbol{w})\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:W_lift])
+  - $(math_dict[:y_homog])
+  - $(math_dict[:k_budget])
+  - ``\\mathbf{\\Sigma}``: The covariance matrix of the variance.
+  - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation.
+
+# Related
+
+  - [`SemiDefiniteLift`](@ref)
+  - [`ConstantCornerLift`](@ref)
+  - [`set_sdp_constraints!`](@ref)
+  - [`MaximumRatio`](@ref)
+"""
+struct ScaleCornerLift <: SemiDefiniteLift end
+"""
+    assert_lift_corner(corner::Option{<:Number})
+
+Check the `corner` of a variance that states its objective term on a lifted weight matrix.
+
+`nothing` asks the model to derive the corner, so it passes. A number is the constant corner of [`ConstantCornerLift`](@ref). It must be finite and above zero, because the bordered matrix of the lift then states ``c\\,\\mathbf{W}_c \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal``. A corner of zero forces ``\\boldsymbol{y} = \\mathbf{0}``.
+
+# Validation
+
+  - If `corner` is a number: `isfinite(corner)` and `corner > 0`. Otherwise the function raises a `DomainError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ConstantCornerLift`](@ref)
+  - [`Variance`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+"""
+function assert_lift_corner(::Nothing)
+    return nothing
+end
+function assert_lift_corner(corner::Number)
+    @argcheck(isfinite(corner) && corner > zero(corner),
+              DomainError(corner, "corner must be finite and > 0"))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
 Measures the portfolio variance, the quadratic form of the weights in a covariance matrix.
 
 `alg` selects the risk expression that the model builds, and each [`VarianceFormulation`](@ref) reports the variance itself. [`QuadRiskExpr`](@ref) states the quadratic form ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}``, and [`SquaredSOCRiskExpr`](@ref) states ``\\sigma^{2}``, the square of a second-order cone variable with ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}`` and ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``. The model adds ``\\sigma`` under both encodings, because the bound in `settings.ub` and the [`MaximumRatio`](@ref) objective need an expression of degree one in the weights. The bound acts on ``\\sigma`` at the square root of `settings.ub`, so a caller states it in the units of a variance. [`set_risk_constraints!`](@ref) states the model.
 
-When `rc` holds rows, the model uses the semidefinite formulation of [sdprp](@cite) whatever `alg` says. A [`SemiDefinitePhylogeny`](@ref) in the constraints also moves the variance to this formulation. The formulation lifts the weights into a symmetric matrix ``\\mathbf{W}``, and the variance becomes the trace ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``, which has degree one in ``(\\boldsymbol{w}, k)``. So under [`MaximumRatio`](@ref) this formulation maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule, and [`rc_variance_constraints!`](@ref) states the rows.
+When `rc` holds rows, the model uses the semidefinite formulation of [sdprp](@cite) whatever `alg` says. A [`SemiDefinitePhylogeny`](@ref) in the constraints also moves the variance to this formulation. The formulation lifts the weights into a symmetric matrix ``\\mathbf{W}``, and the variance becomes the trace ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``. Under [`MaximumRatio`](@ref) the corner of the lift sets the degree of the term, and so the ratio. `lift` selects it. [`ConstantCornerLift`](@ref), the default, gives the Sharpe ratio, as the second-order cone does, and [`ScaleCornerLift`](@ref) gives the excess return per unit of variance. `corner` sets the constant corner of the first. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule, and [`rc_variance_constraints!`](@ref) states the rows.
 
 !!! warning
 
-    The semidefinite formulation is a relaxation. The model states ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and not equality, so the rows bind the returned weights only when the solution has ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``. No term of the model forces a matrix of rank one. A solver can add a positive semidefinite part to ``\\mathbf{W}`` that moves the shares the rows constrain, and the solve still reports success. The rows then hold on ``\\mathbf{W}`` while the shares of the returned weights miss them, under a [`MinimumRisk`](@ref) objective as well as a [`MaximumUtility`](@ref) one. To check a result, compute [`risk_contribution`](@ref) of the returned weights, or [`factor_risk_contribution`](@ref) under [`FactorRiskContribution`](@ref), divide it by its sum, and compare the shares with the rows.
+    The semidefinite formulation is a relaxation. The model states ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and not equality, so the rows bind the returned weights only when the solution has ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``. No term of the model forces a matrix of rank one. A solver can add a positive semidefinite part to ``\\mathbf{W}`` that moves the shares the rows constrain, and the solve still reports success. The rows then hold on ``\\mathbf{W}`` while the shares of the returned weights miss them, under a [`MinimumRisk`](@ref) objective as well as a [`MaximumUtility`](@ref) one. Under [`MaximumRatio`](@ref) the rows read the lift of the objective term, so [`ConstantCornerLift`](@ref) relaxes them as [`MinimumRisk`](@ref) does, and [`ScaleCornerLift`](@ref) relaxes them on the lift with the corner ``k``. The two lifts give different weights, and neither is tight in general. To check a result, compute [`risk_contribution`](@ref) of the returned weights, or [`factor_risk_contribution`](@ref) under [`FactorRiskContribution`](@ref), divide it by its sum, and compare the shares with the rows.
 
 # Mathematical definition
 
@@ -244,6 +356,8 @@ $(DocStringExtensions.FIELDS)
         rc::Option{<:LcE_Lc} = nothing,
         alg::VarianceFormulation = SquaredSOCRiskExpr(),
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+        lift::SemiDefiniteLift = ConstantCornerLift(),
+        corner::Option{<:Number} = nothing,
     ) -> Variance
 
 Keywords correspond to the struct's fields.
@@ -253,6 +367,7 @@ Keywords correspond to the struct's fields.
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
   - If `chol` is a matrix, `!isempty(chol)`.
   - `chol` is `nothing` when `sigma` is `nothing` or a **Deferred Quantity**.
+  - If `corner` is a number, `isfinite(corner)` and `corner > 0`, [`assert_lift_corner`](@ref).
 
 !!! warning
 
@@ -265,7 +380,7 @@ Keywords correspond to the struct's fields.
   - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
   - The method slices `chol` on its columns alone. Its rows index the factorisation, which the asset selection does not address.
   - The method refuses an `rc` that is a [`LinearConstraint`](@ref). A group constraint cannot be restricted to a part of its own group, and the restriction would break factor risk contribution.
-  - `settings`, `rc`, `alg` and `mtx_sqrt` pass through unchanged.
+  - `settings`, `rc`, `alg`, `mtx_sqrt`, `lift` and `corner` pass through unchanged.
 
 # Functor
 
@@ -295,7 +410,9 @@ Variance
       chol ┼ nothing
         rc ┼ nothing
        alg ┼ SquaredSOCRiskExpr()
-  mtx_sqrt ┴ EigenFallbackSquareRoot()
+  mtx_sqrt ┼ EigenFallbackSquareRoot()
+      lift ┼ ConstantCornerLift()
+    corner ┴ nothing
 
 julia> r(w)
 1.3421705804186579
@@ -319,6 +436,8 @@ julia> r(w)
   - [`expected_risk`](@ref)
   - [`risk_contribution`](@ref)
   - [`rc_variance_constraints!`](@ref): registers the rows of `rc` on the lifted matrix.
+  - [`ConstantCornerLift`](@ref)
+  - [`ScaleCornerLift`](@ref)
 
 # References
 
@@ -350,10 +469,19 @@ julia> r(w)
     Square-root algorithm of the covariance matrix that the cone of the variance reads when no `chol` is at hand, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix, such as a rank-one estimate. [`matrix_square_root`](@ref) states each algorithm.
     """
     mtx_sqrt
+    """
+    $(field_dict[:lift_sdp])
+    """
+    lift
+    """
+    $(field_dict[:corner_sdp])
+    """
+    corner
     function Variance(settings::RiskMeasureSettings, sigma::Option{<:SigmaSlot},
                       chol::Option{<:MatNum}, rc::Option{<:LcE_Lc},
                       alg::VarianceFormulation,
-                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})::Variance
+                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
+                      lift::SemiDefiniteLift, corner::Option{<:Number})::Variance
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
@@ -362,16 +490,21 @@ julia> r(w)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
+        assert_lift_corner(corner)
         return new{typeof(settings), typeof(sigma), typeof(chol), typeof(rc), typeof(alg),
-                   typeof(mtx_sqrt)}(settings, sigma, chol, rc, alg, mtx_sqrt)
+                   typeof(mtx_sqrt), typeof(lift), typeof(corner)}(settings, sigma, chol,
+                                                                   rc, alg, mtx_sqrt, lift,
+                                                                   corner)
     end
 end
 function Variance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                   sigma::Option{<:SigmaSlot} = nothing, chol::Option{<:MatNum} = nothing,
                   rc::Option{<:LcE_Lc} = nothing,
                   alg::VarianceFormulation = SquaredSOCRiskExpr(),
-                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::Variance
-    return Variance(settings, sigma, chol, rc, alg, mtx_sqrt)
+                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+                  lift::SemiDefiniteLift = ConstantCornerLift(),
+                  corner::Option{<:Number} = nothing)::Variance
+    return Variance(settings, sigma, chol, rc, alg, mtx_sqrt, lift, corner)
 end
 function (r::Variance)(w::VecNum)
     return LinearAlgebra.dot(w, r.sigma, w)
@@ -414,7 +547,7 @@ The method selects `sigma` and `chol` as one pair, not field by field. A stated 
 
  1. Resolve a **Deferred Quantity** in `sigma` with [`resolve_deferred_quantities`](@ref), giving `r`.
  2. Select the pair `sigma`, `chol` with [`sigma_chol_selector`](@ref). A measure that states neither takes `pr.sigma` and `pr.chol`, and every other measure keeps its own pair.
- 3. Build a new `Variance` from the pair and from the `settings`, `rc`, `alg` and `mtx_sqrt` of `r`.
+ 3. Build a new `Variance` from the pair and from the `settings`, `rc`, `alg`, `mtx_sqrt`, `lift` and `corner` of `r`.
 
 # Related
 
@@ -426,7 +559,7 @@ function factory(r::Variance, pr::AbstractPriorResult, args...; kwargs...)
     r = resolve_deferred_quantities(r, pr)
     sigma, chol = sigma_chol_selector(r.sigma, r.chol, pr)
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg, mtx_sqrt = r.mtx_sqrt)
+                    alg = r.alg, mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
 end
 function port_opt_view(r::Variance, i, args...)
     sigma = nothing_scalar_array_view(r.sigma, i)
@@ -434,7 +567,7 @@ function port_opt_view(r::Variance, i, args...)
     @argcheck(!isa(r.rc, LinearConstraint),
               "`rc` cannot be a `LinearConstraint` because there is no way to only consider items from a specific group and because this would break factor risk contribution")
     return Variance(; settings = r.settings, sigma = sigma, chol = chol, rc = r.rc,
-                    alg = r.alg, mtx_sqrt = r.mtx_sqrt)
+                    alg = r.alg, mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -643,6 +776,8 @@ Measures the worst-case portfolio variance over an uncertainty set of covariance
 
 `ucs` holds the set, as a fitted [`AbstractUncertaintySetResult`](@ref) or as an estimator that the optimisation fits from its returns data or its prior. Each measure holds its own set, so one model can hold more than one worst-case variance. The model states the worst case of the box, the ellipsoid and the norm ball as a dual problem over the lifted weight matrix ``\\mathbf{W}``, and the worst case of the compact set as a second-order cone problem in the weights. [`set_ucs_variance_risk!`](@ref) states the rows and the relaxation. A bound in `settings.ub` is in the units of a variance.
 
+Under [`MaximumRatio`](@ref) the corner of the lift sets the degree of the worst case of the box, the ellipsoid and the norm ball, and so the ratio. `lift` selects it. [`ConstantCornerLift`](@ref), the default, gives the excess return per unit of the worst-case standard deviation, as the compact set does, and [`ScaleCornerLift`](@ref) gives the excess return per unit of the worst-case variance. `corner` sets the constant corner of the first. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+
 # Mathematical definition
 
 ```math
@@ -682,6 +817,8 @@ $(DocStringExtensions.FIELDS)
         ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
         sigma::Option{<:SigmaSlot} = nothing,
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+        lift::SemiDefiniteLift = ConstantCornerLift(),
+        corner::Option{<:Number} = nothing,
     ) -> UncertaintySetVariance
 
 Keywords correspond to the struct's fields.
@@ -689,6 +826,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `sigma` is a matrix, `!isempty(sigma)` and `size(sigma, 1) == size(sigma, 2)`.
+  - If `corner` is a number, `isfinite(corner)` and `corner > 0`, [`assert_lift_corner`](@ref).
 
 !!! warning
 
@@ -700,7 +838,7 @@ Keywords correspond to the struct's fields.
 
   - `ucs` recurses through [`port_opt_view`](@ref) with the asset index alone. A set on the covariance axis maps the index to the entries of the vectorised matrix before it slices.
   - The method slices a stated `sigma` to the selected assets on both axes. A **Deferred Quantity** passes through unsliced, and then resolves on the subset.
-  - `settings` passes through unchanged.
+  - `settings`, `mtx_sqrt`, `lift` and `corner` pass through unchanged.
 
 # Functor
 
@@ -764,7 +902,9 @@ UncertaintySetVariance
            │       dc ┼ DiagonalOfShape()
            │   kwargs ┴ @NamedTuple{}: NamedTuple()
      sigma ┼ 3×3 Matrix{Float64}
-  mtx_sqrt ┴ EigenFallbackSquareRoot()
+  mtx_sqrt ┼ EigenFallbackSquareRoot()
+      lift ┼ ConstantCornerLift()
+    corner ┴ nothing
 
 julia> r(w)
 1.3421705804186579
@@ -805,24 +945,35 @@ julia> r(w)
     Square-root algorithm of the matrix of an [`EllipsoidalUncertaintySet`](@ref) in `ucs`, and of the centre of a [`CompactCovarianceUncertaintySet`](@ref), or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm. The box and the norm ball read no square root.
     """
     mtx_sqrt
+    """
+    $(field_dict[:lift_sdp]) The compact set lifts nothing.
+    """
+    lift
+    """
+    $(field_dict[:corner_sdp])
+    """
+    corner
     function UncertaintySetVariance(settings::RiskMeasureSettings, ucs::Option{<:UcSE_UcS},
                                     sigma::Option{<:SigmaSlot},
-                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
+                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
+                                    lift::SemiDefiniteLift, corner::Option{<:Number})
         if isa(sigma, MatNum)
             @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
             assert_matrix_issquare(sigma, :sigma)
         end
-        return new{typeof(settings), typeof(ucs), typeof(sigma), typeof(mtx_sqrt)}(settings,
-                                                                                   ucs,
-                                                                                   sigma,
-                                                                                   mtx_sqrt)
+        assert_lift_corner(corner)
+        return new{typeof(settings), typeof(ucs), typeof(sigma), typeof(mtx_sqrt),
+                   typeof(lift), typeof(corner)}(settings, ucs, sigma, mtx_sqrt, lift,
+                                                 corner)
     end
 end
 function UncertaintySetVariance(; settings::RiskMeasureSettings = RiskMeasureSettings(),
                                 ucs::Option{<:UcSE_UcS} = NormalUncertaintySet(),
                                 sigma::Option{<:SigmaSlot} = nothing,
-                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
-    return UncertaintySetVariance(settings, ucs, sigma, mtx_sqrt)
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+                                lift::SemiDefiniteLift = ConstantCornerLift(),
+                                corner::Option{<:Number} = nothing)
+    return UncertaintySetVariance(settings, ucs, sigma, mtx_sqrt, lift, corner)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -991,13 +1142,15 @@ function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Union{Val{true}, N
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                                  scale = r.settings.scale),
-                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
+                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
+                                  lift = r.lift, corner = r.corner)
 end
 function _no_bounds_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = r.settings.rke,
                                                    scale = r.settings.scale),
-                    sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
+                    sigma = r.sigma, mtx_sqrt = r.mtx_sqrt, lift = r.lift,
+                    corner = r.corner)
 end
 function no_bounds_risk_measure(r::UncertaintySetVariance,
                                 flag::Union{Val{false}, Val{true}, Nothing} = nothing)
@@ -1032,13 +1185,15 @@ function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
     return UncertaintySetVariance(;
                                   settings = RiskMeasureSettings(; rke = false,
                                                                  scale = one(r.settings.scale)),
-                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
+                                  r.ucs, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt,
+                                  lift = r.lift, corner = r.corner)
 end
 function _no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance, ::Val{false})
     return Variance(;
                     settings = RiskMeasureSettings(; rke = false,
                                                    scale = one(r.settings.scale)),
-                    rc = nothing, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt)
+                    rc = nothing, sigma = r.sigma, mtx_sqrt = r.mtx_sqrt, lift = r.lift,
+                    corner = r.corner)
 end
 function no_bounds_no_risk_expr_risk_measure(r::UncertaintySetVariance,
                                              flag::Union{Val{false}, Val{true}, Nothing} = nothing)
@@ -1086,7 +1241,7 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult, ::Any,
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt)
+                                  mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1108,7 +1263,7 @@ function factory(r::UncertaintySetVariance, pr::AbstractPriorResult,
     ucs = ucs_selector(r.ucs, ucs)
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt)
+                                  mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1133,7 +1288,7 @@ function factory(r::UncertaintySetVariance, ucs::UcSE_UcS,
         nothing_scalar_array_selector(resolve_deferred_quantities(r, pr).sigma, pr.sigma)
     end
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt)
+                                  mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
 end
 """
     ucs_risk_measure(r, rd::ReturnsResult; brt::Bool = false)
@@ -1163,7 +1318,7 @@ function ucs_risk_measure(r::UncertaintySetVariance, rd::ReturnsResult; brt::Boo
     else
         UncertaintySetVariance(; settings = r.settings,
                                ucs = sigma_ucs(r.ucs, rd; brt = brt), sigma = r.sigma,
-                               mtx_sqrt = r.mtx_sqrt)
+                               mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
     end
 end
 function ucs_risk_measure(r::Any, ::ReturnsResult; brt::Bool = false)
@@ -1176,7 +1331,7 @@ function port_opt_view(r::UncertaintySetVariance, i, args...)
     ucs = port_opt_view(r.ucs, i)
     sigma = nothing_scalar_array_view(r.sigma, i)
     return UncertaintySetVariance(; settings = r.settings, ucs = ucs, sigma = sigma,
-                                  mtx_sqrt = r.mtx_sqrt)
+                                  mtx_sqrt = r.mtx_sqrt, lift = r.lift, corner = r.corner)
 end
 
 # Expected-risk input kind — see `risk_input_kind`.
@@ -1184,5 +1339,5 @@ risk_input_kind(::Variance) = WeightsInput()
 risk_input_kind(::StandardDeviation) = WeightsInput()
 risk_input_kind(::UncertaintySetVariance) = WeightsInput()
 
-export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, Variance,
-       StandardDeviation, UncertaintySetVariance
+export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, ConstantCornerLift,
+       ScaleCornerLift, Variance, StandardDeviation, UncertaintySetVariance

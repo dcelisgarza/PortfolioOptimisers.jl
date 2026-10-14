@@ -445,14 +445,27 @@ end
     opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets)
     lcs = LinearConstraintEstimator(; val = [["$a <= 0.2" for a in rd.nx];
                                              ["c3 <= 0.1"]])
-    r = Variance(; rc = lcs)
     obj = MaximumRatio()
-    mr = MeanRisk(; obj = obj, opt = opt, r = r)
-    res = optimise(mr)
+    # On the lift with the corner `k` the relaxation is tight here, so the shares of the
+    # returned weights meet the rows.
+    r = Variance(; rc = lcs, lift = ScaleCornerLift())
+    res = optimise(MeanRisk(; obj = obj, opt = opt, r = r))
     rkc = risk_contribution(factory(r, pr, slv), res.w, pr)
     rkc = rkc / sum(rkc)
     @test all(rkc .- 0.2 .- 20 * sqrt(eps()) .< 0)
     @test abs(sum(rkc[3:3:end]) - 0.1) < 20 * sqrt(eps())
+    # The default lift states the term and the rows on the lift with a constant corner, which
+    # gives the Sharpe ratio (#1676). The rows hold on that lift, but here it is far from rank
+    # one, as under `MinimumRisk`, so the returned weights miss them. Measured: second
+    # eigenvalue 0.81 of the first, largest share 0.29, Sharpe ratio 0.148 against 0.119.
+    rdef = Variance(; rc = lcs)
+    resd = optimise(MeanRisk(; obj = obj, opt = opt, r = rdef); save = true)
+    Wc = JuMP.value.(resd.model[:lift_W])
+    lifted = diag(pr.sigma * Wc) / LinearAlgebra.tr(pr.sigma * Wc)
+    @test all(lifted .- 0.2 .< 1e-5)
+    @test abs(sum(lifted[3:3:end]) - 0.1) < 1e-5
+    sharpe(w) = dot(pr.mu, w) / sqrt(dot(w, pr.sigma, w))
+    @test sharpe(resd.w) > sharpe(res.w)
 end
 
 @testset "Weighted risk expressions" begin

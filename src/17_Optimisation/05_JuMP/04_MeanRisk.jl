@@ -231,7 +231,9 @@ MeanRisk
       │       chol ┼ nothing
       │         rc ┼ nothing
       │        alg ┼ SquaredSOCRiskExpr()
-      │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+      │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+      │       lift ┼ ConstantCornerLift()
+      │     corner ┴ nothing
   obj ┼ MinimumRisk()
    wi ┼ nothing
    fb ┴ nothing
@@ -772,6 +774,7 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, mr.obj)
+    set_sdp_lift_corner!(model, mr.obj, attrs.pr)
     set_w!(model, attrs.pr.X, mr.wi)
     set_weight_constraints!(model, attrs.wb, mr.opt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)

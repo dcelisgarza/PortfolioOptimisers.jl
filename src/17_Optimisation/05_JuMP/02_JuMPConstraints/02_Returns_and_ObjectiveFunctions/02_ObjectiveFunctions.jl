@@ -168,12 +168,18 @@ Where:
   - ``\\sigma(\\boldsymbol{w})``: The portfolio's standard deviation, ``\\sqrt{\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}}``.
   - $(math_dict[:W_lift])
 
-The degree belongs to the formulation, not to the measure, and [`Variance`](@ref) has two
-formulations of different degree:
+The degree belongs to the expression that the model builds, and a variance can build one of
+either degree:
 
   - A measure of degree one, such as [`StandardDeviation`](@ref) or [`ConditionalValueatRisk`](@ref), gives the first quotient.
   - [`Variance`](@ref) in the [`SquaredSOCRiskExpr`](@ref) or [`QuadRiskExpr`](@ref) formulation builds ``\\boldsymbol{y}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{y} = k^{2} \\sigma^{2}(\\boldsymbol{w})``, of degree two. The model maximises ``(\\mathrm{ret} - r_f) / \\sigma(\\boldsymbol{w})``, the Sharpe ratio.
-  - [`Variance`](@ref) in the semidefinite formulation builds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W})`` with ``\\mathbf{W} \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``. The trace is at least ``k \\sigma^{2}(\\boldsymbol{w})``, with equality at ``\\mathbf{W} = \\boldsymbol{y}\\boldsymbol{y}^\\intercal / k``, so it has degree one. The model maximises ``(\\mathrm{ret} - r_f) / \\sigma^{2}(\\boldsymbol{w})``, the excess return per unit of variance. A variance takes this formulation when it holds risk-contribution rows `rc`, when the constraints hold a [`SemiDefinitePhylogeny`](@ref), and always under [`FactorRiskContribution`](@ref).
+  - A variance on a lifted weight matrix reads the corner of the lift, and its `lift` field selects the corner of its objective term. The semidefinite [`Variance`](@ref) is one: it holds risk-contribution rows `rc`, the constraints hold a [`SemiDefinitePhylogeny`](@ref), or the optimiser is [`FactorRiskContribution`](@ref). The box, the ellipsoid and the norm ball of [`UncertaintySetVariance`](@ref) are the others.
+      + [`ConstantCornerLift`](@ref), the default, builds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W}_c)`` with ``c\\,\\mathbf{W}_c \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal`` and a constant ``c``. The term is at least ``k^{2} \\sigma^{2}(\\boldsymbol{w}) / c``, with equality at rank one, so it has degree two, and the model maximises the Sharpe ratio.
+      + [`ScaleCornerLift`](@ref) builds ``\\mathrm{tr}(\\mathbf{\\Sigma} \\mathbf{W})`` with ``k\\,\\mathbf{W} \\succeq \\boldsymbol{y}\\boldsymbol{y}^\\intercal``. The trace is at least ``k \\sigma^{2}(\\boldsymbol{w})``, with equality at rank one, so it has degree one, and the model maximises ``(\\mathrm{ret} - r_f) / \\sigma^{2}(\\boldsymbol{w})``, the excess return per unit of variance.
+
+A bound on a lifted variance reads the lift with the corner ``k`` under both, because the
+row ``R \\leq u\\,k`` needs degree one. [`set_sdp_objective_lift!`](@ref) states the lift of the
+objective.
 
 # Fields
 

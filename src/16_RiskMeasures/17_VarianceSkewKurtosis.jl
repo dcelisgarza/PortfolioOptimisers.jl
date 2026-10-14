@@ -557,7 +557,9 @@ VarianceSkewKurtosis
            │       chol ┼ nothing
            │         rc ┼ nothing
            │        alg ┼ SquaredSOCRiskExpr()
-           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
+           │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │       lift ┼ ConstantCornerLift()
+           │     corner ┴ nothing
         sk ┼ Skewness
            │   settings ┼ MaxRiskMeasureSettings
            │            │   scale ┼ Float64: 1.0

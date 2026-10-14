@@ -9,6 +9,8 @@ NSkeQuadFormulations
 QuadSecondMomentFormulations
 SecondMomentFormulation
 VarianceFormulation
+SemiDefiniteLift
+assert_lift_corner
 resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult)
 resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult)
 resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult)
