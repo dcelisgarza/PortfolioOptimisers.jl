@@ -449,7 +449,14 @@ q = 0.05, min_obs = nothing, min_periods = nothing, rng = Random.default_rng(), 
   can give a count. A fixed count is wrong at a small `b`: 32 nodes err by 0.57 at `b = 0.02`.
   `EigenSumDraws` takes an exact eigen factor, so it reads every kernel. `QuadratureSumDraws` is the
   default of the quadratic spectral kernel: at 5,000 dates and 9,999 draws a test took 22 s under
-  `ObservationDraws` and 26 ms under it. `ObservationDraws` is the default of every other kernel.
+  `ObservationDraws` and 11 ms under it. `ObservationDraws` is the default of every other kernel.
+- **The observed sum** under `QuadratureSumDraws` is its field `form`, an `AbstractLongRunForm`.
+  The quadratic spectral kernel weights every lag, so the exact sum, `ExactLongRunForm`, costs
+  `O(n^2)`: 1.2 s at 50,000 dates, where the draws cost 0.1 s. The default `FeatureLongRunForm` reads
+  the sum through the features of the draws, `‖Φ'd‖²`, at `O(n K)`: 0.8 ms at 50,000 dates and
+  `1.3e-14` from the exact sum. The observed statistic then reads the kernel of the draws. A test
+  takes 6.8 ms at 1,000 dates, 25 ms at 20,000 and 66 ms at 50,000, linear in the length; the
+  oracle takes 14, 57 and 118 ms.
 - **The span** that the bandwidth and the history rule read is `FiniteEntrySpan`, the entries from
   the first finite one to the last, or `FullGridSpan`, every position of the grid. A missing entry
   inside the span keeps its position under both.

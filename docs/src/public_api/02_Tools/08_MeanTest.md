@@ -36,11 +36,6 @@ mean_test_span_length
 
 ```@docs
 AbstractBootstrapDraws
-ObservationDraws
-QuadratureSumDraws
-EigenSumDraws
-wild_bootstrap_statistics
-assert_bootstrap_draws
 ```
 
 ## References

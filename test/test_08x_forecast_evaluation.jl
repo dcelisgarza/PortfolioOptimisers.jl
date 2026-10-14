@@ -986,6 +986,8 @@ end
         @test_throws DomainError QuadratureSumDraws(; tol = 1)
         @test_throws DomainError QuadratureSumDraws(; nodes = 0)
         @test QuadratureSumDraws(; tol = 1e-10, nodes = 7).nodes == 7
+        @test QuadratureSumDraws().form isa FeatureLongRunForm
+        @test QuadratureSumDraws(; form = ExactLongRunForm()).form isa ExactLongRunForm
         # A seed gives a private copy, so the caller's generator does not move.
         rng = StableRNG(3)
         r = PO.mean_test_rng(WildBootstrapMeanTest(; rng = rng, seed = 9))
@@ -1049,6 +1051,25 @@ end
         Phi = PO.quadrature_kernel_features(k, QuadratureSumDraws(; nodes = 4), 300, 30.0)
         @test size(Phi, 2) == 8
         @test maximum(abs, Phi * Phi' - PO.kernel_weight_matrix(k, 300, 30.0)) > 1e-3
+        # The feature form of the observed sum agrees with the exact sum to the error of
+        # the quadrature, with a gap and at a long span.
+        for P in (37, 3_000)
+            d = randn(StableRNG(P), P)
+            d[[2, P - 3]] .= 0
+            d .-= sum(d) / P
+            B = 0.1 * P
+            Phi = PO.quadrature_kernel_features(k, QuadratureSumDraws(), P, B)
+            buf = zeros(P + 1)
+            ex = PO.observed_long_run_form(ExactLongRunForm(), k, d, B, buf, Phi)
+            @test ex == PO.long_run_quadratic_form(k, d, B, buf)
+            @test isapprox(PO.observed_long_run_form(FeatureLongRunForm(), k, d, B, buf,
+                                                     Phi), ex; rtol = 1e-12)
+        end
+        # A sum that is not positive takes no draw.
+        Q, ats = PO.wild_bootstrap_statistics(k, QuadratureSumDraws(), 99, zeros(10),
+                                              trues(10), 10, 10, 1.0, zeros(11),
+                                              StableRNG(1))
+        @test iszero(Q) && isempty(ats)
         u, w = PO.gauss_legendre_positive_nodes(5, Float64)
         @test sum(w) ≈ 1
         @test sum(w .* u .^ 4) ≈ 1 / 5
@@ -1066,7 +1087,8 @@ end
         M = 9_999
         for x in (v, v .+ 0.08)
             for (k, algs) in ((QuadraticSpectralKernel(),
-                               (ObservationDraws(), QuadratureSumDraws(), EigenSumDraws())),
+                               (ObservationDraws(), QuadratureSumDraws(), EigenSumDraws(),
+                                QuadratureSumDraws(; form = ExactLongRunForm()))),
                               (BartlettKernel(), (ObservationDraws(), EigenSumDraws())),
                               (GenericBartlett(), (ObservationDraws(), EigenSumDraws())),
                               (TruncatedKernel(), (ObservationDraws(), EigenSumDraws())))
@@ -1074,7 +1096,8 @@ end
                                                         n_sim = M), x, 5, StableRNG(j))
                      for (j, a) in enumerate(algs)]
                 for s in r[2:end]
-                    @test s.t_stat == r[1].t_stat
+                    # The feature form reads the kernel of the quadrature, to its tolerance.
+                    @test isapprox(s.t_stat, r[1].t_stat; rtol = 1e-12)
                     p = r[1].p_value
                     @test abs(s.p_value - p) <= 4 * sqrt(2 * p * (1 - p) / M) + 2 / M
                     @test isapprox(s.mean_ci_upper - s.mean_ci_lower,
@@ -1082,8 +1105,22 @@ end
                 end
             end
         end
+        # The exact form reads the observed series at the exact weights, as the draws per
+        # observation do.
+        mq = WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), b = 0.15,
+                                   n_sim = 19)
+        @test PO.mean_test(WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(),
+                                                 alg = QuadratureSumDraws(;
+                                                                          form = ExactLongRunForm()),
+                                                 b = 0.15, n_sim = 19), v, 5,
+                           StableRNG(1)).t_stat ==
+              PO.mean_test(WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(),
+                                                 alg = ObservationDraws(), b = 0.15,
+                                                 n_sim = 19), v, 5, StableRNG(1)).t_stat
+        @test mq.alg.form isa FeatureLongRunForm
         # A constant series has no statistic under any algorithm.
-        for a in (QuadratureSumDraws(), EigenSumDraws())
+        for a in (QuadratureSumDraws(), EigenSumDraws(),
+                  QuadratureSumDraws(; form = ExactLongRunForm()))
             mt = WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), alg = a,
                                        n_sim = 19)
             @test all(isnan, values(PO.mean_test(mt, fill(0.03, 40), 1, StableRNG(1))))

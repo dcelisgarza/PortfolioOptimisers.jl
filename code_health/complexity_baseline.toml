@@ -5,7 +5,7 @@
 julia = "1.13.1"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "afc70e40b5"
+commit = "f39f2da0ea"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -59,6 +59,7 @@ commit = "afc70e40b5"
 "src/02_Tools/06_ForwardProperties.jl" = { cyc = 51, cog = 103, arg = 4, cyc_sum = 71, cog_sum = 131, arg_sum = 14, macros = [] }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { cyc = 3, cog = 4, arg = 3, cyc_sum = 32, cog_sum = 9, arg_sum = 76, macros = ["@propagatable"] }
 "src/02_Tools/08_MeanTest.jl" = { cyc = 7, cog = 12, arg = 11, cyc_sum = 115, cog_sum = 117, arg_sum = 140, macros = [] }
+"src/02_Tools/09_MeanTestDraws.jl" = { cyc = 7, cog = 12, arg = 10, cyc_sum = 54, cog_sum = 57, arg_sum = 95, macros = [] }
 "src/03_InputData/01_AssetPanel.jl" = { cyc = 7, cog = 9, arg = 7, cyc_sum = 118, cog_sum = 78, arg_sum = 110, macros = [] }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { cyc = 7, cog = 10, arg = 6, cyc_sum = 80, cog_sum = 63, arg_sum = 76, macros = [] }
 "src/03_InputData/03_ListingSpan.jl" = { cyc = 5, cog = 8, arg = 3, cyc_sum = 20, cog_sum = 13, arg_sum = 20, macros = [] }

@@ -8,7 +8,7 @@ jet = "0.12.1"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "4c442f5031"
+commit = "f39f2da0ea"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -65,6 +65,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/02_Tools/06_ForwardProperties.jl" = { raw = 4, reviewed = 4 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { raw = 2, reviewed = 2 }
 "src/02_Tools/08_MeanTest.jl" = { raw = 0, reviewed = 0 }
+"src/02_Tools/09_MeanTestDraws.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
@@ -476,6 +477,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/02_Tools/06_ForwardProperties.jl" = { raw = 1, reviewed = 1 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/08_MeanTest.jl" = { raw = 0, reviewed = 0 }
+"src/02_Tools/09_MeanTestDraws.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
