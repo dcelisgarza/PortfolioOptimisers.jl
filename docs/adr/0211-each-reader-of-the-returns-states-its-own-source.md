@@ -115,9 +115,10 @@ decision 5 (#1689) met a gapped panel.
 - A tracking-error `MeanRisk` with a prior, an uncertainty set and a centrality constraint states
   `ExcessSource()` in three places, where `brt = true` was one.
 - **The default of a graph reader changes from `pr.X` to `rd.X`.** The clusters of a graph reader
-  move under a factor prior, a scenario window or a gap. The parity rule of #1678 says that a
-  migration build closes only when the pins of `test/test_78_brt_pinned_outputs.jl` pass unchanged.
-  So this change is its own build with new pins, and it lands before the migration builds.
+  move under a factor prior, a scenario window or a gap. The parity rule of #1678 says that the
+  migration closes only when the pins of `test/test_78_brt_pinned_outputs.jl` pass unchanged. So
+  this change is its own build with new pins, and it lands before the migration (ADR 0213,
+  decision 5).
 - On a gapped panel, a hierarchical head with a mask-aware prior and the default `cle` drops each
   young asset that the prior kept, and warns. A caller who wants the asset states the same
   `CoveragePolicy` on the `ce` of the clustering. The dendrogram then reads the observed cells and

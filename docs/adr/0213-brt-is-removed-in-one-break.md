@@ -38,7 +38,8 @@ The facts at `e7085bce58`:
 
 ## Decision
 
-The maintainer decided on 2026-10-13.
+The maintainer decided on 2026-10-13. Decision 5 came on 2026-10-14 (#1693), when the migration
+was split into builds.
 
 1. **`brt` goes in one break.** No release keeps `brt` as a deprecated keyword, and no code maps
    `brt = true` to `x_src` on the readers. Every owner loses the field and the keyword in the same
@@ -58,20 +59,49 @@ The maintainer decided on 2026-10-13.
    `CovarianceForecastEvaluationResult` records the frame. A caller that builds the Result by position
    with a `Bool` in the old position must get an error, not a Result. So the new record either has a
    type that refuses a `Bool`, or a different position or arity.
+5. **The migration reaches `dev` in one merge (#1693).** The pieces of the migration meet on one
+   integration branch, `migration-1678`, which starts from `dev`. Each piece is a session in its own
+   worktree. It owns whole files, the test files of its area included, so no two parallel pieces edit
+   one file. A piece rebases onto the integration branch and fast-forwards into it, and the branch
+   can be red between two pieces. A foundation piece goes first and alone. It adds the values of ADR
+   0212, the shared assertion, the refusal of an inner reader, the verb of the frame walk of ADR
+   [0214](0214-the-readers-of-one-head-can-read-different-frames.md) with its default method, and
+   every new docstring key. Each later piece adds the walk methods of the types that it owns. A last
+   piece rebases the integration branch onto `dev`, runs the pins and the census, and fast-forwards
+   `dev`. Only that piece rebases the integration branch.
 
 ## Consequences
 
-- The migration builds can land one at a time on `dev`. The release that ships the first of them
-  ships all of them, so a caller meets the break once. No release is cut from `dev` while it holds
-  some migration builds and not all.
-- The docstring keys `:brt` and `:brt_read` go in the build that removes their last reader.
+- `dev` never holds a part of the migration, so a release cut from `dev` has all of it or none of
+  it, and a caller meets the break once.
+- Inside a piece, no head forwards `brt` to a migrated reader, and no rule of precedence joins the
+  two. No transitional code is written.
+- A piece cannot run the tests of a head until the pieces that it calls are in. The last piece runs
+  the tests and repairs a failure, and its report names the piece at fault.
+- The docstring keys `:brt` and `:brt_read` go in the last piece, which removes their last reader.
 - No deprecation code is written, tested or removed later.
 - A caller who upgrades gets an error at each `brt` and fixes it with the migration guide. A
   tracking-error `MeanRisk` with a prior, an uncertainty set and a centrality constraint changes one
   keyword into three (ADR 0211).
-- The pins of `test/test_78_brt_pinned_outputs.jl` stay the oracle of each migration build.
+- The pins of `test/test_78_brt_pinned_outputs.jl` stay the oracle of the migration. The last piece
+  closes only when they pass unchanged.
 
 ## Alternatives considered
+
+- **Builds that land one at a time on `dev`, each green.** A migrated reader reads only its own
+  `x_src`, and the head keeps `brt` for the readers that are not migrated yet. Each pin run tests
+  the new spelling of one family. But every build moves the test sites of its family while the
+  head still holds `brt`, and the head paths of ADR 0215 read two frames until the last build.
+- **A migrated reader at `nothing` reads `X - B` under a head with `brt = true`, on `dev` only.**
+  No helper changes until the last build, so the pins test the new spelling only once. It is the
+  rule of precedence that this ADR refused for a release.
+- **One integrator.** Each piece is a branch from `dev` that nobody merges, and one session merges
+  them all. The pieces do not see each other's work, so two pieces can write two forms of one
+  helper.
+- **The frame walk in one file**, as `feature_readable_mask` is. One piece must then name the inner
+  fields of readers that other pieces own.
+- **The last piece moves every old test site.** That piece then carries 24 test files, `test_78`,
+  the docs and the run, which is more than one session.
 
 - **Deprecate `brt` for one release.** A head under `brt = true` warns, then rebuilds each outermost
   reader whose `x_src` is `nothing` with `ExcessSource()`. This is the default on the head that ADR
