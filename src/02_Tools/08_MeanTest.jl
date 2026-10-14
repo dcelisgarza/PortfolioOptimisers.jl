@@ -1055,7 +1055,7 @@ A missing entry is zero in the centred series, so it adds nothing to a sum of pr
 
 # Returns
 
-  - `m::Real`: The mean, `NaN` when no entry is finite.
+  - `m::Real`: The mean, `NaN` when no entry is finite. When every finite entry has one value, the mean is that value, so every entry of `d` is zero and the long-run variance is not positive.
   - `n::Int`: The number of finite entries.
   - `d::Vector{<:Real}`: The centred span, empty when no entry is finite.
   - `f::BitVector`: Whether each entry of `d` is a finite observation.
@@ -1069,6 +1069,11 @@ function mean_test_centred(c::VecNum, span::AbstractMeanTestSpan)
     Tm = float_if_integer(real(eltype(c)))
     n, s, i1, i2 = finite_sum_bounds(c, Tm)
     m = n > 0 ? s / n : Tm(NaN)
+    # `s / n` misses the value of a constant series by round-off, which would centre it to a
+    # long-run variance that is positive. The value is its mean.
+    if n > 0 && all(v -> !isfinite(v) || v == c[i1], view(c, i1:i2))
+        m = oftype(m, c[i1])
+    end
     P = iszero(n) ? 0 : i2 - i1 + 1
     d = Vector{typeof(m)}(undef, P)
     f = falses(P)

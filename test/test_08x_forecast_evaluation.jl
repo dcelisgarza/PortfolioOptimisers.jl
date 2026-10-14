@@ -1125,6 +1125,14 @@ end
                 @test all(isnan, values(r))
             end
         end
+        # A constant series whose sum over its count misses its value by round-off: the
+        # centring residue must not make a long-run variance, with or without a gap.
+        @test sum(fill(0.03, 100)) / 100 != 0.03
+        g = fill(0.03, 100)
+        g[[1, 40, 41, 100]] .= NaN
+        for v in (fill(0.03, 100), g), t in (mt, OverlapMeanTest())
+            @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
+        end
         # An alternating series sums the untapered long-run variance below zero, and the
         # Bartlett one stays positive, so only the overlap test answers NaN.
         v = [0.5, -0.4, 0.5, -0.4, 0.5, -0.4, 0.5, -0.4]
