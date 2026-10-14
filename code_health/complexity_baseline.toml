@@ -204,12 +204,12 @@ commit = "f39f2da0ea"
 "src/08_Phylogeny/06_DBHT/07_DBHTClustering.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 1, arg_sum = 22, macros = [] }
 "src/08_Phylogeny/07_LoGo.jl" = { cyc = 6, cog = 11, arg = 5, cyc_sum = 16, cog_sum = 14, arg_sum = 35, macros = [] }
 "src/08_Phylogeny/08_Network/01_MinimumSpanningTree.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 9, cog_sum = 3, arg_sum = 14, macros = [] }
-"src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { cyc = 1, cog = 1, arg = 4, cyc_sum = 4, cog_sum = 2, arg_sum = 14, macros = ["@propagatable"] }
+"src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 6, cog_sum = 2, arg_sum = 22, macros = ["@propagatable"] }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { cyc = 8, cog = 9, arg = 4, cyc_sum = 18, cog_sum = 11, arg_sum = 32, macros = [] }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { cyc = 5, cog = 6, arg = 5, cyc_sum = 32, cog_sum = 12, arg_sum = 29, macros = [] }
 "src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 29, cog_sum = 10, arg_sum = 47, macros = [] }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { cyc = 1, cog = 0, arg = 0, cyc_sum = 6, cog_sum = 0, arg_sum = 0, macros = [] }
-"src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 4, macros = [] }
+"src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { cyc = 1, cog = 1, arg = 3, cyc_sum = 4, cog_sum = 1, arg_sum = 10, macros = [] }
 "src/08_Phylogeny/09_Centrality/04_CentralityQueries.jl" = { cyc = 1, cog = 1, arg = 6, cyc_sum = 11, cog_sum = 3, arg_sum = 50, macros = [] }
 "src/08_Phylogeny/10_PhylogenyClustering.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 7, cog_sum = 2, arg_sum = 28, macros = [] }
 "src/08_Phylogeny/11_PhylogenyMatrix.jl" = { cyc = 2, cog = 1, arg = 5, cyc_sum = 7, cog_sum = 2, arg_sum = 15, macros = [] }

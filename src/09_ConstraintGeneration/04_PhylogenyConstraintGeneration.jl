@@ -115,7 +115,8 @@ $(DocStringExtensions.FIELDS)
 
     SemiDefinitePhylogenyEstimator(;
         pl::NwE_ClE = NetworkEstimator(),
-        p::Number = 0.05
+        p::Number = 0.05,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> SemiDefinitePhylogenyEstimator
 
 Keywords correspond to the struct's fields. The default `p = 0.05` is the value the source's own worked example uses.
@@ -123,6 +124,8 @@ Keywords correspond to the struct's fields. The default `p = 0.05` is the value 
 ## Validation
 
   - `p >= 0`.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `returns_source(pl) === nothing`: the network or clustering estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
   - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`SemiDefinitePhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
@@ -130,33 +133,35 @@ Keywords correspond to the struct's fields. The default `p = 0.05` is the value 
 ```jldoctest
 julia> SemiDefinitePhylogenyEstimator()
 SemiDefinitePhylogenyEstimator
-  pl ┼ NetworkEstimator
-     │    ce ┼ PortfolioOptimisersCovariance
-     │       │   ce ┼ Covariance
-     │       │      │    me ┼ SimpleExpectedReturns
-     │       │      │       │   w ┴ nothing
-     │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │    w ┴ nothing
-     │       │      │   alg ┼ FullMoment()
-     │       │      │     w ┴ nothing
-     │       │   mp ┼ MatrixProcessing
-     │       │      │     pdm ┼ Posdef
-     │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │       │      │      dn ┼ nothing
-     │       │      │      dt ┼ nothing
-     │       │      │     alg ┼ nothing
-     │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-     │    de ┼ Distance
-     │       │   power ┼ nothing
-     │       │     alg ┴ CanonicalDistance()
-     │   alg ┼ KruskalTree
-     │       │     args ┼ Tuple{}: ()
-     │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │   sep ┼ HopCount
-     │       │   n ┴ Int64: 1
-   p ┴ Float64: 0.05
+     pl ┼ NetworkEstimator
+        │      ce ┼ PortfolioOptimisersCovariance
+        │         │   ce ┼ Covariance
+        │         │      │    me ┼ SimpleExpectedReturns
+        │         │      │       │   w ┴ nothing
+        │         │      │    ce ┼ GeneralCovariance
+        │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │         │      │       │    w ┴ nothing
+        │         │      │   alg ┼ FullMoment()
+        │         │      │     w ┴ nothing
+        │         │   mp ┼ MatrixProcessing
+        │         │      │     pdm ┼ Posdef
+        │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      │      dn ┼ nothing
+        │         │      │      dt ┼ nothing
+        │         │      │     alg ┼ nothing
+        │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │      de ┼ Distance
+        │         │   power ┼ nothing
+        │         │     alg ┴ CanonicalDistance()
+        │     alg ┼ KruskalTree
+        │         │     args ┼ Tuple{}: ()
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     sep ┼ HopCount
+        │         │   n ┴ Int64: 1
+        │   x_src ┴ nothing
+      p ┼ Float64: 0.05
+  x_src ┴ nothing
 ```
 
 # Related
@@ -181,15 +186,22 @@ SemiDefinitePhylogenyEstimator
     $(field_dict[:p_phylo])
     """
     p
-    function SemiDefinitePhylogenyEstimator(pl::NwE_ClE,
-                                            p::Number)::SemiDefinitePhylogenyEstimator
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
+    function SemiDefinitePhylogenyEstimator(pl::NwE_ClE, p::Number,
+                                            x_src::Option{<:AbstractReturnsSource})::SemiDefinitePhylogenyEstimator
         assert_nonneg(p, :p)
-        return new{typeof(pl), typeof(p)}(pl, p)
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :SemiDefinitePhylogenyEstimator)
+        assert_inner_reader(pl, :pl, :SemiDefinitePhylogenyEstimator)
+        return new{typeof(pl), typeof(p), typeof(x_src)}(pl, p, x_src)
     end
 end
 function SemiDefinitePhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
-                                        p::Number = 0.05)::SemiDefinitePhylogenyEstimator
-    return SemiDefinitePhylogenyEstimator(pl, p)
+                                        p::Number = 0.05,
+                                        x_src::Option{<:AbstractReturnsSource} = nothing)::SemiDefinitePhylogenyEstimator
+    return SemiDefinitePhylogenyEstimator(pl, p, x_src)
 end
 """
     const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
@@ -422,7 +434,8 @@ $(DocStringExtensions.FIELDS)
 
     IntegerPhylogenyEstimator(;
         pl::NwE_ClE = NetworkEstimator(),
-        B::Int_VecInt = 1
+        B::Int_VecInt = 1,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> IntegerPhylogenyEstimator
 
 Keywords correspond to the struct's fields.
@@ -433,6 +446,10 @@ Keywords correspond to the struct's fields.
 
       + `AbstractVector`: It is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
 
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+
+  - `returns_source(pl) === nothing`: the network or clustering estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
+
   - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`IntegerPhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
@@ -440,33 +457,35 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> IntegerPhylogenyEstimator()
 IntegerPhylogenyEstimator
-  pl ┼ NetworkEstimator
-     │    ce ┼ PortfolioOptimisersCovariance
-     │       │   ce ┼ Covariance
-     │       │      │    me ┼ SimpleExpectedReturns
-     │       │      │       │   w ┴ nothing
-     │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │    w ┴ nothing
-     │       │      │   alg ┼ FullMoment()
-     │       │      │     w ┴ nothing
-     │       │   mp ┼ MatrixProcessing
-     │       │      │     pdm ┼ Posdef
-     │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │       │      │      dn ┼ nothing
-     │       │      │      dt ┼ nothing
-     │       │      │     alg ┼ nothing
-     │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-     │    de ┼ Distance
-     │       │   power ┼ nothing
-     │       │     alg ┴ CanonicalDistance()
-     │   alg ┼ KruskalTree
-     │       │     args ┼ Tuple{}: ()
-     │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │   sep ┼ HopCount
-     │       │   n ┴ Int64: 1
-   B ┴ Int64: 1
+     pl ┼ NetworkEstimator
+        │      ce ┼ PortfolioOptimisersCovariance
+        │         │   ce ┼ Covariance
+        │         │      │    me ┼ SimpleExpectedReturns
+        │         │      │       │   w ┴ nothing
+        │         │      │    ce ┼ GeneralCovariance
+        │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │         │      │       │    w ┴ nothing
+        │         │      │   alg ┼ FullMoment()
+        │         │      │     w ┴ nothing
+        │         │   mp ┼ MatrixProcessing
+        │         │      │     pdm ┼ Posdef
+        │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      │      dn ┼ nothing
+        │         │      │      dt ┼ nothing
+        │         │      │     alg ┼ nothing
+        │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │      de ┼ Distance
+        │         │   power ┼ nothing
+        │         │     alg ┴ CanonicalDistance()
+        │     alg ┼ KruskalTree
+        │         │     args ┼ Tuple{}: ()
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     sep ┼ HopCount
+        │         │   n ┴ Int64: 1
+        │   x_src ┴ nothing
+      B ┼ Int64: 1
+  x_src ┴ nothing
 ```
 
 # Related
@@ -492,18 +511,32 @@ IntegerPhylogenyEstimator
     $(field_dict[:B_phylo])
     """
     B
-    function IntegerPhylogenyEstimator(pl::NwE_ClE,
-                                       B::Int_VecInt)::IntegerPhylogenyEstimator
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
+    function IntegerPhylogenyEstimator(pl::NwE_ClE, B::Int_VecInt,
+                                       x_src::Option{<:AbstractReturnsSource})::IntegerPhylogenyEstimator
         assert_nonempty_nonneg_finite_val(B, :B)
         if isa(B, VecInt)
             validate_length_integer_phylogeny_constraint_B(pl, B)
         end
-        return new{typeof(pl), typeof(B)}(pl, B)
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :IntegerPhylogenyEstimator)
+        assert_inner_reader(pl, :pl, :IntegerPhylogenyEstimator)
+        return new{typeof(pl), typeof(B), typeof(x_src)}(pl, B, x_src)
     end
 end
-function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(),
-                                   B::Int_VecInt = 1)::IntegerPhylogenyEstimator
-    return IntegerPhylogenyEstimator(pl, B)
+function IntegerPhylogenyEstimator(; pl::NwE_ClE = NetworkEstimator(), B::Int_VecInt = 1,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing)::IntegerPhylogenyEstimator
+    return IntegerPhylogenyEstimator(pl, B, x_src)
+end
+function returns_source(x::Union{<:SemiDefinitePhylogenyEstimator,
+                                 <:IntegerPhylogenyEstimator})
+    return x.x_src
+end
+function reader_frames(x::Union{<:SemiDefinitePhylogenyEstimator,
+                                <:IntegerPhylogenyEstimator}, path::AbstractString, ::Bool)
+    return source_frames(x.x_src, path, true)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -732,53 +765,59 @@ $(DocStringExtensions.FIELDS)
     CentralityConstraint(;
         A::CentralityEstimator = CentralityEstimator(),
         B::Num_VecToScaM = MinValue(),
-        comp::ComparisonOperator = <=
+        comp::ComparisonOperator = <=,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> CentralityConstraint
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - Every argument is bounded by its type and by nothing else: `A` by [`CentralityEstimator`](@ref), `B` by [`Num_VecToScaM`](@ref), and `comp` by [`ComparisonOperator`](@ref). A value outside a bound raises a `TypeError` from the keyword constructor.
-  - No value is checked. A non-finite `B` reaches the generated row unchanged: [`centrality_constraints`](@ref) stores a `NaN` or an `Inf` right-hand side and the model carries it to the solver.
+  - `A` is bounded by [`CentralityEstimator`](@ref), `B` by [`Num_VecToScaM`](@ref), and `comp` by [`ComparisonOperator`](@ref). A value outside a bound raises a `TypeError` from the keyword constructor.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `returns_source(A) === nothing`: the centrality estimator reads the matrix that this constraint picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
+  - No value of `B` is checked. A non-finite `B` reaches the generated row unchanged: [`centrality_constraints`](@ref) stores a `NaN` or an `Inf` right-hand side and the model carries it to the solver.
 
 # Examples
 
 ```jldoctest
 julia> CentralityConstraint()
 CentralityConstraint
-     A ┼ CentralityEstimator
-       │   pl ┼ NetworkEstimator
-       │      │    ce ┼ PortfolioOptimisersCovariance
-       │      │       │   ce ┼ Covariance
-       │      │       │      │    me ┼ SimpleExpectedReturns
-       │      │       │      │       │   w ┴ nothing
-       │      │       │      │    ce ┼ GeneralCovariance
-       │      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-       │      │       │      │       │    w ┴ nothing
-       │      │       │      │   alg ┼ FullMoment()
-       │      │       │      │     w ┴ nothing
-       │      │       │   mp ┼ MatrixProcessing
-       │      │       │      │     pdm ┼ Posdef
-       │      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-       │      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │      │       │      │      dn ┼ nothing
-       │      │       │      │      dt ┼ nothing
-       │      │       │      │     alg ┼ nothing
-       │      │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-       │      │    de ┼ Distance
-       │      │       │   power ┼ nothing
-       │      │       │     alg ┴ CanonicalDistance()
-       │      │   alg ┼ KruskalTree
-       │      │       │     args ┼ Tuple{}: ()
-       │      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-       │      │   sep ┼ HopCount
-       │      │       │   n ┴ Int64: 1
-       │   ct ┼ DegreeCentrality
-       │      │     kind ┼ Int64: 0
-       │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     B ┼ MinValue()
-  comp ┴ typeof(<=): <=
+      A ┼ CentralityEstimator
+        │      pl ┼ NetworkEstimator
+        │         │      ce ┼ PortfolioOptimisersCovariance
+        │         │         │   ce ┼ Covariance
+        │         │         │      │    me ┼ SimpleExpectedReturns
+        │         │         │      │       │   w ┴ nothing
+        │         │         │      │    ce ┼ GeneralCovariance
+        │         │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │         │         │      │       │    w ┴ nothing
+        │         │         │      │   alg ┼ FullMoment()
+        │         │         │      │     w ┴ nothing
+        │         │         │   mp ┼ MatrixProcessing
+        │         │         │      │     pdm ┼ Posdef
+        │         │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │         │      │      dn ┼ nothing
+        │         │         │      │      dt ┼ nothing
+        │         │         │      │     alg ┼ nothing
+        │         │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │         │      de ┼ Distance
+        │         │         │   power ┼ nothing
+        │         │         │     alg ┴ CanonicalDistance()
+        │         │     alg ┼ KruskalTree
+        │         │         │     args ┼ Tuple{}: ()
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │     sep ┼ HopCount
+        │         │         │   n ┴ Int64: 1
+        │         │   x_src ┴ nothing
+        │      ct ┼ DegreeCentrality
+        │         │     kind ┼ Int64: 0
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │   x_src ┴ nothing
+      B ┼ MinValue()
+   comp ┼ typeof(<=): <=
+  x_src ┴ nothing
 ```
 
 # Related
@@ -807,14 +846,28 @@ CentralityConstraint
     $(field_dict[:cc_comp])
     """
     comp
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
     function CentralityConstraint(A::CentralityEstimator, B::Num_VecToScaM,
-                                  comp::ComparisonOperator)
-        return new{typeof(A), typeof(B), typeof(comp)}(A, B, comp)
+                                  comp::ComparisonOperator,
+                                  x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :CentralityConstraint)
+        assert_inner_reader(A, :A, :CentralityConstraint)
+        return new{typeof(A), typeof(B), typeof(comp), typeof(x_src)}(A, B, comp, x_src)
     end
 end
 function CentralityConstraint(; A::CentralityEstimator = CentralityEstimator(),
-                              B::Num_VecToScaM = MinValue(), comp::ComparisonOperator = <=)
-    return CentralityConstraint(A, B, comp)
+                              B::Num_VecToScaM = MinValue(), comp::ComparisonOperator = <=,
+                              x_src::Option{<:AbstractReturnsSource} = nothing)
+    return CentralityConstraint(A, B, comp, x_src)
+end
+function returns_source(cc::CentralityConstraint)
+    return cc.x_src
+end
+function reader_frames(cc::CentralityConstraint, path::AbstractString, ::Bool)
+    return source_frames(cc.x_src, path, true)
 end
 """
     const VecCC = AbstractVector{<:CentralityConstraint}

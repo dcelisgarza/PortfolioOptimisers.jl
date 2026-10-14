@@ -63,8 +63,9 @@ re-derive them:
         @test PO.panel_feature_matrix(pnl)[2] == Z
 
         # The `X` picker is unchanged: `pr.X` is right whichever carrier sits in the slot.
-        @test PO.returns_matrix_picker(rd, nothing, :prior) === rd.X
-        @test PO.returns_matrix_picker(rd, rd, :data) === rd.X
+        @test PO.returns_matrix_picker(rd, nothing, nothing) === rd.X
+        @test PO.returns_matrix_picker(rd, rd, PriorSource()) === rd.X
+        @test PO.returns_matrix_picker(rd, rd, DataSource()) === rd.X
     end
 
     @testset "A prior result alone carries no panel, and the refusal names the way out" begin
@@ -95,6 +96,8 @@ re-derive them:
     =#
     @testset "Every `Pr_RR` method declares `rd`, or is excused by name" begin
         excused = Dict(:returns_matrix_picker => "takes `rd` positionally; it *is* the picker",
+                       :picked_returns_data => "takes `rd` positionally; it picks the returns data of a graph verb for the picker",
+                       :centrality_constraints_from => "takes `rd` positionally from `centrality_constraints`, and passes it on to the picker and the estimator tree",
                        :expected_risk => "reads `pr.X` and the moments; no feature matrix",
                        :risk_gradient => "differentiates `expected_risk` on `pr.X` and the moments; no feature matrix",
                        :calc_net_returns => "reads a returns matrix and fees; no feature matrix",
@@ -185,8 +188,8 @@ re-derive them:
     The pipeline is where the audit found the defect in `src/`: `run_step` and
     `constraint_step_value` passed `ctx.returns` in the `pr` slot and never filled `rd`,
     because the context holds one carrier and there is no second one to pass. Each of the
-    four sites threw before `#666`. Since #1670 they pass the same carrier as `rd` too, to
-    read the returns under the `brt` of the step.
+    four sites threw before `#666`. Since #1670 they pass the same carrier as `rd` too, so
+    that each reader reads the returns that its own source names.
     =#
     @testset "The four `Pipeline` sites carry the panel" begin
         fde = FeatureDistance(; sel = ["z1", "z3"], strict = true)
@@ -202,4 +205,92 @@ re-derive them:
         @test PO.constraint_step_value(CentralityConstraint(; A = cte, B = 1.0, comp = <=),
                                        ctx) isa LinearConstraint
     end
+end
+
+#=
+Each graph reader states its own source (ADR 0211, decisions 1 to 3; ADR 0212, decision 5).
+
+The seven graph readers hold `x_src`, admit all four values, and refuse a stated source on
+each nesting field that holds a reader, because that inner reader receives the matrix that its
+holder picks. The frame walk of ADR 0214 sees each one as an outermost reader that reads the
+raw returns data at `nothing`.
+=#
+struct HalfSource1698 <: PortfolioOptimisers.AbstractReturnsSource end
+@testset "Each graph reader states its own source" begin
+    PO = PortfolioOptimisers
+    readers = (ClustersEstimator, NetworkEstimator, NetworkClustersEstimator,
+               CentralityEstimator, SemiDefinitePhylogenyEstimator,
+               IntegerPhylogenyEstimator, CentralityConstraint)
+    w = StatsBase.pweights(fill(0.1, 10))
+    for T in readers
+        @test isnothing(T().x_src)
+        for x_src in PO.ALL_RETURNS_SOURCES
+            r = T(; x_src = x_src)
+            @test r.x_src === x_src
+            @test PO.returns_source(r) === x_src
+        end
+        @test_throws TypeError T(; x_src = :data)
+        @test_throws TypeError T(; x_src = true)
+        # The walk: the Excess Frame, a raw reader at `nothing`, and a stated raw source.
+        f = PO.reader_frames(T(; x_src = ExcessSource()), "cle", true)
+        @test f.excess && isempty(f.raw)
+        f = PO.reader_frames(T(), "cle", false)
+        @test !f.excess && f.raw == ["cle"]
+        for x_src in (DataSource(), PriorSource())
+            f = PO.reader_frames(T(; x_src = x_src), "cle", true)
+            @test !f.excess && isempty(f.raw)
+        end
+    end
+    # A source the library does not admit is refused by the shared assertion.
+    err = try
+        ClustersEstimator(; x_src = HalfSource1698())
+    catch e
+        e
+    end
+    @test isa(err, ArgumentError) &&
+          occursin("is not a source that `ClustersEstimator` reads", err.msg)
+    # A vector of constraint readers walks each element at its own position.
+    f = PO.reader_frames([SemiDefinitePhylogenyEstimator(),
+                          SemiDefinitePhylogenyEstimator(; x_src = ExcessSource())], "ple",
+                         true)
+    @test f.excess && f.raw == ["ple[1]"]
+    # `factory` keeps the source of a reader whose `ce` and `de` it rebuilds.
+    @test factory(ClustersEstimator(; x_src = ExcessSource()), w).x_src === ExcessSource()
+    @test factory(NetworkEstimator(; x_src = PriorSource()), w).x_src === PriorSource()
+    @test factory(NetworkClustersEstimator(; x_src = DataSource()), w).x_src ===
+          DataSource()
+
+    # An inner reader keeps `nothing`, and the error names the field and the holder.
+    inner = ((() -> NetworkClustersEstimator(;
+                                             nte = NetworkEstimator(;
+                                                                    x_src = ExcessSource())),
+              :nte, :NetworkClustersEstimator),
+             (() -> CentralityEstimator(; pl = ClustersEstimator(; x_src = DataSource())),
+              :pl, :CentralityEstimator),
+             (() -> CentralityEstimator(; pl = NetworkEstimator(; x_src = PriorSource())),
+              :pl, :CentralityEstimator),
+             (() -> SemiDefinitePhylogenyEstimator(;
+                                                   pl = NetworkEstimator(;
+                                                                         x_src = ExcessSource())),
+              :pl, :SemiDefinitePhylogenyEstimator),
+             (() -> IntegerPhylogenyEstimator(;
+                                              pl = ClustersEstimator(;
+                                                                     x_src = ExcessSource())),
+              :pl, :IntegerPhylogenyEstimator),
+             (() -> CentralityConstraint(;
+                                         A = CentralityEstimator(; x_src = ExcessSource())),
+              :A, :CentralityConstraint))
+    for (f, field, holder) in inner
+        err = try
+            f()
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("the `$field` of `$holder` reads the returns matrix", err.msg)
+    end
+    # The source goes on the holder, and the inner reader at `nothing` builds.
+    @test CentralityConstraint(; A = CentralityEstimator(), x_src = ExcessSource()).x_src ===
+          ExcessSource()
+    @test NetworkClustersEstimator(; x_src = ExcessSource()).nte.x_src === nothing
 end
