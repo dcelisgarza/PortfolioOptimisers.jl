@@ -28,13 +28,15 @@ This page covers three points about OWA measures.
     the measure to depend on its whole shape.
 
 !!! note "Exact and approximate formulations"
-    [`OrderedWeightsArray`](@ref) has two formulations. The exact one,
-    `ExactOrderedWeightsArray`, is a linear programme that adds `T × T` constraints for `T`
-    observations, so it grows fast with the length of the sample. The approximate one,
-    `ApproxOrderedWeightsArray`, is the default. It replaces those constraints with one
-    p-norm constraint for each entry of `p`, and it gives an upper bound on the exact risk
-    that is close when the weights change almost linearly with rank. Every optimisation on
-    this page uses the approximate formulation.
+    [`OrderedWeightsArray`](@ref) has three formulations. `ExactOrderedWeightsArray` is a
+    linear programme that adds `T × T` constraints for `T` observations, so it grows fast
+    with the length of the sample. `IterativeOrderedWeightsArray` gives the same exact risk
+    through a relaxed sorting network of `O(T log² T)` linear constraints, so it is the exact
+    formulation for a long sample. The approximate one, `ApproxOrderedWeightsArray`, is the
+    default and the fastest. It replaces those constraints with one p-norm constraint for
+    each entry of `p`, and it gives an upper bound on the exact risk that is close when the
+    weights change almost linearly with rank. Every optimisation on this page uses the
+    approximate formulation.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames
@@ -153,8 +155,9 @@ the GMD measure of section 3. We print the largest absolute difference between i
 the weights of the `GMD` column. A difference of zero means that the two portfolios are the
 same.
 
-Use the approximate formulation for a long sample. Use `ExactOrderedWeightsArray` when the weights
-are far from linear in rank, where the approximation is less close.
+Use the approximate formulation when the time of the solve matters most. When the weights are far
+from linear in rank, the approximation is less close, so use an exact formulation:
+`IterativeOrderedWeightsArray` for a long sample, and `ExactOrderedWeightsArray` for a short one.
 =#
 
 r_approx = OrderedWeightsArray()

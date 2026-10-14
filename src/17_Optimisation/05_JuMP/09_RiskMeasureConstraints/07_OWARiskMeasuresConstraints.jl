@@ -42,8 +42,8 @@ Add Ordered Weights Array (OWA) risk constraints to `model` using the exact form
 The exact formulation is the linear programme that is dual to the assignment problem which
 sorts the sample. It adds two `T × 1` auxiliary variables and one `T × T` block of linear
 constraints, and the risk is the sum of the two auxiliary variables. The block costs
-``T^{2}`` constraints, so [`ApproxOrderedWeightsArray`](@ref) is the cheaper formulation for
-a long sample.
+``T^{2}`` constraints. For a long sample, [`IterativeOrderedWeightsArray`](@ref) gives the
+same exact risk at ``O(T \\log^{2} T)`` rows.
 
 The programme pairs the largest weight with the largest sorted return, so it attains
 ``\\mathrm{sort}(\\boldsymbol{\\omega})^{\\intercal} \\mathrm{sort}(\\hat{\\boldsymbol{r}})``. This equals the OWA
@@ -235,7 +235,7 @@ precision.
 The gap was measured here against the functor at `T = 100`, `N = 8` with the default `p`. The
 Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range
 is 0.37 % high. A fourth-order L-moment weight vector, which is not linear, is 4.5 % high, so
-prefer [`ExactOrderedWeightsArray`](@ref) for a weight vector that is far from a line.
+prefer [`IterativeOrderedWeightsArray`](@ref) for a weight vector that is far from a line.
 
 # Mathematical definition
 
@@ -419,4 +419,236 @@ function set_risk_constraints!(model::JuMP.Model, i::Any,
                                prefix::Symbol = Symbol(""), kwargs...)
     return set_range_risk_constraints!(model, i, r, :aowa_range_risk_, opt, pr, args...;
                                        prefix = prefix, kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add the relaxed sorting network of an [`IterativeOrderedWeightsArray`](@ref) to `model`, and return the OWA risk expression of the weight vector `owa_w`.
+
+The network reads the `owa` variable of [`set_owa_constraints!`](@ref), so the fees and the costs enter as they do for [`ExactOrderedWeightsArray`](@ref). The inputs are divided by the largest absolute asset return and the risk is multiplied by it, which keeps the network values near one. The OWA risk is positively homogeneous, so the scale does not change it.
+
+# JuMP formulation
+
+  - `z`: Vector variable of length `2K`, the two values that each of the `K` comparators writes, in the columns that `alg.ordering` gives.
+  - `c_eq`: The `K` rows `sc * (z_l + z_h - z_a - z_b) == 0`, where comparator `k` reads `z_a` and `z_b`, and writes the smaller value `z_l` and the larger value `z_h`.
+  - `c_a`, `c_b`: The `K` rows `sc * (z_h - z_a) >= 0` and the `K` rows `sc * (z_h - z_b) >= 0`.
+  - `risk`: The expression `s * dot(owa_w, z_out)`, where `z_out` holds the last value that the network writes to each position, in ascending position, and `s` is the largest absolute asset return.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `alg`: The sorting-network formulation.
+  - $(arg_dict[:pr_X])
+  - `owa_w`: Nondecreasing OWA weight vector of length `T`.
+
+# Validation
+
+  - `issorted(owa_w)`, through [`assert_owa_formulation_weights`](@ref). Raises a `DomainError`.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `(; z, c_eq, c_a, c_b, risk)`: The network variable, the three blocks of rows and the risk expression, which the caller registers.
+
+# Related
+
+  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`sorting_network`](@ref)
+  - [`sorting_network_columns`](@ref)
+  - [`set_owa_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:goemans2015])
+"""
+function set_sorting_network_owa!(model::JuMP.Model, alg::IterativeOrderedWeightsArray,
+                                  X::MatNum, owa_w::VecNum; prefix::Symbol = Symbol(""))
+    assert_owa_formulation_weights(alg, owa_w)
+    sc = get_constraint_scale(model)
+    T = get_T(model)
+    owa = set_owa_constraints!(model, X; prefix = prefix)
+    c = sorting_network(alg.merge, T)
+    K = length(c)
+    cols = sorting_network_columns(alg.ordering, c)
+    z = JuMP.@variable(model, [1:(2 * K)])
+    s = maximum(abs, X)
+    s = iszero(s) ? one(s) : s
+    # The inputs, then the values of the network in the order of the comparators.
+    x = [owa / s; z[cols]]
+    # The value that each position holds. Comparator `k` reads `a[k]` and `b[k]`.
+    wire = collect(1:T)
+    a = Vector{Int}(undef, K)
+    b = Vector{Int}(undef, K)
+    for (k, (i, j)) in enumerate(c)
+        a[k] = wire[i]
+        b[k] = wire[j]
+        wire[i] = T + 2 * k - 1
+        wire[j] = T + 2 * k
+    end
+    l = (T + 1):2:(T + 2 * K)
+    h = (T + 2):2:(T + 2 * K)
+    c_eq, c_a, c_b = JuMP.@constraints(model, begin
+                                           sc * (x[l] + x[h] - x[a] - x[b]) == 0
+                                           sc * (x[h] - x[a]) in JuMP.Nonnegatives()
+                                           sc * (x[h] - x[b]) in JuMP.Nonnegatives()
+                                       end)
+    risk = JuMP.@expression(model, s * LinearAlgebra.dot(owa_w, x[wire]))
+    return (; z, c_eq, c_a, c_b, risk)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add Ordered Weights Array (OWA) risk constraints to `model` using the sorting-network formulation.
+
+The formulation is exact for a nondecreasing weight vector, as [`ExactOrderedWeightsArray`](@ref) is, at ``O(T \\log^{2} T)`` linear rows in place of ``T^{2}``. [`set_sorting_network_owa!`](@ref) builds the network.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{OWA}(\\boldsymbol{w}) &= \\begin{cases}
+\\underset{\\boldsymbol{z}}{\\min} & s\\, \\boldsymbol{\\omega}^{\\intercal} \\boldsymbol{z}_{\\mathrm{out}}\\\\
+\\text{s.t.} & z_{l(k)} + z_{h(k)} = z_{a(k)} + z_{b(k)} \\quad \\forall k = 1,\\, \\ldots,\\, K\\\\
+ & z_{h(k)} \\geq z_{a(k)},\\; z_{h(k)} \\geq z_{b(k)} \\quad \\forall k = 1,\\, \\ldots,\\, K\\\\
+ & \\boldsymbol{z}_{\\mathrm{in}} = \\hat{\\boldsymbol{r}} / s\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\boldsymbol{\\omega}``: Is the OWA weight vector, `r.w` if it is a vector, `r.w(T)` if it is a callable.
+  - ``\\hat{\\boldsymbol{r}}``: Is the vector of net portfolio returns.
+  - ``s``: Is the largest absolute asset return.
+  - ``K``: Is the number of comparators of `r.alg.merge` for `T` values.
+  - ``a(k),\\, b(k)``: Are the two values that comparator ``k`` reads.
+  - ``l(k),\\, h(k)``: Are the smaller and the larger value that comparator ``k`` writes.
+  - ``\\boldsymbol{z}_{\\mathrm{in}},\\, \\boldsymbol{z}_{\\mathrm{out}}``: Are the values that the network reads and the last value that it writes to each position, in ascending position.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::OrderedWeightsArray{<:Any, <:Any, <:IterativeOrderedWeightsArray}`: The OWA risk
+    measure with the sorting-network formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Validation
+
+  - The weight vector is nondecreasing. Raises a `DomainError`.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `iowa_risk`: The OWA risk expression added to the model.
+
+# Related
+
+  - [`OrderedWeightsArray`](@ref)
+  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`set_sorting_network_owa!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:goemans2015])
+"""
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::OrderedWeightsArray{<:Any, <:Any,
+                                                      <:IterativeOrderedWeightsArray},
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
+    T = get_T(model)
+    owa_w = isa(r.w, VecNum) ? r.w : r.w(T)
+    net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w; prefix = prefix)
+    state_set!(model, prefix, :iowa_z_, i, net.z)
+    state_set!(model, prefix, :ciowa_eq_, i, net.c_eq)
+    state_set!(model, prefix, :ciowa_a_, i, net.c_a)
+    state_set!(model, prefix, :ciowa_b_, i, net.c_b)
+    iowa_risk = state_set!(model, prefix, :iowa_risk_, i, net.risk)
+    set_risk_bounds_and_expression!(model, opt, iowa_risk, r.settings, :iowa_risk_, i;
+                                    prefix = prefix)
+    return iowa_risk
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Add JuMP risk constraints for `OrderedWeightsArrayRange` using the sorting-network formulation to `model`.
+
+The formulation fuses the two tails, as [`ExactOrderedWeightsArray`](@ref) does. It forms the single weight vector ``\\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}`` and builds one network over it. `r.w2` is already reversed by the constructor of [`OrderedWeightsArrayRange`](@ref), so the difference is the range weight vector, and it is nondecreasing when both tails are.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\boldsymbol{\\omega} &= \\boldsymbol{\\omega}_{1} - \\boldsymbol{\\omega}_{2}\\\\
+\\mathrm{OWA}_{\\mathrm{rg}}(\\boldsymbol{w}) &= \\boldsymbol{\\omega}^{\\intercal} \\mathrm{sort}\\left(\\hat{\\boldsymbol{r}}\\right)\\,.
+\\end{align}
+```
+
+[`set_sorting_network_owa!`](@ref) states the rows that compute the sorted term.
+
+Where:
+
+  - ``\\mathrm{OWA}_{\\mathrm{rg}}(\\boldsymbol{w})``: Is the ordered weighted average range risk of the portfolio.
+  - ``\\boldsymbol{\\omega}_{1}``: Is the loss-tail OWA weight vector, `r.w1` if it is a vector, `r.w1(T)` if it is a callable.
+  - ``\\boldsymbol{\\omega}_{2}``: Is the reversed gain-tail OWA weight vector, `r.w2` if it is a vector, `r.w2(T)` if it is a callable.
+  - ``\\hat{\\boldsymbol{r}}``: Is the vector of net portfolio returns, which ``\\mathrm{sort}`` places in ascending order.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any, <:IterativeOrderedWeightsArray}`: The
+    OWA range risk measure with the sorting-network formulation.
+  - $(arg_dict[:opt_rjumpe])
+  - $(arg_dict[:pr_X])
+
+# Validation
+
+  - The range weight vector is nondecreasing. Raises a `DomainError`.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `iowa_range_risk`: The OWA range risk expression added to the model.
+
+# Related
+
+  - [`OrderedWeightsArrayRange`](@ref)
+  - [`IterativeOrderedWeightsArray`](@ref)
+  - [`set_sorting_network_owa!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:goemans2015])
+"""
+function set_risk_constraints!(model::JuMP.Model, i::Any,
+                               r::OrderedWeightsArrayRange{<:Any, <:Any, <:Any,
+                                                           <:IterativeOrderedWeightsArray},
+                               opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
+                               prefix::Symbol = Symbol(""), kwargs...)
+    T = get_T(model)
+    owa_w1 = isa(r.w1, VecNum) ? r.w1 : r.w1(T)
+    owa_w2 = isa(r.w2, VecNum) ? r.w2 : r.w2(T)
+    net = set_sorting_network_owa!(model, r.alg, pr.X, owa_w1 - owa_w2; prefix = prefix)
+    state_set!(model, prefix, :iowa_range_z_, i, net.z)
+    state_set!(model, prefix, :ciowa_range_eq_, i, net.c_eq)
+    state_set!(model, prefix, :ciowa_range_a_, i, net.c_a)
+    state_set!(model, prefix, :ciowa_range_b_, i, net.c_b)
+    iowa_range_risk = state_set!(model, prefix, :iowa_range_risk_, i, net.risk)
+    set_risk_bounds_and_expression!(model, opt, iowa_range_risk, r.settings,
+                                    :iowa_range_risk_, i; prefix = prefix)
+    return iowa_range_risk
 end

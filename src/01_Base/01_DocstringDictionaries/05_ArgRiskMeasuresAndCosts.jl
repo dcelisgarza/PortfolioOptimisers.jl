@@ -66,6 +66,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :slv => "`slv`: Solver or vector of solvers.",#
                  :p_rm => "`p`: Power or order parameter.",#
                  :p_owa => "`p`: Vector of p-norm orders used to approximate the ordered weights array risk.",#
+                 :merge_owa => "`merge`: Sorting network that the formulation relaxes. Every sorting network gives the exact risk. The network sets the number of rows and the cost of one solver iteration.",#
+                 :ordering_owa => "`ordering`: Order of the network variables in the model. It does not change the risk.",#
                  :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
                  # Deferred Quantity slots. Each admits the value itself or the Estimator that
                  # computes it, resolved against the optimisation's own prior. See

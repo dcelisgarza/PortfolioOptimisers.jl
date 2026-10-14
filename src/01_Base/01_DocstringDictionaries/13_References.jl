@@ -34,6 +34,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :owaog => "[owaog](@cite) W. Ogryczak and T. Śliwiński. *On solving linear programs with the ordered weighted averaging objective*. European Journal of Operational Research 148, 80–91 (2003).",#
                  :owa2 => "[owa2](@cite) D. Cajas. *Higher order moment portfolio optimization with L-moments*. Available at SSRN 4393155 (2023).",#
                  :owa3 => "[owa3](@cite) D. Cajas. *Efficient Gini Mean Difference and Tail Gini Portfolio Optimization based on P-Norms*. Available at SSRN 4711326 (2024).",#
+                 :goemans2015 => "[goemans2015](@cite) M. X. Goemans. *Smallest compact formulation for the permutahedron*. Mathematical Programming 153, 5–11 (2015).",#
+                 :batcher1968 => "[batcher1968](@cite) K. E. Batcher. *Sorting networks and their applications*. In: *Proceedings of the AFIPS Spring Joint Computer Conference*, 307–314 (1968).",#
                  :PMFG => "[PMFG](@cite) G. P. Massara, T. Di Matteo and T. Aste. *Network Filtering for Big Data: Triangulated Maximally Filtered Graph*. Journal of Complex Networks 5, 161–178 (2016).",#
                  :tgini => "[tgini](@cite) W. Ogryczak and A. Ruszczyński. *Dual stochastic dominance and quantile risk measures*. International Transactions in Operational Research 9, 661–680 (2002).",#
                  :politis1992circular => "[politis1992circular](@cite) D. N. Politis and J. P. Romano. *A circular block-resampling procedure for stationary data*. In: *Exploring the Limits of Bootstrap* (John Wiley & Sons, 1992); pp. 263–270.",#

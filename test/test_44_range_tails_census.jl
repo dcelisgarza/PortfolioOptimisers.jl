@@ -54,12 +54,16 @@
         two quantiles of one fitted distribution, not two separate measures.
       - `OrderedWeightsArrayRange` under `ExactOrderedWeightsArray` writes one exact OWA
         block over the combined weight vector.
+      - `OrderedWeightsArrayRange` under `IterativeOrderedWeightsArray` writes one sorting
+        network over the combined weight vector.
     =#
     fused = ["Range" => Range(),
              "ValueatRiskRange/DistributionValueatRisk" =>
                  ValueatRiskRange(; alg = DistributionValueatRisk()),
              "OrderedWeightsArrayRange/ExactOrderedWeightsArray" =>
-                 OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray())]
+                 OrderedWeightsArrayRange(; alg = ExactOrderedWeightsArray()),
+             "OrderedWeightsArrayRange/IterativeOrderedWeightsArray" =>
+                 OrderedWeightsArrayRange(; alg = IterativeOrderedWeightsArray())]
 
     # ------------------------------------------------- the population is fully covered
 

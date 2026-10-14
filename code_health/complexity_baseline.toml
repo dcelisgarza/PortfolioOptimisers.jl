@@ -278,8 +278,8 @@ commit = "afc70e40b5"
 "src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { cyc = 5, cog = 6, arg = 5, cyc_sum = 30, cog_sum = 14, arg_sum = 34, macros = ["@propagatable"] }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { cyc = 6, cog = 11, arg = 7, cyc_sum = 37, cog_sum = 19, arg_sum = 54, macros = ["@propagatable"] }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 29, cog_sum = 13, arg_sum = 40, macros = ["@propagatable"] }
-"src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { cyc = 3, cog = 4, arg = 7, cyc_sum = 77, cog_sum = 35, arg_sum = 121, macros = [] }
-"src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { cyc = 7, cog = 9, arg = 5, cyc_sum = 22, cog_sum = 21, arg_sum = 24, macros = [] }
+"src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { cyc = 3, cog = 4, arg = 7, cyc_sum = 78, cog_sum = 35, arg_sum = 123, macros = [] }
+"src/16_RiskMeasures/07_OWARiskMeasures_b.jl" = { cyc = 7, cog = 9, arg = 5, cyc_sum = 42, cog_sum = 42, arg_sum = 50, macros = [] }
 "src/16_RiskMeasures/08_AverageDrawdown.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 10, cog_sum = 2, arg_sum = 12, macros = ["@propagatable"] }
 "src/16_RiskMeasures/09_UlcerIndex.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 10, cog_sum = 2, arg_sum = 12, macros = ["@propagatable"] }
 "src/16_RiskMeasures/10_MaximumDrawdown.jl" = { cyc = 1, cog = 1, arg = 1, cyc_sum = 8, cog_sum = 2, arg_sum = 6, macros = [] }
@@ -365,7 +365,7 @@ commit = "afc70e40b5"
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/03_EntropicXatRiskConstraints.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 6, cog_sum = 3, arg_sum = 34, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/04_RelativisticXatRiskConstraints.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 2, arg_sum = 34, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/05_PowerNormXatRiskConstraints.jl" = { cyc = 2, cog = 2, arg = 9, cyc_sum = 5, cog_sum = 2, arg_sum = 34, macros = [] }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 10, cog_sum = 9, arg_sum = 36, macros = [] }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl" = { cyc = 3, cog = 4, arg = 9, cyc_sum = 18, cog_sum = 18, arg_sum = 57, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/08_AverageDrawdownConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 2, cog_sum = 2, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/09_UlcerIndexConstraints.jl" = { cyc = 2, cog = 2, arg = 8, cyc_sum = 2, cog_sum = 2, arg_sum = 8, macros = [] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/10_MaximumDrawdownConstraints.jl" = { cyc = 1, cog = 0, arg = 8, cyc_sum = 1, cog_sum = 0, arg_sum = 8, macros = [] }

@@ -14,6 +14,7 @@ UnionRSOCSOCRiskExpr
 EntropyFormulation
 OWA_Func_VecNum
 OrderedWeightsArrayFormulation
+assert_owa_formulation_weights(::OrderedWeightsArrayFormulation, ::VecNum)
 OWA_RevFunc
 OWA_CalOccupant
 owa_l_moment_crm_sumsq_obj
