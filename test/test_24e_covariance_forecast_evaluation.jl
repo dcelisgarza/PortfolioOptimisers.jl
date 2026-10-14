@@ -406,7 +406,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("PortfolioOptimisersCovariance", e.value.msg)
     end
 
-    @testset "brt evaluates a forecast of the returns in excess of the benchmark (#1658)" begin
+    @testset "x_src = ExcessSource() evaluates a forecast of the returns in excess of the benchmark (#1658, #1704)" begin
         # A vector `B` is one benchmark for every asset, and a matrix `B` is one per asset.
         Bv = randn(StableRNG(1658), T) ./ 100
         Bm = randn(StableRNG(16580), T, N) ./ 100
@@ -419,9 +419,10 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
             # The evaluation of a hand-built `X - B`, which loses `B`.
             rx = ReturnsResult(; nx = nx, X = X .- B, ts = ts)
             for (est, cv) in runs
-                a = cfe(est, rb, cv; brt = true, store_forecasts = true)
+                a = cfe(est, rb, cv; x_src = ExcessSource(), store_forecasts = true)
                 z = cfe(est, rx, cv; store_forecasts = true)
-                @test a.brt && !z.brt
+                # The Result records the frame that the verb read, `DataSource()` for `nothing`.
+                @test a.x_src === ExcessSource() && z.x_src === DataSource()
                 @test a.n_valid == z.n_valid
                 for f in columns
                     @test finite_max(getfield(a, f), getfield(z, f)) == 0
@@ -431,10 +432,11 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                 @test isequal(covariance_forecast_portfolio(a, rb, wt),
                               covariance_forecast_portfolio(z, rx, wt))
             end
-            # Under `brt = false` the benchmark is not read.
+            # Under `x_src = nothing` and `DataSource()` the benchmark is not read.
             a = cfe(Covariance(), rb, batch_cv)
             z = cfe(Covariance(), rd, batch_cv)
-            @test !a.brt
+            @test a.x_src === DataSource()
+            @test cfe(Covariance(), rb, batch_cv; x_src = DataSource()).qlike == a.qlike
             for f in columns
                 @test finite_max(getfield(a, f), getfield(z, f)) == 0
             end
@@ -446,17 +448,18 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         ce = ImpliedVolatility(; ppy = 252)
         a = cfe(ce,
                 ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, iv = iv, ivpa = 1.1,
-                              ts = ts), cvb; brt = true)
+                              ts = ts), cvb; x_src = ExcessSource())
         z = cfe(ce, ReturnsResult(; nx = nx, X = X .- Bv, iv = iv, ivpa = 1.1, ts = ts),
                 cvb)
         for f in columns
             @test finite_max(getfield(a, f), getfield(z, f)) == 0
         end
         # No excess return exists without a benchmark.
-        e = @test_throws ArgumentError cfe(Covariance(), rd, batch_cv; brt = true)
+        e = @test_throws ArgumentError cfe(Covariance(), rd, batch_cv;
+                                           x_src = ExcessSource())
         @test occursin("carries no benchmark", e.value.msg)
         rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, ts = ts)
-        a = cfe(Covariance(), rb, batch_cv; brt = true, store_forecasts = true)
+        a = cfe(Covariance(), rb, batch_cv; x_src = ExcessSource(), store_forecasts = true)
         e = @test_throws ArgumentError covariance_forecast_portfolio(a, rd, nothing)
         @test occursin("carries no benchmark", e.value.msg)
         # Two evaluations in different frames do not compare.
@@ -464,6 +467,49 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                                                                    cfe(Covariance(), rb,
                                                                        batch_cv))
         @test occursin("read different returns", e.value.msg)
+        @test occursin("x_src = ExcessSource()", e.value.msg)
+        # `nothing` and `DataSource()` read one frame, so their evaluations compare.
+        cmp = covariance_forecast_compare(cfe(Covariance(), rb, batch_cv),
+                                          cfe(GeneralCovariance(), rb, batch_cv;
+                                              x_src = DataSource()))
+        @test cmp isa CovarianceForecastComparisonResult
+        # The verb reads no prior, so it refuses `PriorSource()`.
+        e = @test_throws ArgumentError cfe(Covariance(), rb, batch_cv;
+                                           x_src = PriorSource())
+        @test occursin("covariance_forecast_evaluation", e.value.msg)
+        # A positional `Bool` in the place of the source builds no Result.
+        vals = Any[getfield(a, f) for f in fieldnames(typeof(a))]
+        @test fieldnames(typeof(a))[5] === :x_src
+        vals[5] = true
+        @test_throws MethodError CovarianceForecastEvaluationResult(vals...)
+        # The verb picks the frame, so the estimator is an inner reader and states no source.
+        # A prior in the Excess Frame would subtract `B` from the `X - B` that the verb holds.
+        for est in (EmpiricalPrior(; x_src = ExcessSource()),
+                    EmpiricalPrior(; x_src = DataSource()),
+                    po.Online(EmpiricalPrior(; x_src = ExcessSource())))
+            e = @test_throws ArgumentError cfe(est, rb, online_cv; x_src = ExcessSource())
+            @test occursin("the `est` of `covariance_forecast_evaluation`", e.value.msg)
+        end
+    end
+
+    @testset "A prior that states a source reads its location in its own frame (#1704)" begin
+        # A shrunk mean makes the location read the returns through `ce`, so a location read
+        # off the raw `X` would differ from the location in the Excess Frame.
+        Bv = randn(StableRNG(1704), T) ./ 100
+        rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, ts = ts)
+        rx = ReturnsResult(; nx = nx, X = X .- Bv, ts = ts)
+        sh = ShrunkExpectedReturns()
+        c = po.forecast_location(EmpiricalPrior(; me = sh, x_src = ExcessSource()), rb)
+        @test c ≈ po.forecast_location(EmpiricalPrior(; me = sh), rx)
+        @test maximum(abs, c - po.forecast_location(EmpiricalPrior(; me = sh), rb)) > 1e-5
+        # A gap in the vector benchmark drops its observation from the fit and the location.
+        Bg = copy(Bv)
+        Bg[[40, 97]] .= NaN
+        keep = setdiff(1:T, [40, 97])
+        rg = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bg, ts = ts)
+        rk = ReturnsResult(; nx = nx, X = X[keep, :] .- Bv[keep], ts = ts[keep])
+        @test po.forecast_location(EmpiricalPrior(; me = sh, x_src = ExcessSource()), rg) ≈
+              po.forecast_location(EmpiricalPrior(; me = sh), rk)
     end
 
     @testset "A gap in a vector benchmark re-projects on the kept rows (#1691)" begin
@@ -477,7 +523,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bg, ts = ts)
         rx = ReturnsResult(; nx = nx, X = X[keep, :] .- Bv[keep], ts = ts[keep])
         for cv in (batch_cv, online_cv)
-            a = cfe(Covariance(), rb, cv; brt = true, store_forecasts = true, w = wt)
+            a = cfe(Covariance(), rb, cv; x_src = ExcessSource(), store_forecasts = true,
+                    w = wt)
             z = cfe(Covariance(), rx, cv; store_forecasts = true, w = wt)
             @test isequal(a.standardised_return, z.standardised_return)
             pa = covariance_forecast_portfolio(a, rb, wt)
@@ -529,7 +576,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         stack(f) = reduce(vcat, [permutedims(getfield(s, f)) for s in steps])
         cfer = CovarianceForecastEvaluationResult(collect(0:(M - 1)),
                                                   [(1:3) .+ 3k for k in 0:(M - 1)],
-                                                  fill(3, M), HorizonReturn(), false,
+                                                  fill(3, M), HorizonReturn(), DataSource(),
                                                   [s.n_valid for s in steps],
                                                   [s.mahalanobis_ratio for s in steps],
                                                   stack(:diagonal_ratio),
@@ -575,8 +622,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # The realised covariance has `N h` degrees of freedom per step, so its band is
         # narrower by `√h` and its exceedance threshold sits at `χ²_{N h}`.
         cfr = CovarianceForecastEvaluationResult(cfer.dates, cfer.test_idx, cfer.horizon,
-                                                 RealisedCovariance(), false, cfer.n_valid,
-                                                 cfer.mahalanobis_ratio,
+                                                 RealisedCovariance(), DataSource(),
+                                                 cfer.n_valid, cfer.mahalanobis_ratio,
                                                  cfer.diagonal_ratio, cfer.qlike,
                                                  cfer.frobenius, cfer.standardised_return,
                                                  cfer.portfolio_qlike, W, nothing, nothing)

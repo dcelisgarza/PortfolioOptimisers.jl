@@ -705,7 +705,7 @@ Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. 
 # Validation
 
   - `a.dates == b.dates` and `a.horizon == b.horizon`. An `ArgumentError` is thrown otherwise, because a per-step difference needs the same steps on both sides.
-  - `a.brt == b.brt`. An `ArgumentError` is thrown otherwise, because a forecast of `X - B` and a forecast of `X` are scored on different returns, so their losses do not compare.
+  - `a.x_src == b.x_src`. An `ArgumentError` is thrown otherwise, because a forecast of `X - B` and a forecast of `X` are scored on different returns, so their losses do not compare.
   - `a` and `b` carry the same number of test portfolios. A `DimensionMismatch` is thrown otherwise.
   - `0 <= lags < n_steps`, where `n_steps` counts the steps that both evaluations scored. A `DomainError` is thrown otherwise.
 
@@ -732,8 +732,8 @@ function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
                                                          length(a.qlike)) - 1)
     @argcheck(isequal(a.dates, b.dates) && a.horizon == b.horizon,
               ArgumentError("the two evaluations do not share their steps: a comparison reads a per-step loss difference, so both must be run over one walk-forward, with the same dates and the same horizon at every step. Run both forecasts through `covariance_forecast_evaluation` with the same `rd` and `cv`."))
-    @argcheck(a.brt == b.brt,
-              ArgumentError("the two evaluations read different returns: one has `brt = $(a.brt)` and the other `brt = $(b.brt)`, so one scored its forecast on `X - B` and the other on `X`, and their losses do not compare. Run both forecasts through `covariance_forecast_evaluation` with the same `brt`."))
+    @argcheck(a.x_src == b.x_src,
+              ArgumentError("the two evaluations read different returns: one has `x_src = $(source_label(a.x_src))` and the other `x_src = $(source_label(b.x_src))`, so one scored its forecast on `X - B` and the other on `X`, and their losses do not compare. Run both forecasts through `covariance_forecast_evaluation` with the same `x_src`."))
     P = size(a.portfolio_qlike, 2)
     @argcheck(size(b.portfolio_qlike, 2) == P,
               DimensionMismatch("the first evaluation carries $(P) test portfolio(s) and the second $(size(b.portfolio_qlike, 2)); hand both the same `w`."))
@@ -809,12 +809,12 @@ Score the stored forecasts of an evaluation again, on a new test portfolio.
 
 With `store_forecasts = true` the Result holds the forecast of every step and the location that the forecast was centred on, so this verb scores a new portfolio without a new run of the loop. The own `w` of the evaluation reproduces its columns.
 
-The test rows are read in the frame of the evaluation, `cfer.brt`, because a forecast of `X - B` is scored on the rows of `X - B`. The verb takes no `brt` of its own, so it cannot score the forecasts of one frame on the rows of another.
+The test rows are read in the frame of the evaluation, `cfer.x_src`, because a forecast of `X - B` is scored on the rows of `X - B`. The verb takes no `x_src` of its own, so it cannot score the forecasts of one frame on the rows of another.
 
 # Algorithm
 
- 1. Drop the observations with a gap in a Shared Series with [`shared_series_view`](@ref) under `cfer.brt`, as the evaluation dropped them before it split the folds.
- 2. Read the returns in the frame of the evaluation with [`benchmark_relative_returns`](@ref) under `cfer.brt`, giving `X`.
+ 1. Drop the observations with a gap in a Shared Series with [`shared_series_view`](@ref) under `cfer.x_src`, as the evaluation dropped them before it split the folds.
+ 2. Read the returns in the frame of the evaluation with [`benchmark_relative_returns`](@ref) under `cfer.x_src`, giving `X`.
  3. For each step, read the stored forecast and location, and the test rows `X[cfer.test_idx[i], :]`.
  4. Score them on `w` with the target of the evaluation, through [`covariance_forecast_step`](@ref).
  5. Put the standardised returns and the portfolio QLIKE losses of the step in its row of each matrix.
@@ -829,7 +829,7 @@ The test rows are read in the frame of the evaluation, `cfer.brt`, because a for
 
   - `cfer.sigma` is not `nothing`. An `ArgumentError` is thrown otherwise, which names `store_forecasts`.
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
-  - The rules of [`shared_series_view`](@ref) and of [`benchmark_relative_returns`](@ref) under `cfer.brt`.
+  - The rules of [`shared_series_view`](@ref) and of [`benchmark_relative_returns`](@ref) under `cfer.x_src`.
 
 # Returns
 
@@ -850,7 +850,7 @@ function covariance_forecast_portfolio(cfer::CovarianceForecastEvaluationResult,
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     # `cfer.test_idx` counts the observations that the evaluation kept, so the verb drops the
     # same gaps of a Shared Series before it indexes.
-    X = benchmark_relative_returns(shared_series_view(rd, cfer.brt, false), cfer.brt)
+    X = benchmark_relative_returns(shared_series_view(rd, cfer.x_src, false), cfer.x_src)
     steps = [covariance_forecast_step(cfer.sigma[i], view(X, cfer.test_idx[i], :),
                                       cfer.location[i], w, cfer.target)
              for i in eachindex(cfer.sigma)]
