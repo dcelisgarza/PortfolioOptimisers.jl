@@ -247,7 +247,7 @@ Where:
   - ``\\mathbb{S}^{N}``: Set of real symmetric ``N \\times N`` matrices.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-A [`Variance`](@ref) in a model that holds this constraint takes the constraint form, whatever its `alg` says. Under [`MaximumRatio`](@ref) the `lift` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule. The rows then read the lift of the objective, [`set_sdp_phylogeny_constraints!`](@ref).
+A [`Variance`](@ref) in a model that holds this constraint takes the constraint form, whatever its `alg` says. Under [`MaximumRatio`](@ref) the `ratio_alg` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule. The rows then read the lift of the objective, [`set_sdp_phylogeny_constraints!`](@ref).
 
 # Fields
 

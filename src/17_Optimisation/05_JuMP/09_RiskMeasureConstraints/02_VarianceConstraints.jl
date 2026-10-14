@@ -403,7 +403,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the semidefinite variance expression, the trace of the covariance matrix times the lifted weight matrix.
 
-The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`ConstantCornerLift`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
+The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
 
 # JuMP formulation
 
@@ -460,7 +460,7 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::Option{<:AbstractPriorResult};
                                 prefix::Symbol = Symbol(""))
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
-    if !sdp_objective_lift_flag(model, r.lift, r.settings)
+    if !sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
         W = set_sdp_constraints!(model; prefix = prefix)
         sigma_W = state_set!(model, prefix, :sigma_W_, i,
                              JuMP.@expression(model, sigma * W))
@@ -744,7 +744,7 @@ The asset weights are ``\\boldsymbol{w} = \\mathbf{P} \\boldsymbol{z}``. With `f
 
 The risk-contribution rows of `r.rc` read the diagonal of `sigma_W_`, one entry for each factor. At rank one entry ``j`` is ``[\\boldsymbol{w}_1]_j [\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}]_j``, the Euler contribution of factor ``j`` that [`factor_risk_contribution`](@ref) reports, and the rows state it as a share of the whole variance. The off-factor weights take no row, and their contribution is the remainder.
 
-When [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`ConstantCornerLift`](@ref), the objective term and the rows read ``\\mathbf{W}_c`` of [`set_sdp_frc_objective_lift!`](@ref) in place of ``\\mathbf{W}_z``, so the term has degree two and the model maximises the Sharpe ratio. The bound reads ``\\mathbf{W}_z``, and the method builds that trace only when `settings.ub` holds a bound.
+When [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term and the rows read ``\\mathbf{W}_c`` of [`set_sdp_frc_objective_lift!`](@ref) in place of ``\\mathbf{W}_z``, so the term has degree two and the model maximises the Sharpe ratio. The bound reads ``\\mathbf{W}_z``, and the method builds that trace only when `settings.ub` holds a bound.
 
 # JuMP formulation
 
@@ -813,7 +813,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     # the rest, present under `flag = true`, price the off-factor weights (#1350).
     sigma_z = transpose(b) * sigma * b
     ub = variance_risk_bounds_val(LinearBound(), r.settings.ub)
-    lift = sdp_objective_lift_flag(model, r.lift, r.settings)
+    lift = sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
     # The bound reads the lift with the corner `k`, and so does the objective term unless
     # it reads the lift with a constant corner, which gives it degree two (#1676).
     if !lift || !isnothing(ub)
@@ -1231,7 +1231,7 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data.
     ucs = sigma_ucs(r.ucs, rd, pr; kwargs...)
-    if !(sdp_lifted_set(ucs) && sdp_objective_lift_flag(model, r.lift, r.settings))
+    if !(sdp_lifted_set(ucs) && sdp_objective_lift_flag(model, r.ratio_alg, r.settings))
         ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
                                                          prefix = prefix)
         bound_expr, ub, bound_name = ucs_variance_risk_bounds!(model, i, ucs,

@@ -448,7 +448,7 @@ end
     obj = MaximumRatio()
     # On the lift with the corner `k` the relaxation is tight here, so the shares of the
     # returned weights meet the rows.
-    r = Variance(; rc = lcs, lift = ScaleCornerLift())
+    r = Variance(; rc = lcs, ratio_alg = LinearRatio())
     res = optimise(MeanRisk(; obj = obj, opt = opt, r = r))
     rkc = risk_contribution(factory(r, pr, slv), res.w, pr)
     rkc = rkc / sum(rkc)

@@ -528,7 +528,7 @@ end
                                                                            alg = RSOCRiskExpr())))).w
     @test isapprox(w_of(1), w_of(4); rtol = 5e-4)
 end
-@testset "Under MaximumRatio ScaleCornerLift maximises return per unit of variance" begin
+@testset "Under MaximumRatio LinearRatio maximises return per unit of variance" begin
     # Issue #1321, kept as an option by #1676. On the lift with the corner `k`,
     # W ⪰ y y' / k, the semidefinite variance tr(Σ W) has degree one in (y, k). The SOC
     # variance y' Σ y has degree two. So MaximumRatio maximises mu' w / w' Σ w on the first
@@ -547,8 +547,8 @@ end
     # to the semidefinite formulation.
     rc = LinearConstraintEstimator(; val = ["$a <= 1000" for a in rd.nx])
     plg = SemiDefinitePhylogeny(; A = zeros(length(pr.mu), length(pr.mu)), p = 0)
-    for (r, kw) in ((Variance(; rc = rc, lift = ScaleCornerLift()), (; sets = sets)),
-                    (Variance(; lift = ScaleCornerLift()), (; ple = plg)))
+    for (r, kw) in ((Variance(; rc = rc, ratio_alg = LinearRatio()), (; sets = sets)),
+                    (Variance(; ratio_alg = LinearRatio()), (; ple = plg)))
         res_of(ohf) = optimise(MeanRisk(; r = r, obj = MaximumRatio(; ohf = ohf),
                                         opt = JuMPOptimiser(; pe = pr, slv = slv, kw...));
                                save = true)
@@ -569,7 +569,7 @@ end
     end
     # The risk form reaches the same maximiser. A logarithmic return selects it.
     lr(w) = expected_return(LogarithmicReturn(), w, pr)
-    res = optimise(MeanRisk(; r = Variance(; rc = rc, lift = ScaleCornerLift()),
+    res = optimise(MeanRisk(; r = Variance(; rc = rc, ratio_alg = LinearRatio()),
                             obj = MaximumRatio(),
                             opt = JuMPOptimiser(; pe = pr, slv = slv, sets = sets,
                                                 ret = LogarithmicReturn())); save = true)
@@ -582,11 +582,11 @@ end
     @test isapprox(w, wu; atol = 2e-4)
 end
 @testset "Under MaximumRatio a lifted variance maximises the Sharpe ratio by default" begin
-    # Issue #1676. `ConstantCornerLift` states the objective term of a lifted variance on a
+    # Issue #1676. `SquareRootRatio` states the objective term of a lifted variance on a
     # second lift with a constant corner c, [Wc y; y' c] ⪰ 0, so tr(Σ Wc) ≥ y' Σ y / c has
     # degree two and MaximumRatio maximises the Sharpe ratio, as the SOC variance does. Rows
     # that never bind, a phylogeny that links no pair, and an uncertainty set of radius zero
-    # then give the tangency weights of `Variance()`. `ScaleCornerLift` keeps the degree-one
+    # then give the tangency weights of `Variance()`. `LinearRatio` keeps the degree-one
     # ratio, which differs.
     ratio(r; ohf = nothing, ret = ArithmeticReturn(), kw...) = optimise(MeanRisk(; r = r,
                                                                                  obj = MaximumRatio(;
@@ -600,7 +600,7 @@ end
     sharpe(w) = dot(pr.mu, w) / sqrt(dot(w, pr.sigma, w))
     wsoc = ratio(Variance()).w
     # Measured 1.0e-3 at most from `wsoc`, on the box, and 6.7e-4 at most under a stated
-    # `ohf`. `ScaleCornerLift` stays 0.15 away.
+    # `ohf`. `LinearRatio` stays 0.15 away.
     tol = 2e-3
     N = length(pr.mu)
     cls = SigmaUncertaintySetClass()
@@ -610,18 +610,20 @@ end
     ell = EllipsoidalUncertaintySet(; sigma = Matrix(1.0I, N^2, N^2), k = 1e-12,
                                     class = cls)
     nb = NormBallUncertaintySet(; kappa = 0.0, L = zeros(N^2, 0), class = cls)
-    cases = [("rc", lift -> Variance(; rc = rc, lift = lift), (; sets = sets)),
-             ("phylogeny", lift -> Variance(; lift = lift), (; ple = plg)),
-             ("box", lift -> UncertaintySetVariance(; ucs = box, lift = lift), (;)),
-             ("ellipsoid", lift -> UncertaintySetVariance(; ucs = ell, lift = lift), (;)),
-             ("norm ball", lift -> UncertaintySetVariance(; ucs = nb, lift = lift), (;))]
+    cases = [("rc", ralg -> Variance(; rc = rc, ratio_alg = ralg), (; sets = sets)),
+             ("phylogeny", ralg -> Variance(; ratio_alg = ralg), (; ple = plg)),
+             ("box", ralg -> UncertaintySetVariance(; ucs = box, ratio_alg = ralg), (;)),
+             ("ellipsoid", ralg -> UncertaintySetVariance(; ucs = ell, ratio_alg = ralg),
+              (;)),
+             ("norm ball", ralg -> UncertaintySetVariance(; ucs = nb, ratio_alg = ralg),
+              (;))]
     for (name, mk, kw) in cases
-        res = ratio(mk(ConstantCornerLift()); kw...)
+        res = ratio(mk(SquareRootRatio()); kw...)
         @test isa(res.retcode, OptimisationSuccess)
         @test haskey(res.model, :lift_W) && haskey(res.model, :sr_ret)
         @test res.model[:lift_corner] == 1
         @test isapprox(res.w, wsoc; atol = tol)
-        res1 = ratio(mk(ScaleCornerLift()); kw...)
+        res1 = ratio(mk(LinearRatio()); kw...)
         @test !haskey(res1.model, :lift_W)
         @test norm(res1.w - wsoc, Inf) > 0.05
         @test sharpe(res1.w) < sharpe(res.w)

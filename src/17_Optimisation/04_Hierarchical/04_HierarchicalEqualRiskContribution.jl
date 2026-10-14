@@ -170,29 +170,29 @@ HierarchicalEqualRiskContribution
        │    x_src ┼ Symbol: :prior
        │   strict ┴ Bool: false
     ri ┼ Variance
-       │   settings ┼ RiskMeasureSettings
-       │            │   scale ┼ Float64: 1.0
-       │            │      ub ┼ nothing
-       │            │     rke ┴ Bool: true
-       │      sigma ┼ nothing
-       │       chol ┼ nothing
-       │         rc ┼ nothing
-       │        alg ┼ SquaredSOCRiskExpr()
-       │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-       │       lift ┼ ConstantCornerLift()
-       │     corner ┴ nothing
+       │    settings ┼ RiskMeasureSettings
+       │             │   scale ┼ Float64: 1.0
+       │             │      ub ┼ nothing
+       │             │     rke ┴ Bool: true
+       │       sigma ┼ nothing
+       │        chol ┼ nothing
+       │          rc ┼ nothing
+       │         alg ┼ SquaredSOCRiskExpr()
+       │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+       │   ratio_alg ┼ SquareRootRatio()
+       │      corner ┴ nothing
     ro ┼ Variance
-       │   settings ┼ RiskMeasureSettings
-       │            │   scale ┼ Float64: 1.0
-       │            │      ub ┼ nothing
-       │            │     rke ┴ Bool: true
-       │      sigma ┼ nothing
-       │       chol ┼ nothing
-       │         rc ┼ nothing
-       │        alg ┼ SquaredSOCRiskExpr()
-       │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-       │       lift ┼ ConstantCornerLift()
-       │     corner ┴ nothing
+       │    settings ┼ RiskMeasureSettings
+       │             │   scale ┼ Float64: 1.0
+       │             │      ub ┼ nothing
+       │             │     rke ┴ Bool: true
+       │       sigma ┼ nothing
+       │        chol ┼ nothing
+       │          rc ┼ nothing
+       │         alg ┼ SquaredSOCRiskExpr()
+       │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+       │   ratio_alg ┼ SquareRootRatio()
+       │      corner ┴ nothing
   scai ┼ SumScalariser()
   scao ┼ SumScalariser()
     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()

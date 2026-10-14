@@ -1009,17 +1009,17 @@ Keywords correspond to the struct's fields.
 julia> RiskLoss()
 RiskLoss
        r ┼ Variance
-         │   settings ┼ RiskMeasureSettings
-         │            │   scale ┼ Float64: 1.0
-         │            │      ub ┼ nothing
-         │            │     rke ┴ Bool: true
-         │      sigma ┼ nothing
-         │       chol ┼ nothing
-         │         rc ┼ nothing
-         │        alg ┼ SquaredSOCRiskExpr()
-         │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-         │       lift ┼ ConstantCornerLift()
-         │     corner ┴ nothing
+         │    settings ┼ RiskMeasureSettings
+         │             │   scale ┼ Float64: 1.0
+         │             │      ub ┼ nothing
+         │             │     rke ┴ Bool: true
+         │       sigma ┼ nothing
+         │        chol ┼ nothing
+         │          rc ┼ nothing
+         │         alg ┼ SquaredSOCRiskExpr()
+         │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+         │   ratio_alg ┼ SquareRootRatio()
+         │      corner ┴ nothing
   window ┼ Int64: 20
      sca ┼ SumScalariser()
       pe ┼ EmpiricalPrior

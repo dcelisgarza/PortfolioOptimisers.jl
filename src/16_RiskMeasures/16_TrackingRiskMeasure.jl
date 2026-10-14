@@ -489,17 +489,17 @@ RiskTrackingRiskMeasure
            │       w ┼ Vector{Float64}: [0.5, 0.5]
            │   fixed ┴ Bool: false
          r ┼ Variance
-           │   settings ┼ RiskMeasureSettings
-           │            │   scale ┼ Int64: 1
-           │            │      ub ┼ nothing
-           │            │     rke ┴ Bool: false
-           │      sigma ┼ nothing
-           │       chol ┼ nothing
-           │         rc ┼ nothing
-           │        alg ┼ SquaredSOCRiskExpr()
-           │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-           │       lift ┼ ConstantCornerLift()
-           │     corner ┴ nothing
+           │    settings ┼ RiskMeasureSettings
+           │             │   scale ┼ Int64: 1
+           │             │      ub ┼ nothing
+           │             │     rke ┴ Bool: false
+           │       sigma ┼ nothing
+           │        chol ┼ nothing
+           │          rc ┼ nothing
+           │         alg ┼ SquaredSOCRiskExpr()
+           │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │   ratio_alg ┼ SquareRootRatio()
+           │      corner ┴ nothing
        alg ┴ IndependentVariableTracking()
 ```
 

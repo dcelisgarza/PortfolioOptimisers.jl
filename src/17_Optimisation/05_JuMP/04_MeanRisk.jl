@@ -223,17 +223,17 @@ MeanRisk
       │     x_src ┼ Symbol: :prior
       │    strict ┴ Bool: false
     r ┼ Variance
-      │   settings ┼ RiskMeasureSettings
-      │            │   scale ┼ Float64: 1.0
-      │            │      ub ┼ nothing
-      │            │     rke ┴ Bool: true
-      │      sigma ┼ nothing
-      │       chol ┼ nothing
-      │         rc ┼ nothing
-      │        alg ┼ SquaredSOCRiskExpr()
-      │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-      │       lift ┼ ConstantCornerLift()
-      │     corner ┴ nothing
+      │    settings ┼ RiskMeasureSettings
+      │             │   scale ┼ Float64: 1.0
+      │             │      ub ┼ nothing
+      │             │     rke ┴ Bool: true
+      │       sigma ┼ nothing
+      │        chol ┼ nothing
+      │          rc ┼ nothing
+      │         alg ┼ SquaredSOCRiskExpr()
+      │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+      │   ratio_alg ┼ SquareRootRatio()
+      │      corner ┴ nothing
   obj ┼ MinimumRisk()
    wi ┼ nothing
    fb ┴ nothing

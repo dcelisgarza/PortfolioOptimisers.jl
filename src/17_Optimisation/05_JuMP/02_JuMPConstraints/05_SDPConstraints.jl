@@ -325,7 +325,7 @@ Where:
 # Related
 
   - [`set_sdp_objective_lift!`](@ref)
-  - [`ConstantCornerLift`](@ref)
+  - [`SquareRootRatio`](@ref)
   - [`set_maximum_ratio_normalisation!`](@ref)
 """
 function set_sdp_lift_corner!(::JuMP.Model, ::ObjectiveFunction, ::AbstractPriorResult)
@@ -341,17 +341,17 @@ function set_sdp_lift_corner!(model::JuMP.Model, obj::MaximumRatio, pr::Abstract
     return nothing
 end
 """
-    sdp_objective_lift_flag(model::JuMP.Model, lift::SemiDefiniteLift,
+    sdp_objective_lift_flag(model::JuMP.Model, ratio_alg::RatioFormulation,
                             settings::RiskMeasureSettings)
 
 Return `true` when a lifted variance states its objective term on the lift with a constant corner, [`set_sdp_objective_lift!`](@ref).
 
-The term needs that lift only when it is a positive term of the objective of a [`MaximumRatio`](@ref): `lift` is [`ConstantCornerLift`](@ref), the head registered `sdp_corner` with [`set_sdp_lift_corner!`](@ref), `settings.rke` is `true` and `settings.scale > 0`. Under every other objective ``k`` is the constant ``1``, and the two lifts are one matrix. A bound needs degree one, so it reads the lift with the corner ``k``. A term with a negative scale is maximised, and only a bound holds a lifted matrix from above. [`ScaleCornerLift`](@ref) gives `false`.
+The term needs that lift only when it is a positive term of the objective of a [`MaximumRatio`](@ref): `ratio_alg` is [`SquareRootRatio`](@ref), the head registered `sdp_corner` with [`set_sdp_lift_corner!`](@ref), `settings.rke` is `true` and `settings.scale > 0`. Under every other objective ``k`` is the constant ``1``, and the two lifts are one matrix. A bound needs degree one, so it reads the lift with the corner ``k``. A term with a negative scale is maximised, and only a bound holds a lifted matrix from above. [`LinearRatio`](@ref) gives `false`.
 
 # Arguments
 
   - $(arg_dict[:model])
-  - `lift`: The `lift` of the measure.
+  - `ratio_alg`: The `ratio_alg` of the measure.
   - `settings`: The settings of the measure.
 
 # Returns
@@ -363,10 +363,10 @@ The term needs that lift only when it is a positive term of the objective of a [
   - [`set_sdp_objective_lift!`](@ref)
   - [`mark_objective_variance!`](@ref)
 """
-function sdp_objective_lift_flag(::JuMP.Model, ::ScaleCornerLift, ::RiskMeasureSettings)
+function sdp_objective_lift_flag(::JuMP.Model, ::LinearRatio, ::RiskMeasureSettings)
     return false
 end
-function sdp_objective_lift_flag(model::JuMP.Model, ::ConstantCornerLift,
+function sdp_objective_lift_flag(model::JuMP.Model, ::SquareRootRatio,
                                  settings::RiskMeasureSettings)
     return shared_has(model, :sdp_corner) &&
            settings.rke &&
@@ -463,7 +463,7 @@ Where:
 
 # Related
 
-  - [`ConstantCornerLift`](@ref)
+  - [`SquareRootRatio`](@ref)
   - [`sdp_objective_lift_flag`](@ref)
   - [`set_sdp_lift_corner!`](@ref)
   - [`set_sdp_constraints!`](@ref)
@@ -548,7 +548,7 @@ Where:
 
   - [`set_sdp_objective_lift!`](@ref)
   - [`set_sdp_frc_constraints!`](@ref)
-  - [`ConstantCornerLift`](@ref)
+  - [`SquareRootRatio`](@ref)
 """
 function set_sdp_frc_objective_lift!(model::JuMP.Model, corner::Option{<:Number})
     lp = nested_prefix(Symbol(""), :lift_)

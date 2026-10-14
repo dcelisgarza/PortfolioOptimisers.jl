@@ -549,17 +549,17 @@ VarianceSkewKurtosis
            │      ub ┼ nothing
            │     rke ┴ Bool: true
         vr ┼ Variance
-           │   settings ┼ RiskMeasureSettings
-           │            │   scale ┼ Float64: 1.0
-           │            │      ub ┼ nothing
-           │            │     rke ┴ Bool: false
-           │      sigma ┼ nothing
-           │       chol ┼ nothing
-           │         rc ┼ nothing
-           │        alg ┼ SquaredSOCRiskExpr()
-           │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-           │       lift ┼ ConstantCornerLift()
-           │     corner ┴ nothing
+           │    settings ┼ RiskMeasureSettings
+           │             │   scale ┼ Float64: 1.0
+           │             │      ub ┼ nothing
+           │             │     rke ┴ Bool: false
+           │       sigma ┼ nothing
+           │        chol ┼ nothing
+           │          rc ┼ nothing
+           │         alg ┼ SquaredSOCRiskExpr()
+           │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │   ratio_alg ┼ SquareRootRatio()
+           │      corner ┴ nothing
         sk ┼ Skewness
            │   settings ┼ MaxRiskMeasureSettings
            │            │   scale ┼ Float64: 1.0

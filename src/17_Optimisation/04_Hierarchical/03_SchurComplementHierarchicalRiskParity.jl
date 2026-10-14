@@ -653,17 +653,17 @@ SchurComplementHierarchicalRiskParity
          │   strict ┴ Bool: false
   params ┼ SchurComplementParams
          │       r ┼ Variance
-         │         │   settings ┼ RiskMeasureSettings
-         │         │            │   scale ┼ Float64: 1.0
-         │         │            │      ub ┼ nothing
-         │         │            │     rke ┴ Bool: true
-         │         │      sigma ┼ nothing
-         │         │       chol ┼ nothing
-         │         │         rc ┼ nothing
-         │         │        alg ┼ SquaredSOCRiskExpr()
-         │         │   mtx_sqrt ┼ EigenFallbackSquareRoot()
-         │         │       lift ┼ ConstantCornerLift()
-         │         │     corner ┴ nothing
+         │         │    settings ┼ RiskMeasureSettings
+         │         │             │   scale ┼ Float64: 1.0
+         │         │             │      ub ┼ nothing
+         │         │             │     rke ┴ Bool: true
+         │         │       sigma ┼ nothing
+         │         │        chol ┼ nothing
+         │         │          rc ┼ nothing
+         │         │         alg ┼ SquaredSOCRiskExpr()
+         │         │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+         │         │   ratio_alg ┼ SquareRootRatio()
+         │         │      corner ┴ nothing
          │   gamma ┼ Float64: 0.5
          │     pdm ┼ Posdef
          │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton

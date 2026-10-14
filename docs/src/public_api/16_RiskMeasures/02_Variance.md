@@ -9,8 +9,8 @@ QuadRiskExpr
 SquaredSOCRiskExpr
 RSOCRiskExpr
 SOCRiskExpr
-ConstantCornerLift
-ScaleCornerLift
+SquareRootRatio
+LinearRatio
 Variance
 StandardDeviation
 UncertaintySetVariance
