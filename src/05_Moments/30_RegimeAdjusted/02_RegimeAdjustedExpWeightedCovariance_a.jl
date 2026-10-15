@@ -189,6 +189,12 @@ direction by the bias that the regime method reads. The factor is exact for fixe
 inverse-volatility direction of `w = nothing` is built from the same estimate, so a smaller bias
 remains, which that function states.
 
+A direction reads the block as a covariance. A HAC block in the warm-up, and a block of assets
+with different histories, need not be positive definite, and a direction with a small positive
+variance on it scores a large statistic: at 8 assets, a half-life of 10 and two lags, one row of
+a block whose smallest eigenvalue is ``-0.31`` scored 0.51 and set the regime state to 51. The
+`indefinite` field names what the statistic does with such a block.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -196,7 +202,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     PortfolioTarget(;
-        w::Option{<:Union{<:VecNum, <:MatNum}} = nothing
+        w::Option{<:Union{<:VecNum, <:MatNum}} = nothing,
+        indefinite::AbstractIndefiniteBlockRule = RefuseIndefiniteWarmUp()
     ) -> PortfolioTarget
 
 Keywords correspond to the struct's fields. The bound is the pair of shapes the fit can honour,
@@ -211,7 +218,8 @@ because [`Statistics.cov(ce::RegimeAdjustedExpWeightedCovariance, X::MatNum; dim
 ```jldoctest
 julia> PortfolioTarget()
 PortfolioTarget
-  w ┴ nothing
+           w ┼ nothing
+  indefinite ┴ RefuseIndefiniteWarmUp()
 ```
 
 # Related
@@ -226,16 +234,21 @@ PortfolioTarget
     $(field_dict[:ra_w])
     """
     w
-    function PortfolioTarget(w::Option{<:Union{<:VecNum, <:MatNum}})
+    """
+    $(field_dict[:ra_indefinite])
+    """
+    indefinite
+    function PortfolioTarget(w::Option{<:Union{<:VecNum, <:MatNum}},
+                             indefinite::AbstractIndefiniteBlockRule)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
         end
-        return new{typeof(w)}(w)
+        return new{typeof(w), typeof(indefinite)}(w, indefinite)
     end
 end
-function PortfolioTarget(;
-                         w::Option{<:Union{<:VecNum, <:MatNum}} = nothing)::PortfolioTarget
-    return PortfolioTarget(w)
+function PortfolioTarget(; w::Option{<:Union{<:VecNum, <:MatNum}} = nothing,
+                         indefinite::AbstractIndefiniteBlockRule = RefuseIndefiniteWarmUp())::PortfolioTarget
+    return PortfolioTarget(w, indefinite)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1030,51 +1043,6 @@ function regime_statistic(target::PortfolioTarget, X::VecNum, C::MatNum,
     end
 
     return length(X) * r .^ 2 ./ v
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Builds the portfolio directions of the regime statistic over the contributing assets, one
-direction to a row, each row summing to one.
-
-Where `target.w` is `nothing`, one inverse-volatility direction is rebuilt from the block at
-every observation, which neutralises the dispersion of the volatilities so that a loud asset
-does not carry the statistic on its own. Where `target.w` holds weights, each row of that matrix
-is one direction, its entries are restricted to the assets that contribute, and a row that keeps
-no weight is dropped.
-
-# Arguments
-
-  - `target::PortfolioTarget`: Portfolio regime-adjustment target.
-  - `C::MatNum`: Bias-corrected covariance block of the contributing assets.
-  - `idx::AbstractVector{<:Integer}`: Index of those assets in the universe.
-  - `min_val::Number`: Floor applied to each variance.
-
-# Returns
-
-  - `W::Option{<:MatNum}`: The directions, or `nothing` where no row keeps a positive weight.
-
-# Related
-
-  - [`regime_statistic`](@ref)
-  - [`regime_target_statistic`](@ref)
-  - [`PortfolioTarget`](@ref)
-"""
-function portfolio_directions(target::PortfolioTarget, C::MatNum,
-                              idx::AbstractVector{<:Integer}, min_val::Number)
-    w = target.w
-    if isnothing(w)
-        inv_sigma = inv.(sqrt.(max.(LinearAlgebra.diag(C), min_val)))
-        return permutedims(inv_sigma / sum(inv_sigma))
-    end
-    Wi = isa(w, AbstractMatrix) ? w[:, idx] : permutedims(w[idx])
-    keep = vec(sum(Wi; dims = 2)) .> zero(eltype(Wi))
-    if !any(keep)
-        return nothing
-    end
-    Wi = Wi[keep, :]
-
-    return Wi ./ sum(Wi; dims = 2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

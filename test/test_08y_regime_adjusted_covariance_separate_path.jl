@@ -535,3 +535,70 @@ below zero was floored the same way. The statistic now scores only a built asset
     one_decay = RegimeAdjustedExpWeightedCovariance(; decay = 0.9, min_obs = 2)
     @test PO.regime_block_built(partial_fit!(one_decay, Xc).cache, one_decay) === true
 end
+
+#=
+Issue #1736. Under HAC a built block in the warm-up can be indefinite, and a direction with a
+small positive variance on it scores a large statistic. On seed 28 of the case below the
+inverse-volatility direction read, after 6 rows, a block with the smallest eigenvalue -0.31 and a
+direction variance of 0.0057, and the next row set the regime state to 51. `PortfolioTarget`
+holds the rule in its field `indefinite`: `RefuseIndefiniteWarmUp()`, the default, refuses such a
+block while the gate of the Mahalanobis target for the same assets is closed;
+`ClipIndefiniteBlock()` clips the eigenvalues of its correlation; `ScoreIndefiniteBlock()` scores
+it as it is.
+=#
+@testset "PortfolioTarget names the rule for an indefinite block" begin
+    na, rho = 8, 0.5
+    U = cholesky(Symmetric(fill(rho, na, na) + (1 - rho) * I)).U
+    sig = collect(range(0.5, 2.0; length = na))
+    X = (randn(StableRNG(28), 8, na) * U) .* transpose(sig)
+    function sep(rule)
+        return RegimeAdjustedExpWeightedCovariance(; decay = 2.0^(-1 / 10),
+                                                   cor_decay = 2.0^(-1 / 20), min_obs = 5,
+                                                   regime_lohi_mult = nothing,
+                                                   regime_decay = 2.0^(-1 / 6000),
+                                                   regime_min_obs = 1,
+                                                   centring = PreCentred(), hac_lags = 2,
+                                                   regime_target = PortfolioTarget(;
+                                                                                   indefinite = rule),
+                                                   regime_method = PO.RootMeanSquaredAdjusted())
+    end
+    @test PortfolioTarget().indefinite === RefuseIndefiniteWarmUp()
+    # The reproduction of the issue: a fit of 6 rows, then the first 7 rows again.
+    function state(rule)
+        ce = sep(rule)
+        cache = partial_fit!(ce, X[1:6, :]).cache
+        C = PO.regime_covariance_block(cache, ce, collect(1:na))
+        return eigmin(Symmetric(C)), partial_fit!(ce, X[1:7, :]).cache.regime_state
+    end
+    lo, score = state(ScoreIndefiniteBlock())
+    @test lo < -0.3 && score > 50
+    # Every block of these rows is young and indefinite, so no row is scored.
+    @test isnothing(state(RefuseIndefiniteWarmUp())[2])
+    # The clip keeps the rows, and the state is a third of the score (measured 15.1).
+    @test 0 < state(ClipIndefiniteBlock())[2] < score / 2
+
+    # The rules on one block: the warm-up rule refuses only a young block with a negative
+    # eigenvalue. A singular block of two rows over three assets is positive semidefinite, and it
+    # is kept.
+    C = [1.0 0.9 0.9; 0.9 1.0 -0.9; 0.9 -0.9 1.0] .* (2 .* transpose([1.0, 2.0, 3.0]))
+    C = (C + transpose(C)) / 2
+    P = [2.0 0.5 0.1; 0.5 3.0 0.2; 0.1 0.2 4.0]
+    @test eigmin(Symmetric(C)) < 0
+    @test isnothing(PO.indefinite_block(RefuseIndefiniteWarmUp(), C, true))
+    @test PO.indefinite_block(RefuseIndefiniteWarmUp(), C, false) === C
+    @test PO.indefinite_block(RefuseIndefiniteWarmUp(), P, true) === P
+    Z = [1.0 2.0 0.5; -0.5 1.0 2.0]
+    S = transpose(Z) * Z
+    @test !isposdef(S) && PO.indefinite_block(RefuseIndefiniteWarmUp(), S, true) === S
+    @test PO.indefinite_block(ScoreIndefiniteBlock(), C, true) === C
+    Cc = PO.indefinite_block(ClipIndefiniteBlock(), C, true)
+    @test Cc !== C && diag(Cc) ≈ diag(C) && eigmin(Symmetric(Cc)) > -1e-12
+    @test PO.indefinite_block(ClipIndefiniteBlock(), P, false) == P
+
+    # The block is young until the gate of the Mahalanobis target opens: at 8 assets, a
+    # correlation half-life of 20 and two lags the gate opens at 20 terms.
+    K1 = PO.mahalanobis_bias_start(2.0^(-1 / 20), na, 2)
+    @test K1 == 20
+    @test !PO.regime_bias_open(ExactDebias(), na, 2.0^(-1 / 20), K1 - 1, 2)
+    @test PO.regime_bias_open(ExactDebias(), na, 2.0^(-1 / 20), K1, 2)
+end

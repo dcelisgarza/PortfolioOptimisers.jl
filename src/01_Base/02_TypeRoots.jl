@@ -491,7 +491,25 @@ A rule is a marker for dispatch, and it holds no data. A new rule needs a method
   - [`RawVolatility`](@ref)
 """
 abstract type AbstractCorrelationVolatility <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the rule that says what the portfolio regime target does with a covariance block that is not positive definite.
+
+[`PortfolioTarget`](@ref) holds the rule in its `indefinite` field. A HAC block in the warm-up, and a block of assets with different histories, need not be positive definite, and a direction with a small positive variance on it then scores a large statistic. The root lives with the other roots, because the target binds its field before the members load.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`indefinite_block`](@ref).
+
+# Related
+
+  - [`RefuseIndefiniteWarmUp`](@ref)
+  - [`ClipIndefiniteBlock`](@ref)
+  - [`ScoreIndefiniteBlock`](@ref)
+"""
+abstract type AbstractIndefiniteBlockRule <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
        OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, AbstractCentring,
        AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming,
-       AbstractCorrelationVolatility
+       AbstractCorrelationVolatility, AbstractIndefiniteBlockRule

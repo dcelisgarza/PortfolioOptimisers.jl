@@ -146,6 +146,7 @@
         :AbstractHacFloor,
         :AbstractHacVolatilityTiming,
         :AbstractHighOrderPriorEstimator_F,
+        :AbstractIndefiniteBlockRule,
         :AbstractLastObservationAlgorithm,
         :AbstractLearningRateSchedule,
         :AbstractLeverageOneMask,

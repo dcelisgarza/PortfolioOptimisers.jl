@@ -757,6 +757,12 @@ is the same for the three methods to first order. What remains is of the next or
 ``K = 20`` and 1.004 in the steady state. At the defaults the first row enters at ``K`` equal to
 the half-life, where the rest is 1.006 at a half-life of 40.
 
+The block passes through [`indefinite_block`](@ref) with the rule of `target.indefinite` first,
+and a row whose block the rule refuses is not scored. The block is young while
+[`regime_bias_open`](@ref) is false for the count of contributing assets, at ``K``, on the decay
+of the correlation structure and with the HAC lags of the estimator: the gate of
+[`MahalanobisTarget`](@ref) for the same assets.
+
 # Arguments
 
   - `target::PortfolioTarget`: Portfolio regime-adjustment target.
@@ -768,7 +774,7 @@ the half-life, where the rest is 1.006 at a half-life of 40.
 # Returns
 
   - `stats::Option{<:VecNum}`: One statistic per direction, or `nothing` where no direction keeps
-    a positive weight.
+    a positive weight, or where the rule of `target.indefinite` refuses the block.
 
 # Related
 
@@ -776,19 +782,27 @@ the half-life, where the rest is 1.006 at a half-life of 40.
   - [`portfolio_regime_bias`](@ref)
   - [`regime_bias!`](@ref)
   - [`inverse_volatility_bias`](@ref)
+  - [`indefinite_block`](@ref)
   - [`update_regime!`](@ref)
 """
 function regime_target_statistic(target::PortfolioTarget,
                                  cache::RegimeAdjustedCovarianceState,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
-    C = regime_covariance_block(cache, ce, idx)
+    K = centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
+    # The block is young while the gate of the Mahalanobis target for the same assets is closed.
+    young = !regime_bias_open(ExactDebias(), length(idx),
+                              has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay, K,
+                              ce.hac_lags)
+    C = indefinite_block(target.indefinite, regime_covariance_block(cache, ce, idx), young)
+    if isnothing(C)
+        return nothing
+    end
     stats = regime_statistic(target, X[idx], C, idx, ce.min_val)
     if isnothing(stats)
         return nothing
     end
 
-    K = centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
     f = portfolio_regime_bias(cache.bias, ce, target, C, idx, K)
     if isnothing(target.w) && !isnothing(cache.bias)
         sv = exp_weight_cross_sum(ce.decay, ce.decay, K, ce.hac_lags)

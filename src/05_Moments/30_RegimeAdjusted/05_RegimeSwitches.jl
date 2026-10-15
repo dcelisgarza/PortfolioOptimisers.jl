@@ -419,7 +419,125 @@ function hac_pair_factor(cache::RegimeAdjustedCovarianceState,
     return F .+ centring_lag_factor(ce.centring, ce.decay, cache.obs_count, dvalid,
                                     cache.lag_records, w, false)
 end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Refuses a covariance block with a negative eigenvalue while the block is young, and scores it once the block is old. This is the default rule of [`PortfolioTarget`](@ref).
+
+The block is young while the gate of [`MahalanobisTarget`](@ref) for the same assets is closed: [`regime_bias_open`](@ref) at the count of the youngest asset, on the decay of the correlation structure, with the HAC lags of the estimator. Under HAC that gate asks that the effective count of observations of the banded weight matrix pass ``n + 1``, and in the warm-up before it a HAC block need not be positive definite. A block of assets with different histories need not be positive definite at any count, and once the gate is open this rule scores it, so the steady state of a panel with a holiday or a late listing does not move. An estimate whose steady state never opens the gate, such as 12 assets at a half-life of 5 under HAC, is young at every count.
+
+On the case of #1736, iid Normal returns at 8 assets, an equicorrelation of 0.5, a half-life of 10, two lags and 30 seeds of 8 rows, the largest regime state of the inverse-volatility direction was 51.4 on the separate path and 14.8 on one decay where the block was scored as it is. On one decay the young blocks of those rows are singular but have no negative eigenvalue, so this rule scores them, and the state stays at 14.8. The separate path refuses every one of those first rows, and it scores its first row at row 14 in the median and at row 21 at most, where its gate opens at 20.
+
+# Constructors
+
+    RefuseIndefiniteWarmUp() -> RefuseIndefiniteWarmUp
+
+# Examples
+
+```jldoctest
+julia> PortfolioTarget().indefinite
+RefuseIndefiniteWarmUp()
+```
+
+# Related
+
+  - [`AbstractIndefiniteBlockRule`](@ref)
+  - [`ClipIndefiniteBlock`](@ref)
+  - [`ScoreIndefiniteBlock`](@ref)
+  - [`indefinite_block`](@ref)
+"""
+struct RefuseIndefiniteWarmUp <: AbstractIndefiniteBlockRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Clips the eigenvalues of the correlation of a covariance block at zero, keeps the variances, and scores the direction on the clipped block, at every count.
+
+The clip is the one that [`regime_adjusted_covariance`](@ref) applies to the report, [`restore_psd!`](@ref). A block that has a Cholesky factor is kept as it is, so the rule costs one Cholesky factor per row, and one eigendecomposition only where the block is not positive definite. It moves the statistic of a panel with a holiday or a late listing in the steady state too, where the block need not be positive semidefinite. On the case of #1736 the largest regime state of the inverse-volatility direction after 8 rows fell from 51.4 to 24.3 on the separate path, and on one decay it stayed at 14.8.
+
+# Constructors
+
+    ClipIndefiniteBlock() -> ClipIndefiniteBlock
+
+# Examples
+
+```jldoctest
+julia> PortfolioTarget(; indefinite = ClipIndefiniteBlock()).indefinite
+ClipIndefiniteBlock()
+```
+
+# Related
+
+  - [`AbstractIndefiniteBlockRule`](@ref)
+  - [`RefuseIndefiniteWarmUp`](@ref)
+  - [`ScoreIndefiniteBlock`](@ref)
+  - [`indefinite_block`](@ref)
+"""
+struct ClipIndefiniteBlock <: AbstractIndefiniteBlockRule end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Scores a covariance block as it is, positive definite or not.
+
+A direction whose variance is at or below `min_val` is still refused, as [`regime_statistic`](@ref) states. A direction with a small positive variance on an indefinite block scores a large statistic, which the clip `regime_lohi_mult` of the estimator bounds where it is set.
+
+# Constructors
+
+    ScoreIndefiniteBlock() -> ScoreIndefiniteBlock
+
+# Examples
+
+```jldoctest
+julia> PortfolioTarget(; indefinite = ScoreIndefiniteBlock()).indefinite
+ScoreIndefiniteBlock()
+```
+
+# Related
+
+  - [`AbstractIndefiniteBlockRule`](@ref)
+  - [`RefuseIndefiniteWarmUp`](@ref)
+  - [`ClipIndefiniteBlock`](@ref)
+  - [`indefinite_block`](@ref)
+"""
+struct ScoreIndefiniteBlock <: AbstractIndefiniteBlockRule end
+"""
+    indefinite_block(::RefuseIndefiniteWarmUp, C::MatNum, young::Bool)
+    indefinite_block(::ClipIndefiniteBlock, C::MatNum, young::Bool)
+    indefinite_block(::ScoreIndefiniteBlock, C::MatNum, young::Bool)
+
+The covariance block that the portfolio regime statistic reads.
+
+# Arguments
+
+  - `C`: The bias-corrected covariance block of the assets that contribute to the statistic.
+  - `young`: Whether the block is young, that is whether the gate of [`MahalanobisTarget`](@ref) for the same assets is closed.
+
+# Returns
+
+  - `block::Option{<:MatNum}`: `nothing` under [`RefuseIndefiniteWarmUp`](@ref) where the block is young and has an eigenvalue below ``-n \\epsilon`` times the largest in size, and `C` else. A singular block, such as a block of fewer observations than assets, is kept: each direction reads a true variance on it. A copy of `C` with the clip of [`restore_psd!`](@ref) under [`ClipIndefiniteBlock`](@ref). `C` under [`ScoreIndefiniteBlock`](@ref).
+
+# Related
+
+  - [`AbstractIndefiniteBlockRule`](@ref)
+  - [`PortfolioTarget`](@ref)
+"""
+function indefinite_block(::RefuseIndefiniteWarmUp, C::MatNum, young::Bool)
+    if !young || LinearAlgebra.issuccess(LinearAlgebra.cholesky(LinearAlgebra.Symmetric(C);
+                                                                check = false))
+        return C
+    end
+    # A singular block of fewer rows than assets is positive semidefinite, and each direction
+    # reads a true variance on it: only a negative eigenvalue refuses the block.
+    vals = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(C))
+    return vals[1] < -length(vals) * eps(eltype(vals)) * maximum(abs, vals) ? nothing : C
+end
+function indefinite_block(::ClipIndefiniteBlock, C::MatNum, ::Bool)
+    return restore_psd!(copy(C))
+end
+function indefinite_block(::ScoreIndefiniteBlock, C::MatNum, ::Bool)
+    return C
+end
 export ExactDebias, LawDebias, RawStatistic, NoHacFloor, PerTermHacFloor,
-       VolatilityBeforeUpdate, VolatilityAfterUpdate, BiasCorrectedVolatility, RawVolatility
+       VolatilityBeforeUpdate, VolatilityAfterUpdate, BiasCorrectedVolatility,
+       RawVolatility, RefuseIndefiniteWarmUp, ClipIndefiniteBlock, ScoreIndefiniteBlock
 public debiases, reads_dependence, hac_floor!, volatility_before_update,
-       correlation_variance
+       correlation_variance, indefinite_block

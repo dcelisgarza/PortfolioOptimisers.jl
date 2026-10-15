@@ -63,6 +63,18 @@ path came out of #1726.
 3. `regime_statistic(::PortfolioTarget, …)` refuses the row, it returns `nothing`, where the
    variance of a direction is not above `min_val`, as `MahalanobisTarget` refuses a block that
    does not factorise. It no longer floors that variance at `min_val`.
+4. `PortfolioTarget` holds the rule for a block that is not positive definite in a field
+   `indefinite::AbstractIndefiniteBlockRule` (#1736). `RefuseIndefiniteWarmUp()`, the default,
+   refuses a block with a negative eigenvalue while the block is young, and scores it once the
+   block is old. A singular block, such as a block of fewer observations than assets, is kept,
+   because each direction reads a true variance on it. The block is young while the gate of `MahalanobisTarget` for the same assets is closed:
+   `regime_bias_open` at the count of the youngest asset, on the decay of the correlation
+   structure and the HAC lags of the estimator. `ClipIndefiniteBlock()` clips the eigenvalues of
+   the correlation of the block at zero with `restore_psd!`, keeps the variances, and scores the
+   clipped block at every count. `ScoreIndefiniteBlock()` scores the block as it is, the rule
+   before #1736. A new rule is a method of `indefinite_block`. The root is `public`, the three
+   rules are exported. The maintainer asked for the three rules behind singleton types, and the
+   strict rule is the default, because it does not move the steady state.
 
 ## Consequences
 
@@ -80,9 +92,26 @@ path came out of #1726.
   multiplier and no regime state after 6 rows reached 1e3, and the two rules of `cor_vol` gave the
   same multiplier to 4e-5.
 - A built HAC block in the warm-up can be indefinite and still give a direction a small positive
-  variance. The row then scores high: one seed of 30 read a regime state of 51 after 8 rows, where
-  one decay read at most 15. A refusal of every indefinite block would also refuse the blocks of a
-  holiday or a late listing, which ADR 0181 lets be indefinite, so that case stays open (#1736).
+  variance, and the row then scores high. A refusal of every indefinite block would also refuse
+  the blocks of a holiday or a late listing, which ADR 0181 lets be indefinite, in the steady
+  state. The gate of the Mahalanobis target separates the two: before it the block is young, and
+  after it `RefuseIndefiniteWarmUp()` scores every block, so the steady state does not move. On 8
+  assets at an equicorrelation of 0.5, half-lives of 10 and 20, two lags and 30 seeds of 8 rows,
+  the largest and second largest regime state of the inverse-volatility direction were:
+
+  | rule | one decay | separate path |
+  | --- | --- | --- |
+  | `ScoreIndefiniteBlock()` | 14.8, 4.95 | 51.4, 28.7 |
+  | `ClipIndefiniteBlock()` | 14.8, 4.95 | 24.3, 15.1 |
+  | `RefuseIndefiniteWarmUp()` | 14.8, 4.95 | no seed scored |
+
+  On one decay the young blocks of those rows are singular, 8 assets over 6 rows, but they have
+  no negative eigenvalue, so the rule scores them as before: each direction reads a true variance
+  on a singular block. A first version that refused every block with no Cholesky factor refused
+  those rows too, and it would have moved the warm-up of every plain panel with more assets than
+  `min_obs`. On the separate path the first scored row is row 14 in the median and row 21 at
+  most, where the gate opens at 20 rows. Before #1736 it was row 6, and row 8 at most. An estimate whose steady state never opens the gate, such
+  as 12 assets at a half-life of 5 under HAC, refuses an indefinite block at every count.
 
 ## Alternatives considered
 
@@ -96,6 +125,10 @@ path came out of #1726.
   decides not to write the block, so the weight is positive while the block is still zero.
 - **Floor a direction's variance at a larger value.** Any floor scores the row against a number
   that is not an estimate.
+- **Refuse an indefinite block only while `K < min_obs + hac_lags`** (#1736). The count has no
+  tie to the law of the block: the HAC weight matrix has negative eigenvalues far past it, and
+  the gate of the Mahalanobis target is the count at which the estimator already trusts a block
+  of the same assets.
 
 ## Related
 

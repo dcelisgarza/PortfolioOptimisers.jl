@@ -16,6 +16,9 @@ VolatilityBeforeUpdate
 VolatilityAfterUpdate
 BiasCorrectedVolatility
 RawVolatility
+RefuseIndefiniteWarmUp
+ClipIndefiniteBlock
+ScoreIndefiniteBlock
 ```
 
 ## Functions
@@ -26,4 +29,5 @@ reads_dependence
 hac_floor!
 volatility_before_update
 correlation_variance
+indefinite_block
 ```
