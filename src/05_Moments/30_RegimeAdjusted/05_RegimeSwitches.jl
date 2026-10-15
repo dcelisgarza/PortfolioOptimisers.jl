@@ -426,7 +426,7 @@ Refuses a covariance block with a negative eigenvalue while the block is young, 
 
 The block is young while the gate of [`MahalanobisTarget`](@ref) for the same assets is closed: [`regime_bias_open`](@ref) at the count of the youngest asset, on the decay of the correlation structure, with the HAC lags of the estimator. Under HAC that gate asks that the effective count of observations of the banded weight matrix pass ``n + 1``, and in the warm-up before it a HAC block need not be positive definite. A block of assets with different histories need not be positive definite at any count, and once the gate is open this rule scores it, so the steady state of a panel with a holiday or a late listing does not move. An estimate whose steady state never opens the gate, such as 12 assets at a half-life of 5 under HAC, is young at every count.
 
-On the case of #1736, iid Normal returns at 8 assets, an equicorrelation of 0.5, a half-life of 10, two lags and 30 seeds of 8 rows, the largest regime state of the inverse-volatility direction was 51.4 on the separate path and 14.8 on one decay where the block was scored as it is. On one decay the young blocks of those rows are singular but have no negative eigenvalue, so this rule scores them, and the state stays at 14.8. The separate path refuses every one of those first rows, and it scores its first row at row 14 in the median and at row 21 at most, where its gate opens at 20.
+On a case of iid Normal returns at 8 assets, an equicorrelation of 0.5, a half-life of 10, two lags and 30 seeds of 8 rows, the largest regime state of the inverse-volatility direction was 51.4 on the separate path and 14.8 on one decay where the block was scored as it is. On one decay the young blocks of those rows are singular but have no negative eigenvalue, so this rule scores them, and the state stays at 14.8. The separate path refuses every one of those first rows, and it scores its first row at row 14 in the median and at row 21 at most, where its gate opens at 20.
 
 # Constructors
 
@@ -452,7 +452,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Clips the eigenvalues of the correlation of a covariance block at zero, keeps the variances, and scores the direction on the clipped block, at every count.
 
-The clip is the one that [`regime_adjusted_covariance`](@ref) applies to the report, [`restore_psd!`](@ref). A block that has a Cholesky factor is kept as it is, so the rule costs one Cholesky factor per row, and one eigendecomposition only where the block is not positive definite. It moves the statistic of a panel with a holiday or a late listing in the steady state too, where the block need not be positive semidefinite. On the case of #1736 the largest regime state of the inverse-volatility direction after 8 rows fell from 51.4 to 24.3 on the separate path, and on one decay it stayed at 14.8.
+The clip is the one that [`regime_adjusted_covariance`](@ref) applies to the report, [`restore_psd!`](@ref). A block that has a Cholesky factor is kept as it is, so the rule costs one Cholesky factor per row, and one eigendecomposition only where the block is not positive definite. It moves the statistic of a panel with a holiday or a late listing in the steady state too, where the block need not be positive semidefinite. On the case of iid Normal returns above, the largest regime state of the inverse-volatility direction after 8 rows fell from 51.4 to 24.3 on the separate path, and on one decay it stayed at 14.8.
 
 # Constructors
 

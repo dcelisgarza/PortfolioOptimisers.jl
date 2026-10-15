@@ -68,9 +68,9 @@ source* states.**
 
 ## Consequences
 
-The key lands with its first user, an audit ticket of #1547, because a `ref_dict` entry with no
-user fails `test/test_26_docs.jl`. Until then the check of the form is vacuous on the source
-tree, so it is pinned on a synthetic text.
+The key landed with its first users, the audit ticket #1536 of #1547, because a `ref_dict` entry
+with no user fails `test/test_26_docs.jl`. The check of the form reads every file of the source
+tree, and a synthetic text pins each form that it refuses.
 
 A `# References` bullet with no note now states that every formulation the docstring takes from
 that work was checked against its original source. A sweep sub-issue filed from now on carries the

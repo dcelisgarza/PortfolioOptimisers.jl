@@ -373,7 +373,7 @@ nothing raises `@error "File exists but no references were collected"` in
     end
 
     @testset "the standard note closes a # References bullet after a locator" begin
-        # The check is vacuous until a docstring carries the note, so it is pinned on text.
+        # A synthetic text pins each form, because the docstrings carry only the accepted one.
         refs = "# References\n\n  - \$(ref_dict[:cajas2025])"
         note = "\$(ref_dict[:no_original_source])"
         @test isempty(note_offenders("$(refs) Equation 3.45. $(note)\n"))

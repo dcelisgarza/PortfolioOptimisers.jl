@@ -44,14 +44,16 @@ end
                         :MinimumSquaredDistance => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`",
                         :MinimumSumSquares => "the parameter is the one of its supertype `SquaredOrderedWeightsArrayAlgorithm{T}`")
     #=
-    ADR 0049 bounds the similarity of these three fields in the header on purpose. `@concrete`
+    ADR 0049 bounds the similarity of the first three fields in the header on purpose. `@concrete`
     also writes a generic positional constructor, and a bound in the header is what makes that
     constructor refuse a similarity that can go negative, so every construction route refuses
-    one.
+    one. The fourth entry uses the same mechanism for a Result: it has no keyword constructor, so
+    only the header bound refuses a value of the wrong type on the positional route.
     =#
     bounded_allowed = Dict(:NetworkEstimator => "ADR 0049: `alg <: Tree_SimMat` refuses a similarity that can go negative on every construction route",
                            :LoGo => "ADR 0049: `sim <: AbstractNonNegativeSimilarityMatrixAlgorithm` refuses a similarity that can go negative on every construction route",
-                           :DBHT => "ADR 0049: `sim <: AbstractNonNegativeSimilarityMatrixAlgorithm` refuses a similarity that can go negative on every construction route")
+                           :DBHT => "ADR 0049: `sim <: AbstractNonNegativeSimilarityMatrixAlgorithm` refuses a similarity that can go negative on every construction route",
+                           :CovarianceForecastEvaluationResult => "#1704: the Result has no keyword constructor, so `x_src <: AbstractReturnsSource` is the one check that refuses a positional `Bool` in the place of the source; test_24e asserts the refusal")
 
     files = String[]
     for d in ("src", "ext"), (r, _, fs) in walkdir(joinpath(root, d)), f in fs

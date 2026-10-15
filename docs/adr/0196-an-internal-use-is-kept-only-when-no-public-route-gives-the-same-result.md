@@ -13,9 +13,10 @@ type. Such a use breaks without notice when the owner changes the internal, and 
 The maintainer asked to rely on internals only where it is necessary.
 
 [#1499](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1499) made the inventory on
-Julia 1.13.1. It found that `Base.ispublic` alone is a wrong measure: MOI, Optim, Roots and
-StatsBase document names in their manuals that they never declare `public`, and 88 of the 136
-qualified accesses were such names.
+Julia 1.13.1. It found that `Base.ispublic` alone is a wrong measure: MOI, Optim and Roots
+document names in their manuals that they never declare `public`, and 88 of the 136 qualified
+accesses were such names. #1500 found that the manual of StatsBase documents `cov2cor!` and
+`cor2cov!` in the same way.
 [#1500](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1500) decided the rule below
 and gave each use a verdict, after a check of the effect of each change on performance,
 architecture, maintainability and ergonomics.
@@ -28,8 +29,9 @@ architecture, maintainability and ergonomics.
    `Base.ispublic` is `true` for it. A docstring alone does not make it public. A field of a Julia
    object, such as `.name`, `.wrapper`, `.parameters` or `.a`, is never public.
 2. A dependency says so with `export`, with `public`, or with its manual. A name that the manual
-   documents is public, and `Base.ispublic` cannot see this, so the census holds each such name
-   with a pointer to the manual page.
+   documents is public, and `Base.ispublic` cannot see this, so the census of
+   [#1501](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1501) holds each such
+   name with a pointer to the manual page.
 3. A field of a dependency type is public only when the manual documents the field and the owner
    gives no accessor for it. When an accessor exists, the code calls the accessor.
 
@@ -73,6 +75,8 @@ internal use of the owner, not of this package.
 
 A Replace goes to the sweep sub-issue of #404 that owns the file, reopened and scoped to this rule.
 A census in `code_health/` holds each Keep with its reason, so a new internal use fails the build.
+The census is the work of #1501. Until it lands, no gate finds a new internal use: the pre-commit
+hook of ExplicitImports excludes its two checks of qualified accesses.
 
 ## Considered options
 
