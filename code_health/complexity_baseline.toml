@@ -248,7 +248,7 @@ commit = "8d43b8434a"
 "src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 22, cog = 37, arg = 7, cyc_sum = 48, cog_sum = 65, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 27, cog_sum = 13, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 16, arg = 10, cyc_sum = 114, cog_sum = 88, arg_sum = 132, macros = [] }
-"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 30, cyc_sum = 72, cog_sum = 54, arg_sum = 131, macros = ["@propagatable"] }
+"src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 31, cyc_sum = 72, cog_sum = 54, arg_sum = 132, macros = ["@propagatable"] }
 "src/10_Prior/12_PriorPartialFit.jl" = { cyc = 9, cog = 12, arg = 8, cyc_sum = 127, cog_sum = 76, arg_sum = 195, macros = [] }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { cyc = 2, cog = 2, arg = 5, cyc_sum = 10, cog_sum = 8, arg_sum = 19, macros = [] }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 11, cog_sum = 5, arg_sum = 19, macros = [] }
