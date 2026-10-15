@@ -139,3 +139,30 @@ regression targets, not a property of the weights. [#1640](https://github.com/dc
 fixed it: [ADR 0203](0203-a-weighted-regression-reads-the-kish-count-of-its-weights.md) scales the
 weights to their Kish count before the call to GLM. A uniform push now gives the unweighted
 stepwise sets, as it gives the unweighted moments. The decision of this ADR does not change.
+
+## Amendment (2026-10-15)
+
+Source 1 of the decision let a caller's `pe.w` win over the nested result's `w` for the whole
+fit. [#1742](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1742) found that this
+rule gives a result whose moments and weights disagree. A caller's `pe.w` reaches the nested
+estimator, and `pr` is refitted under it. A nested prior that reweights its scenarios (an
+`EntropyPoolingPrior`, a `MeucciEntropyPoolingPrior`, an `OpinionPoolingPrior`, or a `FactorPrior`
+or a `BlackLittermanPrior` over one of them) then solves its own views from `pe.w`, and it
+answers its posterior in `pr.w` and its moments in `pr.mu` and `pr.sigma`. The outer solve
+started from `pe.w`, not from `pr.w`. With no outer view, the result reported `w = pe.w` beside
+the moments of the nested posterior, so `mu != X' * w`. With an outer view, the refit under the
+posterior dropped the views of the nested prior.
+
+**A caller's `pe.w` is the prior of the innermost scenarios.** It reaches the nested estimator
+before the refit, as before. After the refit, where `pr.w` is not `nothing`, `w0` is
+`scenario_probabilities(pr.w)`, the posterior of the nested prior. This is the reading that
+already held when the caller states no `w`. So `EntropyPoolingPrior(; pe = inner, w = w)` gives
+the same result as `EntropyPoolingPrior(; pe = inner_w)`, where `inner_w` is `inner` with
+`w = w`. A nested prior that answers no `w`, such as an `EmpiricalPrior` or a `FactorPrior` over
+one, keeps the caller's `pe.w`, so its results do not move. `kld` and `ens` are measured against
+the nested posterior.
+
+The rejected rule kept the caller's `pe.w` as `w0` and refitted the nested prior through
+`scenario_prior`, which holds its model and drops its views. It removes the disagreement too, but
+it discards the views of the nested prior, and those views are part of its configuration. A
+caller's `w` states the probabilities of the scenarios, not a replacement for the views.

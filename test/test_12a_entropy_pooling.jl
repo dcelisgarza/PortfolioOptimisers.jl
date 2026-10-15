@@ -1517,15 +1517,67 @@ nested fit computed must not be discarded on the way through the wrapper.
     # divergence from the inner posterior and not the one from uniform.
     @test isapprox(pr_out.kld, StatsBase.kldivergence(pr_out.w, pr_in.w), rtol = 1e-6)
     @test !isapprox(pr_out.kld, StatsBase.kldivergence(pr_out.w, uni), rtol = 1e-2)
-    # A caller's own `w` still wins over the nested result's.
+    # A caller's own `w` is the prior of the innermost scenarios (#1742). The nested prior
+    # solves its views from it, and its posterior is the prior the outer views start from.
     v = collect(range(0.25, 1.75; length = T0))
     wnu = pweights(v ./ sum(v))
+    pr_inw = prior(EntropyPoolingPrior(; sets = sets, w = wnu,
+                                       mu_views = LinearConstraintEstimator(;
+                                                                            val = "AAPL == 0.004")),
+                   rd)
     pr_w = prior(EntropyPoolingPrior(; pe = inner, sets = sets, w = wnu,
                                      mu_views = LinearConstraintEstimator(;
                                                                           val = "MSFT == 0.003")),
                  rd)
-    @test isapprox(pr_w.kld, StatsBase.kldivergence(pr_w.w, wnu), rtol = 1e-6)
+    @test isapprox(pr_w.kld, StatsBase.kldivergence(pr_w.w, pr_inw.w), rtol = 1e-6)
+    @test !isapprox(pr_w.kld, StatsBase.kldivergence(pr_w.w, wnu), rtol = 1e-2)
     @test !isapprox(collect(pr_w.w), collect(pr_out.w), rtol = 1e-3)
+end
+
+#=
+#1742: a caller's `w` over a nested prior that reweights its scenarios. The nested prior was
+refitted under the caller's `w` and answered its posterior, but the outer solve started from
+the caller's `w`. With no outer view the result reported `w` as the caller's `w` beside the
+moments of the nested posterior, so `mu != X' * w`. The nested posterior is now the outer
+prior probabilities, as it is when the caller states none.
+=#
+@testset "A caller's w over a nested pooling prior is the innermost prior (#1742)" begin
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    fsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["F$i" for i in 1:K]))
+    mv2 = LinearConstraintEstimator(; val = "A2 == 0.002")
+    mv3 = LinearConstraintEstimator(; val = "A3 == 0.001")
+    v = collect(range(1, 2; length = 60))
+    w0 = aweights(v ./ sum(v))
+    for alg in (H0_EntropyPooling(), H1_EntropyPooling(), H2_EntropyPooling()),
+        mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+
+        inner = mk(; sets = sets, alg = alg, mu_views = mv3)
+        # The same nested prior, with the caller's `w` as its own prior probabilities.
+        pr_in = prior(mk(; sets = sets, alg = alg, mu_views = mv3, w = w0), X)
+        pr = prior(mk(; sets = sets, alg = alg, pe = inner, w = w0), X)
+        @test maximum(abs, pr.mu - transpose(X) * pr.w) < 1e-15
+        @test isapprox(pr.mu[3], 0.001; rtol = 1e-6)
+        @test pr.w ≈ pr_in.w
+        @test iszero(pr.kld)
+        pr = prior(mk(; sets = sets, alg = alg, pe = inner, w = w0, mu_views = mv2), X)
+        @test maximum(abs, pr.mu - transpose(X) * pr.w) < 1e-15
+        @test isapprox(pr.mu[2], 0.002; rtol = 1e-6)
+        @test isapprox(pr.kld, StatsBase.kldivergence(pr.w, pr_in.w); rtol = 1e-6)
+        # A factor prior over a nested pooling prior of the factors answers its posterior,
+        # and the factor mean is the mean of the factors under the reported `w`.
+        fin = EntropyPoolingPrior(; sets = fsets, alg = alg,
+                                  mu_views = LinearConstraintEstimator(;
+                                                                       val = "F2 == 0.001"))
+        pr = prior(mk(; sets = sets, alg = alg, pe = FactorPrior(; pe = fin), w = w0), X, F)
+        @test pr.w == pr.f_w
+        @test maximum(abs, pr.f_mu - transpose(F) * pr.w) < 1e-15
+        @test isapprox(pr.f_mu[2], 0.001; rtol = 1e-6)
+    end
 end
 
 #=

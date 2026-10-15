@@ -453,7 +453,7 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
 # Algorithm
 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
- 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Where that refit answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Stage one holds the mean, value at risk, conditional, entropic and relativistic value at risk views. Accumulate them into the constraint dictionary `epc` and the tail view vector `tvs`. Where either is non-empty, solve from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
  4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Where `epc` or `tvs` is non-empty, solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
  5. Stage three holds the skewness, kurtosis and correlation views, with the mean and the variance of every asset they name pinned by [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same emptiness test, solve from the same start step 4 takes, and refit `pr` at the new `w1`.
@@ -508,6 +508,11 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
         pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # A nested prior that reweights its scenarios solves its own views from the
+        # caller's probabilities, and its posterior is the prior of this estimator, as it
+        # is when the caller states none. A nested prior that answers no `w` keeps the
+        # caller's (#1742, ADR 0116).
+        w1 = w0 = scenario_probabilities(something(pr.w, w0))
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
@@ -612,7 +617,7 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
 # Algorithm
 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
- 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Where that refit answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Build every view against that one `pr`: the mean, value at risk, conditional, entropic and relativistic value at risk, variance, covariance, skewness, kurtosis and correlation views. Each row that is linear in the posterior probabilities reaches the constraint dictionary `epc`, and each tail view that needs auxiliary variables reaches the tail view vector `tvs`. No asset's mean or variance is pinned.
  4. Where `epc` or `tvs` is non-empty, solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
  5. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
@@ -653,6 +658,11 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
         pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # A nested prior that reweights its scenarios solves its own views from the
+        # caller's probabilities, and its posterior is the prior of this estimator, as it
+        # is when the caller states none. A nested prior that answers no `w` keeps the
+        # caller's (#1742, ADR 0116).
+        w0 = scenario_probabilities(something(pr.w, w0))
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
@@ -718,7 +728,7 @@ end
 
 Return the observation weights of the fit of `pe.pe`, the prior that `pe` embeds, so that [`pin_prior_choice`](@ref) pins the choice of that fit.
 
-A prior that embeds a prior fits it under the weights `w` that the prior around it gives it. An entropy pooling prior fits it under its prior probabilities `w0`, builds its views on that fit, and refits under the posterior weights. Each refit reads the choice of the `w0` fit. [`factory`](@ref) writes the weights of the outer prior into `pe.w`, so `w0` is `w` when `w` is set, and `pe.w` otherwise. When both are `nothing`, the fit is unweighted.
+A prior that embeds a prior fits it under the weights `w` that the prior around it gives it. An entropy pooling prior fits it under the caller's prior probabilities `pe.w`, builds its views on that fit, and refits under the posterior weights. Each refit reads the choice of the `w0` fit. [`factory`](@ref) writes the weights of the outer prior into `pe.w`, so `w0` is `w` when `w` is set, and `pe.w` otherwise. When both are `nothing`, the fit is unweighted.
 
 # Algorithm
 

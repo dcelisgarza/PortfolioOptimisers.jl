@@ -777,7 +777,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
 # Algorithm
 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
- 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Where that refit answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Build the empty constraint dictionary `epc` and the fixing ledger `fixed`. Resolve the `cvar_views` once against that fit, through [`ep_cvar_views_setup`](@ref) into `cvv`. Every stage searches the targets it holds, so a `prior(...)` reference states one number for the whole chain.
  4. Stage one, the mean and the value at risk. Write the `mu_views` and `var_views` rows into `epc`. When `epc` holds a row or `cvv` states a search, solve through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it.
  5. Stage two, the variance and the covariance. Write the `sigma_views` and `cov_views` rows into `epc`, and pin the mean of every asset those rows read with [`fix_mu!`](@ref), so the stage cannot move a moment an earlier stage set. Under the same emptiness test, solve into `w1`, and refit `pr` under it.
@@ -843,6 +843,11 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
         pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # A nested prior that reweights its scenarios solves its own views from the
+        # caller's probabilities, and its posterior is the prior of this estimator, as it
+        # is when the caller states none. A nested prior that answers no `w` keeps the
+        # caller's (#1742, ADR 0116).
+        w1 = w0 = scenario_probabilities(something(pr.w, w0))
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
@@ -973,7 +978,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
 # Algorithm
 
  1. Fit the wrapped prior estimator, giving `pr`. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`.
- 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
+ 2. Read the prior probabilities `w0` on that axis with [`ep_prior_probabilities`](@ref). They are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is refitted under it. Where that refit answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior. Then pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Build the empty constraint dictionary `epc`. Resolve the `cvar_views` once against that fit, through [`ep_cvar_views_setup`](@ref) into `cvv`.
  4. Write the `mu_views` and `var_views` rows into `epc`.
  5. Write the `sigma_views` and `cov_views` rows into `epc`. No moment is pinned, so [`fix_mu!`](@ref) is never called on this route.
@@ -1033,6 +1038,11 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
         # Scenario Cap, takes them with a zero weight on the rows the cap removed (#1667).
         pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
         pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+        # A nested prior that reweights its scenarios solves its own views from the
+        # caller's probabilities, and its posterior is the prior of this estimator, as it
+        # is when the caller states none. A nested prior that answers no `w` keeps the
+        # caller's (#1742, ADR 0116).
+        w0 = scenario_probabilities(something(pr.w, w0))
     end
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
