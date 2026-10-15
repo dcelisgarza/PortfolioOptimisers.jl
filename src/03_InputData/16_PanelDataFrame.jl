@@ -355,7 +355,7 @@ On a time-varying panel the table keeps only the rows where the active mask is `
 # Algorithm
 
  1. Add the key columns. A time-varying panel gets `"observation"` and `"asset"`, where row `(t - 1) n + k` holds observation `t` and asset `k` of the `n` selected assets. A static panel gets `"asset"` alone.
- 2. For each Panel Field in order, and each of its columns from [`panel_frame_columns`](@ref), add the slab in row-major order, so that each value is on the row of its observation and asset. When the Panel Field carries an observed mask, add the mask of that column next, as `"<column>::observed"`.
+ 2. For each Panel Field in order, and each of its columns from [`panel_frame_columns`](@ref), add the slab in row-major order, so that each value is on the row of its observation and asset. When the Panel Field carries an observed mask, add the mask of that column next, as `"<column>::observed"`, and when it carries a placeholder mask, add that mask after it, as `"<column>::placeholder"`.
  3. On a time-varying panel, add the `"emsk"` column, and keep the rows where the active mask is `true`.
 
 Each column goes through [`panel_frame_column!`](@ref).

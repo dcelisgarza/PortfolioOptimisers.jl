@@ -669,8 +669,20 @@ end
         # divides by the active weight 0.75 under the default, and not under the cash rule.
         @test ivr ≈ [1.75 2.0; 14 / 3 0.0; 8.0 0.0]
         @test ivc ≈ [1.75 2.0; 3.5 0.0; 2.0 0.0]
-        @test ivpar ≈ [3.0, 0.0]
-        @test ivpac ≈ [0.75, 0.0]
+        # Sub-portfolio 2 holds asset 2 alone, inactive at the last row, so it has no rate to
+        # read there. It reads every member, 2.0 under both rules: a zero `ivpa` is refused by
+        # the outer `ReturnsResult` and by the `PredictionReturnsResult` of a fold, and the
+        # census of #1411 met that refusal on the cross-validated path (R7 of #1630).
+        @test ivpar ≈ [3.0, 2.0]
+        @test ivpac ≈ [0.75, 2.0]
+        for alg in (RenormaliseActive(), InactiveAsCash())
+            @test PO.collapse_rate(rdh.ivpa, Wt, m, alg)[2] == 2.0
+            # Row 2 has asset 1 and asset 3 active, so sub-portfolio 2 has no active member
+            # there either, and sub-portfolio 1 keeps its rule.
+            @test PO.collapse_rate(rdh.ivpa, Wt, m[1:2, :], alg)[2] == 2.0
+        end
+        @test PO.collapse_fold_rate(rdh.ivpa, Wt[:, 2], pnl) == 2.0
+        @test PO.collapse_fold_rate(rdh.ivpa, Wt[:, 1], pnl) ≈ 3.0
         # A static panel has no inactive member, so both rules give the plain collapse.
         sp = asset_panel([NumericPanelInput(; name = "a", vals = [1.0, 2.0, 3.0])])
         @test vals(PO.collapse_asset_panel(sp, Wi, nx3, RenormaliseActive()), "a") ==

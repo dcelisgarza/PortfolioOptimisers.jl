@@ -122,7 +122,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that state how the panel collapse of a meta-optimiser weighs a member at an observation where the member is outside the universe.
 
-A sub-portfolio of a meta-optimiser holds each member with one weight for the whole history, and a time-varying Asset Panel lists and delists the members. At an observation where a member is inactive, the panel stores a finite value with no meaning. So the collapse reads only the members that are active there, and the rule states what the weight of an inactive member becomes. The rule is the `pcol` field of [`NestedClustered`](@ref) and of [`Stacking`](@ref), and [`collapse_asset_panel`](@ref) states the mathematics. A static panel has no inactive member, so every rule gives the collapse of all the members.
+A sub-portfolio of a meta-optimiser holds each member with one weight for the whole history, and a time-varying Asset Panel lists and delists the members. At an observation where a member is inactive, the panel stores a finite value with no meaning. So the collapse reads only the members that are active there, and the rule states what the weight of an inactive member becomes. The rule is the `pcol` field of [`NestedClustered`](@ref) and of [`Stacking`](@ref), and [`collapse_asset_panel`](@ref) states the mathematics. A static panel has no inactive member. A static field with no placeholder therefore takes the collapse of all the members under every rule, but a static field with a placeholder reads the members that hold data, and the rules differ there.
 
 # Interfaces
 
@@ -185,7 +185,7 @@ struct InactiveAsCash <: AbstractPanelCollapseAlgorithm end
 
 Returns the divisor of each collapsed value of a time-varying Asset Panel under a rule of the panel collapse, or `nothing` for no division.
 
-[`RenormaliseActive`](@ref) divides by the weight of the active members. The divisor is one where a sub-portfolio has no active member, because its active values are all zero, and where it has no inactive member with weight, because its weights already sum to one. So the second case keeps the collapse of all the members bit for bit, where a division by a sum that rounds to one would change the last bit. [`InactiveAsCash`](@ref) divides by nothing. A static panel, `m = nothing`, has no inactive member, and no rule divides.
+[`RenormaliseActive`](@ref) divides by the weight of the active members. The divisor is one where a sub-portfolio has no active member, because its active values are all zero, and where it has no inactive member with weight, because its weights already sum to one. So the second case keeps the collapse of all the members bit for bit, where a division by a sum that rounds to one would change the last bit. [`InactiveAsCash`](@ref) divides by nothing. A mask of `nothing` marks no member unread, and no rule divides. A static field with a placeholder passes its data mask as `m`, so the rule divides there as on a time-varying panel.
 
 # Mathematical definition
 
@@ -857,7 +857,7 @@ The method that Julia selects is the algorithm.
 
  1. `nothing` and a scalar stay as they are.
  2. A matrix collapses through [`collapse_panel_numeric`](@ref), with the divisors of [`active_weight_divisor`](@ref). It reads the cells of [`finite_read_mask`](@ref): an implied volatility that is not finite counts as an inactive member of its row, so a gap in `iv` does not poison the row.
- 3. A vector collapses as `transpose(W) * a` with no mask. With a mask, the value of each member that is inactive at the last row of `m` becomes zero, the vector collapses in the same way, and the answer divides by the divisors of that row.
+ 3. A vector collapses as `transpose(W) * a` with no mask. With a mask, the value of each member that is inactive at the last row of `m` becomes zero, the vector collapses in the same way, and the answer divides by the divisors of that row. A sub-portfolio with no member with weight active at that row has no value to read there, so it collapses as `transpose(W) * a`: a zero is not a rate, and a Returns Result refuses an `ivpa` of zero.
 
 # Arguments
 
@@ -897,7 +897,11 @@ function collapse_rate(a::VecNum, W::MatNum, m::AbstractMatrix{Bool},
     #! inactive member gives its answer bit for bit.
     c = collapse_panel_numeric(ifelse.(view(m, t, :), a, zero(eltype(a))), W)
     d = active_weight_divisor(alg, view(m, t:t, :), W)
-    return isnothing(d) ? c : c ./ vec(d)
+    #! A sub-portfolio with no member with weight active at the last row has no rate to read
+    #! there, and a Returns Result refuses an `ivpa` of zero, so it reads every member, as
+    #! the static collapse does.
+    h = vec(any(view(m, t, :) .& .!iszero.(W); dims = 1))
+    return ifelse.(h, isnothing(d) ? c : c ./ vec(d), collapse_panel_numeric(a, W))
 end
 """
     finite_read_mask(a::MatNum, m::Nothing) -> Option{BitMatrix}

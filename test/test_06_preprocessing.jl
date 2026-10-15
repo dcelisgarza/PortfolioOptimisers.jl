@@ -2938,7 +2938,19 @@ end
                    pf = [NumericPanelField(; name = "mcap", vals = [1.0, 3.0]),
                          CategoricalPanelField(; name = "sector", levels = ["A", "B"],
                                                codes = [2, 1])])
-    @test_throws "part 3 holds values that differ" vcat(a, mk(), b)
+    @test_throws "part 3 holds values or placeholder masks that differ" vcat(a, mk(), b)
+    # The Feature Matrix holds no placeholder mask, so a placeholder `0.0` and a datum `0.0`
+    # derived one Feature Matrix, and the answer was the first part, whichever it was (R7 of
+    # #1630).
+    p = AssetPanel(;
+                   pf = [NumericPanelField(; name = "x", vals = [0.0, 1.0],
+                                           omsk = [false, true], pmsk = [true, false])])
+    d = AssetPanel(;
+                   pf = [NumericPanelField(; name = "x", vals = [0.0, 1.0],
+                                           omsk = [false, true])])
+    @test_throws "part 2 holds values or placeholder masks that differ" vcat(p, d)
+    @test_throws "part 2 holds values or placeholder masks that differ" vcat(d, p)
+    @test vcat(p, p) === p
 end
 
 @testset "A part whose schema differs is refused" begin

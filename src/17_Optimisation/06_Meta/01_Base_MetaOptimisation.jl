@@ -884,7 +884,7 @@ end
 
 Compute the implied volatilities of the outer problem on the cross-validated path, under the rule of the panel collapse.
 
-Each fold collapses `rd.iv` and `rd.ivpa` with the weights of its sub-portfolio and no panel, so it weighs every member. On a time-varying Asset Panel, the fold-less path weighs the active members of each row (see [`prepare_outer_rd`](@ref)). So this method collapses the original `rd.iv` and `rd.ivpa` again for each fold, with [`collapse_rate`](@ref) on the weights of that fold and the active mask of its rows, as [`rebuild_asset_panel`](@ref) does for the panel. With no panel, or a static one, the stacked values of the predictions are already that collapse, and the method returns them.
+Each fold collapses `rd.iv` and `rd.ivpa` with the weights of its sub-portfolio through [`collapse_fold_rate`](@ref), which reads the active mask and the finite cells under [`RenormaliseActive`](@ref), whatever the rule. On a time-varying Asset Panel, the fold-less path weighs the active members of each row under the rule (see [`prepare_outer_rd`](@ref)). So this method collapses the original `rd.iv` and `rd.ivpa` again for each fold, with [`collapse_rate`](@ref) on the weights of that fold and the active mask of its rows, as [`rebuild_asset_panel`](@ref) does for the panel. With no panel, or a static one, the method returns the stacked values of the predictions. Under the default rule they are the collapse of the rule. Under [`InactiveAsCash`](@ref) they differ from it where `iv` holds a cell that is not finite (#1733).
 
 # Algorithm
 

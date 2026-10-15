@@ -192,9 +192,25 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :step_panel_fields => "passes or refuses the Panel Fields of a step",
                                            :assert_carry_step_panel => "a check of the masks and the fields that a carry honours",
                                            :ep_prior => "passes the panel to the prior it wraps",
-                                           # The stack of the Feature Matrix returns the stored cells, and FeatureDistance reads
-                                           # it beside the active mask.
-                                           :panel_feature_matrix => "the stack FeatureDistance reads, whose cases are below",
+                                           :read_member => "passes the panel of a buffer to the batch moment, whose cases are below",
+                                           :carried_location => "passes the panel of a carry to forecast_location, whose case is below",
+                                           # The steps of the priors that rebuild a prior or read a co-moment: each passes the
+                                           # panel on, as ep_prior does (R7 of #1630).
+                                           :scenario_prior => "passes the panel to the refit of the prior it wraps",
+                                           :scenario_factory => "a step of scenario_prior: passes the panel to the prior it rebuilds",
+                                           :prior_probability_factory => "passes the panel to the prior it rebuilds under the prior probabilities",
+                                           :opinion_pooling_weights => "passes the panel to the prior of each opinion",
+                                           :scenario_rows => "a cut to the rows of the scenarios",
+                                           :read_comoment => "passes the panel to cokurtosis or coskewness, whose cases are below",
+                                           :cross_sectional_regression_stage => "a step of prior on a CrossSectionalFactorPrior",
+                                           :cross_sectional_factor_scenarios => "the regression stage of prior on a CrossSectionalFactorPrior",
+                                           # Masks: the active mask and the estimation mask, and no cell value.
+                                           :coverage_keyword_reduction => "a step of the moments on a panel: the active mask, through coverage_mask, whose case is below",
+                                           :coverage_mask_source => "chooses the active mask coverage_mask reads, whose case is below",
+                                           :benchmark_estimation_mask => "narrows the estimation mask to the finite benchmark returns",
+                                           # The static vcat compares this stack. It is an export of every stored cell, and
+                                           # FeatureDistance reads the stack of feature_matrix beside the readable mask.
+                                           :panel_feature_matrix => "an export of every stored cell beside its observed-mask column",
                                            :feature_matrix => "the stack FeatureDistance reads, whose cases are below",
                                            :select_fields => "a step of feature_matrix",
                                            :select_fields_push! => "a step of feature_matrix",
@@ -509,6 +525,13 @@ function census_collapse_cases(rdk::ReturnsResult)
                      r -> (o = CENSUS_PO.rebuild_returns_result(r, preds1456, ucl, alg);
                            (o.pnl, o.iv, o.ivpa)))])
     end
+    # The rates of one fold, which `reconstruct_rd` collapses with the weights of a
+    # sub-portfolio. The first sub-portfolio holds asset 3, which delists before the last row,
+    # so the poison reaches both `iv` and `ivpa` (R7 of #1630).
+    push!(collapse_cases,
+          ((:collapse_fold_rate,), "the rates of a fold",
+           r -> (CENSUS_PO.collapse_fold_rate(r.iv, CENSUS_WC[:, 1], r.pnl),
+                 CENSUS_PO.collapse_fold_rate(r.ivpa, CENSUS_WC[:, 1], r.pnl))))
     return collapse_cases
 end
 # The census of the names: each consumer that the reflection finds has a case or an exemption,

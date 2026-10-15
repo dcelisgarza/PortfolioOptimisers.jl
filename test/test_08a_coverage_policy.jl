@@ -844,6 +844,14 @@ end
         @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
                                                                                                        copy(s0),
                                                                                                        X)
+        # The refusal names the peel, and a coverage floor that rises, never one that falls: a
+        # lower floor admits more assets and cannot remove a pair.
+        @test_throws "the default `MinimalPeel()`" PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
+                                                                                                copy(s0),
+                                                                                                X)
+        @test_throws "raise `min_coverage`" PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
+                                                                                         copy(s0),
+                                                                                         X)
         # A pair that shares exactly one row is undetermined under the Bessel correction alone.
         Y = peel_disjoint_returns()
         Y[20, 4] = 0.003
@@ -880,17 +888,22 @@ end
         pr0 = prior(pe(MinimalPeel()), X[:, keep])
         @test pr.sigma[keep, keep] == pr0.sigma
         @test pr.mu[keep] == pr0.mu
-        @test_throws ArgumentError prior(pe(MinimalPeel()), X; strict = true)
+        @test_throws "peeled the assets at indices [3]" prior(pe(MinimalPeel()), X;
+                                                              strict = true)
         @test_throws PortfolioOptimisers.IsNonFiniteError prior(pe(NoPeel()), X)
         # A log-return prior passes `strict` to its covariance too.
-        @test_throws ArgumentError prior(pe(MinimalPeel(); horizon = 1), X; strict = true)
+        @test_throws "peeled the assets at indices [3]" prior(pe(MinimalPeel();
+                                                                 horizon = 1), X;
+                                                              strict = true)
         # The folded prior reads the same universe, and `strict` reaches its covariance.
         pf = partial_fit!(pe(MinimalPeel()), X)
         prf = @test_logs (:warn, r"indices \[3\]") match_mode = :any prior(pf)
         @test isequal(prf.sigma, pr.sigma)
-        @test_throws ArgumentError prior(pf; strict = true)
-        @test_throws ArgumentError prior(partial_fit!(pe(MinimalPeel(); horizon = 1), X);
-                                         strict = true)
+        @test_throws "peeled the assets at indices [3]" prior(pf; strict = true)
+        @test_throws "peeled the assets at indices [3]" prior(partial_fit!(pe(MinimalPeel();
+                                                                              horizon = 1),
+                                                                           X);
+                                                              strict = true)
     end
     @testset "Parity: the oracle's greedy peel" begin
         # The oracle's covariance setter, with no nearest repair, peels the available-case

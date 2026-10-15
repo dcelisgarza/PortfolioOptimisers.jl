@@ -405,6 +405,7 @@ The method that Julia selects is the algorithm.
 # Validation
 
   - The table holds each column. Raises a `KeyError`. See [`panel_table_column`](@ref).
+  - The columns state a type that is not `Missing`. A reader such as CSV.jl types a column with no value as `Missing`, for example the columns of a long table with no row. Raises an `ArgumentError`.
 
 # Returns
 
@@ -416,12 +417,19 @@ The method that Julia selects is the algorithm.
   - [`panel_table_read!`](@ref)
 """
 function panel_table_eltype(::AbstractVector{<:Integer}, tab::NamedTuple, cols::VecStr)
-    return mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))),
-                     promote_type, cols)
+    T = mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))), promote_type,
+                  cols)
+    #! A reader types a column with no value as `Missing`, so the column states no type.
+    @argcheck(T !== Union{},
+              ArgumentError("the columns $(cols) of the table hold no value, so the reader of the table gave them no type to read. Read them with a type, for example `CSV.File(path; types = Dict(\"$(first(cols))\" => Float64))`."))
+    return T
 end
 function panel_table_eltype(::Nothing, tab::NamedTuple, cols::VecStr)
-    return mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))),
-                     promote_type, ("$c@$a" for c in cols for a in tab.nx); init = Union{})
+    T = mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))), promote_type,
+                  ("$c@$a" for c in cols for a in tab.nx); init = Union{})
+    @argcheck(T !== Union{},
+              ArgumentError("the columns of $(cols) in the table hold no value, so the reader of the table gave them no type to read. Read them with a type, for example `CSV.File(path; types = Dict(\"$(first(cols))@<asset>\" => Float64))`."))
+    return T
 end
 """
     panel_table_mask(lin, tab::NamedTuple, name::AbstractString, sz::Tuple) -> BitArray
@@ -873,8 +881,10 @@ A static Panel Field that a time-varying panel lifts, see [`RepeatedLeading`](@r
   - The manifest holds every named Panel Field. Raises a `KeyError`.
   - The table holds each column that the manifest and `fields` name. Raises a `KeyError`.
   - A wide table has one row, or one row per observation. Raises a `DimensionMismatch`.
+  - The `"observation"` column of a wide table names the observations of the manifest, as text and in order. Raises an `ArgumentError`. See [`panel_table_cells`](@ref).
   - The rows of a long table name cells of the manifest, each once. See [`panel_long_cells`](@ref).
   - No cell that the function reads is `missing`. Raises an `ArgumentError`.
+  - The value columns of a Panel Field state a type. A long table with no row, read back by CSV.jl, types each column as `Missing`. Raises an `ArgumentError`. See [`panel_table_eltype`](@ref).
   - The [`AssetPanel`](@ref) constructor and the constructor of each Panel Field check the result.
 
 # Returns
@@ -943,7 +953,7 @@ Only the long layout holds an `"asset"` column. A column of the wide layout is n
 # Algorithm
 
  1. The table holds an `"asset"` column: it is a long table. Return the cell of each row, from [`panel_long_cells`](@ref).
- 2. Otherwise it is a wide table, whose rows are the observations in order. Check the row count, and return `nothing`.
+ 2. Otherwise it is a wide table, whose rows are the observations in order. Check the row count and, on a time-varying panel, the labels of its `"observation"` column against the manifest, as text and in order. Return `nothing`.
 
 # Arguments
 
@@ -953,6 +963,7 @@ Only the long layout holds an `"asset"` column. A column of the wide layout is n
 # Validation
 
   - A wide table has one row on a static panel, and one row per observation on a time-varying one. Raises a `DimensionMismatch`.
+  - The `"observation"` column of a wide table, when the table holds one, names the observations of the manifest in order. Raises an `ArgumentError`.
   - The rows of a long table name cells of the manifest, each once. See [`panel_long_cells`](@ref).
 
 # Returns
@@ -972,6 +983,11 @@ function panel_table_cells(df::DataFrames.DataFrame, ax::NamedTuple)
     n = ax.static ? 1 : length(ax.ts)
     @argcheck(DataFrames.nrow(df) == n,
               DimensionMismatch("a wide table holds one row on a static panel and one row per observation on a time-varying one, got $(DataFrames.nrow(df)) rows and a manifest that needs $n"))
+    #! A wide table is read by position, so its labels must be the ones of the manifest, in
+    #! order: a sorted or filtered table would otherwise read back permuted.
+    c = DataFrames.columnindex(df, "observation")
+    @argcheck(ax.static || iszero(c) || panel_text.(df[!, c]) == ax.ts,
+              ArgumentError("a wide table holds the observations of the manifest in order, and its \"observation\" column names them in another order or with other labels. Sort the table by the observation as the manifest orders it, or read the column as text, for example with `CSV.File(path; types = Dict(\"observation\" => String))`."))
     return nothing
 end
 """

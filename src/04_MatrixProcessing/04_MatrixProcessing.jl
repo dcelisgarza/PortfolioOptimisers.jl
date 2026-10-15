@@ -815,7 +815,7 @@ The one refusal of the block rule, shared by [`matrix_processing_block!`](@ref) 
 """
 function assert_finite_block(block::AbstractArray)::Nothing
     @argcheck(all(isfinite, block),
-              IsNonFiniteError("the finite block of the answer carries $(count(!isfinite, block)) non-finite entries, the first at $(findfirst(!isfinite, block)) of a block of size $(size(block)), indexed over the block's own assets and not the full universe. Every asset of the block was estimated on its own, so this cell names assets that share no observation. An axis of length `n` is the asset axis and an axis of length `n^2` is the pair axis, on which the position `c` is the asset pair `(fld(c - 1, n) + 1, mod1(c, n))`. Lower `min_coverage`, fit over a window the cells of the block share, or clear `cvg` to fall back on the Coverage Universe."))
+              IsNonFiniteError("the finite block of the answer carries $(count(!isfinite, block)) non-finite entries, the first at $(findfirst(!isfinite, block)) of a block of size $(size(block)), indexed over the block's own assets and not the full universe. Every asset of the block was estimated on its own, so this cell names assets that share no observation. An axis of length `n` is the asset axis and an axis of length `n^2` is the pair axis, on which the position `c` is the asset pair `(fld(c - 1, n) + 1, mod1(c, n))`. On a covariance, set the `peel` of the `CoveragePolicy` to a rule that removes the assets of such a pair, for example the default `MinimalPeel()`. Otherwise raise `min_coverage` so that admission refuses an asset of the cell, fit over a window the cells of the block share, or clear `cvg` to fall back on the Coverage Universe."))
     return nothing
 end
 

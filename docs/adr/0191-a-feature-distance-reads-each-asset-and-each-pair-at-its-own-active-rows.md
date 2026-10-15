@@ -27,15 +27,17 @@ A row is readable for an asset where the asset is active and no value column of 
 Selector holds a placeholder (#1508, #1631), because a placeholder is not data. A cell that a fill
 policy wrote holds data, and the distance reads it. This is available-case estimation, as a Coverage Policy fits a covariance cell on the rows
 at which both of its assets are active. The maintainer decided each part in a grilling session on
-issue #1450, and #1454 built it.
+issue #1450, and #1454 built it. The checks of the kernel do not follow the rule yet: the checks of
+finiteness and of the domain of the metric read every cell of the window, the inactive cells
+included, so a `NaN` or a value outside the domain at an inactive cell refuses (#1734).
 
 | Part | Rule |
 | --- | --- |
 | `LastObservation` | A field `alg` holds a rule. `LastRow()`, the default, reads the last row, and an asset that is not readable there has no value to read. `LastActiveRow()` reads each asset at its last readable row of the window. |
-| `AggregateFeatures` | Each asset over its readable rows. `w` is resolved once over the window, restricted to the asset's readable rows and divided by their sum. `MedianCollapse` takes the same weights. |
-| `AggregateDistances` | Each pair over the rows at which both assets are readable, the weights restricted and divided by their sum. |
+| `AggregateFeatures` | Each asset over its readable rows. `w` is resolved once over the window, restricted to the asset's readable rows and divided by their sum. `MedianCollapse` takes the same weights. An asset whose readable rows sum to a zero weight has no value to read, and the call refuses and names it. |
+| `AggregateDistances` | Each pair over the rows at which both assets are readable, the weights restricted and divided by their sum. An asset whose readable rows sum to a zero weight refuses as under `AggregateFeatures`: its diagonal total is zero, and no pair rule reaches the diagonal. |
 | `StackObservations` | Each pair stacks its `n` shared readable rows, and `stack_rescale` rescales the distance to the `T` rows of the window, one method per metric (below). |
-| An asset with no value to read | Inside a fit, the entry composes the Investable Mask of the prior with the assets that each `FeatureDistance` can read (`feature_readable_mask`), before `investable_reduction`. The asset departs as a non-investable asset: announced, dropped, weight zero, and listed on the Non-Investable Axis. A direct `distance`, `cor_and_dist` or `clusterise` call refuses, and names the asset and the remedy. |
+| An asset with no value to read | Inside a fit, the entry composes the Investable Mask of the prior with the assets that each `FeatureDistance` can read (`feature_readable_mask`), before `investable_reduction`. The asset departs as a non-investable asset: announced, dropped, weight zero, and listed on the Non-Investable Axis. A direct `distance`, `cor_and_dist` or `clusterise` call refuses, and names the asset and the remedy. The entry composes only a `FeatureDistance` that reads the panel of the returns data, `ape = nothing`. A producer builds its panel inside the call, so the entry cannot read it, and the call refuses inside a fit as a direct call does. |
 | A pair with no shared readable row | A field `pair` on `AggregateDistances` and `StackObservations`. `RefusePair()`, the default, refuses and names the pair. `DropFewerRows()` drops, at the entry of a fit, the asset of the first empty pair with fewer readable rows (the later asset on a tie), until no pair is empty. `FeatureFallback(; alg = MeanCollapse(), w = nothing)` measures the pair by each asset's features collapsed over its own readable rows. |
 
 **The rescale of the stack.** A metric that sums over the coordinates sums over fewer of them

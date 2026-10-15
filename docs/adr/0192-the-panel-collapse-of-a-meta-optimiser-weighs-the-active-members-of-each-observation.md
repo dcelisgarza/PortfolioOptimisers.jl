@@ -53,22 +53,26 @@ matches the outer returns for an additive feature, such as a loading.
 | --- | --- |
 | Every kind of field | A numeric field, the one-hot block of a categorical field and a rectangular tensor field take the restricted weights `D_t` of each row, `D_t,ik = W̃_ik r_ti / d_tk`. A tensor field reads the data mask of each label. A square tensor field reads a pair of members with the weight `W̃_ik W̃_jl` where both are active and the cell holds data, and divides by the weight of the read pairs, so it stays symmetric. Where the read pairs are separable, this is `S°_t = D_tᵀ S_t D_t`. |
 | A lifted field | A static input that a time-varying panel holds as a `RepeatedLeading` takes the rule of each row, so its collapse varies over time. |
-| A static panel | It has no mask and no inactive member, and it does not change under either rule. |
+| A static panel | It has no inactive member. A static field with no placeholder mask reads every member and does not change under either rule. A static field with a placeholder reads `r = u`, so the two rules differ on it as on a time-varying panel. |
 | The divisor | `d_tk` is the weight of the read members under the default, and one under the cash rule. It is also one where a sub-portfolio has no read member, whose values are then the zero of its empty column, and where every member with weight is read. |
 | The observed mask | A collapsed cell is observed where a member that is active and observed has weight: the collapse reads `m .& omsk`, not `omsk`. A field with no observed mask keeps none. |
 | The placeholder mask | A collapsed cell holds a placeholder where no member that is active and holds data has weight: `pmsk° = .!(collapse of m .& u)`. A field with no placeholder mask keeps none. An observed collapsed cell is never a placeholder. |
 | The universe masks | They keep their rule: a sub-portfolio is active where one member with weight is, and so for the estimation mask. |
 | The cross-validated path | `rebuild_asset_panel` stacks the collapsed active and estimation masks of each fold, in place of all-`true` masks, so a sub-portfolio is inactive on the same rows on both paths. A static panel keeps all-`true` masks. |
-| `iv` | `prepare_outer_rd` collapses it with the same rule, row by row, through `collapse_rate`. |
-| `ivpa` | A vector collapses over the members active at the last row of the outer window, the row at which the outer fit stands. A scalar stays as it is. |
+| `iv` | `prepare_outer_rd` collapses it with the same rule, row by row, through `collapse_rate`. It reads `m .& isfinite.(iv)`, so an implied volatility that is not finite counts as an inactive member of its row (#1672). |
+| `ivpa` | A vector collapses over the members active at the last row of the outer window, the row at which the outer fit stands. A sub-portfolio with no member with weight active at that row collapses over every member, as a static panel does: a zero is not a rate, and a Returns Result refuses an `ivpa` of zero. A scalar stays as it is. |
 
 **The cross-validated path collapses the rates again.** Each fold collapses `iv` and `ivpa` in
-`reconstruct_rd` with its own weights and no panel, so it weighs every member. On a time-varying
+`reconstruct_rd` with its own weights through `collapse_fold_rate`, which reads the active mask of
+the panel and the finite cells of `iv` (#1672) under `RenormaliseActive()`. On a time-varying
 panel, `rebuild_fold_rates` collapses the original `rd.iv` and `rd.ivpa` again for each fold,
-with the weights and the active rows of that fold, as `rebuild_asset_panel` does for the panel.
-So `cv` changes execution only, and the rates follow the rule on both paths. The resolution of
-issue #1451 named the fold-less path, and this build carried the rule to the cross-validated
-one, as the same resolution requires of the masks.
+under the rule, with the weights and the active rows of that fold, as `rebuild_asset_panel` does
+for the panel. So on a time-varying panel `cv` changes execution only, and the rates follow the
+rule on both paths. The resolution of issue #1451 named the fold-less path, and this build
+carried the rule to the cross-validated one, as the same resolution requires of the masks. With
+no panel or a static one, `rebuild_fold_rates` keeps the rates of the folds, so the rates read
+`RenormaliseActive()` whatever `pcol` states. The two rules then differ where `iv` holds a cell
+that is not finite, and issue #1733 holds that limit.
 
 **A panel with no inactive member keeps its old result bit for bit.** The divisor of a
 sub-portfolio whose weighted members are all active is exactly one, not a sum that rounds to
@@ -82,7 +86,7 @@ of `prepare_outer_rd` on the census panel, which has inactive members.
 
 - `prepare_outer_rd`, `collapse_asset_panel`, `fold_asset_panel`, `rebuild_asset_panel` and
   `rebuild_returns_result` take the rule as a positional argument with no default, so no path
-  reads a different rule from the meta-optimiser's. The fold-less `predict_outer_returns` reads
-  `opt.pcol`.
+  reads a different rule from the meta-optimiser's, except the rates of a fold with no panel or a
+  static one (#1733). The fold-less `predict_outer_returns` reads `opt.pcol`.
 - A time-varying `ivpa` is outside this decision, in issue #1455.
 - `NestedClustered` and `Stacking` print one more field.

@@ -260,7 +260,7 @@ struct LastRow <: AbstractLastObservationAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Reads each asset at its last active row of the window, the most recent value that an investor had.
+Reads each asset at its last readable row of the window, the most recent value that an investor had. A row is readable where the asset is active and each selected cell holds data, so a placeholder moves the read to an earlier row.
 
 An asset that delisted before the last row is read at the last row at which it was active. An asset with no active row in the window has no value to read.
 
@@ -276,12 +276,12 @@ $(DocStringExtensions.TYPEDEF)
 
 Discards the window and measures one row of each asset's features.
 
-The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice. `alg` names the row of each asset. [`LastRow`](@ref) reads the last row of the window, and [`LastActiveRow`](@ref) reads the last row at which each asset is active. It is also the one member that names its rows before the stack exists: [`collapse_rows`](@ref) answers the rows that `alg` can read, so the kernel stacks those rows of an Asset Panel alone.
+The cheapest member of the family and its default, because it is the only one whose result depends on no aggregation choice. `alg` names the row of each asset. [`LastRow`](@ref) reads the last row of the window, and [`LastActiveRow`](@ref) reads the last row at which each asset is readable: the asset is active, and each selected cell holds data and not a placeholder. It is also the one member that names its rows before the stack exists: [`readable_window_rows`](@ref) answers the rows that `alg` can read, so the kernel stacks those rows of an Asset Panel alone.
 
 # Algorithm
 
- 1. Under [`LastRow`](@ref), or when every asset is active at the last row, take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`, giving an `assets × features` matrix.
- 2. Under [`LastActiveRow`](@ref), take for each asset the row of its last active observation, giving an `assets × features` matrix.
+ 1. Under [`LastRow`](@ref), or when every asset is readable at the last row, take the last slice of the observation axis, `view(Z, size(Z, 1), :, :)`, giving an `assets × features` matrix.
+ 2. Under [`LastActiveRow`](@ref), take for each asset the row of its last readable observation, giving an `assets × features` matrix.
  3. Apply the metric to that matrix once.
 
 # Fields
@@ -1492,12 +1492,12 @@ Stack the Feature Matrix a [`FeatureDistance`](@ref) measures, from the panel it
 
 One site resolves the panel. Under a `nothing` producer, `asset_panel(de.ape, pr, rd, X)` returns the panel that the [`ReturnsResult`](@ref) holds, and otherwise it builds one. The panel method of [`feature_matrix`](@ref) then stacks the columns that `de.sel` names, over the observation rows that `de.alg` reads. The kernel calls this method, and [`feature_labels`](@ref) resolves the panel through the same call, so the labels that a caller rebuilds name the columns that the kernel measured.
 
-The collapse algorithm names the rows, through [`collapse_rows`](@ref). Under [`LastObservation`](@ref), a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that the collapse measures. Every other collapse stacks every observation.
+The collapse algorithm names the rows, through [`readable_window_rows`](@ref). Under [`LastObservation`](@ref) with [`LastRow`](@ref), a time-varying panel stacks its last observation alone, `1 × assets × features`, which is the slice that the collapse measures. With [`LastActiveRow`](@ref), it stacks the rows from the earliest last readable row of an asset to the last row. Every other collapse stacks every observation.
 
 # Algorithm
 
  1. Resolve the panel with [`asset_panel`](@ref).
- 2. Stack it with [`feature_matrix`](@ref), reading `de.sel` and `de.strict`, over the rows [`collapse_rows`](@ref) names for `de.alg`.
+ 2. Stack it with [`feature_matrix`](@ref), reading `de.sel` and `de.strict`, over the rows [`readable_window_rows`](@ref) names for `de.alg`.
 
 # Arguments
 

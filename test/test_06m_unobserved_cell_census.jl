@@ -94,12 +94,10 @@ function census_unobserved_poison(rd::ReturnsResult)
                          pnl = AssetPanel(pf, pnl.amsk, pnl.emsk))
 end
 
-# The exemptions of test_06j, with the reads of the stored cells that differ here: the stack of
-# `feature_matrix` has cases below, and the export of every stored cell beside its mask reads the
-# placeholder by design.
+# The exemptions of test_06j, with the read of the stored cells that differs here: the stack of
+# `feature_matrix` has cases below.
 const CENSUS_UNOBSERVED_EXEMPT = let d = copy(CENSUS_EXEMPT)
     delete!(d, :feature_matrix)
-    d[:panel_feature_matrix] = "an export of every stored cell beside its observed-mask column"
     d
 end
 

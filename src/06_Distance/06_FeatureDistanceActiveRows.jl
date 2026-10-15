@@ -443,7 +443,7 @@ The type of `de.alg` selects one of four methods.
 
  1. [`LastObservation`](@ref): under [`LastRow`](@ref), or when every asset is active at the last row, measure the last row. Otherwise measure each asset at its last active row.
  2. [`AggregateFeatures`](@ref): resolve the weights with [`collapse_weights`](@ref), collapse each asset over its own active rows with [`active_collapse`](@ref), and measure the collapsed matrix.
- 3. [`AggregateDistances`](@ref): measure each row, and add each entry of a pair only at a row where both assets are active, with that row's weight. Divide each entry by its own weight total, and give each pair with a zero total to [`resolve_empty_pairs!`](@ref).
+ 3. [`AggregateDistances`](@ref): measure each row, and add each entry of a pair only at a row where both assets are active, with that row's weight. Check that the weight total of each asset, on the diagonal, is more than zero. Divide each entry by its own weight total, and give each pair with a zero total to [`resolve_empty_pairs!`](@ref).
  4. [`StackObservations`](@ref): measure the whole stack. Measure each pair that shares fewer rows than the window again, on the coordinates of its shared rows, with [`stack_metric`](@ref), and rescale it with [`stack_rescale`](@ref). Give each pair with no shared row to [`resolve_empty_pairs!`](@ref).
 
 # Arguments
@@ -497,6 +497,11 @@ function active_feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances
         wt = isnothing(w) ? one(T) : T(w[t])
         accumulate_active_pairs!(D, S, Dt, wt, view(A, t, :))
     end
+    #! The diagonal total is the weight of the active rows of an asset. A zero total leaves
+    #! `0 / 0` on the diagonal, and no pair rule reaches the diagonal.
+    z = findall(i -> iszero(S[i, i]), axes(S, 1))
+    @argcheck(isempty(z),
+              ArgumentError("FeatureDistance reads each asset at its active rows, and the observation weights of those rows sum to zero for $(feature_asset_labels(win.nx, z)), so no distance of the asset has a value to read. Give a positive weight to one active row of each asset."))
     E = [(i, j) for j in axes(S, 2) for i in 1:(j - 1) if iszero(S[i, j])]
     D ./= S
     return resolve_empty_pairs!(D, de.alg.pair, E, de, win)

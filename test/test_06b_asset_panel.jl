@@ -1942,6 +1942,25 @@ end
     @test_throws KeyError asset_panel(L, mf; fields = ["nope"])
     # The table does not match the manifest.
     @test_throws DimensionMismatch asset_panel(W[1:3, :], mf)
+    # A wide table is read by position, so a sorted table read back permuted with no error
+    # (R7 of #1630). Its labels must be the ones of the manifest, in order.
+    msg = "its \"observation\" column names them in another order or with other labels"
+    @test_throws msg asset_panel(W[[2, 1, 3, 4], :], mf)
+    r = copy(W)
+    r.observation[4] = Date(1999, 1, 1)
+    @test_throws msg asset_panel(r, mf)
+    # A table with no "observation" column is still read by position.
+    @test panel_1399_equal(pnl,
+                           asset_panel(DataFrames.select(W, DataFrames.Not("observation")),
+                                       mf))
+    # A long table of a panel with no active cell has no row, and CSV.jl types each of its
+    # columns as `Missing`. The reader names the columns and the remedy (R7 of #1630).
+    z = AssetPanel(; pf = [NumericPanelField(; name = "x", vals = ones(2, 2))],
+                   amsk = falses(2, 2), emsk = falses(2, 2))
+    @test size(asset_panel(panel_dataframe(z; layout = :long), panel_manifest(z)).amsk) ==
+          (2, 2)
+    @test_throws "hold no value" panel_1399_csv(panel_dataframe(z; layout = :long),
+                                                panel_manifest(z))
     @test_throws KeyError asset_panel(DataFrames.select(L, DataFrames.Not("beta=mom")), mf)
     r = copy(L)
     r.asset[1] = "D"

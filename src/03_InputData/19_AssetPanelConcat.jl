@@ -3,7 +3,7 @@
 
 Concatenates Asset Panels of one universe along the observation axis, `a` first.
 
-Each part holds the same Panel Fields, and the function joins the values and the observed mask of each field, the active mask and the estimation mask. It refuses a part whose schema differs from the schema of `a`. A static panel has no observation axis and states the same values at each observation, so the concatenation of equal static panels is `a`.
+Each part holds the same Panel Fields, and the function joins the values, the observed mask and the placeholder mask of each field, the active mask and the estimation mask. It refuses a part whose schema differs from the schema of `a`. A static panel has no observation axis and states the same values at each observation, so the concatenation of equal static panels is `a`.
 
 The panel holds no asset names and no timestamps. The [`ReturnsResult`](@ref) or the [`PricesResult`](@ref) that holds the panel holds them, and each of the two refuses a repeated timestamp. To join two blocks of returns data, concatenate `X`, `ts` and each other series with `vcat`, concatenate the panels with this function, and make a new `ReturnsResult`.
 
@@ -14,7 +14,7 @@ The element types promote as `vcat` promotes them: a `Float32` part and a `Float
 The method that Julia selects is the algorithm.
 
  1. Check each part `b` against `a` with [`assert_panel_concat`](@ref): the shape, the asset count, the Panel Field names in their order, and the schema of each field.
- 2. `a` is static: check that the Feature Matrix of each part, which [`panel_feature_matrix`](@ref) derives, equals the one of `a`. Return `a`.
+ 2. `a` is static: check that the Feature Matrix of each part, which [`panel_feature_matrix`](@ref) derives, equals the one of `a`, and that the placeholder mask of each field equals the one of `a`. Return `a`.
  3. `a` is time-varying: concatenate the parts of each Panel Field with [`panel_field_vcat`](@ref), and the parts of each mask with [`panel_mask_vcat`](@ref). Make the `AssetPanel` of the results.
 
 # Arguments
@@ -83,8 +83,10 @@ end
 function Base.vcat(a::AssetPanel{<:Any, Nothing, Nothing}, bs::AssetPanel...)
     for (k, b) in enumerate(bs)
         assert_panel_concat(a, b, k + 1)
-        @argcheck(isequal(panel_feature_matrix(a), panel_feature_matrix(b)),
-                  ArgumentError("a static Asset Panel has no observation axis, so it states the same values at each observation, and a concatenation of static panels needs equal parts; part $(k + 1) holds values that differ from the ones of the first part"))
+        #! The Feature Matrix holds no placeholder mask, so the masks are compared apart.
+        @argcheck(isequal(panel_feature_matrix(a), panel_feature_matrix(b)) &&
+                  isequal([f.pmsk for f in a.pf], [f.pmsk for f in b.pf]),
+                  ArgumentError("a static Asset Panel has no observation axis, so it states the same values at each observation, and a concatenation of static panels needs equal parts; part $(k + 1) holds values or placeholder masks that differ from the ones of the first part"))
     end
     return a
 end

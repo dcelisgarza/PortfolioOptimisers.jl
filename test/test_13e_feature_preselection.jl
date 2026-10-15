@@ -381,6 +381,15 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test D[1, 2] ≈ 5 / 3 rtol = 1e-15
         @test D[1, 3] ≈ 18 / 7 rtol = 1e-15
         @test D[2, 3] ≈ 3 rtol = 1e-15
+        # An asset whose active rows carry a zero weight has no distance to read. The total of
+        # `c` was `0 / 0` on the diagonal, which no pair rule reaches, and the refusal named
+        # the pair (a, c) as one that shares no active row (R7 of #1630).
+        w0 = StatsBase.Weights([1.0, 1, 0, 0])
+        msg = "the observation weights of those rows sum to zero for the assets [\"c\"], so no distance of the asset has a value to read"
+        for pair in (RefusePair(), DropFewerRows(), FeatureFallback())
+            @test_throws msg hand_distance(fdist(AggregateDistances(; w = w0, pair = pair)),
+                                           rd)
+        end
     end
     @testset "StackObservations rescales each metric by its method" begin
         # (a, b) stacks rows 1 and 2, differences (1, 2); (a, c) rows 3 and 4, (2, 3). The

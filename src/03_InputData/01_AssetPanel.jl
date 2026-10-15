@@ -1263,7 +1263,7 @@ $(DocStringExtensions.TYPEDEF)
 
 The Asset Panel: the Panel Fields of one universe, and the two point-in-time universe masks.
 
-The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`panel_feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
+The two universe masks are the panel's **defining content**, and the Panel Fields are optional payload. A panel with fields owns their values, so nothing else on a `PricesResult` or a `ReturnsResult` holds a feature matrix, and the Feature Matrix a distance measures is derived from the panel by [`feature_matrix`](@ref) and stored nowhere. A panel with **no** field is the ingestion layer's common case: a caller holding only prices has no market capitalisation and no sector, and the panel states a universe and nothing else. A panel with neither a field nor a mask carries nothing at all and is refused.
 
 One panel takes one of two shapes, and its type parameters say which.
 
@@ -1304,13 +1304,14 @@ julia> pnl = AssetPanel(;
 
 ```
 
-To rename a Panel Field, make the field again with the new name and its values and observed mask. A categorical or a tensor Panel Field also keeps its levels, or its axis, labels and groups.
+To rename a Panel Field, make the field again with the new name, its values, its observed mask and its placeholder mask. A field made without the placeholder mask reads each placeholder as data. A categorical or a tensor Panel Field also keeps its levels, or its axis, labels and groups.
 
 ```jldoctest asset_panel_edits
 julia> f = panel_field(pnl, \"mcap\");
 
 julia> renamed = AssetPanel(;
-                            pf = [NumericPanelField(; name = \"size\", vals = f.vals, omsk = f.omsk);
+                            pf = [NumericPanelField(; name = \"size\", vals = f.vals, omsk = f.omsk,
+                                                    pmsk = f.pmsk);
                                   filter(g -> g.name != \"mcap\", pnl.pf)], amsk = pnl.amsk,
                             emsk = pnl.emsk);
 
