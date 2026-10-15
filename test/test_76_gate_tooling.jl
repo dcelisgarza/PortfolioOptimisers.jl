@@ -14,6 +14,8 @@ Each session wrote its own driver for one test file, and one of those drivers le
   - `code_health/gate_stamp.sh` records the merge-base a gate measured, and its `check` is the
     pre-push guard of `.pre-commit-config.yaml`.
   - `test/run_files.jl` runs named test files after the preamble and counts each one.
+  - `code_health/sweep_check.jl` names `code_health/census_preview.jl` when a branch adds a
+    declaration that the two package-level censuses read. The test checks which diff lines name one.
   - `docs/doctest_files.jl` runs the doctests of the docstrings that named source files hold. The
     test checks its selection on a fixture module. The doctest run itself needs Documenter, which
     the test environment does not hold.
@@ -32,6 +34,10 @@ end
 
 module DocFilesSeam
 include(joinpath(@__DIR__, "..", "docs", "doctest_files.jl"))
+end
+
+module SweepCheckSeam
+include(joinpath(@__DIR__, "..", "code_health", "sweep_check.jl"))
 end
 
 using Test
@@ -354,5 +360,28 @@ end
         @test !(occursin("doctest(PortfolioOptimisers)", setup))
         @test_throws ErrorException DF.workflow_setup("jobs: {}\n")
         @test_throws ErrorException DF.workflow_setup("- name: Run doctest\n  run: julia --project=docs -e 'x = 1'\n")
+    end
+
+    @testset "sweep_check names the declarations the package censuses read" begin
+        #=
+        `test/test_26_docs.jl` ("every choice is catalogued") and
+        `test/test_61_interfaces_section_census.jl` need the package loaded, so an agent met them
+        only after the targeted test files ran. `sweep_check.jl` reads the branch's diff, and an
+        added `struct`, `abstract type`, `export` or `public` names the command that runs both.
+        =#
+        SC = SweepCheckSeam
+        diff = ["+++ b/src/a.jl", "@@ -1,0 +1,9 @@",
+                "+abstract type AbstractThing <: AbstractEstimator end",
+                "+@kwdef struct Thing{T} <: AbstractThing", "+mutable struct State",
+                "+    @concrete struct Inner <: AbstractThing", "+export Thing, State",
+                "+public AbstractThing", "-struct Removed end", " struct Context end",
+                "+    x::Int", "+export Thing"]
+        @test SC.declarations_in(diff) ==
+              ["`abstract type AbstractThing`", "`struct Thing`", "`struct State`",
+               "`struct Inner`", "an `export` line", "a `public` line"]
+        # A field, a call and a comment name nothing, and nor does a file with no addition.
+        @test isempty(SC.declarations_in(["+    s::Int", "+structure(x) = x",
+                                          "+# struct Foo", "+exported = 1"]))
+        @test isempty(SC.declarations_in(String[]))
     end
 end

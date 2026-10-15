@@ -28,6 +28,9 @@
 #   a row in each gate baseline             ADR 0074, `code_health/<gate>.jl check`
 #   the size ceiling                        ADR 0101, `code_health/size.jl check`
 #   the sub-issue and the reopened map      ADR 0084, `code_health/sweep_triage.jl`
+#   an added `struct`, `abstract type`,     `test/test_26_docs.jl` and
+#   `export` or `public` (a note naming     `test/test_61_interfaces_section_census.jl`, which
+#   `code_health/census_preview.jl`)        need the package loaded, so this check never runs them
 #
 # So a green run here is not a green build. It is the four steps of `CLAUDE.md` § *Functionality you
 # add*, checked while they can still be done in the commit that owes them.
@@ -83,19 +86,32 @@ reports something rather than throwing. The ref actually used is returned, so th
 it and the reader can tell a fallback from a choice.
 """
 function changed_files(base::AbstractString)
-    ref = base
+    ref = resolve_base(base)
+    # `branch_files` diffs from the merge-base. A sibling commit that landed on `base` after this
+    # branch started is not a change of this branch, and a diff against `base` itself names it.
+    return filter!(in_scope, CodeHealth.branch_files(ref)), ref
+end
+
+"""
+    resolve_base(base) -> String
+
+`base` when the ref resolves, and `HEAD` when it does not.
+"""
+function resolve_base(base::AbstractString)
     ok = try
         success(Cmd(`git rev-parse --verify --quiet $base`; dir = CodeHealth.REPO_ROOT))
     catch
         false
     end
-    if !(ok)
-        ref = "HEAD"
-    end
-    # `branch_files` diffs from the merge-base. A sibling commit that landed on `base` after this
-    # branch started is not a change of this branch, and a diff against `base` itself names it.
-    return filter!(in_scope, CodeHealth.branch_files(ref)), ref
+    return ok ? String(base) : "HEAD"
 end
+
+"""
+    merge_base(ref) -> String
+
+The commit this branch shares with `ref`, which is where [`changed_files`](@ref) starts its diff.
+"""
+merge_base(ref::AbstractString) = only(git_lines(`git merge-base $ref HEAD`))
 
 # --- the gate baselines ----------------------------------------------------
 
@@ -173,6 +189,97 @@ function check_gates(path, baselines, limit::Integer)
         push!(fs, Finding(:ok, "size: $code of $cap code lines, $(cap - code) to spare."))
     end
     return fs
+end
+
+# --- the censuses that need the package loaded ------------------------------
+
+"""
+    PACKAGE_CENSUS_COMMAND
+
+The command that runs, ahead of their test files, the two censuses that only the loaded package
+can answer. `code_health/census_preview.jl` says why each one needs the module, and which code it
+reuses for each.
+"""
+const PACKAGE_CENSUS_COMMAND = "julia -t 1 --project=test code_health/census_preview.jl"
+
+"""
+    DECLARATION_RES
+
+An added line that declares what the two package-level censuses read: a `struct` (a new Choice for
+the Capability Catalogue, and a concrete member that obliges its supertype to an `# Interfaces`
+section), an `abstract type` (which owes the section once a concrete type subtypes it), and an
+`export` or `public` line (which puts an existing concrete type on the Choice Surface).
+
+A regular expression on the diff rather than a parse: the diff is what says the branch ADDED the
+declaration, and this check only decides whether to name a command. The two test files keep the
+verdict.
+"""
+const DECLARATION_RES = [r"^\+\s*(?:@\w+\s+)*(?:mutable\s+)?struct\s+([A-Za-z_]\w*)" => "struct",
+                         r"^\+\s*abstract\s+type\s+([A-Za-z_]\w*)" => "abstract type",
+                         r"^\+\s*(export|public)\s" => "line"]
+
+"""
+    declarations_in(diff_lines) -> Vector{String}
+
+The declarations of [`DECLARATION_RES`](@ref) on the added lines of a unified diff, each named once,
+as `struct Foo` or as an `export` line, with the backticks. A removed line, a context line and
+the `+++` header name nothing.
+"""
+function declarations_in(diff_lines)
+    out = String[]
+    for l in diff_lines, (re, kind) in DECLARATION_RES
+        if startswith(l, "+++")
+            continue
+        end
+        m = match(re, l)
+        if m !== nothing
+            word = m.captures[1]
+            push!(out, if kind == "line"
+                      "$(word == "export" ? "an" : "a") `$word` line"
+                  else
+                      "`$kind $word`"
+                  end)
+        end
+    end
+    return unique!(out)
+end
+
+"""
+    added_declarations(path, base) -> Vector{String}
+
+[`declarations_in`](@ref) the lines this branch adds to one file since `base`, the merge-base: the
+committed, staged and unstaged edits of a tracked file, and every line of an untracked one.
+"""
+function added_declarations(path::AbstractString, base::AbstractString)
+    tracked = success(pipeline(Cmd(`git ls-files --error-unmatch -- $path`;
+                                   dir = CodeHealth.REPO_ROOT); stdout = devnull,
+                               stderr = devnull))
+    if tracked
+        return declarations_in(git_lines(`git diff --no-renames --unified=0 $base -- $path`))
+    end
+    return declarations_in("+" * l for l in eachline(joinpath(CodeHealth.REPO_ROOT, path)))
+end
+
+"""
+    check_package_censuses(path, base) -> Vector{Finding}
+
+A `:note` when the branch adds a declaration to `path` that `test/test_26_docs.jl` ("every choice
+is catalogued") or `test/test_61_interfaces_section_census.jl` reads. Both need the package loaded,
+which this check never does, so it names the command that runs the two of them. It costs the
+package load and about 35 s more, where the two test files cost about 225 s. Nothing for a file
+that adds none.
+"""
+function check_package_censuses(path::AbstractString, base::AbstractString)
+    decls = added_declarations(path, base)
+    if isempty(decls)
+        return Finding[]
+    end
+    shown = length(decls) > 4 ? [decls[1:4]; "$(length(decls) - 4) more"] : decls
+    return [Finding(:note,
+                    "adds $(join(shown, ", ")), which two censuses read with the package loaded:",
+                    ["`test/test_26_docs.jl` \"every choice is catalogued\", and",
+                     "`test/test_61_interfaces_section_census.jl`. Run both before the tests:",
+                     "  $PACKAGE_CENSUS_COMMAND"])]
 end
 
 # --- the tracker, when it was read -----------------------------------------
@@ -644,12 +751,27 @@ function main(args)
     baselines = [name => CodeHealth.read_toml(joinpath(CodeHealth.DIR, file))
                  for (name, file) in GATE_BASELINES]
     limit = SizeGate.code_limit(CodeHealth.read_rulings())
+    # A survey of the whole manifest asserts no addition, so it names no package census. Every
+    # other scope reads what the branch added since its merge-base with `--base`.
+    base = opts.all ? nothing : merge_base(resolve_base(opts.base))
     failures = 0
+    censused = 0
     for f in scope
         fs = check_file(f, rows, map_names, coverage, entry, tracker, exempted, opts.all)
         append!(fs, check_gates(f, baselines, limit))
+        if base !== nothing
+            pc = check_package_censuses(f, base)
+            censused += length(pc)
+            append!(fs, pc)
+        end
         failures += count(x -> x.level === :fail, fs)
         print_findings(stdout, f, fs)
+    end
+    if censused > 0
+        println("$censused file(s) add a declaration that `test/test_26_docs.jl` and")
+        println("`test/test_61_interfaces_section_census.jl` read. Both need the package loaded, so this")
+        println("check cannot answer them. Run them now, before the two test files (about 225 s):")
+        println("  ", PACKAGE_CENSUS_COMMAND, "\n")
     end
 
     if failures == 0

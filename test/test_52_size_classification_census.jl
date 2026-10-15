@@ -255,6 +255,54 @@ end
         @test isempty(rises(Dict{String, Any}(), Dict("a.jl" => row(500))))
     end
 
+    # ---------------------------------------------------------------- the `measure` verb
+
+    @testset "measure names one file's count and its ceiling" begin
+        #=
+        `size.jl check` prints the worst file of the tree and nothing about the file a person is
+        editing, so an agent that wanted one count cut the script apart into a scratch copy. The
+        `measure` verb prints the counts `check` reads, for the paths named, with the room left
+        under the ceiling of the pass rule above.
+        =#
+        row(n) = Dict("code" => n, "doc" => 0, "comment" => 0, "blank" => 0, "total" => n)
+        mktempdir() do dir
+            mkpath(joinpath(dir, "src"))
+            mkpath(joinpath(dir, "docs"))
+            write(joinpath(dir, "src", "a.jl"),
+                  "f(x) = x\n\"\"\"\nDoc.\n\"\"\"\ng(x) = x\n")
+            write(joinpath(dir, "src", "big.jl"), join(("h$i(x) = x" for i in 1:5), '\n'))
+            write(joinpath(dir, "docs", "x.jl"), "y = 1\n")
+            lines(rows) = S.measure_lines(["src/a.jl", "src/big.jl", "docs/x.jl"];
+                                          root = dir, rows, limit = 3)
+
+            # Under the threshold the ceiling is the threshold, and a row under it changes nothing.
+            got = lines(Dict("src/a.jl" => row(1)))
+            @test got[1] ==
+                  "src/a.jl: 2 code, 3 doc, 0 comment, 0 blank, 5 total. Ceiling 3 (the threshold), 1 to spare."
+            # A file with no row takes the threshold too, and a file over it says so.
+            @test got[2] ==
+                  "src/big.jl: 5 code, 0 doc, 0 comment, 0 blank, 5 total. Ceiling 3 (the threshold), 2 OVER: `check` fails."
+            # A file outside `src/` and `ext/` has a count and no ceiling.
+            @test got[3] ==
+                  "docs/x.jl: 1 code, 0 doc, 0 comment, 0 blank, 1 total. Outside `src/` and `ext/`, so the size gate does not measure it."
+            # Over the threshold a file is held at its recorded number.
+            @test endswith(lines(Dict("src/big.jl" => row(6)))[2],
+                           "Ceiling 6 (the baseline), 1 to spare.")
+            # An absolute path is read as it stands and keyed from the root.
+            @test S.measure_lines([joinpath(dir, "src", "a.jl")]; root = dir, rows = Dict(),
+                                  limit = 3) == [got[1]]
+            # A path that names no file throws rather than printing a count of nothing.
+            @test_throws ErrorException S.measure_lines(["src/none.jl"]; root = dir,
+                                                        rows = Dict(), limit = 3)
+        end
+        # The verb refuses an empty list and a flag, and answers 1, as `check` does on a failure.
+        redirect_stderr(devnull) do
+            @test S.measure_command(String[]) == 1
+            @test S.measure_command(["--files", "src/a.jl"]) == 1
+            @test S.measure_command(["src/no_such_file_anywhere.jl"]) == 1
+        end
+    end
+
     # --------------------------------------------------------- the two committed files
 
     @testset "the threshold and the baseline are well formed" begin

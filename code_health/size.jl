@@ -5,6 +5,10 @@
 #     julia --project=code_health code_health/size.jl check
 #     julia --project=code_health code_health/size.jl refresh
 #     julia --project=code_health code_health/size.jl refresh --accept-rise
+#     julia --project=code_health code_health/size.jl measure <path>...
+#
+# `measure` prints the counts of each named file and the room left under its ceiling, counted as
+# `check` counts them. It reads the baseline and writes nothing, not even a gate stamp.
 #
 # It writes `code_health/size_baseline.toml`, one row per file in scope. `code` is the count of
 # lines that carry code, and it is the only number that binds. `doc`, `comment`, `blank` and
@@ -373,10 +377,103 @@ function publish(m)
     return nothing
 end
 
+# --- measure: the count of named files ---------------------------------------
+
+"""
+    resolve_path(path, root) -> String
+
+The absolute path of a file named on the command line. A path that names a file from the working
+directory is taken as it stands, and any other relative path is read from `root`, so a caller in a
+subdirectory can still name `src/…`.
+"""
+function resolve_path(path::AbstractString, root::AbstractString)
+    if isabspath(path) || isfile(path)
+        return abspath(path)
+    end
+    return joinpath(root, path)
+end
+
+"""
+    measure_lines(paths; root, rows, limit) -> Vector{String}
+
+One line per path: the counts [`line_counts`](@ref) gives, which are the numbers `check` reads, and
+for a file under `src/` or `ext/` the [`ceiling`](@ref) and the room left under it.
+
+`rows` is the `[file]` table of the baseline and `limit` the threshold of `code_health/rulings.toml`.
+Both default to the live files, and a test passes its own. A path that does not exist throws, and so
+does a file that does not parse, because a count of a file the gate cannot read is a number that is
+too low.
+
+`check` prints the worst file of the tree and nothing about the one a person is editing, so this is
+the reading to take before an edit that adds units to a file near its ceiling.
+"""
+function measure_lines(paths; root::AbstractString = CodeHealth.REPO_ROOT,
+                       rows = recorded_rows(CodeHealth.read_toml(joinpath(CodeHealth.DIR,
+                                                                          NAME))),
+                       limit::Integer = code_limit(CodeHealth.read_rulings()))
+    out = String[]
+    for p in paths
+        full = resolve_path(p, root)
+        if !(isfile(full))
+            error("`$p` is not a file, from the working directory or from `$root`.")
+        end
+        key = replace(relpath(full, root), '\\' => '/')
+        c = line_counts(full)
+        line = "$key: $(c["code"]) code, $(c["doc"]) doc, $(c["comment"]) comment, " *
+               "$(c["blank"]) blank, $(c["total"]) total."
+        if CodeHealth.in_scope(key)
+            row = get(rows, key, nothing)
+            cap = ceiling(row, limit)
+            source = if row === nothing || row["code"] <= limit
+                "the threshold"
+            else
+                "the baseline"
+            end
+            spare = cap - c["code"]
+            line *= if spare >= 0
+                " Ceiling $cap ($source), $spare to spare."
+            else
+                " Ceiling $cap ($source), $(-spare) OVER: `check` fails."
+            end
+        else
+            line *= " Outside `src/` and `ext/`, so the size gate does not measure it."
+        end
+        push!(out, line)
+    end
+    return out
+end
+
+const MEASURE_USAGE = "usage: size.jl measure <path>..."
+
+"""
+    measure_command(args) -> Int
+
+The `measure` verb: print [`measure_lines`](@ref) for the named paths. It returns 1 on a missing
+path, as `check` does on a failure, and 0 otherwise. A file over its ceiling still returns 0: the
+verb reports a count, and `check` owns the verdict.
+"""
+function measure_command(args)
+    if isempty(args) || any(a -> startswith(a, "--"), args)
+        println(stderr, MEASURE_USAGE)
+        return 1
+    end
+    lines = try
+        measure_lines(args)
+    catch e
+        println(stderr, sprint(showerror, e))
+        return 1
+    end
+    foreach(println, lines)
+    return 0
+end
+
 # The scheduled job of ADR 0078 reuses this file's `measure` rather than carrying a second copy
 # of it, so the command line runs only when this file is the program. `code_health/triage.jl`
 # includes it into a module of its own and calls `measure` directly.
 if abspath(PROGRAM_FILE) == @__FILE__
+    if !(isempty(ARGS)) && ARGS[1] == "measure"
+        exit(measure_command(ARGS[2:end]))
+    end
     exit(CodeHealth.run_script(ARGS; name = NAME, measure = measure, verify = verify,
                                render = render, publish = publish))
 end
