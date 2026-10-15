@@ -2764,6 +2764,41 @@ missed the block by 7.5 % and 1.3 % on this data. Found after #1649.
 end
 
 #=
+R13 of #1630. Under a Scenario Cap the prior carries its last 40 rows, and the reconstruction
+error took the 60 returns less the 40 rows, which raised a bare `DimensionMismatch`. The residual
+co-moments stay with the model, as the residual block of `sigma` does, so the error reads every
+row of the regression (ADR 0206).
+=#
+@testset "The residual co-moments under a Scenario Cap read every row (R13 of #1630)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    fp = FactorPrior(; pe = EmpiricalPrior(; max_scenarios = 40))
+    h = HighOrderFactorPriorEstimator(; pe = fp)
+    p_on = prior(h, X, F)
+    p_off = prior(HighOrderFactorPriorEstimator(; pe = fp, rsd = false), X, F)
+    @test size(p_on.pr.X, 1) == 40
+    rr = p_on.pr.rr
+    sigma = p_on.pr.sigma - Diagonal(rr.esigma)
+    posdef!(PO.factor_residual_config(fp).pdm, sigma)
+    err = X - (F * transpose(rr.M) .+ transpose(rr.b))
+    kt_ref = PO.cokurtosis_residuals(sigma, err, h.kte.me, h.ex)
+    @test isapprox(p_on.kt, p_off.kt + kt_ref)
+    sk_ref = PO.coskewness_residuals(err, h.ske.me)
+    @test isapprox(p_on.sk, p_off.sk + sk_ref)
+    # Around an entropy pooling prior the model is the same, and the fit runs.
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    ep = EntropyPoolingPrior(; sets = sets, pe = fp,
+                             mu_views = LinearConstraintEstimator(; val = "A2 == 0.002"))
+    pe = prior(HighOrderFactorPriorEstimator(; pe = ep), X, F)
+    @test size(pe.kt) == (N^2, N^2)
+    @test all(isfinite, pe.kt)
+end
+
+#=
 `ShrunkFactorPrior` is the falsification witness for the guard in step 9 of
 `prior(::HighOrderFactorPriorEstimator, …)`: a wrapper that declares a residual block and then
 reports a covariance the block was never added to. Sweep ticket #534.

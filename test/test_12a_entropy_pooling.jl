@@ -2071,3 +2071,58 @@ end
     @test_throws TypeError EntropyPoolingPrior(; w = StatsBase.fweights(fill(1, T)))
     @test_throws TypeError MeucciEntropyPoolingPrior(; w = StatsBase.weights(fill(1.0, T)))
 end
+
+#=
+R13 of #1630. A Scenario Cap keeps 40 of 60 rows, and a caller's `w` weighs those 40 scenarios.
+Three paths gave the 40 weights to a field that reads all 60 rows, and failed with a bare error
+of the regression or of `StatsBase`: the pin of a `PinnedChoice` (`pin_prior_choice`), the
+refit of a nested entropy pooling prior that holds its own `w` (`scenario_factory`,
+`scenario_prior`), and a pool whose `pe1` holds the cap (`prior_probability_factory`). Each
+path now puts the weights on the rows that the field reads, with a zero weight on each row that
+the cap removed (ADR 0209). An ensemble prior reads no weights, so its refit ignored the
+posterior and the views did not reach `mu`; it is now refused when the entropy pooling prior
+is built.
+=#
+@testset "A caller's w over a Scenario Cap reaches every refit (R13 of #1630)" begin
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    mv = LinearConstraintEstimator(; val = "A2 == 0.002")
+    mv3 = LinearConstraintEstimator(; val = "A3 == 0.001")
+    cap = EmpiricalPrior(; max_scenarios = 40)
+    v = collect(range(1, 2; length = 40))
+    w0 = aweights(v ./ sum(v))
+    meets(pr) = isapprox(pr.mu[2], 0.002; rtol = 1e-6) &&
+                maximum(abs, pr.mu - transpose(pr.X) * pr.w) < 1e-15
+    for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+        # The pin reads the rows of the regression, as the batch fit does, so the pinned
+        # choice and the batch choice give one posterior.
+        pin = FactorPrior(; pe = cap, re = StepwiseRegression(; choice = PinnedChoice()))
+        bat = FactorPrior(; pe = cap, re = StepwiseRegression())
+        pp = prior(mk(; sets = sets, mu_views = mv, w = w0, pe = pin), X, F)
+        pb = prior(mk(; sets = sets, mu_views = mv, w = w0, pe = bat), X, F)
+        @test meets(pp)
+        @test isapprox(pp.w, pb.w; rtol = 1e-12)
+        @test isapprox(pp.sigma, pb.sigma; rtol = 1e-12)
+        # A nested entropy pooling prior that holds its own `w`.
+        inner = EntropyPoolingPrior(; sets = sets, mu_views = mv3, w = w0,
+                                    pe = FactorPrior(; pe = cap))
+        @test meets(prior(mk(; sets = sets, mu_views = mv, pe = inner), X, F))
+        # A pool whose `pe1` holds the cap.
+        op = OpinionPoolingPrior(; pe1 = cap,
+                                 pes = [EntropyPoolingPrior(; sets = sets, mu_views = mv3)])
+        pw = prior(mk(; sets = sets, mu_views = mv, pe = op, w = w0), X)
+        @test meets(pw)
+        @test pw.w isa StatsBase.AnalyticWeights
+        # The ensemble reads no weights, so the refit cannot carry the views to its moments.
+        @test_throws ArgumentError mk(; sets = sets, mu_views = mv,
+                                      pe = LowDimensionEnsemblePrior(; seed = 1))
+        @test_throws ArgumentError mk(; sets = sets, mu_views = mv,
+                                      pe = FactorPrior(;
+                                                       pe = LowDimensionEnsemblePrior(;
+                                                                                      seed = 1)))
+    end
+end

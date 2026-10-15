@@ -48,9 +48,23 @@ kind is `StatsBase.AnalyticWeights`.**
    so the kind does not move them.
 
 Under uniform weights the two corrections are equal, so a prior with no view answers the same
-`sigma` as before. Under a view, every posterior covariance with the default `w` moves by the
-factor `(n_eff / (n_eff - 1)) / (T / (T - 1))`. The weights and `mu` do not move, because a
-weighted mean has no correction.
+`sigma` as before. Under a view, the covariance of the scenarios with the default `w` moves by
+the factor `(n_eff / (n_eff - 1)) / (T / (T - 1))`. Over an `EmpiricalPrior` that is every entry
+of `sigma`. Over a factor prior it is the systematic block alone, because the refit holds the
+residual block (ADR 0205).
+
+In a single solve the weights and `mu` do not move, because a weighted mean has no correction.
+A staged algorithm moves them. Each stage after the first reads the corrected `sigma` of the
+stage before, in `fix_sigma!` and in the skewness, kurtosis and correlation rows, so the kind
+changes the rows that the next stage solves. On the data of #1667, with a mean view and a
+skewness view, the weights of `H1_EntropyPooling` and `H2_EntropyPooling` moved by 1.1 %.
+Those rows state the uncorrected moment of the scenarios, so they should read the uncorrected
+variance. #1741 records it.
+
+A variance view states the uncorrected second moment of the scenarios, as the oracle does. So
+the read-out `sigma` of a variance view is not its target. It is `target / (1 - sum(p .^ 2))` over
+an `EmpiricalPrior`. Over a factor prior, the scenario part of the target takes the correction,
+and the residual block does not.
 
 ## Alternatives rejected
 

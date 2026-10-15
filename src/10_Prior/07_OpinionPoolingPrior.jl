@@ -667,6 +667,19 @@ function scenario_factory(pe::OpinionPoolingPrior, w, X::MatNum, F::Option{<:Mat
     wp = first(opinion_pooling_weights(pe, X, F, pnl; kwargs...))
     return scenario_factory(factory(pe.pe2, wp), w, X, F, pnl; kwargs...)
 end
+# A caller's prior probabilities weigh the scenarios of the pool, the rows of `pe1` when it
+# is set. A Scenario Cap in `pe1` keeps the last rows, so `pe1` takes them on the rows that
+# it reads, and the opinions and `pe2` take them on the scenarios, as `factory` gives them.
+function prior_probability_factory(pe::OpinionPoolingPrior, w, X::MatNum,
+                                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                                   kwargs...)
+    pool = factory(pe, w)
+    if isnothing(pe.pe1)
+        return pool
+    end
+    pe1 = prior_probability_factory(pe.pe1, w, X, F, pnl; kwargs...)
+    return rebuild_estimator(pool, (; pe1 = pe1))
+end
 function assert_scenario_model(pe::OpinionPoolingPrior)
     @argcheck(isnothing(pe.pe1),
               ArgumentError("An entropy pooling prior refits the opinion pool inside a factor prior or a Black-Litterman prior under its posterior weights, on the rows that the wrapping prior gives the pool. A pool with `pe1` reads the rows of `pe1` instead, so the refit cannot state its model. Set `pe1 = nothing` in this pool, or give the pool to the entropy pooling prior directly as its `pe`."))

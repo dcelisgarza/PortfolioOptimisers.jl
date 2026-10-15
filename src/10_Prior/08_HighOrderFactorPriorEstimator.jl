@@ -461,7 +461,7 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`. When the low or
  3. Read the probabilities `w = pr.w` of the scenarios, and cut `F` to the rows `Fw` that they weigh with [`scenario_rows`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
  4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `factory(pe.ske, w)` on `Fw`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
  5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the **full** asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The asset count is the full one because step 12 expands the co-moments, and the constructor validates the triple against `length(pr.mu)`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
- 6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`.
+ 6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`. Under a Scenario Cap `posterior_X` holds the last rows alone, so the error reads `F * transpose(M) .+ transpose(b)` over every row instead, as the residual block of `sigma` does.
  7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
  8. Still under `pe.rsd`, and when step 3 produced a `posterior_kt`, read the wrapped estimator's residual declaration with [`factor_residual_config`](@ref) and check its shape with [`assert_factor_residual_config`](@ref).
  9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise read the block as `err_sigma`, the residual variances that the wrapped estimator added, with [`idiosyncratic_variances`](@ref) of `rpr.rr`. They were measured under the weights of that fit, which a variance of `err` under `rsd_cfg.ve` does not read. Subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
@@ -586,7 +586,15 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))[2:3]
     end
     if pe.rsd
-        err = Xr - posterior_X
+        # The residual co-moments stay with the model, as the residual block of `sigma` does,
+        # so they read every row of the regression. Under a Scenario Cap `posterior_X` holds
+        # the last rows alone, and the model rebuilds the rest (ADR 0206).
+        Xm = if size(posterior_X, 1) == size(Xr, 1)
+            posterior_X
+        else
+            F * transpose(M) .+ transpose(rpr.rr.b)
+        end
+        err = Xr - Xm
         if !isnothing(f_sk)
             posterior_sk .+= coskewness_residuals(err, pe.ske.me)
         end

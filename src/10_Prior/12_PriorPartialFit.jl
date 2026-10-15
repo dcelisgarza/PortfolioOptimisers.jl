@@ -993,7 +993,7 @@ An [`EntropyPoolingPrior`](@ref) or a [`MeucciEntropyPoolingPrior`](@ref) fits `
 The method that Julia selects is the algorithm.
 
  1. Any other prior, `nothing`, or `F` that is `nothing`: return `pe`.
- 2. A prior that fits `pe.re` on the returns: apply [`pin_regression_choice`](@ref) to `pe.re` under `w`, and rebuild `pe` with the answer when it differs.
+ 2. A prior that fits `pe.re` on the returns: apply [`pin_regression_choice`](@ref) to `pe.re` under [`scenario_weights`](@ref) of `w` on the rows of `F`, and rebuild `pe` with the answer when it differs. A Scenario Cap makes `w` shorter than `F`, and the rows that the cap removed take a zero weight, as in the batch fit.
  3. A prior that embeds a prior in `pe.pe`: apply this function to `pe.pe` under the weights of [`embedded_pin_weights`](@ref), and rebuild `pe` with the answer when it differs.
  4. An [`OpinionPoolingPrior`](@ref):
      1. Return `pe` when `F` holds fewer than two rows, or when [`pending_choice`](@ref) of `pe` is `false`.
@@ -1036,7 +1036,10 @@ end
 function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
                                     <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
                           w::Option{<:ObsWeights} = nothing)
-    re = pin_regression_choice(pe.re, X, F, w)
+    # The regression reads every row of `F`. Under a Scenario Cap, `w` weighs the
+    # scenarios alone, and the rows that the cap removed take a zero weight, as the batch
+    # fit gives them through `prior_probability_factory` (ADR 0209).
+    re = pin_regression_choice(pe.re, X, F, scenario_weights(w, size(F, 1)))
     return re === pe.re ? pe : rebuild_estimator(pe, (; re = re))
 end
 function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,

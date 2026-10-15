@@ -67,9 +67,12 @@ so the model is held too.
 3. A view row that states a moment the read-out reports takes the residual block off its target.
    `scenario_residual_variances` answers `D` from `rr.esigma` of a `Regression`, and zero for
    anything else. The variance row and a covariance or correlation row on one asset subtract it.
-   `fix_sigma!` holds the rows at `sigma - D`, the variance of the scenarios. The skewness and
-   kurtosis rows read `sigma - D` too, so they state the moments of the scenarios, which is what
-   their `prior(...)` references read. A low order factor model states its residual to the second
+   `fix_sigma!` holds the rows at `sigma - D`. The skewness and kurtosis rows read `sigma - D`
+   too, so they state the moments of the scenarios, which is what their `prior(...)` references
+   read. `sigma - D` is the corrected variance of the scenarios, and the rows state the
+   uncorrected moment, so a stage that pins the variance moves it by the correction of the
+   stage before. #1741 records it. So the views hold on the scenarios, and the read-out `sigma`
+   of a variance view differs from its target by that correction (ADR 0210). A low order factor model states its residual to the second
    moment alone, so no higher moment of the model exists to state.
 
 The decision makes two compositions one model. A mean view on an asset over `FactorPrior` now
@@ -115,7 +118,9 @@ agree to the tolerance of the solver: the weights to 8.9e-11, `mu` to 8.0e-12 an
   observation. The number of these observations is known only after the regression, because the
   Descriptor warm-up and the exposure lag drop rows, so `scenario_factory` and
   `prior_probability_factory` fit the regression with `cross_sectional_regression_stage` to read
-  the factor returns of `pe`. The refit therefore fits the regression twice. No default field of
+  the factor returns of `pe`. `scenario_prior` of this prior runs the stage once and reuses it,
+  so the refit under the posterior weights fits the regression once. The refit under a caller's
+  `w`, through `prior_probability_factory` and then `prior`, fits it twice. No default field of
   the prior other than `pe` reads weights through `factory`, so on the panel of
   `test_12k_cross_sectional_factor_prior.jl` the posterior without a cap is bit-identical to the
   old one. A field that reads observation weights, such as a `ce` with weights, now keeps the

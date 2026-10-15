@@ -39,7 +39,10 @@ are the co-moments of the same scenarios under `w1`.
    ADR 0116. It refuses a `w` that is longer than the returns.
 4. The residual co-moments of `HighOrderFactorPriorEstimator` read no `w`. The residuals belong
    to the model, which the views do not move, and ADR 0205 holds the residual block of `sigma` at
-   the fit of the model for the same reason.
+   the fit of the model for the same reason. They read every row of the regression, as the
+   residual block does. Under a Scenario Cap the result carries the last rows alone, so the error
+   reads `F * M' .+ b'` over every row. Before R13 of #1630 it took the returns less the scenario
+   rows, and failed with a bare `DimensionMismatch`.
 5. The online read of `HighOrderPriorEstimator` refits both co-moments under `pr.w` when the
    embedded result answers one, through `read_comoment`, whether the member folded or not. A state
    folds the rows under equal weights, and it cannot read `w`.

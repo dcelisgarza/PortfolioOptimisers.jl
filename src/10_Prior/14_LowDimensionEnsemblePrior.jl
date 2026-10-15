@@ -323,5 +323,11 @@ function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = no
     return LowOrderPrior(; X = Xf, mu = expand_moment(mu, cmsk, 1),
                          sigma = expand_moment(posdef(pe.pdm, sigma), cmsk))
 end
+# The ensemble reads no observation weights, so an entropy pooling prior around it would
+# refit it unchanged under its posterior weights, and its views would not reach `mu` and
+# `sigma`. `assert_scenario_model` documents every method.
+function assert_scenario_model(::LowDimensionEnsemblePrior)
+    return throw(ArgumentError("An entropy pooling prior refits the prior that it embeds under its posterior weights. LowDimensionEnsemblePrior reads no observation weights, so its moments would ignore the views. Give the entropy pooling prior a prior that reads weights, such as EmpiricalPrior."))
+end
 
 export LowDimensionEnsemblePrior

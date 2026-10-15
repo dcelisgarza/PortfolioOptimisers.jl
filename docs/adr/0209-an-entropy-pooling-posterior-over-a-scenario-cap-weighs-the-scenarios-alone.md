@@ -43,7 +43,12 @@ removed, so that observation has the probability zero.
    `scenario_weights` on the rows of `X`. The regression and the residual block of a factor prior
    take `scenario_weights` on the rows of `F`, because a caller's prior probabilities weigh that
    fit (ADR 0116). A nested entropy pooling prior keeps `w` as its own prior probabilities, on its
-   scenarios.
+   scenarios. Three more paths take the same rule since R13 of #1630. Each failed before with a
+   bare error of the regression or of `StatsBase`.
+   - The pin of a `PinnedChoice` takes `scenario_weights` on the rows of `F`.
+   - The refit of a nested entropy pooling prior that holds its own `w` goes through
+     `prior_probability_factory` in `scenario_factory` and in `scenario_prior`.
+   - An opinion pool whose `pe1` holds the cap gives `w` to `pe1` on the rows of `pe1`.
 4. A weighted moment with a zero weight equals the same moment over the rows of positive weight.
    On the data of the issue, the refit equals `prior(factory(EmpiricalPrior(), w1), X[21:end, :])`
    to `1.7e-21` in `sigma`, and to zero in `mu`. The bias correction of `sigma` reads the 40

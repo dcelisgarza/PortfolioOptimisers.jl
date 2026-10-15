@@ -783,7 +783,7 @@ The method that Julia selects is the algorithm.
  2. A [`FactorPrior`](@ref) or a [`FactorBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w` on the factor returns `F` alone, as the fit of `pe` fits `pe.pe`, and keep every other field. The two factor priors keep `re` and `ve`.
  3. A [`BlackLittermanPrior`](@ref) or a [`BayesianBlackLittermanPrior`](@ref): replace `pe.pe` with this function of `pe.pe` under `w` on `X`, `F` and `pnl`. Their `pe` is their only weighted field.
  4. An [`AugmentedBlackLittermanPrior`](@ref): replace the asset prior `a_pe` with this function of it on `X` and `pnl`, and the factor prior `f_pe` with this function of it on `F` alone, each under `w`. Keep `re`.
- 5. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, under [`factory`](@ref) of `pe.w` when the caller set one. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`, and [`factory`](@ref) would give it `w` as its own prior probabilities and solve its views again. This holds for an entropy pooling prior of the factors in step 2 too.
+ 5. A nested entropy pooling prior: return this function of the estimator that fits its model, `pe.pe`, under [`prior_probability_factory`](@ref) of `pe.w` when the caller set one, which puts `pe.w` on the rows that each weighted field reads. Its posterior is already the prior probabilities of the entropy pooling prior that embeds it, so its views are already in `w`, and [`factory`](@ref) would give it `w` as its own prior probabilities and solve its views again. This holds for an entropy pooling prior of the factors in step 2 too.
  6. An [`OpinionPoolingPrior`](@ref): pool the opinions on `X` with [`opinion_pooling_weights`](@ref), giving the pooled weights `wp`, under which its own fit fits `pe.pe2`. Return this function of [`factory`](@ref) of `pe.pe2` under `wp`, under `w`. The posterior of the pool is already in the prior probabilities of the entropy pooling prior, so [`factory`](@ref) of the pool under `w` pooled its opinions again from `w`, and a [`FactorPrior`](@ref) around it read the factor moments of other weights.
  7. An [`EmpiricalPrior`](@ref): return [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `X`. A Scenario Cap keeps the last rows as scenarios, and `w` weighs these alone. Its moment estimators read every row, so the rows that the cap removed take a zero weight, and the posterior moments are those of the scenarios under `w`. Without a cap, `w` weighs every row and passes unchanged.
  8. A [`CrossSectionalFactorPrior`](@ref): take the factor returns of `pe.pe` with [`cross_sectional_factor_scenarios`](@ref) on `X`, `F` and `pnl`. Replace `pe.pe` with this function of `pe.pe` under `w` on these factor returns alone, as the fit of `pe` fits `pe.pe`, and keep every other field. The regression, the weights of the cross-sectional fit, the residual block and the Return Forecast keep the weights of the fit that the views read, so the scenarios of the refit are the scenarios of that fit. A Scenario Cap in `pe.pe` keeps the last factor returns as scenarios, and step 7 gives a zero weight to the rows that it removed.
@@ -841,8 +841,14 @@ end
 function scenario_factory(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
                           X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                           kwargs...)
-    return scenario_factory(isnothing(pe.w) ? pe.pe : factory(pe.pe, pe.w), w, X, F, pnl;
-                            kwargs...)
+    # A caller's `pe.w` weighs the scenarios. Under a Scenario Cap the regression and the
+    # residual block read more rows, so `factory` gave them too few weights.
+    inner = if isnothing(pe.w)
+        pe.pe
+    else
+        prior_probability_factory(pe.pe, pe.w, X, F, pnl; kwargs...)
+    end
+    return scenario_factory(inner, w, X, F, pnl; kwargs...)
 end
 """
     scenario_prior(pe::AbstractPriorEstimator, w, X::MatNum, F::Option{<:MatNum},
@@ -894,8 +900,13 @@ end
 function scenario_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, w,
                         X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                         kwargs...)
-    return scenario_prior(isnothing(pe.w) ? pe.pe : factory(pe.pe, pe.w), w, X, F, pnl;
-                          kwargs...)
+    # See the note at the same step in `scenario_factory`.
+    inner = if isnothing(pe.w)
+        pe.pe
+    else
+        prior_probability_factory(pe.pe, pe.w, X, F, pnl; kwargs...)
+    end
+    return scenario_prior(inner, w, X, F, pnl; kwargs...)
 end
 """
     prior_probability_factory(pe::AbstractPriorEstimator, w, X::MatNum,
@@ -913,6 +924,8 @@ end
                               pnl::Option{<:AssetPanel}; kwargs...)
     prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
                               F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    prior_probability_factory(pe::OpinionPoolingPrior, w, X::MatNum,
+                              F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
 
 Return [`factory`](@ref) of `pe` under the prior probabilities `w` of the scenarios, with each weighted field on the rows that it reads.
 
@@ -928,6 +941,7 @@ The method that Julia selects is the algorithm.
  4. A [`BlackLittermanPrior`](@ref), a [`BayesianBlackLittermanPrior`](@ref) or a nested entropy pooling prior: take [`factory`](@ref) of `pe` under `w`, and replace its `pe` with this function of `pe.pe` under `w` on `X`, `F` and `pnl`.
  5. An [`AugmentedBlackLittermanPrior`](@ref): take [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `X`. Replace `a_pe` with this function of it on `X` and `pnl`, and `f_pe` with this function of it on `F` alone.
  6. A [`CrossSectionalFactorPrior`](@ref): take the factor returns `f` of `pe.pe` with [`cross_sectional_factor_scenarios`](@ref) on `X`, `F` and `pnl`. Take [`factory`](@ref) of `pe` under [`scenario_weights`](@ref) of `w` on the rows of `f`, which the regression, the residual block and every other weighted field read. Replace its `pe` with this function of `pe.pe` under `w` on `f` alone.
+ 7. An [`OpinionPoolingPrior`](@ref): take [`factory`](@ref) of `pe` under `w`, which gives `w` to the opinions and to `pe2` on the scenarios of the pool. When `pe1` is set, replace it with this function of `pe1` under `w` on `X`, `F` and `pnl`, because a Scenario Cap in `pe1` keeps fewer rows than it reads.
 
 # Arguments
 
@@ -990,10 +1004,11 @@ end
     assert_scenario_model(pe::AugmentedBlackLittermanPrior)
     assert_scenario_model(pe::OpinionPoolingPrior)
     assert_scenario_model(pe::CrossSectionalFactorPrior)
+    assert_scenario_model(pe::LowDimensionEnsemblePrior)
 
 Check that [`scenario_factory`](@ref) can state the model of `pe` as one estimator.
 
-[`scenario_factory`](@ref) returns the estimator that the refit of an entropy pooling prior fits on the rows of `pe`. An [`OpinionPoolingPrior`](@ref) with `pe1` refits `pe2` on the rows of `pe1`, which differ from the rows of `pe`, so no such estimator states its model. The check walks the priors that [`scenario_factory`](@ref) walks, and refuses such a pool, so the entropy pooling prior fails when it is built and not at the refit.
+[`scenario_factory`](@ref) returns the estimator that the refit of an entropy pooling prior fits on the rows of `pe`. An [`OpinionPoolingPrior`](@ref) with `pe1` refits `pe2` on the rows of `pe1`, which differ from the rows of `pe`, so no such estimator states its model. A [`LowDimensionEnsemblePrior`](@ref) reads no observation weights, so its refit under the posterior weights is the fit under the prior probabilities, and the views do not reach its moments. The check walks the priors that [`scenario_factory`](@ref) walks, and refuses each of the two, so the entropy pooling prior fails when it is built and not at the refit.
 
 # Algorithm
 
@@ -1003,6 +1018,7 @@ The method that Julia selects is the algorithm.
  2. A prior that [`scenario_factory`](@ref) rebuilds around `pe.pe`: apply this function to `pe.pe`.
  3. An [`AugmentedBlackLittermanPrior`](@ref): apply this function to `pe.a_pe` and to `pe.f_pe`.
  4. An [`OpinionPoolingPrior`](@ref): check that `pe.pe1` is `nothing`, and apply this function to `pe.pe2`.
+ 5. A [`LowDimensionEnsemblePrior`](@ref): throw.
 
 # Arguments
 
@@ -1011,6 +1027,7 @@ The method that Julia selects is the algorithm.
 # Validation
 
   - Every [`OpinionPoolingPrior`](@ref) that the walk meets has no `pe1`. An `ArgumentError` is thrown otherwise.
+  - The walk meets no [`LowDimensionEnsemblePrior`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Returns
 
