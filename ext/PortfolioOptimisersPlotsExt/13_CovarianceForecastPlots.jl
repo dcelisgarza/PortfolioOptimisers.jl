@@ -24,10 +24,14 @@ function covariance_windows(scored::AbstractVector{Bool}, window::Integer,
 end
 # The windows of an evaluation, and the first point its series draws: the first step under
 # `whole_windows = false`, and the first whole window under `true`. `wo` holds the three
-# window keywords of a figure: `window`, `scored_steps` and `whole_windows`.
+# window keywords of a figure: `window`, `scored_steps` and `whole_windows`. An evaluation
+# with no scored step has nothing to draw, so it is refused as the summary refuses it.
 function covariance_plot_windows(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
                                  wo::NamedTuple)
     scored = cfer.n_valid .> 0
+    if !any(scored)
+        throw(PortfolioOptimisers.IsEmptyError("the evaluation scored no step: every step had no active asset, so there is nothing to draw."))
+    end
     M = wo.scored_steps ? count(scored) : length(scored)
     if !(1 <= wo.window <= M)
         throw(DomainError(wo.window,
@@ -47,6 +51,14 @@ end
 function covariance_plot_check_levels(levels)
     if isempty(levels) || !all(q -> zero(q) < q < one(q), levels)
         throw(DomainError(levels, "levels must hold at least one level, each in (0, 1)"))
+    end
+    return nothing
+end
+# Only the calibration reads a step weighting. The other figures pass `kwargs` to the
+# plotting backend, which drops a keyword it does not know, so the keyword is refused.
+function covariance_plot_check_no_step_weighting(kwargs, figure::AbstractString)
+    if haskey(kwargs, :step_weighting)
+        throw(ArgumentError("$(figure) takes no `step_weighting`: a loss and a rate weight each scored step by one. Only `plot_covariance_calibration` reads it."))
     end
     return nothing
 end
@@ -274,6 +286,7 @@ function PortfolioOptimisers.plot_covariance_qlike(cfer::PortfolioOptimisers.Cov
                                                    window::Integer = 50,
                                                    scored_steps::Bool = false,
                                                    whole_windows::Bool = false, kwargs...)
+    covariance_plot_check_no_step_weighting(kwargs, "plot_covariance_qlike")
     return covariance_plot_lines([covariance_qlike_entry(cfer, nothing,
                                                          (; window, scored_steps,
                                                           whole_windows))],
@@ -284,6 +297,7 @@ function PortfolioOptimisers.plot_covariance_qlike(cfers::AbstractVector{<:Portf
                                                    scored_steps::Bool = false,
                                                    whole_windows::Bool = false, kwargs...)
     covariance_plot_check_evaluations(cfers)
+    covariance_plot_check_no_step_weighting(kwargs, "plot_covariance_qlike")
     nms = PortfolioOptimisers.covariance_forecast_names(names, length(cfers))
     entries = [covariance_qlike_entry(cfers[k], nms[k],
                                       (; window, scored_steps, whole_windows))
@@ -298,6 +312,7 @@ function PortfolioOptimisers.plot_covariance_exceedance(cfer::PortfolioOptimiser
                                                         whole_windows::Bool = false,
                                                         kwargs...)
     covariance_plot_check_levels(levels)
+    covariance_plot_check_no_step_weighting(kwargs, "plot_covariance_exceedance")
     entries = covariance_exceedance_entries(cfer, nothing, levels,
                                             (; window, scored_steps, whole_windows))
     plt = covariance_plot_lines(entries, covariance_exceedance_title(window),
@@ -317,6 +332,7 @@ function PortfolioOptimisers.plot_covariance_exceedance(cfers::AbstractVector{<:
                                                         kwargs...)
     covariance_plot_check_evaluations(cfers)
     covariance_plot_check_levels(levels)
+    covariance_plot_check_no_step_weighting(kwargs, "plot_covariance_exceedance")
     nms = PortfolioOptimisers.covariance_forecast_names(names, length(cfers))
     entries = reduce(vcat,
                      [covariance_exceedance_entries(cfers[k], nms[k], levels,

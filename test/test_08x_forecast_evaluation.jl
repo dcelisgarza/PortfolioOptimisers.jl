@@ -3400,6 +3400,19 @@ end
                                                                                   1, 1);
                                                           umsk = umsk), nothing)
     @test cu.n_silenced == 0 && cu.mean_coverage == 1 && cu.mean_coverage_scored == 1
+    # Every date silenced (#1740): only the first asset carries a forecast, and the weights
+    # leave it out, so each date has a universe and scores none of it.
+    a1 = fill(NaN, size(alpha))
+    a1[:, 1] = IC_ALPHA[:, 1]
+    f1 = forecast_evaluation(a1, PO.forward_mean_returns(IC_ALPHA, 1, 1))
+    w1 = ones(size(a1))
+    w1[:, 1] .= 0
+    @test forecast_coverage(f1, w1) == [0, 0, 0]
+    ca = PO.forecast_summary_coverage(f1, w1)
+    @test ca.n_silenced == length(f1.dates) == 3
+    @test ca.mean_coverage == 0 && ca.min_coverage == 0
+    @test ca.mean_n_scored == 0 && ca.min_n_scored == 0
+    @test isnan(ca.mean_coverage_scored) && isnan(ca.min_coverage_scored)
 end
 
 @testset "An incomparable pair is refused, and the message names the field" begin

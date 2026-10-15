@@ -343,6 +343,27 @@ using Dates, StatsPlots, GraphRecipes, Statistics
         @test_throws PO.IsEmptyError plot_covariance_exceedance(empty)
         @test_throws DimensionMismatch plot_covariance_qlike([r, b]; names = ["a"],
                                                              window = 10)
+        # An evaluation with no scored step has nothing to draw, under both window rules,
+        # as the summary refuses it (#1740). Every test row has no return.
+        rd = cp_panel()
+        rd.X[63:end, :] .= NaN
+        rz = covariance_forecast_evaluation(cp_estimator(20), rd,
+                                            IndexWalkForward(62, 5; purged_size = 2))
+        @test all(iszero, rz.n_valid)
+        @test_throws PO.IsEmptyError covariance_forecast_summary(rz)
+        for f in (plot_covariance_calibration, plot_covariance_qlike,
+                  plot_covariance_exceedance), ss in (false, true)
+
+            @test_throws PO.IsEmptyError f(rz; window = 2, scored_steps = ss)
+            @test_throws PO.IsEmptyError f([r, rz]; window = 2, scored_steps = ss)
+        end
+        # Only the calibration reads a step weighting, and the backend drops a keyword it
+        # does not know, so the other two figures refuse it (#1740).
+        eq = EqualStepWeighting()
+        for f in (plot_covariance_qlike, plot_covariance_exceedance)
+            @test_throws ArgumentError f(r; window = 10, step_weighting = eq)
+            @test_throws ArgumentError f([r, b]; window = 10, step_weighting = eq)
+        end
     end
 
     @testset "The comparison labels each series by its evaluation" begin

@@ -4122,6 +4122,7 @@ Where:
 # Validation
 
   - ``W`` lies in `1:length(cfer.dates)` for every evaluation drawn, or under `scored_steps = true` in `1:count(>(0), cfer.n_valid)`. A `DomainError` is thrown otherwise.
+  - Every evaluation drawn scored at least one step, as [`covariance_forecast_summary`](@ref) needs. An `IsEmptyError` is thrown otherwise, under both settings of `scored_steps`.
   - `diagnostics` is not empty, and each entry is `:mahalanobis`, `:diagonal` or `:bias`. A `DomainError` is thrown otherwise.
   - The vector method: `cfers` is not empty, else an `IsEmptyError` is thrown, and the rules of [`covariance_forecast_names`](@ref).
 
@@ -4192,6 +4193,8 @@ Where:
 # Validation
 
   - ``W`` lies in `1:length(cfer.dates)` for every evaluation drawn, or under `scored_steps = true` in `1:count(>(0), cfer.n_valid)`. A `DomainError` is thrown otherwise.
+  - Every evaluation drawn scored at least one step, as [`covariance_forecast_summary`](@ref) needs. An `IsEmptyError` is thrown otherwise, under both settings of `scored_steps`.
+  - `kwargs` holds no `step_weighting`, because the figure weights each scored step by one and the backend drops a keyword that it does not know. An `ArgumentError` is thrown otherwise.
   - The vector method: `cfers` is not empty, else an `IsEmptyError` is thrown, and the rules of [`covariance_forecast_names`](@ref).
 
 # Returns
@@ -4261,6 +4264,8 @@ Where:
 # Validation
 
   - ``W`` lies in `1:length(cfer.dates)` for every evaluation drawn, or under `scored_steps = true` in `1:count(>(0), cfer.n_valid)`. A `DomainError` is thrown otherwise.
+  - Every evaluation drawn scored at least one step, as [`covariance_forecast_summary`](@ref) needs. An `IsEmptyError` is thrown otherwise, under both settings of `scored_steps`.
+  - `kwargs` holds no `step_weighting`, because the figure weights each scored step by one and the backend drops a keyword that it does not know. An `ArgumentError` is thrown otherwise.
   - `levels` is not empty, and every level lies in `(0, 1)`. A `DomainError` is thrown otherwise.
   - The vector method: `cfers` is not empty, else an `IsEmptyError` is thrown, and the rules of [`covariance_forecast_names`](@ref).
 
