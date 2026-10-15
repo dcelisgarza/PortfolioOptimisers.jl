@@ -742,7 +742,9 @@ observations among the contributing assets. That factor is exact for a fixed dir
 shared history. On the separate correlation path the factor reads `cor_decay`, because the
 correlations carry most of the variance of a direction: at 12 assets, a half-life of 10 and a
 correlation half-life of 20, the squared multiplier of an equal-weight direction is 1.004 with it
-and 0.971 with `decay`. A HAC estimate reads the table of its banded weight matrix, which has
+and 0.971 with `decay`. The factor at `cor_decay` does not hold at every correlation: at 8 assets,
+an equicorrelation of 0.5 and the same half-lives, the equal-weight and the inverse-volatility
+directions read 1.024 under either centring, over 3 seeds of 120 000 rows. A HAC estimate reads the table of its banded weight matrix, which has
 about twice the excess of the plain weights: at two lags the squared multiplier of an
 equal-weight direction is 1.015 over 8 seeds, within its standard error of 0.013, from 1.165
 raw. On the separate path under HAC the table at `cor_decay` keeps the Bartlett weights, where

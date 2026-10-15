@@ -373,7 +373,10 @@ with the limits below.
   states `debias = RawStatistic()`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **Two limits remain.** On the separate correlation path the Mahalanobis factor does not read the
+- **Three limits remain.** On the separate correlation path the portfolio target divides by the
+  factor at `cor_decay` alone. It holds on a factor model (1.004 at 12 assets), but at 8 assets and
+  an equicorrelation of 0.5 an equal-weight and an inverse-volatility direction read 1.024 under
+  either centring (#1726). On the separate correlation path the Mahalanobis factor does not read the
   correlation of the assets: without HAC the three methods read 0.9897 to 1.0018 of the truth, a
   documented limit (#1447). Under HAC, on the kernel of the damped rows, the statistic reads
   0.2 % to 2.2 % high at `R = I` and −2.6 % to +3.4 % at correlated `R` over 4 to 24 assets and
