@@ -739,18 +739,12 @@ variance of each direction.
 A direction reads one estimated variance ``p^{\\top} \\hat{C} p``, so its statistic is biased by
 the factor of [`regime_bias_table`](@ref) that the method reads, at ``K``, the smallest count of
 observations among the contributing assets. That factor is exact for a fixed direction on one
-shared history. On the separate correlation path the factor reads `cor_decay`, because the
-correlations carry most of the variance of a direction: at 12 assets, a half-life of 10 and a
-correlation half-life of 20, the squared multiplier of an equal-weight direction is 1.004 with it
-and 0.971 with `decay`. The factor at `cor_decay` does not hold at every correlation: at 8 assets,
-an equicorrelation of 0.5 and the same half-lives, the equal-weight and the inverse-volatility
-directions read 1.024 under either centring, over 3 seeds of 120 000 rows. A HAC estimate reads the table of its banded weight matrix, which has
+shared history. On the separate correlation path the variance of a direction mixes the variances
+at `decay` with the correlations at `cor_decay`, so no one table holds it, and
+[`portfolio_regime_bias`](@ref) gives each direction its own factor from the two tables. A HAC estimate reads the table of its banded weight matrix, which has
 about twice the excess of the plain weights: at two lags the squared multiplier of an
 equal-weight direction is 1.015 over 8 seeds, within its standard error of 0.013, from 1.165
-raw. On the separate path under HAC the table at `cor_decay` keeps the Bartlett weights, where
-the Mahalanobis target reads the kernel of [`hac_row_kernel`](@ref): the statistic mixes the
-variance at `decay` with the correlation, and at equal weights, ``R = I`` and two lags the
-Bartlett table gives 1.0731 and the kernel 1.0663, against the truth 1.0751 ± 0.0036.
+raw.
 
 The default inverse-volatility direction (`w = nothing`) is built from the same estimate, so the
 direction and the error of the estimate are correlated. Its statistic is also divided by
@@ -779,6 +773,7 @@ the half-life, where the rest is 1.006 at a half-life of 40.
 # Related
 
   - [`PortfolioTarget`](@ref)
+  - [`portfolio_regime_bias`](@ref)
   - [`regime_bias!`](@ref)
   - [`inverse_volatility_bias`](@ref)
   - [`update_regime!`](@ref)
@@ -794,14 +789,15 @@ function regime_target_statistic(target::PortfolioTarget,
     end
 
     K = centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
-    separate = has_separate_cor_decay(ce)
-    # The separate path reads the pre-centred law at `cor_decay`.
-    f = regime_bias!(cache.bias, ce.regime_method, separate ? ce.cor_decay : ce.decay, K,
-                     ce.hac_lags, separate ? PreCentred() : ce.centring, ce.debias)
+    f = portfolio_regime_bias(cache.bias, ce, target, C, idx, K)
     if isnothing(target.w) && !isnothing(cache.bias)
         sv = exp_weight_cross_sum(ce.decay, ce.decay, K, ce.hac_lags)
-        svc = separate ? exp_weight_cross_sum(ce.decay, ce.cor_decay, K, ce.hac_lags) : sv
-        f *= one(f) + inverse_volatility_bias(C, sv, svc, ce.min_val)
+        svc = if has_separate_cor_decay(ce)
+            exp_weight_cross_sum(ce.decay, ce.cor_decay, K, ce.hac_lags)
+        else
+            sv
+        end
+        f = f .* (one(eltype(f)) + inverse_volatility_bias(C, sv, svc, ce.min_val))
     end
     return stats ./ f
 end

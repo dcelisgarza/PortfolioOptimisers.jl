@@ -47,6 +47,20 @@ most 2 100 entries, in about 0.05 s. The scalar estimator divides each `z²` by 
 count of its asset. `PortfolioTarget` divides each direction by the factor at the smallest count of
 the contributing assets.
 
+**On the separate correlation path each portfolio direction mixes two tables (#1726).** The
+variance of a direction reads the variances at `decay` and the correlations at `cor_decay`, so no
+one table holds it: the factor at `cor_decay` alone held on a factor model (1.004 at 12 assets) and
+read 1.024 at 8 assets and an equicorrelation of 0.5. `portfolio_regime_bias` mixes the two
+pre-centred tables by a weight `θ` that the block gives each direction, and divides by `1 + μ`, the
+second-order shift of the mean of the estimated variance. On a replica at 4 to 12 assets, `R = I`,
+equicorrelations of 0.5 and 0.8 and a factor model, the truth over the mixed factor reads 0.9940
+to 1.0023 at the steady state, from 0.9716 to 1.1076 at `cor_decay` alone. Through the estimator,
+at 8 assets and an equicorrelation of 0.5, the separate path reads the multiplier of one decay to
+within 0.07 % for the three methods, either centring and both directions. Under two HAC lags,
+where the convolution reads the Bartlett weights too, it reads 0.05 % to 0.89 % below one decay,
+from 3.1 % to 5.1 % above it, with the first scored row of a zero block left out (#1730). In the warm-up the
+separate path standardises by the raw running variance, which no table holds (#1729).
+
 **The default inverse-volatility direction also divides by `1 + Δ`, its second-order excess
 (#1430).** `PortfolioTarget()` builds its direction from the estimate that it divides by, so the
 direction and the error of the estimate are correlated, and the factor of a fixed direction leaves
@@ -253,9 +267,11 @@ the mean of `r̂²` at `R = I` 14 % too high, the kernel 4 %, and the FirstMomen
 towards their truth by up to 0.3 % and 0.7 % at a correlated `R`, and by at most 0.26 %
 away from it at `R = I`, where the Bartlett over-shrink stopped on the identity. The variance keeps
 the Bartlett kernel, and `hac_vol_before = VolatilityAfterUpdate()` keeps the Bartlett kernel for the correlation too.
-The portfolio target keeps the Bartlett table at `cor_decay` too: its statistic mixes the variance
-at `decay` with the correlation, and the Bartlett table fits it better (the truth 1.0751 ± 0.0036,
-the Bartlett table 1.0731 and the kernel 1.0663, at equal weights, `R = I` and two lags).
+The portfolio target keeps the Bartlett tables too: its statistic mixes the variance at `decay`
+with the correlation, and on the factor at `cor_decay` alone the Bartlett table fitted it better
+(the truth 1.0751 ± 0.0036, the Bartlett table 1.0731 and the kernel 1.0663, at equal weights,
+`R = I` and two lags). Since #1726 its two tables and the sums of its weights read the Bartlett
+weights of `hac_lags`.
 
 **Without HAC the factor does not read the correlation of the assets, and this is a documented
 limit** (the maintainer ruled so on #1447). With `h_i = √(Q_ii / V̂_i)` the statistic splits
@@ -369,7 +385,7 @@ independent of the estimate on every target: the scalar root mean square then re
 half-life of 10 and two lags, and the Mahalanobis factors 0.2 % to 0.7 % high without HAC and 0.4 %
 to 1.4 % high with it. Under `PreCentred()` the two rules agree. A new rule implements
 `reads_dependence` beside `debiases`. The separate path keeps the pre-centred law at `cor_decay`,
-with the limits below.
+and the portfolio target at `decay` too, with the limits below.
 
 ## Consequences
 
@@ -379,10 +395,7 @@ with the limits below.
   states `debias = RawStatistic()`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.
-- **Three limits remain.** On the separate correlation path the portfolio target divides by the
-  factor at `cor_decay` alone. It holds on a factor model (1.004 at 12 assets), but at 8 assets and
-  an equicorrelation of 0.5 an equal-weight and an inverse-volatility direction read 1.024 under
-  either centring (#1726). On the separate correlation path the Mahalanobis factor does not read the
+- **Two limits remain.** On the separate correlation path the Mahalanobis factor does not read the
   correlation of the assets: without HAC the three methods read 0.9897 to 1.0018 of the truth, a
   documented limit (#1447). Under HAC, on the kernel of the damped rows, the statistic reads
   0.2 % to 2.2 % high at `R = I` and −2.6 % to +3.4 % at correlated `R` over 4 to 24 assets and

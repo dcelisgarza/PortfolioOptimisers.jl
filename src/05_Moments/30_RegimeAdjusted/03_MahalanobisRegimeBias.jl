@@ -1270,6 +1270,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Makes the empty store of the portfolio target: the table of its factor, and the two tables that
+the separate correlation path adds.
+
+# Arguments
+
+  - `::PortfolioTarget`: Portfolio regime-adjustment target.
+  - `decay::Number`: Decay of the correlation structure, whose type is the type of the sums.
+  - `::Type{T}`: Element type of the state.
+
+# Returns
+
+  - `bias::NamedTuple`: `table`, the empty table of [`regime_bias!`](@ref) at `decay`;
+    `variance`, the empty table at the decay of the variance; and `convolution`, the empty table
+    of [`exp_weight_convolution_table`](@ref). Only the separate path fills the last two.
+
+# Related
+
+  - [`regime_bias_state`](@ref)
+  - [`portfolio_regime_bias`](@ref)
+"""
+function regime_bias_store(::PortfolioTarget, decay::Number, ::Type{T}) where {T}
+    return (; table = T[], variance = T[], convolution = typeof(decay)[])
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Makes the empty store of the Mahalanobis bias factor: its interpolation nodes, keyed by the count
 of assets, the two tables of the variance factor of the separate correlation path, and the HAC
 kernel of its correlation.

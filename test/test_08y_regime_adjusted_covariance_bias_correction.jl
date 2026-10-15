@@ -262,16 +262,27 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     @test partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
                                                            regime_target = none), Xn).cache.n_regime_obs ==
           0
-    # On the separate path the portfolio reads the factor at `cor_decay`, because the
-    # correlations carry most of the variance of a direction (8 seeds: 1.004 with it, 0.971 with
-    # `decay`, at a correlation half-life of 20).
+    # On the separate path the portfolio holds the tables at `cor_decay` and at `decay`, and the
+    # convolution of their weights (#1726).
     sst = partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
                                                            regime_target = fixed,
                                                            cor_decay = 2.0^(-1 / 20)),
                        R[1:40, :]).cache
-    @test sst.bias[5:40] ==
-          PO.regime_bias_table(PO.FirstMomentRegimeAdjusted(), 2.0^(-1 / 20),
-                               length(sst.bias))[5:40]
+    len = length(sst.bias.table)
+    @test sst.bias.table[5:40] ==
+          PO.regime_bias_table(PO.FirstMomentRegimeAdjusted(), 2.0^(-1 / 20), len)[5:40]
+    @test sst.bias.variance[5:40] ==
+          PO.regime_bias_table(PO.FirstMomentRegimeAdjusted(), 2.0^(-1 / 10), len)[5:40]
+    @test sst.bias.convolution ==
+          PO.exp_weight_convolution_table(2.0^(-1 / 10), 2.0^(-1 / 20),
+                                          length(sst.bias.convolution))
+    # On one decay the variance table and the convolution stay empty.
+    ost = partial_fit!(RegimeAdjustedExpWeightedCovariance(; short...,
+                                                           regime_target = fixed),
+                       R[1:40, :]).cache
+    @test !isempty(ost.bias.table) &&
+          isempty(ost.bias.variance) &&
+          isempty(ost.bias.convolution)
     # An incremental fit reads the same table as a fit over the sample.
     ce = RegimeAdjustedExpWeightedCovariance(; short..., regime_target = fixed)
     @test isequal(cov(partial_fit!(partial_fit!(ce, R[1:200, :]), R[201:400, :])),
@@ -326,4 +337,53 @@ PO.centring_law(c::LawOfItsOwn) = c
                                                         debias = RawStatistic()), X),
                   var(RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
                                                         debias = RawStatistic()), X))
+end
+@testset "on the separate path the portfolio mixes the tables of the two decays (#1726)" begin
+    # The convolution table against a direct sum of the squared convolution of the two sets of
+    # weights, and where the two decays are 1e-9 apart, where the closed form loses every digit.
+    for (a, b) in
+        ((2.0^(-1 / 10), 2.0^(-1 / 20)), (2.0^(-1 / 20), 2.0^(-1 / 10)), (0.9, 0.9 + 1e-9))
+        Y = PO.exp_weight_convolution_table(a, b, 80)
+        for K in (1, 7, 80)
+            wc = [(1 - b) * b^l / (1 - b^K) for l in 0:(K - 1)]
+            c = [sum(wc[l + 1] * (1 - a) * a^(m - l) for l in 0:m) for m in 0:(K - 1)]
+            @test isapprox(Y[K], sum(abs2, c); rtol = 1e-12)
+        end
+    end
+    sums = (; mix = 0.006, spread = 0.0056, shift = -0.014)
+    # At one asset, and at a correlation of one, the direction reads the variance alone: the
+    # table at `decay`, and no shift of the mean.
+    @test all(PO.separate_direction_moments(fill(4.0, 1, 1), [1.0], 1e-12, sums) .≈
+              (1.0, 0.0))
+    s = [0.5, 1.0, 2.0]
+    th, mu = PO.separate_direction_moments(s * transpose(s), fill(1 / 3, 3), 1e-12, sums)
+    @test th ≈ 1 && abs(mu) < 1e-14
+    # At R = I the noise of n variances averages out: θ = Σ a⁴ / (Σ a²)², and no shift.
+    th, mu = PO.separate_direction_moments(Diagonal(s .^ 2) * 1.0, fill(1 / 3, 3), 1e-12,
+                                           sums)
+    @test th ≈ sum(s .^ 4) / sum(s .^ 2)^2 && iszero(mu)
+    # A block with no positive variance along the direction keeps the table at `cor_decay`.
+    @test PO.separate_direction_moments(zeros(2, 2), [0.5, 0.5], 1e-12, sums) == (0.0, 0.0)
+    # Equal decays give no spread between the tables, so the weight is zero.
+    @test PO.separate_direction_moments([1.0 0.5; 0.5 1.0], [0.5, 0.5], 1e-12,
+                                        (; mix = 0.0, spread = 0.0, shift = 0.0)) ==
+          (0.0, 0.0)
+    # The shift against a direct sum: under HAC a lag adds 2 k² to each squared convolution
+    # weight whose older observation is in the window, and without HAC it adds nothing.
+    a, b = 2.0^(-1 / 10), 2.0^(-1 / 20)
+    for L in (nothing, 2), K in (1, 2, 5, 40)
+        ce = RegimeAdjustedExpWeightedCovariance(; decay = a, cor_decay = b, hac_lags = L)
+        k = isnothing(L) ? Float64[] : [1 - i / (L + 1) for i in 1:L]
+        wc = [(1 - b) * b^l / (1 - b^K) for l in 0:(K - 1)]
+        c = [sum(wc[l + 1] * (1 - a) * a^(m - l) for l in 0:m) for m in 0:(K - 1)]
+        Yh = sum(c[m + 1]^2 *
+                 (1 + 2 * sum(abs2, k[1:min(length(k), K - 1 - m)]; init = 0.0))
+                 for m in 0:(K - 1))
+        sv, svc, sc = (PO.exp_weight_cross_sum(x, y, K, L)
+                       for (x, y) in ((a, a), (a, b), (b, b)))
+        sums = PO.separate_path_sums!(Float64[], ce, K)
+        @test sums.shift ≈ svc - sv - (sc - Yh) / 2 &&
+              sums.mix ≈ svc - sc &&
+              sums.spread ≈ sv - 2 * svc + sc
+    end
 end
