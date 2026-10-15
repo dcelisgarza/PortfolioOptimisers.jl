@@ -514,7 +514,7 @@ In both layouts a tensor Panel Field gives one column per trailing-axis label, w
   - `fields`: One Panel Field name as a string, a collection of names, or `nothing` for all Panel Fields of the panel.
   - `assets`: One asset label as a string, a collection of labels, or `nothing` for all assets of the universe.
   - `layout::Symbol = :long`: `:long` for one row per pair of observation and asset in the universe. `:wide` for one row per observation and one column per pair of Panel Field column and asset. The function checks it in every call, and does not use it when `fields` names one Panel Field.
-  - `decode::Bool = true`: Whether a [`CategoricalPanelField`](@ref) gives its levels in place of its integer codes.
+  - `decode::Bool = true`: Whether a [`CategoricalPanelField`](@ref) gives its levels in place of its integer codes. To read the table back, give the same `decode` to [`panel_manifest`](@ref).
 
 # Validation
 

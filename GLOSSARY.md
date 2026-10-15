@@ -191,7 +191,7 @@ The value that a Panel Field stores in a blank that no fill reached: the `val` o
 *Avoid*: calling every unobserved cell a placeholder. A cell is unobserved when the raw input held a blank there, and a filled cell is unobserved and holds data.
 
 **Panel Manifest**
-The small table that describes an Asset Panel beside the table of its values, so the panel can be read back: its shape, its asset names and observation labels, the kind of each Panel Field and whether it carries an observed mask and a placeholder mask, the levels of a categorical field in code order, and the axis name, labels and groups of a tensor field. `panel_manifest` writes it, `panel_dataframe` writes the values, and `asset_panel(df, mf)` reads the two back after any table format, CSV included, which keeps no type and no metadata.
+The small table that describes an Asset Panel beside the table of its values, so the panel can be read back: its shape, its asset names and observation labels, the kind of each Panel Field and whether it carries an observed mask and a placeholder mask, the levels of a categorical field in code order and whether its column holds the levels or the codes, and the axis name, labels and groups of a tensor field. `panel_manifest` writes it, `panel_dataframe` writes the values, and `asset_panel(df, mf)` reads the two back after any table format, CSV included, which keeps no type and no metadata.
 *Avoid*: reading the values table alone as the panel. A column name cannot hold a level that no cell uses, the order of the levels, or the groups of a tensor field, and the long layout drops every asset and observation outside the universe. And storing the manifest as table metadata, which CSV drops.
 
 **Listing Span**

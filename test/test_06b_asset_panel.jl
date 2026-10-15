@@ -1700,7 +1700,7 @@ end
 function panel_1399_trip(pnl; nx = nothing, ts = nothing, layout = :wide, decode = true,
                          kwargs...)
     return panel_1399_csv(panel_dataframe(pnl; nx, ts, layout, decode),
-                          panel_manifest(pnl; nx, ts); decode, kwargs...)
+                          panel_manifest(pnl; nx, ts, decode); kwargs...)
 end
 # Every part of a Panel Field but the values, which a long table keeps on the active cells only.
 function panel_1399_schema(f::NumericPanelField)
@@ -1786,8 +1786,7 @@ end
 @testset "panel_manifest" begin
     pnl = panel_1399_timevarying()
     mf = panel_manifest(pnl; nx = ["A", "B", "C"], ts = TS_1399)
-    @test names(mf) ==
-          ["kind", "field", "label", "group", "observed", "placeholder", "grouped"]
+    @test names(mf) == ["kind", "field", "label", "group", "observed", "placeholder"]
     @test mf.kind[1:8] ==
           ["panel", "observation", "observation", "observation", "observation", "asset",
            "asset", "asset"]
@@ -1798,11 +1797,13 @@ end
     @test mf.kind[9:end] ==
           ["numeric", "numeric", "categorical", "level", "level", "level", "tensor",
            "label", "label", "label", "tensor", "label"]
-    @test isequal(mf.label[12:14], ["Energy", "Tech", "Unused"])
+    @test isequal(mf.label[11:14], ["levels", "Energy", "Tech", "Unused"])
     @test isequal(mf.observed[9:11], [true, false, false])
-    @test isequal(mf.label[15], "factor") && isequal(mf.grouped[15], true)
+    @test isequal(mf.label[15], "factor") && isequal(mf.group[15], "grouped")
     @test isequal(mf.group[16:18], ["style", "style", "momentum"])
-    @test isequal(mf.grouped[19], false) && all(ismissing, mf.group[20:end])
+    @test isequal(mf.group[19], "ungrouped") && all(ismissing, mf.group[20:end])
+    # The manifest records the decode of the table (#1735).
+    @test isequal(panel_manifest(pnl; decode = false).label[11], "codes")
 
     # A static panel has no observation row, and the selections narrow the manifest as they
     # narrow the table.
@@ -1930,6 +1931,13 @@ end
     bad = copy(mf)
     bad.field[12] = "industry"
     @test_throws "a \"level\" or a \"label\" row follows" asset_panel(L, bad)
+    # The flag words of a "categorical" and a "tensor" row (#1735).
+    bad = copy(mf)
+    bad.label[11] = missing
+    @test_throws "its label is \"levels\" or \"codes\"" asset_panel(L, bad)
+    bad = copy(mf)
+    bad.group[15] = missing
+    @test_throws "its group is \"grouped\" or \"ungrouped\"" asset_panel(L, bad)
     bad = copy(mf)
     bad.label[1] = "static"
     @test_throws "a static panel has no observation axis" asset_panel(L, bad)
@@ -1977,7 +1985,10 @@ end
     r.sector[1] = "Retail"
     @test occursin("holds no level \"Retail\"",
                    panel_1399_keyerror(() -> asset_panel(r, mf)))
-    @test_throws "decode = false" asset_panel(L, mf; decode = false)
+    # A manifest that records the codes refuses a table of levels.
+    @test_throws "decode = false" asset_panel(L,
+                                              panel_manifest(pnl; nx = ["A", "B", "C"],
+                                                             ts = TS_1399, decode = false))
     # A static long table holds every asset.
     spnl = panel_1399_static()
     @test_throws "one row per asset" asset_panel(panel_dataframe(spnl)[1:2, :],
@@ -1997,6 +2008,29 @@ end
                                                               types = Dict("asset" =>
                                                                                String))),
                                            mf2); active_only = true)
+    end
+end
+
+# #1735: a reader that guesses column types keeps the text of the groups, and the manifest, not
+# the reader, says whether a categorical column holds the levels or the codes.
+@testset "asset_panel(df, mf): numeric-looking groups and levels survive CSV (#1735)" begin
+    g = AssetPanel(;
+                   pf = [TensorPanelField(; name = "b", axis = "f", labels = ["u", "v"],
+                                          groups = ["01", "02"], vals = ones(3, 2, 2)),
+                         CategoricalPanelField(; name = "c", levels = ["2", "1"],
+                                               codes = [1 2; 2 1; 1 1])],
+                   amsk = trues(3, 2), emsk = trues(3, 2))
+    for layout in (:long, :wide), decode in (true, false)
+        # Plain `CSV.File` on both tables, as the resolution of #1399 reads them.
+        p2 = mktempdir() do d
+            p, m = joinpath(d, "panel.csv"), joinpath(d, "manifest.csv")
+            CSV.write(p, panel_dataframe(g; layout, decode))
+            CSV.write(m, panel_manifest(g; decode))
+            return asset_panel(DataFrame(CSV.File(p)), DataFrame(CSV.File(m)))
+        end
+        @test panel_field(p2, "b").groups == ["01", "02"]
+        @test panel_field(p2, "c").codes == [1 2; 2 1; 1 1]
+        @test panel_1399_equal(g, p2)
     end
 end
 

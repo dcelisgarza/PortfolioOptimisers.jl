@@ -21,6 +21,7 @@ PortfolioOptimisers.panel_read_field
 PortfolioOptimisers.panel_code_reader
 PortfolioOptimisers.panel_manifest_axes
 PortfolioOptimisers.panel_manifest_fields
+PortfolioOptimisers.panel_manifest_flag
 PortfolioOptimisers.panel_manifest_attach!
 PortfolioOptimisers.panel_long_cells
 PortfolioOptimisers.panel_long_position
