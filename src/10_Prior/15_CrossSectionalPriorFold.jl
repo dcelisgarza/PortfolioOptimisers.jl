@@ -1256,7 +1256,7 @@ An unwrapped prior follows the rule of the carry fold: it folds what folds and r
 
 # Algorithm
 
- 1. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`, after the refusal of a member that holds a state, which [`online_entry_state`](@ref) finds. Copy a state that is not the newest one of its lineage with [`cross_sectional_carry_own`](@ref), because the step appends to its histories in place.
+ 1. Seed an empty [`CrossSectionalCarryState`](@ref) when `pe.cache` is `nothing`, after the refusal of a member that holds a state, with [`assert_cold_carry_entry`](@ref). Copy a state that is not the newest one of its lineage with [`cross_sectional_carry_own`](@ref), because the step appends to its histories in place.
  2. Fold `rd` and `gaps` with [`cross_sectional_carry_fold`](@ref). The step succeeded, so record the state it returns as the newest one of its lineage in `tip`. A step that throws leaves the counter, and the next step of the same state writes the same spare rows.
  3. Rebuild the prior with the state.
 
@@ -1268,7 +1268,7 @@ An unwrapped prior follows the rule of the carry fold: it folds what folds and r
 
 # Validation
 
-  - With `pe.cache` at `nothing`, no member of `pe` holds a partial-fit state. The carry reads every member as configuration, and keeps each state that it folds in its own state, so a state that the caller folded into a member would enter the first step, and the prior would no longer equal the batch fit. An `ArgumentError` is thrown otherwise, and it names the path of the state.
+  - With `pe.cache` at `nothing`, no member of `pe` holds a partial-fit state. The carry reads every member as configuration, and keeps each state that it folds in its own state, so a state that the caller folded into a member would enter the first step, and the prior would no longer equal the batch fit. An `ArgumentError` is thrown otherwise, and it names the path of the state, see [`assert_cold_carry_entry`](@ref).
   - The rules of [`cross_sectional_carry_fold`](@ref).
 
 # Returns
@@ -1293,10 +1293,8 @@ function fold_prior_step(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:An
                                                        <:Any, <:Any, <:Any, <:Any,
                                                        <:Option{<:CrossSectionalCarryState}},
                          rd::ReturnsResult, gaps::Option{<:AbstractVector{Bool}})
+    assert_cold_carry_entry(pe, pe.cache, "CrossSectionalFactorPrior")
     st = if isnothing(pe.cache)
-        path = online_entry_state(pe)
-        @argcheck(isnothing(path),
-                  ArgumentError("`CrossSectionalFactorPrior` starts its carry fold with a partial-fit state at `$(path)`. The carry reads every member as configuration and keeps each state it folds in its `CrossSectionalCarryState`, so the first step would fold the new observations onto the state of that member, and the prior would no longer equal the batch fit over the folded observations. Pass the member with its `cache` at `nothing`."))
         CrossSectionalCarryState()
     else
         cross_sectional_carry_own(pe.cache)

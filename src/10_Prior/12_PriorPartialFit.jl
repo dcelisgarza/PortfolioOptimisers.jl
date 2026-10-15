@@ -1400,6 +1400,44 @@ function fold_member(::Nothing, args...; kwargs...)
     return nothing
 end
 """
+    fold_carry_members(pe::EmpiricalPrior, X::VecNum_MatNum; kwargs...) -> EmpiricalPrior
+
+Folds observations into the two members of an [`EmpiricalPrior`](@ref) on its carry route.
+
+Each step of the carry folds `pe.me` and `pe.ce` on the same observations, so the four methods of the carry fold them here. The first step of the carry also refuses a member that holds a state, because the carried rows start empty and that member would read rows that they do not hold.
+
+# Algorithm
+
+ 1. Refuse a member that holds a state at the first step, when `pe.cache` is `nothing`, with [`assert_cold_carry_entry`](@ref).
+ 2. Fold `pe.me` and then `pe.ce` with `X` through [`fold_member`](@ref), and return the estimator with both members rebound.
+
+# Arguments
+
+  - `pe`: Empirical prior estimator on its carry route.
+  - `X`: The observations that the members fold, one observation as a vector or one per row of a matrix.
+  - `kwargs...`: Additional keyword arguments, forwarded to the two folds.
+
+# Validation
+
+  - The rule of [`assert_cold_carry_entry`](@ref).
+  - Every condition that the fold of `pe.me` or `pe.ce` checks.
+
+# Returns
+
+  - `pe`: The estimator, with its two members folded.
+
+# Related
+
+  - [`fold_member`](@ref)
+  - [`assert_cold_carry_entry`](@ref)
+  - [`EmpiricalPrior`](@ref)
+"""
+function fold_carry_members(pe::EmpiricalPrior, X::VecNum_MatNum; kwargs...)
+    assert_cold_carry_entry(pe, pe.cache, "EmpiricalPrior")
+    pe = Accessors.@reset pe.me = fold_member(pe.me, X; kwargs...)
+    return Accessors.@reset pe.ce = fold_member(pe.ce, X; kwargs...)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Reads the estimate of a member out of its fold, or refits the member over the rows of the outer estimator.
@@ -1460,8 +1498,8 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
 # Algorithm
 
  1. Orient a matrix `X` and a matrix `iv` to `observations × assets` with `dims_oriented`, transposing them when `dims == 2`. Under a matrix `X`, take its unmarked observations and their active mask with [`shared_series_member_rows`](@ref).
- 2. Under the horizon method, take `log1p` of the observations of step 1, giving `xl` or `Xl`.
- 3. Fold `pe.me` and `pe.ce` through [`fold_member`](@ref), on the observations of step 2 under the horizon method and on the observations of step 1 otherwise.
+ 2. Under the horizon method, take `log1p` of the observations of step 1.
+ 3. Fold `pe.me` and `pe.ce` through [`fold_carry_members`](@ref), on the observations of step 2 under the horizon method and on the observations of step 1 otherwise. At the first step, when `pe.cache` is `nothing`, it first refuses a member that holds a state.
  4. Append every arithmetic observation, with `iv`, `ivpa` and the marks `gaps`, to the carry state through [`fold_carry`](@ref), and return the estimator with its members and its `cache` field rebound. No member that folds reads `iv`, and a member that does not fold reads it from the carried buffer at the call with no data.
 
 # Arguments
@@ -1479,6 +1517,7 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
 
   - $(val_dict[:dims])
   - Every condition that the fold of `pe.me` or `pe.ce` checks. A member that holds observation weights refuses the fold with an `ArgumentError` that names the member, because a weight vector reweights every past observation when a new one arrives.
+  - At the first step, no member holds a partial-fit state, see [`assert_cold_carry_entry`](@ref). The carried rows start empty, so a warm member would read rows that the carried rows, the refitted members and `X` do not read. An `ArgumentError` that names the path of the state is thrown otherwise.
 
 # Returns
 
@@ -1489,7 +1528,7 @@ The fold takes a factor observation and drops it, because `prior(EmpiricalPrior(
   - [`EmpiricalPrior`](@ref)
   - [`PriorCarryState`](@ref)
   - [`prior`](@ref)
-  - [`fold_member`](@ref)
+  - [`fold_carry_members`](@ref)
   - [`fold_carry`](@ref)
   - [`shared_series_member_rows`](@ref)
 """
@@ -1497,8 +1536,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
                       ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
-    pe = Accessors.@reset pe.me = fold_member(pe.me, x; kwargs...)
-    pe = Accessors.@reset pe.ce = fold_member(pe.ce, x; kwargs...)
+    pe = fold_carry_members(pe, x; kwargs...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
                                                   kwargs...)
 end
@@ -1509,8 +1547,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                       gaps::Option{<:AbstractVector{Bool}} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
-    pe = Accessors.@reset pe.me = fold_member(pe.me, Xm; dims = 1, kw...)
-    pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xm; dims = 1, kw...)
+    pe = fold_carry_members(pe, Xm; dims = 1, kw...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
                                                   ivpa = ivpa, gaps = gaps, kwargs...)
 end
@@ -1518,9 +1555,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
                       ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
-    xl = log1p.(x)
-    pe = Accessors.@reset pe.me = fold_member(pe.me, xl; kwargs...)
-    pe = Accessors.@reset pe.ce = fold_member(pe.ce, xl; kwargs...)
+    pe = fold_carry_members(pe, log1p.(x); kwargs...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
                                                   kwargs...)
 end
@@ -1531,9 +1566,7 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                       gaps::Option{<:AbstractVector{Bool}} = nothing, kwargs...)
     X, iv = dims_oriented(dims, X, iv)
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
-    Xl = log1p.(Xm)
-    pe = Accessors.@reset pe.me = fold_member(pe.me, Xl; dims = 1, kw...)
-    pe = Accessors.@reset pe.ce = fold_member(pe.ce, Xl; dims = 1, kw...)
+    pe = fold_carry_members(pe, log1p.(Xm); dims = 1, kw...)
     return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
                                                   ivpa = ivpa, gaps = gaps, kwargs...)
 end

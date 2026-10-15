@@ -400,7 +400,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Pick the rows of the implied volatility matrix `iv` that pair the rows of the returns matrix `X` that [`returns_matrix_picker`](@ref) picked.
 
-An [`ImpliedVolatility`](@ref) estimator pairs row `t` of `iv` with row `t` of `X`. The returns data carries `iv`, one row per observation of `rd.X`. A prior result can carry fewer rows in `X` than the returns data: a Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) also drops the rows of the Descriptor warm-up and of the exposure lag. Each of them drops leading rows, so the rows of `pr.X` are the last rows of the observations, and the last rows of `iv` pair them.[`scenario_rows`](@ref) reads the probabilities `w` of a prior result on the same last rows.
+An [`ImpliedVolatility`](@ref) estimator pairs row `t` of `iv` with row `t` of `X`. The returns data carries `iv`, one row per observation of `rd.X`. A prior result can carry fewer rows in `X` than the returns data: a Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) also drops the rows of the Descriptor warm-up and of the exposure lag. Each of them drops leading rows. A prior also drops the observations of a Shared Series gap, which are not leading rows, and an optimiser drops them from the returns data before its prior and its readers read it. So inside an optimiser the rows of `pr.X` are the last rows of the observations that it kept, and the last rows of `iv` pair them. [`scenario_rows`](@ref) reads the probabilities `w` of a prior result on the same last rows. A caller that gives a prior result and the raw returns data after such a gap gets the last rows of `iv`, and they are not the observations of `pr.X`.
 
 # Algorithm
 

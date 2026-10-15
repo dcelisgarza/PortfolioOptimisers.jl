@@ -1721,6 +1721,14 @@ end
     clt = clusterise(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa)
     @test clr.res.order == clt.res.order
     @test isapprox(clr.D, clt.D)
+    # `cor` of `ImpliedVolatility` reads `iv` only to check it, so an equal answer does not
+    # show which rows were paired. A surface that is `NaN` on every row that the prior drops
+    # does: only the last rows pass, and the first rows are refused.
+    ivc = copy(ivi)
+    ivc[1:(T - n), :] .= NaN
+    rdc = ReturnsResult(; nx = rdi.nx, X = Xi, iv = ivc, ivpa = 1.1)
+    @test clusterise(clp, pr; rd = rdc, iv = rdc.iv, ivpa = 1.1).res.order == clt.res.order
+    @test_throws IsNonFiniteError clusterise(cle, Xi[1:n, :]; iv = ivc[1:n, :], ivpa = 1.1)
     @test phylogeny_matrix(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
           phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
     ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)),
@@ -1744,6 +1752,7 @@ end
     res = optimise(hrp, rdi)
     @test res.clr.res.order == clt.res.order
     @test isapprox(sum(res.w), 1)
+    @test optimise(hrp, rdc).clr.res.order == clt.res.order
 end
 
 @testset "The prior carrier's `w` is documented as observation weights" begin

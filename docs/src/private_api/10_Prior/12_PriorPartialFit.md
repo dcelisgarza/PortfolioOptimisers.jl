@@ -29,6 +29,7 @@ PortfolioOptimisers.exogenous_step_kwargs
 PortfolioOptimisers.step_panel_fields
 PortfolioOptimisers.fold_factor_argument
 PortfolioOptimisers.fold_member
+PortfolioOptimisers.fold_carry_members
 PortfolioOptimisers.read_member
 PortfolioOptimisers.fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.PriorCarryState}}, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 PortfolioOptimisers.assert_carry_step_panel

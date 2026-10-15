@@ -1727,6 +1727,43 @@ end
         @test optimise(o).w == w
     end
 
+    @testset "The set's graph slots read the implied volatilities of the rows" begin
+        # Found by R14 of #1630. #1644 gave `iv` to the set's prior and not to its centrality
+        # and phylogeny slots, so an `ImpliedVolatility` in a slot refused the fit with an
+        # `IsNothingError`, while the same slot of a JuMP head fitted. The set now resolves
+        # each slot as the JuMP head does, and the online fold equals the batch fit.
+        rng = StableRNG(1644)
+        T, N = 30, 3
+        R = 0.01 .* randn(rng, T, N)
+        iv = 0.15 .+ 0.1 .* rand(rng, T, N)
+        rd = ReturnsResult(; nx = ["A", "B", "C"], X = R, iv = iv, ivpa = 1.0)
+        rows(r, i) = po.port_opt_view(r, i, :)
+        ivc = ImpliedVolatility(; alg = ImpliedVolatilityPremium(), ppy = 1)
+        ce = CentralityEstimator(; pl = NetworkEstimator(; ce = ivc))
+        pr = prior(EmpiricalPrior(), rd)
+        cv = centrality_vector(ce, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd).X
+        # The ceiling lies between the least centrality of the simplex and the centrality of
+        # the free path, which stays near equal weights, so it is feasible and it binds.
+        cte = CentralityConstraint(; A = ce, B = (minimum(cv) + sum(cv) / N) / 2, comp = <=)
+        ple = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator(; ce = ivc))
+        a = po.resolve_allocation_set_rows(ProgrammeAllocationSet(; slv = slv, cte = cte,
+                                                                  ple = ple), pr, rd)
+        c = centrality_constraints(cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
+        p = phylogeny_constraints(ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
+        @test a.ctr.A_ineq == c.A_ineq && a.ctr.B_ineq == c.B_ineq
+        @test a.plr.A == p.A
+        wf = (@test_logs optimise(OPS(; alg = ExponentiatedGradient()), rd)).w
+        opt = OPS(; alg = ExponentiatedGradient(),
+                  set = ProgrammeAllocationSet(; slv = slv, cte = cte))
+        r = @test_logs (:warn, r"Held Step at 1") optimise(opt, rd)
+        @test dot(cv, r.w) <= cte.B + 1e-8 < dot(cv, wf)
+        o = opt
+        @test_logs (:warn, r"Held Step at 1") for t in 1:T
+            o = po.partial_fit!(o, rows(rd, t:t))
+        end
+        @test optimise(o).w == r.w
+    end
+
     @testset "The set's tracking error and ceiling read the benchmark of the rows (#1657)" begin
         # When the benchmark of the rows is the series of a fixed portfolio, a data
         # benchmark equals that portfolio as a fixed `WeightsTracking`, which pays no fee.

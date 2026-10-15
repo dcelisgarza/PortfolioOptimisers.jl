@@ -331,7 +331,10 @@ The cold start of the fold loop uses this walk. The online arm of [`fold_loop`](
 """
 function online_entry_state(est::Union{<:AbstractEstimator,
                                        <:StatsBase.CovarianceEstimator})
-    if hasfield(typeof(est), :cache) && !isnothing(getfield(est, :cache))
+    # The index form keeps a type with no `cache` field, such as `HighOrderPriorEstimator`,
+    # from a `getfield` by a name that it does not have.
+    i = findfirst(==(:cache), fieldnames(typeof(est)))
+    if !isnothing(i) && !isnothing(getfield(est, i))
         return "cache"
     end
     for f in fieldnames(typeof(est))
@@ -343,6 +346,52 @@ function online_entry_state(est::Union{<:AbstractEstimator,
     return nothing
 end
 function online_entry_state(::Any)
+    return nothing
+end
+"""
+    assert_cold_carry_entry(est, ::Nothing, name::AbstractString) -> nothing
+    assert_cold_carry_entry(est, ::Any, name::AbstractString) -> nothing
+
+Refuses a partial-fit state in a member of a carry at its first step.
+
+A carry reads every member as configuration at its first step: the carried rows start empty, and each member folds the new observations. A member that holds a state would fold them onto the observations of that state, so its moment would read rows that the carried rows and every refitted member do not read, and the prior would not equal the batch fit over the folded observations. The fold loop refuses such an estimator at its entry, and a direct [`partial_fit!`](@ref) does not pass through the fold loop, so each carry calls this function before its first step. The second argument marks the state of the carry itself: `nothing` at the first step, and any other value after it, when each member holds the state that the carry folded. A carry that keeps its state in a field passes that field. A carry that keeps its rows in a member, as [`HighOrderPriorEstimator`](@ref) keeps them in its embedded prior, passes the [`online_entry_state`](@ref) of that member.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `cache` is not `nothing`: return, because the members hold the states that the carry folded.
+ 2. `cache` is `nothing`: find the first state in `est` with [`online_entry_state`](@ref), and refuse it.
+
+# Arguments
+
+  - `est`: The estimator that starts its carry.
+  - `cache`: The state of the carry, or the path of the state of the member that carries the rows, and `nothing` at the first step.
+  - `name`: The name of the estimator in the message.
+
+# Validation
+
+  - At the first step, no member of `est` holds a partial-fit state. An `ArgumentError` that names the path of the state is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`online_entry_state`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`EmpiricalPrior`](@ref)
+  - [`HighOrderPriorEstimator`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_cold_carry_entry(est, ::Nothing, name::AbstractString)
+    path = online_entry_state(est)
+    @argcheck(isnothing(path),
+              ArgumentError("`$(name)` starts its carry with a partial-fit state at `$(path)`. The carry reads every member as configuration at its first step, so the step would fold the new observations onto the state of that member, and the prior would no longer equal the batch fit over the folded observations. Pass the member with its `cache` at `nothing`."))
+    return nothing
+end
+function assert_cold_carry_entry(::Any, ::Any, ::AbstractString)
     return nothing
 end
 """

@@ -1116,9 +1116,10 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
 
 # Algorithm
 
- 1. Fold `pe.pe` with the observations and `F` through [`partial_fit!`](@ref).
- 2. Fold `pe.kte` and `pe.ske` with the observations through [`fold_member`](@ref).
- 3. Rebuild the estimator with the three folded members with `Accessors.setproperties`, and return it.
+ 1. At the first step, when `pe.pe` holds no state, refuse a member that holds one with [`assert_cold_carry_entry`](@ref).
+ 2. Fold `pe.pe` with the observations and `F` through [`partial_fit!`](@ref).
+ 3. Fold `pe.kte` and `pe.ske` with the observations through [`fold_member`](@ref).
+ 4. Rebuild the estimator with the three folded members with `Accessors.setproperties`, and return it.
 
 # Arguments
 
@@ -1130,6 +1131,7 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
 # Validation
 
   - `pe.pe` folds. The embedded prior refuses the fold otherwise, with an error that names the wrapper that gives it a buffer.
+  - At the first step, no member holds a partial-fit state. The embedded prior carries the rows and starts with none, so a warm co-moment would read rows that it does not carry. An `ArgumentError` that names the path of the state is thrown otherwise, see [`assert_cold_carry_entry`](@ref).
 
 # Returns
 
@@ -1140,10 +1142,12 @@ The estimator forwards the fold to `pe.pe` in every case, because that member ca
   - [`HighOrderPriorEstimator`](@ref)
   - [`prior`](@ref)
   - [`fold_member`](@ref)
+  - [`assert_cold_carry_entry`](@ref)
   - [`supports_partial_fit`](@ref)
 """
 function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
+    assert_cold_carry_entry(pe, online_entry_state(pe.pe), "HighOrderPriorEstimator")
     return Accessors.setproperties(pe,
                                    (; pe = partial_fit!(pe.pe, X, F; kwargs...),
                                     kte = fold_member(pe.kte, X; kwargs...),
@@ -1159,9 +1163,10 @@ This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prio
 
 # Algorithm
 
- 1. Fold `pe.pe` with `rd` and `gaps` through [`fold_prior_step`](@ref).
- 2. Take the unmarked rows of `rd.X` and of the active mask of `rd.pnl` with [`shared_series_member_rows`](@ref), and fold `pe.kte` and `pe.ske` with them through [`fold_member`](@ref).
- 3. Rebuild the estimator with its folded members with `rebuild_estimator`, and return it.
+ 1. At the first step, when `pe.pe` holds no state, refuse a member that holds one with [`assert_cold_carry_entry`](@ref).
+ 2. Fold `pe.pe` with `rd` and `gaps` through [`fold_prior_step`](@ref).
+ 3. Take the unmarked rows of `rd.X` and of the active mask of `rd.pnl` with [`shared_series_member_rows`](@ref), and fold `pe.kte` and `pe.ske` with them through [`fold_member`](@ref).
+ 4. Rebuild the estimator with its folded members with `rebuild_estimator`, and return it.
 
 # Arguments
 
@@ -1172,6 +1177,7 @@ This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prio
 # Validation
 
   - Every condition that the fold of `pe.pe` over `rd` checks.
+  - The rule of [`assert_cold_carry_entry`](@ref) at the first step.
 
 # Returns
 
@@ -1186,6 +1192,7 @@ This is the forwarding form of [`fold_prior_step`](@ref), the fold of every prio
 """
 function fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,
                          gaps::Option{<:AbstractVector{Bool}})
+    assert_cold_carry_entry(pe, online_entry_state(pe.pe), "HighOrderPriorEstimator")
     X, kw = shared_series_member_rows(rd.X, gaps; step_active_kwargs(rd.pnl)...)
     return rebuild_estimator(pe,
                              (; pe = fold_prior_step(pe.pe, rd, gaps),

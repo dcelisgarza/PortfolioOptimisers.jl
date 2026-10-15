@@ -987,6 +987,33 @@ end
         @test isapprox(h.sk, hb.sk; rtol = 1e-12, nans = true)
         @test isapprox(h.kt, hb.kt; rtol = 1e-12, nans = true)
     end
+    @testset "A carry refuses a member that holds a state at its first step" begin
+        # Found by R14 of #1630. The carried rows start empty, so a warm member folded the
+        # new observations onto rows that no other part of the prior read: `mu` read all 100
+        # rows, and `sigma` and `X` read the last 50, with no message. The fold loop refuses
+        # such a prior at its entry, and a direct call did not, as in #1642.
+        Xw = randn(StableRNG(1642), 100, 4) ./ 100
+        warm = partial_fit!(SimpleExpectedReturns(), Xw[1:50, :])
+        rdw = ReturnsResult(; nx = string.(1:4), X = Xw[51:100, :])
+        for (pe, path) in ((EmpiricalPrior(; me = warm), "me.cache"),
+                           (EmpiricalPrior(; me = warm, horizon = 5), "me.cache"),
+                           (EmpiricalPrior(; ce = partial_fit!(Covariance(), Xw[1:50, :])), "ce.cache"),
+                           (HighOrderPriorEstimator(; ske = partial_fit!(Coskewness(), Xw[1:50, :])),
+                            "ske.cache"))
+            for x in (Xw[51:100, :], Xw[51, :], rdw)
+                isa(pe, HighOrderPriorEstimator) && isa(x, AbstractVector) && continue
+                @test_throws "`$(path)`" partial_fit!(pe, x)
+            end
+        end
+        # A cold prior folds, and the states that it folds pass the later steps.
+        e = partial_fit!(partial_fit!(EmpiricalPrior(), Xw[1:50, :]), Xw[51:100, :])
+        b = prior(EmpiricalPrior(), Xw)
+        @test prior(e).mu ≈ b.mu && prior(e).sigma ≈ b.sigma
+        h = partial_fit!(partial_fit!(HighOrderPriorEstimator(), Xw[1:50, :]),
+                         Xw[51:100, :])
+        hb = prior(HighOrderPriorEstimator(), Xw)
+        @test prior(h).sk ≈ hb.sk && prior(h).kt ≈ hb.kt
+    end
     @testset "The fold refuses what no state records" begin
         @test_throws IsNothingError partial_fit!(online(EmpiricalPrior()),
                                                  ReturnsResult(; nf = ["F1"],

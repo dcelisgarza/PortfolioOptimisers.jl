@@ -35,7 +35,7 @@ The method on a prior result runs these steps.
 
  1. Read `strict` from the current [`ProjectionStep`](@ref).
  2. When `lcse` is keyed by exposure, build `lcsr` from it through [`linear_constraints`](@ref) with the prior's factor regression `pr.rr` and the rows. The regression of its constraint space states its own source. Otherwise `lcsr` is `lcse`.
- 3. Fit the centrality rows `ctr` and the phylogeny result `plr`, as a [`JuMPOptimiser`](@ref) does. Each estimator reads the rows or the prior, as its own `x_src` states. The prior goes to them as `pr`.
+ 3. Fit the centrality rows `ctr` and the phylogeny result `plr`, as a [`JuMPOptimiser`](@ref) does. Each estimator reads the rows or the prior, as its own `x_src` states. The prior goes to them as `pr`, and the implied volatilities `rd.iv` and their adjustment `rd.ivpa` go to them as `iv` and `ivpa`, so an [`ImpliedVolatility`](@ref) in a slot reads the surface of the rows.
  4. Resolve the return floor `ret` against the prior.
  5. Resolve the Calibration Rules of the norm ceilings `l2c`, `linfc` and `lpc`, and of the penalties `l1`, `l2`, `lp` and `linf`, against the prior and the set's solver.
  6. Return the resolved slots and `rd`.
@@ -82,8 +82,9 @@ function resolve_allocation_set_rows(set::ProgrammeAllocationSet, pr::AbstractPr
     else
         set.lcse
     end
-    ctr = centrality_constraints(set.cte, pr; rd = rd, strict = strict)
-    plr = phylogeny_constraints(set.ple, pr; rd = rd)
+    ctr = centrality_constraints(set.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
+                                 strict = strict)
+    plr = phylogeny_constraints(set.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
     ret = factory(set.ret, pr)
     l2c = resolve_calibration_slot(set.l2c, :l2c, pr, pr.w, slv,
                                    CalibrationContext(; p = 2))
