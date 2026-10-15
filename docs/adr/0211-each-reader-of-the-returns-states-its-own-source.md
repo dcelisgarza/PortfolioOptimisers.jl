@@ -27,8 +27,8 @@ evaluation are #1683.
 
 The census at `89e8d37a72` found these facts.
 
-- About 30 concrete reader types: 13 priors, 7 graph readers, 4 uncertainty sets that hold a `pe`,
-  and 2 regression estimators.
+- 26 concrete reader types: 13 priors, 7 graph readers, 4 uncertainty sets that hold a `pe`, and 2
+  regression estimators.
 - The readers nest. `FactorPrior` holds `pe` and `re`, an uncertainty set holds `pe`, and a
   `CentralityConstraint` holds a `CentralityEstimator` that holds a network estimator. Only the
   outermost reader of a slot receives `rd`. Each inner reader receives a matrix from it. This is
@@ -47,7 +47,8 @@ decision 5 (#1689) met a gapped panel.
 
 1. **Each reader estimator holds an `x_src` field, and the default is `nothing`.** A verb reads the
    field of its estimator, so `prior(pe, rd)` reads `pe.x_src`. No head forwards a source, and no
-   verb takes a `brt` or an `x_src` keyword.
+   verb takes a `brt` keyword. One verb takes an `x_src` keyword: `covariance_forecast_evaluation`,
+   because the estimators that it evaluates receive a matrix (ADR 0215).
 2. **The holders.** The 13 prior estimators. The 7 graph readers: `ClustersEstimator`,
    `NetworkClustersEstimator`, `NetworkEstimator`, `CentralityEstimator`,
    `SemiDefinitePhylogenyEstimator`, `IntegerPhylogenyEstimator` and `CentralityConstraint`. The 2
@@ -75,8 +76,9 @@ decision 5 (#1689) met a gapped panel.
    lose `x_src`. Every owner of `brt` loses it: `JuMPOptimiser`, `HierarchicalOptimiser`,
    `InverseVolatility`, `NestedClustered`, `Stacking`, `SubsetResampling` and `PipelineStep`. A head
    gives no default to the readers whose field is `nothing`. The caller states the source on each
-   reader. #1682 decides whether a reader that the caller forgot, which reads `rd.X` beside a reader
-   of `X - B`, is refused. The record of `CovarianceForecastEvaluationResult` is #1683.
+   reader. A reader that the caller forgot, which reads `rd.X` beside a reader of `X - B`, is not
+   refused: it warns when the head is built (#1682, ADR 0214). The record of
+   `CovarianceForecastEvaluationResult` is #1683.
 7. **`OnlinePortfolioSelection` keeps a source for its own step.** Its `brt` becomes `x_src`. The
    head is the estimator in the selection that receives `rd`, and its step reads the price relative.
    Each inner reader of its rule (a forecaster, the window of `AntiCorrelation`, the row selector of
@@ -110,7 +112,9 @@ decision 5 (#1689) met a gapped panel.
 
 - The obligation of ADR 0204 goes away: a reader that a later change adds reads its own field, so no
   head has to remember to forward a keyword.
-- About 30 types gain a field, and each docstring and each printed doctest gains a row.
+- 23 types gain a field: the 13 priors, the 7 graph readers, the 2 regression estimators and
+  `OnlinePortfolioSelection`, whose `brt` becomes `x_src`. `ProjectionStep` holds the source of the
+  step. Each docstring and each printed doctest gains a row.
 - About 20 nesting fields gain a check through one shared helper.
 - A tracking-error `MeanRisk` with a prior, an uncertainty set and a centrality constraint states
   `ExcessSource()` in three places, where `brt = true` was one.
@@ -126,8 +130,7 @@ decision 5 (#1689) met a gapped panel.
   ADR 0118 is amended to say so.
 - The estimators of a covariance forecast evaluation receive a matrix, so they get no field. #1683
   decides where the verb gets the frame.
-- ADR 0204 describes the head-level `brt` that this decision removes. The map supersedes it when the
-  migration builds land.
+- ADR 0204 describes the head-level `brt` that this decision removes. The migration superseded it.
 
 ## Alternatives considered
 
@@ -168,7 +171,7 @@ decision 5 (#1689) met a gapped panel.
 ## Related
 
 - ADR 0044: the rule that named `x_src`. Amended on 2026-10-13 to point here.
-- ADR 0204: the current rule for `brt`.
+- ADR 0204: the head-level rule for `brt`, which this decision superseded.
 - ADR 0208: the data benchmark, which refuses a prior in the Excess Frame (#1692), and its new
   name `DataBenchmarkTracking`.
 - ADR [0213](0213-brt-is-removed-in-one-break.md): `brt` is removed in one break, with no

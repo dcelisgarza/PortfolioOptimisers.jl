@@ -765,7 +765,7 @@ end
 
 Walk the readers of a meta-optimiser, for the warning of a forgotten raw reader and the gap rule of the head.
 
-The group of a meta-optimiser is the head and every reader in its own slots: the prior `pe`, and the clustering `cle` of a [`NestedClustered`](@ref). [`field_frames`](@ref) walks every field. The walk stops at the inner optimisers, the outer optimiser and the fallback, because each one is a head with its own group (ADR 0204, decision 4).
+The group of a meta-optimiser is the head and every reader in its own slots: the prior `pe`, and the clustering `cle` of a [`NestedClustered`](@ref). [`field_frames`](@ref) walks every field. The walk stops at the inner optimisers, the outer optimiser and the fallback, because each one is a head with its own group.
 
 # Arguments
 

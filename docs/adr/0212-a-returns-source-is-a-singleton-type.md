@@ -69,9 +69,12 @@ The maintainer decided on 2026-10-13.
    `ArgumentError` names the field, the reader, the value and the admitted set. The configuration
    alone decides the refusal, so it goes in the constructor.
 7. **A stated source that the call cannot give warns, then falls back.** A graph reader can be called
-   with a prior result and no returns data, or with a bare matrix. A stated `DataSource()` or
-   `ExcessSource()` with no `rd`, and a stated `PriorSource()` on a bare matrix, give a warning. Then
-   the reader reads `pr.X`, or the matrix. `nothing` falls back with no warning.
+   with a prior result and no returns data, or with returns data in the place of the prior result.
+   A stated `DataSource()` or `ExcessSource()` with no `rd`, and a stated `PriorSource()` on returns
+   data with no prior result, give a warning. Then the reader reads `pr.X`, or the `X` of the
+   returns data. `nothing` falls back with no warning. A call on a bare matrix reads that matrix
+   under every source, with no warning: the method over a prior result picks the matrix and then
+   calls the method over the matrix, so the method over the matrix does not read `x_src`.
 8. **Unchanged rules.** `ExcessSource()` on returns data that carries no benchmark throws, as
    `benchmark_relative_returns` does today. `x_src` stays static, with no `TimeDependent` schedule
    (ADR 0044).
@@ -117,11 +120,11 @@ The maintainer decided on 2026-10-13.
 ## Related
 
 - ADR 0044: the rule that named `x_src`.
-- ADR 0204: the current rule for `brt`.
+- ADR 0204: the head-level rule for `brt`, which the migration superseded.
 - ADR 0208: the data benchmark, which refuses a prior in the Excess Frame (#1692), and its new
   name `DataBenchmarkTracking`.
 - ADR 0211: the readers that hold `x_src`.
 - ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md): the frame check that
   `DataSource()` serves (#1682).
 - `returns_matrix_picker`, `benchmark_relative_returns`, `resolve_factor_regression`,
-  `head_frame_returns`, `assert_source_selector`.
+  `head_frame_returns`, and `assert_returns_source`, which replaced `assert_source_selector`.

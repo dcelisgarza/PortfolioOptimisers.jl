@@ -84,7 +84,7 @@ end
 """
     warn_source_fallback(x_src::AbstractReturnsSource) -> Nothing
 
-Warn that a graph reader states a source that the call cannot give, and that the reader reads the `X` of `pr` in its place (ADR 0212, decision 7).
+Warn that a graph reader states a source that the call cannot give, and that the reader reads the `X` of `pr` in its place.
 
 The warning is logged once for each source.
 
@@ -283,7 +283,7 @@ end
 
 Find the assets that hold a non-finite cell in the rows that the plain graph readers of a fit read.
 
-Each graph reader states its own source, so the readers of one fit can read different matrices (ADR 0214). This function picks the matrix of each plain reader from the source that the reader states, and joins the gaps of the readers.
+Each graph reader states its own source, so the readers of one fit can read different matrices. This function picks the matrix of each plain reader from the source that the reader states, and joins the gaps of the readers.
 
 # Algorithm
 
@@ -799,7 +799,7 @@ Compute centrality constraints from asset returns in a prior result using a cent
 
 `centrality_constraints` delegates to the asset-returns variant with the `X` that each constraint states as its source, `pr.X` or the returns of `rd`.
 
-Each constraint of a vector states its own source, so two constraints of one vector can read different matrices (ADR 0214). A vector whose constraints state one source reads one matrix. A vector whose constraints state different sources computes the rows of each constraint from its own matrix, and joins them in the order of the vector with [`merge_linear_constraints`](@ref), which gives the rows of the one call.
+Each constraint of a vector states its own source, so two constraints of one vector can read different matrices. A vector whose constraints state one source reads one matrix. A vector whose constraints state different sources computes the rows of each constraint from its own matrix, and joins them in the order of the vector with [`merge_linear_constraints`](@ref), which gives the rows of the one call.
 
 # Algorithm
 

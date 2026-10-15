@@ -42,7 +42,10 @@ The maintainer decided on 2026-10-13.
    `ExcessSource()` and an outermost reader at `nothing` that reads the raw returns data. The warning
    names the head, the path of the reader at `nothing`, and tells the caller to state `DataSource()`
    or `ExcessSource()` on it. Then the head builds and runs as configured. The configuration alone
-   decides the warning, so it fires in the constructor. An inner reader keeps `nothing` by rule (ADR
+   decides the warning, so it fires in the constructor of the estimator that holds the optimiser and
+   its risk measures, for example `MeanRisk` or `HierarchicalRiskParity`, and the warning names that
+   estimator. A bare `JuMPOptimiser` or `HierarchicalOptimiser` does not warn, because it does not
+   hold the risk measures of its group. An inner reader keeps `nothing` by rule (ADR
    0211, decision 3), so the walk skips it. A reader that states `PriorSource()` reads the frame of
    the prior and never warns by itself.
 4. **A regression reader at `nothing` counts only when it refits.** It counts when the prior estimator
@@ -61,19 +64,21 @@ The maintainer decided on 2026-10-13.
    made from its message. The message names the type of the head and the path of the reader, so a
    head that a cross-validation rebuilds logs one time, and a different mismatch still logs.
 
-The scenario of #1682: a `HierarchicalOptimiser` whose `ClustersEstimator` states `ExcessSource()`
-and holds `FeatureDistance(; ape = RegressionPanel())`, and whose prior stays at `nothing`. The prior
-reads `rd.X` beside an excess reader, so the head warns by decision 3. If the caller states
-`DataSource()` on the prior, the head is silent: the clustering is in the Excess Frame, and its
+The scenario of #1682: a `HierarchicalRiskParity` over a `HierarchicalOptimiser` whose
+`ClustersEstimator` states `ExcessSource()` and holds `FeatureDistance(; ape = RegressionPanel())`,
+and whose prior stays at `nothing`. The prior reads `rd.X` beside an excess reader, so the
+`HierarchicalRiskParity` constructor warns by decision 3. If the caller states `DataSource()` on the
+prior, the head is silent: the clustering is in the Excess Frame, and its
 features are loadings of the raw returns.
 
 ## Consequences
 
 - A tracking-error `MeanRisk` can fit its prior in the Excess Frame and cluster on the raw returns.
   Today a caller cannot build it.
-- The build adds one walk over the reader slots of a head, shared by every head constructor and by
-  the `Pipeline` constructor. ADR 0213 refused a walk of this kind for a deprecation, because it
-  had to rewrite the readers. This walk only reads them.
+- The build adds one walk over the reader slots of a head, shared by the constructor of every
+  optimisation estimator that holds a reader and by the `Pipeline` constructor. ADR 0213 refused a
+  walk of this kind for a deprecation, because it had to rewrite the readers. This walk only reads
+  them.
 - A head with no reader in the Excess Frame never warns, so a caller with no benchmark sees no
   change.
 - The decision about the frame of the online step, the outer problem of a meta-optimiser and the

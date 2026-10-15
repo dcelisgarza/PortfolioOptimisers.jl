@@ -173,12 +173,13 @@ session that built it chose the four details below, and the maintainer accepted 
 - A result keeps its risk measures bound to the rows of the fit, as it keeps them resolved against
   the prior of the fit. A value-level call on a `ReturnsResult` binds them again.
 - A data benchmark pays no fee. A `WeightsTracking` benchmark keeps its own `fees`.
-- Until the migration builds of map #1678 land, the bind refuses `brt = true` on the holder, as
-  before. Decision 3 replaces that check when `brt` goes.
-- A data benchmark beside a precomputed Prior Result in the Excess Frame is not refused, because
-  the result does not show its source.
-- The online selection head has no `brt` of its own yet, so it binds under `brt = false`.
-  [#1662](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1662) and
-  [#1663](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1663) add it.
+- Decision 3 replaced the refusal of `brt = true` on the holder when the migration of map #1678
+  removed `brt`.
+- A precomputed Prior Result counts by the source that it records, as decision 3 states. A
+  `LowOrderPrior` or a `HighOrderPrior` that records `ExcessSource()` beside a data benchmark is
+  refused. A Result type that records no source reads as raw, so it is not refused.
+- The online selection head states its own source in `x_src`
+  ([#1662](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1662),
+  [#1663](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1663)).
 - Scoring a prediction against its benchmark is
   [#1664](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1664).

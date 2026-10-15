@@ -23,9 +23,3 @@ testset = "OWA l-moments"
 issue = 1709
 reason = "iteration 11 misses its rtol = 5e-8, a tolerance too tight for the host"
 host = "red on a Linux host; macOS has its own wider rtol"
-
-[[red]]
-file = "test_71_process_citation_census.jl"
-testset = "src and ext docstrings"
-issue = 1723
-reason = "fifteen docstrings of the brt migration cite an ADR by number"

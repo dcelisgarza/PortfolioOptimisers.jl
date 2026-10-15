@@ -1229,7 +1229,7 @@ A cluster whose best score is tied keeps nobody (see [`groups_argbest`](@ref)).
 
 A [`FeatureDistance`](@ref) in the `cle`'s distance slot measures a Feature Matrix rather than the returns, and it derives that matrix from the [`AssetPanel`](@ref) on `rd` — the returns data the selector is fitted on. Preselection is a *pre-prior* site, so it passes `rd` alone: a selector is fitted by [`fit_preprocessing`](@ref) from the returns data alone and never sees a prior result, and in a [`Pipeline`](@ref) it writes `:returns`, which invalidates any `:prior` already computed. A producer that needs a prior therefore raises here, and it names the site. Supply an [`AssetPanel`](@ref) on the [`ReturnsResult`](@ref) — for instance from [`asset_panel`](@ref) — or the clustering throws (see [`asset_panel`](@ref)).
 
-The `cle` reads `rd.X`, the returns as they arrived, because a selector fits before any prior or benchmark frame exists. So the `cle` states no source, and the constructor refuses a `cle` whose `x_src` is not `nothing` (ADR 0211).
+The `cle` reads `rd.X`, the returns as they arrived, because a selector fits before any prior or benchmark frame exists. So the `cle` states no source, and the constructor refuses a `cle` whose `x_src` is not `nothing`.
 
 The selection is decided on the *full* universe and the surviving columns are sliced only afterwards, so `Z` is measured over every asset before any is dropped.
 

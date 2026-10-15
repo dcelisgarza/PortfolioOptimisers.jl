@@ -52,9 +52,13 @@ was split into builds.
    after the removal. Where a sink swallows it, the build makes the sink refuse an unknown keyword.
 3. **The migration guide gives the replacement.** The section of `docs/src/migration.md` for the
    release that removes `brt` lists `brt` in its table of removed names. It shows the replacement on
-   each kind of reader: a prior, a graph reader, a regression reader, the prior of an uncertainty
-   set, and the step of `OnlinePortfolioSelection`. It also lists, under results that move, the
-   change of the default of a graph reader from `pr.X` to `rd.X` (ADR 0211).
+   each kind of reader: a prior, a graph reader, a regression reader and the prior of an uncertainty
+   set. It also lists, under results that move, the change of the default of a graph reader from
+   `pr.X` to `rd.X` (ADR 0211). The guide lists the breaks against the last release. `v0.32.0` had
+   `brt` on six heads and on `returns_result_picker` alone, so a `brt` that came after it and goes
+   before the next release has no row: `OnlinePortfolioSelection`, `RiskLoss`,
+   `ProgrammeAllocationSet`, `PipelineStep` and the keyword of each verb. A test of decision 2 still
+   covers each of them.
 4. **A positional `Bool` does not build a Result.** #1683 decides how
    `CovarianceForecastEvaluationResult` records the frame. A caller that builds the Result by position
    with a `Bool` in the old position must get an error, not a Result. So the new record either has a
