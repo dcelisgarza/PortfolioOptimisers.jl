@@ -23,4 +23,5 @@ centring_factor
 centring_overlap
 centring_lag_records
 centring_lag_factor
+centring_law
 ```

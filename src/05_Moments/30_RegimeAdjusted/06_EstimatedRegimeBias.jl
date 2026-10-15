@@ -537,16 +537,62 @@ function estimated_bias_factor(m::RegimeTermMoments{<:LogRegimeAdjusted}, I::Nam
     return (f, estimated_bias_factor(m.method, I, c) / f, v)
 end
 """
+    regime_bias_table(method, decay::Number, K::Integer, hac_lags, centring::AbstractCentring,
+                      debias)
+
+Computes the bias factor of a regime statistic for every count from one to `K`, on the law of
+`centring`.
+
+The bias is a moment of the law of the deviations, so the table reads the law that
+[`centring_law`](@ref) names. [`ZeroStartCentring`](@ref) reads the table of
+[`PreCentred`](@ref). A new centring that shares a law of the library returns that law, and needs
+no method of this verb.
+
+A centring with a law of its own returns itself from [`centring_law`](@ref), and adds a method of
+this verb with `centring` bound to its own type. Without that method this method raises a
+`MethodError`, because the law has no table.
+
+# Arguments
+
+  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method, or the
+    table of the moments of one term.
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Largest count of terms in the table.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
+  - `centring::AbstractCentring`: The centring of the estimator.
+  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+
+# Returns
+
+  - `table::AbstractVector`: The factor for each count, or the moments of
+    [`RegimeTermMoments`](@ref).
+
+# Related
+
+  - [`centring_law`](@ref)
+  - [`AbstractCentring`](@ref)
+  - [`mahalanobis_level_bias`](@ref)
+"""
+function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+                           decay::Number, K::Integer, hac_lags, centring::AbstractCentring,
+                           debias::AbstractRegimeDebias = ExactDebias())
+    law = centring_law(centring)
+    if law === centring
+        throw(MethodError(regime_bias_table,
+                          (method, decay, K, hac_lags, centring, debias)))
+    end
+    return regime_bias_table(method, decay, K, hac_lags, law, debias)
+end
+"""
     regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::PreCentred, debias)
-    regime_bias_table(method, decay::Number, K::Integer, hac_lags, ::ZeroStartCentring, debias)
 
 Computes the bias factor of a regime statistic for every count from one to `K`, on the law of a
 pre-centred estimate.
 
 A pre-centred deviation is the return itself, so the terms do not share a location, and the table
 of [`regime_bias_table`](@ref) without a centring is exact: on the plain weights, or on the banded
-weight matrix of the HAC lags. A location that starts at zero is not divided by its weight, and
-the table takes the same law.
+weight matrix of the HAC lags.
 
 # Arguments
 
@@ -569,15 +615,13 @@ the table takes the same law.
   - [`regime_bias!`](@ref)
 """
 function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
-                           decay::Number, K::Integer, ::Nothing,
-                           ::Union{PreCentred, ZeroStartCentring},
+                           decay::Number, K::Integer, ::Nothing, ::PreCentred,
                            ::AbstractRegimeDebias = ExactDebias())
     return regime_bias_table(method, decay, K)
 end
 function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
                            decay::Number, K::Integer, hac_lags::Union{<:Integer, <:VecNum},
-                           ::Union{PreCentred, ZeroStartCentring},
-                           ::AbstractRegimeDebias = ExactDebias())
+                           ::PreCentred, ::AbstractRegimeDebias = ExactDebias())
     return regime_bias_table(method, decay, K, hac_lags)
 end
 """
@@ -665,3 +709,4 @@ function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMom
     end
     return table
 end
+public regime_bias_table

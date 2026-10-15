@@ -503,16 +503,61 @@ function estimated_mahalanobis_dependence(::FirstMomentRegimeAdjusted, ::Number,
     return shift[2] / c * (ctx.grid.ho * acc)^2 / (2 * pi)
 end
 """
+    mahalanobis_level_bias(method, decay::Number, Ks, n::Integer, hac_lags,
+                           centring::AbstractCentring, debias)
+
+Computes the Mahalanobis bias factor at each count of `Ks` on the law of `centring`.
+
+The bias is a moment of the law of the deviations, so the factor reads the law that
+[`centring_law`](@ref) names. [`ZeroStartCentring`](@ref) reads the factor of
+[`PreCentred`](@ref). A new centring that shares a law of the library returns that law, and needs
+no method of this verb.
+
+A centring with a law of its own returns itself from [`centring_law`](@ref), and adds a method of
+this verb with `centring` bound to its own type. Without that method this method raises a
+`MethodError`, because the law has no factor.
+
+# Arguments
+
+  - `method::RegimeAdjustedMethod`: Regime adjustment method, which names the moment.
+  - `decay::Number`: Decay of the weights.
+  - `Ks::AbstractVector{<:Integer}`: Counts of observations, each above `n + 1`.
+  - `n::Integer`: Count of assets that contribute to the statistic, at least two.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
+  - `centring::AbstractCentring`: The centring of the estimator.
+  - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+
+# Returns
+
+  - `factors::VecNum`: The factor at each count of `Ks`.
+
+# Related
+
+  - [`centring_law`](@ref)
+  - [`AbstractCentring`](@ref)
+  - [`regime_bias_table`](@ref)
+"""
+function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
+                                Ks::AbstractVector{<:Integer}, n::Integer, hac_lags,
+                                centring::AbstractCentring,
+                                debias::AbstractRegimeDebias = ExactDebias())
+    law = centring_law(centring)
+    if law === centring
+        throw(MethodError(mahalanobis_level_bias,
+                          (method, decay, Ks, n, hac_lags, centring, debias)))
+    end
+    return mahalanobis_level_bias(method, decay, Ks, n, hac_lags, law, debias)
+end
+"""
     mahalanobis_level_bias(method, decay::Number, Ks, n::Integer, hac_lags, ::PreCentred, debias)
-    mahalanobis_level_bias(method, decay::Number, Ks, n::Integer, hac_lags, ::ZeroStartCentring, debias)
     mahalanobis_level_bias(method, decay::Number, Ks, n::Integer, hac_lags, ::EstimatedCentring, debias)
 
 Computes the Mahalanobis bias factor at each count of `Ks` on the law of the centring of the
 estimator.
 
-A pre-centred estimate, and an estimate whose location starts at zero, read
-[`mahalanobis_level_bias`](@ref) without a centring: their deviation does not share the terms of
-the estimate, so the debias rule changes nothing. Under [`EstimatedCentring`](@ref) a count up to
+A pre-centred estimate reads [`mahalanobis_level_bias`](@ref) without a centring: its deviation
+does not share the terms of the estimate, so the debias rule changes nothing. Under [`EstimatedCentring`](@ref) a count up to
 ``K_{h} = \\lceil \\ln \\sqrt{\\epsilon} / \\ln \\lambda \\rceil`` reads
 [`estimated_mahalanobis_level_bias`](@ref). Past ``K_{h}`` both factors change as ``\\lambda^{K}``,
 so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``, as
@@ -542,8 +587,7 @@ so a count takes the pre-centred factor times the ratio of the two at ``K_{h}``,
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
                                 Ks::AbstractVector{<:Integer}, n::Integer,
                                 hac_lags::Option{<:Union{<:Integer, <:VecNum}},
-                                ::Union{PreCentred, ZeroStartCentring},
-                                ::AbstractRegimeDebias = ExactDebias())
+                                ::PreCentred, ::AbstractRegimeDebias = ExactDebias())
     return mahalanobis_level_bias(method, decay, Ks, n, hac_lags)
 end
 function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
@@ -564,3 +608,4 @@ function mahalanobis_level_bias(method::RegimeAdjustedMethod, decay::Number,
     end
     return out
 end
+public mahalanobis_level_bias

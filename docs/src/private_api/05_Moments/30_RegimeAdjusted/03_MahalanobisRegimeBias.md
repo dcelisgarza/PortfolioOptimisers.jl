@@ -14,7 +14,6 @@ mahalanobis_value_stencil
 mahalanobis_integral_stencil
 mahalanobis_bias_grid
 stencil_dot
-mahalanobis_level_bias
 mahalanobis_lattice
 hac_log_det_path!
 hac_log_det_peak

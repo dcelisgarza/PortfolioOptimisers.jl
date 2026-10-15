@@ -411,7 +411,9 @@ The four exponentially weighted moment estimators hold a centring in their `cent
 
 # Interfaces
 
-A centring is a marker for dispatch, and it holds no data. A new centring needs a method of each verb that the members implement: [`centring_lag`](@ref), [`centring_deviation_mask`](@ref), [`centring_location!`](@ref), [`centring_report_location`](@ref), [`centring_factor`](@ref), [`centring_overlap`](@ref), [`centring_lag_records`](@ref) and [`centring_lag_factor`](@ref).
+A centring is a marker for dispatch, and it holds no data. A new centring needs a method of each verb that the members implement: [`centring_lag`](@ref), [`centring_deviation_mask`](@ref), [`centring_location!`](@ref), [`centring_report_location`](@ref), [`centring_factor`](@ref), [`centring_overlap`](@ref), [`centring_lag_records`](@ref), [`centring_lag_factor`](@ref) and [`centring_law`](@ref).
+
+The bias of a regime statistic is a moment of the law of the deviations, so a new centring names its law with [`centring_law`](@ref). A centring that shares the law of [`PreCentred`](@ref) or of [`EstimatedCentring`](@ref) returns that centring, and the bias tables read its tables. A centring with a law of its own returns itself, and adds a method of [`regime_bias_table`](@ref) and of [`mahalanobis_level_bias`](@ref) for that law.
 
 # Related
 

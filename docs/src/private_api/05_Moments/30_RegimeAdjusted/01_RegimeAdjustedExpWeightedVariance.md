@@ -19,7 +19,6 @@ get_regime_state(method::FirstMomentRegimeAdjusted, z2_valid::VecNum, ::Any)
 get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum, min_val::Number = sqrt(eps(eltype(z2_valid))))
 regime_bias_factor
 regime_log_variance
-regime_bias_table
 regime_bias!
 regime_bias_open
 hac_squared_returns!

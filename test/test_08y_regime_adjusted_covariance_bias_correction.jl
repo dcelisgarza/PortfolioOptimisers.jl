@@ -277,3 +277,53 @@ by that moment, from the exact table `regime_bias_table`. `DiagonalTarget` divid
     @test isequal(cov(partial_fit!(partial_fit!(ce, R[1:200, :]), R[201:400, :])),
                   cov(ce, R[1:400, :]))
 end
+
+# Three centrings of the user (#1725). Each forwards the eight verbs of the interface of
+# `AbstractCentring` to a centring of the library. The first two name a law of the library with
+# `centring_law`, and the third names a law of its own, which has no bias table.
+struct LawOfPreCentred <: PO.AbstractCentring end
+struct LawOfEstimatedCentring <: PO.AbstractCentring end
+struct LawOfItsOwn <: PO.AbstractCentring end
+for (C, base) in
+    ((LawOfPreCentred, PreCentred()), (LawOfEstimatedCentring, EstimatedCentring()),
+     (LawOfItsOwn, PreCentred()))
+    for f in (:centring_lag, :centring_deviation_mask, :centring_location!,
+              :centring_report_location, :centring_factor, :centring_overlap,
+              :centring_lag_records, :centring_lag_factor)
+        @eval PO.$f(::$C, args...; kwargs...) = PO.$f($base, args...; kwargs...)
+    end
+end
+PO.centring_law(::LawOfPreCentred) = PreCentred()
+PO.centring_law(::LawOfEstimatedCentring) = EstimatedCentring()
+PO.centring_law(c::LawOfItsOwn) = c
+
+@testset "a centring of the user reads the bias tables of the law it names" begin
+    @test PO.centring_law(PreCentred()) === PreCentred()
+    @test PO.centring_law(ZeroStartCentring()) === PreCentred()
+    @test PO.centring_law(EstimatedCentring()) === EstimatedCentring()
+    X = randn(StableRNG(1725), 200, 3) .* 0.01
+    for (c, base) in ((LawOfPreCentred(), PreCentred()),
+                      (LawOfEstimatedCentring(), EstimatedCentring()))
+        # The default debias rule reads the table of each statistic, and of each regime target.
+        @test isequal(var(RegimeAdjustedExpWeightedVariance(; centring = c), X),
+                      var(RegimeAdjustedExpWeightedVariance(; centring = base), X))
+        for target in (PO.PortfolioTarget(), PO.DiagonalTarget(), PO.MahalanobisTarget())
+            @test isequal(cov(RegimeAdjustedExpWeightedCovariance(; centring = c,
+                                                                  regime_target = target),
+                              X),
+                          cov(RegimeAdjustedExpWeightedCovariance(; centring = base,
+                                                                  regime_target = target),
+                              X))
+        end
+    end
+    # A law of its own has no table, so the debiased statistic refuses it, and the raw one reads
+    # no table.
+    own = RegimeAdjustedExpWeightedVariance(; centring = LawOfItsOwn())
+    @test_throws MethodError var(own, X)
+    @test_throws MethodError PO.mahalanobis_level_bias(PO.FirstMomentRegimeAdjusted(), 0.9,
+                                                       [20], 3, nothing, LawOfItsOwn())
+    @test isequal(var(RegimeAdjustedExpWeightedVariance(; centring = LawOfItsOwn(),
+                                                        debias = RawStatistic()), X),
+                  var(RegimeAdjustedExpWeightedVariance(; centring = PreCentred(),
+                                                        debias = RawStatistic()), X))
+end

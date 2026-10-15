@@ -659,6 +659,36 @@ function centring_lag_factor(::EstimatedCentring, decay::Number,
     end
     return G
 end
+"""
+    centring_law(::PreCentred)
+    centring_law(::ZeroStartCentring)
+    centring_law(::EstimatedCentring)
+
+The centring whose law of the deviations a regime statistic reads for its bias.
+
+The bias of a regime statistic is a moment of the law of its deviations, and [`regime_bias_table`](@ref) and [`mahalanobis_level_bias`](@ref) compute that moment for each law that the library knows. A centring names the law it shares, and the two tables read the tables of that law.
+
+The library knows two laws. A deviation that does not share the terms of the estimate has the law of [`PreCentred`](@ref): the return itself is the deviation, or the location starts at zero and is not divided by its weight, as in [`ZeroStartCentring`](@ref). A deviation from a location that holds the earlier returns has the law of [`EstimatedCentring`](@ref).
+
+A centring with a law of its own returns itself, and adds a method of [`regime_bias_table`](@ref) and of [`mahalanobis_level_bias`](@ref) for that law. Without the two methods, a regime-adjusted estimator that debiases raises a `MethodError`.
+
+# Returns
+
+  - `law::AbstractCentring`: `PreCentred()` under [`PreCentred`](@ref) and [`ZeroStartCentring`](@ref), `EstimatedCentring()` under [`EstimatedCentring`](@ref).
+
+# Related
+
+  - [`AbstractCentring`](@ref)
+  - [`regime_bias_table`](@ref)
+  - [`mahalanobis_level_bias`](@ref)
+"""
+function centring_law(c::Union{PreCentred, EstimatedCentring})
+    return c
+end
+function centring_law(::ZeroStartCentring)
+    return PreCentred()
+end
 export EstimatedCentring, PreCentred, ZeroStartCentring
 public centring_lag, centring_deviation_mask, centring_location!, centring_report_location,
-       centring_factor, centring_overlap, centring_lag_records, centring_lag_factor
+       centring_factor, centring_overlap, centring_lag_records, centring_lag_factor,
+       centring_law
