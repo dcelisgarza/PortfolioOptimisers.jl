@@ -194,6 +194,8 @@ end
         # `KFold()`. The prequential default of #1575 treats the two blocks alike too. It
         # gives -2.020 and -2.069 here: the two Passthrough scores anti-predict out of time.
         calibs = Dict("return" => 1.8743201813934023, "sharpe" => 0.44520892743434026)
+        # The values of the prequential default, to the three decimals that ADR 0200 states.
+        pcalibs = Dict("return" => -2.020, "sharpe" => -2.069)
         for (unit, uname) in ((IdiosyncraticReturnUnit(), "return"), (sharpe, "sharpe"))
             rfe = TargetReturnForecast(; scores = ds, half_life = 10.0, unit = unit,
                                        cv = KFold())
@@ -208,6 +210,7 @@ end
             a = return_forecast(rfe, pp, blk)
             b = return_forecast(rfe, pp, blk2)
             @test isequal(a.calib, b.calib)
+            @test isapprox(a.calib, pcalibs[uname]; atol = 5e-4)
             @test same(a.mu, b.mu)
             rfe = ExpWeightedReturnForecast(; scores = ds, unit = unit)
             a = return_forecast(rfe, pp, blk)

@@ -15,7 +15,7 @@ The first step of the default `mp` is the `:pdm` step, a Newton repair to the ne
 matrix. `si` has rank at most `K`, the number of factors, so `LinearAlgebra.isposdef` never
 accepts it, and the Newton repair runs at each fit. On the benchmark of
 [#1562](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1562) (500 assets, rank 7) it
-cost 0.057 s of each read-out of the carry fold, longer than the whole step of the oracle. It moved
+cost 0.057 s of each call with no data on the carry fold, longer than the whole step of the oracle. It moved
 `si` by 9.3e-11 relative to its largest entry, because `si` is positive semidefinite to round-off.
 The oracle repairs only the factor covariance, never the asset covariance.
 
@@ -46,11 +46,11 @@ steps of `mp` one by one, so it takes a `MatrixProcessing` alone.
 **The symmetric part.** `support_product` gives `si` symmetric only to round-off, and
 `isposdef` refuses a matrix that is not exactly symmetric. The Newton repair of `si` made it exactly
 symmetric, so the repair of the sum took the path with no repair. With no `:pdm` step on `si`, the
-repair of the sum ran the Newton step on every read-out, and the default saved nothing. So
+repair of the sum ran the Newton step on every call with no data, and the default saved nothing. So
 `NoSystematicRepair` takes the symmetric part of the block after its steps.
 
 **One rule for the batch fit and the step.** The lift has one caller, `cross_sectional_assemble`,
-which the batch fit and the read-out of the carry fold both run. So the carry fold equals the batch
+which the batch fit and the call with no data on the carry fold both run. So the carry fold equals the batch
 fit under each member.
 
 ## Consequences
@@ -62,7 +62,7 @@ fit under each member.
   cancellation in `L F L'` was the repair of the systematic block. Each test states the new value
   and the old one at its line.
 - `SystematicRepair()` gives the outputs from before this ADR, bit for bit.
-- The read-out of the carry fold on the benchmark of #1562 does no Newton repair of a block that is
-  positive semidefinite to round-off.
-- The carry method of `partial_fit!` dispatches on the type parameter of `cache`, which the new
-  field moves from place 25 to place 26.
+- The call with no data on the carry fold, on the benchmark of #1562, does no Newton repair of a
+  block that is positive semidefinite to round-off.
+- The carry method `fold_prior_step` dispatches on the type parameter of `cache` by its place, so
+  the new field moved that place from 25 to 26. Each later field moves it again.

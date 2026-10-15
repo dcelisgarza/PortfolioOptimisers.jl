@@ -252,7 +252,7 @@ the step fits every carried row again, as the batch fit does. The private verb
 `cross_sectional_alive_folds` answers for the solve algorithm of the estimator. The oracle solves each date alone, and its one-hot
 column exists, as zeros, from the seed onward, so it folds the same step at its normal cost. On the
 probe of #1591 (2510 fitted rows, 500 assets), the step where the factor comes alive costs 0.025 s
-with its read-out, against 0.017 s for a normal step, 1.55 s for the refit that it replaces, and
+with its call with no data, against 0.017 s for a normal step, 1.55 s for the refit that it replaces, and
 about 0.03 s for the step of the oracle. The carry equals the batch fit to 5.7e-15.
 
 ### The selection regressions of a factor prior
@@ -310,8 +310,8 @@ in every case.
 Some members make the cost of a step grow with the stream: a Descriptor or an Exposure member with
 no finite look-back and no state, a Return Forecast that reads the panel, a `ve` that does not fold,
 a factor prior `pe` that does not fold, and the idiosyncratic correlation (`th > 0`) when its `ce`
-does not fold, because it then refits at each read-out. A `ce` that folds, as the default
-`ExpWeightedCovariance` does, folds the standardised rows of each step, and the read-out reads its
+does not fold, because it then refits at each call with no data. A `ce` that folds, as the default
+`ExpWeightedCovariance` does, folds the standardised rows of each step, and the call with no data reads its
 state ([#1594](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1594)). The oracle refuses each of them on its fold. Ours fits them again over the rows
 that they need, so the step stays exact
 ([#1590](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1590)).

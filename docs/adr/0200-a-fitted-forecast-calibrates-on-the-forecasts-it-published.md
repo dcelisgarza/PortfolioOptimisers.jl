@@ -36,7 +36,7 @@ member publishes at `t`, before its calibration. The batch fit and a step run th
 
 | `cv` | The predictions that the calibration reads | Folds one row? |
 | --- | --- | --- |
-| `PrequentialCalibration()`, the default | the forecast of each observation from the targets matured at it | yes |
+| `PrequentialCalibration()`, the default | the forecast of each observation from the targets matured at it | yes, under `LinearModel()` with no keyword argument, the default target. Another target refits every matured row, which is exact |
 | a `CrossValidationEstimator`, such as `KFold()` | out of fold, the default before this ADR | no: the carry refits every row, which is exact |
 | `nothing` | in sample | no |
 
@@ -78,26 +78,28 @@ values.
   `test/test_08x_return_forecasts.jl`. The uncalibrated cases keep the default, so the oracle
   checks `NormalEquationsFit` against its own least squares fit.
 - The calibration coefficient can change sign. On the panel of the leverage-one case of
-  `test/test_12zb_parity_cs_prior_carry_fold.jl` (1200 rows, 40 assets, two `Passthrough` scores),
-  `KFold()` gives 1.874 in the return unit and 0.445 in the Sharpe unit. The prequential rule gives
-  -2.020 and -2.069. Out of time, the forecast of those scores has the wrong sign over the
-  recent rows that the calibration weighs most. The k-fold rule also trains each fold on the rows
-  after it, and its slope is positive.
+  `test/test_12zb_parity_cs_prior_carry_fold_pairs_and_panel_rows.jl` (1200 rows, 40 assets, two
+  `Passthrough` scores), `KFold()` gives 1.874 in the return unit and 0.445 in the Sharpe unit. The
+  prequential rule gives -2.020 and -2.069. Out of time, the forecast of those scores has the wrong
+  sign over the recent rows that the calibration weighs most. The k-fold rule also trains each fold
+  on the rows after it, and its slope is positive.
 - `rf.model` of the default is a `NormalEquationsFit`, not a `GLM.LinearModel`. It answers
   `StatsAPI.coef` and `StatsAPI.predict`. Measured on a random design of 1500 samples and 3
   columns, its coefficients equal those of `GLM.LinearModel` to 1.2e-15 relative, and a collinear
   column takes the same zero coefficient.
 - `target_forecast_uncalibrated` takes the number of assets as a last argument.
-- One function, `return_forecast_step`, runs the rule (#1581). The batch fit runs it over every
-  observation from an empty state. A step of the carry fold of `CrossSectionalFactorPrior` runs it
-  over the new observations and the observations whose target matures at the step, from the state
-  that the carry keeps: the normal equations, the model, the two calibration regressions, and the
-  coefficients that predicted the observations whose target has not matured. So the carry keeps
-  the panel rows of the look-back of the Descriptors alone, and the step and the batch fit do the
-  same arithmetic. Under `whole_history`, the member trains on the last `lag + horizon - 1` rows
-  before the block. When that gap is longer than the lag of the prior, the first of those rows
-  are rows of the Descriptor warm-up of the prior, so the carry keeps their scores, once, before
-  the scores of its histories (#1588).
+- One function, `return_forecast_step`, runs the rule (#1581) under `LinearModel()` with no keyword
+  argument, as `target_forecast_folds` answers. Every other target fits each matured sample again
+  through `target_forecast_prequential`, and the carry fold refits the member. The batch fit runs
+  `return_forecast_step` over every observation from an empty state. A step of the carry fold of
+  `CrossSectionalFactorPrior` runs it over the new observations and the observations whose target
+  matures at the step, from the state that the carry keeps: the normal equations, the model, the two
+  calibration regressions, and the coefficients that predicted the observations whose target has not
+  matured. So the carry keeps the panel rows of the look-back of the Descriptors alone, and the step
+  and the batch fit do the same arithmetic. Under `whole_history`, the member trains on the last
+  `lag + horizon - 1` rows before the block. When that gap is longer than the lag of the prior, the
+  first of those rows are rows of the Descriptor warm-up of the prior, so the carry keeps their
+  scores, once, before the scores of its histories (#1588).
 - The forecast that the member publishes at an observation is the forecast of a fit through that
   observation. So the carry gives a slot that reads the Return Forecast history the rows of the
   fold, and fits no member again for it.

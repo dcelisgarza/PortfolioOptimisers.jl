@@ -174,8 +174,10 @@ end
         wv = WindowedVariance(;
                               ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
                                                        min_obs = 5), window = 60)
-        # The batch choice of `style` moves at the second step, and a rolling window does not
-        # fold, so both fit every observation again from the scores that the state carries.
+        # The batch choice of `style` moves at the second step, and the move folds (#1605). A
+        # rolling window does not fold, so it fits every observation again from the scores
+        # that the state carries. A refit leaves a plain `Matrix`, and a step appends to a
+        # view of a backing.
         for (cfg, ee) in (((; fk..., factors = ind, families = ["industry" => nothing],
                             rfe = fw(["industry", "style1"], sharpe)), e),
                           ((; fk..., factors = ind, lag = 2,
@@ -187,6 +189,9 @@ end
             for (k, x) in enumerate(stream(pe, rd, ee))
                 b = batch(pe, k, rd, ee)
                 st = x.pe.cache
+                if k > 1
+                    @test isa(st.csr.f, SubArray) == !isa(pe.ve, WindowedVariance)
+                end
                 @test size(x.pe.cache.win.X, 1) == pe.lag + 1
                 @test size(st.fh) == size(st.vs) == size(b.rr.rf.hist)
                 @test size(st.fsc.S, 1) == size(st.Ms, 1)

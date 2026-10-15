@@ -178,6 +178,18 @@ end
             @test same(e2[1:size(e1, 1), :], e1)
             @test same(sb[2].pe.cache.W[1:size(e1, 1), :], sb[1].pe.cache.W)
         end
+        # The two solve rules that the loop above leaves out, and a Return Forecast that fits
+        # nothing, fold a move the same way.
+        for cfg in
+            ((; style..., cre = CrossSectionalLinearRegression(; alg = MinimumNormSolve())),
+             (; style..., cre = CrossSectionalLinearRegression(; alg = UncheckedSolve())),
+             (; grid_config("FcCustom", rd)..., families = ["style" => nothing]))
+            pe = CrossSectionalFactorPrior(; lambda = 1, cfg...)
+            sb = stream(pe)
+            @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
+            @test all(k -> near(sb[k].pr, batch(pe, k)), 1:3)
+            @test sb[2].pe.cache.csr.f isa SubArray
+        end
         @test CrossSectionalFactorPrior(; style...).unseen === SolvedUnseenMember()
         # A target that keeps the default answer of `is_basis_invariant` can penalise its
         # coefficients, so a move under it fits every observation again, and equals the batch

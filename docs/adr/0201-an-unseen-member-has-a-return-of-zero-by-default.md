@@ -91,8 +91,8 @@ before the block.
 - On the small grid panel, whose only Utilities asset delists, the default moves the factor
   returns of one row by up to 4.6% of the largest factor return, and through them the factor
   moments and the asset moments.
-- The carry method of `partial_fit!` dispatches on the type parameter of `cache`, which the new
-  field moves from place 28 to place 29.
+- The carry method `fold_prior_step` dispatches on the type parameter of `cache` by its place, so
+  the new field moved that place from 28 to 29.
 - Complexity: the inner constructor takes one argument per field, so its `arg` rises from 28 to
   29, and `unseen_member_design` takes five arguments, so the `arg` of its file rises from 3 to 5.
   The baseline records both. The inner constructor builds its type parameters from one tuple of

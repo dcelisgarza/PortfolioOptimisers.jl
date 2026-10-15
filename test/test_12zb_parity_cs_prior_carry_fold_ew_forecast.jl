@@ -193,8 +193,10 @@ end
         wv = WindowedVariance(;
                               ve = ExpWeightedVariance(; decay = 2.0^(-1 / 20),
                                                        min_obs = 5), window = 60)
-        # The batch choice of `style` moves at the second step, and a rolling window does not
-        # fold, so both fit every observation again from an empty state of the recursion.
+        # The batch choice of `style` moves at the second step, and the move folds (#1605). A
+        # rolling window does not fold, so it fits every observation again from an empty state
+        # of the recursion. A refit leaves a plain `Matrix`, and a step appends to a view of a
+        # backing.
         cases = (((; fk..., factors = ind, families = ["industry" => nothing],
                    rfe = ew(["industry", "style1"], sharpe)), e),
                  ((; fk..., factors = ind, lag = 2,
@@ -221,6 +223,9 @@ end
                 if b isa Exception
                     @test x.pr isa Exception
                     continue
+                end
+                if k > 1
+                    @test isa(st.csr.f, SubArray) == !isa(pe.ve, WindowedVariance)
                 end
                 rf, rb = x.pr.rr.rf, b.rr.rf
                 @test size(st.win.X, 1) <= 6

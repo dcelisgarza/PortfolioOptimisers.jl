@@ -206,7 +206,9 @@ end
         # The default, a Sharpe unit with an intercept, the calibration of the orthogonal
         # part, a member that reads the block alone with a gap of three rows, a batch choice
         # that moves at the second step, and a rolling variance that refits every step. The
-        # last two fit every observation again from the scores that the state carries.
+        # move folds (#1605). The rolling variance fits every observation again from the
+        # scores that the state carries. A refit leaves a plain `Matrix`, and a step appends
+        # to a view of a backing.
         for cfg in
             ((; fk..., factors = ind, families = ["industry" => nothing], rfe = tf()),
              (; fk..., factors = ind, rfe = tf(; unit = sharpe, intercept = true)),
@@ -219,6 +221,19 @@ end
             @test po.lookback(pe) == 30 && po.cross_sectional_carry_rows(pe) == pe.lag + 1
             xs = check(pe, e)
             @test all(x -> size(x.pe.cache.win.X, 1) == pe.lag + 1, xs)
+            @test all(x -> isa(x.pe.cache.csr.f, SubArray) == !isa(pe.ve, WindowedVariance),
+                      xs[2:end])
+        end
+        # A target with a keyword argument does not fold under the prequential default, so the
+        # carry fits the member again over every row, which is exact.
+        gk = LinearModel(; kwargs = (; dropcollinear = true))
+        pe = CrossSectionalFactorPrior(; fk..., factors = ind, rfe = tf(; tgt = gk))
+        @test !po.folds_forecast_rows(pe.rfe)
+        for (k, x) in enumerate(stream(pe, rd, e))
+            b = batch(pe, k, rd, e)
+            @test relerr(x.pr.mu, b.mu) < 1e-13 && relerr(x.pr.sigma, b.sigma) < 1e-13
+            @test relerr(x.pr.rr.rf.mu, b.rr.rf.mu) < 1e-13 &&
+                  isequal(isnan.(x.pr.rr.rf.mu), isnan.(b.rr.rf.mu))
         end
         # Under `whole_history` a row before the block trains the fit when its forward window
         # reaches into the block. With a gap of four rows the first row before the block

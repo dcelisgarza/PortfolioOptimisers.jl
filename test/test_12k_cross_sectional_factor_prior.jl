@@ -154,6 +154,10 @@ end
 # recoverable from the carrier and that count alone.
 fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
 
+# A matrix processing estimator of a caller, which is not a `MatrixProcessing`. The prior builds it
+# and never fits it.
+struct CsfpCallerMatrixProcessing <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+
 @testset "The estimator, its defaults and its refusals" begin
     PO = PortfolioOptimisers
     pe = CrossSectionalFactorPrior(; factors = csfp_factors())
@@ -1936,6 +1940,15 @@ allocated the exposure history in the element type of the returns, so integer re
         s = copy(si)
         @test PO.systematic_processing!(SystematicRepair(), mp, s, Xs) === s
         @test s == matrix_processing!(mp, copy(si), Xs)
+        # The default rule reads the steps of a `MatrixProcessing`, so the constructor refuses
+        # another `mp` under it, where the fit would fail with a `MethodError`.
+        cmp = CsfpCallerMatrixProcessing()
+        @test_throws "srep = NoSystematicRepair() runs the steps of mp one by one" CrossSectionalFactorPrior(;
+                                                                                                             factors = csfp_factors(),
+                                                                                                             mp = cmp)
+        @test CrossSectionalFactorPrior(; factors = csfp_factors(), mp = cmp,
+                                        srep = SystematicRepair()).mp === cmp
+        @test isnothing(PO.assert_systematic_repair(NoSystematicRepair(), mp))
     end
     @testset "Integer returns fit, and equal the fit of their float copy" begin
         rd = csfp_panel(; n_assets = 40, n_observations = 80, n_industries = 3,

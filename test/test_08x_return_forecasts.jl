@@ -726,11 +726,13 @@ FOUR MORE CONVENTIONS SHAPE THESE PROBES.
    panel the file already rebuilds, with the idiosyncratic returns and variances drawn from
    the two closed forms the last testset writes and exported to both sides.
 
-8. THE DEFAULTS CALIBRATE OUT OF FOLD AND PUBLISH FROM THE FIRST OBSERVATION.
-   - The default `cv = KFold()` calibrates on the out-of-fold predictions of five
-     unshuffled folds (#1418). An in-sample prediction was fitted to the target the
-     calibration regresses on it, so its slope is biased. `cv = nothing` calibrates in
-     sample, and a hand block with fewer than ten valid samples states it.
+8. THE DEFAULTS CALIBRATE ON PUBLISHED FORECASTS AND PUBLISH FROM THE FIRST OBSERVATION.
+   - The default `cv = PrequentialCalibration()` calibrates on the forecast that each
+     observation published, from the targets that had matured at it (#1575, ADR 0200).
+     `cv = KFold()` calibrates on the out-of-fold predictions of five unshuffled folds
+     (#1418), and the stored cases of the oracle state it. An in-sample prediction was fitted
+     to the target the calibration regresses on it, so its slope is biased. `cv = nothing`
+     calibrates in sample, and a hand block with fewer than ten valid samples states it.
    - The default `min_obs = 1` publishes from the first observation that advances the state
      (#1386). The coefficients after `n` observations are the weighted least squares of those
      observations, so a warm-up guards no bias. A stored case that sets `min_obs = 1` states

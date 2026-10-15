@@ -1212,6 +1212,50 @@ function systematic_processing!(::NoSystematicRepair, mp::MatrixProcessing, sigm
     return sigma
 end
 """
+    assert_systematic_repair(srep::AbstractSystematicRepair,
+                             mp::AbstractMatrixProcessingEstimator) -> nothing
+    assert_systematic_repair(srep::NoSystematicRepair,
+                             mp::AbstractMatrixProcessingEstimator) -> nothing
+
+Checks that the Systematic Repair rule of a [`CrossSectionalFactorPrior`](@ref) can process the systematic block under its matrix processing estimator.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Every rule but [`NoSystematicRepair`](@ref) accepts every `mp`. A rule of a caller states its own needs in its method of [`systematic_processing!`](@ref).
+ 2. [`NoSystematicRepair`](@ref) reads the steps of `mp` one by one, so it accepts a [`MatrixProcessing`](@ref) alone. Without this check, another estimator fails at the fit with a `MethodError` of [`systematic_processing!`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:srep])
+  - `mp`: Matrix processing estimator of the prior.
+
+# Validation
+
+  - Under [`NoSystematicRepair`](@ref), `mp` is a [`MatrixProcessing`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`AbstractSystematicRepair`](@ref)
+  - [`systematic_processing!`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_systematic_repair(::AbstractSystematicRepair,
+                                  ::AbstractMatrixProcessingEstimator)
+    return nothing
+end
+function assert_systematic_repair(::NoSystematicRepair,
+                                  mp::AbstractMatrixProcessingEstimator)
+    @argcheck(isa(mp, MatrixProcessing),
+              ArgumentError("srep = NoSystematicRepair() runs the steps of mp one by one, so it takes a MatrixProcessing alone, and mp is a $(nameof(typeof(mp))). Use srep = SystematicRepair(), which runs matrix_processing! of mp on the systematic block, or pass a MatrixProcessing."))
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Folds each part of a [`CrossSectionalFactorPrior`](@ref) that has a fold, and fits every other part again at each step of the carry fold. This is the default Carry Rule.

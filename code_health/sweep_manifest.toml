@@ -302,7 +302,7 @@
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { map = 6, units = 3, algorithm = 1, swept = true, bindings = ["LowDimensionEnsemblePrior", "fit_min_rows", "prior"] }
 "src/10_Prior/15_CrossSectionalPriorFold.jl" = { map = 6, units = 29, swept = false }
 "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { map = 6, units = 16, swept = false }
-"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { map = 6, units = 33, swept = false }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { map = 6, units = 34, swept = false }
 "src/10_Prior/18_CrossSectionalCarryHistories.jl" = { map = 6, units = 18, swept = false }
 "src/10_Prior/19_PriorScenarios.jl" = { map = 6, units = 11, algorithm = 4, swept = true, bindings = ["cross_sectional_factor_scenarios", "cross_sectional_regression_stage", "resolve_fill_limit", "scenario_ens", "scenario_fill", "scenario_fill_msg", "scenario_fill_pairs", "scenario_fill_remember!", "scenario_fill_report", "scenario_weights", "scenario_window"] }
 "src/10_Prior/20_PriorReturnsSource.jl" = { map = 6, units = 26, algorithm = 16, swept = true, bindings = ["assert_graph_readable", "asset_phylogeny", "average_centrality", "average_centrality", "centrality_constraints", "centrality_constraints_from", "centrality_vector", "centrality_vector", "clusterise", "graph_gap_remedy", "graph_reader_gaps", "graph_reader_mask", "graph_verb_keywords", "implied_volatility_picker", "phylogeny_constraints", "phylogeny_matrix", "picked_returns_data", "plain_graph_reader", "prior_returns_source", "reader_frames", "reader_frames", "refits_regression", "returns_matrix_picker", "returns_source", "stamp_returns_source", "warn_source_fallback"] }
