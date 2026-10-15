@@ -123,10 +123,12 @@ CompactCovarianceUncertaintySet
                                                                                 R, val)
     end
 end
-function CompactCovarianceUncertaintySet(kappa::Number, C::VecNum,
-                                         Q::MatNum)::CompactCovarianceUncertaintySet
+function CompactCovarianceUncertaintySet(kappa::Number, C::VecNum, Q::MatNum,
+                                         val::Option{<:MatNum} = nothing)::CompactCovarianceUncertaintySet
+    # The four positional arguments of a released version, `(kappa, C, Q, val)`, keep their
+    # meaning: a fitted set has no row in `R` (ADR 0189).
     return CompactCovarianceUncertaintySet(kappa, C, Q, zeros(eltype(Q), 0, size(Q, 2)),
-                                           nothing)
+                                           val)
 end
 function CompactCovarianceUncertaintySet(; kappa::Number, C::VecNum, Q::MatNum,
                                          R::MatNum = zeros(eltype(Q), 0, size(Q, 2)),

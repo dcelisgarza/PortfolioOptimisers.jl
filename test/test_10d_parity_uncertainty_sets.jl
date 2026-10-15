@@ -321,9 +321,9 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
                     ii = 1:(N + 1):(N ^ 2)
                     @test isapprox(diag(s_o.L)[ii], diag(s.L)[ii]; rtol = 1e-14)
                 else
-                    # Measured maxscaled 4.5e-13 on the Normal full shape, whose Cholesky
-                    # factor reads a matrix of rank N(N + 1) / 2 after its repair, and 3.7e-15
-                    # on the bootstrap.
+                    # Measured maxscaled 4.5e-13 on the Normal full shape, whose square root
+                    # reads a matrix of rank N(N + 1) / 2 before its repair, and 3.7e-15 on
+                    # the bootstrap.
                     @test parity_compare(s.L * transpose(s.L),
                                          load("NormBallUncertaintySet", kind,
                                               "Cov$(dn)LLt"); scale = :array,

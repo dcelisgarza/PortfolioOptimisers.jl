@@ -715,3 +715,4 @@ function norm_ball_deviation_set(alg::NormBallUncertaintySetAlgorithm, q::Number
 end
 
 export NormBallUncertaintySet
+public k_norm_ball

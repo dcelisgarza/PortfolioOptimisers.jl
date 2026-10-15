@@ -168,7 +168,7 @@ All concrete subtypes should subtype `AbstractUncertaintyKAlgorithm`. A plain nu
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintyKAlgorithm` and implement the following method:
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractUncertaintyKAlgorithm` and implement the following methods. An ellipsoid reads `k_ucs`, and a norm ball reads `k_norm_ball`.
 
 ## `k_ucs`
 
@@ -186,12 +186,27 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `k::Number`: Radius of the ellipsoid.
 
+## `k_norm_ball`
+
+  - `k_norm_ball(km::AbstractUncertaintyKAlgorithm, q::Number, X, L::MatNum, df::Integer) -> Number`: Returns the radius of a norm ball.
+
+### Arguments
+
+  - `km`, `q`, `X`: As for `k_ucs`.
+  - `L`: Geometry map of the ball, in place of the shape. The shape is `L * L'`.
+  - `df`: Dimension of the ball. The caller reads [`ucs_dimension`](@ref) for a map factorised from a shape, and `LinearAlgebra.rank(L)` for a map of deviations. An algorithm that reads no dimension absorbs it.
+
+### Returns
+
+  - `k::Number`: Radius of the ball.
+
 # Related
 
   - [`NormalKUncertaintyAlgorithm`](@ref)
   - [`GeneralKUncertaintyAlgorithm`](@ref)
   - [`ChiSqKUncertaintyAlgorithm`](@ref)
   - [`k_ucs`](@ref)
+  - [`k_norm_ball`](@ref)
 """
 abstract type AbstractUncertaintyKAlgorithm <: AbstractAlgorithm end
 """

@@ -99,4 +99,8 @@ only half a refit. A caller who wants the refit fits the estimator on the viewed
   than before, and exactly what the full set charges it.
 - `test/test_10d_parity_uncertainty_sets.jl` pins the refit route against the oracle's refit, and
   pins the view against the principal block.
+- `test/test_10_uncertainty_set.jl` pins the stack of the view: its orthonormal columns, the
+  principal block, a view of a view, the dropped rows that are zero, the basis of rank `0`, and
+  the residual `R z` of the JuMP model. `test/test_10b_orthogonal_uncertainty_sets.jl` pins the
+  view at the Investable Mask, which adds no row to `R`.
 - ADR 0111 and ADR 0127 carry an amendment that points here.

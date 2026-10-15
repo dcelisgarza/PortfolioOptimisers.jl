@@ -1591,7 +1591,7 @@ Where:
   - [`cross_sectional_idiosyncratic_covariance`](@ref)
 """
 function cross_sectional_residual_block(esigma::VecNum, idx::AbstractVector{<:Integer},
-                                        ::Option{<:AbstractMatrixSquareRootAlgorithm} = nothing)
+                                        ::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     d = esigma[idx]
     return (; D = LinearAlgebra.diagm(d), R = LinearAlgebra.diagm(sqrt.(d)))
 end

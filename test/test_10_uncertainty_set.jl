@@ -1363,6 +1363,13 @@ end
             @test isnothing(ucsc.val)
             @test isa(CompactCovarianceUncertaintySet(2.0, Cc, Qc),
                       CompactCovarianceUncertaintySet)
+            # The four positional arguments of a released version keep their meaning: the
+            # fourth is `val`, and the set has no row in `R` (ADR 0189).
+            Vc = Matrix(1.0 * LinearAlgebra.I(length(Cc)))
+            ucs4 = CompactCovarianceUncertaintySet(2.0, Cc, Qc, Vc)
+            @test ucs4.val == Vc
+            @test size(ucs4.R) == (0, size(Qc, 2))
+            @test isnothing(CompactCovarianceUncertaintySet(2.0, Cc, Qc, nothing).val)
             @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = -1.0, C = Cc,
                                                                      Q = Qc)
             @test_throws DomainError CompactCovarianceUncertaintySet(; kappa = Inf, C = Cc,
