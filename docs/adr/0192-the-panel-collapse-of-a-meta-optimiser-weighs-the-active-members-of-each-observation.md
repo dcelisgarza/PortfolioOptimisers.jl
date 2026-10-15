@@ -64,15 +64,16 @@ matches the outer returns for an additive feature, such as a loading.
 
 **The cross-validated path collapses the rates again.** Each fold collapses `iv` and `ivpa` in
 `reconstruct_rd` with its own weights through `collapse_fold_rate`, which reads the active mask of
-the panel and the finite cells of `iv` (#1672) under `RenormaliseActive()`. On a time-varying
-panel, `rebuild_fold_rates` collapses the original `rd.iv` and `rd.ivpa` again for each fold,
-under the rule, with the weights and the active rows of that fold, as `rebuild_asset_panel` does
-for the panel. So on a time-varying panel `cv` changes execution only, and the rates follow the
-rule on both paths. The resolution of issue #1451 named the fold-less path, and this build
-carried the rule to the cross-validated one, as the same resolution requires of the masks. With
-no panel or a static one, `rebuild_fold_rates` keeps the rates of the folds, so the rates read
-`RenormaliseActive()` whatever `pcol` states. The two rules then differ where `iv` holds a cell
-that is not finite, and issue #1733 holds that limit.
+the panel and the finite cells of `iv` (#1672) under `RenormaliseActive()`. `rebuild_fold_rates`
+collapses the original `rd.iv` and `rd.ivpa` again for each fold, under the rule, with the
+weights and the active rows of that fold, as `rebuild_asset_panel` does for the panel. It does
+this with no panel, a static one and a time-varying one, because the two rules differ wherever
+`iv` holds a cell that is not finite, with or without a panel (#1733). The rows of a fold are the
+`idx` that its `PredictionResult` records, so the collapse needs no timestamps. Under the default
+with no active mask, the rates of the folds already follow the rule, so `rebuild_fold_rates` keeps
+them and their bits. So `cv` changes execution only, and the rates follow the rule on both paths. The resolution of issue #1451 named
+the fold-less path, and this build carried the rule to the cross-validated one, as the same
+resolution requires of the masks.
 
 **A panel with no inactive member keeps its old result bit for bit.** The divisor of a
 sub-portfolio whose weighted members are all active is exactly one, not a sum that rounds to
@@ -86,7 +87,7 @@ of `prepare_outer_rd` on the census panel, which has inactive members.
 
 - `prepare_outer_rd`, `collapse_asset_panel`, `fold_asset_panel`, `rebuild_asset_panel` and
   `rebuild_returns_result` take the rule as a positional argument with no default, so no path
-  reads a different rule from the meta-optimiser's, except the rates of a fold with no panel or a
-  static one (#1733). The fold-less `predict_outer_returns` reads `opt.pcol`.
+  reads a different rule from the meta-optimiser's. The fold-less `predict_outer_returns` reads
+  `opt.pcol`.
 - A time-varying `ivpa` is outside this decision, in issue #1455.
 - `NestedClustered` and `Stacking` print one more field.

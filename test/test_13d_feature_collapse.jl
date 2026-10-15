@@ -809,6 +809,60 @@ end
         end
     end
 
+    @testset "The cross-validated rates follow the rule with no panel or a static one" begin
+        #=
+        A fold collapses `iv` under `RenormaliseActive()`, whatever the rule, so with no
+        panel, or a static one, the rates of the outer problem read the rule only because
+        `rebuild_fold_rates` collapses them again on the rows that each fold records in
+        `idx` (#1733). Asset 2 has no implied volatility on rows 5 to 20, so the two rules
+        differ there.
+        =#
+        ivn = 0.1 .+ 0.2 .* rand(StableRNG(9), T, N)
+        ivn[5:20, 2] .= NaN
+        cls = [[1, 2], collect(3:N)]
+        u = PO.ClusterUniverse(cls)
+        for pnl in (nothing, rectpanel(nf, Zr))
+            rdn = ReturnsResult(; nx = nx, X = X, iv = ivn, ivpa = collect(1.0:N),
+                                pnl = pnl)
+            preds = [PO.cross_val_predict(InverseVolatility(), rdn, KFold(; n = 4);
+                                          cols = cl, ex = seq) for cl in cls]
+            rows = [p.idx for p in preds[1].pred]
+            ros = map((RenormaliseActive(), InactiveAsCash())) do alg
+                ro = PO.rebuild_returns_result(rdn, preds, u, alg)
+                r = 0
+                for (f, rw) in enumerate(rows)
+                    W = PO.fold_weight_matrix(preds, u, f, N)
+                    _, _, iv_e, ivpa_e, _, _ = PO.prepare_outer_rd(PO.port_opt_view(rdn, rw,
+                                                                                    :), W,
+                                                                   alg)
+                    @test ro.iv[(r + 1):(r + length(rw)), :] ≈ iv_e
+                    if f == length(rows)
+                        @test ro.ivpa ≈ ivpa_e
+                    end
+                    r += length(rw)
+                end
+                return ro
+            end
+            @test ros[1].iv[5:20, 1] != ros[2].iv[5:20, 1]
+            @test ros[1].iv[21:end, :] ≈ ros[2].iv[21:end, :]
+        end
+        # A fold that records no rows cannot collapse again, and says so.
+        rdn = ReturnsResult(; nx = nx, X = X, iv = ivn)
+        preds = [PO.cross_val_predict(InverseVolatility(), rdn, KFold(; n = 4); cols = cl,
+                                      ex = seq) for cl in cls]
+        bare = [MultiPeriodPredictionResult(;
+                                            pred = [PredictionResult(; res = p.res,
+                                                                     rd = p.rd, hw = p.hw)
+                                                    for p in pr.pred]) for pr in preds]
+        err = try
+            PO.rebuild_returns_result(rdn, bare, u, InactiveAsCash())
+        catch e
+            e
+        end
+        @test err isa PO.IsNothingError
+        @test occursin("idx => nothing", sprint(showerror, err))
+    end
+
     @testset "The transport carrier is gone" begin
         #=
         `PredictionReturnsResult` used to be the fourth carrier of a feature matrix, and

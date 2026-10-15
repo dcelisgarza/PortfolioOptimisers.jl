@@ -607,7 +607,7 @@ end
 
 Find the rows of the original returns data that each cross-validation fold covers.
 
-The folds do not store their row indices. [`port_opt_view`](@ref) slices `ts` with the `test_idx` of the fold, so the `rd.ts` of a fold is its slice of the original clock, and [`feature_row_indices`](@ref) finds the rows from it. This works on the combinatorial path too, where [`sort_predictions`](@ref) puts the folds of a path in split order and not in time order. The timestamps carry the order that the folds have.
+A fold records its rows in the `idx` of its [`PredictionResult`](@ref), and [`rebuild_fold_rates`](@ref) reads them there. This method finds them from the timestamps. [`port_opt_view`](@ref) slices `ts` with the `test_idx` of the fold, so the `rd.ts` of a fold is its slice of the original clock, and [`feature_row_indices`](@ref) finds the rows from it. This works on the combinatorial path too, where [`sort_predictions`](@ref) puts the folds of a path in split order and not in time order. The timestamps carry the order that the folds have.
 
 Only a time-varying Asset Panel needs the rows. A static panel has no observation axis, so only the time-varying shape needs the clock.
 
@@ -884,13 +884,13 @@ end
 
 Compute the implied volatilities of the outer problem on the cross-validated path, under the rule of the panel collapse.
 
-Each fold collapses `rd.iv` and `rd.ivpa` with the weights of its sub-portfolio through [`collapse_fold_rate`](@ref), which reads the active mask and the finite cells under [`RenormaliseActive`](@ref), whatever the rule. On a time-varying Asset Panel, the fold-less path weighs the active members of each row under the rule (see [`prepare_outer_rd`](@ref)). So this method collapses the original `rd.iv` and `rd.ivpa` again for each fold, with [`collapse_rate`](@ref) on the weights of that fold and the active mask of its rows, as [`rebuild_asset_panel`](@ref) does for the panel. With no panel, or a static one, the method returns the stacked values of the predictions. Under the default rule they are the collapse of the rule. Under [`InactiveAsCash`](@ref) they differ from it where `iv` holds a cell that is not finite (#1733).
+Each fold collapses `rd.iv` and `rd.ivpa` with the weights of its sub-portfolio through [`collapse_fold_rate`](@ref), which reads the active mask and the finite cells under [`RenormaliseActive`](@ref), whatever the rule. The fold-less path weighs the members that it reads under the rule (see [`prepare_outer_rd`](@ref)). So this method collapses the original `rd.iv` and `rd.ivpa` again for each fold, with [`collapse_rate`](@ref) on the weights of that fold, as [`rebuild_asset_panel`](@ref) does for the panel. It does this with no panel, a static one and a time-varying one: under [`InactiveAsCash`](@ref) the two rules differ wherever `iv` holds a cell that is not finite (#1733). The rows of a fold are the `idx` that its [`PredictionResult`](@ref) records, so the method needs no timestamps. Under [`RenormaliseActive`](@ref) with no active mask, the values of the predictions are already the collapse of the rule, and the method keeps them bit for bit.
 
 # Algorithm
 
- 1. Return `iv` and `ivpa` when `rd` carries no panel, a static one, or neither `rd.iv` nor a vector `rd.ivpa`.
- 2. Find the rows of each fold with [`fold_row_indices`](@ref).
- 3. For each fold, normalise its weight matrix from [`fold_weight_matrix`](@ref) with [`synthetic_asset_weights`](@ref), and collapse the rows of `rd.iv` and the vector `rd.ivpa` with [`collapse_rate`](@ref), on the active mask of the rows of the fold.
+ 1. Read the active mask of `rd.pnl` with [`panel_moment_masks`](@ref), giving `am`. It is `nothing` with no panel or a static one.
+ 2. Return `iv` and `ivpa` when `rd` carries neither `rd.iv` nor a vector `rd.ivpa`, or when `alg` is [`RenormaliseActive`](@ref) and `am` is `nothing`.
+ 3. For each fold, normalise its weight matrix from [`fold_weight_matrix`](@ref) with [`synthetic_asset_weights`](@ref), and collapse the rows `idx` of `rd.iv` and the vector `rd.ivpa` with [`collapse_rate`](@ref), on the rows `idx` of the active mask.
  4. Stack the collapsed `iv` of the folds in fold order, and take `ivpa` from the last fold, as each prediction keeps the adjustment of its last fold.
 
 # Arguments
@@ -902,6 +902,10 @@ Each fold collapses `rd.iv` and `rd.ivpa` with the weights of its sub-portfolio 
   - `alg`: The rule of the panel collapse, the `pcol` field of the meta-optimiser.
   - `iv`: The stacked implied volatilities of the predictions, `observations × sub-portfolios`, or `nothing`.
   - `ivpa`: The adjustments of the predictions, one for each sub-portfolio, or `nothing`.
+
+# Validation
+
+  - Every fold of `pred1` records its rows in `idx`, else `IsNothingError`.
 
 # Returns
 
@@ -917,19 +921,23 @@ Each fold collapses `rd.iv` and `rd.ivpa` with the weights of its sub-portfolio 
 function rebuild_fold_rates(rd::ReturnsResult, predictions::VecMPredRes,
                             u::SubPortfolioUniverse, pred1::VecPredRes,
                             alg::AbstractPanelCollapseAlgorithm, iv, ivpa)
-    pnl = rd.pnl
-    if isnothing(pnl) ||
-       panel_is_static(pnl) ||
-       (isnothing(rd.iv) && !isa(rd.ivpa, AbstractVector))
+    # A static panel has no active mask, so it collapses as no panel does.
+    am = first(panel_moment_masks(rd.pnl))
+    #! A fold collapses under `RenormaliseActive()`, so with no active mask its rates already
+    #! follow that rule, and they keep their bits.
+    if (isnothing(rd.iv) && !isa(rd.ivpa, AbstractVector)) ||
+       (isa(alg, RenormaliseActive) && isnothing(am))
         return iv, ivpa
     end
+    @argcheck(all(p -> !isnothing(p.idx), pred1),
+              IsNothingError("the implied volatilities of a meta-optimiser collapse again for each cross-validation fold, so every fold must record the rows it covers in `idx`. Got idx => nothing. Build the predictions with `cross_val_predict`, which records them."))
     na = size(rd.X, 2)
-    rows = fold_row_indices(rd, pred1)
-    rates = map(eachindex(rows)) do f
+    rates = map(eachindex(pred1)) do f
+        rows = pred1[f].idx
         W = synthetic_asset_weights(fold_weight_matrix(predictions, u, f, na))
-        m = view(pnl.amsk, rows[f], :)
-        return (collapse_rate(isnothing(rd.iv) ? nothing : view(rd.iv, rows[f], :), W, m,
-                              alg), collapse_rate(rd.ivpa, W, m, alg))
+        m = isnothing(am) ? nothing : view(am, rows, :)
+        return (collapse_rate(isnothing(rd.iv) ? nothing : view(rd.iv, rows, :), W, m, alg),
+                collapse_rate(rd.ivpa, W, m, alg))
     end
     iv = isnothing(rd.iv) ? iv : reduce(vcat, first.(rates))
     ivpa = isa(rd.ivpa, AbstractVector) ? last(rates[end]) : ivpa
@@ -955,7 +963,7 @@ The folds carry no Asset Panel. The method collapses the original `rd.pnl` again
  5. Check that the folds cover `size(X, 1)` observations, `nobs`.
  6. Build the Asset Panel with [`rebuild_asset_panel`](@ref) under `alg`, giving `pnl`.
  7. Reshape `B` and `iv` to `observations × sub-portfolios`, and name the benchmark columns `_b1`, `_b2`, ….
- 8. On a time-varying panel, collapse `iv` and `ivpa` again under `alg` with [`rebuild_fold_rates`](@ref).
+ 8. Collapse `iv` and `ivpa` again under `alg` with [`rebuild_fold_rates`](@ref).
  9. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of the first prediction.
 
 The method reads `predictions` and does not change them, so two calls on one vector give the same result.
@@ -971,6 +979,7 @@ The method reads `predictions` and does not change them, so two calls on one vec
 
   - The checks of [`assert_fold_alignment`](@ref).
   - The folds of the first sub-portfolio cover as many observations as the stacked returns have rows, else `DimensionMismatch`.
+  - The checks of [`rebuild_fold_rates`](@ref).
 
 # Returns
 

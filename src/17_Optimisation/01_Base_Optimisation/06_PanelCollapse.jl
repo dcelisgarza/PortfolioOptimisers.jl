@@ -974,7 +974,7 @@ end
 
 Collapse an implied volatility quantity of one fold onto its portfolio, as [`collapse_rate`](@ref) collapses it onto a sub-portfolio of a meta-optimiser.
 
-A fold of a cross-validation forms one portfolio, so it collapses `iv` and a vector `ivpa` against one weight vector. It reads the active mask of `pnl` and the rule [`RenormaliseActive`](@ref), the default of a meta-optimiser, so the two collapses agree. `iv` gives one rate per observation, and `ivpa` gives one rate.
+A fold of a cross-validation forms one portfolio, so it collapses `iv` and a vector `ivpa` against one weight vector. It reads the active mask of `pnl` and the rule [`RenormaliseActive`](@ref), the default of a meta-optimiser, so the two collapses agree under the default. A fold of a meta-optimiser does not know its rule, so [`rebuild_fold_rates`](@ref) collapses its rates again under the rule. `iv` gives one rate per observation, and `ivpa` gives one rate.
 
 # Arguments
 
@@ -990,6 +990,7 @@ A fold of a cross-validation forms one portfolio, so it collapses `iv` and a vec
 
   - [`collapse_rate`](@ref)
   - [`reconstruct_rd`](@ref)
+  - [`rebuild_fold_rates`](@ref)
 """
 function collapse_fold_rate(a::MatNum, w::VecNum, pnl::Option{<:AssetPanel})
     return vec(collapse_rate(a, reshape(w, :, 1), first(panel_moment_masks(pnl)),
