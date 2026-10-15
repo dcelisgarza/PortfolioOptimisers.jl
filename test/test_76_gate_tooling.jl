@@ -13,7 +13,9 @@ Each session wrote its own driver for one test file, and one of those drivers le
     foreign rows as the baseline has them.
   - `code_health/gate_stamp.sh` records the merge-base a gate measured, and its `check` is the
     pre-push guard of `.pre-commit-config.yaml`.
-  - `test/run_files.jl` runs named test files after the preamble and counts each one.
+  - `test/run_files.jl` runs named test files after the preamble and counts each one. It prunes
+    a file to the test sets `--testset` selects, times the sets, bounds a file with a watchdog,
+    and names a red that `test/known_red.toml` lists.
   - `code_health/sweep_check.jl` names `code_health/census_preview.jl` when a branch adds a
     declaration that the two package-level censuses read. The test checks which diff lines name one.
   - `docs/doctest_files.jl` runs the doctests of the docstrings that named source files hold. The
@@ -299,6 +301,200 @@ end
               "        - function f(x)\n        3     y = x\n        0     z = 1\n" *
               "        - end\n")
         @test RF.coverage_lines(cov) == (2, [3])
+    end
+
+    @testset "run_files --testset prunes to the selected sets, --time-depth times them" begin
+        RF = DriverSeam.RunFiles
+        code = RF.init_code()
+        dir = mktempdir()
+        # An unselected body that ran would error, so a count of zero errors proves the pruning.
+        write(joinpath(dir, "helper.jl"), """
+              const FROM_HELPER = 3
+              @testset "helper set" begin
+                  error("an unselected set of an included file ran")
+              end
+              """)
+        path = joinpath(dir, "test_fixture.jl")
+        write(path, """
+              include(joinpath(@__DIR__, "helper.jl"))
+              const SETUP = 1
+              @test error("a top-level assertion ran")
+              @testset "outer" begin
+                  x = SETUP + 1
+                  @test error("an assertion on the path ran")
+                  @testset "skip me" begin
+                      error("an unselected body ran")
+                  end
+                  for k in 1:2
+                      y = k
+                      @testset "pick \$(k)" begin
+                          @test y == k
+                          @testset "inner" begin
+                              @test x == 2
+                              @test FROM_HELPER == 3
+                          end
+                      end
+                      @testset "other" begin
+                          error("an unselected body ran")
+                      end
+                  end
+                  if true
+                      @testset "pick in an if" begin
+                          @test true
+                      end
+                  else
+                      @testset "never" begin
+                          error("an unselected body ran")
+                      end
+                  end
+                  foreach(1:1) do _
+                      @testset "pick in a do block" begin
+                          @test true
+                      end
+                      @testset "skip in a do block" begin
+                          error("an unselected body ran")
+                      end
+                  end
+              end
+              @testset "not on the path" begin
+                  error("an unselected body ran")
+              end
+              """)
+        sel = RF.Select(r"^pick")
+        buf = IOBuffer()
+        RF.OUT[] = buf
+        ts, _ = redirect_stdout(devnull) do
+            return RF.run_file(path; code, select = sel, time_depth = 2)
+        end
+        RF.OUT[] = stdout
+        @test (ts.pass, ts.fail, ts.error, ts.broken) == (8, 0, 0, 0)
+        @test sel.matched[] == 3
+        @test ts.ran ==
+              ["outer > pick 1 > inner", "outer > pick 1", "outer > pick 2 > inner",
+               "outer > pick 2", "outer > pick in an if", "outer > pick in a do block",
+               "outer"]
+        # Depth 2 and above are timed, depth 3 is not, and each line ends with its seconds.
+        times = filter(startswith("TIME "), split(String(take!(buf)), '\n'))
+        @test length(times) == 5
+        @test all(l -> startswith(l, "TIME test_fixture.jl outer"), times)
+        @test all(l -> tryparse(Float64, last(split(l))) !== nothing, times)
+        @test RF.result_line(ts, 1.0; selected = 3) ==
+              "RESULT test_fixture.jl pass=8 fail=0 error=0 broken=0 seconds=1.0 selected=3"
+
+        # A regex that selects nothing makes the file red: a run that tested nothing proves
+        # nothing.
+        RF.OUT[] = devnull
+        ts, _ = redirect_stdout(devnull) do
+            return RF.run_file(path; code, select = RF.Select(r"no such set"))
+        end
+        RF.OUT[] = stdout
+        @test (ts.pass, ts.error) == (0, 1)
+
+        @test RF.testset_label(Meta.parse("@testset \"a \$(b) c\" for b in 1:2 end")) ==
+              "a \$(b) c"
+        @test RF.testset_label(Meta.parse("@testset begin end")) == "test set"
+        @test RF.is_testset(Meta.parse("Test.@testset \"a\" begin end"))
+    end
+
+    @testset "run_files reads test/known_red.toml and names a known red" begin
+        RF = DriverSeam.RunFiles
+        # Every row of the real file names a test file that exists.
+        for r in RF.known_red()
+            @test isfile(joinpath(RF.TEST_DIR, r.file))
+            @test r.issue > 0 && !isempty(r.reason)
+        end
+        bad = joinpath(mktempdir(), "known_red.toml")
+        write(bad,
+              "[[red]]\nfile = \"test_x.jl\"\nissue = 1\nreason = \"r\"\ntestest = \"typo\"\n")
+        @test_throws ErrorException RF.known_red(bad)
+        write(bad, "[[red]]\nfile = \"test_x.jl\"\nissue = 1\n")
+        @test_throws ErrorException RF.known_red(bad)
+        @test RF.known_red(joinpath(mktempdir(), "absent.toml")) == RF.KnownRed[]
+
+        function fixture_set(; failed, ran)
+            ts = RF.Collect("test_x.jl"; top = true)
+            ts.failed, ts.ran = failed, ran
+            ts.fail = length(failed)
+            return ts
+        end
+        rows = [RF.KnownRed("test_x.jl", "slow solve", 7, "a tolerance", "Linux"),
+                RF.KnownRed("test_y.jl", nothing, 8, "other file", nothing)]
+        ran = ["a > slow solve", "a > fast", "a"]
+        # A red inside the row's test set is named, with the host note.
+        note, stale = RF.known_red_notes(fixture_set(; failed = ["a > slow solve"], ran),
+                                         rows)
+        @test note == "known red, #7: a tolerance (Linux)"
+        @test isempty(stale)
+        # A red outside every row is named after the rows.
+        note, stale = RF.known_red_notes(fixture_set(;
+                                                     failed = ["a > slow solve",
+                                                               "a > fast"], ran), rows)
+        @test note ==
+              "known red, #7: a tolerance (Linux); red outside known_red.toml: a > fast"
+        # A red that no row covers has no note, so it reads as the session's own.
+        note, stale = RF.known_red_notes(fixture_set(; failed = ["a > fast"], ran), rows)
+        @test note == ""
+        @test length(stale) == 1 && startswith(only(stale), "STALE test/known_red.toml")
+        # A row whose test set passed is stale. Under --testset, a row whose set did not run is
+        # not judged, nor is a row of a whole file.
+        note, stale = RF.known_red_notes(fixture_set(; failed = String[], ran), rows)
+        @test note == "" && length(stale) == 1
+        @test occursin("#7", only(stale)) && occursin("Linux", only(stale))
+        note, stale = RF.known_red_notes(fixture_set(; failed = String[],
+                                                     ran = ["a > fast"]), rows;
+                                         filtered = true)
+        @test note == "" && isempty(stale)
+        whole = [RF.KnownRed("test_x.jl", nothing, 9, "all of it", nothing)]
+        note, stale = RF.known_red_notes(fixture_set(; failed = [""], ran = String[]),
+                                         whole)
+        @test note == "known red, #9: all of it"
+        note, stale = RF.known_red_notes(fixture_set(; failed = String[], ran = String[]),
+                                         whole; filtered = true)
+        @test isempty(stale)
+        @test length(last(RF.known_red_notes(fixture_set(; failed = String[],
+                                                         ran = String[]), whole))) == 1
+    end
+
+    @testset "run_files parses its options and its watchdog kills on time" begin
+        RF = DriverSeam.RunFiles
+        o = RF.parse_args(["--testset=^a b\$", "--time-depth=2", "--timeout=30",
+                           "--done=/x", "test_x.jl"])
+        @test o.testset == r"^a b$" && o.time_depth == 2 && o.timeout == 30.0
+        @test o.done == "/x" && o.names == ["test_x.jl"]
+        o = RF.parse_args(["test_x.jl"])
+        @test o.testset === nothing && o.time_depth == 0 && o.timeout === nothing
+        @test_throws ErrorException RF.parse_args(["--time-depth=-1", "test_x.jl"])
+        @test_throws ErrorException RF.parse_args(["--timeout=0", "test_x.jl"])
+        @test_throws ErrorException RF.parse_args(["--timeout=soon", "test_x.jl"])
+        @test_throws ErrorException RF.parse_args(["--bogus", "test_x.jl"])
+        @test_throws ErrorException RF.parse_args(["--testset=a"])
+        # `--timeout` kills the process that runs the driver, so a REPL may not pass it.
+        @test_throws ErrorException RF.main(["--timeout=5", "test_x.jl"])
+
+        # The watchdog kills a stand-in for the driver and writes the verdict after the lines
+        # of the files that finished.
+        dir = mktempdir()
+        done = joinpath(dir, "done.txt")
+        target = run(`sleep 60`; wait = false)
+        dog = RF.start_watchdog(0.5, "test_x.jl", ["RESULT test_a.jl pass=1"], done;
+                                pid = getpid(target), out = devnull)
+        wait(target)
+        wait(dog)
+        @test target.termsignal == 9
+        @test readlines(done) ==
+              ["RESULT test_a.jl pass=1", "RESULT test_x.jl timeout seconds=0.5",
+               "DONE files=2 status=timeout"]
+        @test !isfile(done * ".partial")
+        # A file that ends in time stops its watchdog, and nothing is killed or written.
+        rm(done)
+        target = run(`sleep 60`; wait = false)
+        dog = RF.start_watchdog(30, "test_x.jl", String[], done; pid = getpid(target),
+                                out = devnull)
+        RF.stop_watchdog(dog, done)
+        @test process_running(target)
+        @test !isfile(done) && !isfile(done * ".partial")
+        kill(target)
+        wait(target)
     end
 
     @testset "doctest_files selects the docstrings of the named files" begin

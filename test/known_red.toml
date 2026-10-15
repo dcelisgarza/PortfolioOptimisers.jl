@@ -1,0 +1,31 @@
+# The test files, or test sets, that are red on `dev` for a reason an OPEN issue records.
+#
+# `test/run_files.jl` reads this file. When a listed file is red, its `RESULT` line ends with
+# `known red, #<issue>: <reason>`, so a session sees at once that the red is not its own, and does
+# not spend a cold run to prove it. A failure that no row covers is still named, after the rows.
+# The verdict does not change: a known red is still red.
+#
+# When a row's file or test set runs and passes, the driver prints a `STALE` line. Delete the row
+# in the commit that fixes its issue, and delete a row whose issue is closed.
+#
+# One `[[red]]` table per row:
+#
+#   file    = "test_X.jl"        the file, as `run_files.jl` names it (required)
+#   testset = "name"             a substring of the path of the red test set, whose names
+#                                `run_files.jl` joins with " > " (optional: the whole file)
+#   issue   = 1234               the open issue that records the red (required)
+#   reason  = "..."              one clause: what is red, and why (required)
+#   host    = "..."              where it is red, when that is not every host (optional)
+
+[[red]]
+file = "test_04_owa.jl"
+testset = "OWA l-moments"
+issue = 1709
+reason = "iteration 11 misses its rtol = 5e-8, a tolerance too tight for the host"
+host = "red on a Linux host; macOS has its own wider rtol"
+
+[[red]]
+file = "test_71_process_citation_census.jl"
+testset = "src and ext docstrings"
+issue = 1723
+reason = "fifteen docstrings of the brt migration cite an ADR by number"

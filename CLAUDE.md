@@ -61,6 +61,8 @@ before you merge so you lower the number that is current.
   `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl …`, as a background Bash
   command. It runs each file after the `init_code` preamble of `test/runtests.jl`,
   prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
+  Narrow it with `--testset=<regex>`, `--time-depth=<N>`, `--timeout=<seconds>`; a red listed in
+  `test/known_red.toml` is named on its `RESULT` line (the header of `test/run_files.jl` explains).
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 
