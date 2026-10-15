@@ -317,6 +317,8 @@ Hold the **variance** of the named assets at the prior value.
 
 The rows go in under the `:feq` key, which the optimiser relaxes with a penalised slack rather than enforcing exactly. A fixing row is a wish, not a view: it competes with the views that were asked for, and it yields where the two cannot both hold.
 
+The left side is the uncorrected moment of the scenarios, and the right side reads the diagonal of `pr.sigma`. The two agree only when the covariance estimator of the prior is uncorrected. Under a corrected estimator, the row holds the variance at the corrected value, which is larger by the correction factor.
+
 # Mathematical definition
 
 The posterior second central moment of every named asset, taken about the prior mean, is held at the prior variance of its scenarios:

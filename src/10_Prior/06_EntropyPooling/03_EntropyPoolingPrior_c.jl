@@ -85,6 +85,17 @@ The comparison operators accepted in each view's constraint strings depend on th
   - `var_views` (Value at Risk) accepts only `==` and `>=`.
   - `cvar_views`, `evar_views` and `rlvar_views` accept `==`, `>=` and `<=`.
 
+# The variance a moment view reads
+
+A skewness, kurtosis or correlation view divides by the variance of an asset, and a staged algorithm holds that variance at its value from the stage before. Both read the variance from the prior that `pe` fits: the diagonal of its `sigma`, less the residual variance of a factor model. The covariance estimator of `pe` therefore decides which variance the rows hold.
+
+The rows state the uncorrected moment of the scenarios, ``\\sum_{t} p_{t} (x_{t,\\,i} - \\mu_{i})^{2}``. The default covariance estimator is corrected. So, under [`H1_EntropyPooling`](@ref) or [`H2_EntropyPooling`](@ref), a skewness or kurtosis view moves the variance of the scenarios up by the correction factor of the stage before. The view also standardises by the corrected variance. To hold and standardise by the uncorrected variance of the scenarios, give `pe` an uncorrected covariance estimator:
+
+    ce = GeneralCovariance(; ce = StatsBase.SimpleCovariance(; corrected = false))
+    pe = EmpiricalPrior(; ce = PortfolioOptimisersCovariance(; ce = Covariance(; ce = ce)))
+
+The posterior `sigma` is then uncorrected too. [`H0_EntropyPooling`](@ref) has no stage before, and it reads the variance of the prior the same way.
+
 # Tail views
 
 A tail view needs auxiliary variables, so it is expressed in the JuMP model rather than reduced to rows that multiply the posterior probabilities. Two consequences follow.
