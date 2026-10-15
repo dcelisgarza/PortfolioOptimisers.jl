@@ -481,9 +481,10 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
 12. Run the master equations with [`vanilla_posteriors`](@ref) over the augmented space, giving the augmented posterior pair. When **neither** half stated a surviving view the stack has nothing to condition on, and [`bl_posteriors`](@ref) hands back the joint prior instead: an empty ``\\mathbf{P}_{aug}`` run through the master equations would add ``\\tau\\boldsymbol{\\Sigma}_{aug}`` and widen the joint covariance on the strength of views that are not there.
 13. Process the augmented posterior covariance in place with [`matrix_processing!`](@ref), under `pe.mp` and the two return matrices side by side.
 14. Truncate the asset half from `1:N`. Nothing is added to it: the intercept and the rate went into the prior mean at step 11, and the update is affine in that mean.
-15. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed. It is not expanded: the reduction never touched the factor axis.
-16. Announce the departures once with [`announce_bl_departures`](@ref).
-17. Build the prior result directly, taking `w`, its diagnostics and `Z` from `a_prior`, and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
+15. Take `n`, the smaller of the row counts of `a_prior.X` and `f_prior.X`. A Scenario Cap in one nested prior keeps the last rows of its own returns alone, and the two blocks of the result describe the same observations, so the result keeps the last `n` rows. Cut the nested prior that carries more rows with [`scenario_tail`](@ref), which refuses a cut of a prior that carries weights and states the count of the moments in `ens`. With no cap, `n` is every observation and nothing is cut. The moments are fitted over every observation, so the cut changes no moment.
+16. Truncate the factor half from `N+1:N+K`, and forward the factor block with [`forward_prior`](@ref), dropping `chol`. The half takes no intercept, because the intercept is the regression's and hence asset-only, no rate, because the stack reached the update carrying the one it needed, and no second processing pass, because a principal submatrix of a processed matrix is already processed. It is not expanded: the reduction never touched the factor axis.
+17. Announce the departures once with [`announce_bl_departures`](@ref).
+18. Build the prior result directly, taking `w`, its diagnostics and `Z` from `a_prior`, the last `n` rows of the reconstruction under `X` and of the oriented `X` under `o_X`, both cut by [`scenario_window`](@ref), and writing every asset-axis block back onto the full universe on the way: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref).
 
 # Related
 
@@ -623,10 +624,17 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # `matrix_processing!` either — `aug_posterior_sigma` was processed as a whole above, and a
     # principal submatrix of the result is already processed.
     f_idx = (N + 1):length(aug_posterior_mu)
+    # A Scenario Cap in either nested prior keeps the last rows of its own returns alone. The
+    # asset and factor blocks describe the same observations, so the result keeps the rows
+    # that both keep, and the nested prior that carries more is cut to them. The moments
+    # above were fitted over every observation, and the cut changes none of them.
+    n = min(size(a_prior.X, 1), size(f_prior.X, 1))
+    a_kept = scenario_tail(a_prior, n, :a_pe)
+    f_kept = scenario_tail(f_prior, n, :f_pe)
     # `chol` is the factor block's only drop: the posterior covariance supersedes the one
     # `f_prior.chol` factorises. The views do not touch the observation axis, so `f_prior`'s own
     # `w` and its diagnostics forward untouched (ADR 0046).
-    fpr = forward_prior(f_prior; mu = aug_posterior_mu[f_idx],
+    fpr = forward_prior(f_kept; mu = aug_posterior_mu[f_idx],
                         sigma = aug_posterior_sigma[f_idx, f_idx], chol = nothing)
     # The feature matrix comes from `a_prior` only: `f_prior` is fit on the factors, so its
     # `Z` would be factors × features and would not describe this asset axis. The augmented
@@ -649,12 +657,13 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     # regression through [`expand_regression`](@ref), so a prior result again lives on the
     # FULL asset axis with a `NaN` in `mu` and on the diagonal of `sigma` for an asset that
     # is not investable, and the next layer derives the same mask this one did. `o_X` is the
-    # caller's own `X` and was never reduced. There is no `chol` here to drop: the augmented
+    # caller's own `X`, cut to the last `n` rows and never reduced. There is no `chol` here to drop: the augmented
     # system produces the asset moments whole and this prior result never held one.
-    return LowOrderPrior(; X = expand_columns(posterior_X, imsk), o_X = X,
+    return LowOrderPrior(; X = expand_columns(scenario_window(n, posterior_X), imsk),
+                         o_X = scenario_window(n, X),
                          mu = expand_moment(posterior_mu, imsk, 1),
-                         sigma = expand_moment(posterior_sigma, imsk), w = a_prior.w,
-                         ens = a_prior.ens, kld = a_prior.kld, ow = a_prior.ow,
+                         sigma = expand_moment(posterior_sigma, imsk), w = a_kept.w,
+                         ens = a_kept.ens, kld = a_kept.kld, ow = a_kept.ow,
                          rr = expand_regression(rr, imsk), fpr = fpr)
 end
 

@@ -150,6 +150,52 @@ function scenario_window(max_scenarios::Integer, X::MatNum)
     return max_scenarios >= t ? X : view(X, (t - max_scenarios + 1):t, :)
 end
 """
+    scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
+
+Cut a nested Prior Result to the last `n` scenarios that it carries.
+
+[`AugmentedBlackLittermanPrior`](@ref) fits two nested priors, one on the asset returns and one on the factor returns. A Scenario Cap in one of them keeps the last rows of its own returns alone. The two blocks of the result describe the same observations, so the result keeps the rows that both nested priors keep, and this function cuts the nested prior that carries more rows. The moments of `pr` are fitted over every observation, so the cut changes no moment.
+
+A Prior Result with `ens = nothing` states `size(pr.X, 1)` as the count of the observations that its moments read. The cut makes `X` shorter, so it writes that count in `ens`, as [`scenario_ens`](@ref) does for the cap itself.
+
+# Algorithm
+
+ 1. Take `t = size(pr.X, 1)`. When `n >= t`, return `pr`.
+ 2. Refuse a `pr` that carries weights, per `# Validation`.
+ 3. Forward `pr` with [`forward_prior`](@ref), with `X` and `o_X` cut by [`scenario_window`](@ref), and with `ens` set to `t` when it is `nothing`.
+
+# Arguments
+
+  - `pr`: The Prior Result of a nested prior.
+  - `n`: The number of scenarios to keep.
+  - `name`: The field of the wrapping prior that holds the nested prior, for the error message.
+
+# Validation
+
+  - When the cut removes a row, `pr.w` is `nothing`. A weight vector states a probability for each row that `pr` carries, so it has no meaning on fewer rows. A `DimensionMismatch` that names `name`, both counts and the fix is thrown otherwise.
+
+# Returns
+
+  - `pr::LowOrderPrior`: `pr` with the last `n` rows of `X`, or `pr` itself.
+
+# Related
+
+  - [`scenario_window`](@ref)
+  - [`scenario_ens`](@ref)
+  - [`AugmentedBlackLittermanPrior`](@ref)
+"""
+function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
+    t = size(pr.X, 1)
+    if n >= t
+        return pr
+    end
+    @argcheck(isnothing(pr.w),
+              DimensionMismatch("`$name` answered $t weighted scenarios, and the other nested prior keeps the last $n. The two blocks of the result describe the same observations, so the result keeps $n rows, and the weights of `$name` have no meaning on fewer rows than they weigh. Put the same Scenario Cap inside `$name`, in the prior that it reweights, so that its weights state the same $n scenarios."))
+    o_X = isnothing(pr.o_X) ? nothing : scenario_window(n, pr.o_X)
+    return forward_prior(pr; X = scenario_window(n, pr.X), o_X = o_X,
+                         ens = something(pr.ens, t))
+end
+"""
     scenario_weights(w::Nothing, t::Integer)
     scenario_weights(w::ObsWeights, t::Integer)
 

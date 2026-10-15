@@ -166,3 +166,22 @@ The rejected rule kept the caller's `pe.w` as `w0` and refitted the nested prior
 `scenario_prior`, which holds its model and drops its views. It removes the disagreement too, but
 it discards the views of the nested prior, and those views are part of its configuration. A
 caller's `w` states the probabilities of the scenarios, not a replacement for the views.
+
+## Amendment (2026-10-15, #1743)
+
+The pool refuses an opinion that answers on a shorter axis than its own, and it held the refit
+`pe2` to no such rule. [#1743](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1743)
+found that a `pe2` that holds a Scenario Cap answers 40 rows under pooled weights over 60, and the
+result raised a bare `DimensionMismatch` from the constructor of `LowOrderPrior`.
+
+**The refit `pe2` answers on the pool's axis too, and a `pe2` that drops rows is refused by
+name.** The pooled weights are over the observations of the pool, so they name no row of a
+shorter result. The message names `pe2`, both counts and the fix that the message for an opinion
+gives: move the estimator that drops rows into `pe1`, where it makes the scenario set for every
+opinion and for `pe2`. The check runs at the fit. A cap at or above the number of observations
+drops no row, so the configuration alone does not decide it, and a row-count verb stays rejected
+for the reason that the Alternatives give.
+
+The rejected reading ran the opinions on the scenarios that `pe2` keeps. It needs a fit of `pe2`
+before the opinions only to learn its row count, which is the cost that this ADR refused for the
+uniform push. And `pe1` already states that composition.

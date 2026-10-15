@@ -2806,6 +2806,61 @@ row of the regression (ADR 0206).
     @test all(isfinite, pe.kt)
 end
 
+@testset "A Scenario Cap in a nested prior cuts the rows of the wrapping prior (#1743)" begin
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    xf = UniverseSets(;
+                      dict = Dict("nx" => ["A$i" for i in 1:N],
+                                  "nf" => ["F$i" for i in 1:K]))
+    gsets = UniverseSets(; xkey = "g", dict = Dict("g" => ["F$i" for i in 1:K]))
+    cap = EmpiricalPrior(; max_scenarios = 40)
+    av = LinearConstraintEstimator(; val = "A1 == 0.001")
+    fv = LinearConstraintEstimator(; val = "F1 == 0.001")
+    fbl(pe) = prior(FactorBlackLittermanPrior(; pe = pe, sets = xf, views = fv), X, F)
+    abl(; kw...) = prior(AugmentedBlackLittermanPrior(; sets = xf, a_views = av,
+                                                      f_views = fv, kw...), X, F)
+    # The result carries the last 40 rows of the uncapped result and of `X`, the moments
+    # stay over every observation, and `ens` states that count.
+    for (c, u) in ((fbl(cap), fbl(EmpiricalPrior())), (abl(; a_pe = cap), abl()),
+                   (abl(; f_pe = cap), abl()), (abl(; a_pe = cap, f_pe = cap), abl()))
+        @test size(c.X, 1) == size(c.fpr.X, 1) == 40
+        @test c.X == u.X[21:end, :]
+        @test c.o_X == X[21:end, :]
+        @test c.mu == u.mu
+        @test c.sigma == u.sigma
+        @test c.fpr.mu == u.fpr.mu
+        @test c.ens == c.fpr.ens == 60
+    end
+    # A nested prior that carries weights cannot be cut to fewer rows than it weighs. The
+    # cap inside it gives weights on the same scenarios.
+    ep(pe) = EntropyPoolingPrior(; pe = pe, sets = gsets,
+                                 mu_views = LinearConstraintEstimator(;
+                                                                      val = "F2 == 0.002"))
+    @test_throws DimensionMismatch abl(; a_pe = cap, f_pe = ep(EmpiricalPrior()))
+    pr = abl(; a_pe = cap, f_pe = ep(cap))
+    @test size(pr.X, 1) == length(pr.fpr.w) == 40
+    # An entropy pooling prior around either one weighs the 40 scenarios.
+    mv = LinearConstraintEstimator(; val = "A2 == 0.002")
+    for pe in (FactorBlackLittermanPrior(; pe = cap, sets = xf, views = fv),
+               AugmentedBlackLittermanPrior(; a_pe = cap, sets = xf, a_views = av, f_views = fv))
+        pr = prior(EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = mv), X, F)
+        @test size(pr.X, 1) == length(pr.w) == 40
+    end
+    # The pool refits `pe2` under weights over its own observations, so a capped `pe2` is
+    # refused by name, and the cap belongs in `pe1`.
+    op = [EntropyPoolingPrior(; sets = sets,
+                              mu_views = LinearConstraintEstimator(; val = "A3 == 0.001"))]
+    pool = OpinionPoolingPrior(; pes = op, pe2 = cap)
+    msg = r"`pe2`, a EmpiricalPrior, answered on 40 observations and the pool has 60"
+    @test_throws msg prior(pool, X)
+    pr = prior(OpinionPoolingPrior(; pes = op, pe1 = cap), X)
+    @test size(pr.X, 1) == length(pr.w) == 40
+end
+
 #=
 `ShrunkFactorPrior` is the falsification witness for the guard in step 9 of
 `prior(::HighOrderFactorPriorEstimator, …)`: a wrapper that declares a residual block and then

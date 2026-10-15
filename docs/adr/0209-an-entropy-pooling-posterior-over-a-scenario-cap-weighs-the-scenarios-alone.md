@@ -83,3 +83,16 @@ removed, so that observation has the probability zero.
   the factor returns of the rows it keeps. The refit gives the posterior weights to `pe` alone,
   through `scenario_weights` on those rows, and holds every other field (ADR 0205). A caller's
   `pe.w` reaches every field through `scenario_weights` on the same rows.
+- Two Black-Litterman priors that wrap a capped prior take the rule of `FactorPrior` since
+  [#1743](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1743). Each failed
+  before with a bare `DimensionMismatch`, or ignored the cap. A cap in a nested prior cuts the
+  rows of the result to the scenarios that it keeps. The moments stay over every observation,
+  and `ens` states that count.
+  - `FactorBlackLittermanPrior` cuts its reconstruction and `o_X` to the rows of its factor
+    prior.
+  - `AugmentedBlackLittermanPrior` keeps the rows that both of its nested priors keep. It cuts
+    the nested prior that carries more rows with `scenario_tail`, which refuses the cut of a
+    prior that carries weights.
+  - So an entropy pooling prior around either one weighs the scenarios of the cap, as the
+    `scenario_factory` of each already assumed. `OpinionPoolingPrior` refuses a `pe2` that
+    holds a cap and points to `pe1` (ADR 0116).

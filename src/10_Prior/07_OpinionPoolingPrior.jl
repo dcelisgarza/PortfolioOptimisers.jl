@@ -516,7 +516,7 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
  1. Orient `X` and `F` by `dims`.
  2. When `pe.pe1` is not `nothing`, replace `X` with the returns of that estimator's prior.
  3. Pool the opinions of `pe.pes` over `X` with [`opinion_pooling_weights`](@ref), giving the consensus weights `w`, the penalised opinion probabilities `ow` and the weights `pw` of each opinion.
- 4. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result.
+ 4. Refit `pe.pe2` under `w` through [`factory`](@ref), giving the moments of the result. Check that the refit answered on the pool's observation axis, per `# Validation`.
  5. Read `ens` as `exp` of the entropy of `w`, and `kld` as the divergence from `w` to each column of `pw`.
 
 # Arguments
@@ -533,6 +533,7 @@ No field of `pe` is modified, so calling `prior` twice on one estimator gives th
 
   - `dims in (1, 2)`.
   - Every opinion answers on the pool's observation axis, which is `pe.pe1`'s result when `pe.pe1` is set and `X` when it is `nothing`. An opinion whose own wrapped estimator drops rows answers on a shorter axis, and its probabilities are then over other scenarios. [`opinion_pooling_weights`](@ref) then raises a `DimensionMismatch` naming the opinion, both counts, and the fix: move the estimator that drops rows into `pe1`.
+  - The refit `pe.pe2` answers on the pool's observation axis too, because the pooled weights are over that axis. A `pe2` that drops rows, such as one that holds a Scenario Cap, answers on a shorter axis. A `DimensionMismatch` naming `pe2`, both counts, and the same fix is then thrown.
 
 # Returns
 
@@ -561,7 +562,14 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole rather than stamped with the
     # pooled weights — see the note at the same step in `03_EntropyPoolingPrior_c.jl`.
-    (; X, o_X, mu, sigma, chol, rr, fpr) = prior(pe2, X, F, pnl; strict = strict, kwargs...)
+    pr2 = prior(pe2, X, F, pnl; strict = strict, kwargs...)
+    # The pooled weights are over the pool's own observation axis, so the refit must answer
+    # on it, as every opinion must. A `pe2` that drops rows, such as one that holds a
+    # Scenario Cap, answers on a shorter axis, and the weights then name no row of its
+    # result. See ADR 0116.
+    @argcheck(size(pr2.X, 1) == length(w),
+              DimensionMismatch("`pe2`, a $(nameof(typeof(pe.pe2))), answered on $(size(pr2.X, 1)) observations and the pool has $(length(w)). The pool refits `pe2` under the pooled weights of its observations, so `pe2` must answer on the pool's axis. Move the estimator that drops rows, such as a Scenario Cap, into `pe1`, where it makes the scenario set for every opinion and for `pe2`."))
+    (; X, o_X, mu, sigma, chol, rr, fpr) = pr2
     ens = exp(StatsBase.entropy(w))
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,

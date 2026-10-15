@@ -389,7 +389,8 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 12. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`. It is not expanded: the reduction never touched the factor axis.
 13. Announce the departures once with [`announce_bl_departures`](@ref), naming them with [`investable_universe_names`](@ref).
 14. Write every asset-axis block back onto the full universe: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref). `chol` is dropped instead of expanded, because a `NaN` frame has no factorisation.
-15. Build the prior result directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
+15. Cut the reconstruction and the oriented `X` to the rows that `f_prior.X` carries, with [`scenario_window`](@ref). A Scenario Cap of `pe.pe` keeps the last rows of `F` alone, and the asset side keeps the same rows, as in [`FactorPrior`](@ref). With no cap, the cut keeps every row. The moments are fitted over every observation, so the cut changes no moment.
+16. Build the prior result directly, taking `w` and its diagnostics from `f_prior`, the reconstruction under `X`, the oriented `X` under `o_X`, and carrying no `Z`. Under a cap, `f_prior.ens` states the count of the observations that the moments read.
 
 # Arguments
 
@@ -522,7 +523,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # asset axis and every one of them goes back: the moment pair through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref), and the
     # regression — its loadings, its intercept and its idiosyncratic block — through
-    # [`expand_regression`](@ref). `o_X` is the caller's own `X` and was never reduced.
+    # [`expand_regression`](@ref). `o_X` is the caller's own `X`, cut to the rows that the
+    # factor prior carries and never reduced.
     #
     # `chol` is the one thing that cannot be expanded and is dropped instead. It factorises
     # `sigma`, and a `NaN` frame has no factorisation, so writing one into a frame would
@@ -532,15 +534,20 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     sigma = expand_moment(sigma, imsk)
     chol = isnothing(imsk) ? chol : nothing
     rr = expand_regression(rr, imsk)
-    posterior_X = expand_columns(posterior_X, imsk)
+    # A Scenario Cap of the factor prior keeps the last rows of `F` alone, so the asset side
+    # keeps the same rows, as in `FactorPrior`: the two blocks describe the same
+    # observations. The moments above were fitted over every observation, and the factor
+    # prior's `ens` states that count.
+    n = size(f_prior.X, 1)
+    posterior_X = expand_columns(scenario_window(n, posterior_X), imsk)
     #
     # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
     # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046).
-    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
-                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
-                         ow = f_prior.ow, rr = rr, fpr = fpr)
+    return LowOrderPrior(; X = posterior_X, o_X = scenario_window(n, X), mu = mu,
+                         sigma = sigma, chol = chol, w = f_prior.w, ens = f_prior.ens,
+                         kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = fpr)
 end
 function factor_residual_config(pe::FactorBlackLittermanPrior)
     return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
