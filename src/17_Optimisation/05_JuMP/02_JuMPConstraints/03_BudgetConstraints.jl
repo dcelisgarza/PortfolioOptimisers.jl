@@ -884,9 +884,9 @@ function set_budget_constraints!(model::JuMP.Model, bgt::BudgetMarketImpact, w::
                           sc * (wn ⊖ un * k) <= 0
                           sc * (w - wb * k - wp + wn) == 0
                           [i = 1:N],
-                          [sc * wip[i], k, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
+                          [sc * wip[i], sc * k, sc * wp[i]] in JuMP.MOI.PowerCone(beta)
                           [i = 1:N],
-                          [sc * win[i], k, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
+                          [sc * win[i], sc * k, sc * wn[i]] in JuMP.MOI.PowerCone(beta)
                       end)
     set_cost_budget_constraints!(model, bgt.vp, bgt.vn, bgt.bgt, w, wip, win)
     return nothing

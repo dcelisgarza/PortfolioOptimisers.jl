@@ -737,6 +737,21 @@ end
         @test isequal(IV, [Inf Inf Inf NaN])
         @test PortfolioOptimisers.cross_sectional_median_cap!(IV, 20.0) == [true]
         @test isequal(IV, [1/3 1/3 1/3 NaN])
+        # One zero variance among 41: the level 0.975 lands on the 40th order statistic, beside
+        # the infinite entry, where `Statistics.quantile` reads `0 * Inf` as `NaN`. The bound is
+        # that order statistic, 40, as on the oracle's finite path, so the zero-variance asset
+        # takes the share of an inverse variance of 40, not the median cap (0.1814 before).
+        row41(x) = reshape([collect(1.0:40.0); x], 1, 41)
+        IV = row41(Inf)
+        W0 = fill(1 / 41, 1, 41)
+        PortfolioOptimisers.cross_sectional_winsorise!(IV, W0, (0.025, 0.975))
+        @test IV[end] == 40.0
+        @test blend(row41(Inf), W0) ≈ blend(row41(1e300), W0) rtol = 1e-15
+        # The lower bound too: the level 0.5 of `[1, 2, Inf]` is the order statistic 2, beside
+        # the infinite entry, so the clamp lifts 1 to 2. A `NaN` bound left it at 1.
+        IV = [1.0 2.0 Inf]
+        PortfolioOptimisers.cross_sectional_winsorise!(IV, ones(1, 3), (0.5, 1.0))
+        @test isequal(IV, [2.0 2.0 Inf])
 
         # The full weight step against the oracle, which refuses an infinity, on the residuals
         # `1e-100` times the shared series. Our answers at zero and at 1e-100 are both its limit.

@@ -961,7 +961,7 @@ LowOrderPrior
                   DimensionMismatch("size(X, 2) ($(size(X, 2))), length(mu) ($(length(mu))), and size(sigma, 1) ($(size(sigma, 1))) must all match"))
         imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
         @argcheck(all(isfinite, view(sigma, imsk, imsk)),
-                  IsNonFiniteError("sigma of investible assets must only contain finite values"))
+                  IsNonFiniteError("sigma of investable assets must only contain finite values"))
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(w, StatsBase.AbstractWeights)
             @argcheck(length(w) == size(X, 1),

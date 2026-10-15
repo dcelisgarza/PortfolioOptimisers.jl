@@ -11,7 +11,8 @@ that correction with two keywords.
 
 - `ddof::Integer` is taken by `L1Norm`, `L2Norm`, `SquaredL2Norm` and `LpNorm`, by `EvenMoment`, and
   by the aliases that build an `EvenMoment`. The tracking error and the tracking risk measure reach
-  it through the `NormError` they hold.
+  it through the `NormError` they hold. `WildBootstrapMeanTest` takes it for the divisor of its
+  long-run variance, and the realised factor attribution takes it for its weight spread.
 - `corrected::Bool` is taken by `SimpleVariance`, `StdValue`, `VarValue` and the
   `StatsBase.SimpleCovariance` inside `GeneralCovariance`.
 
@@ -48,9 +49,11 @@ states an integer and applies a flag, so `ddof = 2` either raises or silently me
 3. One definition never names both. A definition that names `ddof` never calls an upstream spread
    that applies a correction of its own.
 
-A partial fit that reproduces a correction `StatsBase` makes on the batch path subtracts the flag
-itself, as `n - corrected`. It keeps `corrected`, because it reads the field of an estimator whose
-batch path delegates, and one field cannot carry two names.
+Two paths reproduce a correction that `StatsBase` makes on the plain batch path, and subtract the
+flag themselves, as `n - corrected`: a partial fit, and the available-case path of a
+`CoveragePolicy`, whose `coverage_divide` and `coverage_peel` divide each cell by its own count of
+pairs. Both keep `corrected`, because they read the field of an estimator whose plain batch path
+delegates, and one field cannot carry two names.
 
 The defaults do not change. Each is the decision of its site: ADR 0020 fixes the defaults of the
 `NormError` members, and ADR 0087 fixes `corrected = true`.

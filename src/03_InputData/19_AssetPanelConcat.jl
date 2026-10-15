@@ -85,7 +85,7 @@ function Base.vcat(a::AssetPanel{<:Any, Nothing, Nothing}, bs::AssetPanel...)
         assert_panel_concat(a, b, k + 1)
         #! The Feature Matrix holds no placeholder mask, so the masks are compared apart.
         @argcheck(isequal(panel_feature_matrix(a), panel_feature_matrix(b)) &&
-                  isequal([f.pmsk for f in a.pf], [f.pmsk for f in b.pf]),
+                  all(i -> isequal(a.pf[i].pmsk, b.pf[i].pmsk), eachindex(a.pf)),
                   ArgumentError("a static Asset Panel has no observation axis, so it states the same values at each observation, and a concatenation of static panels needs equal parts; part $(k + 1) holds values or placeholder masks that differ from the ones of the first part"))
     end
     return a

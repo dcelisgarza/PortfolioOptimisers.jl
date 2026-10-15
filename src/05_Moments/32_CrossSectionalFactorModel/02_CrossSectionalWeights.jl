@@ -511,7 +511,7 @@ An entry is infinite where its variance is exactly zero. When every entry of the
 # Algorithm
 
  1. For each observation, gather the entries in the estimation universe that are not `NaN`.
- 2. Where the set carries a finite entry, take the quantiles `wins` of that set, and clamp the whole row between them.
+ 2. Where the set carries a finite entry, take the quantiles `wins` of that set, and clamp the whole row between them. A level that lands on an order statistic beside an infinite entry takes that order statistic, which is the limit as those variances go to zero. `Statistics.quantile` gives `NaN` there, and a `NaN` bound clamps nothing.
  3. Where every entry of the set is infinite, write an infinity into every entry of the row that is not `NaN`.
  4. Write an all-`NaN` row where the set is empty, because no bound exists there.
 
@@ -553,14 +553,22 @@ function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
               DimensionMismatch("IV ($(size(IV, 1))×$(size(IV, 2))) must match W0 ($(size(W0, 1))×$(size(W0, 2)))"))
     Tf = eltype(IV)
     u = Tf[]
+    # `Statistics.quantile` takes `(1 - γ) a + γ b` beside an infinite entry, so a level that
+    # lands on an order statistic, `γ = 0` or `γ = 1`, reads `0 * Inf` as `NaN`. The limit as
+    # those variances go to zero is that order statistic, at the position `(n - 1) p + 1`.
+    function bound(p)
+        q = Statistics.quantile(u, p; sorted = true)
+        return ifelse(isnan(q),
+                      u[clamp(trunc(Int, fma(length(u), p, one(p) - p)), 1, length(u))], q)
+    end
     for t in axes(IV, 1)
         row = view(IV, t, :)
         w0 = view(W0, t, :)
         append!(empty!(u),
                 (x for (x, w) in zip(row, w0) if w > zero(eltype(W0)) && !isnan(x)))
         if any(isfinite, u)
-            row .= clamp.(row, Statistics.quantile(u, wins[1]),
-                          Statistics.quantile(u, wins[2]))
+            sort!(u)
+            row .= clamp.(row, bound(wins[1]), bound(wins[2]))
         elseif isempty(u)
             row .= Tf(NaN)
         else

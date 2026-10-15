@@ -2594,6 +2594,36 @@ end
         @test isnothing(PortfolioOptimisers.assert_observation_weights(nothing, :w))
     end
 
+    @testset "Every weighted measure refuses weights of the wrong length" begin
+        # ADR 0202: every numeric site resolves its weights through
+        # `checked_observation_weights`. The testset above samples the kernels; this one reaches
+        # each measure that holds observation weights, one entry too many and one too few.
+        long = pweights(rand(StableRNG(1), 41))
+        short = pweights(rand(StableRNG(1), 39))
+        ctors = (ValueatRisk, ValueatRiskRange, DrawdownatRisk, RelativeDrawdownatRisk,
+                 ConditionalValueatRisk, DistributionallyRobustConditionalValueatRisk,
+                 ConditionalValueatRiskRange,
+                 DistributionallyRobustConditionalValueatRiskRange,
+                 ConditionalDrawdownatRisk, DistributionallyRobustConditionalDrawdownatRisk,
+                 RelativeConditionalDrawdownatRisk, AverageDrawdown,
+                 RelativeAverageDrawdown, UlcerIndex, RelativeUlcerIndex, LowOrderMoment,
+                 HighOrderMoment, Kurtosis, MeanReturn, ThirdCentralMoment, Skewness)
+        slv_ctors = (EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
+                     RelativeEntropicDrawdownatRisk, RelativisticValueatRisk,
+                     RelativisticValueatRiskRange, RelativisticDrawdownatRisk,
+                     RelativeRelativisticDrawdownatRisk, PowerNormValueatRisk,
+                     PowerNormValueatRiskRange, PowerNormDrawdownatRisk,
+                     RelativePowerNormDrawdownatRisk)
+        for wv in (long, short)
+            for ctor in ctors
+                @test_throws DimensionMismatch ctor(; w = wv)(x)
+            end
+            for ctor in slv_ctors
+                @test_throws DimensionMismatch ctor(; slv = slv, w = wv)(x)
+            end
+        end
+    end
+
     @testset "Weighted Ulcer Index" begin
         @test UlcerIndex(; w = w)(x) ≈ sqrt(sum(w .* dd .^ 2) / sum(w))
         @test RelativeUlcerIndex(; w = w)(x) ≈ sqrt(sum(w .* rdd .^ 2) / sum(w))

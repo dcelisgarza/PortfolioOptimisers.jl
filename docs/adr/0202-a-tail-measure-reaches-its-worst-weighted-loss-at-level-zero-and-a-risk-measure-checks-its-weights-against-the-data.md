@@ -63,8 +63,10 @@ variable above the loss of each observation of positive weight, and both the con
 entropic builder call it at level zero. A drawdown measure takes its drawdowns on the full path, so
 a loss of zero weight still moves every later drawdown, as ADR 0059 states for the drawdown twins.
 
-`WorstRealisation` and `MaximumDrawdown` stay unweighted. `ValueatRisk`, the range measures and the
-distributionally robust measures keep `0 < alpha < 1`.
+`WorstRealisation` and `MaximumDrawdown` stay unweighted. Every other tail measure keeps
+`0 < alpha < 1`: `ValueatRisk`, `DrawdownatRisk` and `RelativeDrawdownatRisk`, the range measures,
+the distributionally robust measures, and the relativistic and power-norm measures with their range
+and drawdown forms.
 
 ## Consequences
 

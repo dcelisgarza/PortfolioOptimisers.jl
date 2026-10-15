@@ -1401,6 +1401,13 @@ end
     dw = abs.(w .- w0)
     @test isapprox(sum(w) + 0.1 * sum(dw .^ 2), 1.0; atol = 1e-7)
     @test !isapprox(sum(w) + 0.1 * sum(dw .^ 0.5), 1.0; atol = 1e-7)
+    # The constraint scale scales all three entries of the cone. The middle entry `k` without
+    # `sc` gave `iota^beta * k^(1 - beta) >= sc^(1 - beta) * w_p`: at `sc = 100` the identity
+    # read 0.99999995, and the weights stayed at `w0`.
+    ws = optimise(MeanRisk(; obj = MaximumReturn(),
+                           opt = JuMPOptimiser(; pe = pr, slv = slv, bgt = bmi, sc = 100))).w
+    @test isapprox(sum(ws) + 0.1 * sum(abs.(ws .- w0) .^ 2), 1.0; atol = 1e-7)
+    @test isapprox(ws, w; rtol = 1e-4)
 end
 
 function maximum_ratio_weights(bgt)
