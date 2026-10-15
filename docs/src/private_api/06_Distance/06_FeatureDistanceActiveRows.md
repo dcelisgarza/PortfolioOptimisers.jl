@@ -1,11 +1,12 @@
 ```@meta
-Description = "Feature distance active rows, private API of PortfolioOptimisers.jl: active_window, feature_asset_labels, assert_feature_readable, unreadable_message, …"
+Description = "Feature distance active rows, private API of PortfolioOptimisers.jl: active_window, blank_unreadable, feature_asset_labels, assert_feature_readable, …"
 ```
 
 # [Feature distance active rows: private API](@id private-api-feature-distance-active-rows)
 
 ```@docs
 active_window
+blank_unreadable
 feature_asset_labels
 assert_feature_readable
 unreadable_message

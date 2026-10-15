@@ -963,6 +963,8 @@ end
 
 Validate a feature matrix at the [`distance`](@ref)/[`cor_and_dist`](@ref) entry point: `dims` selects a valid axis, `Z` is non-empty, every entry is finite, and `Z` lies in the metric's domain.
 
+The checks read every cell of `Z`. On a window that holds an unreadable cell, [`distance`](@ref) hands it the copy from [`blank_unreadable`](@ref), which holds a zero at each such cell, so the checks read the readable cells alone: the cells that the collapse reads.
+
 Non-finite entries are rejected because no metric produces a usable distance from them — the Minkowski family gives `Inf` and the cosine family gives `NaN` — and neither can be clustered. Structurally degenerate inputs that a metric *can* handle are admitted: zero feature vectors are given a documented convention (see [`AngularDist`](@ref)), and duplicate or constant features are legitimate.
 
 # Algorithm
@@ -996,6 +998,7 @@ Non-finite entries are rejected because no metric produces a usable distance fro
   - [`assert_dims`](@ref)
   - [`assert_nonempty`](@ref)
   - [`assert_all_finite`](@ref)
+  - [`blank_unreadable`](@ref)
 """
 function assert_feature_matrix(de::FeatureDistance, Z::ArrNum, dims::Integer)::Nothing
     assert_dims(dims)
@@ -1308,14 +1311,15 @@ Compute the distance matrix from a feature matrix.
 
 The 2-D method collapses nothing: a static feature matrix has no observation axis, so the collapse algorithm reads its one row. Its `amsk` is `1 × assets` and marks the assets whose every value column holds data, and the method refuses an asset that it marks `false`. The 3-D method dispatches on it. Assets whose feature vector is entirely zero are given the convention documented in [`patch_zero_feature_vectors!`](@ref).
 
-The 3-D method reads the active mask `amsk` of the window. A collapse then reads each asset, or each pair of assets, at its own active rows, as each member of [`AbstractFeatureCollapseAlgorithm`](@ref) states. A window with no inactive cell gives the result that it gives with no mask.
+The 3-D method reads the active mask `amsk` of the window. A collapse then reads each asset, or each pair of assets, at its own active rows, as each member of [`AbstractFeatureCollapseAlgorithm`](@ref) states. A window with no inactive cell gives the result that it gives with no mask. The checks read the same cells as the collapse: the value of a cell that `amsk` marks `false` reaches neither the distance nor a refusal.
 
 # Algorithm
 
- 1. Validate `Z` and `dims` with [`assert_feature_matrix`](@ref).
- 2. On the 2-D method, check the one-row mask with [`static_window`](@ref) and [`assert_feature_readable`](@ref), and hand `de.metric` and `Z` to the kernel.
+ 1. Check `dims` with [`assert_dims`](@ref).
+ 2. On the 2-D method, check the one-row mask with [`static_window`](@ref) and [`assert_feature_readable`](@ref), validate `Z` with [`assert_feature_matrix`](@ref), and hand `de.metric` and `Z` to the kernel.
  3. On the 3-D method, check the active mask with [`active_window`](@ref), and check that the collapse can read each asset with [`assert_feature_readable`](@ref).
- 4. With no inactive cell, hand `de` and `Z` to the collapse dispatcher [`feature_distance`](@ref), which selects the branch that `de.alg` names. Otherwise hand the window to [`active_feature_distance`](@ref).
+ 4. With no inactive cell, validate `Z` with [`assert_feature_matrix`](@ref), and hand `de` and `Z` to the collapse dispatcher [`feature_distance`](@ref), which selects the branch that `de.alg` names.
+ 5. Otherwise put a zero at each inactive cell of a copy of `Z` with [`blank_unreadable`](@ref), validate the copy with [`assert_feature_matrix`](@ref), and hand it to [`active_feature_distance`](@ref).
 
 # Arguments
 
@@ -1329,10 +1333,9 @@ The 3-D method reads the active mask `amsk` of the window. A collapse then reads
 # Validation
 
   - $(val_dict[:dims])
-  - `!isempty(Z)`.
-  - `all(isfinite, Z)`.
-  - `Z` lies in `de.metric`'s domain (see [`assert_metric_domain`](@ref)).
   - `amsk` is `observations × assets` on the 3-D method and `1 × assets` on the 2-D method, and the collapse can read each asset. See [`assert_feature_readable`](@ref).
+  - `!isempty(Z)`.
+  - Each cell of `Z` that `amsk` marks readable is finite and lies in `de.metric`'s domain (see [`assert_metric_domain`](@ref)). No cell that `amsk` marks `false` is checked.
   - On the 3-D method, a pair of assets with no shared active row takes the rule of the `pair` field of [`AggregateDistances`](@ref) and [`StackObservations`](@ref).
 
 # Returns
@@ -1360,20 +1363,22 @@ julia> distance(FeatureDistance(), Z)
 function distance(de::FeatureDistance, Z::MatNum; dims::Int = 1, amsk = nothing,
                   nx = nothing, kwargs...)
     assert_dims(dims)
-    assert_feature_matrix(de, Z, dims)
     assert_feature_readable(de.alg, static_window(amsk, Z, dims), nx)
+    assert_feature_matrix(de, Z, dims)
     return feature_distance(de.metric, Z, dims)
 end
 function distance(de::FeatureDistance, Z::Arr3Num; dims::Int = 1, amsk = nothing,
                   nx = nothing, kwargs...)
     assert_dims(dims)
-    assert_feature_matrix(de, Z, dims)
     A = active_window(amsk, Z, dims)
     assert_feature_readable(de.alg, A, nx)
     return if isnothing(A)
+        assert_feature_matrix(de, Z, dims)
         feature_distance(de, Z, dims)
     else
-        active_feature_distance(de, (; Z = Z, dims = dims, A = A, nx = nx))
+        Zr = blank_unreadable(Z, A, dims)
+        assert_feature_matrix(de, Zr, dims)
+        active_feature_distance(de, (; Z = Zr, dims = dims, A = A, nx = nx))
     end
 end
 """
@@ -1398,10 +1403,7 @@ The similarity shares the distance's provenance: it is `distance_to_similarity(d
 
 # Validation
 
-  - $(val_dict[:dims])
-  - `!isempty(Z)`.
-  - `all(isfinite, Z)`.
-  - `Z` lies in `de.metric`'s domain (see [`assert_metric_domain`](@ref)).
+  - The checks of [`distance`](@ref): the mask, `!isempty(Z)`, and each readable cell of `Z` is finite and lies in `de.metric`'s domain (see [`assert_metric_domain`](@ref)).
 
 # Returns
 
@@ -1567,7 +1569,7 @@ function feature_window(de::FeatureDistance, pr, rd, X)
     cols = select_fields(pnl, de.sel, de.strict)
     rows, A = feature_window_mask(de.alg, pnl, cols)
     #! The mask leaves out every placeholder, so the zero written there is never read. It
-    #! keeps the stack finite for the checks of the kernel, whatever the placeholder holds.
+    #! keeps the stack the same for every placeholder that the panel stores.
     return feature_stack(pnl, cols; rows = rows, placeholder = 0), A
 end
 """
@@ -1687,7 +1689,7 @@ The prior result and the returns data come in the keyword tail as `pr` and `rd`,
 
   - $(val_dict[:fd_panel])
   - $(val_dict[:fd_strict])
-  - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
+  - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1` at its readable cells: it is not empty, and each cell that the mask marks readable is finite and lies in the domain of `de.metric`. The value of an unreadable cell refuses nothing.
   - The collapse can read each asset at the readable rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared readable row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
 
 # Returns
@@ -1732,7 +1734,7 @@ This is the form that [`clusterise`](@ref) and the network estimators call. It r
 
   - $(val_dict[:fd_panel])
   - $(val_dict[:fd_strict])
-  - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1`: it is not empty, every entry is finite, and it lies in the domain of `de.metric`.
+  - The stacked Feature Matrix passes [`assert_feature_matrix`](@ref) at `dims = 1` at its readable cells: it is not empty, and each cell that the mask marks readable is finite and lies in the domain of `de.metric`. The value of an unreadable cell refuses nothing.
   - The collapse can read each asset at the readable rows of the window, see [`assert_feature_readable`](@ref), and a pair with no shared readable row takes the `pair` rule of its collapse. A fit drops an unreadable asset at its entry with [`feature_readable_mask`](@ref), and this call refuses it.
 
 # Returns

@@ -31,6 +31,10 @@ decision of #1451). Its cases run under each rule, on the fixture and on a secon
 a lifted field, a square field, the implied volatilities and a clock for the cross-validated path.
 The poison also reaches `iv` at each inactive cell, and `ivpa` at each asset that is inactive at
 the last row, the row at which the collapse reads it.
+
+The poison `1e6` is finite and positive, so it cannot show a check that reads an inactive cell. A
+second poisoned copy writes `-1e6`, outside the domain of a metric that needs non-negative
+features, and its `FeatureDistance` cases run under such metrics (#1734).
 =#
 include(joinpath(@__DIR__, "panel_census.jl"))
 
@@ -47,5 +51,11 @@ include(joinpath(@__DIR__, "panel_census.jl"))
     end
     @testset "$(join(names, ", ")): $(label)" for (names, label, f) in collapse_cases
         @test census_equal(f(rdk), f(rdkp))
+    end
+    rdn = census_poison(rd; v = -1e6)
+    @testset "FeatureDistance checks only the cells it reads (#1734): $(label)" for (label,
+                                                                                     f) in
+                                                                                    census_domain_cases(rd)
+        @test census_equal(f(rd), f(rdn))
     end
 end

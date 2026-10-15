@@ -296,7 +296,7 @@ using PortfolioOptimisers, Test, StableRNGs, StatsBase, LinearAlgebra, Clarabel
 using PortfolioOptimisers.Distances: Euclidean, Cityblock, SqEuclidean, Minkowski,
                                      ChiSqDist, WeightedEuclidean, WeightedCityblock,
                                      CosineDist, Chebyshev, WeightedSqEuclidean,
-                                     WeightedMinkowski, TotalVariation
+                                     WeightedMinkowski, TotalVariation, BrayCurtis, Jaccard
 
 const PO = PortfolioOptimisers
 
@@ -483,6 +483,43 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
                    metric = PortfolioOptimisers.Distances.CosineDist())
         @test distance(de, Zz; amsk = A)[1, 2] == 1
         @test_throws DimensionMismatch distance(de, Z; amsk = trues(3, 3))
+    end
+    @testset "The checks read only the readable cells (#1734)" begin
+        # The cell (1, 3) is inactive. Its value refuses nothing and moves no distance, under
+        # each collapse that reads the window and each metric, in either layout.
+        Z = reshape([1.0 2 9; 2 4 9; 3 9 5; 4 9 7], 4, 3, 1)
+        A = Bool[1 1 0; 1 1 0; 1 0 1; 1 0 1]
+        fb = FeatureFallback()
+        metrics = (Euclidean(), AngularDist(), ChiSqDist(), BrayCurtis(), Jaccard())
+        algs = (LastObservation(; alg = LastActiveRow()), AggregateFeatures(),
+                AggregateDistances(; pair = fb), StackObservations(; pair = fb))
+        for v in (-9.0, NaN, Inf), metric in metrics, alg in algs
+            Zv = copy(Z)
+            Zv[1, 3, 1] = v
+            de = FeatureDistance(; metric = metric, alg = alg)
+            @test distance(de, Zv; amsk = A) == distance(de, Z; amsk = A)
+            @test distance(de, permutedims(Zv, (1, 3, 2)); dims = 2, amsk = A) ==
+                  distance(de, Z; amsk = A)
+            @test cor_and_dist(de, Zv; amsk = A) == cor_and_dist(de, Z; amsk = A)
+        end
+        # A fit reads the hand panel with -9 at the inactive cell as it reads the stored 9.
+        rdn = hand_rd(; V = [1.0 2 -9; 2 4 9; 3 9 5; 4 9 7])
+        for metric in (ChiSqDist(), BrayCurtis(), Jaccard()), alg in algs
+            de = fdist(alg; metric = metric)
+            @test hand_distance(de, rdn) == hand_distance(de, rd)
+        end
+        # A readable cell is still checked.
+        Zv = copy(Z)
+        Zv[1, 1, 1] = NaN
+        @test_throws "all(isfinite, Z) must hold" distance(fdist(AggregateFeatures()), Zv;
+                                                           amsk = A)
+        Zv[1, 1, 1] = -1
+        de = FeatureDistance(; metric = ChiSqDist(), alg = AggregateFeatures())
+        @test_throws DomainError distance(de, Zv; amsk = A)
+        # A static matrix refuses an unreadable asset as unreadable, whatever its cells hold.
+        msg = "no value to read for the assets at the positions [2]"
+        @test_throws msg distance(fdist(LastObservation()), [1.0 2; NaN 3; 4 5];
+                                  amsk = Bool[1 0 1])
     end
     @testset "The entry of a fit composes the readable assets with the Investable Mask" begin
         # LastRow cannot read `b`; the other collapses read every asset.

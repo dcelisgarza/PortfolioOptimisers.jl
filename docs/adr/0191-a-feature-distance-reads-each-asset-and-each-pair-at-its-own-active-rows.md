@@ -27,9 +27,14 @@ A row is readable for an asset where the asset is active and no value column of 
 Selector holds a placeholder (#1508, #1631), because a placeholder is not data. A cell that a fill
 policy wrote holds data, and the distance reads it. This is available-case estimation, as a Coverage Policy fits a covariance cell on the rows
 at which both of its assets are active. The maintainer decided each part in a grilling session on
-issue #1450, and #1454 built it. The checks of the kernel do not follow the rule yet: the checks of
-finiteness and of the domain of the metric read every cell of the window, the inactive cells
-included, so a `NaN` or a value outside the domain at an inactive cell refuses (#1734).
+issue #1450, and #1454 built it. The checks of the kernel read the same cells as the collapse
+(#1734). The kernel first refuses an asset that it cannot read, whatever its cells hold. On a
+window with an unreadable cell, it then checks finiteness and the domain of the metric on a copy
+with a zero at each unreadable cell, and collapses that copy, so the value of such a cell reaches
+neither a refusal nor a pass of a collapse. The zero is the value that the stack writes at a
+placeholder, and that the panel collapse of a meta-optimiser writes at an inactive cell. The
+exported `feature_matrix` keeps the stored values, and a direct `distance(de, Z; amsk)` call
+follows the same rule.
 
 | Part | Rule |
 | --- | --- |

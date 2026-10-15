@@ -23,13 +23,12 @@ census_poison_mask(m, amsk) = census_poison_cells!(Array(m), amsk, Returns(true)
 # An inactive cell that reads as observed holds no placeholder (#1631).
 census_poison_placeholder(::Nothing, ::Any) = nothing
 census_poison_placeholder(p, amsk) = census_poison_cells!(Array(p), amsk, Returns(false))
-function census_poison_field(f::NumericPanelField, amsk)
-    return NumericPanelField(f.name,
-                             census_poison_cells!(Array(f.vals), amsk, Returns(1e6)),
+function census_poison_field(f::NumericPanelField, amsk, v)
+    return NumericPanelField(f.name, census_poison_cells!(Array(f.vals), amsk, Returns(v)),
                              census_poison_mask(f.omsk, amsk),
                              census_poison_placeholder(f.pmsk, amsk))
 end
-function census_poison_field(f::CategoricalPanelField, amsk)
+function census_poison_field(f::CategoricalPanelField, amsk, ::Any)
     nl = length(f.levels)
     return CategoricalPanelField(f.name, f.levels,
                                  census_poison_cells!(Array(f.codes), amsk,
@@ -37,9 +36,9 @@ function census_poison_field(f::CategoricalPanelField, amsk)
                                  census_poison_mask(f.omsk, amsk),
                                  census_poison_placeholder(f.pmsk, amsk))
 end
-function census_poison_field(f::TensorPanelField, amsk)
+function census_poison_field(f::TensorPanelField, amsk, v)
     return TensorPanelField(f.name, f.axis, f.labels, f.groups,
-                            census_poison_cells!(Array(f.vals), amsk, Returns(1e6)),
+                            census_poison_cells!(Array(f.vals), amsk, Returns(v)),
                             census_poison_mask(f.omsk, amsk),
                             census_poison_placeholder(f.pmsk, amsk))
 end
@@ -48,9 +47,10 @@ function census_poison_rates(iv::AbstractMatrix, amsk)
     return census_poison_cells!(Array(iv), amsk, Returns(1e6))
 end
 census_poison_rates(ivpa::AbstractVector, amsk) = ifelse.(amsk[end, :], ivpa, 1e6)
-function census_poison(rd::ReturnsResult)
+# `v` is the value a numeric or a tensor cell takes. The rates keep `1e6`, which is positive.
+function census_poison(rd::ReturnsResult; v = 1e6)
     pnl = rd.pnl
-    pf = [census_poison_field(f, pnl.amsk) for f in pnl.pf]
+    pf = [census_poison_field(f, pnl.amsk, v) for f in pnl.pf]
     return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = rd.B,
                          ne = rd.ne, E = rd.E, ts = rd.ts,
                          iv = census_poison_rates(rd.iv, pnl.amsk),
@@ -492,6 +492,44 @@ function census_cases(rd::ReturnsResult)
                r -> CENSUS_PO.collapse_asset_panel(r.pnl, CENSUS_WC, r.nx, alg)))
     end
     return cases
+end
+# The checks of FeatureDistance read only the cells that its collapse reads (#1734). The census
+# fixture makes `adj_volume` and `short_interest` non-negative, so each case is in the domain of
+# its metric on the clean copy, and a negative poison leaves the domain at every inactive cell.
+# Each collapse runs under a metric that needs non-negative features. ChiSqDist has a rescale
+# under StackObservations, and BrayCurtis and Jaccard have none.
+function census_domain_cases(rd::ReturnsResult)
+    fsel = ["adj_volume", "short_interest"]
+    fd(alg, metric) = FeatureDistance(; sel = fsel, alg = alg, metric = metric)
+    fdist(de, r) = distance(de, nothing, r.X; rd = r)
+    fmsg(f) =
+        try
+            f()
+        catch e
+            sprint(showerror, e)
+        end
+    gap_view(r) = CENSUS_PO.port_opt_view(r, vcat(1:20, 61:80), :)
+    chi = CENSUS_PO.Distances.ChiSqDist()
+    bray = CENSUS_PO.Distances.BrayCurtis()
+    jac = CENSUS_PO.Distances.Jaccard()
+    fb = FeatureFallback()
+    return Any[("LastRow refuses the delisted asset",
+                r -> fmsg(() -> fdist(fd(LastObservation(), chi), r))),
+               ("LastActiveRow",
+                r -> fdist(fd(LastObservation(; alg = LastActiveRow()), chi), r)),
+               ("AggregateFeatures", r -> fdist(fd(AggregateFeatures(), bray), r)),
+               ("a median under AggregateFeatures",
+                r -> fdist(fd(AggregateFeatures(; alg = MedianCollapse()), jac), r)),
+               ("AggregateDistances", r -> fdist(fd(AggregateDistances(), jac), r)),
+               ("StackObservations, with a rescale",
+                r -> fdist(fd(StackObservations(), chi), r)),
+               ("StackObservations, with no rescale",
+                r -> fdist(fd(StackObservations(), bray), r)),
+               ("an empty pair under RefusePair",
+                r -> fmsg(() -> fdist(fd(StackObservations(), jac), gap_view(r)))),
+               ("an empty pair under FeatureFallback",
+                r -> (fdist(fd(AggregateDistances(; pair = fb), jac), gap_view(r)),
+                      fdist(fd(StackObservations(; pair = fb), chi), gap_view(r))))]
 end
 # The panel collapse of a meta-optimiser weighs the active members of each observation (#1456).
 # The census fixture holds numeric, categorical and rectangular tensor fields; the collapse

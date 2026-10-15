@@ -39,6 +39,34 @@ function active_window(amsk::AbstractMatrix{Bool}, Z::Arr3Num, dims::Integer)
     return all(amsk) ? nothing : amsk
 end
 """
+    blank_unreadable(Z::Arr3Num, A::AbstractMatrix{Bool}, dims::Integer)
+
+Give a copy of a window of time-varying features with a zero at each cell that the mask `A` marks unreadable.
+
+A collapse reads each asset, or each pair of assets, only at its own readable rows, so the value of an unreadable cell must reach neither the distance nor a refusal. [`distance`](@ref) checks this copy with [`assert_feature_matrix`](@ref) and collapses it. A `NaN`, or a value outside the domain of the metric, at an unreadable cell then refuses nothing, and no pass of a collapse reads it: [`StackObservations`](@ref) measures the whole stack before it measures a pair again on its shared rows, and [`AggregateDistances`](@ref) measures every asset at each row before it keeps the pairs that both are active at. The zero is the value that [`feature_window`](@ref) writes at a placeholder, and that the panel collapse of a meta-optimiser writes at an inactive cell. The copy keeps the element type of `Z`.
+
+# Arguments
+
+  - $(arg_dict[:Z])
+  - `A`: The mask of readable cells of the window, `observations × assets`.
+  - $(arg_dict[:dims])
+
+# Returns
+
+  - `Zr::Array`: The window, the same size and element type as `Z`, with a zero at each unreadable cell.
+
+# Related
+
+  - [`distance`](@ref)
+  - [`active_window`](@ref)
+  - [`active_feature_distance`](@ref)
+  - [`feature_window`](@ref)
+"""
+function blank_unreadable(Z::Arr3Num, A::AbstractMatrix{Bool}, dims::Integer)
+    M = dims == 1 ? A : reshape(A, size(A, 1), 1, size(A, 2))
+    return ifelse.(M, Z, zero(eltype(Z)))
+end
+"""
     feature_readable(alg, A::AbstractMatrix{Bool}) -> BitVector
 
 Mark the assets that a collapse can read in a window, from the active mask of the window.
@@ -435,7 +463,7 @@ end
 
 Turn a window of time-varying features that holds an inactive cell into a distance matrix, reading each asset or each pair at its own active rows.
 
-`win` holds the window `Z`, its layout `dims`, its active mask `A` and the asset names `nx`. [`distance`](@ref) calls this function only when a cell of the window is inactive, and only after [`assert_feature_readable`](@ref) checked that the collapse can read each asset. A window with no inactive cell takes the path of [`feature_distance`](@ref), so its result does not change.
+`win` holds the window `Z`, its layout `dims`, its active mask `A` and the asset names `nx`. `Z` holds a zero at each cell that `A` marks `false`, from [`blank_unreadable`](@ref), so no step of a collapse reads the stored value of such a cell. [`distance`](@ref) calls this function only when a cell of the window is inactive, and only after [`assert_feature_readable`](@ref) checked that the collapse can read each asset. A window with no inactive cell takes the path of [`feature_distance`](@ref), so its result does not change.
 
 # Algorithm
 
