@@ -50,7 +50,7 @@ types of `AbstractOrthogonalForecastFit`:
 | --- | --- |
 | `ScoreNeutralisation()`, the default | The prior neutralises the scores of a member that answers `true` to `fits_idiosyncratic_target` against every estimated factor of the block, after the Neutralisation names of the caller, under `BlockRegressionWeights()`. |
 | `OrthogonalPartCalibration()` | The calibration of `TargetReturnForecast` also fits `κ⊥` on the orthogonal part of each row of the prediction that its calibration reads. The member still publishes `α = κ p`, its Result carries `κ⊥` in `ocalib`, and the prior keeps `g` and scales `α⊥` by `κ⊥ / κ`. |
-| `UnadjustedForecast()` | The prior reads the member as it stands. This is the form of the oracle, one keyword away as [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md) requires. |
+| `UnadjustedForecast()` | The prior reads the member as it stands. This is the form of the oracle, one keyword away as [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-eight-differences-are-deliberate.md) requires. |
 
 **The default output of the prior differs from the oracle on purpose.** A
 fitted member under the default gives a forecast whose `α⊥` carries the scale of its fit and whose

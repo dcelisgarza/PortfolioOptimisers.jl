@@ -537,12 +537,13 @@ end
     end
 
     @testset "Rendering: `cache` never, `max_scenarios` only where it is set" begin
-        @test pe.show_fields(EmpiricalPrior()) == (:ce, :me, :horizon, :fill_limit)
+        # `x_src` names the returns that the prior reads since #1678.
+        @test pe.show_fields(EmpiricalPrior()) == (:ce, :me, :horizon, :fill_limit, :x_src)
         @test pe.show_fields(EmpiricalPrior(; max_scenarios = 10)) ==
-              (:ce, :me, :horizon, :fill_limit, :max_scenarios)
+              (:ce, :me, :horizon, :fill_limit, :max_scenarios, :x_src)
         @test pe.show_fields(PortfolioOptimisersCovariance()) == (:ce, :mp)
         # `mtx_sqrt` holds the square root algorithm since #1410.
-        @test pe.show_fields(FactorPrior()) == (:pe, :mp, :re, :ve, :rsd, :mtx_sqrt)
+        @test pe.show_fields(FactorPrior()) == (:pe, :mp, :re, :ve, :rsd, :mtx_sqrt, :x_src)
         blv = pe.BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
         for est in (EmpiricalPrior(), PortfolioOptimisersCovariance(), FactorPrior(),
                     EntropyPoolingPrior(), OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]),

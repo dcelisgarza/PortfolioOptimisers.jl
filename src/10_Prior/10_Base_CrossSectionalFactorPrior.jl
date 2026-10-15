@@ -954,6 +954,96 @@ function cross_sectional_finite_mean(S::MatNum, t::Integer)
     return iszero(cnt) ? zero(eltype(S)) : num / cnt
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the Leverage-One Mask rules of a [`CrossSectionalFactorPrior`](@ref).
+
+A Leverage-One Pair, which the `h1` field of [`CrossSectionalRegression`](@ref) marks, has a residual that is zero by construction. A rule of this family states how the prior reads that residual when it standardises the idiosyncratic returns into the standardised residuals `S` of the scenarios and the residuals with no fill of the idiosyncratic correlation. The variance history `vs` of the prior does not change under either rule.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. The prior holds it in its `l1mask` field, and [`leverage_one_residuals`](@ref) dispatches on it. The batch fit and the carry fold both call that function before [`cross_sectional_standardised_residuals`](@ref), so a new rule adds one method of it.
+
+# Related
+
+  - [`MaskedLeverageOne`](@ref)
+  - [`UnmaskedLeverageOne`](@ref)
+  - [`leverage_one_residuals`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`AbstractAlgorithm`](@ref)
+"""
+abstract type AbstractLeverageOneMask <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Read the residual of a Leverage-One Pair as a gap in the standardised idiosyncratic returns.
+
+This is the default Leverage-One Mask of a [`CrossSectionalFactorPrior`](@ref). The residual of a marked pair is not an observation of its idiosyncratic return, so the prior writes `NaN` over it with [`leverage_one_nan`](@ref) before the standardisation. The scenarios then give the pair the average standardised return of its observation, and the idiosyncratic correlation leaves the pair out, as every other reader of a marked pair does. The rule does not depend on the history of the variance of the pair.
+
+# Related
+
+  - [`AbstractLeverageOneMask`](@ref)
+  - [`UnmaskedLeverageOne`](@ref)
+  - [`leverage_one_nan`](@ref)
+"""
+struct MaskedLeverageOne <: AbstractLeverageOneMask end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Read the residual of a Leverage-One Pair as it stands.
+
+The prior standardises the zero residual of a marked pair by its variance. Where the variance is positive, which happens when the asset had a sibling in its level before, the standardised return is zero, and the scenarios and the idiosyncratic correlation read it as data. Where the variance is zero, the ratio is not finite, and the pair takes the average standardised return of its observation. This is the form of the oracle that the library is measured against. It stays one keyword away.
+
+# Related
+
+  - [`AbstractLeverageOneMask`](@ref)
+  - [`MaskedLeverageOne`](@ref)
+"""
+struct UnmaskedLeverageOne <: AbstractLeverageOneMask end
+"""
+    leverage_one_residuals(l1mask::MaskedLeverageOne, h1::Option{<:AbstractMatrix{Bool}},
+                           eps::MatNum) -> MatNum
+    leverage_one_residuals(l1mask::UnmaskedLeverageOne, h1::Option{<:AbstractMatrix{Bool}},
+                           eps::MatNum) -> MatNum
+
+Return the idiosyncratic returns that a Cross-Sectional Factor Prior standardises, under its Leverage-One Mask.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`MaskedLeverageOne`](@ref): return `eps` with `NaN` at every pair that `h1` marks, through [`leverage_one_nan`](@ref).
+ 2. [`UnmaskedLeverageOne`](@ref): return `eps`.
+
+# Arguments
+
+  - `l1mask`: The Leverage-One Mask of the prior.
+  - `h1`: The leverage-one mask of [`CrossSectionalRegression`](@ref), `observations × assets`, or `nothing`.
+  - `eps`: Idiosyncratic returns, `observations × assets`.
+
+# Validation
+
+  - `size(h1) == size(eps)` under [`MaskedLeverageOne`](@ref). Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `eps::MatNum`: The idiosyncratic returns that the prior standardises.
+
+# Related
+
+  - [`AbstractLeverageOneMask`](@ref)
+  - [`leverage_one_nan`](@ref)
+  - [`cross_sectional_standardised_residuals`](@ref)
+"""
+function leverage_one_residuals(::MaskedLeverageOne, h1::Option{<:AbstractMatrix{Bool}},
+                                eps::MatNum)::MatNum
+    return leverage_one_nan(h1, eps)
+end
+function leverage_one_residuals(::UnmaskedLeverageOne, ::Option{<:AbstractMatrix{Bool}},
+                                eps::MatNum)::MatNum
+    return eps
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the standardised idiosyncratic returns a scenario set is rebuilt from.
@@ -961,6 +1051,8 @@ Return the standardised idiosyncratic returns a scenario set is rebuilt from.
 The function divides each idiosyncratic return by the idiosyncratic volatility of the same observation, so the whole history is on one scale and the latest volatilities can rescale it. An active pair whose standardised return is not finite takes the average standardised return of its own observation, so a sparse history does not shorten the scenario set. An inactive pair stays `NaN`.
 
 Under `filled = false` the function returns ``z_{ti}`` with `NaN` at every cell that is not finite, and writes no average. The estimate of the idiosyncratic correlation reads that form, see [`cross_sectional_idiosyncratic_covariance`](@ref): the average of the other assets of an observation is not an observation of the pair, and it would correlate the asset with each of them.
+
+The prior passes `eps` through [`leverage_one_residuals`](@ref) first, so under its default Leverage-One Mask a Leverage-One Pair is `NaN` in `eps`, and it takes ``\\bar{z}_{t}`` under `filled = true` whatever its variance.
 
 # Mathematical definition
 
@@ -1003,6 +1095,7 @@ A zero variance gives ``0 / 0`` or ``\\pm\\infty``, and a variance still in warm
 # Related
 
   - [`cross_sectional_finite_mean`](@ref)
+  - [`leverage_one_residuals`](@ref)
   - [`cross_sectional_scenarios`](@ref)
   - [`cross_sectional_idiosyncratic_covariance`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
@@ -1910,3 +2003,6 @@ end
 function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
     return lambda * (iszero(lambda) ? zero(mu) : mu) + (one(lambda) - lambda) * g
 end
+
+export MaskedLeverageOne, UnmaskedLeverageOne
+public AbstractLeverageOneMask

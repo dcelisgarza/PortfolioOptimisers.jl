@@ -320,6 +320,8 @@ A Scenario Cap is a route through `pe`. The prior builds its asset scenarios fro
 
 `ofit` is the Orthogonal Forecast Fit. A fitted Return Forecast regresses the forward idiosyncratic return, which the regression makes orthogonal to the Factor Exposures, so the part of its forecast that the exposures do not span is under-scaled. The default [`ScoreNeutralisation`](@ref) neutralises the scores of such a member against every estimated factor of the block before the fit, [`OrthogonalPartCalibration`](@ref) scales the orthogonal part by a slope fitted on it, and [`UnadjustedForecast`](@ref) reads the member as it stands.
 
+`l1mask` is the Leverage-One Mask. The residual of a Leverage-One Pair is zero by construction, and the default [`MaskedLeverageOne`](@ref) reads it as a gap in the standardised idiosyncratic returns, as the forecast fit, the idiosyncratic diagnostics and the attribution do. [`UnmaskedLeverageOne`](@ref) standardises it as it stands.
+
 `lambda` and `c` are Calibration Slots. Each holds a number, or a rule that computes the number from the fit: `lambda` takes a rule of [`AbstractSpannedShrinkageCalibrationAlgorithm`](@ref), and `c` takes a rule of [`AbstractOrthogonalForecastScaleCalibrationAlgorithm`](@ref). Each fit, each refit and each online step resolves the rules with [`cross_sectional_calibration`](@ref), after the split of the Return Forecast and before the mean. The block records the resolved numbers in its fields `lambda` and `c`.
 
 # Fields
@@ -349,6 +351,7 @@ $(DocStringExtensions.FIELDS)
                               lambda::Num_SpanShrinkCal = PrecisionBlend(),
                               c::Num_OrthFcScaleCal = 1.0,
                               ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
+                              l1mask::AbstractLeverageOneMask = MaskedLeverageOne(),
                               lx::Option{<:AbstractString} = nothing,
                               mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                               ex::FLoops.Transducers.Executor = ThreadedEx(),
@@ -524,6 +527,10 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
     """
     ofit
     """
+    Leverage-One Mask, the rule by which the prior reads the residual of a Leverage-One Pair when it standardises the idiosyncratic returns. [`MaskedLeverageOne`](@ref), the default, reads it as a gap, so the scenarios give the pair the average standardised return of its observation and the idiosyncratic correlation leaves it out. [`UnmaskedLeverageOne`](@ref) reads the zero residual as it stands: zero over a positive variance, and the average over a zero variance.
+    """
+    l1mask
+    """
     Name of a numeric Panel Field of the returns net of the observed factors, or `nothing` to derive them as `X - Z_obs * r_obs`. The regression reads the named field unchanged. Under Currency Factors the net returns are the local returns. A caller names a field when some asset has no currency label, which the derived path gives a `NaN` net return, or when their own local returns are not `X - Z_obs * r_obs`, which includes every panel of simple returns because of the cross term, see [`currency_excess_index`](@ref).
     """
     lx
@@ -569,6 +576,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
                                        rfe::Option{<:AbstractReturnForecastEstimator},
                                        lambda::Num_SpanShrinkCal, c::Num_OrthFcScaleCal,
                                        ofit::AbstractOrthogonalForecastFit,
+                                       l1mask::AbstractLeverageOneMask,
                                        lx::Option{<:AbstractString},
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        ex::FLoops.Transducers.Executor,
@@ -604,8 +612,8 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_systematic_repair(srep, mp)
         # One tuple of the fields gives both the type parameters and the values.
         fs = (factors, neutralise, families, unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp,
-              srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx, mtx_sqrt, ex,
-              choice, carry, cache)
+              srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, l1mask, lx,
+              mtx_sqrt, ex, choice, carry, cache)
         return new{map(typeof, fs)..., typeof(x_src)}(fs..., x_src)
     end
 end
@@ -636,6 +644,7 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                    lambda::Num_SpanShrinkCal = PrecisionBlend(),
                                    c::Num_OrthFcScaleCal = 1.0,
                                    ofit::AbstractOrthogonalForecastFit = ScoreNeutralisation(),
+                                   l1mask::AbstractLeverageOneMask = MaskedLeverageOne(),
                                    lx::Option{<:AbstractString} = nothing,
                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                                    ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
@@ -647,8 +656,8 @@ function CrossSectionalFactorPrior(; factors::Dict_VecPair,
                                      cross_sectional_prior_option(neutralise, :neutralise),
                                      cross_sectional_prior_option(families, :families),
                                      unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp, srep, th,
-                                     bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, lx,
-                                     mtx_sqrt, ex, choice, carry, cache, x_src)
+                                     bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, l1mask,
+                                     lx, mtx_sqrt, ex, choice, carry, cache, x_src)
 end
 # `lambda` and `c` are the two Calibration Slots of the prior. The prior resolves them itself,
 # inside `cross_sectional_assemble`, so the declaration serves the two `assert_` walks alone.
@@ -889,8 +898,14 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, size(ca.f, 1), det)
     (; edof, ediv) = cross_sectional_variance_counts(cnt, csr)
     # The carry fold keeps the standardised rows, because a row reads its own observation
-    # alone (#1565).
-    S = isnothing(fit.S) ? cross_sectional_standardised_residuals(csr.eps, vs, amr) : fit.S
+    # alone (#1565). The residual of a Leverage-One Pair is a gap under the default mask
+    # (#1720).
+    S = if isnothing(fit.S)
+        cross_sectional_standardised_residuals(leverage_one_residuals(pe.l1mask, csr.h1,
+                                                                      csr.eps), vs, amr)
+    else
+        fit.S
+    end
     # The correlation reads the residuals with no fill: the fill of the scenarios writes the
     # mean of the other assets of an observation into a gap, and that value correlates the
     # asset with each of them (#1384). The threshold of zero reads no residual, and a `ce`
@@ -898,7 +913,9 @@ function cross_sectional_assemble(pe::CrossSectionalFactorPrior, f_pr::NamedTupl
     Sc = if iszero(pe.th) || !isnothing(fit.ce)
         nothing
     elseif isnothing(fit.Sc)
-        cross_sectional_standardised_residuals(csr.eps, vs, amr; filled = false)
+        cross_sectional_standardised_residuals(leverage_one_residuals(pe.l1mask, csr.h1,
+                                                                      csr.eps), vs, amr;
+                                               filled = false)
     else
         fit.Sc
     end
@@ -1606,7 +1623,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 function show_fields(::CrossSectionalFactorPrior)
     return (:factors, :neutralise, :families, :unseen, :cre, :wa, :pe, :ve, :ce, :pdm,
             :f_mp, :mp, :srep, :th, :bp, :mcap, :bw, :lag, :minra, :rfe, :lambda, :c, :ofit,
-            :lx, :mtx_sqrt, :ex, :choice, :carry, :x_src)
+            :l1mask, :lx, :mtx_sqrt, :ex, :choice, :carry, :x_src)
 end
 function factor_residual_config(::CrossSectionalFactorPrior)
     # The declaration names a variance estimator that a consumer re-runs on the

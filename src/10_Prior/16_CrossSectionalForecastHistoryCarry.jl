@@ -171,7 +171,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Brings the standardised idiosyncratic returns of the carry fold of a Cross-Sectional Factor Prior up to its fitted observations.
 
-The standardised return of an observation reads the residual, the variance and the active mask of that observation alone, and the fill reads the other assets of the same observation. A step that fits the new observations alone changes no past residual and no past variance, so the state keeps its rows and appends the rows of the new observations. A step that fits every observation again can change every row, so it makes every row again. The call with no data then reads the rows as they are, and its cost does not grow with the history.
+The standardised return of an observation reads the residual, the variance and the active mask of that observation alone, and the fill reads the other assets of the same observation. A step that fits the new observations alone changes no past residual and no past variance, so the state keeps its rows and appends the rows of the new observations. A step that fits every observation again can change every row, so it makes every row again. The call with no data then reads the rows as they are, and its cost does not grow with the history. The residuals of the step take the Leverage-One Mask of the prior through [`leverage_one_residuals`](@ref) before the standardisation, as the batch fit does, so the carry fold equals the batch fit.
 
 Under a threshold `th` above zero, the idiosyncratic correlation reads the rows with no fill, and [`cross_sectional_carry_correlation`](@ref) brings them up. A `ce` that folds, as [`supports_partial_fit`](@ref) answers, folds the rows of the step with [`partial_fit!`](@ref), under the rule of [`cross_sectional_correlation_rows`](@ref) for the gaps. So the state keeps the folded `ce` and no row with no fill, and the call with no data reads the correlation from the state of `ce`. A step that fits every observation again folds every row into the `ce` of the prior again. A `ce` that does not fold makes the state keep the rows with no fill, and the call with no data estimates the correlation over them again.
 
@@ -188,6 +188,7 @@ Under a threshold `th` above zero, the idiosyncratic correlation reads the rows 
 # Related
 
   - [`cross_sectional_standardised_residuals`](@ref)
+  - [`leverage_one_residuals`](@ref)
   - [`cross_sectional_carry_correlation`](@ref)
   - [`cross_sectional_correlation_rows`](@ref)
   - [`cross_sectional_carry_fold`](@ref)
@@ -201,8 +202,11 @@ function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
     eps = st.csr.eps
     k = stepped && !isnothing(st.S) ? size(st.S, 1) : 0
     rn = (k + 1):size(eps, 1)
-    # The fitted rows sit after the first `lag` rows of the histories.
-    E = view(eps, rn, :)
+    # The fitted rows sit after the first `lag` rows of the histories. The rows take the
+    # Leverage-One Mask of the batch fit (#1720).
+    h1 = st.csr.h1
+    E = leverage_one_residuals(pe.l1mask, isnothing(h1) ? nothing : view(h1, rn, :),
+                               view(eps, rn, :))
     V = view(st.vs, rn, :)
     A = view(st.amsk, pe.lag .+ rn, :)
     # A step that fits every observation again makes every row again, and folds them into
@@ -233,7 +237,7 @@ Brings the input of the idiosyncratic correlation of the carry fold of a Cross-S
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `Sc0`: The rows with no fill that the state carries, or `nothing`.
   - `ce0`: The folded `ce` that the state carries, or `pe.ce` at a fit of every observation.
-  - `E`: The idiosyncratic returns of the rows of the step.
+  - `E`: The idiosyncratic returns of the rows of the step, under the Leverage-One Mask of the prior.
   - `V`: The idiosyncratic variances of the rows of the step.
   - `A`: The active mask of the rows of the step.
 

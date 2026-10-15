@@ -95,7 +95,9 @@
     its `# Interfaces` section on 2026-10-15 (issue #1721, the maintainer's ruling).
     `RatioFormulation`, the family of the ratio of a lifted variance, joined with its
     `# Interfaces` section the same day under the rule of #1489, after #1676 exported its two
-    members.
+    members. `AbstractLeverageOneMask`, the family of the Leverage-One Mask of the
+    Cross-Sectional Factor Prior, joined with its `# Interfaces` section and its two members the
+    same day (issue #1720).
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -145,6 +147,7 @@
         :AbstractHighOrderPriorEstimator_F,
         :AbstractLastObservationAlgorithm,
         :AbstractLearningRateSchedule,
+        :AbstractLeverageOneMask,
         :AbstractLongRunForm,
         :AbstractLongRunKernel,
         :AbstractLowOrderPriorEstimator_A,

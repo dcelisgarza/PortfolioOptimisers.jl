@@ -1290,7 +1290,7 @@ function fold_prior_step(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:An
                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
                                                        <:Any, <:Any, <:Any, <:Any, <:Any,
-                                                       <:Any, <:Any, <:Any,
+                                                       <:Any, <:Any, <:Any, <:Any,
                                                        <:Option{<:CrossSectionalCarryState}},
                          rd::ReturnsResult, gaps::Option{<:AbstractVector{Bool}})
     st = if isnothing(pe.cache)

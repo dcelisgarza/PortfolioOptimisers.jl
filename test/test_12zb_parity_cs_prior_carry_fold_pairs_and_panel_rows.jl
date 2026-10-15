@@ -307,6 +307,86 @@ end
         end
     end
 
+    @testset "The standardised residuals read a pair of leverage one as a gap (#1720)" begin
+        # Asset 1 shares the level "A" with asset 2 until row 150, and asset 2 moves to "B"
+        # at row 151. So asset 1 is a pair of leverage one from row 151 on, and its variance
+        # there is positive, because it decays from the residuals of the rows before. Before
+        # #1720 the prior standardised the zero residual of such a pair to a standardised
+        # return of zero, which the scenarios and the idiosyncratic correlation read as data,
+        # and gave the fill to a pair whose variance was zero.
+        T, N, s = 300, 8, 151
+        rng = StableRNG(1720)
+        lvl = repeat(permutedims([i <= 2 ? "A" : (i <= 5 ? "B" : "C") for i in 1:N]), T)
+        lvl[s:T, 2] .= "B"
+        fi = Dict(k => 0.01 .* randn(rng, T) for k in ("A", "B", "C"))
+        X = 0.01 .* randn(rng, T, N)
+        for t in 1:T, i in 1:N
+            X[t, i] += fi[lvl[t, i]][t]
+        end
+        mcap = exp.(log(1e9) .+ 0.5 .* randn(rng, 1, N) .+
+                    0.01 .* cumsum(randn(rng, T, N); dims = 1))
+        lp = ReturnsResult(; nx = ["a$i" for i in 1:N], X = X,
+                           pnl = asset_panel([NumericPanelInput(; name = "market_cap",
+                                                                vals = mcap),
+                                              CategoricalPanelInput(; name = "industry",
+                                                                    vals = lvl)]))
+        lcfg = (; minra = 5, pe = GRID_PE, ve = GRID_VE, families = ["industry" => nothing],
+                factors = ["market" => ConstantExposure(),
+                           "industry" =>
+                               OneHotExposure(; field = "industry", family = "industry")])
+        @test CrossSectionalFactorPrior(; lcfg...).l1mask === MaskedLeverageOne()
+        a = prior(CrossSectionalFactorPrior(; lcfg...), lp)
+        b = prior(CrossSectionalFactorPrior(; lcfg..., l1mask = UnmaskedLeverageOne()), lp)
+        h1 = a.rr.csr.h1
+        vs = a.rr.vs
+        r1 = findall(view(h1, :, 1))
+        @test findall(i -> any(view(h1, :, i)), 1:N) == [1]
+        @test r1 == s:(T - 1)
+        @test all(>(0), vs[r1, 1])
+        # The two rules differ only at the marked pairs. There the oracle's form reads a
+        # standardised return of zero, and the default reads the mean standardised return of
+        # the other assets of the observation. Measured: 2.7e-18.
+        eps = a.rr.csr.eps
+        zbar = [mean(filter(isfinite, eps[t, 2:N] ./ sqrt.(vs[t, 2:N]))) for t in r1]
+        D = a.X .- b.X
+        other = trues(size(D))
+        other[r1, 1] .= false
+        @test all(iszero, D[other])
+        @test isapprox(D[r1, 1], zbar .* sqrt(vs[end, 1]); atol = 1e-15)
+        @test maximum(abs, D[r1, 1]) > 1e-4
+        # The pure function gives the same gap whatever the variance of the pair, and the
+        # oracle's form gives zero or the gap by the variance.
+        m = trues(1, 1)
+        for v in (1e-6, 0.0)
+            e = po.leverage_one_residuals(MaskedLeverageOne(), m, [0.0;;])
+            z = po.cross_sectional_standardised_residuals(e, [v;;], m; filled = false)
+            @test isnan(only(z))
+            e = po.leverage_one_residuals(UnmaskedLeverageOne(), m, [0.0;;])
+            z = po.cross_sectional_standardised_residuals(e, [v;;], m; filled = false)
+            @test isequal(only(z), iszero(v) ? NaN : 0.0)
+        end
+        # `sigma` reads the residuals under a threshold above zero alone. There the row of
+        # asset 1 of the idiosyncratic correlation moves. Measured: 6.4e-2 of the largest
+        # entry of `sigma`.
+        ta = prior(CrossSectionalFactorPrior(; lcfg..., th = 0.5), lp)
+        tb = prior(CrossSectionalFactorPrior(; lcfg..., th = 0.5,
+                                             l1mask = UnmaskedLeverageOne()), lp)
+        @test a.sigma == b.sigma
+        @test relerr(ta.sigma, tb.sigma) > 1e-2
+        # The carry fold masks the same rows, so it equals the batch fit under each rule.
+        le = (0, 200, 201, 300)
+        for l1 in (MaskedLeverageOne(), UnmaskedLeverageOne()), th in (0.0, 0.5)
+            pe = CrossSectionalFactorPrior(; lcfg..., th = th, l1mask = l1)
+            for (k, x) in enumerate(stream(pe, lp, le))
+                @test x.pe.cache isa po.CrossSectionalCarryState
+                bk = batch(pe, k, lp, le)
+                @test isequal(isnan.(x.pr.X), isnan.(bk.X))
+                @test relerr(x.pr.X, bk.X) <= 1e-12
+                @test relerr(x.pr.sigma, bk.sigma) <= 1e-12
+            end
+        end
+    end
+
     @testset "The carried panel rows" begin
         # The Passthrough exposures read one row and the lag is one, so two rows are kept.
         pe = CrossSectionalFactorPrior(; lambda = 1, style...)

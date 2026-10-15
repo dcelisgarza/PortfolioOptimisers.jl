@@ -1,5 +1,5 @@
 ```@meta
-Description = "Base cross-sectional factor Prior, public API of PortfolioOptimisers.jl: AbstractSystematicRepair, AbstractCarryRule."
+Description = "Base cross-sectional factor Prior, public API of PortfolioOptimisers.jl: AbstractSystematicRepair, AbstractCarryRule, AbstractLeverageOneMask, …"
 ```
 
 # Base cross-sectional factor Prior
@@ -14,6 +14,14 @@ The carry rule of a [`CrossSectionalFactorPrior`](@ref) says whether the carry f
 
 ```@docs
 AbstractCarryRule
+```
+
+The leverage-one rule of a [`CrossSectionalFactorPrior`](@ref) says how the prior reads the residual of an asset that is the only member of its level at an observation, when it scales the idiosyncratic returns. [`MaskedLeverageOne`](@ref), the default, reads it as a gap, and [`UnmaskedLeverageOne`](@ref) reads it as it stands.
+
+```@docs
+AbstractLeverageOneMask
+MaskedLeverageOne
+UnmaskedLeverageOne
 ```
 
 Every other name of this topic is private. The [private page](@ref private-api-base-cross-sectional-factor-prior) documents them.

@@ -29,5 +29,5 @@ PortfolioOptimisers.cross_sectional_fold_refit
 PortfolioOptimisers.cross_sectional_fold_step
 PortfolioOptimisers.cross_sectional_fold_histories
 PortfolioOptimisers.cross_sectional_carry_fold
-PortfolioOptimisers.fold_prior_step(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.CrossSectionalCarryState}}, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
+PortfolioOptimisers.fold_prior_step(pe::CrossSectionalFactorPrior{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:Any, <:PortfolioOptimisers.Option{<:PortfolioOptimisers.CrossSectionalCarryState}}, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 ```
