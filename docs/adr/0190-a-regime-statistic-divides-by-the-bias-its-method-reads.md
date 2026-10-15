@@ -372,12 +372,40 @@ finite at every exact count and every node. Against a Monte Carlo of a million d
 without HAC are within 0.3 %. Near the gate under two lags they read low: 0.3 % to 0.8 % for the
 first moment and the log, 0.4 % to 1.7 % for the root mean square, and 4.6 % at five assets, a
 half-life of 10 and the first scored count, where the noise of the Monte Carlo is 2 %. The variance
-of the statistic can be infinite there, so the Monte Carlo is a lower bound on the true mean
-(#1727). The
+of the statistic can be infinite there, so the Monte Carlo is a lower bound on the true mean. The
 research of #1527 had found an identity for the root mean
 square alone and a route through `E ln(1 + t d²)` for the others; that route needs a weight `t` far
 above the spectrum, which the recursion does not hold past `t d² ≈ 3`, and the frame of `W⊥` needs
 no such weight.
+
+**The rule of the level recursion is a field of the target, `recursion = MeanLevelRecursion()` (#1727).**
+The gap near the gate is the error of the level recursion, not of the dependence term or of the
+cut: it is there in the law alone, with no cut and without HAC. A Monte Carlo of the
+log-determinant `F` of each level splits it in two parts of opposite sign. The last transform
+`E[e^{-F/2}]` misses `Var[F] / 8` in its exponent, −0.95 % for the root mean square at five assets, a
+half-life of 2 and 10 observations, and each step reads the mean of a function of a random matrix
+at the mean of the matrix, +0.35 % there. A correction of the last transform alone, which the work
+on #1726 tried, therefore overshoots. `GaussianLevelRecursion()` takes the log-determinant of each
+level as a Gaussian process, and carries its covariance through each step: the linear response of
+the step, and the new variance of the removed direction in closed form through `D`, `ρ` and `ρ'` at
+the two roots of a quadratic. With the true mean and variance of the last level, the Gaussian last
+transform is within `10⁻⁴` of the Monte Carlo at every case tried. The closure lives on the grid of
+the recursion. A grid in `ln s` alone was unstable: a perturbation that sits on its lowest node meets
+`−½ δq ∫ ψ du/u ≈ −(ln(1/s₀)/2) δq` in each step, and the Chebyshev nodes on `[0, s_c]` hold no such
+mode. Its state is the removed part `q` and its covariance, so `δQ(0) = 0` by construction, past the
+grid a perturbation keeps its end value, and the variance kernel is interpolated as
+`(1 + s)(1 + t) K_int`, bounded at both ends. Against a Monte Carlo of two million draws of the law
+at half-lives of 2 to 40, no lag to two lags and two to 12 assets, the closure reads within about
+two standard errors, where the recursion read 0.2 % to 1.3 % low: at 12 assets, a half-life of 5 and
+16 observations −0.06 %, −0.01 % and +0.02 %, against −0.43 %, −0.26 % and −0.12 %. The rest is
+largest at two assets under two lags at the first count, −0.32 % for the root mean square against
+−1.3 %. The ratio of the closure to the recursion is smooth in `λ^K` and tends to 1.0008 to 1.0015
+past the saturation, so the nodes run the closure at eight counts and interpolate the ratio, within
+`2 × 10⁻⁵`. Under `EstimatedCentring()` the factor takes the ratio of the pre-centred law: under HAC
+the root mean square and the log then read within the noise, and the first moment, which read 0.1 %
+to 0.2 % high at 8 and 12 assets, 0.26 % to 0.40 % high. The nodes of one count of assets cost 2 s
+to 5.4 s, where the recursion costs 0.3 s to 0.9 s, so the recursion stays the default, and #1738
+decides on the forecasts of the estimator whether the closure stays.
 
 **`ExactDebias()` reads the law and the dependence, and `LawDebias()` the law alone (#1549).** The
 maintainer asked for both, the exact rule as the default. `LawDebias()` takes the deviation as

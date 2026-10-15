@@ -1127,6 +1127,9 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
   - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `recursion::AbstractLevelRecursion`: The rule of the level recursion,
+    [`MeanLevelRecursion`](@ref) by default. Each factor is multiplied by the ratio of
+    [`mahalanobis_recursion_ratio`](@ref), on the pre-centred law at every centring.
 
 # Returns
 
@@ -1144,7 +1147,8 @@ and up to 3.7 s at a half-life of 250, five lags and 12 assets.
 function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::Integer,
                                 hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
                                 centring::AbstractCentring = PreCentred(),
-                                debias::AbstractRegimeDebias = ExactDebias())
+                                debias::AbstractRegimeDebias = ExactDebias(),
+                                recursion::AbstractLevelRecursion = MeanLevelRecursion())
     start = mahalanobis_bias_start(decay, n, hac_lags)
     Ksat = max(mahalanobis_bias_saturation(decay, n), start)
     K1 = min(start + (isnothing(hac_lags) ? 0 : 32), Ksat)
@@ -1154,8 +1158,13 @@ function mahalanobis_bias_nodes(method::RegimeAdjustedMethod, decay::Number, n::
                      clamp(round(Int, K1 + log(t) / log(decay)), K1, Ksat)
                  end
                  for t in (1 .- cos.(pi .* (0:15) ./ 15 .* one(decay))) ./ 2])
-    f = mahalanobis_level_bias(method, decay, vcat(Ks, start:(K1 - 1)), n, hac_lags,
-                               centring, debias)
+    Kall = vcat(Ks, start:(K1 - 1))
+    f = mahalanobis_level_bias(method, decay, Kall, n, hac_lags, centring, debias)
+    ratio = mahalanobis_recursion_ratio(recursion, method, decay, Kall, n, hac_lags, start,
+                                        Ksat)
+    if !isnothing(ratio)
+        f = f .* ratio
+    end
     sigma = decay .^ (Ks .- (n + 4))
     ratio = view(f, eachindex(Ks)) ./
             [inverse_wishart_bias(method, mahalanobis_bias(decay, K, n), n) for K in Ks]
@@ -1180,6 +1189,8 @@ interpolation the first time the state meets a count of assets.
     `nothing`.
   - `centring::AbstractCentring`: The centring of the estimator, [`PreCentred`](@ref) by default.
   - `debias::AbstractRegimeDebias`: The debias rule, [`ExactDebias`](@ref) by default.
+  - `recursion::AbstractLevelRecursion`: The rule of the level recursion,
+    [`MeanLevelRecursion`](@ref) by default.
 
 # Returns
 
@@ -1197,9 +1208,10 @@ function mahalanobis_regime_bias!(store::AbstractDict, method::RegimeAdjustedMet
                                   decay::Number, K::Integer, n::Integer,
                                   hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
                                   centring::AbstractCentring = PreCentred(),
-                                  debias::AbstractRegimeDebias = ExactDebias())
-    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags, centring, debias),
-                 store, n)
+                                  debias::AbstractRegimeDebias = ExactDebias(),
+                                  recursion::AbstractLevelRecursion = MeanLevelRecursion())
+    nodes = get!(() -> mahalanobis_bias_nodes(method, decay, n, hac_lags, centring, debias,
+                                              recursion), store, n)
     i = K - nodes.start + 1
     if i in eachindex(nodes.exact)
         return nodes.exact[i]

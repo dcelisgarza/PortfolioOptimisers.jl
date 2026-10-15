@@ -1270,7 +1270,8 @@ function regime_target_statistic(target::MahalanobisTarget,
         mahalanobis_regime_bias!(cache.bias.nodes, ce.regime_method, decay, K, n,
                                  correlation_hac_lags!(cache.bias, ce),
                                  has_separate_cor_decay(ce) ? PreCentred() : ce.centring,
-                                 ce.debias) * variance_noise_bias!(cache.bias, ce, K, n)
+                                 ce.debias, target.recursion) *
+        variance_noise_bias!(cache.bias, ce, K, n)
     end
     if isnothing(b)
         return nothing

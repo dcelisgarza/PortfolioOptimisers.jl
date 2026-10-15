@@ -509,7 +509,24 @@ A rule is a marker for dispatch, and it holds no data. A new rule needs a method
   - [`ScoreIndefiniteBlock`](@ref)
 """
 abstract type AbstractIndefiniteBlockRule <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the rule that computes the Mahalanobis bias factor from the level recursion over the directions of the estimate.
+
+[`MahalanobisTarget`](@ref) holds the rule in its `recursion` field. The level recursion of [`mahalanobis_level_bias`](@ref) takes the mean log-determinant of each level inside the exponential, and a rule names what it does about the variance it leaves out. The root lives with the other roots, because the target binds its field before the members load.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`mahalanobis_recursion_ratio`](@ref).
+
+# Related
+
+  - [`MeanLevelRecursion`](@ref)
+  - [`GaussianLevelRecursion`](@ref)
+"""
+abstract type AbstractLevelRecursion <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
        OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, AbstractCentring,
        AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming,
-       AbstractCorrelationVolatility, AbstractIndefiniteBlockRule
+       AbstractCorrelationVolatility, AbstractIndefiniteBlockRule, AbstractLevelRecursion

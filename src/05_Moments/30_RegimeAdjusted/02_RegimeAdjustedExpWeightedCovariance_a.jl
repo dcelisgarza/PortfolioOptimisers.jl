@@ -128,6 +128,26 @@ volatility before its update and the tables at `cor_decay` read the kernel of
 1.090 for `RootMeanSquaredAdjusted` at `cor_decay` alone and 1.026 with the rule after the
 update.
 
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    MahalanobisTarget(;
+        recursion::AbstractLevelRecursion = MeanLevelRecursion()
+    ) -> MahalanobisTarget
+
+Keywords correspond to the struct's fields.
+
+# Examples
+
+```jldoctest
+julia> MahalanobisTarget()
+MahalanobisTarget
+  recursion ┴ MeanLevelRecursion()
+```
+
 # Related
 
   - [`RegimeAdjustedTarget`](@ref)
@@ -136,8 +156,21 @@ update.
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
   - [`mahalanobis_regime_bias!`](@ref)
   - [`variance_noise_bias!`](@ref)
+  - [`AbstractLevelRecursion`](@ref)
 """
-struct MahalanobisTarget <: RegimeAdjustedTarget end
+@concrete struct MahalanobisTarget <: RegimeAdjustedTarget
+    """
+    $(field_dict[:ra_recursion])
+    """
+    recursion
+    function MahalanobisTarget(recursion::AbstractLevelRecursion)
+        return new{typeof(recursion)}(recursion)
+    end
+end
+function MahalanobisTarget(;
+                           recursion::AbstractLevelRecursion = MeanLevelRecursion())::MahalanobisTarget
+    return MahalanobisTarget(recursion)
+end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

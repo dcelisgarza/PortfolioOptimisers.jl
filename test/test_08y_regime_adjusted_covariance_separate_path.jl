@@ -602,3 +602,68 @@ it as it is.
     @test !PO.regime_bias_open(ExactDebias(), na, 2.0^(-1 / 20), K1 - 1, 2)
     @test PO.regime_bias_open(ExactDebias(), na, 2.0^(-1 / 20), K1, 2)
 end
+
+#=
+Issue #1727. The level recursion of `mahalanobis_level_bias` takes the mean log-determinant of each
+level inside the exponential, so near the gate it reads 0.2 % to 1.3 % low against a Monte Carlo
+of the statistic. `MahalanobisTarget(; recursion = GaussianLevelRecursion())` carries the
+covariance of the log-determinant too, a second-order closure, and reads within the noise. The
+default stays `MeanLevelRecursion()`. Issue #1738 compares the two on the forecasts of the
+estimator.
+=#
+@testset "the Mahalanobis target names the rule of its level recursion" begin
+    methods = (PO.RootMeanSquaredAdjusted(), PO.FirstMomentRegimeAdjusted(),
+               PO.LogRegimeAdjusted())
+    @test MahalanobisTarget().recursion === MeanLevelRecursion()
+    @test MahalanobisTarget(; recursion = GaussianLevelRecursion()).recursion ===
+          GaussianLevelRecursion()
+    @test isnothing(PO.mahalanobis_recursion_ratio(MeanLevelRecursion(), methods[1], 0.9,
+                                                   [10, 20], 5, nothing, 9, 400))
+    # The default rule reads the factor of the recursion, as before #1727.
+    lam = 2.0^(-1 / 10)
+    store = PO.regime_bias_store(MahalanobisTarget(), lam, Float64).nodes
+    @test PO.mahalanobis_regime_bias!(store, methods[2], lam, 30, 5) ==
+          PO.mahalanobis_regime_bias!(Dict{Int, Any}(), methods[2], lam, 30, 5, nothing,
+                                      PreCentred(), ExactDebias(), MeanLevelRecursion())
+
+    # A Monte Carlo of 2 million draws of the law of the statistic (Rao-Blackwellised over the n
+    # directions), per (half-life, lags, n, K): the factors of the three methods and their relative
+    # standard errors. The mean recursion reads them 0.2 % to 0.7 % low; the closure reads within 3
+    # standard errors (measured +0.10 %, +0.08 %, +0.07 % and -0.01 %, +0.01 %, +0.01 %). The second
+    # case has a negative eigenvalue, so its last transform is cut.
+    refs = [(2, 0, 5, 10) => ([4.069916, 3.45753, 2.990133], [4.9e-4, 3.5e-4, 2.9e-4]),
+            (10, 2, 5, 14) => ([3.442586, 3.005222, 2.652363], [4.1e-4, 3.0e-4, 2.6e-4])]
+    for (case, (ref, se)) in refs
+        hl, L, n, K = case
+        d = 2.0^(-1 / hl)
+        hac = L == 0 ? nothing : L
+        f = PO.level_closure_factors(methods, d, K, n, hac)
+        mean = [PO.mahalanobis_level_bias(m, d, [K], n, hac)[1] for m in methods]
+        for i in 1:3
+            @test abs(f[i] / ref[i] - 1) < 3 * se[i]
+            @test mean[i] / ref[i] - 1 < -2 * se[i]
+        end
+    end
+
+    # The nodes multiply each factor by the ratio of the closure to the recursion, interpolated
+    # from eight counts: against the closure itself at counts between them, within 2e-5 (measured
+    # 1.1e-5 at most over five settings).
+    for (d, n, hac) in ((lam, 5, nothing), (lam, 5, 2))
+        g = Dict{Int, Any}()
+        K1 = PO.mahalanobis_bias_start(d, n, hac)
+        for K in (K1 + 5, 3 * K1)
+            f = PO.mahalanobis_regime_bias!(g, methods[2], d, K, n, hac, PreCentred(),
+                                            ExactDebias(), GaussianLevelRecursion())
+            @test isapprox(f, PO.level_closure_factors((methods[2],), d, K, n, hac)[1];
+                           rtol = 2e-5)
+        end
+    end
+
+    # The estimator fits with the closure, and the multiplier is finite.
+    X = randn(StableRNG(1727), 60, 4)
+    ce = RegimeAdjustedExpWeightedCovariance(; decay = lam,
+                                             regime_target = MahalanobisTarget(;
+                                                                               recursion = GaussianLevelRecursion()))
+    S = cov(ce, X)
+    @test all(isfinite, S) && issymmetric(S)
+end

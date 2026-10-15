@@ -13,4 +13,5 @@ separate_path_sums!
 exp_weight_convolution_table
 regime_covariance_block
 regime_block_built
+portfolio_directions
 ```

@@ -15,6 +15,7 @@ AbstractHacFloor
 AbstractHacVolatilityTiming
 AbstractCorrelationVolatility
 AbstractIndefiniteBlockRule
+AbstractLevelRecursion
 Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, state)
 Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, i::Int)
 ```

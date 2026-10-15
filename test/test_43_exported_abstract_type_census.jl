@@ -149,6 +149,7 @@
         :AbstractIndefiniteBlockRule,
         :AbstractLastObservationAlgorithm,
         :AbstractLearningRateSchedule,
+        :AbstractLevelRecursion,
         :AbstractLeverageOneMask,
         :AbstractLongRunForm,
         :AbstractLongRunKernel,
