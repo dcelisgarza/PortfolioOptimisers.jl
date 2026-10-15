@@ -3,6 +3,13 @@ name: Doc preview cleanup
 on:
   pull_request:
     types: [closed]
+  # The weekly run clears what the close of a pull request did not: a preview that a run missed, a
+  # run that failed, or a backlog from before this job existed. A schedule fires only from the
+  # default branch, so it and the manual trigger run once this file reaches `main`.
+  schedule:
+    # Sunday, 04:00 UTC.
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
 
 # `gh-pages` carries one full documentation build per open pull request, under
 # `previews/PR<number>`. This job deletes the preview of every pull request that is not open.
@@ -10,13 +17,18 @@ on:
 # It deletes every such preview, not only the one of the pull request that closed. A preview that
 # an earlier run missed still goes, so the previews of closed pull requests cannot pile up. They
 # did pile up once: the site passed the 10 GiB limit of GitHub Pages and every deployment failed.
+# `PagesHealth.yml` watches the size of the site and the result of each deployment.
 concurrency:
-  # This is the group of the Docs run of the same pull request (`Docs.yml` names its group
-  # `${{ github.workflow }}-${{ github.ref }}`), so this run cancels a preview build that is in
-  # progress. Without the cancellation, a build that started before the close deploys after the
-  # cleanup, and its preview comes back.
-  group: Docs-${{ github.ref }}
-  cancel-in-progress: true
+  # On the close of a pull request, this is the group of the Docs run of the same pull request
+  # (`Docs.yml` names its group `${{ github.workflow }}-${{ github.ref }}`), so this run cancels a
+  # preview build that is in progress. Without the cancellation, a build that started before the
+  # close deploys after the cleanup, and its preview comes back.
+  #
+  # A scheduled or manual run has the ref of a branch, and the Docs group of a branch holds its
+  # deploy, which must not be cancelled. Such a run takes a group of its own and cancels nothing.
+  group: >-
+    ${{ github.event_name == 'pull_request' && format('Docs-{0}', github.ref) || 'doc-preview-cleanup-sweep' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   doc-preview-cleanup:
