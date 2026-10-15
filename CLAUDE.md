@@ -63,6 +63,11 @@ before you merge so you lower the number that is current.
   prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
   Narrow it with `--testset=<regex>`, `--time-depth=<N>`, `--timeout=<seconds>`; a red listed in
   `test/known_red.toml` is named on its `RESULT` line (the header of `test/run_files.jl` explains).
+- **A targeted test is one whose result the change can alter.** Trace from the changed code to the
+  test files that assert a value passing through it, add the file of the new test, and add the
+  censuses that read what the commit touched. A file that only names a changed type is not
+  targeted. After a rebase, rerun the files that both your change and the new commits of `dev`
+  reach, and `code_health/gate_stamp.sh drop` every other stale stamp.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 
