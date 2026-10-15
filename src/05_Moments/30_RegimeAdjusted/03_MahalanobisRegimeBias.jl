@@ -761,7 +761,10 @@ Where:
 # Returns
 
   - `cut::Option{<:NamedTuple}`: `nothing` where `peak` is `nothing`. Else the cut ``s^{*}`` as
-    `sstar`, and as `gt` the true ``g`` up to ``\\sigma^{*}``, with ``g(\\sigma^{*})`` past it.
+    `sstar`, and as `gt` the true ``g`` up to ``\\sigma^{*}``, with ``g(\\sigma^{*})`` past it. A
+    point that the lattice marks dead takes ``g(\\sigma^{*})`` too. The lattice can mark a point dead
+    by round-off where the exact slope of [`hac_log_det_peak`](@ref) is still positive, and the peak
+    then falls on that point.
 
 # Related
 
@@ -775,10 +778,12 @@ end
 function mahalanobis_cut!(gh::VecNum, rh::VecNum, xf::AbstractRange, ct::Number,
                           peak::Tuple)
     sigma, gs = peak
-    p = searchsortedlast(xf, log(sigma))
+    # Where the exact slope is still positive at the first point that the lattice marks dead, the
+    # peak falls on that point, so the true g stops at the last point that is not dead.
+    p = min(searchsortedlast(xf, log(sigma)), findlast(isfinite, gh))
     gt = copy(gh)
     gt[(p + 1):end] .= gs
-    pm = argmax(q -> exp(xf[q]) * rh[q], firstindex(xf):p)
+    pm = argmax(q -> exp(xf[q]) * real(rh[q]), firstindex(xf):p)
     nm = exp(xf[pm]) * rh[pm]
     for q in (pm + 1):lastindex(xf)
         gh[q] = gh[pm] + nm * (xf[q] - xf[pm])
@@ -864,7 +869,7 @@ function mahalanobis_transform(grid::NamedTuple, gh::VecNum, e::VecNum, m::Integ
     ls = log(grid.cut.sstar)
     k = clamp(round(Int, (ls - log(first(grid.so))) / grid.ho), 0, length(grid.so) - 1)
     so = grid.so .* exp(ls - log(grid.so[k + 1]))
-    L = zero(so)
+    L = zeros(promote_type(eltype(so), eltype(gh), eltype(e)), length(so))
     for a in 1:(k + 1)
         st = lagrange_stencil(first(xf), step(xf), length(xf), log(so[a]))
         L[a] = exp(-(stencil_dot(st, grid.cut.gt, m) -

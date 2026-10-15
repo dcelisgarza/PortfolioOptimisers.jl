@@ -344,15 +344,21 @@ coordinate along `e` is `‖u‖/√f`, so the mean over it is in closed form, a
 log-determinant inside the exponential, as the recursion takes it, the last transform `L` becomes
 `L^{n+1} L⊥^{−n}`. Against a Monte Carlo of a million draws of the statistic, at half-lives of 5,
 10 and 40, no lag to four lags and two to 12 assets, the three factors are within 0.3 % at the
-steady state and 0.6 % at the first scored count, the error of the level recursion, with or
-without HAC, where the pre-centred factors were 1.3 % to 3.1 % high under HAC and 7.5 % at the first
-scored count of a half-life of 40. Two exceptions are open. The root-mean-squared factor is not
-finite at two to six assets and the first counts after the gate, without HAC, because its central
-difference in `t` steps past the range where the columns are linear, and under two lags they are
-not finite at two assets and the first scored count: the three methods at a half-life of 10, and
-the root mean square at two and three assets at a half-life of 40 (#1724). At two assets and the
-first scored count under two lags, the finite factors read 0.5 % to 0.9 % below a Monte Carlo of
-four million draws. The research of #1527 had found an identity for the root mean
+steady state, with or without HAC, where the pre-centred factors were 1.3 % to 3.1 % high under
+HAC and 7.5 % at the first scored count of a half-life of 40. The root mean square takes the derivative in `t` by a complex
+step, with the step `√ε` over the largest `σ V_g` (#1724). A central difference at `t = ±ε^(1/3)`
+moved the columns by `t σ V_g`, which reaches `10¹⁶` at the top of the lattice of a small block, so
+the factor was not finite at two to eight assets and the first counts. Under HAC the lattice can
+mark a point dead by round-off where the exact slope is still positive, and the cut must not read
+that point: at two assets and the first scored count every factor was not finite. A grid of two to
+12 assets, half-lives 5, 10 and 40, no lag and two lags, each method and each debias rule, is
+finite at every exact count and every node. Against a Monte Carlo of a million draws the factors
+without HAC are within 0.3 %. Near the gate under two lags they read low: 0.3 % to 0.8 % for the
+first moment and the log, 0.4 % to 1.7 % for the root mean square, and 4.6 % at five assets, a
+half-life of 10 and the first scored count, where the noise of the Monte Carlo is 2 %. The variance
+of the statistic can be infinite there, so the Monte Carlo is a lower bound on the true mean
+(#1727). The
+research of #1527 had found an identity for the root mean
 square alone and a route through `E ln(1 + t d²)` for the others; that route needs a weight `t` far
 above the spectrum, which the recursion does not hold past `t d² ≈ 3`, and the frame of `W⊥` needs
 no such weight.

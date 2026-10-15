@@ -212,8 +212,10 @@ this dependence moves.
 
 The columns agree with the eigenvalues of a dense ``M_{K}`` to ``10^{-11}``. Against a Monte Carlo
 of a million draws of the statistic at half-lives of 5, 10 and 40, no lag to four lags and two to
-12 assets, the three factors of [`ExactDebias`](@ref) are within 0.3 % at the steady state and
-0.6 % at the first scored count, the error of the level recursion. The factors of the law alone,
+12 assets, the three factors of [`ExactDebias`](@ref) are within 0.3 % at the steady state, and
+without HAC at the first scored count. Near the gate under HAC they read 0.3 % to 1.7 % low, and
+4.6 % low for the root mean square at five assets and a half-life of 10, the error of the level
+recursion. The factors of the law alone,
 [`LawDebias`](@ref), are 0.2 % to 1.4 % high. The pre-centred factors are 1.3 % to 3.1 % high
 under HAC, and 7.5 % at the first scored count of a half-life of 40.
 
@@ -397,7 +399,9 @@ complement of that direction, and ``\\|u\\|^{2} / f`` is a ``\\chi^{2}_{n}``.
   - The root mean square reads ``\\mathbb{E}[u^{\\top} W^{-1} u] = \\mathbb{E}[\\operatorname{tr} W^{-1}] + \\mathbb{E}[y^{\\top} W^{-1} y]``,
     ``y = Z^{\\top} g``, and the second term is the derivative in ``t`` of
     ``\\mathbb{E}[\\ln \\det Z^{\\top}(M_{K} + t\\, g g^{\\top}) Z]``: the columns move by ``t\\, \\sigma V_{g}``,
-    and a central difference of ``J`` at ``t = \\pm \\epsilon^{1/3}`` gives it, at a fixed cut.
+    and a complex step of ``J`` in ``t`` gives it, at a fixed cut. A finite step does not: ``t\\, \\sigma V_{g}``
+    grows with ``\\sigma`` past the range where the moved columns hold, so the step is
+    ``\\sqrt{\\epsilon}`` over the largest ``\\sigma V_{g}``, and the derivative has no cancellation.
   - The log reads ``\\mathbb{E}[\\ln d^{2}]``, and
     ``\\ln d^{2} = \\ln \\|u\\|^{2} + \\ln \\det W_{\\perp} - \\ln \\det W`` up to the scale. Each
     log-determinant is the sum over the levels of ``\\mathbb{E}[\\ln S_{k}] = \\int (e^{-s/2} - L_{k}) s^{-1} \\mathrm{d}s``,
@@ -414,7 +418,7 @@ Any other method returns the factor of the law.
 
 ```math
 \\begin{align}
-b_{R} &= \\frac{1}{f} \\left(b - \\frac{J(t) - J(-t)}{2 t\\, n c}\\right)\\,, \\\\
+b_{R} &= \\frac{1}{f} \\left(b - \\frac{\\operatorname{Im} J(i t)}{t\\, n c}\\right)\\,, \\\\
 b_{L} &= \\frac{\\tilde{c}}{c} \\exp\\left(J - J_{\\perp} - h \\sum_{s} e^{-s / 2}\\right)\\,, \\\\
 b_{F} &= \\frac{\\tilde{c}}{c} \\frac{1}{2 \\pi} \\left(h \\sum_{s} s^{1/2} L(s)^{n + 1} L_{\\perp}(s)^{-n}\\right)^{2}\\,.
 \\end{align}
@@ -454,15 +458,20 @@ function estimated_mahalanobis_dependence(::RootMeanSquaredAdjusted, b::Number,
                                           ctx::NamedTuple, ::Tuple, peak::Option{<:Tuple},
                                           shift::Tuple, decay::Number, K::Integer)
     (; grid, cols, bufs, n) = ctx
-    ep = cbrt(eps(typeof(b)))
-    Jt = map((ep, -ep)) do t
-        pk = isnothing(peak) ? nothing : (peak[1], peak[4] + t * peak[1] * peak[5])
-        return mahalanobis_level_sum!(grid, cols.g .+ t .* cols.vt, cols.r .+ t .* cols.rt,
-                                      pk, shift, n, bufs)[3]
-    end
+    T = typeof(b)
+    # `vt` reaches 1e21 at the top of the lattice of a small block, so the step is scaled to it.
+    sc = maximum(x -> isfinite(x) ? abs(x) : zero(x), cols.vt; init = one(T))
+    sc = max(sc, maximum(x -> isfinite(x) ? abs(x) : zero(x), cols.rt; init = one(T)))
+    ep = sqrt(eps(T)) / sc
+    C = Complex{T}
+    cbufs = (; dg = zeros(C, size(bufs.dg)), dr = zeros(C, size(bufs.dr)),
+             v = zeros(C, length(bufs.v)), e = zeros(C, length(bufs.e)),
+             lv = map(x -> zeros(C, length(x)), bufs.lv))
+    pk = isnothing(peak) ? nothing : (peak[1], complex(peak[4], ep * peak[1] * peak[5]))
+    J = mahalanobis_level_sum!(grid, complex.(cols.g, ep .* cols.vt),
+                               complex.(cols.r, ep .* cols.rt), pk, shift, n, cbufs)[3]
     c = (one(decay) - decay) / (one(decay) - decay^K)
-    return (b - (Jt[1] - Jt[2]) / (2 * ep) / (n * c)) /
-           centring_factor(EstimatedCentring(), decay, K + 1)
+    return (b - imag(J) / ep / (n * c)) / centring_factor(EstimatedCentring(), decay, K + 1)
 end
 function estimated_mahalanobis_dependence(::LogRegimeAdjusted, ::Number, ctx::NamedTuple,
                                           law::Tuple, peak::Option{<:Tuple}, shift::Tuple,

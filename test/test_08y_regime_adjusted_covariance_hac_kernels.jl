@@ -539,9 +539,24 @@ estimate and the dependence of the deviation on it; `LawDebias()` reads the law 
                                            nothing)
     @test st.bias == PO.regime_bias_table(ce.regime_method, lam, length(st.bias), 2,
                                           EstimatedCentring(), LawDebias())
-    # #1724: at a small block and a small count the root-mean-squared factor is NaN, because the
-    # central difference in `t` steps far past the range where its columns are linear.
-    @test_broken all(isfinite,
-                     PO.mahalanobis_level_bias(methods[1], lam, [6, 7, 30], 2, nothing,
-                                               EstimatedCentring()))
+    # #1724: at a small block and a small count the root-mean-squared factor was NaN, because a
+    # central difference in `t` stepped far past the range where its columns are linear. The
+    # complex step has no such range.
+    f = PO.mahalanobis_level_bias(methods[1], lam, [6, 7, 30], 2, nothing,
+                                  EstimatedCentring())
+    @test isapprox(f, [2.01020, 1.76105, 1.14720]; rtol = 1e-5)
+    # Under two lags at two assets the lattice marks a point dead by round-off where the exact
+    # slope is still positive, and the cut fell on it: every factor at the first count was Inf.
+    for m in methods, d in (ExactDebias(), LawDebias())
+        @test all(isfinite,
+                  PO.mahalanobis_level_bias(m, lam, [6, 7], 2, 2, EstimatedCentring(), d))
+    end
+    # Every exact count and every node of the interpolation is finite, up to eight assets.
+    for (hl, lags, n) in
+        [(10, nothing, 2), (10, nothing, 3), (10, nothing, 8), (10, 2, 2), (10, 2, 3),
+         (10, 2, 8), (40, 2, 2)]
+        nd = PO.mahalanobis_bias_nodes(methods[1], 2.0^(-1 / hl), n, lags,
+                                       EstimatedCentring(), ExactDebias())
+        @test all(isfinite, nd.exact) && all(isfinite, nd.ratio)
+    end
 end
