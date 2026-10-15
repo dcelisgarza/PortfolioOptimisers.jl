@@ -205,6 +205,24 @@ The type names the power of the risk in the denominator of the ratio, as [`Squar
 
 All concrete types that select the ratio of a lifted variance should subtype `RatioFormulation`.
 
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `RatioFormulation` and implement the following method. The root has no method, so a member without one fails with a `MethodError` when the model asks it for the flag.
+
+## `sdp_objective_lift_flag`
+
+  - [`sdp_objective_lift_flag(model::JuMP.Model, ratio_alg::RatioFormulation, settings::RiskMeasureSettings)`](@ref): Returns `true` when the objective term of the variance reads the lift with a constant corner, which gives the ratio of [`SquareRootRatio`](@ref), and `false` when it reads the lift with the corner ``k``, which gives the ratio of [`LinearRatio`](@ref).
+
+### Arguments
+
+  - `model`: The JuMP model of the optimisation.
+  - `ratio_alg`: The concrete subtype instance.
+  - `settings`: The settings of the measure.
+
+### Returns
+
+  - `flag::Bool`.
+
 # Related
 
   - [`SquareRootRatio`](@ref)
@@ -1375,3 +1393,4 @@ risk_input_kind(::UncertaintySetVariance) = WeightsInput()
 
 export SOCRiskExpr, QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, SquareRootRatio,
        LinearRatio, Variance, StandardDeviation, UncertaintySetVariance
+public RatioFormulation

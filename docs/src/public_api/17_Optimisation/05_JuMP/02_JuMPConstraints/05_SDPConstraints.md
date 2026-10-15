@@ -1,7 +1,11 @@
 ```@meta
-Description = "SDP Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "SDP Constraints, public API of PortfolioOptimisers.jl: sdp_objective_lift_flag."
 ```
 
 # SDP Constraints
 
-Every name of this topic is private. The [private page](@ref private-api-sdp-constraints) documents them.
+A member of [`RatioFormulation`](@ref) implements the verb below. The [private page](@ref private-api-sdp-constraints) documents the other names of this topic.
+
+```@docs
+sdp_objective_lift_flag
+```

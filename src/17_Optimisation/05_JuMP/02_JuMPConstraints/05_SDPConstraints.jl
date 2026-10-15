@@ -764,3 +764,5 @@ function set_sdp_frc_phylogeny_constraints!(model::JuMP.Model,
     end
     return nothing
 end
+
+public sdp_objective_lift_flag

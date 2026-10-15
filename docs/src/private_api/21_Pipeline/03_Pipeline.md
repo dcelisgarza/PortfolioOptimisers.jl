@@ -29,7 +29,7 @@ assert_constraint_targets
 
 ## The group of a pipeline
 
-A `Pipeline` joins the group of its last optimiser, so its constructor warns on a reader that states no source beside a reader of the Excess Frame. A nested `Pipeline` adds the frames of its last step to the outer group.
+A `Pipeline` joins the group of its last optimiser, so its constructor warns on a reader that states no source beside a reader of the excess returns. A nested `Pipeline` adds the frames of its last step to the outer group.
 
 ```@docs
 group_frames(::Pipeline)

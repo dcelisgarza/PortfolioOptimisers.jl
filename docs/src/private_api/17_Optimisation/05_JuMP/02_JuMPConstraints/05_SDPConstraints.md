@@ -11,7 +11,6 @@ PortfolioOptimisers.mark_risk_minimised!
 set_sdp_constraints!
 set_sdp_frc_constraints!
 set_sdp_lift_corner!
-sdp_objective_lift_flag
 assert_one_lift_corner
 set_sdp_objective_lift!
 set_sdp_frc_objective_lift!

@@ -429,4 +429,4 @@ v0.33 removes `brt`. Each reader of the returns now states the returns that it f
 ### [If you extend the library](@id migration-0-33-extending)
 
 - **A prior of your own** states its source with a method of `returns_source`, which is now public. A prior with no method reads the raw returns.
-- **`LowOrderPrior`** has a field `x_src` after `fpr`, so its positional constructor takes one more argument. `prior` over a `ReturnsResult`, and the read-out of an online fold, record in it the source of the prior. A returns-matrix method records `nothing`. A Prior Result of your own records no source, and an optimiser reads its returns as raw.
+- **`LowOrderPrior`** has a field `x_src` after `fpr`, so its positional constructor takes one more argument. `prior` over a `ReturnsResult`, and the result that an online fold gives, record in it the source of the prior. A returns-matrix method records `nothing`. A Prior Result of your own records no source, and an optimiser reads its returns as raw.

@@ -22,7 +22,7 @@ add_constraint_result
 
 ## The frame of a step
 
-A step that reads the returns reads them from the source that its own reader states in its `x_src` field. A [`PipelineStep`](@ref) holds no source. The steps whose values the last optimiser receives join the group of that optimiser, and the readers that those values replace leave it. The [`Pipeline`](@ref) constructor warns on that group, and it refuses a prior step in the Excess Frame that feeds an optimiser with a data benchmark.
+A step that reads the returns reads them from the source that its own reader states in its `x_src` field. A [`PipelineStep`](@ref) holds no source. The steps whose values the last optimiser receives join the group of that optimiser, and the readers that those values replace leave it. The [`Pipeline`](@ref) constructor warns on that group, and it refuses a prior step that fits on the excess returns and feeds an optimiser with a data benchmark.
 
 ```@docs
 reader_frames(::PipelineStep, ::AbstractString, ::Bool)

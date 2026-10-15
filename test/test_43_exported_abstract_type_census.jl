@@ -83,6 +83,9 @@
     section and its two members on 2026-10-08 (issue #1606). `AbstractCrossSectionalSolveAlgorithm`,
     the family of the solve rule of the two cross-sectional regression estimators, joined with
     its `# Interfaces` section on 2026-10-15 (issue #1721, the maintainer's ruling).
+    `RatioFormulation`, the family of the ratio of a lifted variance, joined with its
+    `# Interfaces` section the same day under the rule of #1489, after #1676 exported its two
+    members.
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -179,7 +182,7 @@
                           :AbstractCarryRule, :AbstractUnseenMemberRule,
                           :AbstractMeanTestEstimator, :AbstractLongRunKernel,
                           :AbstractMeanTestSpan, :AbstractBootstrapDraws,
-                          :AbstractLongRunForm, :AbstractReturnsSource])
+                          :AbstractLongRunForm, :AbstractReturnsSource, :RatioFormulation])
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&
