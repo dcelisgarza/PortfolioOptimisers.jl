@@ -13,6 +13,7 @@ AbstractCentring
 AbstractRegimeDebias
 AbstractHacFloor
 AbstractHacVolatilityTiming
+AbstractCorrelationVolatility
 Base.iterate(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, state)
 Base.getindex(obj::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult}, i::Int)
 ```

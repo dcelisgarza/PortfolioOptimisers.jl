@@ -93,7 +93,8 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
 =#
 @testset "under HAC the separate path divides each row by the volatility before its update" begin
     # The recursion by hand on a two-asset case of six rows and one lag.
-    function by_hand(X, lam, lamc, before)
+    # Under the default `cor_vol` each variance is divided by its weight first (#1729).
+    function by_hand(X, lam, lamc, before, corrected = true)
         v, Q, prev = zeros(2), zeros(2, 2), nothing
         for t in axes(X, 1)
             x = X[t, :]
@@ -102,6 +103,9 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
                 A += (x * transpose(prev) + prev * transpose(x)) / 2
             end
             s = before ? v : lam * v + (1 - lam) * diag(A)
+            if corrected
+                s = s / max(1 - lam^(before ? t - 1 : t), eps())
+            end
             v = lam * v + (1 - lam) * diag(A)
             is = [si > 1e-12 ? 1 / sqrt(si) : 0.0 for si in s]
             Q = lamc * Q + (1 - lamc) * A .* (is * transpose(is))
@@ -126,6 +130,10 @@ is `x_t² ≥ 0`, and the rule after the update stays (#1440).
         v, Q = by_hand(X, 0.8, 0.9, b)
         @test st.variance ≈ v rtol = 1e-14
         @test st.cor_state ≈ Q rtol = 1e-14
+        # The oracle's rule reads the raw variance state.
+        raw = PO.regime_adjusted_covariance_pass!(rule(b; cor_vol = RawVolatility()), X, 1,
+                                                  nothing, nothing)
+        @test raw.cor_state ≈ by_hand(X, 0.8, 0.9, b, false)[2] rtol = 1e-14
     end
     # The two rules differ, and the default is the rule before the update.
     @test !isapprox(states[1].cor_state, states[2].cor_state; rtol = 1e-2)

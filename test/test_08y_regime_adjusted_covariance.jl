@@ -93,7 +93,9 @@ end
                              oracle_estimator(; regime_target = PO.DiagonalTarget(),
                                               regime_method = PO.RootMeanSquaredAdjusted(), hac_lags = 2),
                              ORACLE_DIAGONAL_RMS_HAC),
-                            ("separate corr", oracle_estimator(; cor_decay = 0.97), ORACLE_SEPARATE_CORR),
+                            # The oracle divides each product by the raw variance state (#1729).
+                            ("separate corr", oracle_estimator(; cor_decay = 0.97, cor_vol = RawVolatility()),
+                             ORACLE_SEPARATE_CORR),
                             # The oracle's estimated location, `ZeroStartCentring()` since #1507.
                             ("uncentred", oracle_estimator(; centring = ZeroStartCentring()), ORACLE_UNCENTRED))
         # The two implementations run the same operations in a different language and sum in

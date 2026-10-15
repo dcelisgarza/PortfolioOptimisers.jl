@@ -119,6 +119,7 @@
         :AbstractConstraintEstimator,
         :AbstractConstraintResult,
         :AbstractConstraintSpace,
+        :AbstractCorrelationVolatility,
         :AbstractCovarianceEstimator,
         :AbstractCovarianceShrinkageTarget,
         :AbstractCoverageAlgorithm,

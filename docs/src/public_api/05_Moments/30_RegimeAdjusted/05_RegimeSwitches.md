@@ -14,6 +14,8 @@ NoHacFloor
 PerTermHacFloor
 VolatilityBeforeUpdate
 VolatilityAfterUpdate
+BiasCorrectedVolatility
+RawVolatility
 ```
 
 ## Functions
@@ -23,4 +25,5 @@ debiases
 reads_dependence
 hac_floor!
 volatility_before_update
+correlation_variance
 ```

@@ -266,6 +266,84 @@ function volatility_before_update(::VolatilityAfterUpdate)
     return false
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Standardises each product of the separate correlation path by the bias-corrected variance. This is the default rule.
+
+The variance state is seeded at zero, so after ``K`` steps it holds ``1 - \\lambda^{K}`` times the variance. A product divided by the raw state thus carries the weight ``1 / (1 - \\lambda^{K})``, which falls with ``K``. The correlation cancels a scale that is the same for every product, but not this one, so in the warm-up the first products weigh more than the weights that the bias tables of [`PortfolioTarget`](@ref) assume. This rule divides the state by ``1 - \\lambda^{K}`` first. At 4 uncorrelated assets and 20 observations it moved the factor of `PortfolioTarget` from 3.5 % high to 0.05 %, and at 12 assets with a correlation of 0.5 from 8.0 % to 1.7 %. The steady state does not change.
+
+# Constructors
+
+    BiasCorrectedVolatility() -> BiasCorrectedVolatility
+
+# Examples
+
+```jldoctest
+julia> RegimeAdjustedExpWeightedCovariance().cor_vol
+BiasCorrectedVolatility()
+```
+
+# Related
+
+  - [`AbstractCorrelationVolatility`](@ref)
+  - [`RawVolatility`](@ref)
+  - [`correlation_variance`](@ref)
+"""
+struct BiasCorrectedVolatility <: AbstractCorrelationVolatility end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Standardises each product of the separate correlation path by the raw variance state, seeded at zero.
+
+This is the rule of the oracle. In the warm-up it weighs the first products of the correlation more than the bias tables of [`PortfolioTarget`](@ref) assume. The steady state is the same as under [`BiasCorrectedVolatility`](@ref).
+
+# Constructors
+
+    RawVolatility() -> RawVolatility
+
+# Examples
+
+```jldoctest
+julia> RegimeAdjustedExpWeightedCovariance(; cor_vol = RawVolatility()).cor_vol
+RawVolatility()
+```
+
+# Related
+
+  - [`AbstractCorrelationVolatility`](@ref)
+  - [`BiasCorrectedVolatility`](@ref)
+  - [`correlation_variance`](@ref)
+"""
+struct RawVolatility <: AbstractCorrelationVolatility end
+"""
+    correlation_variance(::BiasCorrectedVolatility, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
+    correlation_variance(::RawVolatility, v::VecNum, decay::Number, K::AbstractVector{<:Integer})
+
+The variance that standardises each product of the separate correlation path.
+
+# Arguments
+
+  - `v`: The variance state that the product divides by.
+  - `decay`: The decay of the variance.
+  - `K`: The count of the steps that each entry of `v` holds.
+
+# Returns
+
+  - `v::VecNum`: `v` divided by its weight ``1 - \\lambda^{K}`` under [`BiasCorrectedVolatility`](@ref), and `v` unchanged under [`RawVolatility`](@ref).
+
+# Related
+
+  - [`AbstractCorrelationVolatility`](@ref)
+"""
+function correlation_variance(::BiasCorrectedVolatility, v::VecNum, decay::Number,
+                              K::AbstractVector{<:Integer})
+    return v ./ max.(one(decay) .- decay .^ K, eps(decay))
+end
+function correlation_variance(::RawVolatility, v::VecNum, ::Number,
+                              ::AbstractVector{<:Integer})
+    return v
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the outer product of one observation, with the Newey-West HAC correction where `hac_lags` is not `nothing`, and divides each product by its exact factor.
@@ -342,5 +420,6 @@ function hac_pair_factor(cache::RegimeAdjustedCovarianceState,
                                     cache.lag_records, w, false)
 end
 export ExactDebias, LawDebias, RawStatistic, NoHacFloor, PerTermHacFloor,
-       VolatilityBeforeUpdate, VolatilityAfterUpdate
-public debiases, reads_dependence, hac_floor!, volatility_before_update
+       VolatilityBeforeUpdate, VolatilityAfterUpdate, BiasCorrectedVolatility, RawVolatility
+public debiases, reads_dependence, hac_floor!, volatility_before_update,
+       correlation_variance

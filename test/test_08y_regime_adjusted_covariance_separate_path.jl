@@ -434,3 +434,104 @@ the recursion itself, and the interpolation serves the rest (ADR 0190).
         @test 0.98 < multiplier(m) < 1.02
     end
 end
+
+#=
+Issue #1729. The variance state of the separate path is seeded at zero, so after `K` steps it
+holds `1 - λ^K` times the variance. A product divided by the raw state carries the weight
+`1 / (1 - λ^K)`, so the first products of the correlation weigh more than the bias tables assume.
+`BiasCorrectedVolatility()`, the default, divides the state by its weight first. On a replica with
+200 000 draws, at 4 uncorrelated assets and 20 observations, the factor of `PortfolioTarget` read
+3.5 % high under the raw rule and 0.05 % low under the default (ADR 0218).
+=#
+@testset "the separate path standardises by the bias-corrected variance" begin
+    @test RegimeAdjustedExpWeightedCovariance().cor_vol === BiasCorrectedVolatility()
+    lam, lamc = 2.0^(-1 / 10), 2.0^(-1 / 20)
+    function replica(X, corrected)
+        T, n = size(X)
+        v = zeros(n)
+        Q = zeros(n, n)
+        for t in 1:T
+            x = X[t, :]
+            v .= lam .* v .+ (1 - lam) .* x .^ 2
+            s = x ./ sqrt.(corrected ? v ./ (1 - lam^t) : v)
+            Q .= lamc .* Q .+ (1 - lamc) .* s .* transpose(s)
+        end
+        vh = v ./ (1 - lam^T)
+        return Q ./ sqrt.(LinearAlgebra.diag(Q) * transpose(LinearAlgebra.diag(Q))) .*
+               sqrt.(vh * transpose(vh))
+    end
+    sep(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
+                                                    min_obs = 1, regime_method = nothing,
+                                                    centring = PreCentred(), cor_vol = rule)
+    X = randn(StableRNG(1729), 30, 5) .* transpose(1:5)
+    # Measured: 1.1e-15 under the raw rule and 1.3e-15 under the default. The two rules differ by
+    # up to 5.1 relative on one cell at 30 rows, and not at all at 1200.
+    @test isapprox(cov(sep(BiasCorrectedVolatility()), X), replica(X, true); rtol = 1e-12)
+    @test isapprox(cov(sep(RawVolatility()), X), replica(X, false); rtol = 1e-12)
+    # The two rules differ in the warm-up only.
+    @test !isapprox(cov(sep(BiasCorrectedVolatility()), X), cov(sep(RawVolatility()), X);
+                    rtol = 1e-4)
+    Y = randn(StableRNG(1729), 1200, 5) .* transpose(1:5)
+    @test isapprox(cov(sep(BiasCorrectedVolatility()), Y), cov(sep(RawVolatility()), Y);
+                   rtol = 1e-10)
+    # The rule acts on the separate path alone.
+    one_decay(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, min_obs = 1,
+                                                          regime_method = nothing,
+                                                          cor_vol = rule)
+    @test cov(one_decay(BiasCorrectedVolatility()), X) == cov(one_decay(RawVolatility()), X)
+end
+
+#=
+Issue #1730. Under HAC the separate path writes its covariance block only once the diagonal of
+the correlation state is above `min_val`, so the block can keep its zero seed for the first rows.
+The regime statistic read that block, and `PortfolioTarget` and `DiagonalTarget` floored the
+variance at `min_val`, so one row scored about 1e12 and the state kept it for about 40 regime
+half-lives. A built block in the warm-up can also be indefinite, and a direction's variance at or
+below zero was floored the same way. The statistic now scores only a built asset, and
+`PortfolioTarget` refuses a direction with a variance at or below `min_val` (ADR 0218).
+=#
+@testset "under HAC the separate path scores no unbuilt block" begin
+    na, rho = 8, 0.5
+    U = cholesky(Symmetric(fill(rho, na, na) + (1 - rho) * I)).U
+    sig = collect(range(0.5, 2.0; length = na))
+    panel(seed) = (randn(StableRNG(seed), 40, na) * U) .* transpose(sig)
+    function sep(target)
+        return RegimeAdjustedExpWeightedCovariance(; decay = 2.0^(-1 / 10),
+                                                   cor_decay = 2.0^(-1 / 20), min_obs = 5,
+                                                   regime_lohi_mult = nothing,
+                                                   regime_decay = 2.0^(-1 / 6000),
+                                                   regime_min_obs = 1,
+                                                   centring = PreCentred(), hac_lags = 2,
+                                                   regime_target = target,
+                                                   regime_method = PO.RootMeanSquaredAdjusted())
+    end
+    eqw = PortfolioTarget(; w = fill(1 / na, na))
+    state(target, X) = partial_fit!(sep(target), X).cache.regime_state
+
+    # Seed 2: no block is built after 5 rows, so the first scored row, the sixth, is skipped.
+    X = panel(2)
+    @test !any(PO.regime_block_built(partial_fit!(sep(eqw), X[1:5, :]).cache, sep(eqw)))
+    for target in (eqw, PO.DiagonalTarget())
+        @test isnothing(state(target, X[1:6, :]))
+        @test 0 < state(target, X) < 10
+    end
+
+    # Seed 7: the block after 5 rows is built and indefinite, and the equal-weight direction has a
+    # variance below zero, so the row is refused rather than scored at 1e12.
+    X = panel(7)
+    cache = partial_fit!(sep(eqw), X[1:5, :]).cache
+    C = PO.regime_covariance_block(cache, sep(eqw), collect(1:na))
+    @test sum(C) / na^2 < 0
+    @test isnothing(PO.regime_statistic(eqw, X[6, :], C, collect(1:na), 1e-12))
+    @test 0 < state(eqw, X) < 10
+
+    # A constant asset has a variance of zero and a zero row, and it stays built.
+    Xc = 0.01 .* randn(StableRNG(1730), 40, 3)
+    Xc[:, 3] .= 0
+    ce = RegimeAdjustedExpWeightedCovariance(; decay = 0.9, cor_decay = 0.95, min_obs = 2,
+                                             centring = PreCentred())
+    @test all(PO.regime_block_built(partial_fit!(ce, Xc).cache, ce))
+    # The path with one decay steps every entry at each row, so every asset is built.
+    one_decay = RegimeAdjustedExpWeightedCovariance(; decay = 0.9, min_obs = 2)
+    @test PO.regime_block_built(partial_fit!(one_decay, Xc).cache, one_decay) === true
+end

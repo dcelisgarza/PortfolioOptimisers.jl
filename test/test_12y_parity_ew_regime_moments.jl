@@ -33,6 +33,7 @@ THE MEASURE. Every case below agreed on the `NaN` pattern.
 | both regime estimators in small units | Defect found and fixed: the floor | parity at the new default floor |
 | the clamp of a warm-up multiplier | Defect found and fixed | parity |
 | the separate path on a constant asset | Better: the variance 0, where the report floored it at `min_val` | `test_08y` |
+| the separate path in the warm-up | Better: each product divides by the bias-corrected variance, `cor_vol = RawVolatility()` is the oracle's rule (#1729) | `test_08y` |
 
 The Mahalanobis target with `min_obs = 5` on 12 assets reads a singular block, so its cases here
 use `min_obs = 13`. Every case takes the oracle's raw statistic, `debias = RawStatistic()`. The default
@@ -53,10 +54,13 @@ function p1383_rv(; hl = 10, min_obs = 5, rhl = hl / 2, rmin = floor(Int, rhl), 
                                              regime_decay = p1383_dk(rhl),
                                              regime_min_obs = rmin, P1383_ORC..., kw...)
 end
+# The oracle standardises each product of the separate path by the raw variance state. The
+# default divides the state by its weight first, so the warm-up moves (#1729).
 function p1383_rc(; hl = 10, min_obs = 5, rhl = hl / 2, rmin = floor(Int, rhl), kw...)
     return RegimeAdjustedExpWeightedCovariance(; decay = p1383_dk(hl), min_obs = min_obs,
                                                regime_decay = p1383_dk(rhl),
-                                               regime_min_obs = rmin, P1383_ORC..., kw...)
+                                               regime_min_obs = rmin, P1383_ORC...,
+                                               cor_vol = RawVolatility(), kw...)
 end
 
 const P1383_MU = ["MuDefault" => () -> ExpWeightedExpectedReturns(; decay = p1383_dk(40)),

@@ -474,6 +474,24 @@ A rule is a marker for dispatch, and it holds no data. A new rule needs a method
   - [`VolatilityAfterUpdate`](@ref)
 """
 abstract type AbstractHacVolatilityTiming <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Abstract supertype for the variance that standardises each product of the separate correlation path, the rule that says whether the variance state is divided by its weight before the product divides by it.
+
+[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `cor_vol` field. The rule acts only where `cor_decay` is not `nothing`, and only in the warm-up, where the weight of the variance state is below one. The root lives with the other roots, because the estimator binds its field before the members load.
+
+# Interfaces
+
+A rule is a marker for dispatch, and it holds no data. A new rule needs a method of [`correlation_variance`](@ref).
+
+# Related
+
+  - [`BiasCorrectedVolatility`](@ref)
+  - [`RawVolatility`](@ref)
+"""
+abstract type AbstractCorrelationVolatility <: AbstractAlgorithm end
 public AbstractPartialFitState, DynamicAbstractWeights, AbstractOptimisationEstimator,
        OptimisationEstimator, NonFiniteAllocationOptimisationEstimator, AbstractCentring,
-       AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming
+       AbstractRegimeDebias, AbstractHacFloor, AbstractHacVolatilityTiming,
+       AbstractCorrelationVolatility

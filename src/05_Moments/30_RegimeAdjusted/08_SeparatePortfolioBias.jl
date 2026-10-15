@@ -33,14 +33,16 @@ the factor of one table at `cor_decay` reads 0.9716 to 1.1076. Over the mixed fa
 0.5, half-lives of 10 and 20, either centring and both directions, the squared multiplier of the
 separate path is within 0.07 % of the multiplier of one decay on the same data over 3 seeds of
 120 000 rows, where the factor at `cor_decay` alone read 1.6 % to 2.6 % above it. In the warm-up
-the correlation state weights its first products by ``1 / (1 - \\lambda^{t})``, which neither
-factor holds (#1729): at 12 assets, an equicorrelation of 0.5, half-lives of 10 and 20 and 20
-observations the ratio is 1.080, from 1.101 at `cor_decay` alone, and it falls to 1.000 by 200
-observations. Under HAC the three tables and the weight sums read the Bartlett weights of
-`hac_lags`. At two lags and equal weights, on the same data with the first scored row of a zero block left out
-(#1730), the separate path reads 0.06 % to 0.89 % below one decay for the root mean square, 0.07 %
-to 0.61 % for the first moment and 0.05 % to 0.35 % for the log, where the factor at `cor_decay`
-alone read 3.1 % to 5.1 % above it.
+the factor holds no second order of the estimated correlation. Under the default
+`cor_vol = BiasCorrectedVolatility()`, at 12 assets, an equicorrelation of 0.5, half-lives of 10
+and 20 and 20 observations, the ratio is 1.0172, and 1.0095 at 40. At ``R = I`` it is within
+0.05 % at 20 observations. Under `RawVolatility()` the correlation state weights its first
+products by ``1 / (1 - \\lambda^{t})``, which the factor does not hold, and the same ratios read
+1.0802 and 1.0448. Under HAC the three tables and the weight sums read the Bartlett weights of
+`hac_lags`. At two lags and equal weights, on the same data, the separate path reads 0.06 % to
+0.89 % below one decay for the root mean square, 0.07 % to 0.61 % for the first moment and 0.05 %
+to 0.35 % for the log, where the factor at `cor_decay` alone read 3.1 % to 5.1 % above it. That
+measure left out the first scored row of a zero block, which the statistic now skips.
 
 # Arguments
 
@@ -276,4 +278,81 @@ function exp_weight_convolution_table(decay::Number, cor_decay::Number, len::Int
         table[K] = c * acc / (one(lc) - lc)^2
     end
     return table
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the bias-corrected covariance block of the assets that contribute to the regime
+statistic.
+
+This block calibrates the smoother and is never reported, so it takes no repair: the Cholesky
+factor of the Mahalanobis target refuses a block that is not positive definite. Where one decay
+runs, each entry is divided by the weight its pair holds with [`pair_weighted_block`](@ref). Where
+the separate path runs, the correlation already sits inside `cache.covariance`, each pair
+normalised by its weight, and the block applies the per-asset variance correction alone.
+[`bias_corrected_covariance`](@ref) makes the reported estimate from the state.
+
+# Arguments
+
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets that contribute to the statistic.
+
+# Returns
+
+  - `sigma::MatNum`: The bias-corrected covariance block of those assets.
+
+# Related
+
+  - [`RegimeAdjustedCovarianceState`](@ref)
+  - [`regime_statistic`](@ref)
+  - [`bias_corrected_covariance`](@ref)
+"""
+function regime_covariance_block(cache::RegimeAdjustedCovarianceState,
+                                 ce::RegimeAdjustedExpWeightedCovariance,
+                                 idx::AbstractVector{<:Integer})
+    if !has_separate_cor_decay(ce)
+        return pair_weighted_block(cache.covariance, cache.weight, idx)
+    end
+    sigma = cache.covariance[idx, idx]
+    K = centring_terms.(Ref(ce.centring), view(cache.obs_count, idx))
+    correction = inv.(sqrt.(max.(one(ce.decay) .- ce.decay .^ K, eps(ce.decay))))
+    sigma .*= correction .* transpose(correction)
+
+    return sigma
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Mask of the assets whose row of the covariance state the regime statistic can read.
+
+Where `cor_decay` is `nothing`, the state steps at every observation, so every asset is built.
+On the separate path, [`update_var_cor!`](@ref) writes the block only when the diagonal of the
+correlation state is above `min_val`. Under HAC an asset contributes nothing on its first row,
+so the block can stay at its zero seed for the first rows. A written asset has a diagonal equal
+to its variance state, so an asset with a positive variance and a zero diagonal is not built.
+A constant asset has a variance of zero, and it stays built: its row is zero by design.
+
+# Arguments
+
+  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
+  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
+
+# Returns
+
+  - `built::Union{Bool, AbstractVector{<:Bool}}`: `true` on the path with one decay, else the
+    mask of the built assets.
+
+# Related
+
+  - [`update_regime!`](@ref)
+  - [`update_var_cor!`](@ref)
+"""
+function regime_block_built(cache::RegimeAdjustedCovarianceState,
+                            ce::RegimeAdjustedExpWeightedCovariance)
+    if !has_separate_cor_decay(ce)
+        return true
+    end
+    T = eltype(cache.covariance)
+    return .!((cache.variance .> zero(T)) .& iszero.(LinearAlgebra.diag(cache.covariance)))
 end

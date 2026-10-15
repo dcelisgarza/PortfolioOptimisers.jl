@@ -24,7 +24,6 @@ portfolio_directions
 pair_weighted_correlation
 update_var_cor!
 bias_corrected_covariance
-regime_covariance_block
 update_regime!
 process_observation!(cache::RegimeAdjustedCovarianceState, ce::RegimeAdjustedExpWeightedCovariance, X::VecNum, estimation_mask::Option{<:AbstractVector{<:Bool}}, active_mask::Option{<:AbstractVector{<:Bool}})
 assert_regime_target

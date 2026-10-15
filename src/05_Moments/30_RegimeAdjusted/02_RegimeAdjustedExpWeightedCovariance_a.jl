@@ -321,7 +321,9 @@ Where:
     the pairs of which both assets are valid, so a holiday of asset ``i`` holds every entry of
     ``i``. Where `hac_lags` is not `nothing` and `hac_vol_before` is `VolatilityBeforeUpdate()`, the product
     divides by ``\\sqrt{v_{i,t-1} v_{j,t-1}}``, the variances before the step, because the
-    diagonal of a HAC product can be negative and a variance that holds it amplifies it.
+    diagonal of a HAC product can be negative and a variance that holds it amplifies it. Under
+    `cor_vol = BiasCorrectedVolatility()`, the default, each variance is first divided by its
+    weight ``1 - \\lambda^{K_i}``, so the first products weigh no more than the later ones.
   - ``W_{ij,t}``: Weight that the pair holds in ``Q``, with the step of ``Q`` on a unit
     product: ``1 - \\lambda_c^{n_{ij}}``.
   - ``\\rho_{ij,t}``: Correlation, the weighted mean of the standardised product over the
@@ -365,6 +367,7 @@ $(DocStringExtensions.FIELDS)
         hac_lags::Option{<:Integer}                           = nothing,
         hac_floor::AbstractHacFloor                           = NoHacFloor(),
         hac_vol_before::AbstractHacVolatilityTiming           = VolatilityBeforeUpdate(),
+        cor_vol::AbstractCorrelationVolatility                = BiasCorrectedVolatility(),
         regime_method::Option{<:RegimeAdjustedMethod}         = FirstMomentRegimeAdjusted(),
         regime_decay::Number                                  = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer                               = round(Int, max(1, decay_half_life(decay) / 2)),
@@ -436,6 +439,10 @@ true
     """
     hac_vol_before
     """
+    $(field_dict[:cor_vol])
+    """
+    cor_vol
+    """
     $(field_dict[:regime_method])
     """
     regime_method
@@ -476,6 +483,7 @@ true
                                                  hac_lags::Option{<:Integer},
                                                  hac_floor::AbstractHacFloor,
                                                  hac_vol_before::AbstractHacVolatilityTiming,
+                                                 cor_vol::AbstractCorrelationVolatility,
                                                  regime_method::Option{<:RegimeAdjustedMethod},
                                                  regime_decay::Number,
                                                  regime_min_obs::Integer,
@@ -501,14 +509,20 @@ true
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)
         end
         return new{typeof(decay), typeof(cor_decay), typeof(min_obs), typeof(hac_lags),
-                   typeof(hac_floor), typeof(hac_vol_before), typeof(regime_method),
-                   typeof(regime_decay), typeof(regime_min_obs), typeof(regime_target),
-                   typeof(regime_lohi_mult), typeof(min_val), typeof(centring),
-                   typeof(debias), typeof(cache)}(decay, cor_decay, min_obs, hac_lags,
-                                                  hac_floor, hac_vol_before, regime_method,
-                                                  regime_decay, regime_min_obs,
-                                                  regime_target, regime_lohi_mult, min_val,
-                                                  centring, debias, cache)
+                   typeof(hac_floor), typeof(hac_vol_before), typeof(cor_vol),
+                   typeof(regime_method), typeof(regime_decay), typeof(regime_min_obs),
+                   typeof(regime_target), typeof(regime_lohi_mult), typeof(min_val),
+                   typeof(centring), typeof(debias), typeof(cache)}(decay, cor_decay,
+                                                                    min_obs, hac_lags,
+                                                                    hac_floor,
+                                                                    hac_vol_before, cor_vol,
+                                                                    regime_method,
+                                                                    regime_decay,
+                                                                    regime_min_obs,
+                                                                    regime_target,
+                                                                    regime_lohi_mult,
+                                                                    min_val, centring,
+                                                                    debias, cache)
     end
 end
 function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
@@ -525,6 +539,7 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              hac_lags::Option{<:Integer} = nothing,
                                              hac_floor::AbstractHacFloor = NoHacFloor(),
                                              hac_vol_before::AbstractHacVolatilityTiming = VolatilityBeforeUpdate(),
+                                             cor_vol::AbstractCorrelationVolatility = BiasCorrectedVolatility(),
                                              regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                              regime_decay::Number = exp2(-2 /
                                                                          decay_half_life(decay)),
@@ -541,10 +556,10 @@ function RegimeAdjustedExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                              debias::AbstractRegimeDebias = ExactDebias(),
                                              cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedCovariance
     return RegimeAdjustedExpWeightedCovariance(decay, cor_decay, min_obs, hac_lags,
-                                               hac_floor, hac_vol_before, regime_method,
-                                               regime_decay, regime_min_obs, regime_target,
-                                               regime_lohi_mult, min_val, centring, debias,
-                                               cache)
+                                               hac_floor, hac_vol_before, cor_vol,
+                                               regime_method, regime_decay, regime_min_obs,
+                                               regime_target, regime_lohi_mult, min_val,
+                                               centring, debias, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -972,7 +987,10 @@ the transformed values.
 
  1. Build the directions over the contributing assets with [`portfolio_directions`](@ref).
     Return `nothing` where no row keeps a positive weight.
- 2. Return the count of contributing assets times the squared portfolio return, divided by the
+ 2. Return `nothing` where the variance of a direction is not above `min_val`. A HAC block in
+    the warm-up need not be positive definite, and a floor would score the row at about
+    ``r^{2} / 10^{-12}``.
+ 3. Return the count of contributing assets times the squared portfolio return, divided by the
     portfolio variance, for each row.
 
 # Arguments
@@ -981,12 +999,13 @@ the transformed values.
   - `X::VecNum`: Centred returns of the assets that contribute to the statistic.
   - `C::MatNum`: Bias-corrected covariance block of those assets.
   - `idx::AbstractVector{<:Integer}`: Index of those assets in the universe.
-  - `min_val::Number`: Floor applied to each variance and to each portfolio variance.
+  - `min_val::Number`: Floor applied to each variance, and the smallest portfolio variance that
+    the statistic reads.
 
 # Returns
 
   - `stats::Option{<:VecNum}`: One statistic per direction, or `nothing` where no row keeps a
-    positive weight.
+    positive weight or where the variance of a direction is not above `min_val`.
 
 # Related
 
@@ -1002,7 +1021,13 @@ function regime_statistic(target::PortfolioTarget, X::VecNum, C::MatNum,
         return nothing
     end
     r = W * X
-    v = max.(vec(sum((W * C) .* W; dims = 2)), min_val)
+    v = vec(sum((W * C) .* W; dims = 2))
+    # A HAC block in the warm-up need not be positive definite, and a floor at `min_val` turns a
+    # variance at or below zero into a statistic of 1e12. The row is refused, as the Mahalanobis
+    # target refuses a block that does not factorise (#1730).
+    if any(<=(min_val), v)
+        return nothing
+    end
 
     return length(X) * r .^ 2 ./ v
 end
@@ -1116,9 +1141,10 @@ reads.
  2. Standardise the outer product by the running volatilities: after the step of 1, or, where
     `hac_lags` is not `nothing` and `hac_vol_before` is `VolatilityBeforeUpdate()`, before it. The diagonal of a HAC
     row can be negative, and a volatility that holds the row amplifies a negative row, so the
-    diagonal of the correlation state is skewed down. An asset whose variance is not above
-    `min_val` contributes zero, so under the rule before the step an asset contributes nothing
-    on its first row.
+    diagonal of the correlation state is skewed down. Under `cor_vol = BiasCorrectedVolatility()`
+    the variance is first divided by its weight ``1 - \\lambda^{K}``, with [`correlation_variance`](@ref).
+    An asset whose variance is not above `min_val` contributes zero, so under the rule before
+    the step an asset contributes nothing on its first row.
  3. On the pairs of which both assets are valid, advance the correlation state by the step
     ``Q_{ij} \\leftarrow \\lambda_c Q_{ij} + (1 - \\lambda_c) \\Delta_{ij}``, where ``\\Delta`` is
     the standardised outer product, and the weight state by the same step with ``\\Delta_{ij}``
@@ -1150,13 +1176,13 @@ function update_var_cor!(cache::RegimeAdjustedCovarianceState,
     hac_var = hac_floor!(ce.hac_floor, LinearAlgebra.diag(cache.XXt), valid)
     # Under HAC a row divides by the variance before the step, a copy; else `v` aliases the state
     # and reads it after the step (ADR 0190).
-    v = if volatility_before_update(ce.hac_vol_before) && !isnothing(ce.hac_lags)
-        copy(cache.variance)
-    else
-        cache.variance
-    end
+    before = volatility_before_update(ce.hac_vol_before) && !isnothing(ce.hac_lags)
+    v = before ? copy(cache.variance) : cache.variance
     cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
                              (one(ce.decay) - ce.decay) * view(hac_var, valid)
+    # The count of the steps that `v` holds: the count is advanced after this row (#1729).
+    K = centring_terms.(Ref(ce.centring), cache.obs_count) .+ (before ? 0 : 1)
+    v = correlation_variance(ce.cor_vol, v, ce.decay, K)
     positive = valid .& (v .> ce.min_val)
     inv_sigma = ifelse.(positive, inv.(sqrt.(ifelse.(positive, v, one(T)))), zero(T))
     outer_std = cache.XXt .* (inv_sigma .* transpose(inv_sigma))
@@ -1249,55 +1275,14 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Returns the bias-corrected covariance block of the assets that contribute to the regime
-statistic.
-
-This block calibrates the smoother and is never reported, so it takes no repair: the Cholesky
-factor of the Mahalanobis target refuses a block that is not positive definite. Where one decay
-runs, each entry is divided by the weight its pair holds with [`pair_weighted_block`](@ref). Where
-the separate path runs, the correlation already sits inside `cache.covariance`, each pair
-normalised by its weight, and the block applies the per-asset variance correction alone.
-[`bias_corrected_covariance`](@ref) makes the reported estimate from the state.
-
-# Arguments
-
-  - `cache::RegimeAdjustedCovarianceState`: Online covariance computation cache.
-  - `ce::RegimeAdjustedExpWeightedCovariance`: Covariance estimator configuration.
-  - `idx::AbstractVector{<:Integer}`: Index of the assets that contribute to the statistic.
-
-# Returns
-
-  - `sigma::MatNum`: The bias-corrected covariance block of those assets.
-
-# Related
-
-  - [`RegimeAdjustedCovarianceState`](@ref)
-  - [`regime_statistic`](@ref)
-  - [`bias_corrected_covariance`](@ref)
-"""
-function regime_covariance_block(cache::RegimeAdjustedCovarianceState,
-                                 ce::RegimeAdjustedExpWeightedCovariance,
-                                 idx::AbstractVector{<:Integer})
-    if !has_separate_cor_decay(ce)
-        return pair_weighted_block(cache.covariance, cache.weight, idx)
-    end
-    sigma = cache.covariance[idx, idx]
-    K = centring_terms.(Ref(ce.centring), view(cache.obs_count, idx))
-    correction = inv.(sqrt.(max.(one(ce.decay) .- ce.decay .^ K, eps(ce.decay))))
-    sigma .*= correction .* transpose(correction)
-
-    return sigma
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
 Advances the smoothed regime state with one observation, one step ahead of the covariance
 update.
 
 The observation is scored against the state that stands before it, so the statistic compares
 realised risk against predicted risk rather than against itself. Only an asset that was already
-above `min_obs` contributes, because the statistic is sensitive to a poorly estimated asset. A
-`regime_method` of `nothing` advances nothing.
+above `min_obs` contributes, because the statistic is sensitive to a poorly estimated asset. On
+the separate path an asset contributes only once [`regime_block_built`](@ref) holds, so no row
+is scored against a block at its zero seed. A `regime_method` of `nothing` advances nothing.
 
 # Arguments
 
@@ -1332,7 +1317,7 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
                   centring_ready.(Ref(ce.centring), cache.obs_count, ce.min_obs) .&
                   regime_bias_open.(Ref(ce.debias), 1, ce.decay,
                                     centring_terms.(Ref(ce.centring), cache.obs_count),
-                                    ce.hac_lags)
+                                    ce.hac_lags) .& regime_block_built(cache, ce)
     if !isnothing(estimation_mask)
         regime_mask .&= estimation_mask
     end
