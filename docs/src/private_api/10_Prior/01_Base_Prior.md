@@ -24,4 +24,7 @@ investable_universe_names
 held_non_investable
 investable_weights_view
 PortfolioOptimisers.reads_factor_returns
+PortfolioOptimisers.shared_series_row_key
+PortfolioOptimisers.map_row_positions
+PortfolioOptimisers.kept_row_positions
 ```

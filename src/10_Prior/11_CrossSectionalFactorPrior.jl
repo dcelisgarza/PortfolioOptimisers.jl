@@ -1404,10 +1404,11 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; strict::Bool = 
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    rows = shared_series_rows(rd, pe.x_src, false)
     rd = shared_series_view(rd, pe.x_src, false)
     pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; ne = rd.ne,
                E = rd.E, iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, strict = strict, dims = 1)
-    return stamp_returns_source(pr, pe)
+    return stamp_returns_source(shared_series_row_key(pr, rows), pe)
 end
 """
     cross_sectional_pin_choice(choice::BatchChoice, pe::CrossSectionalFactorPrior) -> CrossSectionalFactorPrior

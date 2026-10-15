@@ -1355,11 +1355,13 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     f_pr = cross_sectional_factor_moments(pr, pe.f_mp, ca.f, lv; kwargs...)
     # The histories hold every observation after the warm-up, the last `Tf` of the
     # observations with no Shared Series gap that the fold read, so the fitted rows sit at
-    # these positions of the folded returns that a fit keeps.
+    # these positions of the folded returns that a fit keeps. The buffer keeps every folded
+    # observation with its mark, so the kept rows map each position to its observation.
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
            amr = view(st.amsk, r, :), bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r,
            hist = st.hist, S = st.S, Sc = st.Sc, ce = st.ce,
-           idx = (buffer_fit_count(st.buf) - Tf) .+ r, ts = nothing,
+           idx = kept_row_positions(buffer_kept_rows(st.buf),
+                                    (buffer_fit_count(st.buf) - Tf) .+ r), ts = nothing,
            rf = if folds_forecast_rows(pe.rfe)
                return_forecast_result(pe.rfe, st.fh, st.fst)
            else

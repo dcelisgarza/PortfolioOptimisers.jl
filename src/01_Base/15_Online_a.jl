@@ -650,6 +650,34 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Return the observations of a [`SampleBufferState`](@ref) that a fit keeps, or `nothing` when it keeps every observation.
+
+A fit through the buffer drops each observation with a Shared Series gap, see [`shared_series_buffer`](@ref), so it counts the position of a row among the kept observations. Kept row `k` is observation `rows[k]` of the buffer. A reader that records the position of a fitted row maps it through `rows`, as [`shared_series_row_key`](@ref) does. A buffer with no gap answers `nothing` and allocates nothing.
+
+# Arguments
+
+  - `state`: The buffer to read.
+
+# Returns
+
+  - `rows::Option{Vector{Int}}`: The observations of the buffer with no Shared Series gap, or `nothing` when no observation has a gap.
+
+# Related
+
+  - [`buffer_fit_count`](@ref)
+  - [`buffer_gap_marks`](@ref)
+  - [`shared_series_row_key`](@ref)
+"""
+function buffer_kept_rows(state::SampleBufferState)::Option{Vector{Int}}
+    if isnothing(state.G)
+        return nothing
+    end
+    marks = buffer_gap_marks(state)
+    return any(marks) ? findall(!, marks) : nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Answer `true` when every observation of a [`SampleBufferState`](@ref) has a Shared Series gap, so a fit through the buffer keeps no observation.
 
 A reader that fits on the buffer after each step, as the Choice Rule of a refit does, asks this first, because [`shared_series_buffer`](@ref) refuses such a buffer and the first steps of a run can hold only gaps. A buffer with no marks answers `false` at once and allocates nothing, so the step of a buffer that never meets a gap costs what it cost before the marks existed. A buffer that holds no observation and no mark answers `false` too, as it did before.

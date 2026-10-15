@@ -370,7 +370,7 @@ Where:
 
 # Returns
 
-  - `cov::NamedTuple`: `(; mean_coverage, min_coverage, mean_n_scored, min_n_scored, n_silenced, mean_coverage_scored, min_coverage_scored)`, which are ``\\bar{c}``, ``c_{\\min}``, ``\\bar{n}``, ``n_{\\min}``, ``J_{0}``, ``\\bar{c}_{s}`` and ``c_{s, \\min}``. The four shares are `NaN` when no date has a finite coverage, the two shares over the scored dates are `NaN` when no date scored an asset, and the two counts are `NaN` when the evaluation carries no date.
+  - `cov::NamedTuple`: `(; mean_coverage, min_coverage, mean_n_scored, min_n_scored, n_silenced, mean_coverage_scored, min_coverage_scored)`, which are ``\\bar{c}``, ``c_{\\min}``, ``\\bar{n}``, ``n_{\\min}``, ``J_{0}``, ``\\bar{c}_{s}`` and ``c_{s, \\min}``. The four shares are `NaN` when no date has a finite coverage, the two shares over the scored dates are `NaN` when no date scored an asset, and the two counts of scored assets are `NaN` when the evaluation carries no date, while `n_silenced` is then `0`.
 
 # Related
 
@@ -513,9 +513,10 @@ function forecast_summary_spreads(fes::AbstractVector{<:ForecastEvaluationResult
     q = vec(collect(quantiles))
     n = length(fes)
     m = length(q)
-    alpha::MatNum = first(fes).alpha
-    y::MatNum = first(fes).y
-    Tf = promote_type(real(eltype(alpha)), real(eltype(y)))
+    # The type is read off every evaluation, because a listing can stack evaluations of
+    # different number types, and the first alone would narrow the others.
+    Tf = mapreduce(fe -> promote_type(real(eltype(fe.alpha)), real(eltype(fe.y))),
+                   promote_type, fes)
     sm = Matrix{Tf}(undef, n, m)
     sv = Matrix{Tf}(undef, n, m)
     si = Matrix{Tf}(undef, n, m)

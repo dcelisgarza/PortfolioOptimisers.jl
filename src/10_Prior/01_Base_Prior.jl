@@ -437,10 +437,12 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = fal
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
     x_src = returns_source(pe)
-    rd = shared_series_view(rd, x_src, needs_factor_returns(pe) === true)
+    rf = needs_factor_returns(pe) === true
+    rows = shared_series_rows(rd, x_src, rf)
+    rd = shared_series_view(rd, x_src, rf)
     pr = prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
                ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1)
-    return stamp_returns_source(pr, pe)
+    return stamp_returns_source(shared_series_row_key(pr, rows), pe)
 end
 """
     reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online}) -> Bool
@@ -1736,6 +1738,114 @@ function prior_result_property_pool()
     return unique!(Symbol[fieldnames(LowOrderPrior)..., fieldnames(HighOrderPrior)...])
 end
 
+"""
+    shared_series_row_key(pr::AbstractPriorResult, rows::Nothing)
+    shared_series_row_key(pr::LowOrderPrior, rows::VecInt)
+    shared_series_row_key(pr::HighOrderPrior, rows::VecInt)
+    shared_series_row_key(pr::AbstractPriorResult, state::SampleBufferState)
+
+Map the positions in the row key of the factor model block of a prior back to the observations of the returns data that the fit was given.
+
+A fit drops each observation with a Shared Series gap before it starts, see [`shared_series_view`](@ref) and [`shared_series_buffer`](@ref), so the batch verb counts the position of each row among the observations it kept. Kept row `k` is observation `rows[k]` of the data. The function replaces each position with its observation, so a realised [`factor_attribution`](@ref) of a cross-validation over the same data matches the right rows. A key that kept the positions of the kept rows matched each row after a gap to the row after it, with no error. The timestamps are read off the kept rows, so they need no change.
+
+# Arguments
+
+  - `pr`: The prior that the fit returned.
+  - `rows`: The observations that the fit kept, from [`shared_series_rows`](@ref), or `nothing` when it kept every observation.
+  - `state`: The sample buffer that a refit read. Its kept rows are those of [`buffer_kept_rows`](@ref).
+
+# Returns
+
+  - `pr::AbstractPriorResult`: `pr` itself when the fit kept every observation, and otherwise `pr` with the positions of its block mapped through `rows`.
+
+# Related
+
+  - [`map_row_positions`](@ref)
+  - [`buffer_row_key`](@ref)
+  - [`attribution_row_key`](@ref)
+"""
+function shared_series_row_key(pr::AbstractPriorResult, ::Nothing)
+    return pr
+end
+function shared_series_row_key(pr::LowOrderPrior, rows::VecInt)
+    # The positions are not part of the projection that `o_X` records, so `o_X` stays.
+    return forward_prior(pr; rr = map_row_positions(pr.rr, rows), o_X = pr.o_X)
+end
+function shared_series_row_key(pr::HighOrderPrior, rows::VecInt)
+    return forward_prior(pr; pr = shared_series_row_key(pr.pr, rows))
+end
+function shared_series_row_key(pr::AbstractPriorResult, state::SampleBufferState)
+    return shared_series_row_key(pr, buffer_kept_rows(state))
+end
+"""
+    map_row_positions(rr::Option{<:AbstractLoadingsRegressionResult}, rows::VecInt)
+    map_row_positions(rr::Regression, rows::VecInt)
+    map_row_positions(rr::CrossSectionalFactorModel, rows::VecInt)
+
+Return a factor model block whose positions are mapped through `rows`, and every other field unchanged.
+
+Position `k` becomes `rows[k]`, with [`kept_row_positions`](@ref). A block that records no row key, or no block at all, is returned as it is.
+
+# Arguments
+
+  - `rr`: The factor model block, or `nothing`.
+  - `rows`: The observation of each position.
+
+# Returns
+
+  - `rr`: The block with its positions mapped, or `rr` itself.
+
+# Related
+
+  - [`shared_series_row_key`](@ref)
+  - [`forget_row_positions`](@ref)
+  - [`set_row_key`](@ref)
+"""
+function map_row_positions(rr::Option{<:AbstractLoadingsRegressionResult}, ::VecInt)
+    return rr
+end
+function map_row_positions(rr::Regression, rows::VecInt)
+    return set_row_key(rr, kept_row_positions(rows, rr.idx), rr.ts)
+end
+function map_row_positions(rr::CrossSectionalFactorModel, rows::VecInt)
+    # Every field is read with `getfield`, for the reason `forget_row_positions` states.
+    names = fieldnames(typeof(rr))
+    fields = NamedTuple{names}(map(k -> getfield(rr, k), names))
+    return CrossSectionalFactorModel(; fields...,
+                                     idx = kept_row_positions(rows, getfield(rr, :idx)))
+end
+"""
+    kept_row_positions(rows::Nothing, pos::Option{<:VecInt})
+    kept_row_positions(rows::VecInt, pos::Nothing)
+    kept_row_positions(rows::VecInt, pos::VecInt)
+
+Return the observation of each position among the kept rows.
+
+Kept row `k` is observation `rows[k]`. With no `rows`, every observation was kept, so the positions are the observations. With no positions, there is nothing to map.
+
+# Arguments
+
+  - `rows`: The kept observations, or `nothing` when every observation was kept.
+  - `pos`: The positions among the kept rows, or `nothing`.
+
+# Returns
+
+  - `idx::Option{<:VecInt}`: `rows[pos]`, `pos` itself when `rows` is `nothing`, or `nothing` when `pos` is `nothing`.
+
+# Related
+
+  - [`map_row_positions`](@ref)
+  - [`buffer_kept_rows`](@ref)
+"""
+function kept_row_positions(::Nothing, pos::Option{<:VecInt})
+    return pos
+end
+function kept_row_positions(::VecInt, ::Nothing)
+    return nothing
+end
+function kept_row_positions(rows::VecInt, pos::VecInt)
+    return rows[pos]
+end
 export prior, LowOrderPrior, HighOrderPrior
 public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior
 # The `# Interfaces`-marked types of #1146 (ADR 0154): the four families

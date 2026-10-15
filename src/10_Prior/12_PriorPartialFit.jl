@@ -330,7 +330,7 @@ Where:
 
  1. Read the state out of `pe.cache` with [`partial_fit_cache`](@ref).
  2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), and run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the result with [`buffer_prior`](@ref), which gives the masks, the Panel Fields and the Exogenous Series that the buffer records, and the caller's keyword arguments.
- 3. Under a [`SampleBufferState`](@ref), correct the row key of the factor model block with [`buffer_row_key`](@ref). The batch verb counts the positions from the first row of the buffer, and a capped buffer does not record how many rows it dropped.
+ 3. Under a [`SampleBufferState`](@ref), correct the row key of the factor model block. The batch verb counts the positions among the rows that it kept, so [`shared_series_row_key`](@ref) maps them back through the rows of [`buffer_kept_rows`](@ref). The batch verb also counts them from the first row of the buffer, and a capped buffer does not record how many rows it dropped, so [`buffer_row_key`](@ref) removes them under a cap.
 
 # Arguments
 
@@ -362,7 +362,7 @@ end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
     fit = shared_series_buffer(state)
     pr = buffer_prior(pe, fit, sample_buffer_panel(fit); kwargs...)
-    return buffer_row_key(pr, state.max_history)
+    return buffer_row_key(shared_series_row_key(pr, state), state.max_history)
 end
 """
     buffer_row_key(pr::AbstractPriorResult, max_history::Nothing)

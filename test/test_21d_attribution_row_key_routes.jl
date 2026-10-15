@@ -263,4 +263,67 @@ PortfolioOptimisers.keeps_observations(::RowKeyLyingDropResult) = true
         @test isnothing(stepped(online(FactorPrior(); max_history = 120), rdf).rr.idx)
         @test stepped(online(FactorPrior()), rdf).rr.idx == 1:T
     end
+
+    @testset "A Shared Series gap keeps the positions of the data (R10 of #1630)" begin
+        # A fit drops an observation with a gap in a Shared Series, and counted the rows it
+        # kept, so each row after the gap matched the next data row with no error. Measured
+        # before the fix: a key of 1:249 for a gap at row 50, and a systematic volatility
+        # 0.31 % off.
+        rows(r, i) = PO.port_opt_view(r, i, :)
+        function stepped(e, data)
+            for (a, b) in ((1, 90), (91, 170), (171, 250))
+                e = partial_fit!(e, rows(data, a:b))
+            end
+            return prior(e)
+        end
+        Fg = copy(F)
+        Fg[50, :] .= NaN
+        rdg = ReturnsResult(; nx = nx, X = X, nf = nf, F = Fg)
+        kept = [1:49; 51:T]
+        pg = prior(FactorPrior(), rdg)
+        @test pg.rr.idx == kept
+        @test stepped(PO.update_online_estimator(Online(FactorPrior())), rdg).rr.idx == kept
+        # The walk-forward attribution is w' M f of each test row, as it is with no gap.
+        cv = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdg, wf)
+        W, _ = PO.attribution_prediction_history(cv)
+        sys = [dot(W[t, :], pg.rr.M * Fg[120 + t, :]) for t in axes(W, 1)]
+        @test factor_attribution(cv, pg).sys.vol ≈ std(sys) rtol = 1e-14
+        # The Cross-Sectional Factor Prior drops a gap of the benchmark under ExcessSource, on
+        # the batch fit, on a buffer refit and on the carry fold.
+        b = [mean(filter(isfinite, r)) for r in eachrow(rd.X)]
+        pe = CrossSectionalFactorPrior(; lambda = 1, factors = factors,
+                                       x_src = ExcessSource())
+        ref = prior(pe, PO.rebuild_estimator(rd, (; B = b))).rr.idx
+        @test 50 in ref
+        b[50] = NaN
+        rdb = PO.rebuild_estimator(rd, (; B = b))
+        @test prior(pe, rdb).rr.idx == filter(!=(50), ref)
+        @test stepped(PO.update_online_estimator(Online(pe)), rdb).rr.idx ==
+              filter(!=(50), ref)
+        st = pe
+        for (a, c) in ((1, 90), (91, 170), (171, 250))
+            st = partial_fit!(st, rows(rdb, a:c))
+        end
+        @test st.cache isa PO.CrossSectionalCarryState
+        @test prior(st).rr.idx == filter(!=(50), ref)
+    end
+
+    @testset "A key the block does not hold is refused at the head of the series too" begin
+        # A gap of the block at the first test row was left out with no error, as a row before
+        # the block is, while the same gap at the tenth test row was refused.
+        for g in (121, 130), r in (true, false)
+            Fh = copy(F)
+            Fh[g, :] .= NaN
+            rdh = ReturnsResult(; nx = nx, X = X, nf = nf, F = Fh, ts = r ? ts : nothing)
+            cv = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdh, wf)
+            @test_throws ArgumentError factor_attribution(cv, prior(FactorPrior(), rdh))
+        end
+        # A block key with an entry missing for a row of the block is refused, not matched.
+        pf = prior(FactorPrior(), rdf)
+        short = PO.forward_prior(pf; rr = PO.set_row_key(pf.rr, 1:100, nothing),
+                                 o_X = pf.o_X)
+        cv = cross_val_predict(InverseVolatility(; pe = FactorPrior()), rdf,
+                               IndexWalkForward(60, 20))
+        @test_throws DimensionMismatch factor_attribution(cv, short)
+    end
 end

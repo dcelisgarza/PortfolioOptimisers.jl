@@ -3756,6 +3756,7 @@ function plot_forecast_ic_by_holding_period end
         w::Option{<:MatNum} = nothing;
         n::Integer = 10,
         min_count::Integer = fe.min_count,
+        ppy::Number = fe.ppy,
         kwargs...
     ) -> Plot
     plot_forecast_portfolio_by_holding_period(
@@ -3765,6 +3766,7 @@ function plot_forecast_ic_by_holding_period end
         weighting = IdentityMetric(),
         n::Integer = 10,
         min_count::Integer = fe.min_count,
+        ppy::Number = fe.ppy,
         kwargs...
     ) -> Plot
 
@@ -3788,6 +3790,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `n`: Number of holding periods the table reaches.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It also chooses the dates that every row of the table is read on.
+  - $(arg_dict[:fe_table_ppy])
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -3868,6 +3871,7 @@ function plot_forecast_ic_decay end
         w::Option{<:MatNum} = nothing;
         n::Integer = 10,
         min_count::Integer = fe.min_count,
+        ppy::Number = fe.ppy,
         kwargs...
     ) -> Plot
     plot_forecast_portfolio_decay(
@@ -3877,6 +3881,7 @@ function plot_forecast_ic_decay end
         weighting = IdentityMetric(),
         n::Integer = 10,
         min_count::Integer = fe.min_count,
+        ppy::Number = fe.ppy,
         kwargs...
     ) -> Plot
 
@@ -3900,6 +3905,7 @@ The figure takes the evaluation and not the block, for the reason [`plot_forecas
   - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history the block is read with.
   - `n`: Number of forward windows the table reaches.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It also chooses the dates that every row of the table is read on.
+  - $(arg_dict[:fe_table_ppy])
   - `kwargs...`: Additional keyword arguments passed to the plotting backend.
 
 # Validation
@@ -4073,7 +4079,7 @@ function plot_forecast_evaluation_summary end
 
 Plot the rolling calibration of a covariance forecast: the Mahalanobis ratio, the diagonal ratio and the bias statistic over a window of steps, with a reference line at one.
 
-Each series is the statistic of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. The two ratios are means with the weights of `step_weighting`, as in the summary, and the bias statistic is the sample standard deviation of the standardised returns. So a window as wide as the run ends at the value of the summary under the same `step_weighting`. A step with no active asset adds nothing to a window. The first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. The bias statistic needs two scored steps in its window. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Each series is the statistic of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. The two ratios are means with the weights of `step_weighting`, as in the summary, and the bias statistic is the sample standard deviation of the standardised returns. So a window as wide as the run ends at the value of the summary under the same `step_weighting`. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. The bias statistic needs two scored steps in its window. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
 The default window spans a fixed number of steps, which is a fixed stretch of the walk-forward, so two evaluations on one walk-forward are read over the same steps at each point. `scored_steps = true` makes the window hold the last ``W`` scored steps instead, so it stretches over a step with no active asset, and that step draws no point. `whole_windows = true` starts each series at its first whole window in place of the first step. Both moving averages are valid. With `step_weighting = EqualStepWeighting()` and both keywords `true`, each series is the plain rolling mean of the scored steps, drawn from its first whole window.
 
@@ -4152,7 +4158,7 @@ function plot_covariance_calibration end
 
 Plot the rolling mean of the QLIKE loss of the variance of the test portfolios of a covariance forecast.
 
-Each series is the mean portfolio QLIKE of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. A step with no active asset adds nothing to a window. The first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). Lower is better, and only the difference between two forecasts is a reading, so the figure draws no reference line. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Each series is the mean portfolio QLIKE of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). Lower is better, and only the difference between two forecasts is a reading, so the figure draws no reference line. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
 An evaluation with one test portfolio draws the loss of that portfolio. An evaluation with several draws the median over the portfolios, with a band from the fifth to the ninety-fifth percentile.
 
@@ -4222,7 +4228,7 @@ function plot_covariance_qlike end
 
 Plot the rolling rate at which the Mahalanobis statistic of a covariance forecast exceeds the chi-squared quantile of each level, with a dashed line at the target rate of each level.
 
-Each series is the exceedance rate of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. [`covariance_exceedance`](@ref) states the statistic and its threshold. A step with no active asset adds nothing to a window. The first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). The rate is ``1 - q`` under a Gaussian null, and it rises with heavy tails as well as with a forecast that is wrong, so it compares two forecasts better than it tests one. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
+Each series is the exceedance rate of [`covariance_forecast_summary`](@ref), taken over the last ``W`` steps of the walk-forward in place of all of them. So a window as wide as the run ends at the value of the summary. [`covariance_exceedance`](@ref) states the statistic and its threshold. A step with no active asset adds nothing to a window. Under the defaults, the first ``W - 1`` points, and a window with no scored step, are `NaN` and drawn blank. `scored_steps` and `whole_windows` set the window and the first point, as in [`plot_covariance_calibration`](@ref). The rate is ``1 - q`` under a Gaussian null, and it rises with heavy tails as well as with a forecast that is wrong, so it compares two forecasts better than it tests one. The package extension `PortfolioOptimisersPlotsExt` implements the methods, and it loads with `StatsPlots`.
 
 The vector method is the comparison. It draws one series per evaluation and level, on the dates of that evaluation. A series is labelled by the name of its evaluation when one level is drawn, and by the name and the level otherwise. Its default draws one level, so that a figure of four forecasts carries four series and not eight.
 

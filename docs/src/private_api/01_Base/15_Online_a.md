@@ -19,6 +19,7 @@ PortfolioOptimisers.exogenous_buffer_kwargs
 PortfolioOptimisers.implied_volatility_buffer_kwargs
 PortfolioOptimisers.buffer_gap_marks
 PortfolioOptimisers.buffer_fit_count
+PortfolioOptimisers.buffer_kept_rows
 PortfolioOptimisers.buffer_fits_none
 PortfolioOptimisers.shared_series_buffer
 PortfolioOptimisers.assert_sample_buffer(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator})

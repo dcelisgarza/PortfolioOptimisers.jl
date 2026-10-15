@@ -3363,6 +3363,16 @@ end
         @test isequal(getfield(cp, f), getfield(lp, f))
     end
     @test cp.ppy == 1 && lp.ppy == [1, 1]
+    # The spreads take the type of every evaluation, not of the first (R10 of #1630). A
+    # `Float32` evaluation listed first narrowed the spreads of a `Float64` one.
+    a32 = Float32.(IC_ALPHA)
+    fe32 = forecast_evaluation(a32, PO.forward_mean_returns(a32, 1, 1))
+    l32 = forecast_evaluation_summary([fe32, fe1]; paired = false, quantiles = (0.25,),
+                                      mt = OverlapMeanTest())
+    for f in FS_SPREAD
+        @test eltype(getfield(l32, f)) == Float64
+        @test isequal(getfield(l32, f)[2:2, :], getfield(s1, f))
+    end
     @test_throws PO.IsEmptyError forecast_evaluation_summary(ForecastEvaluationResult[];
                                                              paired = false,
                                                              mt = OverlapMeanTest())

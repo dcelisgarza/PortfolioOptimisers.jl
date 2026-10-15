@@ -23,7 +23,7 @@ for a longer series too, because the series ends at row 240 and the block at row
 recorded which data rows it describes:
 
 - a fold rebuilds its returns as a new net series, so no view back to the data survives;
-  `MultiPeriodPredictionResult.id` names a fold, not a row; `rd.ts` exists only when the data
+  `MultiPeriodPredictionResult.id` names a run or a path, not a row; `rd.ts` exists only when the data
   carries timestamps;
 - `CrossSectionalFactorModel` recorded no rows. Its fit drops the Descriptor warm-up and the lag.
 
@@ -40,7 +40,11 @@ missing `ts` only where it is load-bearing.
    batch fit records `rw[r]`, the rows after the warm-up and the lag. The carry fold records the
    positions among every observation it folded, and no timestamp, because its buffer keeps none.
    A time-cut of the block cuts the key with it. Both default to `nothing`, so a block built by
-   hand keeps the old behaviour.
+   hand keeps the old behaviour. A fit drops each observation with a Shared Series gap before it
+   starts, and counts its rows among the observations it kept. `shared_series_row_key` maps each
+   of those positions back to its observation in the data, on the batch fit, on a buffer refit
+   and on the carry fold. A key that kept the count matched every row after a gap to the row
+   after it, with no error.
 2. `PredictionResult` gains `idx`, the `test_idx` of the fold. The indexed `predict` records it.
    The whole-sample `predict` records `nothing`, because it cannot know where its returns data
    came from. The timestamps stay on `rd.ts`.
@@ -50,15 +54,18 @@ missing `ts` only where it is load-bearing.
    the returns data that the cross-validation split, and the method cannot check that.
 4. **The lag is applied on the whole block first, and the block is cut to the matched rows
    second.** The first test row therefore keeps the exposures of the row before it.
-5. Test rows before the first row that the block decomposes, or after its last row, are left out.
-   A test row between two matched rows that the block does not hold is refused, and so is a series
-   that repeats a block row or does not keep its order.
+5. Test rows whose keys come before the first row that the block decomposes, or after its last
+   row, are left out. A test row whose key lies inside that range and that the block does not
+   hold is refused, wherever it stands in the series, and so is a series that repeats a block row
+   or does not keep its order. A block whose key does not have one entry for each of its rows is
+   refused too.
 6. With no shared key, the method lines the series up at the tail, as before.
 7. **`Regression` carries the key too**
    ([#1495](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1495)). Its loadings are
    one fit over the sample, so the key names the observations of the prior result that holds it:
    the rows of `pr.fpr.X` and of the reconstruction `pr.X`, which the attribution reads. The rd
-   entry of `FactorPrior` records the positions and `rd.ts`. Under a Scenario Cap of the factor
+   entry of `FactorPrior` records the positions and `rd.ts`, with the positions mapped through
+   the Shared Series gaps as item 1 states. Under a Scenario Cap of the factor
    prior, the asset side keeps the same last rows as `F`, so the key is the last positions of the
    data. Before this, a `FactorPrior` with a Scenario Cap refused to fit, because the two blocks
    had different row counts. Another producer of a `Regression` records no key and keeps the tail
@@ -73,7 +80,9 @@ missing `ts` only where it is load-bearing.
 9. **A refit over a capped buffer records no positions.** The batch verb counts the positions from
    the first row of the buffer, and a buffer that drops its oldest rows does not record how many
    it dropped. A key of `2:120` on data rows `132:250` matched the wrong rows with no error. The
-   refit now removes the positions under a `max_history` cap and keeps the timestamps.
+   refit now removes the positions under a `max_history` cap. A buffer keeps no timestamps, so
+   the block of a capped refit carries no key, and the attribution lines the series up at the
+   tail.
 
 ## Consequences
 
@@ -88,7 +97,8 @@ missing `ts` only where it is load-bearing.
   `BudgetedHindsightPath`. A population of paths takes one attribution per path. A path of
   `MultipleRandomised` holds a subset of the assets, so it is attributed against a prior fitted
   on the same subset, and weights over another universe are refused with a `DimensionMismatch`.
-- `CrossSectionalFactorModel` and `PredictionResult` each carry one more type parameter, after the
+- `CrossSectionalFactorModel` and `Regression` each carry two more type parameters, for `idx` and
+  `ts`, and `PredictionResult` carries one more, for `idx`. Each new parameter comes after the
   existing ones, so a dispatch that names a prefix of the parameters is unchanged.
 - The cost is one integer vector, a range on the batch fit, on each block, the timestamps of the
   fit rows when the data carries them, and one range on each fold.
@@ -108,7 +118,9 @@ missing `ts` only where it is load-bearing.
 - **A row count check for a Pipeline fold** (record `test_idx` when the window after the steps has
   `length(test_idx)` rows). It reads a symptom, not a contract: a step that keeps the count but
   shifts, resamples or reorders the rows passes the check, and the attribution then reads the
-  wrong rows with no error. The predicate fails safe, because a step that makes no promise gives
-  no positions.
+  wrong rows with no error. The predicate fails safe for a step of the data level, because a step
+  that makes no promise gives no positions. The mirror answers `true` for a step of the other
+  level, which is correct because `apply_fitted_step` is the identity there. A new method of
+  `apply_fitted_step` therefore needs its own method of the mirror.
 - **The key on `LowOrderPrior`**, so that every prior records its rows. It changes a core result
   type and every reader of it, for one consumer. The block is what the attribution reads.

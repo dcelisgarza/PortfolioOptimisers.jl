@@ -132,7 +132,7 @@ below `min_count` are dropped before that call, as its Precomputed-returns contr
 **`max_drawdown` and `calmar` are of the compressed path**; the docstring carries the caveat and no
 guard is applied. A quantile spread is a difference of two means and not a book, so it gets the
 three annualisation figures and a hit rate through `forecast_series_summary`. The turnover of the
-book is `calc_turnover`, which landed in `src/17_NetReturnsDrawdowns.jl` beside `calc_net_returns`
+book is `calc_turnover`, which landed in `src/14_NetReturnsDrawdowns.jl` beside `calc_net_returns`
 because a caller who holds a weight path wants its turnover whether a forecast produced it or not;
 its first observation is `NaN`, because a path cannot say whether it opened from cash.
 
@@ -235,7 +235,7 @@ fifteen parameters has a home, tabulated in #932's resolution.
 
 ## Consequences
 
-Seventeen names are exported from `src/08_Moments/45_ReturnForecasts/07`–`14`: the three targets,
+Seventeen names are exported from `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07`–`14`: the three targets,
 the two Results, `forecast_evaluation`, `forecast_history`, and the ten level-2 verbs and
 summaries; eleven `plot_forecast_*` figures from the extension. `AbstractForecastTarget` is not
 exported. `GLOSSARY.md` defines **Forecast Evaluation**, **Forward Target** and **Forecast

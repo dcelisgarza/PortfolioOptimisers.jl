@@ -679,10 +679,11 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 function prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
+    rows = shared_series_rows(rd, pe.x_src, true)
     rd = shared_series_view(rd, pe.x_src, true)
     pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
                ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, strict = strict, dims = 1)
-    return stamp_returns_source(pr, pe)
+    return stamp_returns_source(shared_series_row_key(pr, rows), pe)
 end
 
 export FactorPrior

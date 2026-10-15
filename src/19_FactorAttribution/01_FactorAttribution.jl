@@ -2065,7 +2065,7 @@ The series of a cross-validation names its rows, and its folds usually cover few
 
 # Validation
 
-  - With a common key, the key of the series has `T` entries, else a `DimensionMismatch` is raised, and the rules of [`attribution_match_rows`](@ref) hold.
+  - With a common key, the key of the series has `T` entries and the key of the block has one entry for each observation of the block, else a `DimensionMismatch` is raised, and the rules of [`attribution_match_rows`](@ref) hold.
   - The rules of [`attribution_align`](@ref).
 
 # Returns
@@ -2089,6 +2089,8 @@ function attribution_key_align(blk::NamedTuple, T::Integer, key::NamedTuple)
     end
     @argcheck(length(kp.series) == T,
               DimensionMismatch("the row key of the return series ($(length(kp.series)) entries) must have one entry for each observation of the series ($T)"))
+    @argcheck(length(kp.block) == size(blk.f, 1),
+              DimensionMismatch("the row key of the factor model block ($(length(kp.block)) entries) must have one entry for each observation of the block ($(size(blk.f, 1)))"))
     al = attribution_align(blk, size(blk.f, 1))
     m = attribution_match_rows(kp.block, kp.series, blk.lag)
     return merge(attribution_window(al, m.arows), (; rows = m.rows))
@@ -2132,7 +2134,7 @@ end
 
 Return the rows of a return series that a factor model block decomposes, and the aligned block row of each.
 
-Block row `t` of a fit with exposure lag `lag` decomposes its returns with the exposures of block row `t - lag`, so the first `lag` block rows decompose nothing. Aligned row `a` is block row `a + lag`. The function finds the aligned row whose key equals the key of each observation of the series. The observations before the first match and after the last match fall outside the block, as the observations of a fold before the first fitted row do, and the attribution leaves them out. Every observation between the two must match, because a gap inside the block is a fold whose rows the block does not hold.
+Block row `t` of a fit with exposure lag `lag` decomposes its returns with the exposures of block row `t - lag`, so the first `lag` block rows decompose nothing. Aligned row `a` is block row `a + lag`. The function finds the aligned row whose key equals the key of each observation of the series. The observations before the first match and after the last match fall outside the block, as the observations of a fold before the first fitted row do, and the attribution leaves them out, when their keys lie outside the range of the keys of the aligned rows. Every other observation must match, because a key inside that range with no row is a gap of the block, for example an observation that the fit dropped for a Shared Series gap. A gap at the head of the series is refused as a gap between two matches is.
 
 # Arguments
 
@@ -2143,7 +2145,7 @@ Block row `t` of a fit with exposure lag `lag` decomposes its returns with the e
 # Validation
 
   - At least one observation of the series matches an aligned row. Raises a `DimensionMismatch`.
-  - Every observation between the first match and the last match matches an aligned row. Raises an `ArgumentError` that names the first unmatched observations.
+  - Every observation between the first match and the last match, and every observation whose key lies inside the range of the keys of the aligned rows, matches an aligned row. Raises an `ArgumentError` that names the first unmatched observations.
   - The matched aligned rows increase strictly, so the series repeats no observation and keeps the order of the block. Raises an `ArgumentError`.
 
 # Returns
@@ -2164,9 +2166,13 @@ function attribution_match_rows(bk::AbstractVector, sk::AbstractVector, lag::Int
     @argcheck(!isempty(kept),
               DimensionMismatch("no observation of the return series is a row that the factor model block decomposes. The block decomposes $(Tb - lag) rows, those after its exposure lag of $lag. Fit the prior on returns data that covers the rows of the series."))
     rows = first(kept):last(kept)
-    gaps = rows[iszero.(view(m, rows))]
+    # An unmatched observation before the first match is outside the block only when its key
+    # comes before the first aligned row. A key inside the range of the aligned rows is a gap
+    # of the block, wherever the observation stands in the series.
+    lo, hi = extrema(view(bk, (lag + 1):Tb))
+    gaps = findall(k -> iszero(m[k]) && (k in rows || lo <= sk[k] <= hi), eachindex(m))
     @argcheck(isempty(gaps),
-              ArgumentError("observations $(first(gaps, 5)) of the return series lie between two rows of the factor model block, and the block holds no row for them. Fit the prior on the returns data that the cross-validation split, or drop those observations."))
+              ArgumentError("observations $(first(gaps, 5)) of the return series lie inside the rows of the factor model block, and the block holds no row for them. Fit the prior on the returns data that the cross-validation split, or drop those observations."))
     arows = m[rows]
     @argcheck(all(>(0), diff(arows)),
               ArgumentError("the return series repeats a row of the factor model block, or does not keep its order. A realised attribution reads the observations in the order of time, so its folds must not overlap and must come in the order of time."))

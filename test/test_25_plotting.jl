@@ -956,6 +956,20 @@
         @test length(p_dbk.series_list) == 4
         @test p_dbk[1][:title] == "Forecast Books by Decay Window"
         @test all(isequal.(p_dbk.series_list[4][:y], t_dc.zscore_sharpe))
+        # `ppy` reaches the table of each book figure (R10 of #1630). It fell into `kwargs...`,
+        # so the figure drew the columns at the `ppy` of the evaluation.
+        p2 = 2 * fe_fp.ppy
+        t_dc2 = forecast_decay(fe_fp, eps_fp; n = 3, ppy = p2)
+        t_hp2 = forecast_holding_period(fe_fp, eps_fp; n = 3, ppy = p2)
+        @test !all(isequal.(t_dc2.rank_ann_return, t_dc.rank_ann_return))
+        @test all(isequal.(plot_forecast_portfolio_decay(fe_fp, eps_fp; n = 3, ppy = p2).series_list[1][:y],
+                           t_dc2.rank_ann_return))
+        @test all(isequal.(plot_forecast_portfolio_by_holding_period(fe_fp, eps_fp; n = 3,
+                                                                     ppy = p2).series_list[1][:y],
+                           t_hp2.rank_ann_return))
+        @test all(isequal.(plot_forecast_portfolio_decay(fe_fp, rd_fp, csfm_fp; n = 3,
+                                                         ppy = p2).series_list[1][:y],
+                           t_dc2.rank_ann_return))
         # The carrier-and-block arity builds the target history off the block, so it draws
         # the same table without the caller holding one.
         @test all(isequal.(plot_forecast_ic_decay(fe_fp, rd_fp, csfm_fp; n = 3).series_list[2][:y],
