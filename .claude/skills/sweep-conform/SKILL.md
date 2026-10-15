@@ -121,8 +121,14 @@ measured the old tree. Pay the cheap work first and the slow gates once, on the 
 4. Run `sweep_check.jl --fetch`, then the fast gates scoped to your files:
    `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
    complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
-5. Run `test_26` and the doctests (the `run-doctests` skill), then JET last, scoped the same way.
-6. Commit, fetch, and rebase again if `dev` moved. Push with `git push origin HEAD:dev`.
+5. Run the four census files that catch a missing declaration or row, in the foreground:
+   `julia -t 1 --project=test test/run_files.jl --done=<path> test_43_exported_abstract_type_census.jl test_45_sweep_census.jl test_47_alias_and_module_census.jl test_66_public_declaration_census.jl`.
+   They take seconds after the one-minute package load. `test_45` holds the manifest row,
+   `test_47` the `include` line, and `test_43` and `test_66` the `public` and `export`
+   declarations, which `sweep_check.jl` does not read. Run them even when your targeted tests
+   leave them out: a build piece once closed with `test_66` red.
+6. Run `test_26` and the doctests (the `run-doctests` skill), then JET last, scoped the same way.
+7. Commit, fetch, and rebase again if `dev` moved. Push with `git push origin HEAD:dev`.
 
 Each gate and each test file records a stamp of the tree it measured. The pre-push hook refuses
 the push when `dev` moved, after a gate ran, in a file or a `src/` directory your branch changes,

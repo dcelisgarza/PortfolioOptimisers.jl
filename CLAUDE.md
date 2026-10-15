@@ -34,13 +34,15 @@ during one ticket, one after the other. Only a simultaneous edit loses work. The
 finishes last commits the common file. That session rebases onto the commit of the session that
 finished first, then adds its own change to the current text.
 
-Three files are shared by every sweep ticket, so this rule bites hardest there:
+Three files are shared by every sweep ticket, and a fourth by every ticket that adds an ADR, so
+this rule bites hardest there:
 
 - `code_health/sweep_manifest.toml` — one row per source file.
 - `src/01_Base/01_DocstringDictionaries/` — `arg_dict`, `math_dict` and their siblings, one
   subject to a file, so two sessions collide only when they add keys of one subject.
 - `test/test_26_docs.jl` — the library-wide ratchets, `DETAILS_TOTAL`, `NO_RELATED_TOTAL` and
   `MATH_COPY_TOTAL`.
+- `docs/adr/README.md` — the ADR index, one row per ADR, so two new ADRs add adjacent rows.
 
 A ratchet is one number for the whole library. Two sessions that each lower it write two different
 numbers, and a merge keeps one of them. Lower a ratchet in the commit that pays it, and rebase
