@@ -31,7 +31,7 @@ end
 
 [`AbstractPriorResult`](@ref) method of [`reader_frames`](@ref): the frames that a Prior Result in the place of a prior adds to the group of its optimiser.
 
-A Prior Result records the source that its prior stated, see [`prior_returns_source`](@ref). So a Result that the online read-out, a prior step of a [`Pipeline`](@ref) or the caller puts in the place of the prior keeps the frame of that prior. The method passes the recorded source to [`source_frames`](@ref) with `raw = false`. A Result at `nothing` then adds nothing: it was fitted before the head was built, so the head cannot warn that its source was forgotten.
+A Prior Result records the source that its prior stated, see [`prior_returns_source`](@ref). So a Result that the call with no data on an online fold, a prior step of a [`Pipeline`](@ref) or the caller puts in the place of the prior keeps the frame of that prior. The method passes the recorded source to [`source_frames`](@ref) with `raw = false`. A Result at `nothing` then adds nothing: it was fitted before the head was built, so the head cannot warn that its source was forgotten.
 
 # Arguments
 

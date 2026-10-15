@@ -298,7 +298,7 @@ This is the method of [`prior`](@ref) with no data, and the entry point of every
   - A [`SampleBufferState`](@ref) means refit. The estimator has no recursion of its own, so the method runs the batch verb over the rows that the buffer kept. These are all the rows folded so far when the buffer has no cap, and the last `max_history` rows when an [`Online`](@ref) set one. The method drops the rows that the buffer marks with a Shared Series gap, with [`shared_series_buffer`](@ref), as the batch fit over the same rows drops them at its entry. The batch verb receives the factor rows that the buffer recorded, through [`factor_buffer`](@ref), or `nothing` where the buffer recorded none. The fold fixed that choice from the estimator tree.
   - A [`PriorCarryState`](@ref) means fold and carry. Each family that takes it has its own method of `prior` with no data.
 
-Every method with no data records the source that `pe` states in the prior result, with [`stamp_returns_source`](@ref), as the [`ReturnsResult`](@ref) method does. A consumer that receives the read-out in place of the estimator then reads its frame.
+Every method with no data records the source that `pe` states in the prior result, with [`stamp_returns_source`](@ref), as the [`ReturnsResult`](@ref) method does. A consumer that receives that Result in place of the estimator then reads its frame.
 
 # Mathematical definition
 
