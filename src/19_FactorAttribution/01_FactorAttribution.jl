@@ -1422,7 +1422,8 @@ end
                        fcb::Option{<:FactorFamilyBasis} = nothing,
                        unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                        observed::Integer = 0, fam::Option{<:VecStr} = nothing,
-                       h1::Option{<:AbstractMatrix{Bool}} = nothing, assets::Bool = false,
+                       h1::Option{<:AbstractMatrix{Bool}} = nothing,
+                       dc::Option{<:AbstractMatrix{Bool}} = nothing, assets::Bool = false,
                        se::Bool = false, ppy::Number = 1, ddof::Integer = 1,
                        unknown::AbstractUnknownEntryRule = EntrywiseUnknown())
         -> FactorAttributionResult
@@ -1545,6 +1546,7 @@ The three components sum to the total: ``\\sum_{C} \\mathrm{VC}_{C} = \\sqrt{p}\
   - `fam`: Family label of each factor, or `nothing` for no family axis.
   - `lev`: Assets whose variance split the model does not identify, a Leverage-One Pair at one row or more, or `nothing` for none. A prior method reads it off the `h1` field of a cross-sectional fit, through [`attribution_marked_assets`](@ref).
   - `h1`: Leverage-one mask, `observations × assets`, on the observations of `eps`, or `nothing` for none.
+  - `dc`: Dropped-column mask of the fit, `observations × estimated factors`, on the observations of `eps` and on the axis the regression was written in, or `nothing` for none. A factor it marks took a return of zero by the rule of [`DependentColumnDrop`](@ref), so `se = true` gives it no estimation error, and reads the other factors on the columns that the fit kept. A prior method reads it off the `dc` field of a cross-sectional fit.
   - `f`: Factor returns, `observations × factors`.
   - `eps`: Idiosyncratic returns, `observations × assets`, `NaN` at a pair the model does not decompose.
   - `lag`: Number of observations by which the exposures lag the returns.
@@ -1624,38 +1626,6 @@ function factor_attribution(ppred::PopulationPredictionResult, pr::AbstractPrior
     return [factor_attribution(p, pr, args...; kwargs...) for p in ppred.pred]
 end
 """
-    attribution_block_arrays(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult)
-        -> NamedTuple
-
-Return a factor model block as the bare arrays a realised attribution reads.
-
-The block states its histories through the reads of [`factor_attribution`](@ref), and this function takes each of them once, so a prior method and the bare-array method hand [`attribution_align`](@ref) the same fields.
-
-# Arguments
-
-  - `rr`: The factor model block.
-  - `pr`: The prior result the block travels on, which carries the two return series of a block that stores none.
-
-# Returns
-
-  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `unseen`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_unseen_rule`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), and the fields `idx` and `ts` of [`attribution_row_key`](@ref).
-
-# Related
-
-  - [`attribution_align`](@ref)
-  - [`attribution_array_block`](@ref)
-"""
-function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
-                                  pr::AbstractPriorResult)
-    return (; B = attribution_exposures(rr), f = attribution_factor_returns(rr, pr),
-            eps = attribution_idiosyncratic_returns(rr, pr), lag = attribution_lag(rr),
-            rw = attribution_regression_weights(rr),
-            vs = attribution_idiosyncratic_variances(rr),
-            fcb = attribution_family_basis(rr), unseen = attribution_unseen_rule(rr),
-            no = attribution_observed_count(rr), fam = attribution_families(rr),
-            h1 = attribution_leverage_marks(rr), attribution_row_key(rr)...)
-end
-"""
     attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                             lag::Integer = B isa Arr3Num ? 1 : 0, trim::Bool = false,
                             rw::Option{<:MatNum} = nothing, vs::Option{<:MatNum} = nothing,
@@ -1702,13 +1672,14 @@ function attribution_array_block(B::MatNum_Arr3Num, f::MatNum, eps::MatNum;
                                  fcb::Option{<:FactorFamilyBasis} = nothing,
                                  unseen::AbstractUnseenMemberRule = SolvedUnseenMember(),
                                  observed::Integer = 0, fam::Option{<:VecStr} = nothing,
-                                 h1::Option{<:AbstractMatrix{Bool}} = nothing)
+                                 h1::Option{<:AbstractMatrix{Bool}} = nothing,
+                                 dc::Option{<:AbstractMatrix{Bool}} = nothing)
     @argcheck(lag >= zero(lag),
               DomainError(lag,
                           "the exposure lag must be non-negative: a negative lag pairs each return with an exposure from after it"))
     return (; B = B, f = f, eps = eps, lag = ifelse((B isa Arr3Num) | trim, lag, zero(lag)),
             rw = rw, vs = vs, fcb = fcb, unseen = unseen, no = observed, fam = fam, h1 = h1,
-            idx = nothing, ts = nothing)
+            dc = dc, idx = nothing, ts = nothing)
 end
 """
     attribution_array_model(B::MatNum, F::MatNum, d::VecNum_MatNum;

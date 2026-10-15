@@ -16,7 +16,12 @@ cross_sectional_least_squares
 cross_sectional_rank
 assert_cross_sectional_rank
 cross_sectional_column_drop
+cross_sectional_kept_columns
+cross_sectional_drop_mask
+cross_sectional_bit_mask
+cross_sectional_mark_dropped!
 cross_sectional_row_space
+cross_sectional_target_coef
 cross_sectional_systematic
 cross_sectional_foreach
 ```

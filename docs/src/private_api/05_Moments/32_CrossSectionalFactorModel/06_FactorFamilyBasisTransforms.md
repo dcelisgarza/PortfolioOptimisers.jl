@@ -12,4 +12,6 @@ unseen_member_change
 unseen_member_family!
 unseen_member_returns
 unseen_member_change_at
+cs_dropped_design
+cs_dropped_change
 ```

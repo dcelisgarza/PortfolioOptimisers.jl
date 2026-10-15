@@ -964,7 +964,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Map the coefficients of a regression on the design of [`unseen_member_design`](@ref) back to the reduced factor returns.
 
-The row of each changed observation `t` becomes `P_t` times the coefficients of that row. Every other row, the residuals, the counts, the intercept and the leverage-one mark stay as the regression gives them. The design times the coefficients equals the reduced exposures times the factor returns, so the residuals are those of the factor returns.
+The row of each changed observation `t` becomes `P_t` times the coefficients of that row. Every other row, the residuals, the counts, the intercept, the leverage-one mark and the dropped-column mask stay as the regression gives them. The mask names the columns of the changed design, so a diagnostic composes it with `P_t`. The design times the coefficients equals the reduced exposures times the factor returns, so the residuals are those of the factor returns.
 
 # Arguments
 
@@ -988,7 +988,7 @@ function unseen_member_returns(csr::CrossSectionalRegression, P)
         LinearAlgebra.mul!(view(f, t, :), Pt, view(csr.f, t, :))
     end
     return CrossSectionalRegression(; f = f, eps = csr.eps, n = csr.n, b = csr.b,
-                                    h1 = csr.h1)
+                                    h1 = csr.h1, dc = csr.dc)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1019,6 +1019,88 @@ function unseen_member_change_at(P, t::Integer)
         end
     end
     return nothing
+end
+"""
+    cs_dropped_design(B::Arr3Num, P, dc::Nothing)
+    cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
+
+Return the design and the changes that a diagnostic of the factor returns reads, after the columns that the fit dropped.
+
+Under [`DependentColumnDrop`](@ref) the fit of an observation solves the columns that its rank test keeps, and gives every other factor a return of zero by the rule. So its factor returns are ``\\mathbf{P}_{t} \\mathbf{S}_{t}`` times the coefficients of the kept columns, where ``\\mathbf{S}_{t}`` is the identity with a zero column at each dropped factor, and ``\\mathbf{P}_{t}`` is the change of an Unseen Member, or the identity. The verb zeroes the dropped columns of the design and composes the two changes. So a dropped factor has a variance of zero, as an Unseen Member has, because the rule states its return, and the kept factors read the inverse Gram matrix of the kept columns, which the fit solved. Without the mask the diagnostic reads the pseudo-inverse of the whole design, which states no value for any factor of the dependent group.
+
+# Arguments
+
+  - `B`: The design of the regression, `observations × assets × factors`, from [`cs_regression_data`](@ref).
+  - `P`: The `t => P_t` pairs on the rows of `B`.
+  - `dc`: The dropped-column mask `observations × factors` on the rows of `B`, or `nothing`.
+
+# Returns
+
+  - `(; B, P)`: The design with a zero column at each dropped factor, and the composed changes. `B` and `P` themselves when the mask drops nothing.
+
+# Related
+
+  - [`cs_regression_data`](@ref)
+  - [`cs_dropped_change`](@ref)
+  - [`cs_regression_t_stats`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function cs_dropped_design(B::Arr3Num, P, ::Nothing)
+    return (; B = B, P = P)
+end
+function cs_dropped_design(B::Arr3Num, P, dc::AbstractMatrix{Bool})
+    if !any(dc)
+        return (; B = B, P = P)
+    end
+    K = size(B, 3)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tp = typeof(sqrt(one(float_if_integer(real(eltype(B))))))
+    Bd = copy(B)
+    Pd = Pair{Int, Matrix{Tp}}[]
+    for t in axes(B, 1)
+        Pt = unseen_member_change_at(P, t)
+        d = view(dc, t, :)
+        if any(d)
+            Bd[t, :, d] .= zero(eltype(Bd))
+            push!(Pd, t => cs_dropped_change(Pt, d, 1:K, K, Tp))
+        elseif !isnothing(Pt)
+            push!(Pd, t => Pt)
+        end
+    end
+    return (; B = Bd, P = Pd)
+end
+"""
+    cs_dropped_change(Pt::Option{<:AbstractMatrix}, d::AbstractVector{Bool},
+                      cols::AbstractVector{<:Integer}, K::Integer, ::Type{T})
+
+Return the change of one observation, composed with the selection of the columns that its fit kept.
+
+The selection ``\\mathbf{S}_{t}`` is the identity of order `K` with a zero column at `cols[d]`, and the answer is ``\\mathbf{P}_{t} \\mathbf{S}_{t}``, or ``\\mathbf{S}_{t}`` when the observation has no change. [`cs_dropped_design`](@ref) states the rule.
+
+# Arguments
+
+  - `Pt`: The change of the observation, `K × K`, or `nothing`.
+  - `d`: The dropped-column mask of the observation, one entry per entry of `cols`.
+  - `cols`: The position on the axis of the change of each column of the mask.
+  - `K`: The order of the change.
+  - `T`: Element type of the selection.
+
+# Returns
+
+  - `Q::Matrix`: The composed change, `K × K`.
+
+# Related
+
+  - [`cs_dropped_design`](@ref)
+  - [`attribution_error_pass`](@ref)
+"""
+function cs_dropped_change(Pt::Option{<:AbstractMatrix}, d::AbstractVector{Bool},
+                           cols::AbstractVector{<:Integer}, K::Integer, ::Type{T}) where {T}
+    S = Matrix{T}(LinearAlgebra.I, K, K)
+    for j in view(cols, d)
+        S[j, j] = zero(T)
+    end
+    return isnothing(Pt) ? S : Pt * S
 end
 
 public reduce_factor_names, reduce_exposures, reduce_loadings, reduce_factor_returns,

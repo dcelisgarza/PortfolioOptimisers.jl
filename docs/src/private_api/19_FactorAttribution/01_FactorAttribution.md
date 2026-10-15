@@ -28,7 +28,6 @@ attribution_idiosyncratic_matrix
 attribution_safe_corr
 attribution_family_index
 attribution_family_axis
-attribution_block_arrays
 attribution_array_block
 attribution_array_model
 attribution_array_mask

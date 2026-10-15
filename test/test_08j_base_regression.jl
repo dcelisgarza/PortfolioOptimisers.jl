@@ -1308,6 +1308,24 @@ end
 # A regression target the library does not know, for `cross_sectional_least_squares`.
 struct LeverageTestTarget <: PortfolioOptimisers.AbstractRegressionTarget end
 
+# A caller's own weighted least-squares target, which states no basis invariance, so the fit
+# hands it the design itself (#1719). Its solve is a pseudo-inverse.
+struct PinvTestTarget{W} <: PortfolioOptimisers.AbstractRegressionTarget
+    w::W
+end
+struct PinvTestFit{C}
+    c::C
+end
+function PortfolioOptimisers.factory(::PinvTestTarget, w::PortfolioOptimisers.ObsWeights)
+    return PinvTestTarget(w)
+end
+function PortfolioOptimisers.StatsAPI.fit(tgt::PinvTestTarget, X::AbstractMatrix,
+                                          y::AbstractVector)
+    sq = sqrt.(tgt.w)
+    return PinvTestFit(LinearAlgebra.pinv(X .* sq) * (y .* sq))
+end
+PortfolioOptimisers.StatsAPI.coef(m::PinvTestFit) = m.c
+
 # A cross-sectional estimator the library does not know, which answers the public verb alone.
 struct BlockTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressionEstimator end
 function PortfolioOptimisers.cross_sectional_regression(::BlockTestRegression, Z, X, W)
@@ -1560,6 +1578,126 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
             @test cre.alg === alg
         end
         @test CrossSectionalTargetRegression().alg === PseudoInverseFallback()
+    end
+
+    @testset "A nearly dependent factor set: one rank test at the scale of the design (#1719)" begin
+        PO = PortfolioOptimisers
+        seq = PO.FLoops.SequentialEx()
+        T, N = 3, 40
+        Z0 = randn(StableRNG(1), T, N, 3)
+        Xn = randn(StableRNG(3), T, N) ./ 100
+        Wn = ones(T, N)
+        noise = randn(StableRNG(2), T, N)
+        # Between a design condition number of about 1e8 and 1e14 / K the rank test of the fit
+        # keeps every column, and the Gram matrix of `GLM` squares the condition number. A
+        # basis-invariant target fits the design whose weighted Gram matrix is the identity,
+        # so it gives the factor returns of the linear member at the precision of the design.
+        # Before the fix it dropped the third column from 2e9: `[-1.36e-3, 5.02e-4, 0]`.
+        for d in (1e-5, 1e-7, 1e-9, 1e-11)
+            Zn = copy(Z0)
+            Zn[:, :, 3] = Z0[:, :, 1] .+ d .* noise
+            D = sqrt.(Wn[1, :]) .* Zn[1, :, :]
+            @test PO.cross_sectional_rank(D) == 3
+            tol = 100 * LinearAlgebra.cond(D) * eps()
+            for alg in
+                (PseudoInverseFallback(), DependentColumnDrop(), RankDeficiencyRefusal())
+                linear = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                                   alg = alg,
+                                                                                   ex = seq),
+                                                    Zn, Xn, Wn)
+                @test isa(alg, DependentColumnDrop) ? !any(linear.dc) : isnothing(linear.dc)
+                for tgt in (LinearModel(), GeneralisedLinearModel())
+                    target = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                       tgt = tgt,
+                                                                                       alg = alg,
+                                                                                       ex = seq),
+                                                        Zn, Xn, Wn)
+                    # The residuals subtract `Z * f` from returns a factor of `f` smaller,
+                    # so they agree at the same precision. Measured worst: 2e-6 at 1e-11.
+                    @test isapprox(target.f, linear.f; rtol = tol)
+                    @test isapprox(target.eps, linear.eps; rtol = tol)
+                end
+            end
+        end
+        # The whitened fit of a full-rank design equals the plain fit to rounding.
+        A = Zc[1, :, :]
+        y = Xc[1, :]
+        w = Wc[1, :]
+        tgt = PO.factory(LinearModel(), StatsBase.aweights(w))
+        plain = PO.StatsAPI.coef(PO.StatsAPI.fit(tgt, A, y))
+        @test PO.cross_sectional_target_coef(tgt, A, y, A .* sqrt.(w)) ≈ plain
+        # A target that is not basis-invariant fits the design itself.
+        own = PO.factory(PinvTestTarget(nothing), StatsBase.aweights(w))
+        @test PO.cross_sectional_target_coef(own, A, y, A .* sqrt.(w)) ==
+              PO.StatsAPI.coef(PO.StatsAPI.fit(own, A, y))
+        # On an exactly dependent design every member of a GLM target means what it means
+        # for the linear member, and so does a caller's own target.
+        Zd = copy(Zc)
+        Zd[:, :, 2] = 2 .* Zd[:, :, 1]
+        for intercept in (false, true)
+            linear = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                               intercept = intercept),
+                                                Zd, Xc, Wc)
+            drop = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                             alg = DependentColumnDrop(),
+                                                                             intercept = intercept),
+                                              Zd, Xc, Wc)
+            # The mask marks the column whose return the rule states, at every observation:
+            # the pivot keeps the doubled column, whose norm is larger.
+            dropped = falses(size(drop.f))
+            dropped[:, 1] .= true
+            @test drop.dc == dropped
+            @test all(iszero, drop.f[drop.dc])
+            for tgt in (GeneralisedLinearModel(), PinvTestTarget(nothing))
+                gdrop = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                  tgt = tgt,
+                                                                                  alg = DependentColumnDrop(),
+                                                                                  intercept = intercept),
+                                                   Zd, Xc, Wc)
+                @test gdrop.f ≈ drop.f
+                @test gdrop.dc == drop.dc
+                @test_throws "has rank $(size(Zd, 3) - 1)" cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                                                     tgt = tgt,
+                                                                                                                     alg = RankDeficiencyRefusal(),
+                                                                                                                     intercept = intercept),
+                                                                                      Zd,
+                                                                                      Xc,
+                                                                                      Wc)
+                # `UncheckedSolve()` hands the full design to the target, whose own
+                # factorisation decides the factor returns, and the fitted values stay those
+                # of the linear member.
+                unchecked = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                      tgt = tgt,
+                                                                                      alg = UncheckedSolve(),
+                                                                                      intercept = intercept),
+                                                       Zd, Xc, Wc)
+                @test unchecked.eps ≈ linear.eps
+                @test isnothing(unchecked.dc)
+                # A pseudo-inverse target lands on the answer of least norm.
+                if tgt isa PinvTestTarget
+                    @test unchecked.f ≈ linear.f
+                end
+            end
+            # A full-rank design passes the refusal of every target, with the intercept.
+            refused = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                alg = RankDeficiencyRefusal(),
+                                                                                intercept = intercept),
+                                                 Zc, Xc, Wc)
+            plain = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                              intercept = intercept),
+                                               Zc, Xc, Wc)
+            @test refused.f ≈ plain.f
+            @test intercept ? refused.b ≈ plain.b : isnothing(refused.b)
+        end
+        # The mask has the shape of the factor returns, and a view keeps it.
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = ones(2, 2),
+                                                                eps = ones(2, 3),
+                                                                n = [3, 3],
+                                                                dc = falses(2, 3))
+        csr = CrossSectionalRegression(; f = ones(2, 2), eps = ones(2, 3), n = [3, 3],
+                                       dc = BitMatrix([0 1; 0 0]))
+        @test PO.port_opt_view(csr, [1, 3]).dc === csr.dc
+        @test PO.cross_sectional_kept_columns(zeros(4, 2), 0) == Int[]
     end
 
     @testset "The two members agree" begin

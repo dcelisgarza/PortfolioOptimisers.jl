@@ -215,7 +215,7 @@ The block keywords describe the arrays, and [`attribution_array_block`](@ref) ta
 
 # Returns
 
-  - `kw::NamedTuple`: The block keywords `blk`, among `lag`, `trim`, `rw`, `vs`, `fcb`, `unseen`, `observed`, `fam` and `h1`, and the other keywords `entry`.
+  - `kw::NamedTuple`: The block keywords `blk`, among `lag`, `trim`, `rw`, `vs`, `fcb`, `unseen`, `observed`, `fam`, `h1` and `dc`, and the other keywords `entry`.
 
 # Related
 
@@ -224,7 +224,8 @@ The block keywords describe the arrays, and [`attribution_array_block`](@ref) ta
 """
 function attribution_array_keywords(kwargs)
     nt = values(kwargs)
-    ks = filter(in((:lag, :trim, :rw, :vs, :fcb, :unseen, :observed, :fam, :h1)), keys(nt))
+    ks = filter(in((:lag, :trim, :rw, :vs, :fcb, :unseen, :observed, :fam, :h1, :dc)),
+                keys(nt))
     return (; blk = NamedTuple{ks}(nt), entry = Base.structdiff(nt, NamedTuple{ks}))
 end
 function factor_attribution(W::VecNum_MatNum, B::MatNum_Arr3Num, f::MatNum, eps::MatNum,
@@ -345,6 +346,39 @@ function attribution_unknown_kinds(rule::KindwiseUnknown)
     return (; unstated = rule.unstated, leverage = rule.leverage)
 end
 """
+    attribution_block_arrays(rr::AbstractLoadingsRegressionResult, pr::AbstractPriorResult)
+        -> NamedTuple
+
+Return a factor model block as the bare arrays a realised attribution reads.
+
+The block states its histories through the reads of [`factor_attribution`](@ref), and this function takes each of them once, so a prior method and the bare-array method hand [`attribution_align`](@ref) the same fields.
+
+# Arguments
+
+  - `rr`: The factor model block.
+  - `pr`: The prior result the block travels on, which carries the two return series of a block that stores none.
+
+# Returns
+
+  - `blk::NamedTuple`: The fields `B`, `f`, `eps`, `lag`, `rw`, `vs`, `fcb`, `unseen`, `no` and `fam`, from [`attribution_exposures`](@ref), [`attribution_factor_returns`](@ref), [`attribution_idiosyncratic_returns`](@ref), [`attribution_lag`](@ref), [`attribution_regression_weights`](@ref), [`attribution_idiosyncratic_variances`](@ref), [`attribution_family_basis`](@ref), [`attribution_unseen_rule`](@ref), [`attribution_observed_count`](@ref) and [`attribution_families`](@ref), and the fields `idx` and `ts` of [`attribution_row_key`](@ref).
+
+# Related
+
+  - [`attribution_align`](@ref)
+  - [`attribution_array_block`](@ref)
+"""
+function attribution_block_arrays(rr::AbstractLoadingsRegressionResult,
+                                  pr::AbstractPriorResult)
+    return (; B = attribution_exposures(rr), f = attribution_factor_returns(rr, pr),
+            eps = attribution_idiosyncratic_returns(rr, pr), lag = attribution_lag(rr),
+            rw = attribution_regression_weights(rr),
+            vs = attribution_idiosyncratic_variances(rr),
+            fcb = attribution_family_basis(rr), unseen = attribution_unseen_rule(rr),
+            no = attribution_observed_count(rr), fam = attribution_families(rr),
+            h1 = attribution_leverage_marks(rr), dc = attribution_dropped_columns(rr),
+            attribution_row_key(rr)...)
+end
+"""
     attribution_leverage_marks(rr::AbstractLoadingsRegressionResult) -> Nothing
     attribution_leverage_marks(rr::CrossSectionalFactorModel) -> Option{<:AbstractMatrix{Bool}}
 
@@ -370,6 +404,33 @@ function attribution_leverage_marks(::AbstractLoadingsRegressionResult)::Nothing
 end
 function attribution_leverage_marks(rr::CrossSectionalFactorModel)
     return isnothing(rr.csr) ? nothing : rr.csr.h1
+end
+"""
+    attribution_dropped_columns(rr::AbstractLoadingsRegressionResult) -> Nothing
+    attribution_dropped_columns(rr::CrossSectionalFactorModel) -> Option{<:AbstractMatrix{Bool}}
+
+Return the dropped-column mask of a factor model block, or `nothing`.
+
+The mask is the `dc` field of the cross-sectional fit, `observations × estimated factors`, on the rows of the idiosyncratic returns. A block that is not cross-sectional fits no design across the assets, so it drops no column.
+
+# Arguments
+
+  - `rr`: The factor model block.
+
+# Returns
+
+  - `dc::Option{<:AbstractMatrix{Bool}}`: The dropped-column mask, or `nothing` when the block states none.
+
+# Related
+
+  - [`CrossSectionalRegression`](@ref)
+  - [`attribution_error_pass`](@ref)
+"""
+function attribution_dropped_columns(::AbstractLoadingsRegressionResult)::Nothing
+    return nothing
+end
+function attribution_dropped_columns(rr::CrossSectionalFactorModel)
+    return isnothing(rr.csr) ? nothing : rr.csr.dc
 end
 """
     attribution_marked_assets(h1::Nothing) -> Nothing
@@ -582,7 +643,7 @@ end
 
 Return the standard errors of the mean return contributions for one matrix of idiosyncratic variances.
 
-The sandwich of each observation reads `s2`, and the function sums it over the observations through the portfolio exposure. [`attribution_standard_errors`](@ref) calls it with the variances of the regression pairs. [`attribution_leverage_errors`](@ref) calls it with an indicator in place of the variances, so one reduction gives the answer and the weight that each output puts on a set of pairs. At an observation with an Unseen Member, [`attribution_changed_covariance`](@ref) maps the sandwich of the changed design to the covariance of the factor returns.
+The sandwich of each observation reads `s2`, and the function sums it over the observations through the portfolio exposure. [`attribution_standard_errors`](@ref) calls it with the variances of the regression pairs. [`attribution_leverage_errors`](@ref) calls it with an indicator in place of the variances, so one reduction gives the answer and the weight that each output puts on a set of pairs. At an observation with an Unseen Member, [`attribution_changed_covariance`](@ref) maps the sandwich of the changed design to the covariance of the factor returns. At an observation where [`DependentColumnDrop`](@ref) dropped a column, [`attribution_dropped_observation`](@ref) takes the sandwich on the kept columns, so a dropped factor has no estimation error.
 
 # Arguments
 
@@ -611,11 +672,14 @@ function attribution_error_pass(s2::AbstractMatrix, g::MatNum, al::NamedTuple,
     cur = attribution_observed_indices(al.no, K)
     keep = findall(!, red.observed)
     se(v) = s1 * sqrt(max(zero(v), v)) / T
-    V = [attribution_changed_covariance(unseen_member_change_at(red.P, t),
-                                        attribution_sandwich(view(red.B, t, :, :),
-                                                             view(al.rw, t, :),
-                                                             view(s2, t, :), keep), keep)
-         for t in 1:T]
+    function obs_covariance(t)
+        ob = attribution_dropped_observation(al.dc, view(red.B, t, :, :),
+                                             unseen_member_change_at(red.P, t), keep,
+                                             red.nr, t)
+        Vt = attribution_sandwich(ob.B, view(al.rw, t, :), view(s2, t, :), keep)
+        return attribution_changed_covariance(ob.P, Vt, keep)
+    end
+    V = [obs_covariance(t) for t in 1:T]
     sys = se(sum(LinearAlgebra.dot(view(red.g, t, keep), V[t], view(red.g, t, keep))
                  for t in 1:T))
     Vf = attribution_expand_errors(al.fcb, attribution_scatter(V, keep, red.nr))

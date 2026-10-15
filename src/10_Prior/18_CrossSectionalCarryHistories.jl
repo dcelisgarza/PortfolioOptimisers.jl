@@ -46,7 +46,8 @@ function cross_sectional_fold_append(a::CrossSectionalRegression,
     return CrossSectionalRegression(; f = cross_sectional_fold_append(a.f, b.f),
                                     eps = cross_sectional_fold_append(a.eps, b.eps),
                                     n = cross_sectional_fold_append(a.n, b.n), b = nothing,
-                                    h1 = cross_sectional_fold_append(a.h1, b.h1))
+                                    h1 = cross_sectional_fold_append(a.h1, b.h1),
+                                    dc = cross_sectional_fold_append(a.dc, b.dc))
 end
 """
     cross_sectional_fold_join(Ms, obs, b::AbstractArray, bo::Nothing) -> NamedTuple
@@ -524,9 +525,10 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
     z = (Tf - pe.lag + 1):Tf
     fr = cross_sectional_expand(st.fcb, r, pe.lag, st.csr.f)
     marks = cross_sectional_move_marks(pe, st, fcb)
-    f = cross_sectional_move_solve(pe, st,
-                                   (; fcb = fcb, f = fr[:, retained_factor_indices(fcb)],
-                                    lv = marks.lv))
+    f = fr[:, retained_factor_indices(fcb)]
+    # The mask of the old basis names the columns of that basis, so the move writes it again.
+    dc = isnothing(st.csr.dc) ? nothing : zeros(Bool, size(f))
+    cross_sectional_move_solve(pe, st, (; fcb = fcb, f = f, lv = marks.lv, dc = dc))
     cb = cross_sectional_observed_block(st.obs, 1:Tf, r,
                                         buffer_fit_count(st.buf) - size(st.Ms, 1))
     fo = cross_sectional_fold_factor_returns(f, marks.lv, cb)
@@ -539,8 +541,8 @@ function cross_sectional_rebase_state(pe::CrossSectionalFactorPrior,
                                        Z = reduce_exposures(factor_basis_slice(fcb, z),
                                                             st.Ms[z, :, :]),
                                        csr = CrossSectionalRegression(; f = f, eps = eps,
-                                                                      n = n, b = b,
-                                                                      h1 = h1),
+                                                                      n = n, b = b, h1 = h1,
+                                                                      dc = cross_sectional_bit_mask(dc)),
                                        lv1 = marks.lv1, lv = marks.lv,
                                        pe = cross_sectional_refold_factors(pe.pe, fo,
                                                                            st.seed)))
@@ -561,12 +563,13 @@ A column that is zero at an observation is an Unseen Member under [`ZeroUnseenMe
  1. Build the design of each fitted observation `s` in `mv.fcb` with [`unseen_member_design`](@ref), on the factors that `mv.lv` marks, and scale its rows of positive weight in `st.W[s, :]` by the square root of the weight.
  2. Keep the factor returns of the observation when [`cross_sectional_rank`](@ref) of the columns of that design that are not zero equals their number.
  3. Otherwise, regress the returns of the observation with [`cross_sectional_live_regression`](@ref), under the policy of `pe.cre`, after `s - 1` fitted observations, so a refusal names the observation `s`, as the batch fit does. Map the answer with [`unseen_member_returns`](@ref). Write the factor returns into the row `s` of `mv.f`.
+ 4. When `mv.dc` is a mask, write the dropped columns of the observation into its row `s`. An observation that step 2 keeps drops exactly its zero columns, because its other columns have full rank, and a zero column takes the last pivot. An observation that step 3 solves again takes the mask of its new fit.
 
 # Arguments
 
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `st`: The state, whose `fcb` is the basis of the last fit.
-  - `mv`: The move, `(; fcb, f, lv)`: the new basis over the rows of `st.fcb`; the factor returns of the fitted observations in `fcb`, the columns of the raw factor returns that `fcb` keeps, which the function modifies in place; and the mark of the factors that are not empty in the last pass, in `fcb`.
+  - `mv`: The move, `(; fcb, f, lv, dc)`: the new basis over the rows of `st.fcb`; the factor returns of the fitted observations in `fcb`, the columns of the raw factor returns that `fcb` keeps, which the function modifies in place; the mark of the factors that are not empty in the last pass, in `fcb`; and the dropped-column mask of the fitted observations in `fcb`, all `false` on entry, which the function writes in place, or `nothing` when the fit states no mask.
 
 # Returns
 
@@ -581,7 +584,7 @@ A column that is zero at an observation is an Unseen Member under [`ZeroUnseenMe
 """
 function cross_sectional_move_solve(pe::CrossSectionalFactorPrior,
                                     st::CrossSectionalCarryState, mv::NamedTuple)
-    (; fcb, f, lv) = mv
+    (; fcb, f, lv, dc) = mv
     Xs = something(st.Xl, st.X)
     for s in axes(f, 1)
         sl = factor_basis_slice(fcb, s:s)
@@ -591,14 +594,59 @@ function cross_sectional_move_solve(pe::CrossSectionalFactorPrior,
         idx = findall(>(zero(eltype(W))), view(W, 1, :))
         A = view(ud.Z, 1, idx, lv) .* sqrt.(view(W, 1, idx))
         nz = map(c -> any(!iszero, c), eachcol(A))
+        # A solve again writes its own mask over this one.
+        cross_sectional_move_dropped!(dc, s, lv, nz)
         if cross_sectional_rank(view(A, :, nz)) < count(nz)
             t = s + pe.lag
             csr = cross_sectional_live_regression(pe.cre, ud.Z, view(Xs, t:t, :), W, lv,
                                                   s - 1).csr
             f[s, :] = view(unseen_member_returns(csr, ud.P).f, 1, :)
+            cross_sectional_move_dropped!(dc, s, csr.dc)
         end
     end
     return f
+end
+"""
+    cross_sectional_move_dropped!(dc::Nothing, s::Integer, args...) -> Nothing
+    cross_sectional_move_dropped!(dc::AbstractMatrix{Bool}, s::Integer,
+                                  lv::AbstractVector{Bool}, nz::AbstractVector{Bool}) -> Nothing
+    cross_sectional_move_dropped!(dc::AbstractMatrix{Bool}, s::Integer,
+                                  ds::AbstractMatrix{Bool}) -> Nothing
+
+Write the dropped columns of one observation in a new Factor Family Basis, on the carry fold of a Cross-Sectional Factor Prior.
+
+[`cross_sectional_move_solve`](@ref) states the rule.
+
+# Arguments
+
+  - `dc`: Dropped-column mask of the fitted observations in the new basis, written in place, or `nothing`.
+  - `s`: Row of the observation.
+  - `lv`: The mark of the factors that are not empty, in the new basis.
+  - `nz`: Whether each column of the design of the factors that `lv` marks is not zero.
+  - `ds`: The dropped-column mask of the new fit of the observation, one row.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_move_solve`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function cross_sectional_move_dropped!(::Nothing, ::Integer, args...)::Nothing
+    return nothing
+end
+function cross_sectional_move_dropped!(dc::AbstractMatrix{Bool}, s::Integer,
+                                       lv::AbstractVector{Bool},
+                                       nz::AbstractVector{Bool})::Nothing
+    dc[s, findall(lv)] = .!nz
+    return nothing
+end
+function cross_sectional_move_dropped!(dc::AbstractMatrix{Bool}, s::Integer,
+                                       ds::AbstractMatrix{Bool})::Nothing
+    dc[s, :] = view(ds, 1, :)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

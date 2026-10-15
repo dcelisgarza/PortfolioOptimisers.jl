@@ -13,7 +13,9 @@ attribution_prediction_history
 attribution_fold_weights
 attribution_fold_returns
 attribution_unknown_kinds
+attribution_block_arrays
 attribution_leverage_marks
+attribution_dropped_columns
 attribution_marked_assets
 attribution_sole_factors!
 attribution_leverage_nan

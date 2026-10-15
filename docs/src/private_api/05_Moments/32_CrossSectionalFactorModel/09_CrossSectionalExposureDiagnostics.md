@@ -20,4 +20,6 @@ exposure_universe_size
 exposure_covered_count
 exposure_coverage_weights
 cs_diagnostic_exposures
+cs_masked_vif
+cs_masked_condition_number
 ```

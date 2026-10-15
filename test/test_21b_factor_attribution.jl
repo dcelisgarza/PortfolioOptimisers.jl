@@ -1431,3 +1431,53 @@ end
         @test PO.attribution_scale(12.0, 1.0f0).s2 === sqrt(12.0)
     end
 end
+
+@testset "The standard errors read the rank of the fit and its dropped columns (#1719)" begin
+    PO = PortfolioOptimisers
+    seq = PO.FLoops.SequentialEx()
+    T, N = 6, 30
+    rng = StableRNG(1719)
+    Z = randn(rng, T, N, 3)
+    Z[:, :, 3] = Z[:, :, 1]
+    X = randn(rng, T, N) ./ 100
+    W = 1.0 .+ rand(rng, T, N)
+    vs = fill(1e-4, T, N)
+    w = fill(1 / N, N)
+    ret = X * w
+    # Under `DependentColumnDrop()` the factor of the dropped column took a return of zero
+    # by the rule, so it has no estimation error, and the kept factor has the error of the
+    # fit on the kept columns. Without the mask the pseudo-inverse splits the error of the
+    # pair in two halves.
+    r = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                  alg = DependentColumnDrop(),
+                                                                  ex = seq), Z, X, W)
+    @test all(r.dc[:, 3]) && !any(r.dc[:, 1:2])
+    se(args...; kw...) = factor_attribution(w, args..., ret; lag = 0, rw = W, vs = vs,
+                                            se = true, kw...)
+    fd = se(Z, r.f, r.eps; dc = r.dc)
+    f2 = se(Z[:, :, 1:2], r.f[:, 1:2], r.eps)
+    f0 = se(Z, r.f, r.eps)
+    @test fd.fbd.mu_se[1:2] ≈ f2.fbd.mu_se
+    @test fd.fbd.mu_se[3] == 0
+    @test f0.fbd.mu_se[1]≈f0.fbd.mu_se[3] rtol=1e-10
+    @test fd.sys.mu_se ≈ f2.sys.mu_se
+    # A nearly dependent pair keeps both columns in the fit, so the sandwich keeps both too.
+    # A rank test on the Gram matrix truncated it from a design condition number of 1e8.
+    Zn = copy(Z)
+    Zn[:, :, 3] = Z[:, :, 1] .+ 1e-9 .* randn(StableRNG(2), T, N)
+    q = W[1, :]
+    s2 = vs[1, :]
+    V = PO.attribution_sandwich(Zn[1, :, :], q, s2, 1:3)
+    B = Zn[1, :, :]
+    Dp = LinearAlgebra.pinv(sqrt.(q) .* B; rtol = 0)
+    @test V≈Dp * LinearAlgebra.Diagonal(q .* s2) * Dp' rtol=1e-4
+    @test V[1, 1] > 1e10 * V[2, 2]
+    # A weight of zero leaves the pair out of the design, as the fit leaves it out.
+    q0 = copy(q)
+    q0[1] = 0
+    @test PO.attribution_sandwich(Z[1, :, :], q0, s2, 1:2) ≈
+          PO.attribution_sandwich(Z[1, 2:end, :], q[2:end], s2[2:end], 1:2)
+    @test PO.attribution_sandwich(zeros(N, 2), q, s2, 1:2) == zeros(2, 2)
+    @test PO.attribution_dropped_observation(r.dc, Z[1, :, :], nothing, 1:3, 3, 1).P ==
+          LinearAlgebra.Diagonal([1.0, 1.0, 0.0])
+end

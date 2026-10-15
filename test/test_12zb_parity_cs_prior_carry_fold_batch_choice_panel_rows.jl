@@ -243,7 +243,8 @@ end
         # the answer onto the row space, as `PseudoInverseFallback()` does (#1625).
         function solved(pe, st)
             f = fill(NaN, size(st.csr.f))
-            po.cross_sectional_move_solve(pe, st, (; fcb = st.fcb, f = f, lv = st.lv))
+            po.cross_sectional_move_solve(pe, st,
+                                          (; fcb = st.fcb, f = f, lv = st.lv, dc = nothing))
             return findall(r -> all(isfinite, r), collect(eachrow(f)))
         end
         beta = "beta" => CompositeExposure(;
@@ -284,6 +285,13 @@ end
                 xs = stream(pe, dl, de)
                 @test xs[2].pe.cache.csr.f isa SubArray
                 @test all(k -> near(xs[k].pr, batch(pe, k, dl, de)), eachindex(xs))
+                # The mask of the dropped columns names the columns of the basis, so the move
+                # writes it again, and the stream marks the columns that the batch fit drops
+                # (#1719).
+                @test all(eachindex(xs)) do k
+                    dc = batch(pe, k, dl, de).rr.csr.dc
+                    return any(dc) && xs[k].pr.rr.csr.dc == dc
+                end
             end
             k = length(de) - 1
             @test near(batch(pes[2], k, dl, de), batch(pes[1], k, dl, de))

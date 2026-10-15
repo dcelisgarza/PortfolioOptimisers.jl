@@ -963,4 +963,231 @@ end
 function cs_diagnostic_exposures(Ms::Arr3Num)
     return Ms
 end
-export exposure_correlation, exposure_stability, exposure_dispersion, exposure_coverage
+"""
+    exposure_vif(G::Arr3Num) -> Matrix{<:Real}
+    exposure_vif(B::Arr3Num, w::Option{<:MatNum}) -> Matrix{<:Real}
+    exposure_vif(csfm::CrossSectionalFactorModel) -> FactorDiagnosticResult
+
+Return the variance inflation factor of every factor, one row per observation.
+
+The factor measures how much the collinearity of the cross-sectional design inflates the variance of a factor return. A value of one says that the factor is orthogonal to the others of that observation, and a large value says that the factor is nearly a combination of them, so its estimated return is unstable rather than wrong.
+
+The factor is ``1 / (1 - R_{k}^{2})``, where ``R_{k}^{2}`` is the uncentred coefficient of determination of the weighted column ``k`` on the other columns, so it is at least one. On an exactly collinear slice the answer keeps that meaning. A column that the slice identifies gets its finite factor from the pseudo-inverse. A column that the other columns reproduce has ``R_{k}^{2} = 1``, and its factor is `Inf`. A column of zeros has no ``R_{k}^{2}``, and its factor is `NaN`. [`exposure_condition_number`](@ref) shows such a slice.
+
+# Mathematical definition
+
+```math
+\\mathrm{VIF}_{t,k} = (\\mathbf{G}_{t})_{kk} \\, (\\mathbf{G}_{t}^{-1})_{kk}
+```
+
+Where:
+
+  - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
+  - ``(\\mathbf{G}_{t}^{-1})_{kk}``: Diagonal of the inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines. It is `Inf` for a column the slice does not identify, so the product is `Inf`, or `NaN` when ``(\\mathbf{G}_{t})_{kk}`` is zero.
+  - ``\\mathrm{VIF}_{t,k}``: Variance inflation factor of factor ``k`` at observation ``t``.
+
+# Algorithm
+
+ 1. On the method over a Gram history, take the diagonal of the inverse of every slice with [`cs_gram_inverse_diagonal`](@ref), and multiply it entry by entry by the diagonal of the slice itself.
+ 2. On the methods that read a design, take the weighted design of every observation with [`cs_design_slice`](@ref), the diagonal of its inverse Gram matrix with [`cs_inverse_diagonal!`](@ref) at the rank of the fit, and multiply it by the squared norm of each column. A Gram matrix formed in floating point squares the condition number of the design, so these methods do not form one, and they keep a factor that the fit keeps on a design whose condition number exceeds about ``10^{8}``.
+ 3. On the methods that read a design, answer `NaN` at an observation whose eligible asset count does not exceed the factor count, because such a design determines no variance.
+
+# Arguments
+
+  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes. An Unseen Member has a zero column there, and so has the member that carries the condition when the family drops an Unseen Member, so their factor is `NaN`.
+
+# Validation
+
+  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
+  - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
+
+# Returns
+
+  - `vif::Matrix{<:Real}`: `observations × factors`, on the methods over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the design axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
+
+# Examples
+
+```jldoctest
+julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
+
+julia> exposure_vif(cs_gram(B))
+1×2 Matrix{Float64}:
+ 1.0  1.0
+```
+
+# Related
+
+  - [`cs_gram`](@ref)
+  - [`cs_gram_inverse_diagonal`](@ref)
+  - [`exposure_condition_number`](@ref)
+  - [`cs_regression_t_stats`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function exposure_vif(G::Arr3Num)
+    T = size(G, 1)
+    K = size(G, 2)
+    D = cs_gram_inverse_diagonal(G)
+    Tf = eltype(D)
+    vif = Matrix{Tf}(undef, T, K)
+    for k in 1:K, t in 1:T
+        vif[t, k] = Tf(G[t, k, k]) * D[t, k]
+    end
+    return vif
+end
+function exposure_vif(B::Arr3Num, w::Option{<:MatNum})
+    mask, u = cs_estimation_mask_weights(B, w)
+    return cs_masked_vif(B, mask, u)
+end
+function exposure_vif(csfm::CrossSectionalFactorModel)
+    data = cs_regression_data(csfm)
+    mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
+    return cs_design_result(csfm, cs_masked_vif(data.B, mask, u))
+end
+"""
+    cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+
+Return the variance inflation factors of a design whose mask a caller has already resolved.
+
+# Arguments
+
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `mask`: Eligibility mask `observations × assets`.
+  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
+
+# Returns
+
+  - `vif::Matrix{<:Real}`: `observations × factors`, `NaN` at an observation with no degrees of freedom.
+
+# Related
+
+  - [`exposure_vif`](@ref)
+"""
+function cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+    T, _, K = size(B)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    # The answer starts absent, so an observation with no degrees of freedom needs no branch.
+    vif = fill(Tf(NaN), T, K)
+    for t in 1:T
+        if count(view(mask, t, :)) <= K
+            continue
+        end
+        Dt = cs_design_slice(B, u, t, Tf)
+        cs_inverse_diagonal!(vif, Dt, t)
+        for k in 1:K
+            vif[t, k] *= sum(abs2, view(Dt, :, k))
+        end
+    end
+    return vif
+end
+"""
+    exposure_condition_number(G::Arr3Num) -> Vector{<:Real}
+    exposure_condition_number(B::Arr3Num, w::Option{<:MatNum}) -> Vector{<:Real}
+    exposure_condition_number(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+
+Return the two-norm condition number of the Gram matrix of the cross-sectional design, one entry per observation.
+
+The condition number reads the whole design at once, where a variance inflation factor reads one factor of it. It is the square of the condition number of the weighted design. A value of one says that the columns of the weighted design are orthogonal and of equal norm, and a large value says that one direction of the factor space carries almost no weighted exposure, so the fit of that observation is sensitive to a small change in the returns. The methods that read a design square the condition number of the weighted design itself rather than form the Gram matrix, which would lose every condition number above about ``10^{8}`` to rounding. An exactly collinear design answers `Inf` or a value near the reciprocal of the square of the machine epsilon, and which of the two it answers is a property of the singular value decomposition rather than of the design. The smallest singular value of a rank-deficient matrix rounds either to zero or to a value near the machine epsilon. Both answers say that the design of that observation is singular. The method over a Gram history answers `Inf` or a value near the reciprocal of the machine epsilon there.
+
+# Mathematical definition
+
+```math
+\\kappa_{t} = \\frac{\\sigma_{\\max}(\\mathbf{G}_{t})}{\\sigma_{\\min}(\\mathbf{G}_{t})} = \\left(\\frac{\\sigma_{\\max}(\\mathbf{D}_{t})}{\\sigma_{\\min}(\\mathbf{D}_{t})}\\right)^{2}
+```
+
+Where:
+
+  - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
+  - ``\\mathbf{D}_{t}``: Weighted design of observation ``t``, which [`cs_design_slice`](@ref) defines, so ``\\mathbf{G}_{t} = \\mathbf{D}_{t}^{\\intercal} \\mathbf{D}_{t}``.
+  - ``\\sigma_{\\max}``, ``\\sigma_{\\min}``: Largest and smallest singular values.
+
+# Arguments
+
+  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes.
+
+# Validation
+
+  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
+  - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
+
+# Returns
+
+  - `kappa::Vector{<:Real}`: One entry per observation. The methods that read a design answer `NaN` at an observation whose eligible asset count does not exceed the factor count.
+
+# Examples
+
+```jldoctest
+julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
+
+julia> exposure_condition_number(cs_gram(B))
+1-element Vector{Float64}:
+ 1.0
+```
+
+# Related
+
+  - [`cs_gram`](@ref)
+  - [`exposure_vif`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function exposure_condition_number(G::Arr3Num)
+    T = size(G, 1)
+    K = size(G, 2)
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
+    kappa = Vector{Tf}(undef, T)
+    Gt = Matrix{Tf}(undef, K, K)
+    for t in 1:T
+        cs_gram_slice!(Gt, G, t)
+        kappa[t] = LinearAlgebra.cond(Gt)
+    end
+    return kappa
+end
+function exposure_condition_number(B::Arr3Num, w::Option{<:MatNum})
+    mask, u = cs_estimation_mask_weights(B, w)
+    return cs_masked_condition_number(B, mask, u)
+end
+function exposure_condition_number(csfm::CrossSectionalFactorModel)
+    data = cs_regression_data(csfm)
+    mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
+    return cs_masked_condition_number(data.B, mask, u)
+end
+"""
+    cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+
+Return the condition numbers of a design whose mask a caller has already resolved.
+
+# Arguments
+
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `mask`: Eligibility mask `observations × assets`.
+  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
+
+# Returns
+
+  - `kappa::Vector{<:Real}`: One entry per observation, `NaN` at an observation with no degrees of freedom.
+
+# Related
+
+  - [`exposure_condition_number`](@ref)
+"""
+function cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+    T, _, K = size(B)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    kappa = fill(Tf(NaN), T)
+    for t in 1:T
+        if count(view(mask, t, :)) > K
+            kappa[t] = LinearAlgebra.cond(cs_design_slice(B, u, t, Tf))^2
+        end
+    end
+    return kappa
+end
+export exposure_correlation, exposure_stability, exposure_dispersion, exposure_coverage,
+       exposure_vif, exposure_condition_number

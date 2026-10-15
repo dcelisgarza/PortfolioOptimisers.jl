@@ -173,7 +173,8 @@ function attribution_align(blk::NamedTuple, T::Integer)
             rw = attribution_finite_rows(attribution_trim_rows(blk.rw, brows)),
             vs = attribution_trim_rows(blk.vs, brows),
             fcb = attribution_trim_basis(blk.fcb, Tb - lag), unseen = blk.unseen,
-            rows = rows, no = blk.no, h1 = attribution_trim_rows(blk.h1, brows))
+            rows = rows, no = blk.no, h1 = attribution_trim_rows(blk.h1, brows),
+            dc = attribution_trim_rows(blk.dc, brows))
 end
 """
     attribution_trim_exposures(B::MatNum, lag::Integer)
@@ -378,7 +379,8 @@ function attribution_window(al::NamedTuple, rows)
             rw = attribution_trim_rows(al.rw, rows),
             vs = attribution_trim_rows(al.vs, rows),
             fcb = attribution_window_basis(al.fcb, rows), unseen = al.unseen, rows = rows,
-            no = al.no, h1 = attribution_trim_rows(al.h1, rows))
+            no = al.no, h1 = attribution_trim_rows(al.h1, rows),
+            dc = attribution_trim_rows(al.dc, rows))
 end
 """
     attribution_window_exposures(B::MatNum, rows)
@@ -1096,23 +1098,26 @@ end
 
 Return the sandwich covariance of the factor returns of one observation.
 
-The fit of one observation is a weighted least squares across the assets, so the covariance of its coefficients is the sandwich of the Gram matrix around the weighted idiosyncratic variances. A rank-deficient Gram matrix falls back to the pseudo-inverse, which is the policy [`PseudoInverseFallback`](@ref) states and the rank test [`cross_sectional_rank`](@ref) applies, so the standard errors of a collinear cross-section are the minimum-norm answer rather than an arbitrarily large one.
+The fit of one observation is a weighted least squares across the assets, so the covariance of its coefficients is the sandwich of the Gram matrix around the weighted idiosyncratic variances. A rank-deficient design falls back to the pseudo-inverse, which is the policy [`PseudoInverseFallback`](@ref) states, so the standard errors of a collinear cross-section are the minimum-norm answer rather than an arbitrarily large one.
+
+The verb reads the weighted design ``\\mathbf{D}_{t}`` of the pairs of positive weight rather than its Gram matrix, and takes its rank with [`cross_sectional_rank`](@ref), the rank test of the fit. A Gram matrix formed in floating point squares the condition number, so on a design whose condition number exceeds about ``10^{8}`` its rank test would drop a direction that the fit kept, and truncate the sandwich of a factor that the fit estimated.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\mathbf{G}_{t} &= \\mathbf{B}_{t}^{\\intercal} \\mathbf{Q}_{t} \\mathbf{B}_{t}\\,, \\\\
-\\mathbf{V}_{t} &= \\mathbf{G}_{t}^{+} \\mathbf{B}_{t}^{\\intercal} \\mathbf{Q}_{t} \\boldsymbol{\\Omega}_{t} \\mathbf{Q}_{t} \\mathbf{B}_{t} \\mathbf{G}_{t}^{+}\\,.
+\\mathbf{G}_{t} &= \\mathbf{B}_{t}^{\\intercal} \\mathbf{Q}_{t} \\mathbf{B}_{t} = \\mathbf{D}_{t}^{\\intercal} \\mathbf{D}_{t}\\,, \\quad \\mathbf{D}_{t} = \\mathbf{Q}_{t}^{1/2} \\mathbf{B}_{t}\\,, \\\\
+\\mathbf{V}_{t} &= \\mathbf{G}_{t}^{+} \\mathbf{B}_{t}^{\\intercal} \\mathbf{Q}_{t} \\boldsymbol{\\Omega}_{t} \\mathbf{Q}_{t} \\mathbf{B}_{t} \\mathbf{G}_{t}^{+} = \\mathbf{D}_{t}^{+} \\mathbf{Q}_{t} \\boldsymbol{\\Omega}_{t} \\left(\\mathbf{D}_{t}^{+}\\right)^{\\intercal}\\,.
 \\end{align}
 ```
 
-``\\mathbf{B}_{t}`` here holds the columns of the estimated factors alone. ``\\mathbf{G}_{t}^{+}`` is ``\\mathbf{G}_{t}^{-1}`` when ``\\mathbf{G}_{t}`` has full rank, and the Moore-Penrose pseudo-inverse when it does not.
+``\\mathbf{B}_{t}`` here holds the columns of the estimated factors alone. ``\\mathbf{D}_{t}^{+}`` is the pseudo-inverse of ``\\mathbf{D}_{t}`` over its first ``r_{t}`` singular directions, where ``r_{t}`` is the rank that [`cross_sectional_rank`](@ref) reads. It equals ``\\mathbf{G}_{t}^{+} \\mathbf{D}_{t}^{\\intercal}``, so the two forms agree, and it is ``\\mathbf{G}_{t}^{-1} \\mathbf{D}_{t}^{\\intercal}`` on a design of full rank.
 
 Where:
 
   - ``\\mathbf{G}_{t}``: Gram matrix of the weighted cross-sectional fit of observation ``t``.
   - ``\\mathbf{G}_{t}^{+}``: Pseudo-inverse of ``\\mathbf{G}_{t}``.
+  - ``\\mathbf{D}_{t}``: Weighted design of observation ``t``, over the pairs of positive weight.
   - $(math_dict[:B_t_att])
   - $(math_dict[:Q_t_att])
   - $(math_dict[:Omega_t_att])
@@ -1137,14 +1142,20 @@ Where:
 """
 function attribution_sandwich(Bt::MatNum, q::VecNum, s2::VecNum,
                               keep::AbstractVector{<:Integer})
-    B = view(Bt, :, keep)
-    G = transpose(B) * LinearAlgebra.Diagonal(q) * B
-    S = transpose(B) * LinearAlgebra.Diagonal(q .^ 2 .* s2) * B
-    if cross_sectional_rank(G) == size(G, 2)
-        return transpose(G \ transpose(G \ S))
+    idx = findall(x -> x > zero(x), q)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(Bt)), real(eltype(q)),
+                                                       real(eltype(s2)))))))
+    D = Tf.(sqrt.(view(q, idx)) .* view(Bt, idx, keep))
+    r = cross_sectional_rank(D)
+    if iszero(r)
+        return zeros(Tf, length(keep), length(keep))
     end
-    Gi = LinearAlgebra.pinv(Matrix(G))
-    return Gi * S * Gi
+    F = LinearAlgebra.svd(D)
+    Dp = view(F.V, :, 1:r) *
+         LinearAlgebra.Diagonal(inv.(view(F.S, 1:r))) *
+         transpose(view(F.U, :, 1:r))
+    return Dp * LinearAlgebra.Diagonal(Tf.(view(q, idx) .* view(s2, idx))) * transpose(Dp)
 end
 """
     attribution_changed_covariance(Pt::Nothing, V::MatNum, keep::AbstractVector{<:Integer})
@@ -1173,6 +1184,57 @@ The fit of such an observation regressed on the reduced exposures times ``\\math
 """
 function attribution_changed_covariance(::Nothing, V::MatNum, ::AbstractVector{<:Integer})
     return V
+end
+"""
+    attribution_dropped_observation(dc::Nothing, Bt::MatNum, Pt::Option{<:AbstractMatrix},
+                                    keep::AbstractVector{<:Integer}, nr::Integer,
+                                    t::Integer) -> NamedTuple
+    attribution_dropped_observation(dc::AbstractMatrix{Bool}, Bt::MatNum,
+                                    Pt::Option{<:AbstractMatrix},
+                                    keep::AbstractVector{<:Integer}, nr::Integer,
+                                    t::Integer) -> NamedTuple
+
+Return the exposures and the change of one observation after the columns that its fit dropped.
+
+Under [`DependentColumnDrop`](@ref) the fit solved the kept columns and gave each dropped factor a return of zero by the rule. So the function zeroes the dropped columns of the exposures, and composes the change of the observation with the selection of the kept columns through [`cs_dropped_change`](@ref). [`attribution_sandwich`](@ref) then reads the kept columns, and [`attribution_changed_covariance`](@ref) gives a dropped factor a zero row and a zero column, as it gives an Unseen Member.
+
+# Arguments
+
+  - `dc`: The dropped-column mask, `observations × estimated factors`, or `nothing`.
+  - `Bt`: The exposures of the observation in the regression basis, `assets × factors`.
+  - `Pt`: The change of the observation, or `nothing`.
+  - `keep`: The factors the regression estimates, one per column of `dc`.
+  - `nr`: The number of columns of the regression basis.
+  - `t`: The observation.
+
+# Returns
+
+  - `(; B, P)`: The exposures and the change, `Bt` and `Pt` themselves when the observation drops nothing.
+
+# Related
+
+  - [`attribution_error_pass`](@ref)
+  - [`cs_dropped_design`](@ref)
+  - [`attribution_changed_covariance`](@ref)
+"""
+function attribution_dropped_observation(::Nothing, Bt::MatNum,
+                                         Pt::Option{<:AbstractMatrix},
+                                         ::AbstractVector{<:Integer}, ::Integer, ::Integer)
+    return (; B = Bt, P = Pt)
+end
+function attribution_dropped_observation(dc::AbstractMatrix{Bool}, Bt::MatNum,
+                                         Pt::Option{<:AbstractMatrix},
+                                         keep::AbstractVector{<:Integer}, nr::Integer,
+                                         t::Integer)
+    d = view(dc, t, :)
+    if !any(d)
+        return (; B = Bt, P = Pt)
+    end
+    Bd = copy(Bt)
+    Bd[:, view(keep, d)] .= zero(eltype(Bd))
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tp = typeof(sqrt(one(float_if_integer(real(eltype(Bt))))))
+    return (; B = Bd, P = cs_dropped_change(Pt, d, keep, nr, Tp))
 end
 function attribution_changed_covariance(Pt::AbstractMatrix, V::MatNum,
                                         keep::AbstractVector{<:Integer})

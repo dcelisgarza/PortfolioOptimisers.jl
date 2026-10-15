@@ -1020,6 +1020,9 @@ end
         # A holder of asset 5 keeps its systematic error, equal to the plug-in one.
         @test att(w5, EntrywiseUnknown()).sys.mu_se == att(w5, lz).sys.mu_se
         # The oracle reads the plug-in variance of the pair, zero, so a holder has no error.
-        @test iszero(att(w3, lz).sys.mu_se)
+        # The sandwich reads the pseudo-inverse of the weighted design, whose hat row of the
+        # pair is its unit vector to round-off, so the variance is round-off: measured
+        # 6.5e-13 on the error (#1719).
+        @test att(w3, lz).sys.mu_se^2 < 1e-15 * att(weq, lz).sys.mu_se^2
     end
 end

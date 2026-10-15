@@ -32,6 +32,7 @@ attribution_observed_flags
 attribution_broadcast_exposures
 attribution_sandwich
 attribution_changed_covariance
+attribution_dropped_observation
 attribution_expand_errors
 attribution_scatter
 attribution_family_errors

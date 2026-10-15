@@ -11,4 +11,6 @@ exposure_correlation
 exposure_stability
 exposure_dispersion
 exposure_coverage
+exposure_vif
+exposure_condition_number
 ```

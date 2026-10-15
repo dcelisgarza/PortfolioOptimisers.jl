@@ -1323,21 +1323,28 @@ end
     P = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 -0.5 0.0]
     G = (Zl * P)' * (Zl * P)
     D = zeros(1, 3)
-    @test PO.cs_inverse_diagonal!(D, G, 1, P) == 2
+    # The verb reads the weighted design, and its Gram twin reads the Gram slice (#1719).
+    @test PO.cs_inverse_diagonal!(D, Zl * P, 1, P) == 2
     @test D[1, :]≈LinearAlgebra.diag(P * LinearAlgebra.pinv(G) * P') atol=1e-12
     @test all(x -> 0 < x < Inf, D)
+    Dg = zeros(1, 3)
+    @test PO.cs_gram_inverse_diagonal!(Dg, G, 1, P) == 2
+    @test Dg≈D atol=1e-12
     # A zero row of the change is an Unseen Member, whose return the rule states.
     P0 = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 0.0 0.0]
-    PO.cs_inverse_diagonal!(D, (Zl * P0)' * (Zl * P0), 1, P0)
+    PO.cs_inverse_diagonal!(D, Zl * P0, 1, P0)
     @test D[1, 3] == 0 && all(isfinite, D)
     # Without a change the slice keeps its own answer.
-    PO.cs_inverse_diagonal!(D, Zl' * Zl, 1)
+    PO.cs_inverse_diagonal!(D, Zl, 1)
     @test D[1, :] ≈ LinearAlgebra.diag(inv(Zl' * Zl))
     # A coefficient that the change keeps in the null space stays unidentified.
     Zc = copy(Zl)
     Zc[:, 1] .= 0
-    PO.cs_inverse_diagonal!(D, Zc' * Zc, 1, Matrix(1.0LinearAlgebra.I, 3, 3))
+    PO.cs_inverse_diagonal!(D, Zc, 1, Matrix(1.0LinearAlgebra.I, 3, 3))
     @test isinf(D[1, 1]) && isfinite(D[1, 2])
+    # A design of rank zero identifies no coefficient, and a zero row still has no variance.
+    PO.cs_inverse_diagonal!(D, zeros(0, 3), 1, P0)
+    @test isinf(D[1, 1]) && isinf(D[1, 2]) && D[1, 3] == 0
     @test isnothing(PO.unseen_member_change_at((), 1))
     @test PO.unseen_member_change_at([2 => P], 2) === P
     @test isnothing(PO.unseen_member_change_at([2 => P], 1))

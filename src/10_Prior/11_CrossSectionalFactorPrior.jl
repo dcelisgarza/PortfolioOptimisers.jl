@@ -1721,7 +1721,41 @@ function cross_sectional_live_regression(cre::AbstractCrossSectionalRegressionEs
     f[:, lv] = csl.f
     return (;
             csr = CrossSectionalRegression(; f = f, eps = csl.eps, n = csl.n, b = csl.b,
-                                           h1 = csl.h1), lv = lv)
+                                           h1 = csl.h1,
+                                           dc = cross_sectional_live_dropped(csl.dc, lv)),
+            lv = lv)
+end
+"""
+    cross_sectional_live_dropped(dc::Nothing, lv::AbstractVector{Bool}) -> Nothing
+    cross_sectional_live_dropped(dc::AbstractMatrix{Bool}, lv::AbstractVector{Bool})
+        -> BitMatrix
+
+Expand the dropped-column mask of a regression on the factors that are not empty onto every factor.
+
+An Empty Factor takes a return of zero because no pair loads on it, not because the solve dropped its column, so its column of the mask is `false`.
+
+# Arguments
+
+  - `dc`: The dropped-column mask of the regression on the factors that `lv` marks, or `nothing`.
+  - `lv`: `true` at each factor that is not empty.
+
+# Returns
+
+  - `dc::Option{<:BitMatrix}`: The mask on every factor, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_live_regression`](@ref)
+  - [`CrossSectionalRegression`](@ref)
+"""
+function cross_sectional_live_dropped(::Nothing, ::AbstractVector{Bool})::Nothing
+    return nothing
+end
+function cross_sectional_live_dropped(dc::AbstractMatrix{Bool},
+                                      lv::AbstractVector{Bool})::BitMatrix
+    d = falses(size(dc, 1), length(lv))
+    d[:, lv] = dc
+    return d
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

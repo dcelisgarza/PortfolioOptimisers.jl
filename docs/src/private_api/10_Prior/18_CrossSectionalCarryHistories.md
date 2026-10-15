@@ -26,6 +26,7 @@ PortfolioOptimisers.cross_sectional_rebase_family
 PortfolioOptimisers.cross_sectional_move_marks
 PortfolioOptimisers.cross_sectional_move_row_marks
 PortfolioOptimisers.cross_sectional_move_solve
+PortfolioOptimisers.cross_sectional_move_dropped!
 PortfolioOptimisers.cross_sectional_refold_factors
 ```
 

@@ -2647,3 +2647,74 @@ end
     end
     @test isequal(idio_vol_ic(blk), idio_vol_ic(em, vm))
 end
+
+@testset "The regression diagnostics read the rank and the inverse of the weighted design (#1719)" begin
+    PO = PortfolioOptimisers
+    seq = PO.FLoops.SequentialEx()
+    T, N = 3, 40
+    Z0 = randn(StableRNG(1), T, N, 3)
+    X = randn(StableRNG(3), T, N) ./ 100
+    W = ones(T, N)
+    noise = randn(StableRNG(2), T, N)
+    cre = CrossSectionalLinearRegression(; ex = seq)
+    # A Gram matrix squares the condition number of the design, so from about 1e8 its rank
+    # test drops a direction that the fit kept. Measured before the fix at `d = 1e-9`: the
+    # t-statistics `[NaN, 0.397, NaN]`, the VIF `[Inf, 1.0005, Inf]`. The diagnostics now
+    # read the design at the rank of the fit, and stay finite and continuous over the band.
+    tref = nothing
+    for d in (1e-5, 1e-7, 1e-9, 1e-11)
+        Z = copy(Z0)
+        Z[:, :, 3] = Z0[:, :, 1] .+ d .* noise
+        r = cross_sectional_regression(cre, Z, X, W)
+        t = cs_regression_t_stats(Z, r.f, r.eps, W)
+        @test all(isfinite, t)
+        tref = something(tref, t)
+        @test t≈tref rtol=1e-3
+        vif = exposure_vif(Z, W)
+        @test all(x -> 1 <= x < Inf, vif)
+        D = Z[1, :, :] .* sqrt.(W[1, :])
+        @test exposure_condition_number(Z, W)[1]≈LinearAlgebra.cond(D)^2 rtol=1e-6
+        @test PO.cs_score_regressors(nothing, Z, W) == fill(3, T)
+        # The Gram route stays for a caller that holds the Gram history alone. Its precision
+        # is that of a matrix whose condition number is the square: measured 4e-6 at 1e-5.
+        if d >= 1e-5
+            tolg = 10 * LinearAlgebra.cond(D)^2 * eps()
+            @test isapprox(cs_regression_t_stats(Z, r.f, r.eps, W; G = cs_gram(Z, W)), t;
+                           rtol = tolg)
+            @test isapprox(exposure_vif(cs_gram(Z, W)), vif; rtol = tolg)
+        elseif d <= 1e-9
+            @test any(isnan, cs_regression_t_stats(Z, r.f, r.eps, W; G = cs_gram(Z, W)))
+        end
+    end
+    @test_throws DimensionMismatch cs_regression_t_stats(Z0, zeros(T, 3), zeros(T, N), W;
+                                                         G = zeros(T, 2, 2))
+    # Under `DependentColumnDrop()` an exactly dependent factor takes a return of zero by the
+    # rule. The block reads the mask of the fit: the dropped factor has no t-statistic, and
+    # the kept factors have those of the fit on the kept columns. Without the mask the
+    # pseudo-inverse of the whole design leaves the group unidentified.
+    Z = copy(Z0)
+    Z[:, :, 3] = Z0[:, :, 1]
+    r = cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                  alg = DependentColumnDrop(),
+                                                                  ex = seq), Z, X, W)
+    @test r.dc == repeat([false false true], T)
+    blk = CrossSectionalFactorModel(; M = Z[T, :, :], b = zeros(N), csr = r, Ms = Z, rw = W,
+                                    bw = fill(1 / N, T, N))
+    t = cs_regression_t_stats(blk).X
+    r2 = cross_sectional_regression(cre, Z[:, :, 1:2], X, W)
+    @test t[:, 1:2] == cs_regression_t_stats(Z[:, :, 1:2], r2.f, r2.eps, W)
+    @test all(isnan, t[:, 3])
+    @test all(isnan, cs_regression_t_stats(Z, r.f, r.eps, W)[:, [1, 3]])
+    # The design keeps its own columns for the VIF, which describes the exposures.
+    @test all(isinf, exposure_vif(blk).X[:, [1, 3]])
+    # A mask that drops nothing, or no mask, leaves the design and the changes alone.
+    @test PO.cs_dropped_design(Z, (), falses(T, 3)).B === Z
+    @test PO.cs_dropped_design(Z, (), nothing).B === Z
+    # The selection composes with the change of an Unseen Member.
+    P = [1.0 0.0 0.0; 0.0 1.0 0.0; 0.0 -0.5 0.0]
+    dd = PO.cs_dropped_design(Z, [1 => P, 2 => P], BitMatrix([1 0 0; 0 0 0; 0 0 0]))
+    @test only(p for p in dd.P if first(p) == 1) ==
+          (1 => P * LinearAlgebra.Diagonal([0, 1, 1]))
+    @test only(p for p in dd.P if first(p) == 2) == (2 => P)
+    @test all(iszero, dd.B[1, :, 1]) && dd.B[2, :, 1] == Z[2, :, 1]
+end
