@@ -74,7 +74,8 @@ large on average (Jensen's inequality): at 12 assets and a half-life of 10 the s
 of a correctly calibrated return is 1.6 times its dimension. Before the block has more than
 `n + 1` observations the mean is not finite, and before it has more than `n + 3` the variance is
 not finite, so one observation can hold the smoothed regime state. Where the `debias` field of
-[`RegimeAdjustedExpWeightedCovariance`](@ref) is `true`, the target skips those observations and
+[`RegimeAdjustedExpWeightedCovariance`](@ref) is [`ExactDebias`](@ref) or [`LawDebias`](@ref),
+the target skips those observations and
 divides the rest by the bias that its regime method reads, so the statistic has the calibration
 that the method assumes.
 
@@ -122,8 +123,10 @@ correlation path the factor reads `cor_decay`, and [`variance_noise_bias!`](@ref
 noise of the variance at `decay`, to the mean and to the spread of each method: at a correlation
 half-life of 20 the three methods read 0.998, 0.997 and 0.996 over 8 seeds, from 1.032, 1.030
 and 1.027 at `cor_decay` alone. At two HAC lags, where each correlation row divides by the
-volatility before its update, `RootMeanSquaredAdjusted` reads 0.966, from 1.090 at `cor_decay`
-alone and 1.026 with the rule after the update.
+volatility before its update and the tables at `cor_decay` read the kernel of
+[`hac_row_kernel`](@ref), the three methods read 1.001, 1.001 and 1.000 over 8 seeds, from
+1.090 for `RootMeanSquaredAdjusted` at `cor_decay` alone and 1.026 with the rule after the
+update.
 
 # Related
 
@@ -1076,7 +1079,8 @@ reads.
 
 # Algorithm
 
- 1. Advance the variance with the diagonal of the outer product, floored at zero.
+ 1. Advance the variance with the diagonal of the outer product. Each term is floored at zero
+    only under `hac_floor = PerTermHacFloor()`.
  2. Standardise the outer product by the running volatilities: after the step of 1, or, where
     `hac_lags` is not `nothing` and `hac_vol_before` is `VolatilityBeforeUpdate()`, before it. The diagonal of a HAC
     row can be negative, and a volatility that holds the row amplifies a negative row, so the

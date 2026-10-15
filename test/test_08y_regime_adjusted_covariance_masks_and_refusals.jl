@@ -297,6 +297,16 @@ lines, and each one is driven here on purpose.
     # block at all and blanks the whole matrix.
     @test all(isnan, cov(sep(), fill(NaN, 6, 3)))
 
+    # A constant asset beside active ones reports the variance 0, not `min_val`: the report
+    # scales the correlation by the volatilities and floors no variance before it (#1383).
+    Xc = 0.01 .* randn(StableRNG(1383), 40, 3)
+    Xc[:, 3] .= 0
+    for centring in (PreCentred(), EstimatedCentring())
+        Sc = cov(sep(; centring = centring), Xc)
+        @test all(iszero, view(Sc, 3, :)) && all(iszero, view(Sc, :, 3))
+        @test all(>(0), view(LinearAlgebra.diag(Sc), 1:2))
+    end
+
     # An asset that delists mid-sample has its variance and its correlation state reset, which
     # is the branch the single-recursion path does not carry.
     X = randn(rng, 30, 3) .* 0.02

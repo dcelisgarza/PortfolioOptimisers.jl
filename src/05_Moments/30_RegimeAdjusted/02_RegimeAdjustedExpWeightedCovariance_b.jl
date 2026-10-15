@@ -157,7 +157,8 @@ unchanged. Under `debias = RawStatistic()` the factor is one, which is the raw s
 
 # Returns
 
-  - `factor::Number`: The factor of the method's law, or one where `ce.debias` is `false`.
+  - `factor::Number`: The factor of the method's law, or one where `ce.debias` is
+    [`RawStatistic`](@ref).
 
 # Related
 
@@ -744,7 +745,10 @@ correlation half-life of 20, the squared multiplier of an equal-weight direction
 and 0.971 with `decay`. A HAC estimate reads the table of its banded weight matrix, which has
 about twice the excess of the plain weights: at two lags the squared multiplier of an
 equal-weight direction is 1.015 over 8 seeds, within its standard error of 0.013, from 1.165
-raw.
+raw. On the separate path under HAC the table at `cor_decay` keeps the Bartlett weights, where
+the Mahalanobis target reads the kernel of [`hac_row_kernel`](@ref): the statistic mixes the
+variance at `decay` with the correlation, and at equal weights, ``R = I`` and two lags the
+Bartlett table gives 1.0731 and the kernel 1.0663, against the truth 1.0751 ± 0.0036.
 
 The default inverse-volatility direction (`w = nothing`) is built from the same estimate, so the
 direction and the error of the estimate are correlated. Its statistic is also divided by
@@ -1108,8 +1112,8 @@ Makes the empty table of bias factors for a new state of a regime-adjusted varia
 
 # Returns
 
-  - `bias::Option{<:VecNum}`: An empty vector where `ce.debias` is `true` and a regime method is
-    set, else `nothing`.
+  - `bias::Option{<:VecNum}`: An empty vector where [`debiases`](@ref) holds for `ce.debias`
+    and a regime method is set, else `nothing`.
 
 # Related
 
@@ -1137,8 +1141,8 @@ target holds one factor for each count.
 
 # Returns
 
-  - `bias::Option{<:Union{<:AbstractVector, <:NamedTuple}}`: The empty store where `ce.debias` is
-    `true` and a regime method is set, else `nothing`.
+  - `bias::Option{<:Union{<:AbstractVector, <:NamedTuple}}`: The empty store where
+    [`debiases`](@ref) holds for `ce.debias` and a regime method is set, else `nothing`.
 
 # Related
 
@@ -1200,7 +1204,8 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Computes the squared Mahalanobis distance of one observation, divided by the bias of the
-estimated block that the regime method reads, where `ce.debias` is `ExactDebias()`.
+estimated block that the regime method reads, where `ce.debias` is `ExactDebias()` or
+`LawDebias()`.
 
 # Algorithm
 

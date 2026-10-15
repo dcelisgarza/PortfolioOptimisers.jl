@@ -253,6 +253,9 @@ the mean of `r̂²` at `R = I` 14 % too high, the kernel 4 %, and the FirstMomen
 towards their truth by up to 0.3 % and 0.7 % at a correlated `R`, and by at most 0.26 %
 away from it at `R = I`, where the Bartlett over-shrink stopped on the identity. The variance keeps
 the Bartlett kernel, and `hac_vol_before = VolatilityAfterUpdate()` keeps the Bartlett kernel for the correlation too.
+The portfolio target keeps the Bartlett table at `cor_decay` too: its statistic mixes the variance
+at `decay` with the correlation, and the Bartlett table fits it better (the truth 1.0751 ± 0.0036,
+the Bartlett table 1.0731 and the kernel 1.0663, at equal weights, `R = I` and two lags).
 
 **Without HAC the factor does not read the correlation of the assets, and this is a documented
 limit** (the maintainer ruled so on #1447). With `h_i = √(Q_ii / V̂_i)` the statistic splits
@@ -271,7 +274,8 @@ the three methods read 0.9897 to 1.0018 of the truth, and a three-factor model w
 reads lower on the mean (0.9947) than every equicorrelation, so no function of `γ` alone holds it.
 
 **The gate is `K > n + 3`, where the variance of the statistic is finite.** At `n = 1` an estimate
-of four observations or fewer is not scored. The gate reads the count of each asset, so a young
+of four terms or fewer is not scored, which is five valid returns or fewer under
+`EstimatedCentring()`, because the first return of an asset gives no term. The gate reads the count of each asset, so a young
 asset leaves the statistic as it does below `min_obs`. Under HAC the effective count
 `1 / tr(A²)` must also pass `n + 1`, the count at which the mean of the inverse of a plain estimate
 is finite. At 12 assets, a half-life of 10 and two lags, `K > n + 3` alone opens at `K = 16`,
@@ -318,8 +322,8 @@ and four lags, and the Mahalanobis factor 1.3 % to 3.1 % at two to 12 assets. Th
 `K` terms is `R_K = λ R_{K−1} + q_K`, so on a lattice of step `|ln λ|` in `ln s` the transform at
 `s` reads the transform at `λ s` of the count before, and a Gaussian state of the location and the
 last `L` deviations carries both parts exactly, one step per point and count. The scalar table
-under `EstimatedCentring()` reads it with or without HAC, and so do the diagonal target and the
-portfolio target on one decay. It agrees with the eigenvalues of `M` to `10⁻¹²` where the estimate
+under `EstimatedCentring()` reads it with or without HAC. The diagonal target reads it on both paths, because its terms read
+the variance at `decay`, and the portfolio target reads it on one decay. It agrees with the eigenvalues of `M` to `10⁻¹²` where the estimate
 is positive definite. Past `λ^K = √ε` it holds its ratio to the pre-centred table, within
 `4 × 10⁻⁹`. It costs 0.12 s to 0.16 s at a half-life of 40 and 3.4 s at 250, once per state. A
 Monte Carlo of the estimator over half-lives 5 to 40, one to four lags and every target puts the
@@ -342,7 +346,13 @@ log-determinant inside the exponential, as the recursion takes it, the last tran
 10 and 40, no lag to four lags and two to 12 assets, the three factors are within 0.3 % at the
 steady state and 0.6 % at the first scored count, the error of the level recursion, with or
 without HAC, where the pre-centred factors were 1.3 % to 3.1 % high under HAC and 7.5 % at the first
-scored count of a half-life of 40. The research of #1527 had found an identity for the root mean
+scored count of a half-life of 40. Two exceptions are open. The root-mean-squared factor is not
+finite at two to six assets and the first counts after the gate, without HAC, because its central
+difference in `t` steps past the range where the columns are linear, and under two lags they are
+not finite at two assets and the first scored count: the three methods at a half-life of 10, and
+the root mean square at two and three assets at a half-life of 40 (#1724). At two assets and the
+first scored count under two lags, the finite factors read 0.5 % to 0.9 % below a Monte Carlo of
+four million draws. The research of #1527 had found an identity for the root mean
 square alone and a route through `E ln(1 + t d²)` for the others; that route needs a weight `t` far
 above the spectrum, which the recursion does not hold past `t d² ≈ 3`, and the frame of `W⊥` needs
 no such weight.
@@ -358,7 +368,8 @@ with the limits below.
 ## Consequences
 
 - Every default fit of a regime estimator moves, and so does every default fit of the
-  Cross-Sectional Factor Prior, whose `ve` and `pe` are regime estimators. A stored oracle case
+  Cross-Sectional Factor Prior, whose `ve` is a regime-adjusted variance and whose `pe` holds a
+  regime-adjusted covariance, both pre-centred. A stored oracle case
   states `debias = RawStatistic()`.
 - The default inverse-volatility direction keeps the next order of its excess, about `9 s₂²`,
   which the docstring of its statistic states with the warm-up rows.

@@ -5,7 +5,7 @@ Divides the regime statistic by the exact bias that its method reads in the inve
 
 The inverse of an estimated variance is too large on average (Jensen's inequality), so a raw statistic has a mean above the one the method assumes. Each method reads its own moment of the ratio ``Q = \\hat{v} / \\sigma^2``: the root mean square reads ``\\mathbb{E}[1 / Q]``, the first moment reads ``\\mathbb{E}[Q^{-1/2}]^2`` and the log reads ``\\exp(-\\mathbb{E}[\\ln Q])``. [`regime_bias_table`](@ref) computes each one exactly from the law of the estimate. The statistic skips an estimate too young for its variance to be finite.
 
-Under [`EstimatedCentring`](@ref) the deviation that the statistic reads shares its location with the terms of the estimate, so the two are not independent, and each method reads the moment of the deviation and the estimate together: ``\\mathbb{E}[u^{2} / Q]`` for the root mean square, and so on. This rule reads that dependence for every method and every target. [`LawDebias`](@ref) reads the law of the estimate alone.
+Under [`EstimatedCentring`](@ref) the deviation that the statistic reads shares its location with the terms of the estimate, so the two are not independent, and each method reads the moment of the deviation and the estimate together: ``\\mathbb{E}[u^{2} / Q]`` for the root mean square, and so on. This rule reads that dependence for every method, for the scalar estimator and the diagonal target on every path, and for the portfolio and the Mahalanobis targets on one decay. On the separate correlation path the portfolio and the Mahalanobis targets read the pre-centred law at `cor_decay`. [`LawDebias`](@ref) reads the law of the estimate alone.
 
 # Constructors
 

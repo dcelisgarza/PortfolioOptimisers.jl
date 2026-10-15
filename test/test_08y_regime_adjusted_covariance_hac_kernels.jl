@@ -361,6 +361,11 @@ the kernel of `hac_row_kernel`, as the Mahalanobis tables do (ADR 0190).
     @test r2 / PO.pair_weight_square_sum(lamc, 1.0, 2) < 0.9
 end
 
+#=
+Issues #1548 and #1549, found by #1527. Under `EstimatedCentring()` the terms of the estimate
+share their location, and the next deviation reads it too. `ExactDebias()` reads the law of the
+estimate and the dependence of the deviation on it; `LawDebias()` reads the law alone (ADR 0190).
+=#
 @testset "under the estimated location the tables read the law of the shared deviations" begin
     # The estimate as the variance pass forms it: after K + 1 returns it is (1 - λ) xᵀ M x, and
     # the location is gᵀx, both read off the pass by polarisation on unit returns.
@@ -534,4 +539,9 @@ end
                                            nothing)
     @test st.bias == PO.regime_bias_table(ce.regime_method, lam, length(st.bias), 2,
                                           EstimatedCentring(), LawDebias())
+    # #1724: at a small block and a small count the root-mean-squared factor is NaN, because the
+    # central difference in `t` steps far past the range where its columns are linear.
+    @test_broken all(isfinite,
+                     PO.mahalanobis_level_bias(methods[1], lam, [6, 7, 30], 2, nothing,
+                                               EstimatedCentring()))
 end

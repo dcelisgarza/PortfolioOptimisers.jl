@@ -1359,8 +1359,8 @@ the row, and the tables at `cor_decay` read the kernel of [`hac_row_kernel`](@re
 damping. At two lags the methods then read 1.0076, 1.0078 and 1.0077 at ``R = I``, and 1.0049,
 0.9993 and 0.9931 at an equicorrelation of 0.8. Over 4 to 24 assets, half-lives of 5 to 20,
 correlation half-lives of 20 and 40 and one to four lags the mean reads 0.2 % to 2.2 % high at
-``R = I``, where the Bartlett kernel read 0.8 % to 9.5 % low; the rest grows with the count of
-assets and of lags. Where each row divides by the volatility after its update
+``R = I``, where the Bartlett kernel read 0.8 % to 9.5 % low, and −2.6 % to +3.4 % over every
+correlation of the same grid; the rest grows with the count of assets and of lags. Where each row divides by the volatility after its update
 (`hac_vol_before = VolatilityAfterUpdate()`), the tables keep the Bartlett kernel, and the mean reads 1.1 % to
 3.0 % high at two lags.
 
