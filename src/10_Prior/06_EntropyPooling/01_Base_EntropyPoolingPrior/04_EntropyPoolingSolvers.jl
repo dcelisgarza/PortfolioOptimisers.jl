@@ -213,7 +213,7 @@ Return the prior probabilities an entropy pooling fit starts from.
 
 A prior that reweights observations works on the observation axis its nested prior **answered**, not on the axis it was handed. A nested prior may drop rows: a [`CrossSectionalFactorPrior`](@ref) drops the observations its Descriptors warm up over and the observations its exposure lag consumes, so its scenarios are the window the fit is defined on. So `pr` is fitted first, and the prior probabilities are read on its rows.
 
-The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior. Uniform over the rows of `pr.X` is the last. This is the read before the refit under a caller's `pe.w`. When that refit answers its own `pr.w`, the nested prior solved its views from `pe.w`, and `ep_prior` reads its posterior `pr.w` instead (#1742).
+The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior. Uniform over the rows of `pr.X` is the last. This is the read before the refit under a caller's `pe.w`. When that refit answers its own `pr.w`, the nested prior solved its views from `pe.w`, and `ep_prior` reads its posterior `pr.w` instead.
 
 # Algorithm
 

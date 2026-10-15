@@ -1,5 +1,5 @@
 ```@meta
-Description = "Mahalanobis level closure, private API of PortfolioOptimisers.jl: level_closure_factors, level_closure_step, level_closure_kernel, …"
+Description = "Mahalanobis level closure, private API of PortfolioOptimisers.jl: level_closure_factors, level_closure_maps, level_closure_point, LevelClosureTable, …"
 ```
 
 # [Mahalanobis level closure: private API](@id private-api-mahalanobis-level-closure)
