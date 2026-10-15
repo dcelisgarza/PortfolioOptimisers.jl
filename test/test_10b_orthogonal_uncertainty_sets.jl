@@ -310,6 +310,30 @@ include(joinpath(@__DIR__, "parity_harness.jl"))
             @test isapprox(mu_ucs(ue, pr777).L * transpose(mu_ucs(ue, pr777).L),
                            P * Diagonal(D) * P; atol = 1e-14)
         end
+        @testset "Issue 1732: the square root of the scaling is a named algorithm" begin
+            # `Base.sqrt` of an indefinite `Symmetric` matrix returns a complex matrix, and
+            # the set stored it as its map. A loadings block that a caller builds by hand can
+            # give an indefinite scaling, and `matrix_square_root` refuses it.
+            ue(alg) = OrthogonalUncertaintySet(; scaling = IdiosyncraticVarianceScaling(),
+                                               metric = IdentityMetric(), mtx_sqrt = alg)
+            @test OrthogonalUncertaintySet().mtx_sqrt === EigenFallbackSquareRoot()
+            E = Matrix(Diagonal(D))
+            E[1, 1] = E[3, 3] = -0.05
+            prE = prior777(B, D; rw = RW, bw = BW, esigma = E)
+            for alg in (EigenFallbackSquareRoot(), RidgeCholeskySquareRoot(), nothing)
+                @test_throws PosDefException mu_ucs(ue(alg), prE)
+            end
+            # The set of order 2 reads only `L * L'`, so every algorithm gives one set, and
+            # the radius reads the scaling, not the map.
+            base = mu_ucs(ue(EigenFallbackSquareRoot()), pr777)
+            @test eltype(base.L) == Float64
+            for alg in (RidgeCholeskySquareRoot(), nothing)
+                s = mu_ucs(ue(alg), pr777)
+                @test isapprox(s.L * transpose(s.L), base.L * transpose(base.L);
+                               rtol = 1e-10)
+                @test s.kappa == base.kappa
+            end
+        end
         @testset "An integer loadings block fits as its floating-point copy does" begin
             Bi = [1 0; 0 1; 1 1; 2 1; 0 3; 1 2]
             for metric in (IdentityMetric(), InverseIdiosyncraticVarianceMetric())

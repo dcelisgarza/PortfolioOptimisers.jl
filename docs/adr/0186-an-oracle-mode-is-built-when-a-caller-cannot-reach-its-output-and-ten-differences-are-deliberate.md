@@ -64,7 +64,10 @@ Issue #1410 gave the field, named `mtx_sqrt`, to every estimator that takes a sq
 covariance, and removed `covariance_factor`, which `matrix_square_root` supersedes. The owners are
 the two factor priors, `Variance`, `StandardDeviation`, `DistributionValueatRisk`,
 `UncertaintySetVariance`, `ArithmeticReturn`, `RelaxedRiskBudgeting`, `Kurtosis`,
-`NegativeSkewness` and `NormBallUncertaintySetAlgorithm`. Every one of them defaults to
+`NegativeSkewness` and `NormBallUncertaintySetAlgorithm`. Issue #1732 added the two that the census
+of #1410 missed: `FactorBlackLittermanPrior`, whose lift took the keyword default of `factor_lift`,
+and `OrthogonalUncertaintySet`, whose mean set took `Base.sqrt` of its scaling and stored a complex
+map for an indefinite one. Every one of them defaults to
 `EigenFallbackSquareRoot()`, and the oracle's ridge, `RidgeCholeskySquareRoot()`, and the bare
 Cholesky, `nothing`, are one keyword away. A square root that feeds only a second-order cone needs
 `G' G = Σ`, so a singular positive semidefinite matrix is valid input there.

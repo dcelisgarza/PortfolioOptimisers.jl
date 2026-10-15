@@ -754,13 +754,14 @@ The split is the whole of the mathematics that this function contributes. What h
 # Algorithm
 
  1. Check that `X` is square.
- 2. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
- 3. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
- 4. Fit the Marčenko-Pastur density to `vals` with [`find_max_eval`](@ref), giving `max_val`, the upper edge of the noise band.
- 5. Count the eigenvalues that do not exceed `max_val`, giving `num_factors`, the number of noise eigenvalues.
- 6. Rebuild `X` from the split spectrum with [`_denoise!`](@ref), through the branch that `dn.alg` selects.
- 7. Repair the rebuilt matrix with [`posdef!`](@ref), under `dn.pdm`.
- 8. When step 2 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 2, so the original diagonal returns exactly.
+ 2. When `X` has a zero variance, set its row and column to zero and denoise the block of the positive variances with a recursive call, through [`zero_variance_block!`](@ref), and return `X`. A zero variance has no correlation, so step 3 cannot standardise it. The ratio `q` reads the number of assets, so the block of `n` assets takes the ratio `q * N / n`, as [`matrix_processing_block!`](@ref) does.
+ 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 4. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
+ 5. Fit the Marčenko-Pastur density to `vals` with [`find_max_eval`](@ref), giving `max_val`, the upper edge of the noise band.
+ 6. Count the eigenvalues that do not exceed `max_val`, giving `num_factors`, the number of noise eigenvalues.
+ 7. Rebuild `X` from the split spectrum with [`_denoise!`](@ref), through the branch that `dn.alg` selects.
+ 8. Repair the rebuilt matrix with [`posdef!`](@ref), under `dn.pdm`.
+ 9. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
 
 # Arguments
 
@@ -812,6 +813,7 @@ julia> denoise!(Denoise(), X, 10 / 5)
   - [`FixedDenoise`](@ref)
   - [`ShrunkDenoise`](@ref)
   - [`posdef!`](@ref)
+  - [`zero_variance_block!`](@ref)
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
@@ -828,6 +830,12 @@ function denoise!(::Nothing, X::MatNum, args...)::MatNum
 end
 function denoise!(dn::Denoise, X::MatNum, q::Number)
     assert_matrix_issquare(X, :X)
+    # A zero variance has no correlation, so only the positive block is denoised. `q` reads
+    # the number of assets, so the block takes the ratio of its own size.
+    N = size(X, 1)
+    if zero_variance_block!((block, n) -> denoise!(dn, block, q * N / n), X)
+        return X
+    end
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
     if iscov

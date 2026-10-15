@@ -320,7 +320,7 @@ A zero variance has no correlation, so it cannot be standardised. The projection
 
  1. Check that `X` is square.
  2. Return `X` unchanged when [`posdef_accepts`](@ref) accepts it under `pdm.alg`. For an algorithm of `NearestCorrelationMatrix.jl` the test is `isposdef`, and [`ClippedNearestCorrelation`](@ref) brings its own test and its refusals.
- 3. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_rows!`](@ref). When there is such a row, repair the block of positive variances with a recursive call, write the block back, and return `X`. The recursive call refuses only a repaired block that is not positive semidefinite to round-off. A matrix with a zero variance never passes the test of step 2, so this step is always reached for it.
+ 3. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_block!`](@ref). When there is such a row, repair the block of positive variances with a recursive call, write the block back, and return `X`. The recursive call refuses only a repaired block that is not positive semidefinite to round-off. A matrix with a zero variance never passes the test of step 2, so this step is always reached for it.
  4. Repair `X` with [`posdef_repair!`](@ref) under `pdm.alg` and the keyword arguments `pdm.kwargs`, and return `X`.
 
 # Arguments
@@ -379,6 +379,7 @@ julia> posdef!(Posdef(), X)
   - [`posdef`](@ref)
   - [`Posdef`](@ref)
   - [`zero_variance_rows!`](@ref)
+  - [`zero_variance_block!`](@ref)
   - [`MatNum`](@ref)
 """
 function posdef!(::Nothing, X::MatNum)::MatNum
@@ -391,11 +392,7 @@ function posdef!(pdm::Posdef, X::MatNum)
     end
     # A zero variance forces a zero row and column, so only the positive block is repaired.
     # The recursive call refuses a repaired block that is not PSD, never the zero rows.
-    p = zero_variance_rows!(X, trues(size(X, 1)))
-    if !all(p)
-        block = X[p, p]
-        posdef!(pdm, block)
-        X[p, p] = block
+    if zero_variance_block!((block, _) -> posdef!(pdm, block), X)
         return X
     end
     return posdef_repair!(pdm.alg, X; pdm.kwargs...)
@@ -451,6 +448,48 @@ function zero_variance_rows!(X::MatNum, fin::AbstractVector{Bool})
         X[fin, z] .= zero(eltype(X))
     end
     return fin .& .!z
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Runs a matrix verb on the block of the positive variances of `X`, when `X` has a zero variance, and writes the block back.
+
+A zero variance has no correlation, so a verb that standardises `X` divides zero by zero on that row. [`zero_variance_rows!`](@ref) sets the row and column of each zero variance to zero, which is the only answer a positive semidefinite matrix has for them, and the verb then runs on the rest. [`posdef!`](@ref), [`denoise!`](@ref) and [`detone!`](@ref) share this step.
+
+# Algorithm
+
+ 1. Set the zero-variance rows and columns of `X` to zero with [`zero_variance_rows!`](@ref), and read `p`, the mask of the positive variances.
+ 2. Return `false` when every variance is positive. The caller then runs its verb on the whole of `X`.
+ 3. When at least one variance is positive, copy the block `X[p, p]`, call `f(block, count(p))`, and write the block back into `X`.
+ 4. Return `true`. A matrix whose variances are all zero is the zero matrix after step 1, so `f` is not called.
+
+# Arguments
+
+  - `f`: The verb, called as `f(block, n)` with the block of the positive variances and its size `n`. It changes `block` in place. The size lets a verb rescale a ratio that reads the number of assets.
+  - $(arg_dict[:sigrhoX])
+
+# Returns
+
+  - `done::Bool`: `true` when `X` had a zero variance, so the caller returns `X`. `false` when `X` is unchanged and the caller runs its verb on the whole of it.
+
+# Related
+
+  - [`zero_variance_rows!`](@ref)
+  - [`posdef!`](@ref)
+  - [`denoise!`](@ref)
+  - [`detone!`](@ref)
+"""
+function zero_variance_block!(f, X::MatNum)
+    p = zero_variance_rows!(X, trues(size(X, 1)))
+    if all(p)
+        return false
+    end
+    if any(p)
+        block = X[p, p]
+        f(block, count(p))
+        X[p, p] = block
+    end
+    return true
 end
 """
     posdef_accepts(alg, X::MatNum) -> Bool

@@ -25,6 +25,7 @@ $(DocStringExtensions.FIELDS)
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
         rsd::Bool = true,
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
         cache::Option{<:AbstractPartialFitState} = nothing,
         x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> FactorBlackLittermanPrior
@@ -156,6 +157,7 @@ FactorBlackLittermanPrior
            l ┼ nothing
          tau ┼ nothing
          rsd ┼ Bool: true
+    mtx_sqrt ┼ EigenFallbackSquareRoot()
        x_src ┴ nothing
 ```
 
@@ -235,6 +237,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
     """
     rsd
     """
+    $(field_dict[:mtx_sqrt])
+    """
+    mtx_sqrt
+    """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
@@ -251,6 +257,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
                                        tau::Option{<:Number}, rsd::Bool,
+                                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        cache::Option{<:AbstractPartialFitState},
                                        x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :FactorBlackLittermanPrior)
@@ -259,20 +266,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
                    typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
-                   typeof(l), typeof(tau), typeof(rsd), typeof(cache), typeof(x_src)}(pe,
-                                                                                      f_mp,
-                                                                                      mp,
-                                                                                      re,
-                                                                                      ve,
-                                                                                      views,
-                                                                                      sets,
-                                                                                      views_conf,
-                                                                                      w, rf,
-                                                                                      l,
-                                                                                      tau,
-                                                                                      rsd,
-                                                                                      cache,
-                                                                                      x_src)
+                   typeof(l), typeof(tau), typeof(rsd), typeof(mtx_sqrt), typeof(cache),
+                   typeof(x_src)}(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf, l,
+                                  tau, rsd, mtx_sqrt, cache, x_src)
     end
 end
 function FactorBlackLittermanPrior(;
@@ -286,10 +282,11 @@ function FactorBlackLittermanPrior(;
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
                                    tau::Option{<:Number} = nothing, rsd::Bool = true,
+                                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                                    cache::Option{<:AbstractPartialFitState} = nothing,
                                    x_src::Option{<:AbstractReturnsSource} = nothing)::FactorBlackLittermanPrior
     return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
-                                     l, tau, rsd, cache, x_src)
+                                     l, tau, rsd, mtx_sqrt, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -304,7 +301,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd, :mtx_sqrt, :x_src)`.
 
 # Related
 
@@ -314,7 +311,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(::FactorBlackLittermanPrior)
     return (:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd,
-            :x_src)
+            :mtx_sqrt, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -387,7 +384,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
  7. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref), over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref); otherwise it is `prior_mu`, which is on that scale already.
  8. Run the master equations with [`bl_posteriors`](@ref), giving the posterior factor pair. When no view row survived it hands back `prior_total_mu` and the factor prior covariance instead, and step 10 lifts those exactly as it lifts a posterior pair.
  9. Process the posterior factor covariance in place with [`matrix_processing!`](@ref), under `pe.f_mp` and `F`.
-10. Lift the posterior factor pair onto the reduced assets with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, and processes `sigma` under `pe.mp`.
+10. Lift the posterior factor pair onto the reduced assets with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, takes the square root of the posterior factor covariance that `chol` holds under `pe.mtx_sqrt`, and processes `sigma` under `pe.mp`.
 11. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
 12. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`. It is not expanded: the reduction never touched the factor axis.
 13. Announce the departures once with [`announce_bl_departures`](@ref), naming them with [`investable_universe_names`](@ref).
@@ -499,7 +496,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
     (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
                                                           f_posterior_mu, f_posterior_sigma,
-                                                          Xi, posterior_X; kwargs...)
+                                                          Xi, posterior_X;
+                                                          mtx_sqrt = pe.mtx_sqrt, kwargs...)
     # The lift already measured the residual variances, so the block carries them instead of
     # making every consumer recompute them from the reconstruction error. Under `rsd = false`
     # the lift added no residual block and `esigma` is `nothing`, which is what the field then

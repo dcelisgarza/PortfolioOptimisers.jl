@@ -411,6 +411,37 @@ end
         @test all(iszero, sigma[3, :])
         @test LinearAlgebra.isposdef(sigma[p, p])
     end
+    @testset "Ticket 1731: Denoise and Detone leave a zero variance out on the plain route" begin
+        # `denoise!` and `detone!` each divide by the standard deviations, so a constant asset
+        # gave `0 / 0` and `eigen` refused the matrix. Each verb now works on the block of the
+        # positive variances, as `posdef!` does.
+        Xd = randn(StableRNG(1429), 120, 6) ./ 100
+        Xd[:, 3] .= 0.0
+        S = cov(Xd)
+        T, N = size(Xd)
+        p = [1, 2, 4, 5, 6]
+        # The Marchenko-Pastur ratio of the block reads the size of the block.
+        r = denoise!(Denoise(), copy(S), T / N)
+        @test r[p, p] == denoise!(Denoise(), S[p, p], T / length(p))
+        @test all(iszero, r[3, :])
+        @test all(iszero, r[:, 3])
+        r = detone!(Detone(), copy(S))
+        @test r[p, p] == detone!(Detone(), S[p, p])
+        @test all(iszero, r[3, :])
+        @test all(iszero, r[:, 3])
+        # The call on the block refuses more modes than the block has assets.
+        @test_throws DomainError detone!(Detone(; n = 6), copy(S))
+        # A matrix of zeros has no block, and each verb leaves it as it is.
+        @test denoise!(Denoise(), zeros(3, 3), 2.0) == zeros(3, 3)
+        @test detone!(Detone(), zeros(3, 3)) == zeros(3, 3)
+        # `PortfolioOptimisersCovariance` takes the plain route on a finite sample.
+        for mp in (MatrixProcessing(; dn = Denoise()), MatrixProcessing(; dt = Detone()))
+            sigma = cov(PortfolioOptimisersCovariance(; mp = mp), Xd)
+            @test all(isfinite, sigma)
+            @test all(iszero, sigma[3, :])
+            @test LinearAlgebra.isposdef(sigma[p, p])
+        end
+    end
     @testset "Ticket 447: matrix_processing! applies mp.order" begin
         rng = StableRNG(90210)
         Xd = randn(rng, 120, 6)
@@ -1342,6 +1373,37 @@ end
     # On a positive definite factor covariance the default is the plain Cholesky factor.
     pp = prior(fp(), X, F[:, 1:3])
     @test pp.chol == prior(fp(; mtx_sqrt = nothing), X, F[:, 1:3]).chol
+end
+
+@testset "FactorBlackLittermanPrior on a singular factor covariance (#1732)" begin
+    # The prior lifts its posterior through `factor_lift`, as `FactorPrior` does, so it holds
+    # the same field. It took the keyword default of the lift before, which a caller could not
+    # change. A view leaves the null direction of the factor covariance in the posterior.
+    rng = StableRNG(1396)
+    F = 0.01 .* randn(rng, 120, 3)
+    F = hcat(F, -F[:, 1])
+    X = F[:, 1:3] * (0.5 .+ rand(rng, 3, 6)) .+ 0.005 .* randn(rng, 120, 6)
+    mp = MatrixProcessing(; pdm = nothing)
+    nx = string.("A", 1:6)
+    views = LinearConstraintEstimator(; val = ["F2 == 0.001"])
+    function fbl(K; kwargs...)
+        sets = UniverseSets(; dict = Dict("nx" => nx, "nf" => string.("F", 1:K)))
+        return FactorBlackLittermanPrior(;
+                                         pe = EmpiricalPrior(;
+                                                             ce = PortfolioOptimisersCovariance(;
+                                                                                                mp = mp)),
+                                         f_mp = mp, mp = mp, views = views, sets = sets,
+                                         kwargs...)
+    end
+    @test fbl(4).mtx_sqrt === EigenFallbackSquareRoot()
+    @test_throws PosDefException prior(fbl(4; mtx_sqrt = nothing), X, F)
+    pr = prior(fbl(4; mtx_sqrt = RidgeCholeskySquareRoot()), X, F)
+    @test isapprox(pr.chol' * pr.chol, pr.sigma; rtol = 1e-11)
+    pr = prior(fbl(4), X, F)
+    @test isapprox(pr.chol' * pr.chol, pr.sigma; rtol = 1e-14)
+    # On a positive definite posterior the default is the plain Cholesky factor.
+    @test prior(fbl(3), X, F[:, 1:3]).chol ==
+          prior(fbl(3; mtx_sqrt = nothing), X, F[:, 1:3]).chol
 end
 
 #=

@@ -311,7 +311,7 @@ Inside a cluster of a hierarchical optimiser, the two routes give different sets
 \\mathbf{Q}\\mathbf{Q}^{\\intercal} &= \\mathbf{W}^{1/2}\\mathbf{B}\\left(\\mathbf{W}^{1/2}\\mathbf{B}\\right)^{+}\\,, \\\\
 \\operatorname{col}(\\mathbf{G}) &= \\left\\{ \\boldsymbol{v} \\in \\mathbb{R}^{N} \\,\\vert\\, \\mathbf{B}^{\\intercal}\\mathbf{W}\\boldsymbol{v} = \\mathbf{0} \\right\\}\\,, \\\\
 r &= N - r_{\\mathbf{B}}\\,, \\\\
-\\mathbf{L} &= \\mathbf{G}\\mathbf{\\Lambda}^{1/2}\\,, \\\\
+\\mathbf{L}\\mathbf{L}^{\\intercal} &= \\mathbf{G}\\mathbf{\\Lambda}\\mathbf{G}^{\\intercal}\\,, \\\\
 \\kappa_{\\boldsymbol{\\mu}} &= \\sqrt{F^{-1}_{\\chi^{2}_{r}}(1 - q)}\\,, \\\\
 \\mathbf{C} &= \\mathbf{W}^{-1/2}\\,, \\\\
 \\underset{\\boldsymbol{\\mu} \\in U_{\\boldsymbol{\\mu}}}{\\min} \\boldsymbol{w}^{\\intercal}\\boldsymbol{\\mu} &= \\boldsymbol{w}^{\\intercal}\\hat{\\boldsymbol{\\mu}} - \\kappa_{\\boldsymbol{\\mu}} \\lVert \\mathbf{L}^{\\intercal}\\boldsymbol{w} \\rVert_{2}\\,, \\\\
@@ -330,7 +330,7 @@ Where:
   - $(math_dict[:r_orth])
   - $(math_dict[:N])
   - $(math_dict[:Lambda_orth])
-  - ``\\mathbf{L}``: Geometry map of the mean set, ``N \\times r``.
+  - ``\\mathbf{L}``: Geometry map of the mean set, ``N \\times r``, the product of ``\\mathbf{G}`` and the square root of ``\\mathbf{\\Lambda}`` under `mtx_sqrt`.
   - ``\\kappa_{\\boldsymbol{\\mu}}``: Radius of the mean set. The line above is the radius of [`ChiSqKUncertaintyAlgorithm`](@ref), the default. [`GeneralKUncertaintyAlgorithm`](@ref) gives ``\\sqrt{(1 - q)/q}``, and a number is the radius itself.
   - ``F^{-1}_{\\chi^{2}_{r}}``: Quantile function of the chi-squared distribution with ``r`` degrees of freedom.
   - ``q``: Significance level of the mean set.
@@ -356,7 +356,8 @@ $(DocStringExtensions.FIELDS)
         method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
         scaling::AbstractOrthogonalScaling = IdentityScaling(),
         kappa::Num_CptRad = 1.0,
-        metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric()
+        metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric(),
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> OrthogonalUncertaintySet
 
 Keywords correspond to the struct's fields.
@@ -371,12 +372,13 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> OrthogonalUncertaintySet()
 OrthogonalUncertaintySet
-        q ┼ Float64: 0.05
-   method ┼ ChiSqKUncertaintyAlgorithm
-          │   ambient ┴ Bool: false
-  scaling ┼ IdentityScaling()
-    kappa ┼ Float64: 1.0
-   metric ┴ InverseIdiosyncraticVarianceMetric()
+         q ┼ Float64: 0.05
+    method ┼ ChiSqKUncertaintyAlgorithm
+           │   ambient ┴ Bool: false
+   scaling ┼ IdentityScaling()
+     kappa ┼ Float64: 1.0
+    metric ┼ InverseIdiosyncraticVarianceMetric()
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -418,9 +420,14 @@ OrthogonalUncertaintySet
     Cross-sectional weighting under which the factor span is taken. It fixes the geometry of both sets, because both read one span.
     """
     metric
+    """
+    Square-root algorithm of the scaling ``\\mathbf{\\Lambda}`` of the mean set, whose square root gives the geometry map ``\\mathbf{L}``, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix, and every algorithm refuses an indefinite one. The set of order `2` reads only ``\\mathbf{L} \\mathbf{L}^\\intercal``, so the algorithm does not change the set where two of them succeed. [`matrix_square_root`](@ref) states each algorithm.
+    """
+    mtx_sqrt
     function OrthogonalUncertaintySet(q::Number, method::Num_UcSK,
                                       scaling::AbstractOrthogonalScaling, kappa::Num_CptRad,
-                                      metric::AbstractOrthogonalityMetric)
+                                      metric::AbstractOrthogonalityMetric,
+                                      mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         @argcheck(zero(q) < q < one(q), DomainError(q, "q must be in (0, 1)"))
         # A rule states no number yet, so its range is checked where the number lands, in
         # `CompactCovarianceUncertaintySet`'s own constructor.
@@ -431,15 +438,17 @@ OrthogonalUncertaintySet
                       DomainError(kappa, "kappa must be finite and >= 0"))
         end
         return new{typeof(q), typeof(method), typeof(scaling), typeof(kappa),
-                   typeof(metric)}(q, method, scaling, kappa, metric)
+                   typeof(metric), typeof(mtx_sqrt)}(q, method, scaling, kappa, metric,
+                                                     mtx_sqrt)
     end
 end
 function OrthogonalUncertaintySet(; q::Number = 0.05,
                                   method::Num_UcSK = ChiSqKUncertaintyAlgorithm(),
                                   scaling::AbstractOrthogonalScaling = IdentityScaling(),
                                   kappa::Num_CptRad = 1.0,
-                                  metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric())::OrthogonalUncertaintySet
-    return OrthogonalUncertaintySet(q, method, scaling, kappa, metric)
+                                  metric::AbstractOrthogonalityMetric = InverseIdiosyncraticVarianceMetric(),
+                                  mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::OrthogonalUncertaintySet
+    return OrthogonalUncertaintySet(q, method, scaling, kappa, metric, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -515,7 +524,7 @@ Builds the mean [`NormBallUncertaintySet`](@ref) on the Orthogonal Subspace, fro
  5. Orthonormalise `A` times the selected eigenvectors with a reduced `LinearAlgebra.qr`, giving `G`, and read `r`, the dimension of the Orthogonal Subspace, as its column count. An empty `keep` gives a `G` with no column.
  6. When `r` is `0`, return the set with a radius of zero, a map of one zero column, and `pr.mu` as its centre. The zero radius leaves the nominal mean.
  7. Take `lambda`, the scaling, through [`orthogonal_scaling`](@ref).
- 8. Form `L`, the product of `G` and the symmetric square root of `lambda`.
+ 8. Form `L`, the product of `G` and the square root of `lambda` that [`matrix_square_root`](@ref) takes under `ue.mtx_sqrt`. The set of order `2` reads only `L * L'`, which is `G * lambda * G'` for every algorithm. An indefinite `lambda` raises a `LinearAlgebra.PosDefException`, because a loadings block that a caller builds by hand can give one.
  9. Size the radius with [`k_norm_ball`](@ref) at `r` degrees of freedom, and return the set of order `2` with `pr.mu` as its centre. A set fitted on one prior and passed to another optimisation therefore carries the centre that its geometry was calibrated on.
 
 # Arguments
@@ -561,7 +570,7 @@ function orthogonal_mu_set(ue::OrthogonalUncertaintySet, pr::AbstractPriorResult
                                       p = 2, class = MuUncertaintySetClass(), val = pr.mu)
     end
     lambda = orthogonal_scaling(ue.scaling, G, rr)
-    L = G * sqrt(LinearAlgebra.Symmetric(lambda))
+    L = G * matrix_square_root(ue.mtx_sqrt, lambda)
     return NormBallUncertaintySet(;
                                   kappa = k_norm_ball(ue.method, ue.q, nothing, lambda, r),
                                   L = L, p = 2, class = MuUncertaintySetClass(),

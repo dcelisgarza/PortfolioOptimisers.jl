@@ -83,9 +83,9 @@ commit = "8d43b8434a"
 "src/03_InputData/20_PanelFieldValues.jl" = { cyc = 3, cog = 3, arg = 4, cyc_sum = 12, cog_sum = 4, arg_sum = 15, macros = [] }
 "src/03_InputData/21_AssetPanelSummary.jl" = { cyc = 9, cog = 11, arg = 4, cyc_sum = 55, cog_sum = 47, arg_sum = 19, macros = [] }
 "src/03_InputData/22_PanelRoundTrip.jl" = { cyc = 7, cog = 10, arg = 5, cyc_sum = 72, cog_sum = 59, arg_sum = 64, macros = [] }
-"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 33, cog_sum = 20, arg_sum = 22, macros = [] }
-"src/04_MatrixProcessing/02_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 18, cog_sum = 11, arg_sum = 30, macros = [] }
-"src/04_MatrixProcessing/03_Detone.jl" = { cyc = 3, cog = 2, arg = 2, cyc_sum = 8, cog_sum = 3, arg_sum = 8, macros = [] }
+"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 36, cog_sum = 22, arg_sum = 24, macros = [] }
+"src/04_MatrixProcessing/02_Denoise.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 19, cog_sum = 13, arg_sum = 30, macros = [] }
+"src/04_MatrixProcessing/03_Detone.jl" = { cyc = 4, cog = 4, arg = 2, cyc_sum = 9, cog_sum = 5, arg_sum = 8, macros = [] }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { cyc = 5, cog = 5, arg = 6, cyc_sum = 30, cog_sum = 11, arg_sum = 88, macros = [] }
 "src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { cyc = 6, cog = 7, arg = 2, cyc_sum = 13, cog_sum = 10, arg_sum = 12, macros = [] }
 "src/05_Moments/01_Base_Moments.jl" = { cyc = 19, cog = 26, arg = 8, cyc_sum = 126, cog_sum = 140, arg_sum = 139, macros = ["@define_pretty_show"] }
@@ -232,7 +232,7 @@ commit = "8d43b8434a"
 "src/10_Prior/05_BlackLitterman/01_BlackLittermanViewsGeneration.jl" = { cyc = 11, cog = 21, arg = 6, cyc_sum = 24, cog_sum = 28, arg_sum = 24, macros = [] }
 "src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl" = { cyc = 5, cog = 5, arg = 10, cyc_sum = 34, cog_sum = 17, arg_sum = 74, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/05_BlackLitterman/03_BayesianBlackLittermanPrior.jl" = { cyc = 2, cog = 2, arg = 10, cyc_sum = 6, cog_sum = 4, arg_sum = 19, macros = ["@forward_properties", "@propagatable"] }
-"src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl" = { cyc = 4, cog = 6, arg = 15, cyc_sum = 8, cog_sum = 7, arg_sum = 25, macros = ["@forward_properties", "@propagatable"] }
+"src/10_Prior/05_BlackLitterman/04_FactorBlackLittermanPrior.jl" = { cyc = 4, cog = 6, arg = 16, cyc_sum = 8, cog_sum = 7, arg_sum = 26, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/05_BlackLitterman/05_AugmentedBlackLittermanPrior.jl" = { cyc = 7, cog = 10, arg = 15, cyc_sum = 12, cog_sum = 12, arg_sum = 24, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/01_EntropyPoolingAlgorithms.jl" = { cyc = 2, cog = 1, arg = 6, cyc_sum = 7, cog_sum = 4, arg_sum = 13, macros = [] }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 20, cog_sum = 19, arg_sum = 36, macros = [] }
@@ -266,7 +266,7 @@ commit = "8d43b8434a"
 "src/11_UncertaintySets/06_CalibrationRules.jl" = { cyc = 3, cog = 4, arg = 6, cyc_sum = 89, cog_sum = 50, arg_sum = 162, macros = [] }
 "src/11_UncertaintySets/07_CompactUncertaintySets.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 9, cog_sum = 6, arg_sum = 8, macros = [] }
 "src/11_UncertaintySets/08_NormBallUncertaintySets.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 33, cog_sum = 17, arg_sum = 41, macros = [] }
-"src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 36, cog_sum = 18, arg_sum = 72, macros = [] }
+"src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl" = { cyc = 4, cog = 5, arg = 6, cyc_sum = 36, cog_sum = 18, arg_sum = 73, macros = [] }
 "src/11_UncertaintySets/10_CompactRadiusRules.jl" = { cyc = 6, cog = 8, arg = 8, cyc_sum = 21, cog_sum = 16, arg_sum = 32, macros = [] }
 "src/12_Turnover.jl" = { cyc = 2, cog = 2, arg = 4, cyc_sum = 18, cog_sum = 11, arg_sum = 9, macros = ["@propagatable"] }
 "src/13_Fees.jl" = { cyc = 4, cog = 5, arg = 4, cyc_sum = 98, cog_sum = 35, arg_sum = 160, macros = ["@propagatable"] }
