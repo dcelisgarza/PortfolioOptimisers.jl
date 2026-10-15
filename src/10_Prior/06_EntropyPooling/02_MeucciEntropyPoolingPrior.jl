@@ -11,7 +11,7 @@ Reach for [`EntropyPoolingPrior`](@ref) instead where a tail view has to be an i
 
 The comparison operator a view accepts depends on the moment it constrains: `var_views` takes `==` and `>=`, `cvar_views` takes `==` alone, and every other view family takes `==`, `>=` and `<=`. An unsupported operator raises a `Meta.ParseError` naming the operators that view accepts.
 
-A skewness, kurtosis or correlation view divides by the variance of an asset, and a staged algorithm holds that variance at its value from the stage before. Both read the variance from the diagonal of the `sigma` that `pe` fits, and the rows state the uncorrected moment of the scenarios. The default covariance estimator is corrected. So, under [`H1_EntropyPooling`](@ref) or [`H2_EntropyPooling`](@ref), a skewness or kurtosis view moves the variance of the scenarios up by the correction factor of the stage before. Give `pe` an uncorrected covariance estimator to hold and standardise by the uncorrected variance. [`EntropyPoolingPrior`](@ref) shows the estimator.
+A skewness, kurtosis or correlation view divides by the variance of an asset, and a staged algorithm holds that variance at its value from the stage before. Both read the variance from the diagonal of the `sigma` that `pe` fits, and the rows state the uncorrected moment of the scenarios. The default covariance estimator is corrected. So, under [`H1_EntropyPooling`](@ref) or [`H2_EntropyPooling`](@ref), a skewness or kurtosis view moves the variance of the scenarios up by the correction factor of the stage before. Give `pe` an uncorrected covariance estimator to hold and standardise by the uncorrected variance. [`EntropyPoolingPrior`](@ref) shows the estimator. A `prior(...)` reference in a skewness or kurtosis view reads the sample statistic under the observation weights of the prior of the stage.
 
 !!! warning
 
@@ -901,15 +901,15 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
         if !isnothing(pe.sk_views)
-            to_fix = ep_sk_views!(pe.sk_views, epc, vpr, vsets; strict = strict,
-                                  ledger = led)
+            to_fix = ep_sk_views!(pe.sk_views, epc, vpr, vsets, scenario_probabilities(w1);
+                                  strict = strict, ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
         # kurtosis
         if !isnothing(pe.kt_views)
-            to_fix = ep_kt_views!(pe.kt_views, epc, vpr, vsets; strict = strict,
-                                  ledger = led)
+            to_fix = ep_kt_views!(pe.kt_views, epc, vpr, vsets, scenario_probabilities(w1);
+                                  strict = strict, ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
@@ -1072,11 +1072,11 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
         if !isnothing(pe.sk_views)
-            ep_sk_views!(pe.sk_views, epc, vpr, vsets; strict = strict, ledger = led)
+            ep_sk_views!(pe.sk_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
         end
         # kurtosis
         if !isnothing(pe.kt_views)
-            ep_kt_views!(pe.kt_views, epc, vpr, vsets; strict = strict, ledger = led)
+            ep_kt_views!(pe.kt_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
         end
         # rho
         if !isnothing(pe.rho_views)

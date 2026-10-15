@@ -1001,10 +1001,14 @@ end
                                    opt = opt), rd)
     @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = 1e-4)
     @test isapprox(pr.sigma[1, 1], 1.3 * pr0.sigma[1, 1], rtol = 5e-3)
+    # The reference reads the skewness under the observation weights of the prior of the
+    # skewness stage, the posterior of the mean and variance views (#1741).
+    ps = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                   sigma_views = sigma_views, opt = opt), rd)
     @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                          reshape(pr.X[:, 1],
                                                                                  :, 1)),
-                   2 * Skewness()([1], reshape(pr0.X[:, 1], :, 1)), rtol = 5e-3)
+                   2 * Skewness(; w = ps.w)([1], reshape(ps.X[:, 1], :, 1)), rtol = 5e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -1035,24 +1039,19 @@ end
     @test pr.mu[1] <= 1.5 * pr0.mu[1]
     @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1] / (1 - sum(abs2, pr.w)),
                    rtol = 1e-5)
-    # The staged algorithm fixes the variance at the corrected value of the stage before, so
-    # the kurtosis moves with the correction of the posterior weights, by 5.3e-6 (#1687).
-    @test isapprox(HighOrderMoment(; w = pr.w,
-                                   alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                                     ve = SimpleVariance(;
-                                                                                         w = pr.w)))([1],
-                                                                                                     reshape(pr.X[:,
-                                                                                                                  1],
-                                                                                                             :,
-                                                                                                             1)),
-                   HighOrderMoment(;
-                                   alg = StandardisedHighOrderMoment(;
-                                                                     alg = FourthMoment()))([1],
-                                                                                            reshape(pr.X[:,
-                                                                                                         1],
-                                                                                                    :,
-                                                                                                    1)) *
-                   0.87, rtol = 1e-5)
+    # The reference reads the kurtosis under the observation weights of the prior of the
+    # kurtosis stage, the posterior of the mean and variance views (#1741). The view does not
+    # bind there, so the posterior stays at that prior.
+    pk = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                   sigma_views = sigma_views, opt = opt), rd)
+    kt = wi -> HighOrderMoment(; w = wi,
+                               alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                          reshape(pr.X[:,
+                                                                                                       1],
+                                                                                                  :,
+                                                                                                  1))
+    @test kt(pr.w) >= 0.87 * kt(pk.w)
+    @test isapprox(pr.w, pk.w, rtol = 1e-5)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views,

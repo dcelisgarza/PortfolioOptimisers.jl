@@ -96,6 +96,8 @@ The rows state the uncorrected moment of the scenarios, ``\\sum_{t} p_{t} (x_{t,
 
 The posterior `sigma` is then uncorrected too. [`H0_EntropyPooling`](@ref) has no stage before, and it reads the variance of the prior the same way.
 
+A `prior(...)` reference in a skewness or kurtosis view reads the sample statistic of the scenarios under the observation weights of the prior that the stage reads, as a value at risk reference does. The statistic standardises by its own variance estimator, not by the variance that the row reads.
+
 # Tail views
 
 A tail view needs auxiliary variables, so it is expressed in the JuMP model rather than reduced to rows that multiply the posterior probabilities. Two consequences follow.
@@ -568,15 +570,15 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     if !isnothing(pe.rho_views) || !isnothing(pe.sk_views) || !isnothing(pe.kt_views)
         # skew
         if !isnothing(pe.sk_views)
-            to_fix = ep_sk_views!(pe.sk_views, epc, vpr, vsets; strict = strict,
-                                  ledger = led)
+            to_fix = ep_sk_views!(pe.sk_views, epc, vpr, vsets, scenario_probabilities(w1);
+                                  strict = strict, ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
         # kurtosis
         if !isnothing(pe.kt_views)
-            to_fix = ep_kt_views!(pe.kt_views, epc, vpr, vsets; strict = strict,
-                                  ledger = led)
+            to_fix = ep_kt_views!(pe.kt_views, epc, vpr, vsets, scenario_probabilities(w1);
+                                  strict = strict, ledger = led)
             fix_mu!(epc, view(fixed, :, 1), to_fix, vpr)
             fix_sigma!(epc, view(fixed, :, 2), to_fix, vpr)
         end
@@ -690,11 +692,11 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     end
     # skew
     if !isnothing(pe.sk_views)
-        ep_sk_views!(pe.sk_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_sk_views!(pe.sk_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     # kurtosis
     if !isnothing(pe.kt_views)
-        ep_kt_views!(pe.kt_views, epc, vpr, vsets; strict = strict, ledger = led)
+        ep_kt_views!(pe.kt_views, epc, vpr, vsets, w0; strict = strict, ledger = led)
     end
     # rho
     if !isnothing(pe.rho_views)

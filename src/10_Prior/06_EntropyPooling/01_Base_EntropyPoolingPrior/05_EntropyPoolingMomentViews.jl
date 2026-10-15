@@ -890,18 +890,22 @@ function ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
     return to_fix
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, ::Nothing = nothing,
+                 w::Option{<:ObsWeights} = nothing)
 
 Read the prior **skewness** of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:skew)` names, by applying [`Skewness`](@ref) to the `i`-th column of `pr.X`. That is the standardised third central moment of the sample, and it ignores `pr.w`.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:skew)` names, by applying [`Skewness`](@ref) to the `i`-th column of `pr.X`. That is the standardised third central moment of the sample under `w`, the weights that `pr` was read at. The weights reach the mean and the variance estimator of [`Skewness`](@ref) too.
+
+A refit prior does not carry its weights in `pr.w`, so the caller gives them, as for the value at risk method of [`get_pr_value`](@ref). Under a staged algorithm they are the weights of the prior of the stage.
 
 # Arguments
 
   - `pr`: Prior result containing asset return information.
   - `i`: Index of the asset.
   - `::Val{:skew}`: Dispatch tag for skewness extraction.
-  - `args...`: Additional arguments (ignored).
+  - `::Nothing`: The level slot of [`replace_prior_views`](@ref), which a skewness does not read.
+  - $(arg_dict[:oow])
 
 # Returns
 
@@ -913,14 +917,16 @@ Read the prior **skewness** of asset `i`.
   - [`HighOrderPrior`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
+  - [`ep_sk_views!`](@ref): gives `w` to this method.
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew}, args...)
-    #! Think about how to include pr.w
-    return Skewness()(view(pr.X, :, i))
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:skew},
+                      ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
+    return Skewness(; w = w)(view(pr.X, :, i))
 end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                 pr::AbstractPriorResult, sets::UniverseSets,
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false)
 
 Add the **skewness** views of a group to the entropy pooling constraint dictionary.
 
@@ -943,7 +949,7 @@ The third central moment expands into raw moments, and the two lowest of them ar
 
 The second line uses ``\\sum_{t} p_{t} = 1`` to carry the two constants inside the sum, which is the form the body builds.
 
-The expansion needs the variance of the scenarios that the sum reads, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the skewness of the scenarios, which is the statistic that a `prior(...)` reference reads.
+The expansion needs the variance of the scenarios that the sum reads, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the skewness of the scenarios. A `prior(...)` reference reads the sample skewness under `w` with [`Skewness`](@ref), which standardises by its own variance estimator.
 
 Where:
 
@@ -964,7 +970,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
 
  1. Parse the view equations of `skew_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans.
- 3. Replace every `prior(...)` reference by the prior skewness, through [`replace_prior_views`](@ref).
+ 3. Replace every `prior(...)` reference by the prior skewness under `w`, through [`replace_prior_views`](@ref).
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
  5. Read the prior variances of the scenarios into `sigma`: the diagonal of `pr.sigma`, less [`scenario_residual_variances`](@ref).
  6. Build `tmp`, the standardised third moment contribution of every observation, transposed so a row of `lcs` multiplies it from the left.
@@ -976,6 +982,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `pr`: Prior result containing asset return information.
   - `sets`: Asset set mapping asset names to indices.
+  - `w`: The weights that `pr` was read at, or `nothing` for uniform weights. A `prior(...)` reference reads the skewness under them.
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
@@ -992,13 +999,15 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
-                      pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                      pr::AbstractPriorResult, sets::UniverseSets,
+                      w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                       ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     skew_views = parse_equation(skew_views.val; datatype = eltype(X))
     skew_views = replace_group_by_assets(skew_views, sets, false, true, false;
                                          ledger = ledger)
-    skew_views = replace_prior_views(skew_views, pr, sets, :skew; strict = strict)
+    skew_views = replace_prior_views(skew_views, pr, sets, :skew, nothing, w;
+                                     strict = strict)
     lcs = get_linear_constraints(skew_views, sets; datatype = eltype(X), strict = strict,
                                  ledger = ledger)
     #! Under `strict = false` a view that names no asset is warned about and dropped, and
@@ -1024,18 +1033,20 @@ function ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
     return to_fix
 end
 """
-    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
+    get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis},
+                 ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
 
 Read the prior **kurtosis** of asset `i`.
 
-`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:kurtosis)` names, by applying [`HighOrderMoment`](@ref) with a [`StandardisedHighOrderMoment`](@ref) of [`FourthMoment`](@ref) to the `i`-th column of `pr.X`. That is the standardised fourth central moment of the sample, and it ignores `pr.w`.
+`get_pr_value` is the dispatch table that resolves a `prior(...)` reference inside a view. This method reads the statistic the tag `Val(:kurtosis)` names, by applying [`HighOrderMoment`](@ref) with a [`StandardisedHighOrderMoment`](@ref) of [`FourthMoment`](@ref) to the `i`-th column of `pr.X`. That is the standardised fourth central moment of the sample under `w`, on the rule of the skewness method of [`get_pr_value`](@ref).
 
 # Arguments
 
   - `pr`: Prior result containing asset return information.
   - `i`: Index of the asset.
   - `::Val{:kurtosis}`: Dispatch tag for kurtosis extraction.
-  - `args...`: Additional arguments (ignored).
+  - `::Nothing`: The level slot of [`replace_prior_views`](@ref), which a kurtosis does not read.
+  - $(arg_dict[:oow])
 
 # Returns
 
@@ -1047,16 +1058,19 @@ Read the prior **kurtosis** of asset `i`.
   - [`HighOrderPrior`](@ref)
   - [`AbstractPriorResult`](@ref)
   - [`get_pr_value`](@ref)
+  - [`ep_kt_views!`](@ref): gives `w` to this method.
 """
-function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis}, args...)
-    #! Think about how to include pr.w
-    return HighOrderMoment(; alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(view(pr.X,
-                                                                                             :,
-                                                                                             i))
+function get_pr_value(pr::AbstractPriorResult, i::Integer, ::Val{:kurtosis},
+                      ::Nothing = nothing, w::Option{<:ObsWeights} = nothing)
+    return HighOrderMoment(; w = w,
+                           alg = StandardisedHighOrderMoment(; alg = FourthMoment()))(view(pr.X,
+                                                                                           :,
+                                                                                           i))
 end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                 pr::AbstractPriorResult, sets::UniverseSets,
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false)
 
 Add the **kurtosis** views of a group to the entropy pooling constraint dictionary.
 
@@ -1078,7 +1092,7 @@ The fourth central moment expands into raw moments, and every constant of the ex
 
 The first line uses ``\\sum_{t} p_{t} = 1`` to carry the constant ``3 \\mu_{i}^{4}`` inside the sum, which is the form the body builds.
 
-The standardisation reads the variance of the scenarios, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the kurtosis of the scenarios, which is the statistic that a `prior(...)` reference reads.
+The standardisation reads the variance of the scenarios, so ``\\sigma_{i}^{2}`` here is ``\\sigma_{i}^{2} - \\delta_{i}``, the variance that [`fix_sigma!`](@ref) holds. The view states the kurtosis of the scenarios. A `prior(...)` reference reads the sample kurtosis under `w` with [`HighOrderMoment`](@ref), which standardises by its own variance estimator.
 
 Where:
 
@@ -1099,7 +1113,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
 
  1. Parse the view equations of `kurtosis_views.val`, giving one [`ParsingResult`](@ref) per view.
  2. Replace every group name by the assets it spans.
- 3. Replace every `prior(...)` reference by the prior kurtosis, through [`replace_prior_views`](@ref).
+ 3. Replace every `prior(...)` reference by the prior kurtosis under `w`, through [`replace_prior_views`](@ref).
  4. Turn the parsed views into the linear constraint blocks `lcs`, one for `:ineq` and one for `:eq`. Under `strict = false` every row of the group can drop, and `lcs` is then `nothing`: the group states no view, and the call returns a `to_fix` that names no asset.
  5. Build `X_sq` and `mu_sq`, the squares of the returns and of the prior means.
  6. Build `tmp`, the fourth moment contribution of every observation, standardised by the prior variance of the scenarios, the diagonal of `pr.sigma` less [`scenario_residual_variances`](@ref), and transposed so a row of `lcs` multiplies it from the left.
@@ -1111,6 +1125,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
   - `pr`: Prior result containing asset return information.
   - `sets`: Asset set mapping asset names to indices.
+  - `w`: The weights that `pr` was read at, or `nothing` for uniform weights. A `prior(...)` reference reads the kurtosis under them.
   - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
 
 # Returns
@@ -1127,13 +1142,14 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - [`MeucciEntropyPoolingPrior`](@ref)
 """
 function ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
-                      pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                      pr::AbstractPriorResult, sets::UniverseSets,
+                      w::Option{<:ObsWeights} = nothing; strict::Bool = false,
                       ledger::Option{<:AbstractVector} = nothing)
     X = pr.X
     kurtosis_views = parse_equation(kurtosis_views.val; datatype = eltype(X))
     kurtosis_views = replace_group_by_assets(kurtosis_views, sets, false, true, false;
                                              ledger = ledger)
-    kurtosis_views = replace_prior_views(kurtosis_views, pr, sets, :kurtosis;
+    kurtosis_views = replace_prior_views(kurtosis_views, pr, sets, :kurtosis, nothing, w;
                                          strict = strict)
     lcs = get_linear_constraints(kurtosis_views, sets; datatype = eltype(X),
                                  strict = strict, ledger = ledger)

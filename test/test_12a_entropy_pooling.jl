@@ -259,10 +259,14 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
                                    sigma_views = sigma_views, sk_views = sk_views), rd)
     @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = ifelse(Sys.islinux(), 1e-3, 1e-6))
     @test isapprox(pr.sigma[1, 1], 1.3 * pr0.sigma[1, 1], rtol = 5e-3)
+    # The reference reads the skewness under the observation weights of the prior of the
+    # skewness stage, the posterior of the mean and variance views (#1741).
+    ps = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                   sigma_views = sigma_views), rd)
     @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                          reshape(pr.X[:, 1],
                                                                                  :, 1)),
-                   2 * Skewness()([1], reshape(pr0.X[:, 1], :, 1)), rtol = 5e-3)
+                   2 * Skewness(; w = ps.w)([1], reshape(ps.X[:, 1], :, 1)), rtol = 5e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -291,24 +295,19 @@ include(joinpath(@__DIR__, "test12_setup.jl"))
     @test pr.mu[1] <= 1.5 * pr0.mu[1]
     @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1] / (1 - sum(abs2, pr.w)),
                    rtol = 1e-5)
-    # The staged algorithm fixes the variance at the corrected value of the stage before, so
-    # the kurtosis moves with the correction of the posterior weights, by 5.3e-6 (#1687).
-    @test isapprox(HighOrderMoment(; w = pr.w,
-                                   alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                                     ve = SimpleVariance(;
-                                                                                         w = pr.w)))([1],
-                                                                                                     reshape(pr.X[:,
-                                                                                                                  1],
-                                                                                                             :,
-                                                                                                             1)),
-                   HighOrderMoment(;
-                                   alg = StandardisedHighOrderMoment(;
-                                                                     alg = FourthMoment()))([1],
-                                                                                            reshape(pr.X[:,
-                                                                                                         1],
-                                                                                                    :,
-                                                                                                    1)) *
-                   0.87, rtol = 1e-5)
+    # The reference reads the kurtosis under the observation weights of the prior of the
+    # kurtosis stage, the posterior of the mean and variance views (#1741). The view does not
+    # bind there, so the posterior stays at that prior.
+    pk = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                   sigma_views = sigma_views), rd)
+    kt = wi -> HighOrderMoment(; w = wi,
+                               alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                          reshape(pr.X[:,
+                                                                                                       1],
+                                                                                                  :,
+                                                                                                  1))
+    @test kt(pr.w) >= 0.87 * kt(pk.w)
+    @test isapprox(pr.w, pk.w, rtol = 1e-5)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -2176,5 +2175,55 @@ is built.
                                       pe = FactorPrior(;
                                                        pe = LowDimensionEnsemblePrior(;
                                                                                       seed = 1)))
+    end
+end
+@testset "A skewness or kurtosis reference reads the observation weights of its stage (#1741)" begin
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X = X[1:60, :]
+    T = size(X, 1)
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    skf = (w, x) -> Skewness(; w = w)(x)
+    ktf = (w, x) -> HighOrderMoment(; w = w,
+                                    alg = StandardisedHighOrderMoment(;
+                                                                      alg = FourthMoment()))(x)
+    v = collect(range(1, 2; length = T))
+    wv = aweights(v ./ sum(v))
+
+    # The reference applies the high order moment functor to the column under the observation
+    # weights. With no weights it is the reading of the sample with equal weights.
+    pr0 = prior(EmpiricalPrior(), X)
+    for (f, key) in ((skf, :skew), (ktf, :kurtosis))
+        x = X[:, 2]
+        @test isapprox(PortfolioOptimisers.get_pr_value(pr0, 2, Val(key)), f(nothing, x);
+                       rtol = 1e-12)
+        @test isapprox(PortfolioOptimisers.get_pr_value(pr0, 2, Val(key), nothing, wv),
+                       f(wv, x); rtol = 1e-12)
+        @test !isapprox(f(wv, x), f(nothing, x); rtol = 1e-2)
+    end
+
+    # End to end, a view that names the prior value states the reading under the weights of
+    # the prior of its stage: the prior probabilities under `H0`, and the posterior of the
+    # mean view under a staged algorithm, where the refit carries no `w`. The view gives the
+    # posterior of the same view written as that number. The reading with equal weights is
+    # 3 % to 9 % away.
+    mv = LinearConstraintEstimator(; val = "A1 == 0.004")
+    for alg in (H0_EntropyPooling(), H1_EntropyPooling(), H2_EntropyPooling()),
+        mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+
+        p1 = prior(mk(; sets = sets, alg = alg, mu_views = mv, w = wv), X)
+        ws = isa(alg, H0_EntropyPooling) ? wv : p1.w
+        for (f, key, j) in ((skf, :sk_views, 2), (ktf, :kt_views, 3))
+            val = f(ws, X[:, j])
+            @test !isapprox(val, f(nothing, X[:, j]); rtol = 1e-2)
+            vref = NamedTuple{(key,)}((LinearConstraintEstimator(;
+                                                                 val = "A$j == prior(A$j)"),))
+            vnum = NamedTuple{(key,)}((LinearConstraintEstimator(; val = "A$j == $val"),))
+            pa = prior(mk(; sets = sets, alg = alg, mu_views = mv, w = wv, vref...), X)
+            pb = prior(mk(; sets = sets, alg = alg, mu_views = mv, w = wv, vnum...), X)
+            @test isapprox(pa.w, pb.w; rtol = 1e-12)
+        end
     end
 end
