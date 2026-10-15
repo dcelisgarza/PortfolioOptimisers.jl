@@ -222,6 +222,18 @@ end
 
 row(counts, f) = ["raw" => counts[f]["raw"], "reviewed" => counts[f]["reviewed"]]
 
+# A red names the reports behind its number, so reading them needs no second `measure` run. A
+# carried rename row holds no reports of its own, and prints nothing.
+function print_reports(m, run, file)
+    for r in get(m.reviewed, file, CodeHealth.Reviewed[])
+        if r.run == run
+            println("    line ", r.line, ": ", r.kind, ": ",
+                    replace(r.message, '\n' => "\n      "))
+        end
+    end
+    return nothing
+end
+
 recorded_runs(recorded) = get(recorded, "run", Dict{String, Any}())
 
 function recorded_rows(recorded, run)
@@ -279,6 +291,7 @@ function render(m, recorded, accept_rise::Bool)
             th = CodeHealth.thresholds(rulings)
             for f in added
                 if counts[f]["reviewed"] >= th["jet_reviewed"]
+                    print_reports(m, run, f)
                     throw(CodeHealth.RefreshRefused("ERROR: $f enters with reviewed = $(counts[f]["reviewed"]), and an added " *
                                                     "file must enter at 0.\n       Lower it, or add a Dismissal citing an " *
                                                     "approved Rationale."))
@@ -290,6 +303,9 @@ function render(m, recorded, accept_rise::Bool)
     end
     # The refusal waits for every run, so it names every rise the accepting refresh would record.
     if !isempty(rs) && !accept_rise
+        for r in rs
+            print_reports(m, r.group, r.key)
+        end
         CodeHealth.refuse_rise(NAME, rs)
     end
     io = IOBuffer()
@@ -353,6 +369,7 @@ function verify(m, recorded)
         for r in rs
             CodeHealth.annotate(r.key,
                                 "reviewed JET reports rose from $(r.old) to $(r.new) in run $run.")
+            print_reports(m, run, r.key)
         end
         append!(all_rises, rs)
     end
