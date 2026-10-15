@@ -837,7 +837,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Read the Return Forecast as the member states it.
 
-The prior splits the forecast of the member as it stands, so a fitted member keeps the under-scale of `α⊥`. This is the form of the independent implementation that the library is measured against. It stays one keyword away, and the parity cases of the prior state it.
+The prior splits the forecast of the member as it stands, so a fitted member keeps the under-scale of `α⊥`. This is the form of the oracle that the library is measured against. It stays one keyword away, and the parity cases of the prior state it.
 
 # Related
 

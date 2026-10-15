@@ -876,6 +876,11 @@ include(joinpath(@__DIR__, "parity_grid.jl"))
         # The Gaussian reference of a threshold of three, `2Φ(-3)`.
         @test sr.mean_tail_rate < 0.002699796063260207 < sa.mean_tail_rate
         @test sr.mean_cs_std < 1 < sa.mean_cs_std
+        # The four numbers of ADR 0187, to the digits it states them.
+        @test 100 * sr.mean_tail_rate ≈ 0.12 atol = 0.005
+        @test 100 * sa.mean_tail_rate ≈ 0.55 atol = 0.005
+        @test sr.mean_cs_std ≈ 0.988 atol = 0.0005
+        @test sa.mean_cs_std ≈ 1.009 atol = 0.0005
     end
 
     @testset "The midrank of a tie" begin

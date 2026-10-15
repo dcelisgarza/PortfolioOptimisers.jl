@@ -181,8 +181,10 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
                                         csr = CrossSectionalRegression(; f = zeros(3, 2),
                                                                        eps = zeros(3, N),
                                                                        n = fill(N, 3)),
-                                        fx = zeros(3, 1))
+                                        fx = zeros(3, 1), nf = [p.csfm.nf; "obs"])
         @test po.estimated_factor_columns(obs) == 1:2
+        @test po.orthogonal_forecast_member(ScoreNeutralisation(), members.EW, obs).scores.neutralise ==
+              p.csfm.nf
     end
 
     @testset "OrthogonalPartCalibration scales the orthogonal part by κ⊥ / κ" begin

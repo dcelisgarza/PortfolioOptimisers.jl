@@ -924,7 +924,7 @@ Return the idiosyncratic return history and the idiosyncratic variance history t
 
 The group reads the residual of the fit against the variance the fit predicted for it. Neither history has a factor axis, so the group takes no lag and no family re-basis, and it reads the two histories as the block wrote them. Dispatch, not a branch, selects the absent case, and its message names the field the caller must populate.
 
-A pair that the `h1` field of the regression marks has a leverage of one: the design fitted its return exactly, so its residual is zero by construction and its variance under the design is zero too. Its standardised return is ``0 / 0``, which is not defined, so the verb writes `NaN` over its residual and every verb of the group leaves the pair out. A variance that read only such residuals is zero, and [`standardised_idio_value`](@ref) answers `NaN` for it.
+A pair that the `h1` field of the regression marks has a leverage of one: the design fitted its return exactly, so its residual is zero by construction and its variance under the design is zero too. Its standardised return is ``0 / 0``, which is not defined, so the verb writes `NaN` over its residual and every verb of the group leaves the pair out. The verb writes `NaN` over its variance too, as [`forecast_idiosyncratic_variances`](@ref) does, because a variance that read such residuals is not a forecast of the next return: under `ahead = true` the first unmarked row after a marked row would divide by it, and [`idio_vol_ic`](@ref) would rank it. A variance that read only such residuals and that the mask does not reach is zero, and [`standardised_idio_value`](@ref) answers `NaN` for it.
 
 # Arguments
 
@@ -940,7 +940,7 @@ A pair that the `h1` field of the regression marks has a leverage of one: the de
 # Returns
 
   - `eps::MatNum`: Idiosyncratic return history `observations × assets`, `NaN` at a pair that `h1` marks.
-  - `vs::MatNum`: Idiosyncratic variance history `observations × assets`.
+  - `vs::MatNum`: Idiosyncratic variance history `observations × assets`, `NaN` at a pair that `h1` marks.
 
 # Related
 
@@ -960,7 +960,7 @@ function idio_diagnostic_data(::CrossSectionalRegression, ::Nothing)
     return throw(IsNothingError("vs cannot be nothing: an idiosyncratic diagnostic reads the idiosyncratic variance history of the block"))
 end
 function idio_diagnostic_data(csr::CrossSectionalRegression, vs::MatNum)
-    return leverage_one_nan(csr.h1, csr.eps), vs
+    return leverage_one_nan(csr.h1, csr.eps), leverage_one_nan(csr.h1, vs)
 end
 
 export standardised_idio_returns, idio_calibration, idio_tail_rate, idio_kurtosis,

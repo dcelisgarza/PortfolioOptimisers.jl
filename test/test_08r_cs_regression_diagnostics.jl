@@ -2615,3 +2615,35 @@ end
     @test all(isfinite, fs.mean_abs_t[1:2])
     @test length(fs.coverage) == 3
 end
+
+@testset "The idiosyncratic group leaves out the variance of a Leverage-One Pair (#1571)" begin
+    # Asset 1 is alone in its level on rows 3 and 4 and has a sibling again from row 5. The
+    # variance of the marked rows read only zero residuals, so it is not a forecast, and the
+    # first unmarked row must not divide by it, as the forecast fit does not.
+    rng = StableRNG(1_571_08)
+    T, N = 8, 5
+    eps = 0.01 * randn(rng, T, N)
+    vs = 1e-4 .* (1 .+ rand(rng, T, N))
+    h1 = falses(T, N)
+    h1[3:4, 1] .= true
+    eps[3:4, 1] .= 0
+    vs[3:4, 1] .= [1e-12, 1e-20]
+    csr = CrossSectionalRegression(; f = zeros(T, 1), eps = eps, n = fill(N, T), h1 = h1)
+    blk = CrossSectionalFactorModel(; M = ones(N, 1), b = zeros(N), csr = csr, vs = vs,
+                                    lag = 1)
+    e, v = PortfolioOptimisers.idio_diagnostic_data(blk)
+    @test isequal(v, PortfolioOptimisers.forecast_idiosyncratic_variances(blk))
+    @test all(isnan, e[3:4, 1]) && all(isnan, v[3:4, 1])
+    z = standardised_idio_returns(e, v)
+    @test all(isnan, z[3:5, 1])
+    @test z[6, 1] ≈ eps[6, 1] / sqrt(vs[5, 1])
+    em = copy(eps)
+    vm = copy(vs)
+    em[h1] .= NaN
+    vm[h1] .= NaN
+    for ahead in (true, false)
+        @test isequal(idio_calibration(blk; ahead = ahead),
+                      idio_calibration(em, vm; ahead = ahead))
+    end
+    @test isequal(idio_vol_ic(blk), idio_vol_ic(em, vm))
+end

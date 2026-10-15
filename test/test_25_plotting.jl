@@ -762,6 +762,16 @@
         @test is_plot(plot_idio_tail_rate(csfm_id))
         @test is_plot(plot_idio_tail_rate(pr_id))
         @test is_plot(plot_idio_tail_rate(csfm_id; threshold = 2))
+        # Each plot draws its verb under the same `ahead` (ADR 0187), and the two rules differ.
+        for (plt, f) in ((plot_idio_calibration, idio_calibration),
+                         (plot_idio_tail_rate, idio_tail_rate), (plot_idio_kurtosis, idio_kurtosis),
+                         (plot_idio_skewness, idio_skewness))
+            @test !isequal(f(csfm_id), f(csfm_id; ahead = false))
+            for ahead in (true, false), src in (csfm_id, pr_id)
+                @test isequal(plt(src; ahead = ahead).series_list[1][:y],
+                              f(csfm_id; ahead = ahead))
+            end
+        end
         # A block that carries no idiosyncratic variance history names the field.
         no_vs_id = CrossSectionalFactorModel(; M = randn(rng_id, Ni, Ki), b = zeros(Ni),
                                              csr = csr_id, lag = 1)

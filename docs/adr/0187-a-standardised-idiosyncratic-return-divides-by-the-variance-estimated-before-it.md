@@ -25,7 +25,8 @@ reasons:
    large the shock. It pulls the deviation below `1` and the tails below the Gaussian reference for
    a forecast that is right. On the large parity panel, whose residuals are Gaussian, the 3-sigma
    tail rate is 0.12 % under the same-row rule and 0.55 % one step ahead, against a reference of
-   0.27 %. The mean deviation is 0.988 against 1.009.
+   0.27 %. The mean deviation is 0.988 against 1.009. `test_12o_parity_harness.jl` asserts the
+   four numbers to these digits.
 3. **The group contradicted itself.** `idio_vol_residual_dependence` already divided `|ε_{t+1}|`
    by the volatility of row `t`, and named it `|z_{t+1}|`. Under the same-row rule that name was
    wrong, and under the one-step-ahead rule it is exact.

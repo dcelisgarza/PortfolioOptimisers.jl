@@ -32,8 +32,12 @@ sample, on 500 assets × 2520 observations with one score `s1 = β ℓ + u` and 
 | `ExpWeightedReturnForecast` | 1 | yes | 0.953 ± 0.032 | 1.000 |
 | control: `TargetReturnForecast` | 0 | no | 0.975 ± 0.043 | 1.002 |
 
+The table was measured once, in #1485, and no test asserts its numbers. `test_12zd` asserts the
+same effect on a smaller panel: under the default rule `α⊥ = α` to round-off, and as it stands the
+member's ratio of variances is above 1.8.
+
 `FixedWeightedReturnForecast` has the same ratio of variances, but it fits nothing, so it has no
-fitted scale to repair. The independent implementation that map
+fitted scale to repair. The oracle that map
 [#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375) measures the library
 against reads the fitted member as it stands, and the stored parity cases pin that form.
 
@@ -46,9 +50,9 @@ types of `AbstractOrthogonalForecastFit`:
 | --- | --- |
 | `ScoreNeutralisation()`, the default | The prior neutralises the scores of a member that answers `true` to `fits_idiosyncratic_target` against every estimated factor of the block, after the Neutralisation names of the caller, under `BlockRegressionWeights()`. |
 | `OrthogonalPartCalibration()` | The calibration of `TargetReturnForecast` also fits `κ⊥` on the orthogonal part of each row of the prediction that its calibration reads. The member still publishes `α = κ p`, its Result carries `κ⊥` in `ocalib`, and the prior keeps `g` and scales `α⊥` by `κ⊥ / κ`. |
-| `UnadjustedForecast()` | The prior reads the member as it stands. This is the form of the independent implementation, one keyword away as [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md) requires. |
+| `UnadjustedForecast()` | The prior reads the member as it stands. This is the form of the oracle, one keyword away as [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-seven-differences-are-deliberate.md) requires. |
 
-**The default output of the prior differs from the independent implementation on purpose.** A
+**The default output of the prior differs from the oracle on purpose.** A
 fitted member under the default gives a forecast whose `α⊥` carries the scale of its fit and whose
 `g` is about zero. Under a linear member the forecast is orthogonal to the loadings under `rw[T]`
 to round-off, so `α⊥ = α`.
@@ -58,8 +62,8 @@ future row. `DescriptorScores` has a public field `nw` for the weights of its Ne
 `EstimationMaskWeights()` by default, which keeps every standalone result, or
 `BlockRegressionWeights()`. The scoring step after the regression reads the same weights. The
 Neutralisation fits an intercept by default (#1521), so its residual has a zero weighted mean, and
-a standardised score stays orthogonal to the loadings for every design. Parity with the
-independent implementation needs `EstimationMaskWeights()` and
+a standardised score stays orthogonal to the loadings for every design. Parity with the oracle
+needs `EstimationMaskWeights()` and
 `cre = CrossSectionalLinearRegression(; intercept = false)`. A standalone caller can make the same
 repair.
 
@@ -86,10 +90,15 @@ the forecast history. A ratio `κ⊥ / κ` that is not finite is the warm-up of 
 the zero split of a forecast that is not finite.
 
 **The rule holds on every path.** The prior reaches its forecast through
-`cross_sectional_return_forecast` alone, which the batch fit, the online refit and the carry fold
+`cross_sectional_return_forecast`, which the batch fit, the online refit and the carry fold
 ([ADR 0193](0193-the-cross-sectional-factor-prior-refits-online-first-and-folds-as-a-host-next.md))
-all call. The Return Forecast history that a slot reads is the history of the member that the rule
-fits.
+all call. Its three steps dispatch on the rule: `orthogonal_forecast_member`,
+`orthogonal_forecast_result` and `orthogonal_forecast_rescale`. The carry fold fits the member
+before that call, through `orthogonal_forecast_member` and a fourth step,
+`orthogonal_forecast_step`, and hands the result in. So a rule that changes
+`orthogonal_forecast_result` changes `orthogonal_forecast_step` in the same way, or the carry fold
+differs from the batch fit. The Return Forecast history that a slot reads is the history of the
+member that the rule fits.
 
 **The parity cases state `ofit = UnadjustedForecast()`** wherever the prior holds a fitted member.
 The standalone member tests do not change.
@@ -110,8 +119,8 @@ The standalone member tests do not change.
 
 - **Leave the member as it stands and let `c` repair it.** `ForecastCalibrationSlope` repairs the
   scale, but it needs the forecast history, which costs 11 to 14 minutes at 500 assets × 2520
-  observations for `TargetReturnForecast`. A repair inside the member costs nothing.
+  observations for `TargetReturnForecast` (#1482). A repair inside the member costs nothing.
 - **Neutralise under the estimation mask.** It is not the inner product of the split, so it repairs
   the scale only in part when `rw` is a power of the capitalisation.
 - **Change the standalone member.** It stands outside a prior, and it keeps parity with the
-  independent implementation (#1386).
+  oracle (#1386).
