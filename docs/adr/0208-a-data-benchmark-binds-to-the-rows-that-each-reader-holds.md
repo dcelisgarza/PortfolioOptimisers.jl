@@ -51,8 +51,9 @@ The maintainer decided decisions 1 and 2 on 2026-10-13. Decisions 3, 4 and 5 cam
    - A graph reader or a regression reader in the Excess Frame does not count, because no tracking
      form reads its matrix. The mix of ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md)
      stays legal.
-   - A precomputed Prior Result holds no source, so it reads as raw and does not refuse, as in ADR
-     0214, decision 4, and ADR 0215, decision 3.
+   - A Prior Result in the place of the prior counts by the source that it records (ADR 0215,
+     decision 3). A Result that records `ExcessSource()` refuses, and a Result at `nothing` reads as
+     raw and does not refuse.
    - Each inner head and each outer head of a meta-optimiser, and each fallback, checks its own
      prior.
    - `bind_data_benchmark` loses its `brt` argument. It keeps the refusal of returns data with no

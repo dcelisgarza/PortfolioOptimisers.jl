@@ -197,6 +197,7 @@ Kurtosis
                       alg1::AbstractMomentAlgorithm, alg2::SecondMomentFormulation,
                       pe::Option{<:AbstractPriorEstimator},
                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
+        assert_returns_source(returns_source(pe), (nothing,), :Kurtosis, "pe.x_src")
         mu_flag = isa(mu, VecNum)
         kt_flag = isa(kt, MatNum)
         if mu_flag

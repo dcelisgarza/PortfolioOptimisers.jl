@@ -1,8 +1,24 @@
 ---
-status: accepted
+status: superseded
 ---
 
 # A Returns Result drops no field that the mathematics lets it carry
+
+## Superseded (2026-10-14)
+
+Map #1678 replaced `brt` before this ADR reached `main`. `brt` is removed in one break (ADR
+[0213](0213-brt-is-removed-in-one-break.md)). Each reader of the returns states its own source in
+`x_src` (ADR [0211](0211-each-reader-of-the-returns-states-its-own-source.md) and ADR
+[0212](0212-a-returns-source-is-a-singleton-type.md)). The readers of one head can read different
+frames (ADR [0214](0214-the-readers-of-one-head-can-read-different-frames.md)). The paths that read
+the frame of a head read the source of a reader (ADR
+[0215](0215-the-paths-that-read-the-frame-of-a-head-read-the-source-of-a-reader.md)).
+
+Decisions 1 and 3 hold, with `x_src = ExcessSource()` in the place of `brt = true`: a rebuild
+carries every field, and the excess source refuses returns with no benchmark. Decision 2 holds as
+ADR 0211 states it: the returns data stays raw, and each reader subtracts the benchmark once.
+Decisions 4 to 10 described the `brt` of a head, a step, a verb and a loss, and they are
+superseded. The text below is the reasoning of that time.
 
 ## Context
 

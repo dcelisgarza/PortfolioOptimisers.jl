@@ -605,7 +605,7 @@ end
 
 Refuse a [`DataBenchmarkTracking`](@ref) in `x` when the prior `pe` that its measure reads states `x_src = ExcessSource()`.
 
-Every tracking form compares `pr.X * w` with its benchmark series. Under a prior in the Excess Frame `pr.X` holds `X - B`, so a data benchmark gives the series `(X - B) * w - B`, and the benchmark is subtracted two times. No use of the pair is correct, so the constructor of each holder of the tracking part and the prior refuses it. The configuration alone decides the refusal. A precomputed Prior Result states no source, so it reads as raw and passes. A graph reader or a regression reader in the Excess Frame does not count, because no tracking form reads its matrix.
+Every tracking form compares `pr.X * w` with its benchmark series. Under a prior in the Excess Frame `pr.X` holds `X - B`, so a data benchmark gives the series `(X - B) * w - B`, and the benchmark is subtracted two times. No use of the pair is correct, so the constructor of each holder of the tracking part and the prior refuses it. The configuration alone decides the refusal. A Prior Result in the place of the prior counts by the source that it records, see [`prior_returns_source`](@ref): a Result at `nothing` reads as raw and passes. A graph reader or a regression reader in the Excess Frame does not count, because no tracking form reads its matrix.
 
 # Algorithm
 

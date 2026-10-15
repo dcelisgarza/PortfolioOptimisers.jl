@@ -2531,8 +2531,8 @@ end
     =#
     pool = PortfolioOptimisers.prior_result_property_pool()
     @test pool ==
-          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :pr, :kt, :D2, :L2,
-           :S2, :sk, :V, :skmp]
+          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :x_src, :pr, :kt,
+           :D2, :L2, :S2, :sk, :V, :skmp]
     @test allunique(pool)
     # `fpr` is a field of both carriers, so the concatenation is not already unique.
     @test :fpr in fieldnames(LowOrderPrior)
@@ -3292,4 +3292,97 @@ end
     m = copy(mu)
     m[1] = NaN
     @test LowOrderPrior(; X = X, mu = m, sigma = s) isa LowOrderPrior
+end
+
+@testset "A Prior Result records the source of its prior (#1701, #1705)" begin
+    PO = PortfolioOptimisers
+    rngs = StableRNG(1705)
+    Ts, Ns = 80, 4
+    Fs = 0.01 .* randn(rngs, Ts, 2)
+    Xs = Fs * (0.5 .+ rand(rngs, 2, Ns)) .+ 0.005 .* randn(rngs, Ts, Ns)
+    Bs = 0.8 .* Fs[:, 1]
+    rds = ReturnsResult(; nx = ["a", "b", "c", "d"], X = Xs, nf = ["f1", "f2"], F = Fs,
+                        nb = ["m"], B = Bs)
+    xe = ExcessSource()
+    # The returns-data method records the source that the prior states.
+    for (pe, src) in ((EmpiricalPrior(), nothing),
+                      (EmpiricalPrior(; x_src = DataSource()), DataSource()),
+                      (EmpiricalPrior(; x_src = xe), xe), (FactorPrior(; x_src = xe), xe),
+                      (HighOrderPriorEstimator(; x_src = xe), xe))
+        @test PO.prior_returns_source(prior(pe, rds)) === src
+    end
+    # A returns matrix states no frame, and a view and a forward keep the source.
+    @test isnothing(prior(EmpiricalPrior(; x_src = xe), Xs).x_src)
+    pr = prior(EmpiricalPrior(; x_src = xe), rds)
+    @test PO.port_opt_view(pr, [1, 3]).x_src === xe
+    @test PO.forward_prior(pr; mu = pr.mu .+ 1).x_src === xe
+    @test PO.stamp_returns_source(pr, EmpiricalPrior(; x_src = xe)) === pr
+    @test isnothing(PO.stamp_returns_source(pr, EmpiricalPrior()).x_src)
+    # A HighOrderPrior holds no field of its own: it answers from the prior that it wraps.
+    hop = prior(HighOrderPriorEstimator(; x_src = xe), rds)
+    @test !hasfield(typeof(hop), :x_src)
+    @test hop.pr.x_src === xe
+    # The read-out of an online fold records the source of the folded estimator.
+    pf = partial_fit!(EmpiricalPrior(; x_src = xe), Xs .- Bs)
+    @test prior(pf).x_src === xe
+    @test prior(pf).mu ≈ pr.mu
+    @test prior(partial_fit!(HighOrderPriorEstimator(; x_src = xe), Xs .- Bs)).x_src === xe
+    # The frame walk counts a Result by its source, and a Result at `nothing` adds nothing.
+    @test PO.reader_frames(pr, "pe", false).excess
+    frn = PO.reader_frames(prior(EmpiricalPrior(), rds), "pe", false)
+    @test !frn.excess && isempty(frn.raw)
+    # So a data benchmark refuses an excess Result, as it refuses an excess prior (ADR 0208).
+    tr = TrackingError(; tr = DataBenchmarkTracking(), err = 0.01)
+    @test_throws ArgumentError JuMPOptimiser(; pe = pr, tr = tr, slv = slv)
+    @test isa(JuMPOptimiser(; pe = prior(EmpiricalPrior(), rds), tr = tr, slv = slv),
+              JuMPOptimiser)
+    # The outer problem of a meta-optimiser reads the frame that the Result records, so a
+    # precomputed Result equals its estimator.
+    nc(pe) = optimise(NestedClustered(; pe = pe, cle = ClustersEstimator(; x_src = xe),
+                                      opti = InverseVolatility(),
+                                      opto = InverseVolatility()), rds).w
+    @test nc(pr) ≈ nc(EmpiricalPrior(; x_src = xe))
+    @test !isapprox(nc(PO.forward_prior(pr; x_src = nothing)), nc(pr); atol = 1e-3)
+    # The returns-data methods take `strict` and `dims` and no other keyword (ADR 0213).
+    for pe in (EmpiricalPrior(), FactorPrior())
+        @test_throws MethodError prior(pe, rds; brt = true)
+        @test prior(pe, rds; dims = 2, strict = false).mu ≈ prior(pe, rds).mu
+    end
+end
+
+@testset "No verb or type that took `brt` takes it, and no sink swallows it (#1705)" begin
+    PO = PortfolioOptimisers
+    rngs = StableRNG(17051)
+    Xs = 0.01 .* randn(rngs, 60, 4)
+    rds = ReturnsResult(; nx = ["a", "b", "c", "d"], X = Xs, nb = ["m"], B = Xs[:, 1])
+    pr = prior(EmpiricalPrior(), rds)
+    s1 = first(slv)
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = s1))
+    w = fill(0.25, 4)
+    for f in (() -> JuMPOptimiser(; slv = s1, brt = true),
+              () -> HierarchicalOptimiser(; brt = true), () -> InverseVolatility(; brt = true),
+              () -> NestedClustered(; opti = mr, opto = mr, brt = true),
+              () -> Stacking(; opti = [mr], opto = mr, brt = true),
+              () -> SubsetResampling(; opt = mr, brt = true),
+              () -> OnlinePortfolioSelection(; brt = true), () -> PO.RiskLoss(; brt = true),
+              () -> ProgrammeAllocationSet(; slv = s1, brt = true),
+              () -> ShortTermLossControlPortfolio(; slv = s1, brt = true),
+              () -> LowDimensionEnsemblePortfolio(; N = 4, slv = s1, brt = true),
+              () -> covariance_forecast_evaluation(Covariance(), rds, IndexWalkForward(40, 10);
+                                                   brt = true),
+              () -> benchmark_relative_returns(rds, true),
+              () -> clusterise(ClustersEstimator(), rds; brt = true),
+              () -> clusterise(ClustersEstimator(), pr; rd = rds, x_src = :prior),
+              () -> phylogeny_matrix(NetworkEstimator(), pr; rd = rds, brt = true),
+              () -> phylogeny_constraints(SemiDefinitePhylogenyEstimator(), pr; brt = true),
+              () -> centrality_vector(CentralityEstimator(), pr; rd = rds, brt = true),
+              () -> centrality_vector(NetworkEstimator(), DegreeCentrality(), pr; brt = true),
+              () -> average_centrality(CentralityEstimator(), w, pr; brt = true),
+              () -> asset_phylogeny(NetworkEstimator(), w, pr; brt = true),
+              () -> centrality_constraints(CentralityConstraint(), pr; brt = true))
+        @test_throws MethodError f()
+    end
+    # The keywords that the library forwards still reach the graph verbs.
+    @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1,
+                         branchorder = :optimal), PO.AbstractClusteringResult)
 end

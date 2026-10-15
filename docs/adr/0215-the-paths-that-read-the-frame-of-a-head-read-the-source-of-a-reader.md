@@ -46,7 +46,7 @@ The facts at `37613955bc`:
 
 ## Decision
 
-The maintainer decided on 2026-10-13.
+The maintainer decided on 2026-10-13, and decided decision 3 again on 2026-10-14 (#1701).
 
 1. **The online fold reads the source of the prior that it folds.** `fold_returns` reads
    `pe.x_src`. Under `ExcessSource()` the buffer of the prior gets `X - B`, and the Fold Context
@@ -60,11 +60,18 @@ The maintainer decided on 2026-10-13.
    rows too, so every reader of the head pairs the same observations. The gap of the factor returns
    keeps its rule, which reads the prior. A fallback is a head with its own group, so it drops by its
    own rule, as today.
-3. **The outer problem reads the source of the meta's own prior.** `outer_returns_source` adds `B`
-   back when the `x_src` of the meta's prior estimator is `ExcessSource()`, and otherwise reads `pr`
-   as today. A precomputed Prior Result holds no field, so the outer problem reads it as raw. This
-   agrees with ADR 0214, decision 4, which treats a precomputed Prior Result as a source that the
-   type does not show. The CV path does not change.
+3. **The outer problem reads the source that the Prior Result records.** `LowOrderPrior` holds
+   `x_src`, and a `HighOrderPrior` answers it from the `LowOrderPrior` that it wraps, as it answers
+   `X`. `prior(pe, rd)` and the read-out `prior(pe)` of an online fold record the source of `pe`,
+   and a returns-matrix method records `nothing`. `outer_returns_source` adds `B` back when the
+   Prior Result records `ExcessSource()`, and otherwise reads `pr` as before. So the read-out of an
+   online fold, a prior step of a `Pipeline` and a precomputed Prior Result each keep their frame.
+   The frame walk of ADR 0214 counts a Prior Result in the place of a prior by the source that it
+   records, with no raw reader at `nothing`. So a data benchmark refuses an excess Result (ADR
+   [0208](0208-a-data-benchmark-binds-to-the-rows-that-each-reader-holds.md), decision 3). The CV
+   path does not change. The heads piece (#1701) found the cause: `batch_from_state` puts the
+   read-out in `opt.pe`, so the outer problem of a `NestedClustered` in the Excess Frame lost the
+   `+ B`, and its weights differed from the batch fit by 0.0092.
 4. **`covariance_forecast_evaluation` takes an `x_src` keyword.** This is the one exception to ADR
    0211, decision 1. The verb is the outermost reader of the evaluation, as the step of
    `OnlinePortfolioSelection` is for its rules: no estimator in the call receives `rd`. The keyword
@@ -91,8 +98,9 @@ The maintainer decided on 2026-10-13.
   answers both.
 - A raw prior in a group with an excess reader loses the gap rows of `B`. So its Prior Result inside
   the head can differ from `prior(pe, rd)` on the same data, which keeps those rows.
-- A caller cannot state that a precomputed Prior Result of a meta-optimiser is in the Excess Frame.
-  The migration guide lists this beside the removal of `brt`.
+- A precomputed Prior Result keeps the frame that its prior stated, because `prior(pe, rd)` records
+  it. A caller who builds a Prior Result by hand states its frame with
+  `forward_prior(pr; x_src = ExcessSource())`. A printed `LowOrderPrior` shows an `x_src` row.
 - The pins of `test/test_78_brt_pinned_outputs.jl` stay valid when the helpers state
   `ExcessSource()` on the prior of each head and of each meta-optimiser. Then the group rule and
   the rule of the prior agree.
@@ -107,8 +115,19 @@ The maintainer decided on 2026-10-13.
   Frame beside a raw prior reads `NaN` rows.
 - **Each reader drops its own gap rows.** The readers of one head then read different observations,
   which the head drop of ADR 0117 exists to prevent.
-- **The Prior Result records the frame that it fitted in.** A precomputed excess Prior Result then
-  works, but each Prior Result type gets a field and each printed result a row.
+- **The outer problem reads the source of the meta's prior estimator** (the decision of
+  2026-10-13). Three paths put a Prior Result in the place of the estimator: the read-out of an
+  online fold, a prior step of a `Pipeline`, and a precomputed Result. Each one read as raw, so the
+  outer problem lost the `+ B`.
+- **A keyword through the call.** `kwargs...` reach every attempt of the fallback chain and every
+  inner optimiser, so the keyword must be stripped two times, and it repairs the read-out only.
+- **A positional argument.** The fallback chain passes the same `args...` to each attempt, so a
+  `MeanRisk` fallback gets a `MethodError`.
+- **A frame field on `ReturnsResult`.** It is a larger change than one field.
+- **A refit of the prior in the two meta-optimisers.** It loses the read of the folded state.
+- **A field on `HighOrderPrior` too.** The first text of the decision gave both types a field.
+  `HighOrderPrior` holds none of the returns fields and forwards them to the `LowOrderPrior` that
+  it wraps, so a second copy of the source could disagree with the first.
 - **The outer problem always reads the raw `rd.X` on the rows of `pr`.** It needs no frame and it
   agrees with the CV path. But under a factor prior `pr.X` is a reconstruction, so the outer problem
   moves with no benchmark too, which needs a re-pin build past this map.
@@ -123,7 +142,7 @@ The maintainer decided on 2026-10-13.
 ## Related
 
 - ADR 0117: the drop of a Shared Series gap, and the marks of the online step (#1675).
-- ADR 0204: the current rule for `brt`.
+- ADR 0204: the rule for `brt`, which this map supersedes.
 - ADR 0211: the readers that hold `x_src`, and decision 1, to which decision 4 is the exception.
 - ADR 0212: the values of `x_src`, and the shared assertion.
 - ADR 0213: `brt` is removed in one break, and a positional `Bool` builds no Result.

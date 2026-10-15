@@ -187,12 +187,12 @@
         @test_throws MethodError LoGo(Distance(), AngularSimilarity(), Posdef())
         @test_throws MethodError NetworkEstimator(PortfolioOptimisersCovariance(),
                                                   Distance(), AngularSimilarity(),
-                                                  HopCount())
+                                                  HopCount(), nothing)
         # The admitted members build by either route.
         @test DBHT(MaximumDistanceSimilarity(), UniqueRoot()) isa DBHT
         @test LoGo(Distance(), ComplementSimilarity(), Posdef()) isa LoGo
         @test NetworkEstimator(PortfolioOptimisersCovariance(), Distance(), KruskalTree(),
-                               HopCount()) isa NetworkEstimator
+                               HopCount(), nothing) isa NetworkEstimator
         # Every surviving member still constructs on all three.
         for sim in nonneg
             @test NetworkEstimator(; alg = sim).alg === sim
@@ -1799,7 +1799,7 @@
         # Sources still construct, by keyword and positionally.
         @test isa(SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator()),
                   SemiDefinitePhylogenyEstimator)
-        @test isa(SemiDefinitePhylogenyEstimator(ClustersEstimator(), 0.05),
+        @test isa(SemiDefinitePhylogenyEstimator(ClustersEstimator(), 0.05, nothing),
                   SemiDefinitePhylogenyEstimator)
         @test isa(IntegerPhylogenyEstimator(; pl = ClustersEstimator()),
                   IntegerPhylogenyEstimator)
@@ -1812,7 +1812,8 @@
         the limit of the guarantee is on the record: the keyword constructor is the
         enforced API.
         =#
-        @test isa(SemiDefinitePhylogenyEstimator(plr, 0.05), SemiDefinitePhylogenyEstimator)
+        @test isa(SemiDefinitePhylogenyEstimator(plr, 0.05, nothing),
+                  SemiDefinitePhylogenyEstimator)
 
         # What the runtime guard is still for: a precomputed constraint *result* in `ple`.
         # It was already rejected when held directly...
@@ -3029,15 +3030,17 @@ end
     a second, *private* scale returning beside the model-wide one that every other
     constraint family shares.
     =#
-    @test fieldnames(IntegerPhylogenyEstimator) == (:pl, :B)
+    @test fieldnames(IntegerPhylogenyEstimator) == (:pl, :B, :x_src)
     @test fieldnames(IntegerPhylogeny) == (:A, :B)
     # The keyword is gone from both keyword constructors.
     @test_throws MethodError IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1,
                                                        scale = 100_000.0)
     @test_throws MethodError IntegerPhylogeny(; A = [0.0 1.0; 1.0 0.0], B = 2,
                                               scale = 100_000.0)
-    # The positional constructors take the two fields and no third.
-    @test isa(IntegerPhylogenyEstimator(NetworkEstimator(), 1), IntegerPhylogenyEstimator)
+    # The positional constructors take the fields and no scale: the estimator states its
+    # source last (#1698), and the result holds the two fields that the constraint reads.
+    @test isa(IntegerPhylogenyEstimator(NetworkEstimator(), 1, nothing),
+              IntegerPhylogenyEstimator)
     @test isa(IntegerPhylogeny([0.0 1.0; 1.0 0.0], 2), IntegerPhylogeny)
     # The refit from estimator to result carries only what the constraint reads.
     X = randn(StableRNG(987654321), 200, 5)

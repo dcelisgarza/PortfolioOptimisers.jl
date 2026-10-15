@@ -138,8 +138,9 @@ end
     @testset "Every cluster of a NestedClustered fits its own currency factors" begin
         # The clustering reads the fitted rows of the prior. A clustering of the raw returns
         # gives a cluster with fewer than `minra` eligible assets at most observations (#1689).
-        res = optimise(NestedClustered(; pe = pe, x_src = :prior, opti = inner,
-                                       opto = EqualWeighted()), fx.rd)
+        res = optimise(NestedClustered(; pe = pe,
+                                       cle = ClustersEstimator(; x_src = PriorSource()),
+                                       opti = inner, opto = EqualWeighted()), fx.rd)
         @test sum(res.w) ≈ 1
         @test all(r -> r.retcode isa OptimisationSuccess, res.resi)
         for r in res.resi
@@ -258,8 +259,9 @@ end
     @testset "A NestedClustered over the industry factors fits every cluster (#1372)" begin
         pei = CrossSectionalFactorPrior(; lambda = 1, factors = fac3, minra = 3)
         innr = MeanRisk(; opt = JuMPOptimiser(; pe = pei, slv = slv))
-        res = optimise(NestedClustered(; pe = pei, x_src = :prior, opti = innr,
-                                       opto = EqualWeighted()), fx.rd)
+        res = optimise(NestedClustered(; pe = pei,
+                                       cle = ClustersEstimator(; x_src = PriorSource()),
+                                       opti = innr, opto = EqualWeighted()), fx.rd)
         @test sum(res.w) ≈ 1
         @test all(r -> r.retcode isa OptimisationSuccess, res.resi)
     end

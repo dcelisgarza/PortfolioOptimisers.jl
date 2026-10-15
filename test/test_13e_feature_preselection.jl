@@ -61,6 +61,13 @@ end
         @test !hasproperty(ClusterGroups(), :z_src)
         @test !hasproperty(RedundancySelector(; alg = ClusterGroups(), score = SCM()),
                            :z_src)
+        # The `cle` reads `rd.X` as it arrived, so it states no source (#1698, #1705).
+        for x_src in (DataSource(), ExcessSource(), PriorSource())
+            @test_throws ArgumentError ClusterGroups(;
+                                                     cle = ClustersEstimator(;
+                                                                             x_src = x_src))
+        end
+        @test isnothing(ClusterGroups(; cle = ClustersEstimator(; x_src = nothing)).cle.x_src)
     end
 
     @testset "a taxonomy selects a different universe from the returns correlation" begin

@@ -512,11 +512,11 @@ function expand_investable_ucs(set::AbstractUncertaintySetResult, ::Nothing,
     return set
 end
 """
-    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
+    ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
 
 Fits both uncertainty sets in one pass from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method, so an estimator that shares a prior or a simulation between the two axes computes it once. It takes no keyword: the container carries every input of the fit, and the prior of the set states the source of the returns, so an unknown keyword is a `MethodError` and is not ignored.
+The method unpacks the container and forwards to the matrix method, so an estimator that shares a prior or a simulation between the two axes computes it once. It takes no keyword but `dims`, which it ignores, as [`prior`](@ref) does on a `ReturnsResult`: the container carries every input of the fit, and the prior of the set states the source of the returns, so an unknown keyword is a `MethodError` and is not ignored.
 
 # Algorithm
 
@@ -531,6 +531,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
 
   - `uc`: Uncertainty set estimator. Used to construct the uncertainty set.
   - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
+  - $(arg_dict[:dims_rd])
 
 # Validation
 
@@ -549,7 +550,7 @@ The method unpacks the container and forwards to the matrix method, so an estima
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
+function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
     x_src = returns_source(uc.pe)
@@ -558,11 +559,11 @@ function ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
                dims = 1)
 end
 """
-    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
+    mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
 
 Fits the mean uncertainty set from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method. A caller that needs both axes calls [`ucs`](@ref) instead, which fits them in one pass. It takes no keyword, as [`ucs`](@ref) states.
+The method unpacks the container and forwards to the matrix method. A caller that needs both axes calls [`ucs`](@ref) instead, which fits them in one pass. It takes no keyword but `dims`, which it ignores, as [`ucs`](@ref) states.
 
 # Algorithm
 
@@ -577,6 +578,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
 
   - `uc`: Uncertainty set estimator. Used to construct the expected returns uncertainty set.
   - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
+  - $(arg_dict[:dims_rd])
 
 # Validation
 
@@ -595,7 +597,7 @@ The method unpacks the container and forwards to the matrix method. A caller tha
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
+function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
     x_src = returns_source(uc.pe)
@@ -604,11 +606,11 @@ function mu_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
                   ivpa = rd.ivpa, dims = 1)
 end
 """
-    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
+    sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
 
 Fits the covariance uncertainty set from an estimator and a [`ReturnsResult`](@ref).
 
-The method unpacks the container and forwards to the matrix method. An estimator with no covariance analogue raises there, as [`CharacteristicUncertaintySet`](@ref) does. It takes no keyword, as [`ucs`](@ref) states.
+The method unpacks the container and forwards to the matrix method. An estimator with no covariance analogue raises there, as [`CharacteristicUncertaintySet`](@ref) does. It takes no keyword but `dims`, which it ignores, as [`ucs`](@ref) states.
 
 # Algorithm
 
@@ -623,6 +625,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
 
   - `uc`: Uncertainty set estimator. Used to construct the covariance uncertainty set.
   - `rd`: [`ReturnsResult`](@ref). Contains the returns data and associated metadata.
+  - $(arg_dict[:dims_rd])
 
 # Validation
 
@@ -641,7 +644,7 @@ The method unpacks the container and forwards to the matrix method. An estimator
   - [`BoxUncertaintySet`](@ref)
   - [`EllipsoidalUncertaintySet`](@ref)
 """
-function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult)
+function sigma_ucs(uc::AbstractUncertaintySetEstimator, rd::ReturnsResult; dims::Int = 1)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(uc.pe, rd.F)
     x_src = returns_source(uc.pe)

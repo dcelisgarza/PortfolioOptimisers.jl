@@ -786,10 +786,17 @@ end
                                                                                                         slv = s1),
                                                                                     frc_ple = [SemiDefinitePhylogenyEstimator(),
                                                                                                plx])
-    # A raw prior, a precomputed Prior Result and a schedule pass. A graph reader or a
+    # A raw prior, a raw Prior Result and a schedule pass. A Prior Result records the source
+    # of its prior, so an excess one refuses as its prior does (#1705). A graph reader or a
     # regression reader in the Excess Frame does not count.
     @test_logs MeanRisk(; opt = JuMPOptimiser(; pe = eraw, slv = s1), r = dbt)
-    @test_logs MeanRisk(; opt = JuMPOptimiser(; pe = prior(epx, rd), slv = s1), r = dbt)
+    @test_logs MeanRisk(; opt = JuMPOptimiser(; pe = prior(eraw, rd), slv = s1), r = dbt)
+    @test_throws "its prior `opt.pe` states `x_src = ExcessSource()`" MeanRisk(;
+                                                                               opt = JuMPOptimiser(;
+                                                                                                   pe = prior(epx,
+                                                                                                              rd),
+                                                                                                   slv = s1),
+                                                                               r = dbt)
     @test_logs MeanRisk(;
                         opt = JuMPOptimiser(; pe = eraw, slv = s1,
                                             cte = CentralityConstraint(; x_src = xs)),

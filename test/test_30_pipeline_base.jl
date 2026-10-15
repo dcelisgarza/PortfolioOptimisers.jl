@@ -804,15 +804,9 @@ end
             pipe = @test_logs min_level = Logging.Warn Pipeline(; steps = (step(src), opt))
             res = fit(pipe, rd)
             ref = fit(Pipeline(; steps = (opt,)), rd)
-            if isa(opt, NestedClustered) && isa(src, ExcessSource)
-                # The outer problem of a meta-optimiser reads a Prior Result in `pe` as
-                # raw until a Prior Result records its source, which is the work of
-                # "Build: the last piece of the brt migration (pins, docs, merge to dev)"
-                # (#1705). That piece turns this into `@test`.
-                @test_broken isapprox(res.w, ref.w; atol = 1e-6)
-            else
-                @test isapprox(res.w, ref.w; atol = 1e-6)
-            end
+            # The Prior Result of the step records its source, so the outer problem of a
+            # meta-optimiser reads it in its frame (#1705).
+            @test isapprox(res.w, ref.w; atol = 1e-6)
             @test res.ctx.prior.mu ≈ prior(pe(src), rd).mu
             # The returns data keeps its raw `X` and its `B`.
             @test res.ctx.returns === rd

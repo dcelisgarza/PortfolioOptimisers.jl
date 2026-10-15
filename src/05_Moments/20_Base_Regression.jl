@@ -1774,8 +1774,10 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 # Algorithm
 
  1. Check that `rd` carries both matrices, per `# Validation` below.
- 2. Drop the observations at which a factor return is not finite, with [`shared_series_view`](@ref). A regression on such an observation has no regressor for any asset.
- 3. Call `regression(re, rd.X, rd.F)` on the kept observations, giving the regression result.
+ 2. Read the source that `re` states with [`returns_source`](@ref), giving `x_src`. A regression reader that receives the returns data states its own source (ADR 0211).
+ 3. Drop the observations at which a factor return is not finite, and under `x_src = ExcessSource()` the observations of a gap of a vector benchmark, with [`shared_series_view`](@ref). A regression on such an observation has no regressor for any asset.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 5. Call `regression(re, X, rd.F)` on the kept observations, giving the regression result.
 
 # Arguments
 
@@ -1786,6 +1788,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 
   - `!isnothing(rd.X)`. A regression needs the asset returns it explains.
   - `!isnothing(rd.F)`. A regression needs the factor returns it explains them with.
+  - The rules of [`benchmark_relative_returns`](@ref). So `x_src = PriorSource()` throws an `ArgumentError`, because the call gives no Prior Result, and `x_src = ExcessSource()` refuses returns data with no benchmark.
 
 # Returns
 
@@ -1799,8 +1802,9 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
-    rd = shared_series_view(rd, nothing, true)
-    return regression(re, rd.X, rd.F)
+    x_src = returns_source(re)
+    rd = shared_series_view(rd, x_src, true)
+    return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
 end
 """
     assert_finite_factor_rows(F::MatNum) -> Nothing

@@ -361,6 +361,29 @@ using Accessors: Accessors
         @test isa(PO.regression(est, rd), PO.Regression)
     end
 
+    @testset "regression(re, rd) reads the source of re (#1699, #1705)" begin
+        # A regression reader that receives the returns data states its own source.
+        bm = 0.05 .* F[:, 2]
+        rdb = PO.ReturnsResult(; nx = ["y"], X = reshape(y, :, 1), nf = rd.nf, F = F,
+                               nb = ["b"], B = bm)
+        excess = PO.ReturnsResult(; nx = ["y"], X = reshape(y .- bm, :, 1), nf = rd.nf,
+                                  F = F)
+        for x_src in (nothing, PO.DataSource())
+            r = PO.regression(PO.StepwiseRegression(; x_src = x_src), rdb)
+            @test r.M == PO.regression(PO.StepwiseRegression(), rd).M
+        end
+        r = PO.regression(PO.StepwiseRegression(; x_src = PO.ExcessSource()), rdb)
+        @test r.M == PO.regression(PO.StepwiseRegression(), excess).M
+        @test r.M != PO.regression(PO.StepwiseRegression(), rd).M
+        # The call gives no Prior Result, and the excess source needs a benchmark.
+        @test_throws ArgumentError PO.regression(PO.StepwiseRegression(;
+                                                                       x_src = PO.PriorSource()),
+                                                 rdb)
+        @test_throws ArgumentError PO.regression(PO.StepwiseRegression(;
+                                                                       x_src = PO.ExcessSource()),
+                                                 rd)
+    end
+
     @testset "GeneralisedLinearModel validation" begin
         # The constructor checks `variant` against the WIDER of the two tuples.
         for v in PO.PSEUDO_R2_VARIANTS

@@ -70,7 +70,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :p_owa => "`p`: Vector of p-norm orders used to approximate the ordered weights array risk.",#
                  :merge_owa => "`merge`: Sorting network that the formulation relaxes. Every sorting network gives the exact risk. The network sets the number of rows and the cost of one solver iteration.",#
                  :ordering_owa => "`ordering`: Order of the network variables in the model. It does not change the risk.",#
-                 :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref).",#
+                 :pe_rm => "`pe`: Optional prior estimator that fills every prior-derived slot the measure leaves unstated, from a single fit. A stated slot wins. See [`resolve_deferred_quantities`](@ref). It fits on the returns of the Prior Result that the measure receives, so it states no source of its own, and the constructor refuses a `pe` whose `x_src` is not `nothing`, see [`assert_returns_source`](@ref).",#
                  # Deferred Quantity slots. Each admits the value itself or the Estimator that
                  # computes it, resolved against the optimisation's own prior. See
                  # `DeferredQuantity` and ADR 0051.

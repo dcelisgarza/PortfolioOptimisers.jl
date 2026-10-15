@@ -289,7 +289,8 @@ ARCHUncertaintySet
              │           me ┼ SimpleExpectedReturns
              │              │   w ┴ nothing
              │      horizon ┼ nothing
-             │   fill_limit ┴ nothing
+             │   fill_limit ┼ nothing
+             │        x_src ┴ nothing
           ce ┼ PortfolioOptimisersCovariance
              │   ce ┼ Covariance
              │      │    me ┼ SimpleExpectedReturns

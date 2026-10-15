@@ -1259,7 +1259,7 @@ function prior(pe::HighOrderPriorEstimator; kwargs...)
     pnl = buffer_asset_panel(buf)
     kt = read_comoment(cokurtosis, pe.kte, pr.w, X, pnl; kwargs...)
     sk, V = read_comoment(coskewness, pe.ske, pr.w, X, pnl; kwargs...)
-    return assemble_high_order_prior(pe, pr, kt, sk, V)
+    return stamp_returns_source(assemble_high_order_prior(pe, pr, kt, sk, V), pe)
 end
 
 export HighOrderPriorEstimator

@@ -242,6 +242,33 @@ end
 # nothing, so only the risk side is declared.
 deferred_slots(r::MeanReturnRiskRatio) = (; rk = r.rk)
 """
+    reader_frames(r::MeanReturnRiskRatio, path::AbstractString,
+                  refit::Bool) -> ReturnsFrames
+
+Return the frames of the readers inside the risk side of a [`MeanReturnRiskRatio`](@ref), for the frame walk of a head.
+
+The risk side `rk` can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref). Each of those readers belongs to the group of the head that holds the measure, so the method walks every field of `r` with [`field_frames`](@ref). A field that holds no reader adds nothing.
+
+# Arguments
+
+  - `r`: The risk measure.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the fields of `r`.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`field_frames`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+"""
+function reader_frames(r::MeanReturnRiskRatio, path::AbstractString, refit::Bool)
+    return field_frames(r, path, refit)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether [`MeanReturnRiskRatio`](@ref) `r` requires previous portfolio weights.

@@ -1085,7 +1085,7 @@ end
 
 Return the returns on which the outer problem of a meta-optimiser scores its sub-portfolios, in the raw frame of `rd`.
 
-The outer problem reads the raw returns of the sub-portfolios, as a cross-validated prediction reads them, and the readers of the outer optimiser state their own sources. The returns of the Prior Result are in the frame that the prior of the meta-optimiser was fitted in. When that prior states `x_src = ExcessSource()`, the frame is the excess over the benchmark, so this function adds the benchmark back. A precomputed Prior Result states no source, so the outer problem reads it as raw.
+The outer problem reads the raw returns of the sub-portfolios, as a cross-validated prediction reads them, and the readers of the outer optimiser state their own sources. The returns of the Prior Result are in the frame that the prior of the meta-optimiser was fitted in, and the Prior Result records that frame, see [`prior_returns_source`](@ref). When it records `ExcessSource()`, the frame is the excess over the benchmark, so this function adds the benchmark back. The source comes from the Result and not from the estimator, because three paths put a Result in place of the prior estimator: the read-out of an online fold, a prior step of a [`Pipeline`](@ref), and a Prior Result that the caller computed. A Prior Result that a returns-matrix method of [`prior`](@ref) fitted records no source, so the outer problem reads it as raw.
 
 # Mathematical definition
 
@@ -1108,7 +1108,7 @@ Where:
 
   - `pr`: The Prior Result of the meta-optimiser.
   - `rd`: The returns data of the meta-optimiser, on the observations of `pr`.
-  - `x_src`: The source that the prior estimator of the meta-optimiser states, see [`returns_source`](@ref).
+  - `x_src`: The source that `pr` records, see [`prior_returns_source`](@ref).
 
 # Returns
 
@@ -1175,7 +1175,7 @@ With Fees, [`calc_net_returns`](@ref) subtracts the fee of sub-portfolio ``k`` f
 Without folds:
 
  1. View `rd` onto the observations the Prior Result answers on with [`outer_prior_rows`](@ref). Prepare the returns data of the outer problem from it with [`prepare_outer_rd`](@ref) under the rule `opt.pcol`, giving `nb`, `B`, `iv`, `ivpa`, `pnl` and the buffer `X`.
- 2. Take the returns that the sub-portfolios are scored on with [`outer_returns_source`](@ref) under the source of `opt.pe`, giving `src`. It is the Prior Result, or the returns of the Prior Result with the benchmark added back when `opt.pe` states `x_src = ExcessSource()`.
+ 2. Take the returns that the sub-portfolios are scored on with [`outer_returns_source`](@ref) under the source that `pr` records, giving `src`. It is the Prior Result, or the returns of the Prior Result with the benchmark added back when `pr` records `x_src = ExcessSource()`.
  3. For each inner result `res` in `resi`, write its net returns with [`calc_net_returns`](@ref) to column `i` of `X`, on `src` and Fees viewed onto sub-portfolio `i`.
  4. Build the [`ReturnsResult`](@ref), with the asset names `_1`, `_2`, … and the factors and timestamps of `rd`.
 
@@ -1215,7 +1215,7 @@ function predict_outer_returns(::Option{<:OptimisationCrossValidation}, opt,
                                resi::VecOpt)
     rd = outer_prior_rows(rd, pr)
     nb, B, iv, ivpa, pnl, X = prepare_outer_rd(rd, wi, opt.pcol)
-    src = outer_returns_source(pr, rd, returns_source(opt.pe))
+    src = outer_returns_source(pr, rd, prior_returns_source(pr))
     for (i, res) in enumerate(resi)
         X[:, i] = calc_net_returns(res, sub_portfolio_view(u, src, i),
                                    sub_portfolio_view(u, fees, i))

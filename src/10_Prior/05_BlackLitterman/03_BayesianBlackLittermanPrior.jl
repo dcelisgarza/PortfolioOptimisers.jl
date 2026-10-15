@@ -147,7 +147,8 @@ BayesianBlackLittermanPrior
              │            │        tgt ┼ LinearModel
              │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
              │            │     choice ┼ BatchChoice()
-             │            │   included ┴ nothing
+             │            │   included ┼ nothing
+             │            │      x_src ┴ nothing
              │         ve ┼ SimpleVariance
              │            │          me ┼ SimpleExpectedReturns
              │            │             │   w ┴ nothing

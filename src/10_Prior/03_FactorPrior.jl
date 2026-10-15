@@ -96,7 +96,8 @@ FactorPrior
            │        tgt ┼ LinearModel
            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
            │     choice ┼ BatchChoice()
-           │   included ┴ nothing
+           │   included ┼ nothing
+           │      x_src ┴ nothing
         ve ┼ SimpleVariance
            │          me ┼ SimpleExpectedReturns
            │             │   w ┴ nothing
@@ -635,7 +636,8 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
                          rr = expand_regression(rr, cmsk), fpr = f_prior)
 end
 """
-    prior(pe::FactorPrior, rd::ReturnsResult; kwargs...) -> LowOrderPrior
+    prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1)
+        -> LowOrderPrior
 
 Fit a Factor Prior from a [`ReturnsResult`](@ref).
 
@@ -646,13 +648,15 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
  1. Check that `rd` carries asset returns and factor returns.
  2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `pe.x_src = ExcessSource()`. The factor prior, the regression and the reconstruction then read the same observations.
  3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
- 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `rd.ts` as keyword arguments alongside `kwargs`, and `dims = 1` last, because a `ReturnsResult` holds its observations along the rows.
+ 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `rd.ts` and `strict` as keyword arguments, and `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
+ 5. Record `pe.x_src` in the prior result with [`stamp_returns_source`](@ref).
 
 # Arguments
 
   - `pe`: Factor prior estimator.
   - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and factor returns in `rd.F`.
-  - `kwargs...`: Additional keyword arguments passed to the returns-matrix method.
+  - $(arg_dict[:strict_prior_rd])
+  - $(arg_dict[:dims_rd])
 
 # Validation
 
@@ -672,12 +676,13 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
   - [`ReturnsResult`](@ref)
   - [`Regression`](@ref)
 """
-function prior(pe::FactorPrior, rd::ReturnsResult; kwargs...)
+function prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
     rd = shared_series_view(rd, pe.x_src, true)
-    return prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
-                 ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, kwargs..., dims = 1)
+    pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
+               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, strict = strict, dims = 1)
+    return stamp_returns_source(pr, pe)
 end
 
 export FactorPrior

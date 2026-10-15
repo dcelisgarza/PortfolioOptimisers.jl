@@ -2488,6 +2488,28 @@ end
         end
     end
 
+    @testset "A measure that holds a return term or a measure joins the walk (#1701, #1705)" begin
+        noframes(fr) = !fr.excess && isempty(fr.raw)
+        un = DeltaUncertaintySet(; pe = EmpiricalPrior())
+        usv = UncertaintySetVariance(; ucs = un)
+        art = ArithmeticReturn(; ucs = un)
+        @test PO.reader_frames(ExpectedReturn(; rt = art), "r", false).raw ==
+              ["r.rt.ucs.pe"]
+        @test PO.reader_frames(ExpectedReturnRiskRatio(; rt = art, rk = usv), "r", false).raw ==
+              ["r.rt.ucs.pe", "r.rk.ucs.pe"]
+        @test PO.reader_frames(MeanReturnRiskRatio(; rk = usv), "r", false).raw ==
+              ["r.rk.ucs.pe"]
+        @test noframes(PO.reader_frames(ExpectedReturn(), "r", false))
+        # The `pe` of a moment measure fits on the returns of the Prior Result that the
+        # measure receives, so it states no source of its own.
+        for T in (Skewness, Kurtosis, VarianceSkewKurtosis),
+            x_src in (DataSource(), ExcessSource())
+
+            @test_throws ArgumentError T(; pe = EmpiricalPrior(; x_src = x_src))
+            @test isa(T(; pe = EmpiricalPrior()), T)
+        end
+    end
+
     @testset "Validation" begin
         for T in (Variance, StandardDeviation, UncertaintySetVariance)
             @test_throws DimensionMismatch T(; sigma = rand(3, 4))

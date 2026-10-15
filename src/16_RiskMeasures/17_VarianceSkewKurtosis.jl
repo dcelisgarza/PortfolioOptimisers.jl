@@ -205,6 +205,7 @@ Skewness
     function Skewness(settings::MaxRiskMeasureSettings, ve::AbstractVarianceEstimator,
                       sk::Option{<:SkSlot}, w::Option{<:ObsWeights}, mu::Option{<:MuSlot},
                       pe::Option{<:AbstractPriorEstimator})
+        assert_returns_source(returns_source(pe), (nothing,), :Skewness, "pe.x_src")
         if isa(sk, MatNum)
             @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
             @argcheck(size(sk, 1)^2 == size(sk, 2),
@@ -627,6 +628,8 @@ VarianceSkewKurtosis
     pe
     function VarianceSkewKurtosis(settings::RiskMeasureSettings, vr::Variance, sk::Skewness,
                                   kt::Kurtosis, pe::Option{<:AbstractPriorEstimator})
+        assert_returns_source(returns_source(pe), (nothing,), :VarianceSkewKurtosis,
+                              "pe.x_src")
         vr = no_risk_expr_risk_measure(vr)
         sk = no_risk_expr_risk_measure(sk)
         kt = no_risk_expr_risk_measure(kt)

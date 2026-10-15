@@ -26,6 +26,33 @@ function reader_frames(pe::AbstractPriorEstimator, path::AbstractString, ::Bool)
     return source_frames(returns_source(pe), path, true)
 end
 """
+    reader_frames(pr::AbstractPriorResult, path::AbstractString, refit::Bool)
+        -> ReturnsFrames
+
+[`AbstractPriorResult`](@ref) method of [`reader_frames`](@ref): the frames that a Prior Result in the place of a prior adds to the group of its optimiser.
+
+A Prior Result records the source that its prior stated, see [`prior_returns_source`](@ref). So a Result that the online read-out, a prior step of a [`Pipeline`](@ref) or the caller puts in the place of the prior keeps the frame of that prior. The method passes the recorded source to [`source_frames`](@ref) with `raw = false`. A Result at `nothing` then adds nothing: it was fitted before the head was built, so the head cannot warn that its source was forgotten.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit]) A Prior Result does not read it.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the Prior Result.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`source_frames`](@ref)
+  - [`prior_returns_source`](@ref)
+"""
+function reader_frames(pr::AbstractPriorResult, path::AbstractString, ::Bool)
+    return source_frames(prior_returns_source(pr), path, false)
+end
+"""
     picked_returns_data(pr::Pr_RR, rd::Option{<:ReturnsResult}) -> Option{<:ReturnsResult}
 
 Return the returns data that a graph verb received, or `nothing` when it received none.
@@ -403,6 +430,27 @@ function implied_volatility_picker(X::MatNum, iv::Option{<:MatNum})
     return view(iv, (size(iv, 1) - size(X, 1) + 1):size(iv, 1), :)
 end
 """
+    graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
+                        dims::Integer = 1) -> Nothing
+
+Refuse a keyword that a graph verb over a [`Pr_RR`](@ref) does not forward.
+
+A graph verb forwards its keywords to the asset-returns method, and the moment estimators of that method ignore a keyword that they do not know. So a keyword that the library removed would run with no error. Each graph verb over a `Pr_RR` calls this function with its own keywords, so an unknown keyword raises the `MethodError` of the language. The four keywords are the ones that the callers of the library forward: `ivpa` to an implied volatility estimator, `branchorder` to a hierarchical clustering, `strict` to a centrality constraint, and `dims`, which the call overrides with `dims = 1`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`clusterise`](@ref)
+  - [`centrality_constraints`](@ref)
+"""
+function graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
+                             dims::Integer = 1)
+    return nothing
+end
+"""
     clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
 
 Clusterise asset or factor returns from a prior result using a clustering estimator.
@@ -420,7 +468,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments passed to the clustering estimator.
+  - `kwargs...`: Additional keyword arguments passed to the clustering estimator. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -437,6 +485,7 @@ Clusterise asset or factor returns from a prior result using a clustering estima
 function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
                     rd::Option{<:ReturnsResult} = nothing, iv::Option{<:MatNum} = nothing,
                     kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(cle))
     assert_graph_readable(cle, X)
     return clusterise(cle, X; pr = pr, rd = rd, iv = implied_volatility_picker(X, iv),
@@ -461,7 +510,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
+  - `kwargs...`: Additional keyword arguments passed to the estimator. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -478,6 +527,7 @@ Compute the phylogeny matrix from asset returns in a prior result using a networ
 """
 function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
                           iv::Option{<:MatNum} = nothing, kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(pl))
     assert_graph_readable(pl, X)
     return phylogeny_matrix(pl, X; pr = pr, rd = rd, iv = implied_volatility_picker(X, iv),
@@ -501,7 +551,7 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
+  - `kwargs...`: Additional keyword arguments passed to the estimator. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -518,6 +568,7 @@ Compute phylogeny constraints from asset returns in a prior result using a phylo
 function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
                                rd::Option{<:ReturnsResult} = nothing,
                                iv::Option{<:MatNum} = nothing, kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(plc))
     assert_graph_readable(plc, X)
     return phylogeny_constraints(plc, X; pr = pr, rd = rd,
@@ -541,7 +592,7 @@ Compute the centrality vector for a centrality estimator and prior result.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments passed to the asset-returns method. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -558,6 +609,7 @@ Compute the centrality vector for a centrality estimator and prior result.
 function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing,
                            iv::Option{<:MatNum} = nothing, kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(cte))
     assert_graph_readable(cte, X)
     return centrality_vector(cte, X; pr = pr, rd = rd,
@@ -583,7 +635,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments passed to the asset-returns method. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -601,6 +653,7 @@ Compute the centrality vector for a network or clustering estimator and centrali
 function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
                            rd::Option{<:ReturnsResult} = nothing,
                            iv::Option{<:MatNum} = nothing, kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(pl))
     assert_graph_readable(pl, X)
     return centrality_vector(pl, ct, X; pr = pr, rd = rd,
@@ -627,7 +680,7 @@ Compute the weighted average centrality for a network or phylogeny result.
   - `w`: Portfolio weights vector.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments passed to the asset-returns method. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -667,7 +720,7 @@ The estimator method picks between the results itself, where the network-and-alg
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: Additional keyword arguments passed to the asset-returns method. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -684,6 +737,7 @@ The estimator method picks between the results itself, where the network-and-alg
 function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
                             rd::Option{<:ReturnsResult} = nothing,
                             iv::Option{<:MatNum} = nothing, kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(cte))
     assert_graph_readable(cte, X)
     return average_centrality(cte, w, X; pr = pr, rd = rd,
@@ -709,7 +763,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
+  - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -728,6 +782,7 @@ This function computes the phylogeny matrix from the asset returns in the prior 
 function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
                          rd::Option{<:ReturnsResult} = nothing,
                          iv::Option{<:MatNum} = nothing, kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(pl))
     assert_graph_readable(pl, X)
     return asset_phylogeny(pl, w, X; pr = pr, rd = rd,
@@ -758,7 +813,7 @@ Each constraint of a vector states its own source, so two constraints of one vec
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd]) Read for `X` under the source of the reader, and passed on to the estimator tree.
   - $(arg_dict[:iv_x_src])
-  - `kwargs...`: Additional keyword arguments passed to the estimator. `strict` is read by the asset-returns variant, which reports a dropped zero centrality vector through it.
+  - `kwargs...`: Additional keyword arguments passed to the estimator. `strict` is read by the asset-returns variant, which reports a dropped zero centrality vector through it. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Returns
 
@@ -805,7 +860,7 @@ Compute the centrality constraints of `ccs` from the returns matrix of the sourc
   - $(arg_dict[:rd])
   - $(arg_dict[:iv_x_src])
   - $(arg_dict[:x_src_read])
-  - `kwargs...`: Additional keyword arguments passed to the asset-returns variant.
+  - `kwargs...`: Additional keyword arguments passed to the asset-returns variant. An unknown keyword raises a `MethodError`, see [`graph_verb_keywords`](@ref).
 
 # Validation
 
@@ -823,6 +878,7 @@ Compute the centrality constraints of `ccs` from the returns matrix of the sourc
 function centrality_constraints_from(ccs::CC_VecCC, pr::Pr_RR, rd::Option{<:ReturnsResult},
                                      iv::Option{<:MatNum},
                                      x_src::Option{<:AbstractReturnsSource}; kwargs...)
+    graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, x_src)
     assert_graph_readable(ccs, X)
     return centrality_constraints(ccs, X; pr = pr, rd = rd,
@@ -908,4 +964,75 @@ function refits_regression(pe::Union{<:HighOrderPriorEstimator, <:BlackLitterman
 end
 function refits_regression(pe::OpinionPoolingPrior)
     return refits_regression(pe.pe2)
+end
+"""
+    stamp_returns_source(pr::LowOrderPrior, pe) -> LowOrderPrior
+    stamp_returns_source(pr::HighOrderPrior, pe) -> HighOrderPrior
+    stamp_returns_source(pr::AbstractPriorResult, pe) -> AbstractPriorResult
+
+Record in a Prior Result the source that its prior estimator states.
+
+[`prior`](@ref) calls this function when it fits on a [`ReturnsResult`](@ref), and when it reads out the state of an online fold. A consumer that receives the Result in place of the estimator then reads the frame of `X` from the Result, see [`outer_returns_source`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. [`LowOrderPrior`](@ref): read the source of `pe` with [`returns_source`](@ref). Return `pr` when its `x_src` is already that source, and otherwise rebuild it with [`reconstruct_prior`](@ref) and the new `x_src`.
+ 2. [`HighOrderPrior`](@ref): stamp the `LowOrderPrior` that it wraps, and rebuild the outer Result around it. The outer Result answers `x_src` from the inner one.
+ 3. A Prior Result of another type has no field for the source, so it is returned unchanged, and a consumer reads it as raw returns.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+  - $(arg_dict[:pe])
+
+# Returns
+
+  - `pr::AbstractPriorResult`: The Prior Result, with the source of `pe` recorded when its type holds the field.
+
+# Related
+
+  - [`prior_returns_source`](@ref)
+  - [`returns_source`](@ref)
+  - [`LowOrderPrior`](@ref)
+"""
+function stamp_returns_source(pr::LowOrderPrior, pe)
+    x_src = returns_source(pe)
+    return pr.x_src === x_src ? pr : reconstruct_prior(pr, (; x_src = x_src))
+end
+function stamp_returns_source(pr::HighOrderPrior, pe)
+    inner = stamp_returns_source(pr.pr, pe)
+    return inner === pr.pr ? pr : reconstruct_prior(pr, (; pr = inner))
+end
+function stamp_returns_source(pr::AbstractPriorResult, ::Any)
+    return pr
+end
+"""
+    prior_returns_source(pr::Union{<:LowOrderPrior, <:HighOrderPrior})
+        -> Option{<:AbstractReturnsSource}
+    prior_returns_source(pr::AbstractPriorResult) -> Nothing
+
+Return the source that a Prior Result records, see [`stamp_returns_source`](@ref).
+
+A Prior Result of a type that the library does not ship records no source, so the answer is `nothing`, and a consumer reads its `X` as raw returns.
+
+# Arguments
+
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `x_src::Option{<:AbstractReturnsSource}`: The `x_src` of the [`LowOrderPrior`](@ref), or `nothing`.
+
+# Related
+
+  - [`stamp_returns_source`](@ref)
+  - [`outer_returns_source`](@ref)
+"""
+function prior_returns_source(pr::Union{<:LowOrderPrior, <:HighOrderPrior})
+    return pr.x_src
+end
+function prior_returns_source(::AbstractPriorResult)
+    return nothing
 end

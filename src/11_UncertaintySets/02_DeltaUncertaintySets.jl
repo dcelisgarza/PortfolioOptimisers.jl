@@ -50,7 +50,8 @@ DeltaUncertaintySet
          │           me ┼ SimpleExpectedReturns
          │              │   w ┴ nothing
          │      horizon ┼ nothing
-         │   fill_limit ┴ nothing
+         │   fill_limit ┼ nothing
+         │        x_src ┴ nothing
      dmu ┼ Float64: 0.1
   dsigma ┴ Float64: 0.1
 ```

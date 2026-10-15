@@ -2,9 +2,10 @@
 The outputs of every configuration that reads the Excess Frame, pinned as fixed values before
 `x_src` takes over `brt` (#1679, map #1678).
 
-The values were recorded on `dev` with today's `brt`. A migration build changes the helpers in
-the section "The doors of the Excess Frame" and never the pins: the helpers are the only lines
-of this file that spell `brt`. A migration closes only when every pin passes unchanged.
+The values were recorded on `dev` with the `brt` of that time. The migration (#1705) changed
+the helpers in the section "The doors of the Excess Frame" and never the pins. Five cases pass a
+reader to an outer head, which no helper builds, so they route it through `excess_readers`. A
+migration closes only when every pin passes unchanged.
 
 Each case returns a vector of numbers. A case marked `:solved` reads a conic solve and compares
 to `atol = 5e-5`; a case marked `:exact` reads closed-form algebra and compares to `rtol = 1e-8`.
@@ -80,27 +81,86 @@ Pipeline), which the decision tickets of the map can change.
     ocv = OnlineIndexWalkForward(60, 5; purged_size = 2)
     cfe_columns(a) = vcat(finite(a.qlike), finite(a.mahalanobis_ratio), finite(a.frobenius))
 
-    # --- The doors of the Excess Frame: the only lines of this file that spell `brt`. ---
-    excess_jump(; kw...) = JuMPOptimiser(; slv = slv, brt = true, kw...)
-    excess_hierarchical(; kw...) = HierarchicalOptimiser(; brt = true, kw...)
-    excess_inverse_volatility() = InverseVolatility(; brt = true)
-    excess_nested(; kw...) = NestedClustered(; brt = true, kw...)
-    excess_stacking(; kw...) = Stacking(; brt = true, kw...)
-    excess_subsets(; kw...) = SubsetResampling(; brt = true, kw...)
-    excess_prior(pe, r) = prior(pe, r; brt = true)
-    excess_ucs(uc, r) = ucs(uc, r; brt = true)
-    excess_exposure(ece, s, r) = linear_constraints(ece, s; rd = r, brt = true)
-    excess_shared_view(r) = po.shared_series_view(r, true, false)
-    excess_step(; kw...) = PipelineStep(; brt = true, kw...)
-    excess_cfe(est, r, c) = covariance_forecast_evaluation(est, r, c; brt = true,
+    # --- The doors of the Excess Frame. `brt` is gone (#1705): each outermost reader states
+    # its own source, and these helpers give each one the source that `brt = true` on its
+    # head gave it. A prior reads `X - B`. A graph reader reads the source that the old
+    # `x_src` of its head named: `:prior` is `PriorSource()`, and `:data`, the default, is
+    # `ExcessSource()`. A regression reader refits on `X - B` where the prior of its head
+    # gives no loadings, and keeps `nothing`, which reads the loadings of the prior,
+    # where it gives them. The walk stops at the first reader, so an inner reader keeps
+    # `nothing`, and it stops at an inner optimiser, which `brt` never reached. ---
+    excess_reader(x, ::Any, ::Any) = x
+    function excess_reader(v::AbstractVector, g, rg)
+        u = map(y -> excess_reader(y, g, rg), v)
+        return all(map(===, u, v)) ? v : u
+    end
+    function excess_reader(pe::po.AbstractPriorEstimator, ::Any, ::Any)
+        return po.rebuild_estimator(pe, (; x_src = ExcessSource()))
+    end
+    function excess_reader(x::Union{<:ClustersEstimator, <:NetworkEstimator,
+                                    <:SemiDefinitePhylogenyEstimator,
+                                    <:IntegerPhylogenyEstimator, <:CentralityConstraint}, g,
+                           ::Any)
+        return po.rebuild_estimator(x, (; x_src = g))
+    end
+    function excess_reader(re::Union{<:StepwiseRegression, <:DimensionReductionRegression},
+                           ::Any, rg)
+        return po.rebuild_estimator(re, (; x_src = rg))
+    end
+    function excess_reader(x::Union{<:ArithmeticReturn, <:UncertaintySetVariance,
+                                    <:po.AbstractUncertaintySetEstimator,
+                                    <:ExposureConstraintEstimator, <:FactorSpace,
+                                    <:FactorRiskBudgeting}, g, rg)
+        return excess_fields(x, g, rg)
+    end
+    function excess_fields(x, g, rg)
+        fns = fieldnames(typeof(x))
+        vals = map(f -> excess_reader(getfield(x, f), g, rg), fns)
+        moved = Tuple(f for (f, v) in zip(fns, vals) if v !== getfield(x, f))
+        isempty(moved) && return x
+        return po.rebuild_estimator(x,
+                                    NamedTuple{moved}(Tuple(getindex(vals,
+                                                                     findfirst(==(f), fns))
+                                                            for f in moved)))
+    end
+    function excess_head(x, xs::Symbol = :data)
+        rg = po.refits_regression(x.pe) ? ExcessSource() : nothing
+        return excess_fields(x, xs === :prior ? PriorSource() : ExcessSource(), rg)
+    end
+    # A reader that a case passes to an outer head, beside a head over an `EmpiricalPrior`.
+    excess_readers(x) = excess_reader(x, ExcessSource(), ExcessSource())
+    excess_jump(; x_src = :data, kw...) = excess_head(JuMPOptimiser(; slv = slv, kw...),
+                                                      x_src)
+    function excess_hierarchical(; x_src = :data, kw...)
+        return excess_head(HierarchicalOptimiser(; kw...), x_src)
+    end
+    excess_inverse_volatility() = excess_head(InverseVolatility())
+    excess_nested(; x_src = :data, kw...) = excess_head(NestedClustered(; kw...), x_src)
+    excess_stacking(; kw...) = excess_head(Stacking(; kw...))
+    excess_subsets(; kw...) = excess_head(SubsetResampling(; kw...))
+    excess_prior(pe, r) = prior(excess_readers(pe), r)
+    excess_ucs(uc, r) = ucs(excess_readers(uc), r)
+    excess_exposure(ece, s, r) = linear_constraints(excess_readers(ece), s; rd = r)
+    excess_shared_view(r) = po.shared_series_view(r, ExcessSource(), false)
+    excess_step(; est, kw...) = PipelineStep(; est = excess_readers(est), kw...)
+    excess_cfe(est, r, c) = covariance_forecast_evaluation(est, r, c;
+                                                           x_src = ExcessSource(),
                                                            store_forecasts = true)
-    excess_selection(; kw...) = OnlinePortfolioSelection(; brt = true, kw...)
-    excess_risk_loss(; kw...) = RiskLoss(; brt = true, kw...)
-    excess_programme_set(; kw...) = ProgrammeAllocationSet(; slv = slv, brt = true, kw...)
-    excess_loss_control(; kw...) = ShortTermLossControlPortfolio(; slv = slv, brt = true,
-                                                                 kw...)
-    excess_ensemble(; kw...) = LowDimensionEnsemblePortfolio(; N = N, slv = slv, brt = true,
-                                                             kw...)
+    excess_selection(; kw...) = OnlinePortfolioSelection(; x_src = ExcessSource(), kw...)
+    excess_risk_loss(; kw...) = excess_head(RiskLoss(; kw...))
+    excess_programme_set(; kw...) = excess_head(ProgrammeAllocationSet(; slv = slv, kw...))
+    function excess_loss_control(; kw...)
+        return ShortTermLossControlPortfolio(; slv = slv,
+                                             pe = EmpiricalPrior(; ce = RankOneCovariance(),
+                                                                 x_src = ExcessSource()),
+                                             kw...)
+    end
+    function excess_ensemble(; kw...)
+        return LowDimensionEnsemblePortfolio(; N = N, slv = slv,
+                                             pe = LowDimensionEnsemblePrior(;
+                                                                            x_src = ExcessSource()),
+                                             kw...)
+    end
 
     # --- The cases: `(key, tol, f)`, where `f()` gives the vector that the pin holds. ---
     cases = Tuple{String, Symbol, Function}[]
@@ -121,9 +181,9 @@ Pipeline), which the decision tickets of the map can change.
                       r))
         case!("MeanRisk, UncertaintySetVariance with its own prior, $b", :solved,
               () -> w(MeanRisk(;
-                               r = UncertaintySetVariance(;
-                                                          ucs = DeltaUncertaintySet(;
-                                                                                    pe = EmpiricalPrior())),
+                               r = excess_readers(UncertaintySetVariance(;
+                                                                         ucs = DeltaUncertaintySet(;
+                                                                                                   pe = EmpiricalPrior()))),
                                opt = excess_jump()), r))
         case!("MeanRisk, an exposure constraint that refits the loadings, $b", :solved,
               () -> w(MeanRisk(; opt = excess_jump(; lcse = exposure(), sets = sets)), r))
@@ -145,26 +205,27 @@ Pipeline), which the decision tickets of the map can change.
               () -> w(RiskBudgeting(; opt = excess_jump()), r))
         case!("RiskBudgeting, factor risk budgeting, $b", :solved,
               () -> w(RiskBudgeting(;
-                                    rba = FactorRiskBudgeting(;
-                                                              re = DimensionReductionRegression()),
+                                    rba = excess_readers(FactorRiskBudgeting(;
+                                                                             re = DimensionReductionRegression())),
                                     opt = excess_jump()), r))
         case!("RelaxedRiskBudgeting, $b", :solved,
               () -> w(RelaxedRiskBudgeting(; opt = excess_jump()), r))
         case!("RelaxedRiskBudgeting, factor risk budgeting, $b", :solved,
               () -> w(RelaxedRiskBudgeting(;
-                                           rba = FactorRiskBudgeting(;
-                                                                     re = DimensionReductionRegression()),
+                                           rba = excess_readers(FactorRiskBudgeting(;
+                                                                                    re = DimensionReductionRegression())),
                                            opt = excess_jump()), r))
         case!("FactorRiskContribution, $b", :solved,
-              () -> w(FactorRiskContribution(; opt = excess_jump()), r))
+              () -> w(FactorRiskContribution(; re = excess_readers(StepwiseRegression()),
+                                             opt = excess_jump()), r))
         case!("NearOptimalCentering, $b", :solved,
               () -> w(NearOptimalCentering(; opt = excess_jump()), r))
         case!("NearOptimalCentering, UncertaintySetVariance with its own prior, $b",
               :solved,
               () -> w(NearOptimalCentering(;
-                                           r = UncertaintySetVariance(;
-                                                                      ucs = DeltaUncertaintySet(;
-                                                                                                pe = EmpiricalPrior())),
+                                           r = excess_readers(UncertaintySetVariance(;
+                                                                                     ucs = DeltaUncertaintySet(;
+                                                                                                               pe = EmpiricalPrior()))),
                                            opt = excess_jump()), r))
 
         # The hierarchical heads. A FactorPrior gives a prior `X` that differs from the

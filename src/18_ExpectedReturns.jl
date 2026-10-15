@@ -852,6 +852,35 @@ end
 # derived recursion resolves a vector element by element.
 deferred_slots(r::ExpectedReturnRiskRatio) = (; rt = r.rt, rk = r.rk)
 """
+    reader_frames(r::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}, path::AbstractString,
+                  refit::Bool) -> ReturnsFrames
+
+Return the frames of the readers inside a risk measure that holds a return term, for the frame walk of a head.
+
+The return term `rt` can hold an uncertainty set with a prior of its own, see [`ArithmeticReturn`](@ref), and the risk side `rk` of [`ExpectedReturnRiskRatio`](@ref) can hold a risk measure with a reader. Each of those readers belongs to the group of the head that holds the measure, so the method walks every field of `r` with [`field_frames`](@ref). A field that holds no reader adds nothing.
+
+# Arguments
+
+  - `r`: The risk measure.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the fields of `r`.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`field_frames`](@ref)
+  - [`ExpectedReturn`](@ref)
+  - [`ExpectedReturnRiskRatio`](@ref)
+"""
+function reader_frames(r::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio},
+                       path::AbstractString, refit::Bool)
+    return field_frames(r, path, refit)
+end
+"""
     expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult,
                   fees::Option{<:Fees} = nothing; kwargs...)
 

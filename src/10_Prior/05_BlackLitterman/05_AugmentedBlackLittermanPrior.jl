@@ -240,7 +240,8 @@ AugmentedBlackLittermanPrior
                │        tgt ┼ LinearModel
                │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
                │     choice ┼ BatchChoice()
-               │   included ┴ nothing
+               │   included ┼ nothing
+               │      x_src ┴ nothing
        a_views ┼ LinearConstraintEstimator
                │   val ┼ Vector{String}: ["A == 0.03", "B + C == 0.04"]
                │   key ┴ nothing

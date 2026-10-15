@@ -373,7 +373,7 @@ end
         @test panel_field(rd.pnl, "sector").codes ==
               panel_field(ppnl, "sector").codes[2:end, :]
         @test rd.pnl.amsk == prices_to_returns(ic.X).pnl.amsk
-        rp = PO.prior_step_returns(rd, true)
+        rp = PO.prior_step_returns(rd, ExcessSource())
         @test rp.pnl === rd.pnl
         @test isequal(rp.X, rd.X .- rd.B)
         @test isequal(benchmark_relative_returns(rd, ExcessSource()), rd.X .- rd.B)

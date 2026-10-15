@@ -531,4 +531,4 @@ function warn_raw_readers(head, fr::ReturnsFrames = group_frames(head))::Nothing
 end
 
 export DataSource, ExcessSource, PriorSource
-public AbstractReturnsSource, source_frames
+public AbstractReturnsSource, source_frames, returns_source

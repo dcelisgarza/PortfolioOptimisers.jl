@@ -170,7 +170,8 @@ NormalUncertaintySet
          │           me ┼ SimpleExpectedReturns
          │              │   w ┴ nothing
          │      horizon ┼ nothing
-         │   fill_limit ┴ nothing
+         │   fill_limit ┼ nothing
+         │        x_src ┴ nothing
      alg ┼ BoxUncertaintySetAlgorithm()
    n_sim ┼ Int64: 3000
        q ┼ Float64: 0.05

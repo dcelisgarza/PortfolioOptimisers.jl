@@ -397,3 +397,36 @@ These results keep their numbers, but their number type changed:
 - **`Regression`** and **`CrossSectionalFactorModel`** have the fields `edof` and `ediv`, so their positional constructors take two more arguments.
 - **`FactorRiskBudgeting`** has a `hedge` field, `false` by default, so its positional constructor takes one more argument.
 - **`FiniteAllocationInput`** has a field `ca`, the collateral algorithm, so its positional constructor takes one more argument.
+
+## From v0.32 to v0.33
+
+v0.33 removes `brt`. Each reader of the returns now states the returns that it fits on in its own `x_src` field: `nothing`, `DataSource()`, `ExcessSource()` or `PriorSource()`. `ExcessSource()` reads `X - B`, the returns in excess of the benchmark, as `brt = true` did. A head holds no source and passes none to its readers, so you state the source on each reader. The `Symbol` field `x_src` of `JuMPOptimiser`, `HierarchicalOptimiser` and `NestedClustered` is gone too, and a clustering, phylogeny or centrality estimator at the default reads the returns data, where v0.32 read the prior. A call that passes `brt` raises a `MethodError`.
+
+### [Names that were removed](@id migration-0-33-removed)
+
+| Removed | Write instead |
+| --- | --- |
+| `brt` of `JuMPOptimiser`, `HierarchicalOptimiser`, `InverseVolatility`, `NestedClustered`, `Stacking` and `SubsetResampling` | State `x_src = ExcessSource()` on each reader in the head: the prior, `JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()))`, and each clustering, phylogeny, centrality or regression estimator and each prior of an uncertainty set that must read `X - B`. A regression estimator at `nothing` reads the loadings of a prior that gives them, as it did under `brt = true`. A head that holds a reader at `nothing` beside a reader at `ExcessSource()` warns once when you build it. State `DataSource()` on the raw reader to silence the warning. An inner optimiser, a fallback and the outer optimiser of a meta-optimiser state their own sources, as they applied their own `brt`. |
+| `brt` of `PipelineStep` | State the source on the estimator of the step: `PipelineStep(; est = EmpiricalPrior(; x_src = ExcessSource()), writes = :prior)`. |
+| The `brt` keyword of `prior`, `ucs`, `mu_ucs`, `sigma_ucs` and `linear_constraints` | State the source on the reader: `prior(EmpiricalPrior(; x_src = ExcessSource()), rd)`, `ucs(DeltaUncertaintySet(; pe = EmpiricalPrior(; x_src = ExcessSource())), rd)`, and `FactorSpace(; re = StepwiseRegression(; x_src = ExcessSource()))` in an exposure constraint. |
+| The `brt` keyword of `covariance_forecast_evaluation`, and the `brt` field of `CovarianceForecastEvaluationResult` | `covariance_forecast_evaluation(est, rd, cv; x_src = ExcessSource())`. The verb states the source, because the estimator that it evaluates receives a matrix. So the verb refuses an estimator that states a source. The field of the Result is `x_src`, which is `DataSource()` or `ExcessSource()`. |
+| `brt` of `OnlinePortfolioSelection` | `OnlinePortfolioSelection(; x_src = ExcessSource())`. The head steps on `1 + r - b`, and every reader of the rows inside its rule reads `X - B`. |
+| `brt` of `RiskLoss`, `ProgrammeAllocationSet`, `ShortTermLossControlPortfolio` and `LowDimensionEnsemblePortfolio` | State the source on the prior: `RiskLoss(; pe = EmpiricalPrior(; x_src = ExcessSource()))`, `ShortTermLossControlPortfolio(; pe = EmpiricalPrior(; ce = RankOneCovariance(), x_src = ExcessSource()))`, and `LowDimensionEnsemblePortfolio(; pe = LowDimensionEnsemblePrior(; x_src = ExcessSource()))`. A `ProgrammeAllocationSet` also needs the source on its phylogeny and centrality estimators. |
+| The `x_src` field, `:prior` or `:data`, of `JuMPOptimiser`, `HierarchicalOptimiser` and `NestedClustered`, and the `x_src` keyword of `clusterise` and the other graph verbs | State the source on the graph reader. `x_src = :prior` becomes `PriorSource()`: `HierarchicalOptimiser(; cle = ClustersEstimator(; x_src = PriorSource()))` and `JuMPOptimiser(; ple = SemiDefinitePhylogenyEstimator(; x_src = PriorSource()))`. `x_src = :data` becomes `nothing` or `DataSource()`. A graph verb reads the source of its estimator: `clusterise(ClustersEstimator(; x_src = PriorSource()), pr; rd = rd)`. |
+| `benchmark_relative_returns(rd, brt::Bool)` | `benchmark_relative_returns(rd, ExcessSource())` for `true`, and `benchmark_relative_returns(rd, nothing)` for `false`. |
+
+### [Calls that now raise](@id migration-0-33-raises)
+
+| Call | v0.32 | v0.33 |
+| --- | --- | --- |
+| A keyword other than `strict` and `dims` on `prior` over a `ReturnsResult`, for example `prior(pe, rd; brt = true)` | Ran, and ignored the keyword. | Raises a `MethodError`. |
+| A keyword other than `dims` on `ucs`, `mu_ucs` or `sigma_ucs` over a `ReturnsResult` | Ran, and ignored the keyword. | Raises a `MethodError`. |
+
+### [Results that move](@id migration-0-33-numbers)
+
+- **A clustering, phylogeny or centrality estimator at the default reads the returns data `rd.X`.** v0.32 read the `X` of the prior, `x_src = :prior`. The two differ when the prior changes its returns: a factor prior gives a reconstruction of rank equal to the number of factors, a prior with a scenario cap keeps fewer rows, and a prior that fills a gap writes a value where the returns data holds none. State `x_src = PriorSource()` on the graph reader to keep the v0.32 numbers.
+
+### [If you extend the library](@id migration-0-33-extending)
+
+- **A prior of your own** states its source with a method of `returns_source`, which is now public. A prior with no method reads the raw returns.
+- **`LowOrderPrior`** has a field `x_src` after `fpr`, so its positional constructor takes one more argument. `prior` over a `ReturnsResult`, and the read-out of an online fold, record in it the source of the prior. A returns-matrix method records `nothing`. A Prior Result of your own records no source, and an optimiser reads its returns as raw.

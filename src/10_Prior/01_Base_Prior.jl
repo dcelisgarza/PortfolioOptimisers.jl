@@ -40,7 +40,7 @@ A prior that returns `true` also implements `partial_fit!(pe, f::MatNum) -> pe`,
 
 ## `returns_source` (optional)
 
-  - `PortfolioOptimisers.returns_source(pe::MyPriorEstimator) -> Option{<:AbstractReturnsSource}`: Returns the source of the returns that the prior fits on, usually a field `x_src::Option{<:AbstractReturnsSource}` that the keyword constructor checks with `PortfolioOptimisers.assert_returns_source(x_src, PortfolioOptimisers.DATA_RETURNS_SOURCES, :MyPriorEstimator)`.
+  - `returns_source(pe::MyPriorEstimator) -> Option{<:AbstractReturnsSource}`: Returns the source of the returns that the prior fits on, usually a field `x_src::Option{<:AbstractReturnsSource}` that the keyword constructor checks with `PortfolioOptimisers.assert_returns_source(x_src, PortfolioOptimisers.DATA_RETURNS_SOURCES, :MyPriorEstimator)`.
 
 The [`ReturnsResult`](@ref) method of [`prior`](@ref) reads the source through this method, and so does the frame walk of an optimiser. The fallback returns `nothing`, so a prior that implements no method reads the raw returns `rd.X`. A prior that holds another reader in a field refuses a source on it in its keyword constructor with `PortfolioOptimisers.assert_inner_reader`, because the outer prior picks the returns.
 
@@ -70,7 +70,8 @@ LowOrderPrior
     kld ┼ nothing
      ow ┼ nothing
      rr ┼ nothing
-    fpr ┴ nothing
+    fpr ┼ nothing
+  x_src ┴ nothing
 ```
 
 # Related
@@ -384,7 +385,8 @@ Groups the two result types that hold an asset returns matrix `X` and a feature 
 """
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
-    prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+    prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
+          dims::Int = 1)
 
 Compute prior information from asset and/or factor returns using a prior estimator.
 
@@ -399,7 +401,7 @@ This method is the entry point every caller uses, and it is written once here. W
  3. Read the source that `pe` states with [`returns_source`](@ref), giving `x_src`.
  4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations.
  5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 6. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne` and `rd.E` as keyword arguments alongside `kwargs`, and return the prior result it produces. A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
+ 6. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `strict` as keyword arguments, and record `x_src` in the prior result it produces with [`stamp_returns_source`](@ref). A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. So the keyword `dims` has no effect.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no `ReturnsResult`, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
@@ -407,7 +409,8 @@ The Asset Panel travels as the third positional argument for the same reason `rd
 
   - $(arg_dict[:pe])
   - `rd`: Asset and/or factor returns result.
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
+  - $(arg_dict[:strict_prior_rd])
+  - $(arg_dict[:dims_rd])
 
 # Validation
 
@@ -429,13 +432,15 @@ The Asset Panel travels as the third positional argument for the same reason `rd
   - [`LowOrderPrior`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
+               dims::Int = 1)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
     x_src = returns_source(pe)
     rd = shared_series_view(rd, x_src, needs_factor_returns(pe) === true)
-    return prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
-                 ivpa = rd.ivpa, ne = rd.ne, E = rd.E, kwargs..., dims = 1)
+    pr = prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
+               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1)
+    return stamp_returns_source(pr, pe)
 end
 """
     reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online}) -> Bool
@@ -790,7 +795,8 @@ $(DocStringExtensions.FIELDS)
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
         rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-        fpr::Option{<:LowOrderPrior} = nothing
+        fpr::Option{<:LowOrderPrior} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
@@ -833,6 +839,10 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
 
 `o_X` requires `rr`. Every estimator that overwrites `X` today does so by projecting a factor prior through regression loadings, so a prior result claiming a reconstruction it cannot explain is a bug. This is a present-tense constraint rather than a law of the domain, and a future estimator that transforms `X` without a regression must relax it deliberately.
 
+## The source of the returns
+
+`x_src` records the frame of `X`. [`prior`](@ref) fills it with the source that the prior estimator states, through [`stamp_returns_source`](@ref), when it fits on a [`ReturnsResult`](@ref) and when it reads out the state of an online fold. A returns-matrix method of `prior` cannot know the frame of the matrix that it receives, so it leaves `nothing`. The field lets a consumer that receives the Result in place of the estimator read the frame: the outer problem of a meta-optimiser adds the benchmark back to `X` when the field is [`ExcessSource`](@ref), see [`outer_returns_source`](@ref). A [`HighOrderPrior`](@ref) holds no field of its own, and answers `x_src` from the `LowOrderPrior` that it wraps.
+
 ## Validation
 
   - `X`, `mu`, and `sigma` must be non-empty.
@@ -873,7 +883,8 @@ LowOrderPrior
     kld ┼ nothing
      ow ┼ nothing
      rr ┼ nothing
-    fpr ┴ nothing
+    fpr ┼ nothing
+  x_src ┴ nothing
 ```
 
 # Related
@@ -931,12 +942,17 @@ LowOrderPrior
     $(field_dict[:fpr])
     """
     fpr
+    """
+    $(field_dict[:x_src_pr])
+    """
+    x_src
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
                            ow::Option{<:VecNum},
                            rr::Option{<:AbstractLoadingsRegressionResult},
-                           fpr::Option{<:LowOrderPrior})
+                           fpr::Option{<:LowOrderPrior},
+                           x_src::Option{<:AbstractReturnsSource})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -993,8 +1009,8 @@ LowOrderPrior
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
         return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
-                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr),
-                   typeof(fpr)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr)
+                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
+                   typeof(x_src)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src)
     end
 end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
@@ -1002,8 +1018,9 @@ function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        w::Option{<:ObsWeights} = nothing, ens::Option{<:Number} = nothing,
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       fpr::Option{<:LowOrderPrior} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr)
+                       fpr::Option{<:LowOrderPrior} = nothing,
+                       x_src::Option{<:AbstractReturnsSource} = nothing)::LowOrderPrior
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1040,7 +1057,7 @@ The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a d
 
  1. Cut the Cholesky factor to `i` on its column axis, giving `chol`. A prior result that holds none keeps `nothing`.
  2. Cut the original returns matrix to `i` on its asset axis, giving `o_X`. A prior result that holds none keeps `nothing`. It takes the same cut `X` takes in the next step, because the two are assets-major over the same observations.
- 3. Rebuild the prior result through its ordinary keyword constructor, naming every field: `X` and `mu` cut to `i`, `sigma` cut to `i` on both axes, `chol` and `o_X` from the two steps above, `rr` recursed through [`port_opt_view`](@ref) with `i`, and `w`, `ens`, `kld`, `ow` and `fpr` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
+ 3. Rebuild the prior result through its ordinary keyword constructor, naming every field: `X` and `mu` cut to `i`, `sigma` cut to `i` on both axes, `chol` and `o_X` from the two steps above, `rr` recursed through [`port_opt_view`](@ref) with `i`, and `w`, `ens`, `kld`, `ow`, `fpr` and `x_src` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
 
 # Arguments
 
@@ -1065,7 +1082,7 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         fpr = pr.fpr)
+                         fpr = pr.fpr, x_src = pr.x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1423,7 +1440,8 @@ HighOrderPrior
        │     kld ┼ nothing
        │      ow ┼ nothing
        │      rr ┼ nothing
-       │     fpr ┴ nothing
+       │     fpr ┼ nothing
+       │   x_src ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}

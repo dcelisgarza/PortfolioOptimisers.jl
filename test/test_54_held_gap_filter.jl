@@ -714,10 +714,10 @@ end
     @test_logs (:warn, r"at `c = 0\.3` a 5% CVaR is a 16\.7% CVaR") prior(pe5, Xmix,
                                                                           nothing, pnl_mix)
     @test_logs (:warn,
-                r"whose graph reader reads the prior, `x_src = :prior`, may branch the asset alone") prior(pe5,
-                                                                                                           Xmix,
-                                                                                                           nothing,
-                                                                                                           pnl_mix)
+                r"whose graph reader reads the prior, `x_src = PriorSource\(\)`, may branch the asset alone") prior(pe5,
+                                                                                                                    Xmix,
+                                                                                                                    nothing,
+                                                                                                                    pnl_mix)
     @test_logs (:warn, r"entropy pooling view on the asset is calibrated") prior(pe5, Xmix,
                                                                                  nothing,
                                                                                  pnl_mix)
@@ -823,7 +823,9 @@ end
     # clustering of the returns data meets the gap itself (ADR 0211, decision 8).
     resh = optimise(HierarchicalRiskParity(; r = ConditionalValueatRisk(),
                                            opt = HierarchicalOptimiser(; pe = pe,
-                                                                       x_src = :prior)), rd)
+                                                                       cle = ClustersEstimator(;
+                                                                                               x_src = PriorSource()))),
+                    rd)
     # A scenario measure over a `NaN` column has no answer at all, so both solves are the
     # proof that the fill reached the model.
     @test isa(resj.retcode, PO.OptimisationSuccess)
@@ -857,7 +859,7 @@ end
     # A plain clustering leaves `d` out of the Investable Mask at the entry of the head, and
     # names it with the two remedies.
     plain = (:warn,
-             r"plain moment estimator, and the rows that it reads hold a gap for 1 asset\(s\) that the prior kept: \[\"d\"\].*`CoveragePolicy`.*`x_src = :prior`")
+             r"plain moment estimator, and the rows that it reads hold a gap for 1 asset\(s\) that the prior kept: \[\"d\"\].*`CoveragePolicy`.*`x_src = PriorSource\(\)`")
     res = @test_logs plain (:info, r"left the investable universe.*\[\"c\", \"d\"\]") optimise(hrp(),
                                                                                                rd)
     @test res.imsk == BitVector([1, 1, 0, 0])
@@ -871,7 +873,10 @@ end
     aware = @test_logs left_c optimise(hrp(; cle = ClustersEstimator(; ce = cvg_ce)), rd)
     @test aware.imsk == BitVector([1, 1, 0, 1])
     @test aware.w[4] > 0
-    filled = @test_logs left_c optimise(hrp(; x_src = :prior), rd)
+    filled = @test_logs left_c optimise(hrp(;
+                                            cle = ClustersEstimator(;
+                                                                    x_src = PriorSource())),
+                                        rd)
     @test filled.imsk == aware.imsk
     @test filled.w[4] > 0
 
@@ -900,8 +905,8 @@ end
     pr3 = PO.port_opt_view(pr, [1, 2, 4])
     rd3 = PO.port_opt_view(rd, [1, 2, 4])
     @test_throws IsNonFiniteError clusterise(ClustersEstimator(), pr3; rd = rd3)
-    @test_throws "x_src = :prior" clusterise(ClustersEstimator(), pr3; rd = rd3)
-    @test isa(clusterise(ClustersEstimator(), pr3; rd = rd3, x_src = :prior),
+    @test_throws "x_src = PriorSource()" clusterise(ClustersEstimator(), pr3; rd = rd3)
+    @test isa(clusterise(ClustersEstimator(; x_src = PriorSource()), pr3; rd = rd3),
               PO.AbstractClusteringResult)
     @test isa(clusterise(ClustersEstimator(; ce = cvg_ce), pr3; rd = rd3),
               PO.AbstractClusteringResult)

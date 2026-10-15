@@ -1177,7 +1177,7 @@ using Dates, Statistics
         Ed = randn(StableRNG(4), 6, 1) ./ 100
         rd = ReturnsResult(; nx = ["a", "b", "c", "d"], X = X, nb = ["m"], B = X[:, 1],
                            ne = ["u"], E = Ed)
-        @test PO.prior_step_returns(rd, true).E === Ed
+        @test PO.prior_step_returns(rd, ExcessSource()).E === Ed
         rdv = PO.vcat_observations(PO.port_opt_view(rd, 1:3, :),
                                    PO.port_opt_view(rd, 4:6, :))
         @test rdv.E == Ed
@@ -1205,8 +1205,7 @@ using Dates, Statistics
         cls = [[1, 2], [3, 4]]
         res = [optimise(EqualWeighted(), PO.port_opt_view(rd, cl)) for cl in cls]
         W = [0.5 0.0; 0.5 0.0; 0.0 0.5; 0.0 0.5]
-        rdo = PO.predict_outer_returns(nothing,
-                                       (; pcol = PO.RenormaliseActive(), brt = false),
+        rdo = PO.predict_outer_returns(nothing, (; pcol = PO.RenormaliseActive()),
                                        PO.ClusterUniverse(cls), rd, pr, nothing, W, res)
         @test rdo.E === Ed
         @test rdo.ne == ["u"]

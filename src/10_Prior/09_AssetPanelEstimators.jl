@@ -499,31 +499,32 @@ It reads no prior result, so it is the one producer that runs where no prior exi
 julia> PhylogenyPanel()
 PhylogenyPanel
    pl ┼ NetworkEstimator
-      │    ce ┼ PortfolioOptimisersCovariance
-      │       │   ce ┼ Covariance
-      │       │      │    me ┼ SimpleExpectedReturns
-      │       │      │       │   w ┴ nothing
-      │       │      │    ce ┼ GeneralCovariance
-      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │      │       │    w ┴ nothing
-      │       │      │   alg ┼ FullMoment()
-      │       │      │     w ┴ nothing
-      │       │   mp ┼ MatrixProcessing
-      │       │      │     pdm ┼ Posdef
-      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │       │      │      dn ┼ nothing
-      │       │      │      dt ┼ nothing
-      │       │      │     alg ┼ nothing
-      │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │    de ┼ Distance
-      │       │   power ┼ nothing
-      │       │     alg ┴ CanonicalDistance()
-      │   alg ┼ KruskalTree
-      │       │     args ┼ Tuple{}: ()
-      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │   sep ┼ HopCount
-      │       │   n ┴ Int64: 1
+      │      ce ┼ PortfolioOptimisersCovariance
+      │         │   ce ┼ Covariance
+      │         │      │    me ┼ SimpleExpectedReturns
+      │         │      │       │   w ┴ nothing
+      │         │      │    ce ┼ GeneralCovariance
+      │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+      │         │      │       │    w ┴ nothing
+      │         │      │   alg ┼ FullMoment()
+      │         │      │     w ┴ nothing
+      │         │   mp ┼ MatrixProcessing
+      │         │      │     pdm ┼ Posdef
+      │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+      │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │         │      │      dn ┼ nothing
+      │         │      │      dt ┼ nothing
+      │         │      │     alg ┼ nothing
+      │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+      │      de ┼ Distance
+      │         │   power ┼ nothing
+      │         │     alg ┴ CanonicalDistance()
+      │     alg ┼ KruskalTree
+      │         │     args ┼ Tuple{}: ()
+      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+      │     sep ┼ HopCount
+      │         │   n ┴ Int64: 1
+      │   x_src ┴ nothing
   alg ┼ Proximity
       │   decay ┴ LinearDecay()
 ```
