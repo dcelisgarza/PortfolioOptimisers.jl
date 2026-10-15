@@ -557,9 +557,11 @@ function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
     # lands on an order statistic, `γ = 0` or `γ = 1`, reads `0 * Inf` as `NaN`. The limit as
     # those variances go to zero is that order statistic, at the position `(n - 1) p + 1`.
     function bound(p)
-        q = Statistics.quantile(u, p; sorted = true)
+        q = Statistics.quantile(u, p)
         return ifelse(isnan(q),
-                      u[clamp(trunc(Int, fma(length(u), p, one(p) - p)), 1, length(u))], q)
+                      partialsort(u,
+                                  clamp(trunc(Int, fma(length(u), p, one(p) - p)), 1,
+                                        length(u))), q)
     end
     for t in axes(IV, 1)
         row = view(IV, t, :)
@@ -567,7 +569,6 @@ function cross_sectional_winsorise!(IV::Matrix{<:Number}, W0::MatNum,
         append!(empty!(u),
                 (x for (x, w) in zip(row, w0) if w > zero(eltype(W0)) && !isnan(x)))
         if any(isfinite, u)
-            sort!(u)
             row .= clamp.(row, bound(wins[1]), bound(wins[2]))
         elseif isempty(u)
             row .= Tf(NaN)
