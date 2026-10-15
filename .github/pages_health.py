@@ -180,7 +180,8 @@ def main():
             f"The expanded size of `{BRANCH}` is {total / GIB:.2f} GiB, above the limit of {LIMIT_GIB:g} GiB "
             f"(GitHub Pages refuses a site above 10 GiB). Previews hold {previews_size / GIB:.2f} GiB and "
             f"the version links {(total - blobs) / GIB:.2f} GiB. Run the `Doc preview cleanup` workflow, "
-            "or cap `deploydocs(versions = ...)` in `docs/make.jl`."
+            "or lower `PAGES_KEEP_MINORS` in `.github/workflows/DocPreviewCleanup.yml`. "
+            "`deploydocs(versions = ...)` deletes no version, so it does not shrink the site."
         )
 
     report.append("")

@@ -12,8 +12,9 @@ name: Pages health
 # blob, so it downloads none of the site. `.github/pages_health.py` holds the logic, and a person
 # can run it locally with `gh` logged in.
 #
-# The check caps nothing. Each release adds a version directory and its alias link, and the
-# decision on how many versions `gh-pages` keeps is #1722.
+# The check caps nothing. `DocPreviewCleanup.yml` does: each week it keeps the versions of the
+# newest minor series and the previews that a pull request asks for with a label, and it deletes
+# the rest (#1722). This check is the backstop when that job stops or the cap is too high.
 #
 # A schedule fires only from the default branch, so this file runs once it reaches `main`.
 

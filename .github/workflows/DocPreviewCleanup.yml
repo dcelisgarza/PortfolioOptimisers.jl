@@ -11,13 +11,23 @@ on:
     - cron: "0 4 * * 0"
   workflow_dispatch:
 
-# `gh-pages` carries one full documentation build per open pull request, under
-# `previews/PR<number>`. This job deletes the preview of every pull request that is not open.
+# GitHub Pages refuses a site above 10 GiB. `gh-pages` passed that limit once, and every deployment
+# failed for two days (#1722). This job keeps the size of `gh-pages` bounded. It deletes two things:
 #
-# It deletes every such preview, not only the one of the pull request that closed. A preview that
-# an earlier run missed still goes, so the previews of closed pull requests cannot pile up. They
-# did pile up once: the site passed the 10 GiB limit of GitHub Pages and every deployment failed.
+# - A preview under `previews/PR<number>` whose pull request is not open, or does not carry the
+#   label `PREVIEW_LABEL`. `Docs.yml` builds a preview only for a pull request with that label.
+#   The job deletes every such preview, not only the one of the pull request that closed, so a
+#   preview that an earlier run missed still goes.
+# - Every released version outside the `PAGES_KEEP_MINORS` newest minor series. Documenter never
+#   deletes a version, and Pages expands each alias link of a version into a full copy, so each
+#   release adds about twice the size of one build. `.github/pages_prune.py` holds that logic.
+#
+# A URL into a deleted version, such as `/v0.12/`, stops resolving. That is the price of the cap.
 # `PagesHealth.yml` watches the size of the site and the result of each deployment.
+env:
+  PREVIEW_LABEL: docs-preview
+  PAGES_KEEP_MINORS: "5"
+
 concurrency:
   # On the close of a pull request, this is the group of the Docs run of the same pull request
   # (`Docs.yml` names its group `${{ github.workflow }}-${{ github.ref }}`), so this run cancels a
@@ -32,11 +42,11 @@ concurrency:
 
 jobs:
   doc-preview-cleanup:
-    name: Delete the previews of closed pull requests
+    name: Delete the unwanted previews and the old versions
     runs-on: ubuntu-latest
     # `gh-pages` takes one writer at a time. Two cleanups that run together push over each other,
     # so queue them instead of cancelling them. A queued run that a newer one replaces loses
-    # nothing: the newer run deletes every preview of a closed pull request.
+    # nothing: the newer run deletes everything the older one would.
     concurrency:
       group: doc-preview-cleanup
       cancel-in-progress: false
@@ -49,33 +59,47 @@ jobs:
         uses: actions/checkout@v7
         with:
           ref: gh-pages
-      - name: Delete the previews and the history, then push
+          path: site
+      # The script lives on the branch that the pull request went into, or on the branch of the
+      # run. A separate path keeps it out of the tree that the job commits.
+      - name: Checkout the scripts
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          path: tools
+          sparse-checkout: .github
+      - name: Delete the previews, the old versions and the history, then push
+        working-directory: site
         run: |
           set -euo pipefail
           base="$(git rev-parse HEAD)"
-          # A failed listing stops the job here. It must never read as "no pull request is open",
-          # because that deletes every preview.
-          open_previews="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --limit 1000 \
-            --json number --jq '.[] | "previews/PR\(.number)"')"
-          removed=0
+          # A failed listing stops the job here. It must never read as "no pull request asks for a
+          # preview", because that deletes every preview.
+          wanted="$(gh pr list --repo "${GITHUB_REPOSITORY}" --state open --label "${PREVIEW_LABEL}" \
+            --limit 1000 --json number --jq '.[] | "previews/PR\(.number)"')"
+          previews=0
           for dir in previews/PR*; do
             [ -d "${dir}" ] || continue
-            if grep -qxF "${dir}" <<< "${open_previews}"; then
+            if grep -qxF "${dir}" <<< "${wanted}"; then
               continue
             fi
             echo "Delete ${dir}"
             git rm -rf --quiet "${dir}"
-            removed=$((removed + 1))
+            previews=$((previews + 1))
           done
-          if [ "${removed}" -eq 0 ]; then
-            echo "No preview of a closed pull request. Nothing to delete."
+          # The script prints one deleted version directory to a line.
+          versions="$(python3 -I ../tools/.github/pages_prune.py . | tee /dev/stderr | wc -l)"
+          git add -A .
+          if git diff --cached --quiet; then
+            echo "No preview to delete, and no version outside the ${PAGES_KEEP_MINORS} newest minor series."
             exit 0
           fi
           git config user.name "Documenter.jl"
           git config user.email "documenter@juliadocs.github.io"
-          git commit -m "delete ${removed} previews of closed pull requests"
-          # A plain delete leaves every preview in the history of the branch, so the repository
-          # never gets smaller. Replace the history with one commit that holds the current tree.
+          git commit -m "delete ${previews} previews and ${versions} versions outside the ${PAGES_KEEP_MINORS} newest minor series"
+          # A plain delete leaves every preview and version in the history of the branch, so the
+          # repository never gets smaller. Replace the history with one commit that holds the
+          # current tree.
           git branch gh-pages-new "$(echo "delete history" | git commit-tree HEAD^{tree})"
           # The lease refuses the push when a deploy moved `gh-pages` after the checkout. A plain
           # force push discards that deploy. The next cleanup deletes what this run leaves.
