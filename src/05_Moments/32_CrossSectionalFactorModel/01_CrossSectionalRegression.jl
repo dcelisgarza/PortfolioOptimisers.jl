@@ -7,6 +7,63 @@ A member decides what [`CrossSectionalLinearRegression`](@ref) and [`CrossSectio
 
 A member means the same thing under both estimators, so the two give the same factor returns for a least-squares target. [`CrossSectionalTargetRegression`](@ref) refuses [`MinimumNormSolve`](@ref), whose answer on a target is the answer of [`PseudoInverseFallback`](@ref).
 
+All concrete and/or abstract types representing cross-sectional solve algorithms should be subtypes of `AbstractCrossSectionalSolveAlgorithm`.
+
+# Interfaces
+
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractCrossSectionalSolveAlgorithm` and implement the following methods. A member that only [`CrossSectionalLinearRegression`](@ref) reads needs only [`cross_sectional_solve`](@ref), and a member that only [`CrossSectionalTargetRegression`](@ref) reads needs only [`cross_sectional_target_solve`](@ref).
+
+## `cross_sectional_solve`
+
+  - [`cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum, t::Integer)`](@ref): Returns the factor returns of one observation of a [`CrossSectionalLinearRegression`](@ref).
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `A`: Weighted design of one observation, `eligible assets × factors`.
+  - `y`: Weighted target of one observation, of length `eligible assets`.
+  - `t`: Index of the observation, for the message of a refusal.
+
+### Returns
+
+  - `f::VecNum`: Factor returns of the observation, of length `size(A, 2)`.
+
+## `cross_sectional_target_solve`
+
+  - [`cross_sectional_target_solve(alg::AbstractCrossSectionalSolveAlgorithm, tgt::AbstractRegressionTarget, obs::NamedTuple)`](@ref): Returns the factor returns of one observation of a [`CrossSectionalTargetRegression`](@ref).
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `tgt`: Regression target of the observation, which carries its weights. Fit it with `StatsAPI.fit(tgt, A, y)`.
+  - `obs`: The observation, `(; A, y, D, t)`: the exposures `A` and the returns `y` of the eligible assets, the weighted design `D` for a rank test, and the index `t` of the observation.
+
+### Returns
+
+  - `f::VecNum`: Factor returns of the observation, of length `size(obs.A, 2)`.
+
+## `assert_cross_sectional_target_solve`
+
+  - [`assert_cross_sectional_target_solve(alg::AbstractCrossSectionalSolveAlgorithm, tgt::AbstractRegressionTarget)`](@ref): Refuses a target that the member cannot solve, in the constructor of [`CrossSectionalTargetRegression`](@ref). The root passes every target, so a member that solves every target needs no method.
+
+### Arguments
+
+  - `alg`: The concrete subtype instance.
+  - `tgt`: Regression target.
+
+### Returns
+
+  - `nothing`. A refusal throws an `ArgumentError`.
+
+### Examples
+
+```jldoctest
+julia> struct MySolve <: PortfolioOptimisers.AbstractCrossSectionalSolveAlgorithm end
+
+julia> CrossSectionalTargetRegression(; alg = MySolve()).alg
+MySolve()
+```
+
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
@@ -1606,4 +1663,6 @@ export CrossSectionalRegression, CrossSectionalLinearRegression,
        UncheckedSolve, MinimumNormSolve, DependentColumnDrop, ZeroUnseenMember,
        SolvedUnseenMember, cross_sectional_regression, cross_sectional_r2,
        mean_cross_sectional_r2
-public AbstractUnseenMemberRule
+public AbstractUnseenMemberRule, AbstractCrossSectionalSolveAlgorithm,
+       cross_sectional_solve, cross_sectional_target_solve,
+       assert_cross_sectional_target_solve

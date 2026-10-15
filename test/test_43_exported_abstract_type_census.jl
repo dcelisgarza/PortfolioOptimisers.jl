@@ -80,7 +80,9 @@
     2026-10-08 (issue #1576). `AbstractCarryRule`, the family of the Carry Rule of the same
     prior, joined with its two members on 2026-10-08 (issue #1602). `AbstractUnseenMemberRule`,
     the family of the Unseen Member rule of the same prior, joined with its `# Interfaces`
-    section and its two members on 2026-10-08 (issue #1606).
+    section and its two members on 2026-10-08 (issue #1606). `AbstractCrossSectionalSolveAlgorithm`,
+    the family of the solve rule of the two cross-sectional regression estimators, joined with
+    its `# Interfaces` section on 2026-10-15 (issue #1721, the maintainer's ruling).
     They are held to their own list for the same reason — public is API too.
     =#
     allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
@@ -90,6 +92,7 @@
                           :AbstractConstraintSpace, :AbstractCovarianceEstimator,
                           :AbstractCovarianceShrinkageTarget, :AbstractCoverageAlgorithm,
                           :AbstractCrossSectionalRegressionEstimator,
+                          :AbstractCrossSectionalSolveAlgorithm,
                           :AbstractCrossSectionalTransform,
                           :AbstractCrossSectionalWeightsAlgorithm,
                           :AbstractDeformationCalibrationAlgorithm,
