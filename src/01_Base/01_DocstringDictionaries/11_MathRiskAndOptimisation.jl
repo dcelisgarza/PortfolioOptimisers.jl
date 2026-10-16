@@ -216,4 +216,15 @@ unique_key_dict!(math_dict, :math_dict,
                  :b_patt => "``\\boldsymbol{b}``: Intercept the predicted attribution reads, ``N \\times 1``, the expected return of each asset that the factors do not explain. Every non-finite entry and the entry of every non-investable asset is zero.",#
                  :g_patt => "``\\boldsymbol{g} = \\mathbf{B}^{\\intercal} \\boldsymbol{w}``: Predicted factor exposure of the portfolio, ``K \\times 1``, with entry ``g_{k}`` for factor ``k``. The loadings and the weights do not move, so one exposure holds for every period.",#
                  :sigma_P_patt => "``\\sigma_{P}``: Predicted portfolio volatility, the square root of the quadratic form of the weights in the covariance of the prior result.",#
-                 :m_patt => "``\\boldsymbol{m} \\in \\{0, 1\\}^{N}``: Investable mask, one entry per asset. An entry is ``1`` when the prior could estimate the asset, and ``0`` otherwise.")
+                 :m_patt => "``\\boldsymbol{m} \\in \\{0, 1\\}^{N}``: Investable mask, one entry per asset. An entry is ``1`` when the prior could estimate the asset, and ``0`` otherwise.",#
+                 # Inference on the Sharpe ratio. `probabilistic_sharpe_ratio`,
+                 # `minimum_track_record_length`, `deflated_sharpe_ratio`,
+                 # `expected_max_sharpe_ratio` and their helpers state one set of symbols.
+                 :sr_hat => "``\\widehat{\\mathrm{SR}}``: Sample Sharpe ratio per period of ``\\boldsymbol{x}``, the excess of its sample mean over the risk-free rate `rf` divided by its corrected sample standard deviation.",#
+                 :sr_star => "``\\mathrm{SR}^{*}``: Benchmark Sharpe ratio per period.",#
+                 :gamma3_hat => "``\\hat{\\gamma}_{3}``: Sample skewness of ``\\boldsymbol{x}``, its third central moment divided by the cube of its biased sample standard deviation.",#
+                 :gamma4_hat => "``\\hat{\\gamma}_{4}``: Sample kurtosis of ``\\boldsymbol{x}``, its fourth central moment divided by the square of its biased sample variance. It is ``3`` for a normal distribution.",#
+                 :Phi_normal => "``\\Phi``: Distribution function of the standard normal distribution, and ``\\Phi^{-1}`` its quantile function.",#
+                 :n_trials => "``N``: Number of independent trials of the search.",#
+                 :sigma_sr_trials => "``\\sigma``: Dispersion of the Sharpe ratios of the trials, their standard deviation.",#
+                 :gamma_em => "``\\gamma``: Euler-Mascheroni constant, about ``0.5772``.")

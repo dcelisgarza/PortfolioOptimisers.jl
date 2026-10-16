@@ -448,7 +448,7 @@ end
 """
     read_out_fallback(opt::OptimisationEstimator, res::OptimisationResult; kwargs...)
 
-Walks the fallback chain of a head that reads out with no data, after its own read-out `res`. The two callers are the read-outs of [`OnlinePortfolioSelection`](@ref) and [`PreviousWeights`](@ref).
+Walks the fallback chain of a head that reads out with no data, after its own result `res`. The two callers are the methods of `optimise(opt)` with no data for [`OnlinePortfolioSelection`](@ref) and [`PreviousWeights`](@ref).
 
 The batch verb hands the returns data of the head to each fallback. A head that reads out with no data has none to hand on, so each fallback reads itself out with `optimise(fb)` and no data, from the rows that [`step_fallback`](@ref) folded into it. The chain of the answer then starts with the failed pair of the head, and the chain that the fallback walked follows it, as in the batch verb.
 
@@ -456,12 +456,12 @@ The batch verb hands the returns data of the head to each fallback. A head that 
 
  1. Return `res` when it succeeded or when `opt.fb` is `nothing`.
  2. Otherwise warn, and read the fallback out with `optimise(opt.fb; kwargs...)`, giving `fbres`.
- 3. Return `fbres` through [`factory`](@ref) with the chain of the failed pair of `opt` and `res`, followed by the chain of `fbres` when the fallback is an estimator that walked one. A precomputed result answers itself, and its own `fb` is not a chain that this read-out walked.
+ 3. Return `fbres` through [`factory`](@ref) with the chain of the failed pair of `opt` and `res`, followed by the chain of `fbres` when the fallback is an estimator that walked one. A precomputed result answers itself, and its own `fb` is not a chain that this function walked.
 
 # Arguments
 
   - `opt`: The head, with its [`TimeDependent`](@ref) schedules reset.
-  - `res`: The read-out of the head.
+  - `res`: The result of the head with no data.
   - `kwargs`: The keyword arguments of `optimise` with no data on the fallback, passed on unchanged.
 
 # Returns
@@ -875,7 +875,7 @@ Turns a folded optimiser into the batch call that reads it out, an estimator and
 
 The rebuilt `ReturnsResult` holds every observation that the step folded, and the folded prior drops the observations of a Shared Series gap, see [`shared_series_buffer`](@ref). So the function drops the same observations from the `ReturnsResult` with [`optimiser_shared_series_view`](@ref), while `opt` still holds the prior estimator: a prior result reads no factor return, so the batch path would not drop a gap of the factor returns. The prior and every reader that pairs its observations with the last observations of the returns data then read the same observations, as in the batch fit. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer, and a fallback reads the same `ReturnsResult` as the optimiser it replaces.
 
-The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser with an empty `ReturnsResult`, and its batch function decides whether it answers without returns. `optimise(opt)` with no returns does not reach this function for a [`PreviousWeights`](@ref), because that head has a read-out of its own.
+The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser with an empty `ReturnsResult`, and its batch function decides whether it answers without returns. `optimise(opt)` with no returns does not reach this function for a [`PreviousWeights`](@ref), because that head has its own method of `optimise(opt)` with no data.
 
 # Algorithm
 

@@ -274,6 +274,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
                  :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
                  :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
+                 # Inference on the Sharpe ratio of a return series.
+                 :sr_x => "`x`: Periodic return series, or a matrix with one return series in each column. A `NaN` entry is an observation that is not available, and the function drops it.",#
+                 :bsr => "`bsr`: Benchmark Sharpe ratio per period, in the frequency of `x`.",#
                  # The fold context of the online step.
                  :cache_opt => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. The returns themselves are carried by the prior, which owns the rows once; this holds every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.",#
                  :cache_rows => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. This head holds no prior, so it is the bottom of the chain and its state carries the returns themselves, beside every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.")

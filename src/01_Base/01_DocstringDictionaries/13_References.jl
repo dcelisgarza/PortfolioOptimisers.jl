@@ -43,6 +43,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :quintile => "[quintile](@cite) R. Zhou and D. P. Palomar. *Understanding the Quintile Portfolio*. IEEE Transactions on Signal Processing 68, 4030–4040 (2020).",#
                  :scott1979 => "[scott1979](@cite) D. W. Scott. *On optimal and data-based histograms*. Biometrika 66, 605–610 (1979).",#
                  :sharpe_stderr => "[sharpe_stderr](@cite) D. H. Bailey and M. Lopez de Prado. *The Sharpe ratio efficient frontier*. Journal of Risk 15, 3–44 (2012).",#
+                 :bailey2014deflated => "[bailey2014deflated](@cite) D. H. Bailey and M. Lopez de Prado. *The deflated Sharpe ratio: correcting for selection bias, backtest overfitting, and non-normality*. The Journal of Portfolio Management 40, 94–107 (2014).",#
                  :smyth2022enhanced => "[smyth2022enhanced](@cite) W. Smyth and D. Broby. *An enhanced Gerber statistic for portfolio optimization*. Finance Research Letters 49, 103229 (2022).",#
                  :EPTail => "[EPTail](@cite) D. Cajas. *Entropy Pooling with CVaR and EVaR Views*. Available at SSRN 7120258 (2026).",#
                  :EPRLVaR => "[EPRLVaR](@cite) D. Cajas. *Entropy Pooling with Relativistic Value at Risk Views*. Available at SSRN 7329718 (2026).",#

@@ -1125,6 +1125,15 @@ Three formulations optimise it. `ApproxOrderedWeightsArray`, the default, is a p
 - **MeanReturn**, **ThirdCentralMoment**: reporting statistics.
 - **ExpectedReturnRiskRatio** / **MeanReturnRiskRatio**: a configurable return-to-risk ratio, subsuming Sharpe, Calmar and Sortino through the choice of risk measure.
 
+**Probabilistic Sharpe Ratio**
+The probability that the true Sharpe ratio of a return series is greater than a benchmark Sharpe ratio, given the length of the series and the skewness and kurtosis of its returns. Every quantity is per period. `probabilistic_sharpe_ratio` computes it.
+
+**Minimum Track Record Length**
+The least number of observations at which the Probabilistic Sharpe Ratio of a series reaches a confidence level, for the sample moments of the series. It is a number of observations, and it is infinite when the Sharpe ratio does not exceed the benchmark. `minimum_track_record_length` computes it.
+
+**Deflated Sharpe Ratio**
+The Probabilistic Sharpe Ratio of the best of several trials, against the expected maximum Sharpe ratio of the search as its benchmark. It corrects the selected Sharpe ratio for the number and the dispersion of the trials. The count is of *independent* trials: correlated trials are fewer, and `implied_independent_trials` estimates their number. `deflated_sharpe_ratio` computes it, and `expected_max_sharpe_ratio` computes the benchmark.
+
 ## 6. Post-Processing
 
 **Net Returns**

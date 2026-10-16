@@ -55,6 +55,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :eqineq => "Both `eq` and `ineq` cannot be `nothing` at the same time, `!(isnothing(ineq) && isnothing(eq))`.",
                  :decay => "`0 < decay < 1`.",#
                  :rf => "`isfinite(rf)`.",#
+                 :bsr => "`isfinite(bsr)`.",#
                  :q_scorer => "`0 <= q <= 1`.",#
                  :unit => "`unit > 0`.",#
                  :katz_alpha => "`alpha > 0`.",#
