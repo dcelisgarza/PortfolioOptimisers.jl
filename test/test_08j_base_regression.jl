@@ -1963,6 +1963,49 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                                 b = [1.0, 2.0, 3.0])
     end
 
+    @testset "The cache of a refit: the live mask, the active mask and the forecast history (#1751)" begin
+        f = [1.0 0.0; 3.0 0.0]
+        eps = [0.1 0.2 0.3; 0.4 0.5 0.6]
+        n = [3, 3]
+        # A regression records which factors it estimated, one entry per column of `f`.
+        csr = CrossSectionalRegression(; f = f, eps = eps, n = n, lv = BitVector([1, 0]))
+        @test csr.lv == [true, false]
+        @test isnothing(CrossSectionalRegression(; f = f, eps = eps, n = n).lv)
+        @test_throws DimensionMismatch CrossSectionalRegression(; f = f, eps = eps, n = n,
+                                                                lv = trues(3))
+        # The mask indexes factors, so an asset view keeps it.
+        @test PortfolioOptimisers.port_opt_view(csr, [1, 3]).lv === csr.lv
+        # The block stores the two histories of the cache on the rows of the fit.
+        M = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        amr = BitMatrix([1 1 0; 1 1 1])
+        hist = [0.1 0.2 0.3; 0.4 0.5 0.6]
+        rw = ones(2, 3)
+        blk = CrossSectionalFactorModel(; M = M, b = zeros(3), csr = csr, rw = rw,
+                                        amr = amr, hist = hist)
+        @test blk.amr === amr
+        @test blk.hist === hist
+        @test isnothing(CrossSectionalFactorModel(; M = M, b = zeros(3)).amr)
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = zeros(3),
+                                                                 amr = trues(2, 2))
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = zeros(3),
+                                                                 hist = zeros(2, 4))
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = zeros(3),
+                                                                 rw = rw, amr = trues(3, 3))
+        @test_throws DimensionMismatch CrossSectionalFactorModel(; M = M, b = zeros(3),
+                                                                 rw = rw,
+                                                                 hist = zeros(3, 3))
+        # An asset view cuts both histories on their asset axis.
+        v = PortfolioOptimisers.port_opt_view(blk, [1, 3])
+        @test v.amr == amr[:, [1, 3]]
+        @test v.hist == hist[:, [1, 3]]
+        # The forecast block keeps the cache, so every refit after the first reads it.
+        sp = (; rf = nothing, g = nothing, ap = nothing, hist = nothing)
+        rb = PortfolioOptimisers.cross_sectional_forecast_block(blk, sp, 1.0, 1.0)
+        @test rb.amr === amr
+        @test rb.hist === hist
+        @test isnothing(getfield(rb, :L))
+    end
+
     @testset "The type tree" begin
         # Both roots are umbrellas. An estimator child names the geometry it fits, and
         # a result child names what a member carries.

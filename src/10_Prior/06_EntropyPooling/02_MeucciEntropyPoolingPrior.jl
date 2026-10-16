@@ -833,6 +833,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     # it answered. See the note at the same step in `EntropyPoolingPrior`'s staged
     # `ep_prior`. ADR 0116.
     pe, pr, w0 = ep_wrapped_prior(pe, X, F, pnl; strict = strict, kwargs...)
+    # Every refit reads the cache of the fit that the views read (#1751).
+    pr0 = pr
     w1 = w0
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
@@ -859,7 +861,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     if !isempty(epc) || !isnothing(cvv)
         # See the note at the same step in `EntropyPoolingPrior`'s staged `ep_prior` (#1649).
         w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, w0, pe.opt), 1)
-        pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
+        pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
+                            cache_reg = true)
         vpr = investable_prior(imsk, pr)
     end
     if !isnothing(pe.sigma_views) || !isnothing(pe.cov_views)
@@ -879,7 +882,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         if !isempty(epc) || !isnothing(cvv)
             ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
             w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, ws, pe.opt), 1)
-            pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
+            pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
+                                cache_reg = true)
             vpr = investable_prior(imsk, pr)
         end
     end
@@ -909,7 +913,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         if !isempty(epc) || !isnothing(cvv)
             ws = ifelse(isa(alg, H1_EntropyPooling), w0, w1)
             w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, ws, pe.opt), 1)
-            pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
+            pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
+                                cache_reg = true)
         end
     end
     announce_ep_departures(ni, led, isempty(epc) && isnothing(cvv) && !isempty(led))
@@ -926,7 +931,8 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         ens = ens, kld = kld, rr = rr, fpr = fpr, ss_gaps = ss_gaps)
+                         ens = ens, kld = kld, rr = rr, fpr = fpr, ss_gaps = ss_gaps,
+                         pc = opinion_pooling_cache(pr))
 end
 """
     ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatNum,
@@ -1014,6 +1020,8 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     # See the note at the same step in the staged method: the nested prior is fitted
     # first, and the prior probabilities are read on the rows it answered. ADR 0116.
     pe, pr, w0 = ep_wrapped_prior(pe, X, F, pnl; strict = strict, kwargs...)
+    # Every refit reads the cache of the fit that the views read (#1751).
+    pr0 = pr
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
     pe = pin_prior_choice(pe, X, F, nothing, pnl; strict = strict, kwargs...)
@@ -1060,7 +1068,8 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     # issue #852.
     if !isempty(epc) || !isnothing(cvv)
         w1 = LinearAlgebra.normalize!(ep_cvar_views_solve!(cvv, epc, w0, pe.opt), 1)
-        pr = scenario_prior(pe.pe, w1, X, F, pnl; strict = strict, kwargs...)
+        pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
+                            cache_reg = true)
     end
     # Entropy pooling reweights observations without touching either axis of `Z`, so the
     # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
@@ -1075,7 +1084,8 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
     ens = exp(StatsBase.entropy(w1))
     kld = StatsBase.kldivergence(w1, w0)
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w1,
-                         ens = ens, kld = kld, rr = rr, fpr = fpr, ss_gaps = ss_gaps)
+                         ens = ens, kld = kld, rr = rr, fpr = fpr, ss_gaps = ss_gaps,
+                         pc = opinion_pooling_cache(pr))
 end
 
 function factor_residual_config(pe::MeucciEntropyPoolingPrior)

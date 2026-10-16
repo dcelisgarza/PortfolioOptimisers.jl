@@ -662,35 +662,361 @@ function cross_sectional_factor_scenarios(pe::CrossSectionalFactorPrior, X::MatN
                                           ivpa = ivpa, ts = ts)
     return (; f = all(rs.lv) ? rs.ca.f : rs.ca.f[:, rs.lv], rs = rs, kw = kwargs)
 end
+"""
+    cross_sectional_cached_block(pe::CrossSectionalFactorPrior, pr::Nothing, X::MatNum)
+    cross_sectional_cached_block(pe::CrossSectionalFactorPrior, pr::AbstractPriorResult,
+                                 X::MatNum)
+    cross_sectional_cached_block(pe::CrossSectionalFactorPrior, pr::LowOrderPrior, X::MatNum)
+
+Return the block of the fit `pr` of a [`CrossSectionalFactorPrior`](@ref) when it holds the cache that a refit under new scenario weights reads, and `nothing` otherwise.
+
+A fit of `prior` with `cache_reg = true` stores the cache. [`EntropyPoolingPrior`](@ref) and [`MeucciEntropyPoolingPrior`](@ref) fit the prior that they wrap with it, and give the result of that fit to [`scenario_prior`](@ref) and [`scenario_factory`](@ref). The regression, the cross-sectional weights, the residual block and the Return Forecast of a refit are those of the fit, so the refit reads them from the block and runs no regression. A result with no cache gives `nothing`, and the refit then runs the whole fit.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No result, or a result of any other type: return `nothing`.
+ 2. A [`LowOrderPrior`](@ref): return its block `rr` when every condition holds, and `nothing` otherwise:
+     1. `rr` is a [`CrossSectionalFactorModel`](@ref) with a regression `csr`, a recorded live-factor mask `csr.lv` and an active-mask history `amr`.
+     2. `rr` has one row of `M` for each column of `X`, so the cache describes the asset universe of the refit.
+     3. When a Calibration Slot of `pe` reads the Return Forecast history, as [`reads_forecast_history`](@ref) answers, and `pe` states a Return Forecast Estimator, `rr` carries that history in `hist`.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `pr`: The result of the fit that the views read, or `nothing`.
+  - $(arg_dict[:X])
+
+# Returns
+
+  - `rr::Option{<:CrossSectionalFactorModel}`: The block that holds the cache, or `nothing`.
+
+# Related
+
+  - [`scenario_prior`](@ref)
+  - [`scenario_factory`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+  - [`cross_sectional_moment_prior`](@ref)
+"""
+function cross_sectional_cached_block(::CrossSectionalFactorPrior,
+                                      ::Option{<:AbstractPriorResult}, ::MatNum)::Nothing
+    return nothing
+end
+function cross_sectional_cached_block(pe::CrossSectionalFactorPrior, pr::LowOrderPrior,
+                                      X::MatNum)::Option{<:CrossSectionalFactorModel}
+    rr = pr.rr
+    if !isa(rr, CrossSectionalFactorModel) ||
+       isnothing(rr.amr) ||
+       isnothing(rr.csr) ||
+       isnothing(rr.csr.lv) ||
+       size(rr.M, 1) != size(X, 2)
+        return nothing
+    end
+    reads = (reads_forecast_history(pe.lambda) || reads_forecast_history(pe.c)) &&
+            !isnothing(pe.rfe)
+    return reads && isnothing(rr.hist) ? nothing : rr
+end
+"""
+    cross_sectional_cached_scenarios(rr::CrossSectionalFactorModel) -> NamedTuple
+
+Return the factor returns that the factor prior of a [`CrossSectionalFactorPrior`](@ref) is fitted on, from the block of a fit that stores the cache.
+
+The regression stage gives these factor returns to the fit, as [`cross_sectional_factor_scenarios`](@ref) states. The block of a fit with `cache_reg = true` holds the regression and its live-factor mask, so [`scenario_prior`](@ref) and [`scenario_factory`](@ref) read the same factor returns from it and run no regression.
+
+# Algorithm
+
+ 1. Take the factor returns of the block with [`cross_sectional_factor_returns`](@ref), the estimated factors and then the observed ones, giving `fa`.
+ 2. Extend the live-factor mask `rr.csr.lv` of the estimated factors with `true` for each observed factor, giving `lv`. An Observed Factor carries the return the caller observed, so it is never empty.
+ 3. Take the columns of `fa` that `lv` marks, giving `f`.
+
+# Arguments
+
+  - `rr`: The block of a fit that stores the cache, as [`cross_sectional_cached_block`](@ref) answers.
+
+# Returns
+
+  - `fa::MatNum`: The factor returns on the combined reduced factor axis.
+  - `f::MatNum`: The factor returns of the factors that are not empty, which the factor prior reads.
+  - `lv::BitVector`: `true` at each factor of `fa` that is not empty.
+
+# Related
+
+  - [`cross_sectional_cached_block`](@ref)
+  - [`cross_sectional_factor_scenarios`](@ref)
+"""
+function cross_sectional_cached_scenarios(rr::CrossSectionalFactorModel)
+    fa = cross_sectional_factor_returns(rr)
+    lv = vcat(rr.csr.lv, trues(size(fa, 2) - length(rr.csr.lv)))
+    return (; fa = fa, f = all(lv) ? fa : fa[:, lv], lv = lv)
+end
+"""
+    cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit, rf::Nothing,
+                                   csfm::CrossSectionalFactorModel,
+                                   cre::AbstractCrossSectionalRegressionEstimator)
+    cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
+                                   rf::AbstractReturnForecastResult,
+                                   csfm::CrossSectionalFactorModel,
+                                   cre::AbstractCrossSectionalRegressionEstimator)
+
+Split a Return Forecast Result against the latest Factor Exposures of the estimated factors of a [`CrossSectionalFactorModel`](@ref), giving its spanned coefficients and its orthogonal part before the Orthogonal Forecast Scale.
+
+[`cross_sectional_return_forecast`](@ref) fits the forecast and splits it here. The refit of [`scenario_prior`](@ref) reads the forecast that the block carries, and splits it here, so it fits no member.
+
+# Algorithm
+
+ 1. No Return Forecast Result: return `nothing` for both parts.
+ 2. Split `rf.mu` against the latest exposures of the estimated factors with [`cross_sectional_alpha_split`](@ref), under the weights of the latest row of `csfm.rw`, giving `g` and `ap`. The observed factors are the trailing columns of `L`, and the split leaves them out, so `g` has one entry per column of `csr.f`.
+ 3. Scale `ap` with [`orthogonal_forecast_rescale`](@ref), which changes it under [`OrthogonalPartCalibration`](@ref) alone.
+
+# Arguments
+
+  - `ofit`: The Orthogonal Forecast Fit of the prior.
+  - `rf`: The Return Forecast Result, or `nothing`.
+  - `csfm`: The factor-model block.
+  - `cre`: Cross-Sectional Regression Estimator of the split.
+
+# Validation
+
+  - The rules of [`cross_sectional_alpha_split`](@ref).
+
+# Returns
+
+  - `g::Option{<:VecNum}`: The spanned coefficients, or `nothing`.
+  - `ap::Option{<:VecNum}`: The orthogonal part before the Orthogonal Forecast Scale, one entry per asset, or `nothing`.
+
+# Related
+
+  - [`cross_sectional_return_forecast`](@ref)
+  - [`cross_sectional_alpha_split`](@ref)
+  - [`orthogonal_forecast_rescale`](@ref)
+"""
+function cross_sectional_forecast_split(::AbstractOrthogonalForecastFit, ::Nothing,
+                                        ::CrossSectionalFactorModel,
+                                        ::AbstractCrossSectionalRegressionEstimator)
+    return (; g = nothing, ap = nothing)
+end
+function cross_sectional_forecast_split(ofit::AbstractOrthogonalForecastFit,
+                                        rf::AbstractReturnForecastResult,
+                                        csfm::CrossSectionalFactorModel,
+                                        cre::AbstractCrossSectionalRegressionEstimator)
+    rw = csfm.rw
+    #! The observed factors are the trailing columns of `L`, and the fit observes their
+    #! returns, so the forecast splits against the loadings the regression estimated.
+    L = view(csfm.L, :, 1:size(csfm.csr.f, 2))
+    (; g, ap) = cross_sectional_alpha_split(cre, rf.mu, L, @view(rw[size(rw, 1), :]))
+    return orthogonal_forecast_rescale(ofit, rf, g, ap)
+end
+"""
+    cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+                                 csfm::CrossSectionalFactorModel, sp::NamedTuple, L::MatNum,
+                                 am::AbstractVector{Bool}, Xs::MatNum, oX::Option{<:MatNum};
+                                 kwargs...) -> LowOrderPrior
+
+Build the Prior Result of a [`CrossSectionalFactorPrior`](@ref) from its block and its factor moments, with the steps of [`cross_sectional_assemble`](@ref) that read the factor moments.
+
+The fit and the call with no data of the carry fold reach it through [`cross_sectional_assemble`](@ref). The refit of [`scenario_prior`](@ref) under new scenario weights reaches it with the block of the fit that the views read. The block, the scenarios and the Return Forecast read no scenario weight of the factor prior, so the refit takes them from that fit, and only the steps that this function runs read the new weights.
+
+# Algorithm
+
+ 1. Take the ready factors of `f_pr` with [`cross_sectional_ready_factors`](@ref) and the determined assets with [`cross_sectional_determined`](@ref). Refuse a fit that determines no asset with [`assert_cross_sectional_factor_moments`](@ref).
+ 2. Resolve the Spanned Shrinkage `lambda` and the Orthogonal Forecast Scale `c` with [`cross_sectional_calibration`](@ref), against the factor moments `f_pr` and the block `csfm`.
+ 3. Write `b = c ap`, the Return Forecast Result and the resolved `lambda` and `c` onto the block with [`cross_sectional_forecast_block`](@ref), giving `rr`. Blend the spanned part into the mean of the estimated factors with [`cross_sectional_forecast_mu`](@ref) under the resolved `lambda`, and keep the mean of the observed factors, giving `f_mu`.
+ 4. Expand the blended factor moments onto the raw factor axis with [`cross_sectional_expand`](@ref), with the basis of the block.
+ 5. Take the investable assets `idx` with [`cross_sectional_investable`](@ref), from the active assets `am` of the latest observation, the latest idiosyncratic variances of `csfm.vs`, and the assets that the ready factors of the blended mean determine.
+ 6. Lift the reduced factor distribution onto the assets with [`cross_sectional_lift`](@ref), and add `b` to the expected return it answers.
+ 7. Assemble a [`LowOrderPrior`](@ref) over `Xs`, with `oX` under `o_X`, the three lifted moments, the factor prior's `w` divided by its sum, its `ens`, `kld` and `ow`, the block under `rr`, and the expanded factor prior under `fpr`. The factor prior keeps the cache `pc` of a pool that answered it, so the refit of the pool reads it from `fpr`. The factor prior holds the factor returns of the block on the raw axis, on the last rows that the scenarios keep.
+
+# Arguments
+
+  - `pe`: Cross-Sectional Factor Prior estimator.
+  - `f_pr`: The factor moments that [`cross_sectional_factor_moments`](@ref) states over the combined reduced factor returns.
+  - `csfm`: The factor-model block, with the regression, the variance history, the idiosyncratic covariance, the basis and the factor returns of the fit.
+  - `sp`: The split of the Return Forecast, `(; rf, g, ap, hist)`.
+  - `L`: The loadings of the latest observation on the combined reduced factor axis.
+  - `am`: The active mask of the latest observation, one entry per asset.
+  - `Xs`: The asset return scenarios.
+  - `oX`: The base-currency returns of the scenario rows, or `nothing`.
+  - `kwargs...`: Additional keyword arguments passed to [`cross_sectional_lift`](@ref).
+
+# Validation
+
+  - The factor prior determines the factor moments of at least one asset. Raises an [`IsNonFiniteError`](@ref).
+  - At least one asset is investable at the latest observation. Raises an [`IsEmptyError`](@ref).
+  - The rules of every verb the algorithm names. A resolved `lambda` lies in `[0, 1]`, and a resolved `c` is finite and `>= 0`.
+
+# Returns
+
+  - `pr::LowOrderPrior`: The prior on the full asset universe, as [`prior`](@ref) states it.
+
+# Related
+
+  - [`cross_sectional_assemble`](@ref)
+  - [`scenario_prior`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function cross_sectional_moment_prior(pe::CrossSectionalFactorPrior, f_pr::NamedTuple,
+                                      csfm::CrossSectionalFactorModel, sp::NamedTuple,
+                                      L::MatNum, am::AbstractVector{Bool}, Xs::MatNum,
+                                      oX::Option{<:MatNum}; kwargs...)
+    csr = csfm.csr
+    T = size(csr.f, 1)
+    # A factor the factor prior states no moment for changes no moment of an asset with a
+    # zero loading on it, so the fit refuses only when no asset is determined (#1510). The
+    # check runs before the calibration, which reads the factor moments.
+    det = cross_sectional_determined(L, cross_sectional_ready_factors(f_pr.mu, f_pr.sigma))
+    assert_cross_sectional_factor_moments(f_pr.mu, f_pr.sigma, T, det)
+    (; lambda, c) = cross_sectional_calibration(pe, f_pr, csfm, sp)
+    rr = cross_sectional_forecast_block(csfm, sp, lambda, c)
+    # The forecast spans the estimated factors alone, so the blend reaches their mean and
+    # the mean of each observed factor is the one the factor prior states.
+    Ke = size(csr.f, 2)
+    f_mu = @views vcat(cross_sectional_forecast_mu(lambda, f_pr.mu[1:Ke], sp.g),
+                       f_pr.mu[(Ke + 1):end])
+    # The block's basis covers its own rows, so the moments expand with the ratios of its
+    # last row, the last fitted observation.
+    ex = cross_sectional_expand(csfm.fcb, 1:T, f_mu, f_pr.sigma)
+    # The blend at `lambda = 0` reads no factor mean, so the investable assets read the
+    # ready factors of the blended mean, which hold every factor ready before it.
+    rdy = cross_sectional_ready_factors(f_mu, f_pr.sigma)
+    idx = cross_sectional_investable(am, @view(csfm.vs[end, :]),
+                                     cross_sectional_determined(L, rdy))
+    @argcheck(!isempty(idx),
+              IsEmptyError("no asset is investable at the latest observation: every asset is either inactive, or carries a non-finite idiosyncratic variance or Factor Exposure, or loads on a factor whose moments the factor prior does not state. Give more observations, or widen the active mask of the Asset Panel."))
+    # A factor prior with a Scenario Cap carries its last rows alone, and the scenarios pair
+    # the last rows of each history, so the factor returns keep the rows the scenarios keep
+    # (#1384).
+    rs = (T - size(Xs, 1) + 1):T
+    lift = cross_sectional_lift(pe.srep, pe.mp, L, f_mu, f_pr.sigma, csfm.esigma, idx, Xs;
+                                mtx_sqrt = pe.mtx_sqrt, kwargs...)
+    fX = something(csfm.fr, cross_sectional_factor_returns(csfm))
+    fpr = LowOrderPrior(; X = fX[rs, :], mu = ex.mu, sigma = ex.sigma, w = f_pr.w,
+                        ens = f_pr.ens, kld = f_pr.kld, ow = f_pr.ow, pc = f_pr.pc)
+    return LowOrderPrior(; X = Xs, o_X = oX, mu = lift.mu + rr.b, sigma = lift.sigma,
+                         chol = lift.chol, w = f_pr.w, ens = f_pr.ens, kld = f_pr.kld,
+                         ow = f_pr.ow, rr = rr, fpr = fpr)
+end
+"""
+    cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
+                                 amr::AbstractMatrix{Bool}, hist::Option{<:MatNum})
+        -> CrossSectionalFactorModel
+
+Store the cache that the refit of an entropy pooling prior reads on the block of a [`CrossSectionalFactorPrior`](@ref).
+
+[`cross_sectional_assemble`](@ref) calls it after the Return Forecast. A plain fit stores nothing, and a fit with `cache_reg = true` stores the active mask of the fitted rows in `amr` and the Return Forecast history in `hist`, which is `nothing` when no Calibration Slot reads it.
+
+# Arguments
+
+  - `csfm`: The factor-model block.
+  - `cache_reg`: If `true`, store the cache.
+  - `amr`: The active mask of the fitted rows.
+  - `hist`: The Return Forecast history, or `nothing`.
+
+# Returns
+
+  - `csfm::CrossSectionalFactorModel`: The block, with the cache when `cache_reg` is `true`.
+
+# Related
+
+  - [`cross_sectional_assemble`](@ref)
+  - [`cross_sectional_cached_block`](@ref)
+"""
+function cross_sectional_stored_cache(csfm::CrossSectionalFactorModel, cache_reg::Bool,
+                                      amr::AbstractMatrix{Bool}, hist::Option{<:MatNum})
+    return cache_reg ? rebuild_estimator(csfm, (; amr = amr, hist = hist)) : csfm
+end
+"""
+    cross_sectional_kept_cache(f_pr::NamedTuple, pf::Option{<:AbstractPriorResult}) -> NamedTuple
+
+Keep the cache of a pool in the factor slot of a [`CrossSectionalFactorPrior`](@ref) on the factor moments of its refit.
+
+The refit of [`scenario_prior`](@ref) fits the model of the pool under the new weights, which is `pe2` of the pool and keeps no cache. So the factor prior `fpr` of the refit would carry no cache, and an entropy pooling prior around a nested one would run the opinions of the pool again. The fit that the views read gives the cache in `pf`, the factor prior of its result, and the refit keeps it.
+
+# Arguments
+
+  - `f_pr`: The factor moments of the refit, as [`cross_sectional_factor_moments`](@ref) states them.
+  - `pf`: The factor prior of the result of the fit that the views read, or `nothing`.
+
+# Returns
+
+  - `f_pr::NamedTuple`: `f_pr`, with `pc` from `pf` when `f_pr` carries none.
+
+# Related
+
+  - [`opinion_pooling_cache`](@ref)
+  - [`scenario_prior`](@ref)
+  - [`cross_sectional_moment_prior`](@ref)
+"""
+function cross_sectional_kept_cache(f_pr::NamedTuple, pf::Option{<:AbstractPriorResult})
+    return isnothing(f_pr.pc) ? merge(f_pr, (; pc = opinion_pooling_cache(pf))) : f_pr
+end
 # The refit of a Cross-Sectional Factor Prior under the posterior weights holds its model, as
 # the refit of a `FactorPrior` does (ADR 0205), and gives the weights to `pe` alone, on the
-# factor returns that it reads (#1685). `scenario_factory` documents every method.
-function scenario_factory(pe::CrossSectionalFactorPrior, w, X::MatNum, F::Option{<:MatNum},
-                          pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
+# factor returns that it reads (#1685). A fit that stores the cache gives those factor
+# returns with no regression (#1751). `scenario_factory` documents every method.
+function scenario_factory(pe::CrossSectionalFactorPrior, w,
+                          pr::Option{<:AbstractPriorResult}, X::MatNum, F::Option{<:MatNum},
+                          pnl::Option{<:AssetPanel}; strict::Bool = false,
+                          cache_reg::Bool = false, kwargs...)
+    rr = cross_sectional_cached_block(pe, pr, X)
+    f = if isnothing(rr)
+        cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...).f
+    else
+        cross_sectional_cached_scenarios(rr).f
+    end
     return rebuild_estimator(pe,
                              (;
-                              pe = scenario_factory(pe.pe, w, f, nothing, nothing;
-                                                    strict = strict)))
+                              pe = scenario_factory(pe.pe, w, scenario_factor_result(pr), f,
+                                                    nothing, nothing; strict = strict)))
 end
-# The refit of an entropy pooling prior runs the regression stage once, and fits the factor
-# prior of `scenario_factory` on its factor returns. `scenario_prior` documents every method.
-function scenario_prior(pe::CrossSectionalFactorPrior, w, X::MatNum, F::Option{<:MatNum},
-                        pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
-    (; f, rs, kw) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
-    fpe = scenario_factory(pe.pe, w, f, nothing, nothing; strict = strict)
-    f_pr = cross_sectional_factor_moments(fpe, pe.f_mp, rs.ca.f, rs.lv; strict = strict,
-                                          kw...)
-    return cross_sectional_assemble(pe, f_pr, rs.ca, rs.fit, rs.rde; kw...)
+# The refit of an entropy pooling prior fits the factor prior of `scenario_factory` on the
+# factor returns of the regression. A fit that stores the cache gives the regression, the
+# scenarios and the Return Forecast of the fit that the views read, so the refit runs the
+# steps that read the factor moments alone (#1751). Otherwise it runs the regression stage
+# once. `scenario_prior` documents every method.
+function scenario_prior(pe::CrossSectionalFactorPrior, w, pr::Option{<:AbstractPriorResult},
+                        X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
+                        strict::Bool = false, cache_reg::Bool = false, kwargs...)
+    rr = cross_sectional_cached_block(pe, pr, X)
+    pf = scenario_factor_result(pr)
+    if isnothing(rr)
+        (; f, rs, kw) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
+        fpe = scenario_factory(pe.pe, w, pf, f, nothing, nothing; strict = strict)
+        f_pr = cross_sectional_kept_cache(cross_sectional_factor_moments(fpe, pe.f_mp,
+                                                                         rs.ca.f, rs.lv;
+                                                                         strict = strict,
+                                                                         kw...), pf)
+        return cross_sectional_assemble(pe, f_pr, rs.ca, rs.fit, rs.rde;
+                                        cache_reg = cache_reg, kw...)
+    end
+    # The refit runs no regression stage, so it drops the keywords that the stage alone reads.
+    kw = Base.structdiff(values(kwargs), NamedTuple{(:ne, :E, :iv, :ivpa, :ts)})
+    (; fa, f, lv) = cross_sectional_cached_scenarios(rr)
+    fpe = scenario_factory(pe.pe, w, pf, f, nothing, nothing; strict = strict)
+    f_pr = cross_sectional_kept_cache(cross_sectional_factor_moments(fpe, pe.f_mp, fa, lv;
+                                                                     strict = strict,
+                                                                     kw...), pf)
+    sp = (; rf = rr.rf, cross_sectional_forecast_split(pe.ofit, rr.rf, rr, pe.cre)...,
+          hist = rr.hist)
+    am = view(rr.amr, size(rr.amr, 1), :)
+    return cross_sectional_moment_prior(pe, f_pr, rr, sp, rr.L, am, pr.X, pr.o_X; kw...)
 end
 # A caller's prior probabilities weigh the fit, so every field takes them on the rows of the
-# factor returns, which each field reads (ADR 0209).
+# factor returns, which each field reads (ADR 0209). The regression answers one factor return
+# for each row after the Descriptor warm-up and the exposure lag, so the count of those rows
+# runs the exposure stage alone (#1751).
 function prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
-                                   F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
-                                   kwargs...)
-    (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
-    inner = prior_probability_factory(pe.pe, w, f, nothing, nothing)
-    return rebuild_estimator(factory(pe, scenario_weights(w, size(f, 1))), (; pe = inner))
+                                   F::Option{<:MatNum}, pnl::AssetPanel;
+                                   ne::Option{<:VecStr} = nothing,
+                                   E::Option{<:MatNum} = nothing,
+                                   iv::Option{<:MatNum} = nothing,
+                                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    (; rw) = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                            ivpa = ivpa)
+    assert_cross_sectional_lag_rows(length(rw), pe.lag)
+    n = length(rw) - pe.lag
+    inner = prior_probability_factory(pe.pe, w, n)
+    return rebuild_estimator(factory(pe, scenario_weights(w, n)), (; pe = inner))
 end
 # The regression answers one factor return for each row after the Descriptor warm-up and the
 # exposure lag, so the count runs the exposure stage alone. The factor prior then counts its

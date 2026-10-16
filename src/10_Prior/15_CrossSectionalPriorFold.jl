@@ -1325,6 +1325,7 @@ The call with no data builds the Prior Result with [`cross_sectional_assemble`](
   - `pe`: Cross-Sectional Factor Prior estimator.
   - `st`: The state of its carry fold.
   - $(arg_dict[:strict]) It is forwarded to the factor prior.
+  - $(arg_dict[:cache_reg]) It is forwarded to [`cross_sectional_assemble`](@ref).
   - `kwargs...`: Additional keyword arguments passed to the matrix processing and the lift.
 
 # Validation
@@ -1343,7 +1344,7 @@ The call with no data builds the Prior Result with [`cross_sectional_assemble`](
   - [`cross_sectional_assemble`](@ref)
 """
 function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
-               strict::Bool = false, kwargs...)
+               strict::Bool = false, cache_reg::Bool = false, kwargs...)
     Tf = isnothing(st.Ms) ? 0 : size(st.Ms, 1)
     @argcheck(!isnothing(st.csr),
               ArgumentError("the carry fold of this Cross-Sectional Factor Prior holds $Tf observation(s) after the Descriptor warm-up, and a fit needs at least lag + 2 = $(pe.lag + 2) of them. Fold more observations before the call with no data."))
@@ -1367,7 +1368,8 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
                nothing
            end)
     pr = cross_sectional_assemble(pe, f_pr, ca, fit,
-                                  cross_sectional_carry_forecast_returns(pe, st); kwargs...)
+                                  cross_sectional_carry_forecast_returns(pe, st);
+                                  cache_reg = cache_reg, kwargs...)
     return shared_series_record(pr, st.buf)
 end
 function fold_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult,

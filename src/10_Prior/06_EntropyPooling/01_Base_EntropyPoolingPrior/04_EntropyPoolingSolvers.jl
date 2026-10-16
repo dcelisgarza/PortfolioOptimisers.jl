@@ -309,7 +309,7 @@ Where:
 
  1. Return `w` when `epc` holds no row. An empty view set states nothing, so the posterior is the prior, and it is answered exactly rather than solved for.
  2. Open `A` and `B` with the row that pins the posterior to sum to one, both sides divided by ``\\sqrt{T}``.
- 3. Stack the block of every key of `epc` onto `A` and `B`, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
+ 3. Stack the block of every key of `epc` onto `A` and `B`, in the sorted order of the keys, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
  4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
  5. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
  6. Raise when `Optim.converged` reports that the solve failed.
@@ -363,7 +363,11 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     factor = inv(sqrt(T))
     blocks = Any[(fill(factor, 1, T), [factor])]
     wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
-    for (key, val) in epc
+    #! The keys of `epc` are `Symbol`s, which hash by their address, so the order of the
+    #! `Dict` moves between two processes. The blocks stack in the sorted order of their keys,
+    #! so one view set gives one problem in every process.
+    for key in sort!(collect(keys(epc)))
+        val = epc[key]
         s = length(val[2])
         #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
         #! fix carries no weight. That is what a primal penalty of weight `sc2` means, and
@@ -449,7 +453,11 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     factor = inv(sqrt(T))
     blocks = Any[(fill(factor, 1, T), [factor])]
     wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
-    for (key, val) in epc
+    #! The keys of `epc` are `Symbol`s, which hash by their address, so the order of the
+    #! `Dict` moves between two processes. The blocks stack in the sorted order of their keys,
+    #! so one view set gives one problem in every process.
+    for key in sort!(collect(keys(epc)))
+        val = epc[key]
         s = length(val[2])
         #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
         #! fix carries no weight. That is what a primal penalty of weight `sc2` means, and

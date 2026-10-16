@@ -78,7 +78,8 @@ LowOrderPrior
        rr ┼ nothing
       fpr ┼ nothing
     x_src ┼ nothing
-  ss_gaps ┴ nothing
+  ss_gaps ┼ nothing
+       pc ┴ nothing
 ```
 
 # Related
@@ -393,7 +394,7 @@ Groups the two result types that hold an asset returns matrix `X` and a feature 
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
     prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
-          dims::Int = 1)
+          dims::Int = 1, cache_reg::Bool = false)
 
 Compute prior information from asset and/or factor returns using a prior estimator.
 
@@ -408,7 +409,7 @@ This method is the entry point every caller uses, and it is written once here. W
  3. Read the source that `pe` states with [`returns_source`](@ref), giving `x_src`.
  4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations.
  5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
- 6. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `strict` as keyword arguments, and record `x_src` in the prior result it produces with [`stamp_returns_source`](@ref). A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. So the keyword `dims` has no effect.
+ 6. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `strict` and `cache_reg` as keyword arguments, and record `x_src` in the prior result it produces with [`stamp_returns_source`](@ref). A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. So the keyword `dims` has no effect.
  7. Record the observations that step 4 dropped with [`shared_series_record`](@ref), so a reader that holds `rd` pairs the rows of `X` with the right observations.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no `ReturnsResult`, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
@@ -419,6 +420,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
   - `rd`: Asset and/or factor returns result.
   - $(arg_dict[:strict_prior_rd])
   - $(arg_dict[:dims_rd])
+  - $(arg_dict[:cache_reg])
 
 # Validation
 
@@ -441,7 +443,7 @@ The Asset Panel travels as the third positional argument for the same reason `rd
   - [`HighOrderPrior`](@ref)
 """
 function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
-               dims::Int = 1)
+               dims::Int = 1, cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
     x_src = returns_source(pe)
@@ -450,7 +452,8 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = fal
     rows = shared_series_rows(rd, x_src, rf)
     rd = shared_series_view(rd, x_src, rf)
     pr = prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
-               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1)
+               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1,
+               cache_reg = cache_reg)
     return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end
 """
@@ -808,7 +811,8 @@ $(DocStringExtensions.FIELDS)
         rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
         fpr::Option{<:LowOrderPrior} = nothing,
         x_src::Option{<:AbstractReturnsSource} = nothing,
-        ss_gaps::Option{<:AbstractVector{Bool}} = nothing
+        ss_gaps::Option{<:AbstractVector{Bool}} = nothing,
+        pc::Option{<:NamedTuple} = nothing
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
@@ -873,6 +877,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the prior result that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
   - The rules of [`assert_shared_series_gaps`](@ref) on `ss_gaps`.
+  - If `pc` is not `nothing`, `length(pc.w) == size(X, 1)`, and `size(pc.X, 1) == size(X, 1)` when `pc.X` is a matrix, through [`assert_pool_cache`](@ref).
 
 ## View parameters
 
@@ -884,6 +889,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - `w`, `ens`, `kld` and `ow` pass through unchanged. They live on the observation axis, and `i` indexes assets.
   - `fpr` passes through unchanged, because it is a distribution over factors rather than over assets. It is why the view keeps `rr` and `fpr` together, and so keeps the factor-block rule of `LowOrderPrior` satisfied.
   - `ss_gaps` passes through unchanged. It lives on the observation axis.
+  - `pc` is dropped. Its rows hold every asset, and a refit of the sub-universe has no cache of its own.
 
 # Examples
 
@@ -903,7 +909,8 @@ LowOrderPrior
        rr ┼ nothing
       fpr ┼ nothing
     x_src ┼ nothing
-  ss_gaps ┴ nothing
+  ss_gaps ┼ nothing
+       pc ┴ nothing
 ```
 
 # Related
@@ -969,6 +976,10 @@ LowOrderPrior
     $(field_dict[:ss_gaps])
     """
     ss_gaps
+    """
+    $(field_dict[:pc])
+    """
+    pc
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
@@ -976,7 +987,8 @@ LowOrderPrior
                            rr::Option{<:AbstractLoadingsRegressionResult},
                            fpr::Option{<:LowOrderPrior},
                            x_src::Option{<:AbstractReturnsSource},
-                           ss_gaps::Option{<:AbstractVector{Bool}})
+                           ss_gaps::Option{<:AbstractVector{Bool}},
+                           pc::Option{<:NamedTuple})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -1033,11 +1045,47 @@ LowOrderPrior
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
         assert_shared_series_gaps(ss_gaps, size(X, 1))
-        return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
-                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
-                   typeof(x_src), typeof(ss_gaps)}(X, o_X, mu, sigma, chol, w, ens, kld, ow,
-                                                   rr, fpr, x_src, ss_gaps)
+        assert_pool_cache(pc, size(X, 1))
+        fs = (X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps, pc)
+        return new{map(typeof, fs)...}(fs...)
     end
+end
+"""
+    assert_pool_cache(pc::Nothing, T::Integer)
+    assert_pool_cache(pc::NamedTuple, T::Integer)
+
+Check the cache of an opinion pool against the scenarios of the [`LowOrderPrior`](@ref) that carries it.
+
+The cache weighs the scenarios of the pool, so its pooled weights and its rows have the rows of the result.
+
+# Arguments
+
+  - `pc`: The cache of the pool, `(; X, w)`, or `nothing`.
+  - `T`: The number of scenarios of the result.
+
+# Validation
+
+  - `length(pc.w) == T`. A `DimensionMismatch` is thrown otherwise.
+  - `size(pc.X, 1) == T` when `pc.X` is a matrix. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`opinion_pooling_cache`](@ref)
+"""
+function assert_pool_cache(::Nothing, ::Integer)::Nothing
+    return nothing
+end
+function assert_pool_cache(pc::NamedTuple, T::Integer)::Nothing
+    @argcheck(length(pc.w) == T,
+              DimensionMismatch("length(pc.w) ($(length(pc.w))) must match size(X, 1) ($T): the pooled weights weigh the scenarios of the result"))
+    @argcheck(isnothing(pc.X) || size(pc.X, 1) == T,
+              DimensionMismatch("pc.X ($(size(pc.X, 1)) rows) must have the rows of X ($T)"))
+    return nothing
 end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        sigma::MatNum, chol::Option{<:MatNum} = nothing,
@@ -1046,8 +1094,10 @@ function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        fpr::Option{<:LowOrderPrior} = nothing,
                        x_src::Option{<:AbstractReturnsSource} = nothing,
-                       ss_gaps::Option{<:AbstractVector{Bool}} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps)
+                       ss_gaps::Option{<:AbstractVector{Bool}} = nothing,
+                       pc::Option{<:NamedTuple} = nothing)::LowOrderPrior
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps,
+                         pc)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1469,7 +1519,8 @@ HighOrderPrior
        │        rr ┼ nothing
        │       fpr ┼ nothing
        │     x_src ┼ nothing
-       │   ss_gaps ┴ nothing
+       │   ss_gaps ┼ nothing
+       │        pc ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}

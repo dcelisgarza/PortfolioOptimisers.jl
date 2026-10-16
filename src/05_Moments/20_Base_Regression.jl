@@ -127,7 +127,8 @@ CrossSectionalRegression
     n ┼ Vector{Int64}: [3]
     b ┼ nothing
    h1 ┼ nothing
-   dc ┴ nothing
+   dc ┼ nothing
+   lv ┴ nothing
 ```
 
 # Related

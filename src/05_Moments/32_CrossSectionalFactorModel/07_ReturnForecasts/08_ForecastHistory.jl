@@ -58,7 +58,8 @@ function forecast_history_block(csfm::CrossSectionalFactorModel,
                                                                                                                :),
                                                                   dc = nothing_scalar_array_getindex_odd_order(csr.dc,
                                                                                                                1:tb,
-                                                                                                               :))
+                                                                                                               :),
+                                                                  lv = csr.lv)
                                      end, Ms = Mb,
                                      vs = isnothing(vs) ? nothing : vs[1:tb, :],
                                      esigma = csfm.esigma, edof = csfm.edof,

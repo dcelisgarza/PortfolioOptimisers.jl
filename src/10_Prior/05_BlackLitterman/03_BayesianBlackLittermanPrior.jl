@@ -384,8 +384,8 @@ The width of ``\\mathbf{P}`` is enforced rather than assumed: a precomputed [`Bl
 # Algorithm
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
- 2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
- 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, and check it carries a regression with [`assert_prior_regression`](@ref).
+ 2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref), through [`assert_bbl_views_axis`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
+ 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`. [`bbl_posterior`](@ref) runs the steps 3 to 16 on it, so the refit of [`scenario_prior`](@ref) under new scenario weights blends the views into a refit `prior_result` with the same code. Check that `prior_result` carries a regression with [`assert_prior_regression`](@ref).
  4. Derive the Investable Mask with [`investable_mask`](@ref) and view the fitted prior at it with [`investable_prior`](@ref). The mask alone, and not [`investable_views`](@ref): the views land on the factors, so there is no Non-Investable Axis to mint and no asset universe this member otherwise reads.
  5. Read `posterior_X`, `prior_sigma`, `fpr` and `rr` off the *reduced* prior, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, and read `P`, `Q` and `omega` off the result with [`bl_view_block`](@ref). The axis is `:tfkey`, because these views land on the factors. A view set with no row left gives a `0 × K` block, and the steps below then answer the moments this member's factor model implies — see the note under `bl_view_block`, and note that it is *not* the wrapped prior.
@@ -436,6 +436,36 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     X, F = dims_oriented(dims, X, F)
+    assert_bbl_views_axis(pe, F)
+    prior_result = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    return bbl_posterior(pe, prior_result, F, strict; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a [`BayesianBlackLittermanPrior`](@ref) whose factor universe does not describe the factor returns.
+
+The fit and the refit of [`scenario_prior`](@ref) both run this check before they fit the wrapped prior.
+
+# Arguments
+
+  - `pe`: Bayesian Black-Litterman prior estimator.
+  - `F`: Factor returns, `observations × factors`.
+
+# Validation
+
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.tfkey)` and `length(pe.sets.dict[pe.sets.tfkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`assert_bl_views_axis`](@ref)
+"""
+function assert_bbl_views_axis(pe::BayesianBlackLittermanPrior, F::MatNum)
     # The views update the *factor* distribution — the assets are its projection through the
     # loadings — so they resolve against the declared factor axis, not against `xkey`. Only the
     # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own
@@ -446,7 +476,39 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
                         "BayesianBlackLittermanPrior, whose views are written in factor names",
                         "F")
     end
-    prior_result = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Blends the factor views of a [`BayesianBlackLittermanPrior`](@ref) into the result its wrapped prior answered.
+
+Everything the estimator does after the wrapped prior has answered, written once: the steps 3 to 16 of the returns-matrix method of [`prior`](@ref). The batch fit reaches it with the result of a fit over the caller's matrices, and the refit of [`scenario_prior`](@ref) reaches it with the result of the refit of the wrapped prior under new scenario weights. Nothing here reads the asset returns, which the result already carries. The factor returns give the observation count of the views and the matrix that processes the factor covariance.
+
+# Arguments
+
+  - `pe`: Bayesian Black-Litterman prior estimator.
+  - `prior_result`: The result of the wrapped prior `pe.pe`.
+  - `F`: Factor returns, `observations × factors`.
+  - `strict`: If `true`, enforce strict validation of views and sets.
+  - `kwargs...`: Additional keyword arguments passed to matrix processing.
+
+# Validation
+
+  - The rules of the returns-matrix method of [`prior`](@ref), from step 3 on.
+
+# Returns
+
+  - `pr::LowOrderPrior`: As the returns-matrix method of [`prior`](@ref) states it.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`bl_posterior`](@ref)
+  - [`scenario_prior`](@ref)
+"""
+function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPriorResult,
+                       F::MatNum, strict::Bool; kwargs...)
     assert_prior_regression(prior_result, :pe)
     # The reduction, once, at this estimator's entry. The views land on the *factors*, so the
     # view axis is untouched by a departure and no view row can be dropped for one — which is

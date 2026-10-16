@@ -528,7 +528,9 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     vapr = investable_prior(imsk, a_prior)
     a_prior_mu, a_prior_sigma = vapr.mu, vapr.sigma
     # Factor prior.
-    f_prior = prior(pe.f_pe, F; strict = strict)
+    # The keywords reach the factor prior too, so a refit under new scenario weights reads
+    # its cache from `fpr` (#1751).
+    f_prior = prior(pe.f_pe, F; strict = strict, kwargs...)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors. Only the reconstruction is shared with `FactorPrior`:
     # the asset moments here come out of the augmented system, not out of a lift. It runs on
@@ -664,7 +666,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                          mu = expand_moment(posterior_mu, imsk, 1),
                          sigma = expand_moment(posterior_sigma, imsk), w = a_kept.w,
                          ens = a_kept.ens, kld = a_kept.kld, ow = a_kept.ow,
-                         rr = expand_regression(rr, imsk), fpr = fpr)
+                         rr = expand_regression(rr, imsk), fpr = fpr,
+                         pc = opinion_pooling_cache(a_kept))
 end
 
 function factor_residual_config(::AugmentedBlackLittermanPrior)

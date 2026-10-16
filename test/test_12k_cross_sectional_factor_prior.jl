@@ -2114,3 +2114,148 @@ end
         @test !iszero(a.rr.b)
     end
 end
+
+# A prior that counts its fits, so a test reads how many times a refit fits it.
+struct CsfpFitCountPrior{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    pe::T
+    n::Base.RefValue{Int}
+end
+function PortfolioOptimisers.prior(pe::CsfpFitCountPrior, X::PortfolioOptimisers.MatNum,
+                                   args...; dims::Int = 1, kwargs...)
+    pe.n[] += 1
+    return prior(pe.pe, X; dims = dims, kwargs...)
+end
+function PortfolioOptimisers.factory(pe::CsfpFitCountPrior, w)
+    return CsfpFitCountPrior(PortfolioOptimisers.factory(pe.pe, w), pe.n)
+end
+PortfolioOptimisers.keeps_observations(::CsfpFitCountPrior) = true
+
+#=
+An entropy pooling prior holds the model of the prior it wraps, so its refit under the posterior
+weights reads the regression, the scenarios and the Return Forecast of the fit that the views
+read (ADR 0205). A fit with `cache_reg = true` stores what the refit needs on its block, and the
+refit reads it from the result of that fit, so it runs no regression (#1751, ADR 0219).
+=#
+@testset "The refit under new scenario weights reads the cache of the fit (#1751)" begin
+    PO = PortfolioOptimisers
+    rd = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3, seed = 782_001,
+                    late_listing_proba = 0.0, delisting_proba = 0.0, missing_ratio = 0.0).rd
+    rfe = FixedWeightedReturnForecast(;
+                                      scores = DescriptorScores(;
+                                                                descriptors = [Passthrough(;
+                                                                                           field = "eps_ntm")],
+                                                                outlier = nothing,
+                                                                scoring = nothing),
+                                      scale = 0.02)
+    pes = (CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5),
+           CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                     families = ["industry" => nothing]),
+           CrossSectionalFactorPrior(; factors = csfp_factors(), minra = 5, rfe = rfe,
+                                     lambda = PrecisionBlend(;
+                                                             err = ForecastHistoryError()),
+                                     c = ForecastCalibrationSlope(;
+                                                                  wu = ThresholdWarmUp(;
+                                                                                       min_obs = 2))))
+    kw = (; ne = rd.ne, E = rd.E)
+    for pe in pes
+        pr = prior(pe, rd)
+        prc = prior(pe, rd; cache_reg = true)
+        # A plain fit stores no cache, and the cache changes no number. The regression
+        # records its live factors on every fit.
+        @test isnothing(pr.rr.amr)
+        @test isnothing(pr.rr.hist)
+        @test pr.rr.csr.lv == prc.rr.csr.lv == trues(size(pr.rr.csr.f, 2))
+        @test size(prc.rr.amr) == size(prc.rr.rw)
+        @test isnothing(prc.rr.hist) == isnothing(pe.rfe)
+        # An asset that the model does not determine is `NaN`, so the checks read `isequal`.
+        @test isequal(prc.mu, pr.mu)
+        @test isequal(prc.sigma, pr.sigma)
+        @test isequal(prc.X, pr.X)
+        @test isnothing(PO.cross_sectional_cached_block(pe, pr, rd.X))
+        @test isnothing(PO.cross_sectional_cached_block(pe, nothing, rd.X))
+        @test PO.cross_sectional_cached_block(pe, prc, rd.X) === prc.rr
+        # A cache of another asset universe is not read.
+        @test isnothing(PO.cross_sectional_cached_block(pe, prc, rd.X[:, 1:5]))
+        T = size(prc.X, 1)
+        w = StatsBase.aweights(LinearAlgebra.normalize(rand(StableRNG(3), T) .+ 0.5, 1))
+        full = PO.scenario_prior(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
+        cached = PO.scenario_prior(pe, w, prc, rd.X, nothing, rd.pnl; kw...)
+        for k in (:X, :o_X, :mu, :sigma, :w)
+            @test isequal(getproperty(cached, k), getproperty(full, k))
+        end
+        @test isequal(cached.fpr.mu, full.fpr.mu)
+        @test isequal(cached.fpr.sigma, full.fpr.sigma)
+        @test isequal(cached.rr.b, full.rr.b)
+        @test isequal(cached.rr.lambda, full.rr.lambda)
+        @test isequal(cached.rr.c, full.rr.c)
+        # The refit keeps the cache, so a later stage reads it too.
+        @test PO.cross_sectional_cached_block(pe, cached, rd.X) === cached.rr
+        # The cached refit runs no regression. Measured on this panel: 0.6 MB and 0.2 MB in
+        # place of 5.3 MB and 6.7 MB. The Calibration Slots of the forecast read the factor
+        # moments, so they run again under the new weights, and the refit there allocates
+        # 8.1 MB in place of 12.8 MB.
+        f_full() = PO.scenario_prior(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
+        f_cached() = PO.scenario_prior(pe, w, prc, rd.X, nothing, rd.pnl; kw...)
+        f_full()
+        f_cached()
+        @test @allocated(f_cached()) <
+              @allocated(f_full()) * (isnothing(pe.rfe) ? 1 / 4 : 9 / 10)
+        # The estimator of the refit reads the same factor returns from the cache.
+        a = PO.scenario_factory(pe, w, nothing, rd.X, nothing, rd.pnl; kw...)
+        b = PO.scenario_factory(pe, w, prc, rd.X, nothing, rd.pnl; kw...)
+        @test isequal(prior(a, rd).mu, prior(b, rd).mu)
+    end
+    # The entropy pooling prior fits its prior with the cache, and every refit reads it, so
+    # the result is the one of the full refit.
+    pe = first(pes)
+    sets = UniverseSets(; dict = Dict("nx" => rd.nx))
+    views = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.002")
+    s2 = prior(pe, rd).sigma[2, 2]
+    sv = LinearConstraintEstimator(; val = "$(rd.nx[2]) == $(1.2 * s2)")
+    for ep in
+        (EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views, sigma_views = sv),
+         MeucciEntropyPoolingPrior(; pe = pe, sets = sets, mu_views = views))
+        pw = prior(ep, rd)
+        @test !isnothing(pw.rr.amr)
+        @test isapprox(LinearAlgebra.dot(pw.w, pw.X[:, 1]), 0.002; rtol = 1e-5)
+    end
+    # A caller's prior probabilities are put on the rows of the factor returns with the
+    # exposure stage alone, and give the estimator of the regression stage.
+    T = size(prior(pe, rd).X, 1)
+    w0 = StatsBase.pweights(fill(inv(T), T))
+    q = PO.prior_probability_factory(pe, w0, rd.X, nothing, rd.pnl; kw...)
+    n = size(PO.cross_sectional_factor_scenarios(pe, rd.X, nothing, rd.pnl; kw...).f, 1)
+    @test n == T
+    ref = PO.rebuild_estimator(PO.factory(pe, PO.scenario_weights(w0, n)),
+                               (; pe = PO.factory(pe.pe, PO.scenario_weights(w0, n))))
+    @test isequal(prior(q, rd).mu, prior(ref, rd).mu)
+    stage() = PO.cross_sectional_regression_stage(pe, rd.X, nothing, rd.pnl; kw...)
+    ppf() = PO.prior_probability_factory(pe, w0, rd.X, nothing, rd.pnl; kw...)
+    stage()
+    ppf()
+    @test @allocated(ppf()) < @allocated(stage())
+    # A pool in the factor slot stores its cache on the factor prior of the result, and the
+    # refit reads it from `fpr`, so the opinions run once, for the fit alone.
+    nfit = Ref(0)
+    pool = OpinionPoolingPrior(;
+                               pes = [EntropyPoolingPrior(;
+                                                          pe = CsfpFitCountPrior(EmpiricalPrior(),
+                                                                                 nfit))])
+    pp = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                   pe = pool)
+    @test isnothing(prior(pp, rd).fpr.pc)
+    @test !isnothing(prior(pp, rd; cache_reg = true).fpr.pc)
+    nfit[] = 0
+    pw = prior(EntropyPoolingPrior(; pe = pp, sets = sets, mu_views = views), rd)
+    @test nfit[] == 1
+    @test isapprox(LinearAlgebra.dot(pw.w, pw.X[:, 1]), 0.002; rtol = 1e-5)
+    # The refit keeps the cache on its factor prior, so the refit of an entropy pooling prior
+    # around a nested one pools no opinion either.
+    @test !isnothing(pw.fpr.pc)
+    nfit[] = 0
+    inner = EntropyPoolingPrior(; pe = pp, sets = sets, mu_views = views)
+    outer = LinearConstraintEstimator(; val = "$(rd.nx[1]) == 0.0021")
+    pn = prior(EntropyPoolingPrior(; pe = inner, sets = sets, mu_views = outer), rd)
+    @test nfit[] == 1
+    @test isapprox(LinearAlgebra.dot(pn.w, pn.X[:, 1]), 0.0021; rtol = 1e-5)
+end

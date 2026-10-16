@@ -1796,7 +1796,7 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = fep), X, F)
     @test isapprox(pr.mu[1], 0.004, rtol = 1e-6)
     @test isapprox(pr.mu, transpose(pr.X) * pr.w, rtol = 1e-10)
-    @test isa(PortfolioOptimisers.scenario_factory(fep, pr.w, X, F, nothing).pe,
+    @test isa(PortfolioOptimisers.scenario_factory(fep, pr.w, nothing, X, F, nothing).pe,
               EmpiricalPrior)
     # An opinion pool reweights scenarios too, so the refit holds the rows of `pe1` and the
     # model of `pe2` under the pooled weights, and the opinions do not pool again. Before the
@@ -1887,12 +1887,13 @@ end
     for p in (FactorPrior(), FactorBlackLittermanPrior(; views = blv),
               AugmentedBlackLittermanPrior(; a_views = blv, f_views = blv),
               BlackLittermanPrior(; pe = FactorPrior(), views = blv))
-        q = PortfolioOptimisers.scenario_factory(p, w, X, F, nothing)
+        q = PortfolioOptimisers.scenario_factory(p, w, nothing, X, F, nothing)
         r = hasproperty(p, :re) ? p : p.pe
         s = hasproperty(q, :re) ? q : q.pe
         @test s.re === r.re
     end
-    @test typeof(PortfolioOptimisers.scenario_factory(EmpiricalPrior(), w, X, F, nothing)) ==
+    @test typeof(PortfolioOptimisers.scenario_factory(EmpiricalPrior(), w, nothing, X, F,
+                                                      nothing)) ==
           typeof(PortfolioOptimisers.factory(EmpiricalPrior(), w))
 end
 
@@ -2332,4 +2333,125 @@ end
              nothing) == 60
     @test nk[] == 0
     @test isnothing(ks(abl(EmpiricalPrior(), FitCountPrior{false}(cap, nc)), 60))
+end
+
+@testset "The refit of an opinion pool reads the cache of the fit (#1751)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1751)
+    X = randn(rng, 60, 4) ./ 100
+    F = randn(rng, 60, 2) ./ 100
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A1", "A2", "A3", "A4"]))
+    fsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["F1", "F2"]))
+    lce(s) = LinearConstraintEstimator(; val = s)
+    # An opinion fits its prior once, and refits it once after its own solve, so each pooling
+    # of the opinions adds two fits to `no`.
+    no, n1 = Ref(0), Ref(0)
+    ops = [EntropyPoolingPrior(; pe = FitCountPrior{true}(EmpiricalPrior(), no),
+                               sets = sets, mu_views = lce("A3 == 0.001")),
+           EntropyPoolingPrior(; sets = sets, mu_views = lce("A4 == -0.001"))]
+    w = aweights(LinearAlgebra.normalize(rand(rng, 60) .+ 0.5, 1))
+    for pe1 in (nothing, FitCountPrior{false}(EmpiricalPrior(), n1))
+        op = OpinionPoolingPrior(; pes = ops, pe1 = pe1)
+        pr = prior(op, X)
+        prc = prior(op, X; cache_reg = true)
+        # A plain fit stores no cache, and the cache changes no number.
+        @test isnothing(pr.pc)
+        @test prc.pc.w == prc.w
+        @test isnothing(pe1) ? isnothing(prc.pc.X) : prc.pc.X == prior(pe1, X).X
+        @test prc.mu == pr.mu
+        @test prc.sigma == pr.sigma
+        no[] = 0
+        full = PO.scenario_prior(op, w, nothing, X, nothing, nothing)
+        @test no[] == 2
+        no[] = 0
+        n1[] = 0
+        cached = PO.scenario_prior(op, w, prc, X, nothing, nothing)
+        # The refit reads the rows and the pooled weights, so no opinion and no `pe1` runs.
+        @test no[] == 0
+        @test n1[] == 0
+        @test cached.mu == full.mu
+        @test cached.sigma == full.sigma
+        @test cached.w == full.w
+        @test cached.pc === prc.pc
+        # The entropy pooling prior fits the pool once, and its refit pools no opinion.
+        no[] = 0
+        s2 = pr.sigma[2, 2]
+        ep = prior(EntropyPoolingPrior(; pe = op, sets = sets,
+                                       mu_views = lce("A1 == 0.004"),
+                                       sigma_views = lce("A2 == $(1.2 * s2)")), X)
+        @test no[] == 2
+        @test isapprox(LinearAlgebra.dot(ep.w, ep.X[:, 1]), 0.004; rtol = 1e-6)
+        @test ep.pc.w == prc.w
+    end
+    # A factor prior gives its factor prior the cache, and the refit reads it from `fpr`.
+    fops = [EntropyPoolingPrior(; pe = FitCountPrior{true}(EmpiricalPrior(), no),
+                                sets = fsets, mu_views = lce("F1 == 0.002"))]
+    fpool = OpinionPoolingPrior(; pes = fops)
+    @test !isnothing(prior(FactorPrior(; pe = fpool), X, F; cache_reg = true).fpr.pc)
+    @test isnothing(prior(FactorPrior(; pe = fpool), X, F).fpr.pc)
+    # A feasible view sits near the prior mean of the asset.
+    near(p) = p.mu[1] + sqrt(p.sigma[1, 1]) / 10
+    t1 = near(prior(FactorPrior(; pe = fpool), X, F))
+    no[] = 0
+    ep = prior(EntropyPoolingPrior(; pe = FactorPrior(; pe = fpool), sets = sets,
+                                   mu_views = lce("A1 == $t1")), X, F)
+    @test no[] == 2
+    @test isapprox(LinearAlgebra.dot(ep.w, ep.X[:, 1]), t1; rtol = 1e-6)
+    # An augmented Black-Litterman prior gives its factor prior the cache too.
+    sets2 = UniverseSets(; xkey = "nx",
+                         dict = Dict("nx" => ["A1", "A2", "A3", "A4"],
+                                     "nf" => ["F1", "F2"]))
+    abl = AugmentedBlackLittermanPrior(; f_pe = fpool, a_views = lce("A2 == 0.001"),
+                                       f_views = lce("F2 == 0.001"), sets = sets2)
+    @test !isnothing(prior(abl, X, F; cache_reg = true).fpr.pc)
+    t2 = near(prior(abl, X, F))
+    no[] = 0
+    ep = prior(EntropyPoolingPrior(; pe = abl, sets = sets, mu_views = lce("A1 == $t2")), X,
+               F)
+    @test no[] == 2
+    @test isapprox(LinearAlgebra.dot(ep.w, ep.X[:, 1]), t2; rtol = 1e-6)
+    # A result states a cache with the rows of its scenarios, and an asset view drops it.
+    @test_throws DimensionMismatch LowOrderPrior(; X = X, mu = zeros(4), sigma = cov(X),
+                                                 pc = (; X = nothing, w = w[1:10]))
+    @test_throws DimensionMismatch LowOrderPrior(; X = X, mu = zeros(4), sigma = cov(X),
+                                                 pc = (; X = X[1:10, :], w = w))
+    lp = LowOrderPrior(; X = X, mu = zeros(4), sigma = cov(X), pc = (; X = nothing, w = w))
+    @test isnothing(PO.port_opt_view(lp, [1, 2]).pc)
+    @test isnothing(PO.opinion_pooling_cache(nothing))
+    @test PO.opinion_pooling_cache(lp) === lp.pc
+    # The count of the rows stands in for the data of a prior that reads no Asset Panel.
+    for p in (EmpiricalPrior(), EmpiricalPrior(; max_scenarios = 30),
+              OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                  pe1 = EmpiricalPrior(; max_scenarios = 30)))
+        w0 = aweights(fill(inv(30), 30))
+        a = PO.prior_probability_factory(p, w0, X[1:30, :], F[1:30, :], nothing)
+        b = PO.prior_probability_factory(p, w0, 30)
+        @test prior(a, X[1:30, :], F[1:30, :]).mu == prior(b, X[1:30, :], F[1:30, :]).mu
+    end
+end
+
+@testset "The solve stacks the view blocks in one order in every process" begin
+    # The keys of the view blocks are `Symbol`s, which hash by their address, so the order of
+    # their `Dict` moves between two processes. A search near an infeasible view set reads the
+    # order of its rows, and the Meucci CVaR tests above failed in one process and passed in
+    # another with no change to their code (#1751). Two `Dict`s that iterate in two orders
+    # give one problem.
+    PO = PortfolioOptimisers
+    T = 50
+    w = StatsBase.pweights(fill(1 / T, T))
+    x = randn(StableRNG(9), T, 3) ./ 100
+    eq = (reshape(x[:, 1], 1, T), [0.002])
+    iq = (reshape(-x[:, 2], 1, T), [0.001])
+    a = Dict{Symbol, Tuple{<:PO.MatNum, <:PO.VecNum}}()
+    a[:eq] = eq
+    a[:ineq] = iq
+    b = Dict{Symbol, Tuple{<:PO.MatNum, <:PO.VecNum}}()
+    sizehint!(b, 64)
+    b[:ineq] = iq
+    b[:eq] = eq
+    @test collect(keys(a)) != collect(keys(b))
+    for opt in (OptimEntropyPooling(), OptimEntropyPooling(; alg = LogEntropyPooling()))
+        @test PO.entropy_pooling(w, a, PO.AbstractEntropyPoolingTailView[], opt) ==
+              PO.entropy_pooling(w, b, PO.AbstractEntropyPoolingTailView[], opt)
+    end
 end

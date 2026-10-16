@@ -513,7 +513,9 @@ function assert_factor_residual_config(pe::AbstractPriorEstimator, cfg)::Nothing
 end
 """
     prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
-          dims::Int = 1, strict::Bool = false, ts::Option{<:VecDate} = nothing, kwargs...)
+          dims::Int = 1, strict::Bool = false, ts::Option{<:VecDate} = nothing,
+          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, cache_reg::Bool = false,
+          kwargs...)
 
 Compute factor-based prior moments for asset returns using a factor model.
 
@@ -543,7 +545,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
 # Algorithm
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
- 2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe.
+ 2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. `cache_reg` reaches it too, so a prior there stores the cache that a refit under new scenario weights reads from `fpr`.
  3. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref). The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`. The regression is `pe.re` viewed to the Coverage Universe with [`coverage_regression`](@ref).
  4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
  5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
@@ -561,6 +563,7 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
   - $(arg_dict[:strict])
   - $(arg_dict[:ts]) It has one entry for each observation of `X`, and the loadings result records the entries of the rows the prior result carries, or `nothing`. The method that takes a [`ReturnsResult`](@ref) passes `rd.ts`.
   - $(arg_dict[:cvg_active_mask])
+  - $(arg_dict[:cache_reg])
   - `kwargs...`: Additional keyword arguments passed to matrix processing and estimators.
 
 # Validation
@@ -583,7 +586,8 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
 """
 function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing;
                dims::Int = 1, strict::Bool = false, ts::Option{<:VecDate} = nothing,
-               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+               cache_reg::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
     T = size(X, 1)
     @argcheck(isnothing(ts) || length(ts) == T,
@@ -597,7 +601,9 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
                                   active_mask = dims_oriented(dims, active_mask))
     # `strict` reaches the wrapped prior: `pe.pe` admits `BlackLittermanPrior` and
     # `EntropyPoolingPrior`, both of which resolve view names against a universe and honour it.
-    f_prior = prior(pe.pe, F; strict = strict)
+    # The factor prior stores its cache for a refit under new scenario weights, which reads
+    # it from `fpr` (#1751).
+    f_prior = prior(pe.pe, F; strict = strict, cache_reg = cache_reg)
     rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, cmsk), Xc, F)
     (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
                                                           f_prior.mu, f_prior.sigma, Xc,
@@ -636,8 +642,8 @@ function prior(pe::FactorPrior, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} 
                          rr = expand_regression(rr, cmsk), fpr = f_prior)
 end
 """
-    prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1)
-        -> LowOrderPrior
+    prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1,
+          cache_reg::Bool = false) -> LowOrderPrior
 
 Fit a Factor Prior from a [`ReturnsResult`](@ref).
 
@@ -648,7 +654,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
  1. Check that `rd` carries asset returns and factor returns.
  2. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of the factor returns, and a gap of a vector benchmark under `pe.x_src = ExcessSource()`. The factor prior, the regression and the reconstruction then read the same observations.
  3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
- 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `rd.ts` and `strict` as keyword arguments, and `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
+ 4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `rd.ts`, `strict` and `cache_reg` as keyword arguments, and `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
  5. Record the observations that step 2 dropped with [`shared_series_record`](@ref), and `pe.x_src` with [`stamp_returns_source`](@ref).
 
 # Arguments
@@ -657,6 +663,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
   - $(arg_dict[:rd]) It must carry asset returns in `rd.X` and factor returns in `rd.F`.
   - $(arg_dict[:strict_prior_rd])
   - $(arg_dict[:dims_rd])
+  - $(arg_dict[:cache_reg])
 
 # Validation
 
@@ -676,14 +683,16 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
   - [`ReturnsResult`](@ref)
   - [`Regression`](@ref)
 """
-function prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1)
+function prior(pe::FactorPrior, rd::ReturnsResult; strict::Bool = false, dims::Int = 1,
+               cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
     T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, true)
     rd = shared_series_view(rd, pe.x_src, true)
     pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; iv = rd.iv,
-               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, strict = strict, dims = 1)
+               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, ts = rd.ts, strict = strict, dims = 1,
+               cache_reg = cache_reg)
     return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end
 

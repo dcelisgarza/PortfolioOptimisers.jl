@@ -117,10 +117,10 @@ agree to the tolerance of the solver: the weights to 8.9e-11, `mu` to 8.0e-12 an
   `pe` then failed with a bare `DimensionMismatch`, because its fields read every fitted
   observation. The number of these observations is known only after the regression, because the
   Descriptor warm-up and the exposure lag drop rows, so `scenario_factory` and
-  `prior_probability_factory` fit the regression with `cross_sectional_regression_stage` to read
-  the factor returns of `pe`. `scenario_prior` of this prior runs the stage once and reuses it,
-  so the refit under the posterior weights fits the regression once. The refit under a caller's
-  `w`, through `prior_probability_factory` and then `prior`, fits it twice. No default field of
+  `prior_probability_factory` read the factor returns of `pe`, or their count. The refit reads
+  the regression of the fit that the views read from its Result, and
+  `prior_probability_factory` counts the rows with the exposure stage alone, so neither fits the
+  regression again (ADR 0219). No default field of
   the prior other than `pe` reads weights through `factory`, so on the panel of
   `test_12k_cross_sectional_factor_prior.jl` the posterior without a cap is bit-identical to the
   old one. A field that reads observation weights, such as a `ce` with weights, now keeps the

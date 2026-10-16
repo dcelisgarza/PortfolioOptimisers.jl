@@ -2540,7 +2540,7 @@ end
     pool = PortfolioOptimisers.prior_result_property_pool()
     @test pool ==
           [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :x_src, :ss_gaps,
-           :pr, :kt, :D2, :L2, :S2, :sk, :V, :skmp]
+           :pc, :pr, :kt, :D2, :L2, :S2, :sk, :V, :skmp]
     @test allunique(pool)
     # `fpr` is a field of both carriers, so the concatenation is not already unique.
     @test :fpr in fieldnames(LowOrderPrior)

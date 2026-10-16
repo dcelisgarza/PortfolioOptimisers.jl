@@ -323,6 +323,8 @@ A pair whose leverage is one has a direction of the design of its own, for examp
 
 A factor whose column [`DependentColumnDrop`](@ref) dropped at an observation takes a return of zero by the rule, not from the data. `dc` marks these pairs of observation and factor, so a diagnostic of the fit gives such a factor a variance of zero, and it reads the other factors on the columns that the fit kept.
 
+An Empty Factor has no nonzero exposure at a pair of positive weight, so the fit cannot estimate it at any observation and gives it a return of zero. `lv` records which factors the fit estimated. A refit of a [`CrossSectionalFactorPrior`](@ref) under new scenario weights reads it, so it fits the factor prior on the same factors as the fit.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -335,7 +337,8 @@ $(DocStringExtensions.FIELDS)
         n::AbstractVector{<:Integer},
         b::Option{<:VecNum} = nothing,
         h1::Option{<:AbstractMatrix{Bool}} = nothing,
-        dc::Option{<:AbstractMatrix{Bool}} = nothing
+        dc::Option{<:AbstractMatrix{Bool}} = nothing,
+        lv::Option{<:AbstractVector{Bool}} = nothing
     ) -> CrossSectionalRegression
 
 Keywords correspond to the struct's fields.
@@ -348,13 +351,14 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(b)`, and `length(b) == size(f, 1)`.
   - If provided, `size(h1) == size(eps)`.
   - If provided, `size(dc) == size(f)`.
+  - If provided, `length(lv) == size(f, 2)`.
 
 ## View parameters
 
 `CrossSectionalRegression` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
   - `eps` and `h1` are sliced on their **second** axis, which is the asset axis of a cross-sectional result.
-  - `f`, `n`, `b` and `dc` pass through unchanged. Each is indexed by observation and by factor, and neither axis follows an asset selection.
+  - `f`, `n`, `b`, `dc` and `lv` pass through unchanged. Each is indexed by observation, by factor or by both, and neither axis follows an asset selection.
 
 # Examples
 
@@ -367,7 +371,8 @@ CrossSectionalRegression
     n ┼ Vector{Int64}: [3, 3]
     b ┼ nothing
    h1 ┼ nothing
-   dc ┴ nothing
+   dc ┼ nothing
+   lv ┴ nothing
 ```
 
 # Related
@@ -404,10 +409,15 @@ CrossSectionalRegression
     Dropped-column mask `observations × factors`, or `nothing`. An entry is true where [`DependentColumnDrop`](@ref) dropped the column of the factor at the observation, so the fit gave the factor a return of zero by the rule. `nothing` states no drop, as a fit under every other solve algorithm, and a result that a caller builds by hand, does.
     """
     dc
+    """
+    Live-factor mask, one entry per column of `f`, or `nothing`. An entry is true where the factor is not an Empty Factor, so the fit estimated its return, and false where the fit gave it a return of zero because no pair of positive weight loads on it. `nothing` states no record, as a result that a caller builds by hand, or that a carry fold joins from its steps, does.
+    """
+    lv
     function CrossSectionalRegression(f::MatNum, eps::MatNum, n::AbstractVector{<:Integer},
                                       b::Option{<:VecNum},
                                       h1::Option{<:AbstractMatrix{Bool}},
-                                      dc::Option{<:AbstractMatrix{Bool}})
+                                      dc::Option{<:AbstractMatrix{Bool}},
+                                      lv::Option{<:AbstractVector{Bool}})
         @argcheck(!isempty(f), IsEmptyError("f cannot be empty"))
         @argcheck(!isempty(eps), IsEmptyError("eps cannot be empty"))
         @argcheck(!isempty(n), IsEmptyError("n cannot be empty"))
@@ -428,19 +438,20 @@ CrossSectionalRegression
             @argcheck(size(dc) == size(f),
                       DimensionMismatch("dc ($(size(dc, 1))×$(size(dc, 2))) must match f ($(size(f, 1))×$(size(f, 2)))"))
         end
-        return new{typeof(f), typeof(eps), typeof(n), typeof(b), typeof(h1), typeof(dc)}(f,
-                                                                                         eps,
-                                                                                         n,
-                                                                                         b,
-                                                                                         h1,
-                                                                                         dc)
+        if !isnothing(lv)
+            @argcheck(length(lv) == size(f, 2),
+                      DimensionMismatch("lv ($(length(lv))) must have one entry per column of f ($(size(f, 2)))"))
+        end
+        fs = (f, eps, n, b, h1, dc, lv)
+        return new{map(typeof, fs)...}(fs...)
     end
 end
 function CrossSectionalRegression(; f::MatNum, eps::MatNum, n::AbstractVector{<:Integer},
                                   b::Option{<:VecNum} = nothing,
                                   h1::Option{<:AbstractMatrix{Bool}} = nothing,
-                                  dc::Option{<:AbstractMatrix{Bool}} = nothing)::CrossSectionalRegression
-    return CrossSectionalRegression(f, eps, n, b, h1, dc)
+                                  dc::Option{<:AbstractMatrix{Bool}} = nothing,
+                                  lv::Option{<:AbstractVector{Bool}} = nothing)::CrossSectionalRegression
+    return CrossSectionalRegression(f, eps, n, b, h1, dc, lv)
 end
 """
     port_opt_view(csr::CrossSectionalRegression, i, args...)
@@ -451,7 +462,7 @@ Return a view of a [`CrossSectionalRegression`](@ref) result, selecting only the
 
  1. Take a column view of `eps` over `i`, giving the residuals of the selected assets. The asset axis of a cross-sectional result is the **second** one, because a row of `eps` is one observation.
  2. Take the same view of `h1` when it is set, through [`nothing_scalar_array_view_odd_order`](@ref).
- 3. Build a new [`CrossSectionalRegression`](@ref) from the two views and the four untouched fields, which re-runs every guard of the constructor.
+ 3. Build a new [`CrossSectionalRegression`](@ref) from the two views and the five untouched fields, which re-runs every guard of the constructor.
 
 # Arguments
 
@@ -473,7 +484,8 @@ CrossSectionalRegression
     n ┼ Vector{Int64}: [3]
     b ┼ nothing
    h1 ┼ nothing
-   dc ┴ nothing
+   dc ┼ nothing
+   lv ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(csr, [1, 3])
 CrossSectionalRegression
@@ -482,7 +494,8 @@ CrossSectionalRegression
     n ┼ Vector{Int64}: [3]
     b ┼ nothing
    h1 ┼ nothing
-   dc ┴ nothing
+   dc ┼ nothing
+   lv ┴ nothing
 ```
 
 # Related
@@ -494,7 +507,7 @@ function port_opt_view(csr::CrossSectionalRegression, i, args...)::CrossSectiona
     return CrossSectionalRegression(; f = csr.f, eps = view(csr.eps, :, i), n = csr.n,
                                     b = csr.b,
                                     h1 = nothing_scalar_array_view_odd_order(csr.h1, :, i),
-                                    dc = csr.dc)
+                                    dc = csr.dc, lv = csr.lv)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1509,7 +1522,8 @@ CrossSectionalRegression
     n ┼ Vector{Int64}: [3]
     b ┼ nothing
    h1 ┼ 1×3 BitMatrix
-   dc ┴ nothing
+   dc ┼ nothing
+   lv ┴ nothing
 ```
 
 # Related

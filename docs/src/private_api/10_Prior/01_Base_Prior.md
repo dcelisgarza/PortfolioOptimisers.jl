@@ -26,6 +26,7 @@ investable_weights_view
 PortfolioOptimisers.reads_factor_returns
 PortfolioOptimisers.shared_series_record
 PortfolioOptimisers.assert_shared_series_gaps
+PortfolioOptimisers.assert_pool_cache
 PortfolioOptimisers.shared_series_kept_rows
 PortfolioOptimisers.prior_data_rows
 PortfolioOptimisers.map_row_positions

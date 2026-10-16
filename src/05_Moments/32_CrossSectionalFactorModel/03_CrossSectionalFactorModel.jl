@@ -561,7 +561,9 @@ $(DocStringExtensions.FIELDS)
         lambda::Option{<:Number} = nothing,
         c::Option{<:Number} = nothing,
         idx::Option{<:VecInt} = nothing,
-        ts::Option{<:VecDate} = nothing
+        ts::Option{<:VecDate} = nothing,
+        amr::Option{<:AbstractMatrix{Bool}} = nothing,
+        hist::Option{<:MatNum} = nothing
     ) -> CrossSectionalFactorModel
 
 Keywords correspond to the struct's fields.
@@ -575,8 +577,8 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(fam)`, and `length(fam) == size(M, 2)`.
   - If provided, `!isempty(Ms)`, `size(Ms, 2) == size(M, 1)`, and `size(Ms, 3) == size(M, 2)`.
   - If provided, `size(csr.eps, 2) == size(M, 1)`.
-  - If provided, `!isempty(vs)`, `!isempty(rw)`, `!isempty(bw)`, and each carries `size(M, 1)` columns.
-  - Every two of `vs`, `rw` and `bw` that are present agree on the observation axis, so `size(rw) == size(bw) == size(vs)` when all three are present.
+  - If provided, `!isempty(vs)`, `!isempty(rw)`, `!isempty(bw)`, `!isempty(amr)`, `!isempty(hist)`, and each carries `size(M, 1)` columns.
+  - Every two of `vs`, `rw`, `bw`, `amr` and `hist` that are present agree on the observation axis, so `size(rw) == size(bw) == size(vs)` when all three are present.
   - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
   - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
   - If provided, `lag >= 0`.
@@ -592,7 +594,7 @@ Keywords correspond to the struct's fields.
   - `M`, `L` and `b` are sliced on their **first** axis, which is the asset axis of a loadings result.
   - `csr` is viewed by its own [`port_opt_view`](@ref) method.
   - `Ms` is sliced on its **second** axis, which is the asset axis of a slice.
-  - `vs`, `rw` and `bw` are sliced on their **second** axis, which is the asset axis of a per-asset history.
+  - `vs`, `rw`, `bw`, `amr` and `hist` are sliced on their **second** axis, which is the asset axis of a per-asset history.
   - `esigma` is sliced by [`idiosyncratic_covariance_view`](@ref), on one axis or on both.
   - `edof` and `ediv` are sliced on their only axis, which is the asset axis.
   - `rf` is viewed by its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
@@ -626,7 +628,9 @@ CrossSectionalFactorModel
   lambda ┼ nothing
        c ┼ nothing
      idx ┼ nothing
-      ts ┴ nothing
+      ts ┼ nothing
+     amr ┼ nothing
+    hist ┴ nothing
 ```
 
 # Related
@@ -731,6 +735,14 @@ CrossSectionalFactorModel
     Timestamp of each row of the fit, or `nothing` when the returns data that the prior read carries no timestamps. When the folds of a cross-validation carry timestamps too, a [`factor_attribution`](@ref) matches the two by timestamp, so a prior fitted on other returns data still finds its rows.
     """
     ts
+    """
+    Active-mask history `observations × assets`, on the rows of `csr.f`, or `nothing`. Entry `(t, i)` is true where asset `i` was active at the observation of row `t`. A prior fitted with `cache_reg = true` stores it, so its refit under new scenario weights reads the active assets of the latest row from the block and runs no regression. Every other fit leaves it `nothing`.
+    """
+    amr
+    """
+    Return Forecast history `observations × assets`, on the rows of `csr.f`, or `nothing`. It is the history that a Calibration Slot of the prior read. A prior fitted with `cache_reg = true` stores it when a slot reads it, so its refit under new scenario weights resolves the slot again from the block. Every other fit leaves it `nothing`.
+    """
+    hist
     function CrossSectionalFactorModel(M::MatNum, L::Option{<:MatNum}, b::VecNum,
                                        csr::Option{<:CrossSectionalRegression},
                                        Ms::Option{<:Arr3Num}, vs::Option{<:MatNum},
@@ -744,7 +756,9 @@ CrossSectionalFactorModel
                                        rf::Option{<:AbstractReturnForecastResult},
                                        fx::Option{<:MatNum}, fr::Option{<:MatNum},
                                        lambda::Option{<:Number}, c::Option{<:Number},
-                                       idx::Option{<:VecInt}, ts::Option{<:VecDate})
+                                       idx::Option{<:VecInt}, ts::Option{<:VecDate},
+                                       amr::Option{<:AbstractMatrix{Bool}},
+                                       hist::Option{<:MatNum})
         @argcheck(!isempty(M), IsEmptyError("M cannot be empty"))
         @argcheck(!isempty(b), IsEmptyError("b cannot be empty"))
         N = size(M, 1)
@@ -791,9 +805,15 @@ CrossSectionalFactorModel
         assert_cs_history_obs(trw, tbw, :rw, :bw)
         assert_cs_history_obs(trw, tvs, :rw, :vs)
         assert_cs_history_obs(tbw, tvs, :bw, :vs)
+        tam = cs_history_assets(amr, N, :amr)
+        thi = cs_history_assets(hist, N, :hist)
+        assert_cs_history_obs(trw, tam, :rw, :amr)
+        assert_cs_history_obs(tvs, tam, :vs, :amr)
+        assert_cs_history_obs(trw, thi, :rw, :hist)
+        assert_cs_history_obs(tvs, thi, :vs, :hist)
         assert_cs_block_rows(idx, ts, csr)
         fs = (M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf, fam, fcb, unseen, lag,
-              rf, fx, fr, lambda, c, idx, ts)
+              rf, fx, fr, lambda, c, idx, ts, amr, hist)
         return new{map(typeof, fs)...}(fs...)
     end
 end
@@ -817,9 +837,12 @@ function CrossSectionalFactorModel(; M::MatNum, L::Option{<:MatNum} = nothing, b
                                    lambda::Option{<:Number} = nothing,
                                    c::Option{<:Number} = nothing,
                                    idx::Option{<:VecInt} = nothing,
-                                   ts::Option{<:VecDate} = nothing)::CrossSectionalFactorModel
+                                   ts::Option{<:VecDate} = nothing,
+                                   amr::Option{<:AbstractMatrix{Bool}} = nothing,
+                                   hist::Option{<:MatNum} = nothing)::CrossSectionalFactorModel
     return CrossSectionalFactorModel(M, L, b, csr, Ms, vs, esigma, edof, ediv, rw, bw, nf,
-                                     fam, fcb, unseen, lag, rf, fx, fr, lambda, c, idx, ts)
+                                     fam, fcb, unseen, lag, rf, fx, fr, lambda, c, idx, ts,
+                                     amr, hist)
 end
 """
     cross_sectional_factor_returns(csfm::CrossSectionalFactorModel) -> MatNum
@@ -984,7 +1007,7 @@ Return a view of a [`CrossSectionalFactorModel`](@ref) result, selecting only th
  1. Read `L` with `getfield`, never through property access. The `swap(L, M)` rule of [`CrossSectionalFactorModel`](@ref) makes `csfm.L` return `csfm.M` when `L` is unset, so a property read would materialise `L` as a copy of `M` and lose the unset-ness.
  2. Take a row view of `M`, of `L` when step 1 found a matrix, and an element view of `b`, giving the loadings and the factor-orthogonal expected return of the selected assets.
  3. View the nested fit with its own [`port_opt_view`](@ref) method, which cuts its residuals on the asset axis.
- 4. Take a view of `Ms` on its second axis, and of `vs`, `rw` and `bw` on their second axis, giving the histories of the selected assets.
+ 4. Take a view of `Ms` on its second axis, and of `vs`, `rw`, `bw`, `amr` and `hist` on their second axis, giving the histories of the selected assets.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape, and view `edof` and `ediv` with [`nothing_scalar_array_view`](@ref).
  6. View the Return Forecast with its own [`port_opt_view`](@ref) method, which cuts `mu` and `hist` on the asset axis.
  7. Build a new [`CrossSectionalFactorModel`](@ref) from the views, passing `nf`, `fam`, `fcb`, `lag`, `fx`, `fr`, `lambda`, `c`, `idx` and `ts` through, which re-runs every guard of the constructor.
@@ -1054,7 +1077,11 @@ function port_opt_view(csfm::CrossSectionalFactorModel, i,
                                      else
                                          port_opt_view(rf, i, args...)
                                      end, fx = csfm.fx, fr = csfm.fr, lambda = csfm.lambda,
-                                     c = csfm.c, idx = csfm.idx, ts = csfm.ts)
+                                     c = csfm.c, idx = csfm.idx, ts = csfm.ts,
+                                     amr = nothing_scalar_array_view_odd_order(csfm.amr, :,
+                                                                               i),
+                                     hist = nothing_scalar_array_view_odd_order(csfm.hist,
+                                                                                :, i))
 end
 """
     regression(csfm::CrossSectionalFactorModel, args...)

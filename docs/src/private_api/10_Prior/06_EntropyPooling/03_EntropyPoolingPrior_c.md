@@ -12,6 +12,7 @@ ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
 embedded_pin_weights
 ep_wrapped_prior
 scenario_factory
+PortfolioOptimisers.scenario_factor_result
 scenario_prior
 prior_probability_factory
 assert_scenario_model
