@@ -885,8 +885,8 @@ The positions of the row key of a factor model block count the observations of t
 
 # Algorithm
 
- 1. Find the kept observations with [`shared_series_rows`](@ref). View `rd` at them when there is a gap.
- 2. Refresh the estimation mask with [`benchmark_estimation_mask`](@ref).
+ 1. Find the kept observations with [`shared_series_rows`](@ref).
+ 2. View `rd` at them, and refresh the estimation mask, with [`shared_series_cut`](@ref).
 
 # Arguments
 
@@ -926,7 +926,38 @@ julia> PortfolioOptimisers.shared_series_view(rd, ExcessSource(), false).X
 """
 function shared_series_view(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
                             rf::Bool)::ReturnsResult
-    rows = shared_series_rows(rd, x_src, rf)
+    return shared_series_cut(rd, x_src, shared_series_rows(rd, x_src, rf))
+end
+"""
+    shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                      rows::Option{<:VecInt}) -> ReturnsResult
+
+Return the returns data at the observations `rows` that a fit keeps, with the estimation mask of a matrix benchmark refreshed.
+
+This is the second half of [`shared_series_view`](@ref). A caller that finds the kept observations by another rule, and needs them after the cut, passes them here. An optimiser does so, because it also drops the observations that the record of its prior result marks, and it maps the prior that it fits back through the same rows, see [`shared_series_solve`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rows`: The positions of the kept observations, or `nothing` when the fit keeps every observation.
+
+# Validation
+
+  - At least one observation is kept. An [`IsEmptyError`](@ref) is thrown otherwise.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself when `rows` is `nothing` and no estimation mask changes, and otherwise its view.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_rows`](@ref)
+  - [`benchmark_estimation_mask`](@ref)
+"""
+function shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                           rows::Option{<:VecInt})::ReturnsResult
     @argcheck(isnothing(rows) || !isempty(rows),
               IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under `x_src = ExcessSource()` or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or drop them with MissingDataFilter before the conversion to returns."))
     rd = isnothing(rows) ? rd : port_opt_view(rd, rows, :)

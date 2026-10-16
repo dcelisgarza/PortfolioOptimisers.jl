@@ -662,7 +662,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 function optimise(hrp::HierarchicalRiskParity{<:Any, <:Any, <:Any, <:Nothing},
                   rd::ReturnsResult; kwargs...)
     assert_batch_entry(hrp, "`optimise`")
-    return _optimise(hrp, shared_series_args(hrp, rd)...; kwargs...)
+    return shared_series_solve(hrp, rd; kwargs...)
 end
 
 @pipe_delegates HierarchicalRiskParity opt

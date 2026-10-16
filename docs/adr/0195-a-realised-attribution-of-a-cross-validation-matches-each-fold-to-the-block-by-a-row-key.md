@@ -41,7 +41,7 @@ missing `ts` only where it is load-bearing.
    positions among every observation it folded, and no timestamp, because its buffer keeps none.
    A time-cut of the block cuts the key with it. Both default to `nothing`, so a block built by
    hand keeps the old behaviour. A fit drops each observation with a Shared Series gap before it
-   starts, and counts its rows among the observations it kept. `shared_series_row_key` maps each
+   starts, and counts its rows among the observations it kept. `shared_series_record` maps each
    of those positions back to its observation in the data, on the batch fit, on a buffer refit
    and on the carry fold. A key that kept the count matched every row after a gap to the row
    after it, with no error.

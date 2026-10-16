@@ -567,7 +567,7 @@ Run the inverse volatility portfolio optimisation.
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
     assert_batch_entry(iv, "`optimise`")
-    return _optimise(iv, shared_series_args(iv, rd)...; kwargs...)
+    return shared_series_solve(iv, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)

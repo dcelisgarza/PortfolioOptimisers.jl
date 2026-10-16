@@ -708,8 +708,7 @@ Run the Relaxed Risk Budgeting portfolio optimisation.
 function optimise(rrb::RelaxedRiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(rrb, "`optimise`")
-    return _optimise(rrb, shared_series_args(rrb, rd)...; str_names = str_names,
-                     save = save, kwargs...)
+    return shared_series_solve(rrb, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates RelaxedRiskBudgeting opt

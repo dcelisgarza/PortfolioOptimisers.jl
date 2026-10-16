@@ -22,6 +22,7 @@ PortfolioOptimisers.shared_series_complete
 PortfolioOptimisers.shared_row_finite
 PortfolioOptimisers.shared_series_length
 PortfolioOptimisers.shared_series_view
+PortfolioOptimisers.shared_series_cut
 PortfolioOptimisers.shared_series_gaps
 PortfolioOptimisers.shared_series_step
 PortfolioOptimisers.benchmark_estimation_mask

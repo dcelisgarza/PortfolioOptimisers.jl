@@ -1422,7 +1422,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult; kwargs...)
     assert_batch_entry(sh, "`optimise`")
-    return _optimise(sh, shared_series_args(sh, rd)...; kwargs...)
+    return shared_series_solve(sh, rd; kwargs...)
 end
 
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,

@@ -521,7 +521,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 View the returns data of a meta-optimiser onto the observations its Prior Result answers on.
 
-The outer problem reads the net return of each sub-portfolio off the scenarios of the Prior Result, one row per scenario, so its returns data must hold one row per scenario too. A prior that answers on every observation leaves `rd` whole. A [`CrossSectionalFactorPrior`](@ref) answers on the observations it fitted, which are the last ones of `rd`, because its Descriptor warm-up and its exposure lag consume the first. So a prior with fewer scenarios than `rd` has observations takes the last rows of `rd`, and the timestamps, the benchmark, the Exogenous Series and the Asset Panel of the outer problem follow them.
+The outer problem reads the net return of each sub-portfolio off the scenarios of the Prior Result, one row per scenario, so its returns data must hold one row per scenario too. A prior that answers on every observation leaves `rd` whole. A [`CrossSectionalFactorPrior`](@ref) answers on the observations it fitted, which are the last ones of `rd`, because its Descriptor warm-up and its exposure lag consume the first. So a prior with fewer scenarios than `rd` has observations takes the last rows of `rd`, and the timestamps, the benchmark, the Exogenous Series and the Asset Panel of the outer problem follow them. A prior that dropped the observations of a Shared Series gap from the `rd` that it read takes the last of the observations that it kept, see [`prior_data_rows`](@ref).
 
 # Arguments
 
@@ -534,7 +534,7 @@ The outer problem reads the net return of each sub-portfolio off the scenarios o
 
 # Returns
 
-  - `rd::ReturnsResult`: `rd` itself, or its view onto its last `size(pr.X, 1)` observations.
+  - `rd::ReturnsResult`: `rd` itself, or its view onto the `size(pr.X, 1)` observations that [`prior_data_rows`](@ref) pairs with the scenarios.
 
 # Related
 
@@ -547,7 +547,7 @@ function outer_prior_rows(rd::ReturnsResult, pr::AbstractPriorResult)::ReturnsRe
     n = size(pr.X, 1)
     @argcheck(n <= T,
               DimensionMismatch("the outer problem of a meta-optimiser reads one row of net returns per scenario of the Prior Result, and the prior states $n scenarios over $T observations. A prior that generates more scenarios than observations cannot build the returns of the synthetic assets; give the meta-optimiser a prior that answers on the observations"))
-    return n == T ? rd : port_opt_view(rd, (T - n + 1):T, :)
+    return n == T ? rd : port_opt_view(rd, prior_data_rows(pr, T, n), :)
 end
 """
     assert_fold_alignment(predictions) -> VecPredRes

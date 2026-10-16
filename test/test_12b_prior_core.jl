@@ -1702,12 +1702,12 @@ end
     rdi = ReturnsResult(; nx = string.('a':'h'), X = Xi, iv = ivi, ivpa = 1.1)
 
     pick = PortfolioOptimisers.implied_volatility_picker
-    @test isnothing(pick(Xi, nothing))
-    @test pick(Xi, ivi) === ivi
-    @test pick(Xi[(T - n + 1):end, :], ivi) == ivi[(T - n + 1):end, :]
+    @test isnothing(pick(rdi, Xi, nothing))
+    @test pick(rdi, Xi, ivi) === ivi
+    @test pick(rdi, Xi[(T - n + 1):end, :], ivi) == ivi[(T - n + 1):end, :]
     # An `iv` with fewer rows pairs no row, so it passes on unchanged and the estimator
     # refuses it.
-    @test pick(Xi, ivi[1:n, :]) == ivi[1:n, :]
+    @test pick(rdi, Xi, ivi[1:n, :]) == ivi[1:n, :]
 
     cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
     clp = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252), x_src = PriorSource())
@@ -2539,8 +2539,8 @@ end
     =#
     pool = PortfolioOptimisers.prior_result_property_pool()
     @test pool ==
-          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :x_src, :pr, :kt,
-           :D2, :L2, :S2, :sk, :V, :skmp]
+          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :x_src, :ss_gaps,
+           :pr, :kt, :D2, :L2, :S2, :sk, :V, :skmp]
     @test allunique(pool)
     # `fpr` is a field of both carriers, so the concatenation is not already unique.
     @test :fpr in fieldnames(LowOrderPrior)

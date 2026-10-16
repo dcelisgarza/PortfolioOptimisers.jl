@@ -24,7 +24,10 @@ investable_universe_names
 held_non_investable
 investable_weights_view
 PortfolioOptimisers.reads_factor_returns
-PortfolioOptimisers.shared_series_row_key
+PortfolioOptimisers.shared_series_record
+PortfolioOptimisers.assert_shared_series_gaps
+PortfolioOptimisers.shared_series_kept_rows
+PortfolioOptimisers.prior_data_rows
 PortfolioOptimisers.map_row_positions
 PortfolioOptimisers.kept_row_positions
 ```

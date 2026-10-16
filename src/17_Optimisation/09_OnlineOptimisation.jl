@@ -351,53 +351,236 @@ function partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
     return fold_returns(opt, rd)
 end
 """
-    optimiser_shared_series_view(rd::ReturnsResult,
+    optimiser_shared_series_rows(rd::ReturnsResult,
                                  opt::Union{<:OptimisationEstimator, <:OptimisationResult})
-    optimiser_shared_series_view(rd::ReturnsResult,
+    optimiser_shared_series_rows(rd::ReturnsResult,
                                  opt::Union{<:JuMPOptimisationEstimator,
                                             <:HierarchicalRiskParity,
                                             <:HierarchicalEqualRiskContribution,
                                             <:SchurComplementHierarchicalRiskParity})
-    optimiser_shared_series_view(rd::ReturnsResult,
+    optimiser_shared_series_rows(rd::ReturnsResult,
                                  opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                             <:InverseVolatility, <:NestedClustered,
                                             <:Stacking, <:SubsetResampling})
 
-Return the returns data that one solve of `opt` reads, with the observations of a Shared Series gap dropped, see [`shared_series_args`](@ref).
+Return the observations of `rd` that one solve of `opt` keeps, or `nothing` when it keeps every observation, see [`shared_series_solve`](@ref).
 
-The optimisers that hold a prior are the ones whose online step folds the prior, so the two unions are the unions of [`partial_fit!`](@ref). An optimiser drops a gap of a vector benchmark when any reader of its group states [`ExcessSource`](@ref), see [`group_source`](@ref), and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for its prior, with [`shared_series_view`](@ref). A raw reader of the group loses the rows too, so every reader of the head pairs the same observations. An outer estimator reads the group of the whole head and the prior of the configuration that it holds in `opt`. An optimiser that holds no prior and reads no benchmark, and a precomputed result, return `rd`.
+The optimisers that hold a prior are the ones whose online step folds the prior, so the two unions are the unions of [`partial_fit!`](@ref). An optimiser drops a gap of a vector benchmark when any reader of its group states [`ExcessSource`](@ref), see [`group_source`](@ref), and a gap of the factor returns when [`reads_factor_returns`](@ref) answers `true` for its prior, see [`prior_shared_series_rows`](@ref). A raw reader of the group loses the rows too, so every reader of the head pairs the same observations. An outer estimator reads the group of the whole head and the prior of the configuration that it holds in `opt`. An optimiser that holds no prior and reads no benchmark, and a precomputed result, keep every observation.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. An optimiser with no prior, or a result: return `rd`.
- 2. An outer estimator: return `shared_series_view(rd, group_source(opt), reads_factor_returns(opt.opt.pe))`.
- 3. A configuration or a meta-optimiser: return `shared_series_view(rd, group_source(opt), reads_factor_returns(opt.pe))`.
+ 1. An optimiser with no prior, or a result: return `nothing`.
+ 2. An outer estimator: return `prior_shared_series_rows(rd, group_source(opt), opt.opt.pe)`.
+ 3. A configuration or a meta-optimiser: return `prior_shared_series_rows(rd, group_source(opt), opt.pe)`.
 
 # Related
 
-  - [`shared_series_args`](@ref)
-  - [`shared_series_view`](@ref)
-  - [`reads_factor_returns`](@ref)
+  - [`optimiser_shared_series_view`](@ref)
+  - [`shared_series_solve`](@ref)
+  - [`prior_shared_series_rows`](@ref)
+"""
+function optimiser_shared_series_rows(::ReturnsResult,
+                                      ::Union{<:OptimisationEstimator,
+                                              <:OptimisationResult})
+    return nothing
+end
+function optimiser_shared_series_rows(rd::ReturnsResult,
+                                      opt::Union{<:JuMPOptimisationEstimator,
+                                                 <:HierarchicalRiskParity,
+                                                 <:HierarchicalEqualRiskContribution,
+                                                 <:SchurComplementHierarchicalRiskParity})
+    return prior_shared_series_rows(rd, group_source(opt), opt.opt.pe)
+end
+function optimiser_shared_series_rows(rd::ReturnsResult,
+                                      opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                                 <:InverseVolatility, <:NestedClustered,
+                                                 <:Stacking, <:SubsetResampling})
+    return prior_shared_series_rows(rd, group_source(opt), opt.pe)
+end
+"""
+    prior_shared_series_rows(rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource}, pe)
+        -> Option{Vector{Int}}
+
+Return the observations of `rd` that a head keeps for its group and its prior, or `nothing` when it keeps every observation.
+
+The head drops the observations of a gap that [`shared_series_rows`](@ref) finds under the source of its group `gsrc`, and of a gap of the factor returns when its prior estimator reads them. A prior that is already a result reads no factor return in this solve, so the head reads the record of the result instead. When `rd` is the returns data that the result read, the head also drops the observations that `pe.ss_gaps` marks, see [`shared_series_kept_rows`](@ref). Then the readers of the head pair the rows of `pe.X` with the last rows of the cut data, as they do for a prior that the head fits. So the read-out of an online fold gives the head the whole returns data, and each fallback cuts it by its own rule, see [`batch_from_state`](@ref).
+
+# Algorithm
+
+ 1. Find the observations that the group and the prior estimator keep with [`shared_series_rows`](@ref), giving `rows`.
+ 2. Find the observations that the record of a prior result keeps with [`shared_series_kept_rows`](@ref), giving `kept`. An estimator, and `rd` with no asset returns, give `nothing`.
+ 3. Return the observations that both keep, with [`intersect_kept_rows`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - `gsrc`: The source of the group of the head, see [`group_source`](@ref).
+  - `pe`: The prior of the head, an estimator, a prior result, or `nothing`.
+
+# Returns
+
+  - `rows::Option{Vector{Int}}`: The positions of the kept observations, or `nothing`.
+
+# Related
+
+  - [`optimiser_shared_series_rows`](@ref)
+  - [`shared_series_rows`](@ref)
+  - [`shared_series_kept_rows`](@ref)
+"""
+function prior_shared_series_rows(rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource},
+                                  pe)
+    rows = shared_series_rows(rd, gsrc, reads_factor_returns(pe))
+    kept = isnothing(rd.X) ? nothing : shared_series_kept_rows(pe, size(rd.X, 1))
+    return intersect_kept_rows(rows, kept)
+end
+"""
+    intersect_kept_rows(a::Option{<:VecInt}, b::Option{<:VecInt}) -> Option{<:VecInt}
+
+Return the observations that two cuts both keep, where `nothing` keeps every observation.
+
+# Related
+
+  - [`prior_shared_series_rows`](@ref)
+"""
+function intersect_kept_rows(::Nothing, b::Option{<:VecInt})
+    return b
+end
+function intersect_kept_rows(a::VecInt, ::Nothing)
+    return a
+end
+function intersect_kept_rows(a::VecInt, b::VecInt)
+    return intersect(a, b)
+end
+"""
+    optimiser_shared_series_view(rd::ReturnsResult,
+                                 opt::Union{<:OptimisationEstimator, <:OptimisationResult},
+                                 rows = nothing)
+    optimiser_shared_series_view(rd::ReturnsResult,
+                                 opt::Union{<:JuMPOptimisationEstimator,
+                                            <:HierarchicalRiskParity,
+                                            <:HierarchicalEqualRiskContribution,
+                                            <:SchurComplementHierarchicalRiskParity,
+                                            <:JuMPOptimiser, <:HierarchicalOptimiser,
+                                            <:InverseVolatility, <:NestedClustered,
+                                            <:Stacking, <:SubsetResampling},
+                                 rows::Option{<:VecInt} = optimiser_shared_series_rows(rd, opt))
+
+Return the returns data that one solve of `opt` reads, with the observations that [`optimiser_shared_series_rows`](@ref) drops dropped, see [`shared_series_solve`](@ref).
+
+An optimiser that holds a prior cuts `rd` with [`shared_series_cut`](@ref) under the source of its group, which also refreshes the estimation mask of a matrix benchmark. An optimiser that holds no prior, and a precomputed result, return `rd`.
+
+# Related
+
+  - [`shared_series_solve`](@ref)
+  - [`optimiser_shared_series_rows`](@ref)
+  - [`shared_series_cut`](@ref)
 """
 function optimiser_shared_series_view(rd::ReturnsResult,
                                       ::Union{<:OptimisationEstimator,
-                                              <:OptimisationResult})
+                                              <:OptimisationResult}, ::Any = nothing)
     return rd
 end
 function optimiser_shared_series_view(rd::ReturnsResult,
                                       opt::Union{<:JuMPOptimisationEstimator,
                                                  <:HierarchicalRiskParity,
                                                  <:HierarchicalEqualRiskContribution,
-                                                 <:SchurComplementHierarchicalRiskParity})
-    return shared_series_view(rd, group_source(opt), reads_factor_returns(opt.opt.pe))
-end
-function optimiser_shared_series_view(rd::ReturnsResult,
-                                      opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                                 <:SchurComplementHierarchicalRiskParity,
+                                                 <:JuMPOptimiser, <:HierarchicalOptimiser,
                                                  <:InverseVolatility, <:NestedClustered,
-                                                 <:Stacking, <:SubsetResampling})
-    return shared_series_view(rd, group_source(opt), reads_factor_returns(opt.pe))
+                                                 <:Stacking, <:SubsetResampling},
+                                      rows::Option{<:VecInt} = optimiser_shared_series_rows(rd,
+                                                                                            opt))
+    return shared_series_cut(rd, group_source(opt), rows)
+end
+"""
+    fits_prior(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
+                          <:HierarchicalEqualRiskContribution,
+                          <:SchurComplementHierarchicalRiskParity})
+    fits_prior(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility,
+                          <:NestedClustered, <:Stacking, <:SubsetResampling})
+
+Answer `true` when one solve of `opt` fits its prior on the returns data, so that the prior of its result counts the observations of the data after the cut of the solve.
+
+A prior that is already a result is not fitted again, and it keeps the record of the data that it read. [`shared_series_solve`](@ref) asks only after a cut that dropped an observation, and only an optimiser that holds a prior drops one, so the function has no method for an optimiser that holds no prior.
+
+# Returns
+
+  - `flag::Bool`: Whether the solve fits a prior.
+
+# Related
+
+  - [`shared_series_solve`](@ref)
+"""
+function fits_prior(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
+                               <:HierarchicalEqualRiskContribution,
+                               <:SchurComplementHierarchicalRiskParity})
+    return fits_prior(opt.opt)
+end
+function fits_prior(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                               <:InverseVolatility, <:NestedClustered, <:Stacking,
+                               <:SubsetResampling})
+    return !isa(opt.pe, AbstractPriorResult)
+end
+"""
+    set_result_prior(res::Union{<:NaiveOptimisationResult, <:NestedClusteredResult,
+                                <:StackingResult, <:SubsetResamplingResult,
+                                <:SchurComplementHierarchicalRiskParityResult,
+                                <:HierarchicalResult, <:ProcessedJuMPOptimiserAttributes},
+                     pr::AbstractPriorResult)
+    set_result_prior(res::JuMPOptimisationResult, pr::AbstractPriorResult)
+    set_result_prior(res::Union{<:RiskJuMPOptimisationResult,
+                                <:NonRiskJuMPOptimisationResult,
+                                <:HierarchicalRiskParityResult,
+                                <:HierarchicalEqualRiskContributionResult},
+                     pr::AbstractPriorResult)
+
+Rebuild an optimisation result with the prior result `pr` in place of its own.
+
+[`shared_series_solve`](@ref) is the one caller. It replaces the prior with the same prior plus the record of the cut, so every other field stays correct.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A result that holds the prior in its first field `pr`, and the processed attributes of a JuMP head: rebuild it through its positional constructor with `pr` as the first field.
+ 2. The shared core of a JuMP head: rebuild it with the processed attributes of step 1, through the inner constructor, as [`set_retcode`](@ref) does.
+ 3. A JuMP head, or a hierarchical head, that holds the core in its first field `jr` or `hr`: rebuild it through its positional constructor with the core of step 1 or step 2.
+
+# Validation
+
+  - The prior of each type is in its first field, or in the core in its first field. Every concrete type above obeys this rule, so the method checks nothing.
+
+# Returns
+
+  - `res`: The rebuilt result.
+
+# Related
+
+  - [`shared_series_solve`](@ref)
+  - [`factory`](@ref)
+"""
+function set_result_prior(res::Union{<:NaiveOptimisationResult, <:NestedClusteredResult,
+                                     <:StackingResult, <:SubsetResamplingResult,
+                                     <:SchurComplementHierarchicalRiskParityResult,
+                                     <:HierarchicalResult,
+                                     <:ProcessedJuMPOptimiserAttributes},
+                          pr::AbstractPriorResult)
+    flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
+    return (typeof(res).name.wrapper)(pr, Base.tail(flds)...)
+end
+function set_result_prior(res::JuMPOptimisationResult, pr::AbstractPriorResult)
+    return JuMPOptimisationResult(set_result_prior(res.pa, pr), res.retcode, res.sol,
+                                  res.model)
+end
+function set_result_prior(res::Union{<:RiskJuMPOptimisationResult,
+                                     <:NonRiskJuMPOptimisationResult,
+                                     <:HierarchicalRiskParityResult,
+                                     <:HierarchicalEqualRiskContributionResult},
+                          pr::AbstractPriorResult)
+    flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
+    return (typeof(res).name.wrapper)(set_result_prior(first(flds), pr), Base.tail(flds)...)
 end
 function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
                                  <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)
@@ -862,7 +1045,7 @@ function held_timestamps(::PreviousWeights)
     return nothing
 end
 """
-    batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling}, gsrc::Option{<:AbstractReturnsSource} = group_source(opt))
+    batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser, <:InverseVolatility, <:NestedClustered, <:Stacking, <:SubsetResampling})
     batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio})
     batch_from_state(opt::JuMPOptimisationEstimator)
     batch_from_state(opt::Union{<:HierarchicalRiskParity, <:HierarchicalEqualRiskContribution, <:SchurComplementHierarchicalRiskParity})
@@ -873,22 +1056,21 @@ Turns a folded optimiser into the batch call that reads it out, an estimator and
 
 `optimise(opt)` with no returns rebuilds the `ReturnsResult` and calls the ordinary batch path, so no member above the prior needs a method of its own. The prior becomes `prior(pe)`, a prior result, which the batch path does not refit, so the solve reads the folded prior.
 
-The rebuilt `ReturnsResult` holds every observation that the step folded, and the folded prior drops the observations of a Shared Series gap, see [`shared_series_buffer`](@ref). So the function drops the same observations from the `ReturnsResult` with [`optimiser_shared_series_view`](@ref), while `opt` still holds the prior estimator: a prior result reads no factor return, so the batch path would not drop a gap of the factor returns. The prior and every reader that pairs its observations with the last observations of the returns data then read the same observations, as in the batch fit. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer, and a fallback reads the same `ReturnsResult` as the optimiser it replaces.
+The rebuilt `ReturnsResult` holds every observation that the step folded, and the folded prior drops the observations of a Shared Series gap, see [`shared_series_buffer`](@ref). The folded prior records the observations that it dropped in its `ss_gaps`, see [`shared_series_record`](@ref), so the function returns the whole `ReturnsResult`. The head then drops the marked observations itself, see [`prior_shared_series_rows`](@ref), and the prior and every reader that pairs its observations with the last observations of the returns data read the same observations, as in the batch fit. Each fallback receives the whole `ReturnsResult` and drops by its own rule, as in the batch fit. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer.
 
 The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser with an empty `ReturnsResult`, and its batch function decides whether it answers without returns. `optimise(opt)` with no returns does not reach this function for a [`PreviousWeights`](@ref), because that head has its own method of `optimise(opt)` with no data.
 
 # Algorithm
 
- 1. A JuMP head or a hierarchical head reads out the bundle it holds in `opt` under the source of its own group, and rebuilds itself around the bundle.
+ 1. A JuMP head or a hierarchical head reads out the bundle it holds in `opt`, and rebuilds itself around the bundle.
  2. An optimiser with no state goes to [`batch_without_state`](@ref).
- 3. Rebuild `rd` with [`returns_result`](@ref). An optimiser that holds a prior drops the observations of a Shared Series gap from it with [`shared_series_view`](@ref), under the source of the group `gsrc` and the factor rule of its prior, as [`optimiser_shared_series_view`](@ref) drops them.
+ 3. Rebuild `rd` with [`returns_result`](@ref).
  4. Rebuild the optimiser with `cache = nothing`. An optimiser that holds a prior also replaces `pe` with `prior(pe)`, the result of the folded prior.
  5. Return the optimiser and `rd`.
 
 # Arguments
 
   - `opt`: The optimiser to read out.
-  - `gsrc`: The source of the group of the head that holds `opt`, see [`group_source`](@ref). The default is the group of `opt` itself.
 
 # Validation
 
@@ -905,16 +1087,15 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
   - [`returns_result`](@ref)
   - [`partial_fit!`](@ref)
   - [`prior`](@ref)
-  - [`optimiser_shared_series_view`](@ref)
+  - [`prior_shared_series_rows`](@ref)
 """
 function batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                      <:InverseVolatility, <:NestedClustered, <:Stacking,
-                                     <:SubsetResampling},
-                          gsrc::Option{<:AbstractReturnsSource} = group_source(opt))
+                                     <:SubsetResampling})
     if isnothing(opt.cache)
         return batch_without_state(opt, opt.pe)
     end
-    rd = shared_series_view(returns_result(opt), gsrc, reads_factor_returns(opt.pe))
+    rd = returns_result(opt)
     return rebuild_estimator(opt, (; pe = prior(opt.pe), cache = nothing)), rd
 end
 function batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted,
@@ -926,13 +1107,13 @@ function batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted,
     return rebuild_estimator(opt, (; cache = nothing)), rd
 end
 function batch_from_state(opt::JuMPOptimisationEstimator)
-    inner, rd = batch_from_state(opt.opt, group_source(opt))
+    inner, rd = batch_from_state(opt.opt)
     return rebuild_estimator(opt, (; opt = inner)), rd
 end
 function batch_from_state(opt::Union{<:HierarchicalRiskParity,
                                      <:HierarchicalEqualRiskContribution,
                                      <:SchurComplementHierarchicalRiskParity})
-    inner, rd = batch_from_state(opt.opt, group_source(opt))
+    inner, rd = batch_from_state(opt.opt)
     return rebuild_estimator(opt, (; opt = inner)), rd
 end
 """

@@ -1372,7 +1372,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
  2. Drop the observations of a gap of a vector benchmark under `pe.x_src = ExcessSource()` with [`shared_series_view`](@ref). The estimator does not read the factor returns, so a gap in them drops nothing.
  3. Read the asset returns with [`benchmark_relative_returns`](@ref) under `pe.x_src`, giving `X`.
  4. Call the returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.ne`, `rd.E`, `rd.iv`, `rd.ivpa`, `rd.ts` and `strict` as keyword arguments, and `dims = 1`, because a `ReturnsResult` holds its observations along the rows.
- 5. Record `pe.x_src` in the prior result with [`stamp_returns_source`](@ref).
+ 5. Record the observations that step 2 dropped with [`shared_series_record`](@ref), and `pe.x_src` with [`stamp_returns_source`](@ref).
 
 # Arguments
 
@@ -1404,11 +1404,12 @@ function prior(pe::CrossSectionalFactorPrior, rd::ReturnsResult; strict::Bool = 
               IsNothingError("a Cross-Sectional Factor Prior regresses asset returns on their Factor Exposures, and rd.X is nothing"))
     @argcheck(!isnothing(rd.pnl),
               IsNothingError("a Cross-Sectional Factor Prior reads its Factor Exposures off an Asset Panel, and rd.pnl is nothing. Build the ReturnsResult with the `pnl` that asset_panel returns."))
+    T = size(rd.X, 1)
     rows = shared_series_rows(rd, pe.x_src, false)
     rd = shared_series_view(rd, pe.x_src, false)
     pr = prior(pe, benchmark_relative_returns(rd, pe.x_src), rd.F, rd.pnl; ne = rd.ne,
                E = rd.E, iv = rd.iv, ivpa = rd.ivpa, ts = rd.ts, strict = strict, dims = 1)
-    return stamp_returns_source(shared_series_row_key(pr, rows), pe)
+    return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end
 """
     cross_sectional_pin_choice(choice::BatchChoice, pe::CrossSectionalFactorPrior) -> CrossSectionalFactorPrior

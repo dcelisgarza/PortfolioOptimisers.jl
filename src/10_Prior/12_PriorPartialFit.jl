@@ -330,7 +330,7 @@ Where:
 
  1. Read the state out of `pe.cache` with [`partial_fit_cache`](@ref).
  2. Dispatch on the type of the state. Under a [`SampleBufferState`](@ref), drop the rows of a Shared Series gap with [`shared_series_buffer`](@ref), and run the batch verb over the [`sample_buffer`](@ref) and the [`factor_buffer`](@ref) of the result with [`buffer_prior`](@ref), which gives the masks, the Panel Fields and the Exogenous Series that the buffer records, and the caller's keyword arguments.
- 3. Under a [`SampleBufferState`](@ref), correct the row key of the factor model block. The batch verb counts the positions among the rows that it kept, so [`shared_series_row_key`](@ref) maps them back through the rows of [`buffer_kept_rows`](@ref). The batch verb also counts them from the first row of the buffer, and a capped buffer does not record how many rows it dropped, so [`buffer_row_key`](@ref) removes them under a cap.
+ 3. Under a [`SampleBufferState`](@ref), record the Shared Series cut with [`shared_series_record`](@ref): the marks of the dropped observations of the buffer, and the row key of the factor model block. The batch verb counts the positions among the rows that it kept, so the record maps them back through the rows of [`buffer_kept_rows`](@ref). The batch verb also counts them from the first row of the buffer, and a capped buffer does not record how many rows it dropped, so [`buffer_row_key`](@ref) removes them under a cap.
 
 # Arguments
 
@@ -362,7 +362,7 @@ end
 function prior(pe::AbstractPriorEstimator, state::SampleBufferState; kwargs...)
     fit = shared_series_buffer(state)
     pr = buffer_prior(pe, fit, sample_buffer_panel(fit); kwargs...)
-    return buffer_row_key(shared_series_row_key(pr, state), state.max_history)
+    return buffer_row_key(shared_series_record(pr, state), state.max_history)
 end
 """
     buffer_row_key(pr::AbstractPriorResult, max_history::Nothing)
@@ -1743,7 +1743,8 @@ The equality holds for `mu`, `sigma`, `X` and `ens`, with and without a horizon,
  4. Read `mu` and `sigma` through [`read_member`](@ref), which refits a member that did not fold over `X`, or over `Xl` under the horizon method. A member that it refits also takes the panel of [`buffer_asset_panel`](@ref), and the implied volatilities and `ivpa` that [`implied_volatility_buffer_kwargs`](@ref) reads from the carried buffer, as the batch verb gives `rd.pnl`, `rd.iv` and `rd.ivpa` to both members. A covariance that it refits is the [`library_covariance_estimator`](@ref) of `pe.ce`, as in the batch verb. An [`ImpliedVolatility`](@ref) has no fold, so it is such a member.
  5. Under the horizon method, convert `mu` and `sigma` with [`horizon_moments!`](@ref).
  6. Cut the carried rows to `pe.max_scenarios` with [`scenario_window`](@ref), and copy them into a new matrix `Xs`, because the next fold writes into the storage of the buffer.
- 7. Fill `Xs` with [`scenario_fill`](@ref), and return a [`LowOrderPrior`](@ref) whose `ens` [`scenario_ens`](@ref) reads from the rows before the cut.
+ 7. Fill `Xs` with [`scenario_fill`](@ref), and build a [`LowOrderPrior`](@ref) whose `ens` [`scenario_ens`](@ref) reads from the rows before the cut.
+ 8. Record the observations of the buffer that step 3 dropped with [`shared_series_record`](@ref), and return the prior.
 
 # Arguments
 
@@ -1790,10 +1791,10 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     # Materialised, not viewed: the buffer's backing matrix is written and reallocated by the
     # next fold, and a Result holding a view of it would change under its holder.
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
-    return LowOrderPrior(;
-                         X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                         mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
-                         x_src = pe.x_src)
+    pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
+                       mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
+                       x_src = pe.x_src)
+    return shared_series_record(pr, state.buf)
 end
 function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                   <:Option{<:PriorCarryState}}; strict::Bool = false,
@@ -1816,10 +1817,10 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                         vols..., kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = Matrix(scenario_window(pe.max_scenarios, X))
-    return LowOrderPrior(;
-                         X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
-                         mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
-                         x_src = pe.x_src)
+    pr = LowOrderPrior(; X = scenario_fill(Xs, mu, sigma, strict, fill_limit, state.named),
+                       mu = mu, sigma = sigma, ens = scenario_ens(pe.max_scenarios, X),
+                       x_src = pe.x_src)
+    return shared_series_record(pr, state.buf)
 end
 """
     partial_fit!(pe::BlackLittermanPrior, X, F = nothing; kwargs...)

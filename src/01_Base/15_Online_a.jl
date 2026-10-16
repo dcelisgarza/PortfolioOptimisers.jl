@@ -652,7 +652,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the observations of a [`SampleBufferState`](@ref) that a fit keeps, or `nothing` when it keeps every observation.
 
-A fit through the buffer drops each observation with a Shared Series gap, see [`shared_series_buffer`](@ref), so it counts the position of a row among the kept observations. Kept row `k` is observation `rows[k]` of the buffer. A reader that records the position of a fitted row maps it through `rows`, as [`shared_series_row_key`](@ref) does. A buffer with no gap answers `nothing` and allocates nothing.
+A fit through the buffer drops each observation with a Shared Series gap, see [`shared_series_buffer`](@ref), so it counts the position of a row among the kept observations. Kept row `k` is observation `rows[k]` of the buffer. A reader that records the position of a fitted row maps it through `rows`, as [`shared_series_record`](@ref) does. A buffer with no gap answers `nothing` and allocates nothing.
 
 # Arguments
 
@@ -666,7 +666,7 @@ A fit through the buffer drops each observation with a Shared Series gap, see [`
 
   - [`buffer_fit_count`](@ref)
   - [`buffer_gap_marks`](@ref)
-  - [`shared_series_row_key`](@ref)
+  - [`shared_series_record`](@ref)
 """
 function buffer_kept_rows(state::SampleBufferState)::Option{Vector{Int}}
     if isnothing(state.G)

@@ -400,15 +400,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Pick the rows of the implied volatility matrix `iv` that pair the rows of the returns matrix `X` that [`returns_matrix_picker`](@ref) picked.
 
-An [`ImpliedVolatility`](@ref) estimator pairs row `t` of `iv` with row `t` of `X`. The returns data carries `iv`, one row per observation of `rd.X`. A prior result can carry fewer rows in `X` than the returns data: a Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) also drops the rows of the Descriptor warm-up and of the exposure lag. Each of them drops leading rows. A prior also drops the observations of a Shared Series gap, which are not leading rows, and an optimiser drops them from the returns data before its prior and its readers read it. So inside an optimiser the rows of `pr.X` are the last rows of the observations that it kept, and the last rows of `iv` pair them. [`scenario_rows`](@ref) reads the probabilities `w` of a prior result on the same last rows. A caller that gives a prior result and the raw returns data after such a gap gets the last rows of `iv`, and they are not the observations of `pr.X`.
+An [`ImpliedVolatility`](@ref) estimator pairs row `t` of `iv` with row `t` of `X`. The returns data carries `iv`, one row per observation of `rd.X`. A prior result can carry fewer rows in `X` than the returns data: a Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) also drops the rows of the Descriptor warm-up and of the exposure lag. Each of them drops leading rows. A prior also drops the observations of a Shared Series gap, which are not leading rows, and it records them in `pr.ss_gaps`. So when `iv` is the implied volatility of the returns data that the prior read, the rows of `pr.X` are the last observations that the marks keep. An optimiser drops the same observations from the returns data before its readers read it, so inside an optimiser `iv` has fewer rows than the marks, and the last rows of `iv` pair the rows of `pr.X`. [`prior_data_rows`](@ref) tells the two cases apart. [`scenario_rows`](@ref) reads the probabilities `w` of a prior result on the last rows of the matrix that the prior fitted.
 
 # Algorithm
 
  1. Return `iv` unchanged when it is `nothing`, or when it has no more rows than `X`. A `iv` with fewer rows than `X` pairs no row, and the estimator that reads it refuses it.
- 2. Otherwise return a view of the last `size(X, 1)` rows of `iv`.
+ 2. Otherwise return a view of the rows of `iv` that [`prior_data_rows`](@ref) pairs with the `size(X, 1)` rows of `X`.
 
 # Arguments
 
+  - `pr`: The prior result or the returns data that the graph verb received. Only a prior result records the observations of a Shared Series gap.
   - `X`: The returns matrix that [`returns_matrix_picker`](@ref) picked, `observations × assets`.
   - `iv`: The implied volatility matrix of the returns data, `observations × assets`, or `nothing`.
 
@@ -419,15 +420,16 @@ An [`ImpliedVolatility`](@ref) estimator pairs row `t` of `iv` with row `t` of `
 # Related
 
   - [`returns_matrix_picker`](@ref)
+  - [`prior_data_rows`](@ref)
   - [`scenario_rows`](@ref)
   - [`ImpliedVolatility`](@ref)
   - [`clusterise`](@ref)
 """
-function implied_volatility_picker(X::MatNum, iv::Option{<:MatNum})
+function implied_volatility_picker(pr::Pr_RR, X::MatNum, iv::Option{<:MatNum})
     if isnothing(iv) || size(iv, 1) <= size(X, 1)
         return iv
     end
-    return view(iv, (size(iv, 1) - size(X, 1) + 1):size(iv, 1), :)
+    return view(iv, prior_data_rows(pr, size(iv, 1), size(X, 1)), :)
 end
 """
     graph_verb_keywords(; ivpa = nothing, branchorder = nothing, strict::Bool = false,
@@ -488,7 +490,7 @@ function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
     graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(cle))
     assert_graph_readable(cle, X)
-    return clusterise(cle, X; pr = pr, rd = rd, iv = implied_volatility_picker(X, iv),
+    return clusterise(cle, X; pr = pr, rd = rd, iv = implied_volatility_picker(pr, X, iv),
                       kwargs..., dims = 1)
 end
 """
@@ -530,8 +532,8 @@ function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult}
     graph_verb_keywords(; kwargs...)
     X = returns_matrix_picker(pr, rd, returns_source(pl))
     assert_graph_readable(pl, X)
-    return phylogeny_matrix(pl, X; pr = pr, rd = rd, iv = implied_volatility_picker(X, iv),
-                            kwargs..., dims = 1)
+    return phylogeny_matrix(pl, X; pr = pr, rd = rd,
+                            iv = implied_volatility_picker(pr, X, iv), kwargs..., dims = 1)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -572,7 +574,8 @@ function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr
     X = returns_matrix_picker(pr, rd, returns_source(plc))
     assert_graph_readable(plc, X)
     return phylogeny_constraints(plc, X; pr = pr, rd = rd,
-                                 iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
+                                 iv = implied_volatility_picker(pr, X, iv), kwargs...,
+                                 dims = 1)
 end
 """
     centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
@@ -613,7 +616,7 @@ function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
     X = returns_matrix_picker(pr, rd, returns_source(cte))
     assert_graph_readable(cte, X)
     return centrality_vector(cte, X; pr = pr, rd = rd,
-                             iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
+                             iv = implied_volatility_picker(pr, X, iv), kwargs..., dims = 1)
 end
 """
     centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
@@ -657,7 +660,7 @@ function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::
     X = returns_matrix_picker(pr, rd, returns_source(pl))
     assert_graph_readable(pl, X)
     return centrality_vector(pl, ct, X; pr = pr, rd = rd,
-                             iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
+                             iv = implied_volatility_picker(pr, X, iv), kwargs..., dims = 1)
 end
 """
     average_centrality(pl::NwE_Pl_ClE_Cl,
@@ -741,7 +744,8 @@ function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
     X = returns_matrix_picker(pr, rd, returns_source(cte))
     assert_graph_readable(cte, X)
     return average_centrality(cte, w, X; pr = pr, rd = rd,
-                              iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
+                              iv = implied_volatility_picker(pr, X, iv), kwargs...,
+                              dims = 1)
 end
 """
     asset_phylogeny(pl::NwE_ClE_Cl,
@@ -786,7 +790,7 @@ function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
     X = returns_matrix_picker(pr, rd, returns_source(pl))
     assert_graph_readable(pl, X)
     return asset_phylogeny(pl, w, X; pr = pr, rd = rd,
-                           iv = implied_volatility_picker(X, iv), kwargs..., dims = 1)
+                           iv = implied_volatility_picker(pr, X, iv), kwargs..., dims = 1)
 end
 """
     centrality_constraints(ccs::CentralityConstraint, pr::Pr_RR;
@@ -882,7 +886,7 @@ function centrality_constraints_from(ccs::CC_VecCC, pr::Pr_RR, rd::Option{<:Retu
     X = returns_matrix_picker(pr, rd, x_src)
     assert_graph_readable(ccs, X)
     return centrality_constraints(ccs, X; pr = pr, rd = rd,
-                                  iv = implied_volatility_picker(X, iv), kwargs...,
+                                  iv = implied_volatility_picker(pr, X, iv), kwargs...,
                                   dims = 1)
 end
 """

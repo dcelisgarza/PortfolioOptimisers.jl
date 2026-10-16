@@ -5,7 +5,7 @@
 julia = "1.13.2"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "3f467969ba"
+commit = "9a0a31331d"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -226,7 +226,7 @@ commit = "3f467969ba"
 "src/09_ConstraintGeneration/07_ThresholdConstraintGeneration.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 8, cog_sum = 4, arg_sum = 3, macros = ["@propagatable"] }
 "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl" = { cyc = 4, cog = 5, arg = 7, cyc_sum = 22, cog_sum = 17, arg_sum = 32, macros = [] }
 "src/09_ConstraintGeneration/09_CrossSectionalFactorAxis.jl" = { cyc = 5, cog = 5, arg = 3, cyc_sum = 15, cog_sum = 8, arg_sum = 11, macros = [] }
-"src/10_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 12, cyc_sum = 97, cog_sum = 71, arg_sum = 73, macros = ["@forward_properties"] }
+"src/10_Prior/01_Base_Prior.jl" = { cyc = 10, cog = 7, arg = 13, cyc_sum = 116, cog_sum = 80, arg_sum = 110, macros = ["@forward_properties"] }
 "src/10_Prior/02_EmpiricalPrior.jl" = { cyc = 4, cog = 3, arg = 7, cyc_sum = 12, cog_sum = 7, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/03_FactorPrior.jl" = { cyc = 3, cog = 2, arg = 10, cyc_sum = 19, cog_sum = 7, arg_sum = 50, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/04_HighOrderPrior.jl" = { cyc = 12, cog = 25, arg = 6, cyc_sum = 57, cog_sum = 68, arg_sum = 59, macros = ["@forward_properties", "@propagatable"] }

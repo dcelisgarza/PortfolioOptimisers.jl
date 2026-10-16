@@ -569,11 +569,12 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     # result. See ADR 0116.
     @argcheck(size(pr2.X, 1) == length(w),
               DimensionMismatch("`pe2`, a $(nameof(typeof(pe.pe2))), answered on $(size(pr2.X, 1)) observations and the pool has $(length(w)). The pool refits `pe2` under the pooled weights of its observations, so `pe2` must answer on the pool's axis. Move the estimator that drops rows, such as a Scenario Cap, into `pe1`, where it makes the scenario set for every opinion and for `pe2`."))
-    (; X, o_X, mu, sigma, chol, rr, fpr) = pr2
+    (; X, o_X, mu, sigma, chol, rr, fpr, ss_gaps) = pr2
     ens = exp(StatsBase.entropy(w))
     kld = [StatsBase.kldivergence(w, view(pw, :, i)) for i in axes(pw, 2)]
     return LowOrderPrior(; X = X, o_X = o_X, mu = mu, sigma = sigma, chol = chol, w = w,
-                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr)
+                         ens = ens, kld = kld, ow = ow, rr = rr, fpr = fpr,
+                         ss_gaps = ss_gaps)
 end
 """
     opinion_pooling_weights(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum},

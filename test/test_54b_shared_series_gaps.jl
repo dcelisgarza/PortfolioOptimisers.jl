@@ -470,3 +470,137 @@ end
     @test isapprox(filter(isfinite, p.mu), filter(isfinite, q.mu); atol = 1e-12)
     @test p.rr.idx == q.rr.idx
 end
+
+@testset "A prior records the observations of a Shared Series cut (#1744)" begin
+    # After a cut, no part of a prior stated which observation of the returns data each row
+    # of its `X` is. Three readers paired the wrong rows: a graph reader of the prior returns
+    # with the raw returns data, an online fallback, and the row key of the prior of an
+    # optimiser. The prior now records the dropped observations in `ss_gaps`.
+    using Clarabel
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false))
+    rows(r, i) = PO.port_opt_view(r, i, :)
+    step(opt, r) = foldl((o, i) -> partial_fit!(o, rows(r, i:i)), 1:size(r.X, 1);
+                         init = opt)
+    Fg = copy(F0)
+    Fg[gap, 1] = NaN
+    # The surface is `NaN` at the dropped observation alone, so a reader that pairs it with
+    # a row of the prior refuses it.
+    ivg = copy(iv0)
+    ivg[gap, 1] = NaN
+    rdg = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg, iv = ivg, ivpa = 1.1)
+    pr = prior(FactorPrior(), rdg)
+
+    @testset "The marks and the row key of a prior" begin
+        @test findall(pr.ss_gaps) == [gap]
+        @test length(pr.ss_gaps) == T
+        @test pr.rr.idx == keep
+        # A fit that drops nothing records nothing.
+        @test isnothing(prior(FactorPrior(),
+                              ReturnsResult(; nx = nx, X = X0, nf = nf, F = F0)).ss_gaps)
+        @test isnothing(prior(EmpiricalPrior(), rdg).ss_gaps)
+        # A high order prior answers the marks of the prior that it wraps.
+        hp = prior(HighOrderPriorEstimator(; pe = FactorPrior()), rdg)
+        @test hp.ss_gaps == pr.ss_gaps
+        @test hp.rr.idx == keep
+        # A view on the assets keeps the marks, which live on the observations.
+        @test PO.port_opt_view(pr, 1:2).ss_gaps == pr.ss_gaps
+        # A second cut composes with the first: the prior read the `T - 1` observations
+        # that a first cut kept, and dropped one more.
+        rd2 = rows(rdg, keep)
+        F2 = copy(rd2.F)
+        F2[3, 2] = NaN
+        p2 = prior(FactorPrior(), ReturnsResult(; nx = nx, X = rd2.X, nf = nf, F = F2))
+        @test findall(p2.ss_gaps) == [3]
+        p3 = PO.shared_series_record(p2, keep, T)
+        @test findall(p3.ss_gaps) == [3, gap]
+        @test p3.rr.idx == setdiff(keep, 3)
+    end
+
+    @testset "The constructor checks the marks" begin
+        Xs = X0[1:4, 1:2]
+        mu = vec(Statistics.mean(Xs; dims = 1))
+        sigma = Statistics.cov(Xs)
+        @test isnothing(LowOrderPrior(; X = Xs, mu = mu, sigma = sigma).ss_gaps)
+        @test LowOrderPrior(; X = Xs, mu = mu, sigma = sigma,
+                            ss_gaps = [false, true, false, false, false]).ss_gaps ==
+              [false, true, false, false, false]
+        # Marks with no gap are refused, so the cut data is always shorter than the marks.
+        @test_throws ArgumentError LowOrderPrior(; X = Xs, mu = mu, sigma = sigma,
+                                                 ss_gaps = falses(5))
+        # The rows of `X` are the last kept observations, so the marks keep at least that many.
+        @test_throws DimensionMismatch LowOrderPrior(; X = Xs, mu = mu, sigma = sigma,
+                                                     ss_gaps = [true, true, false, false])
+    end
+
+    @testset "A graph reader pairs iv by the marks" begin
+        # The window is short enough that the regression of the 59 kept rows has more than
+        # two windows.
+        ive = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityRegression(; ws = 10))
+        clp = ClustersEstimator(; ce = ive, x_src = PriorSource())
+        ref = clusterise(clp, pr; iv = ivg[keep, :], ivpa = 1.1)
+        # Before #1744 the last rows of iv paired row `gap` of iv with row `gap - 1` of
+        # `pr.X`, and the call raised an `IsNonFiniteError`.
+        @test clusterise(clp, pr; rd = rdg, iv = rdg.iv, ivpa = 1.1).res.order ==
+              ref.res.order
+        pick = PO.implied_volatility_picker
+        @test pick(pr, pr.X, ivg) == ivg[keep, :]
+        n = 20
+        Xn = pr.X[(end - n + 1):end, :]
+        @test pick(pr, Xn, ivg) == ivg[keep[(end - n + 1):end], :]
+        # The data after the cut has fewer rows than the marks, so its last rows pair.
+        @test pick(pr, Xn, ivg[keep, :]) == ivg[keep[(end - n + 1):end], :]
+        @test PO.prior_data_rows(rdg, T, n) == (T - n + 1):T
+        # A head that holds the result cuts the marked observations, as a head that fits
+        # the prior does.
+        hrp(pe) = optimise(HierarchicalRiskParity(;
+                                                  opt = HierarchicalOptimiser(; pe = pe,
+                                                                              cle = clp)),
+                           rdg)
+        @test hrp(pr).w ≈ hrp(FactorPrior()).w
+    end
+
+    @testset "An optimiser maps the prior that it fits back to the data" begin
+        # Before #1744 the optimiser cut `rd` before its prior, so the key counted the
+        # positions of the cut data, `1:(T - 1)`.
+        heads = (InverseVolatility(; pe = FactorPrior()),
+                 MeanRisk(; opt = JuMPOptimiser(; pe = FactorPrior(), slv = slv)),
+                 HierarchicalRiskParity(;
+                                        opt = HierarchicalOptimiser(; pe = FactorPrior())),
+                 HierarchicalEqualRiskContribution(;
+                                                   opt = HierarchicalOptimiser(;
+                                                                               pe = FactorPrior())))
+        @testset "$(nameof(typeof(h)))" for h in heads
+            res = optimise(h, rdg)
+            @test res.pr.ss_gaps == pr.ss_gaps
+            @test res.pr.rr.idx == keep
+            @test res.pr.sigma ≈ pr.sigma
+        end
+        # A prior result keeps the record of the data that it read.
+        res = optimise(InverseVolatility(; pe = pr), rdg)
+        @test res.pr.ss_gaps == pr.ss_gaps
+        @test res.pr.rr.idx == keep
+        @test PO.intersect_kept_rows([1, 2, 4], [2, 3, 4]) == [2, 4]
+    end
+
+    @testset "An online fallback reads the rows of its own rule" begin
+        rdf = ReturnsResult(; nx = nx, X = X0, nf = nf, F = Fg)
+        # Infeasible bounds, so the fallback answers.
+        bad = WeightBounds(; lb = fill(0.5, N), ub = ones(N))
+        mk(pe) = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv, wb = bad),
+                          fb = InverseVolatility())
+        b = optimise(mk(FactorPrior()), rdf)
+        o = optimise(step(PO.update_online_estimator(mk(PO.Online(FactorPrior()))), rdf))
+        # The fallback holds an EmpiricalPrior, which reads no factor return, so it reads
+        # every observation in batch and online.
+        @test b.w ≈ optimise(InverseVolatility(), rdf).w
+        @test o.w ≈ b.w
+        # The read-out of the head itself still cuts the marked observation.
+        ok(pe) = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv))
+        ro = optimise(step(PO.update_online_estimator(ok(PO.Online(FactorPrior()))), rdf))
+        rb = optimise(ok(FactorPrior()), rdf)
+        @test isapprox(ro.w, rb.w; rtol = 1e-6)
+        @test ro.pr.ss_gaps == rb.pr.ss_gaps
+        @test ro.pr.rr.idx == rb.pr.rr.idx == keep
+    end
+end

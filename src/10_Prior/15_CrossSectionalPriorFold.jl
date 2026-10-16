@@ -1317,7 +1317,8 @@ The call with no data builds the Prior Result with [`cross_sectional_assemble`](
  3. Read the factor prior with [`cross_sectional_factor_prior`](@ref) over the factor returns of the factors that are not empty and the observed returns, and process and expand its moments with [`cross_sectional_factor_moments`](@ref). An Observed Factor is never empty.
  4. Count the residuals of each asset with [`variance_count`](@ref) on the folded `ve`.
  5. Take the returns data of the Return Forecast with [`cross_sectional_carry_forecast_returns`](@ref).
- 6. Build the result with [`cross_sectional_assemble`](@ref), with the Return Forecast history and the standardised idiosyncratic returns that the state carries. The block records the position of each fitted row among the folded observations, and no timestamp, because the buffer keeps none.
+ 6. Build the result with [`cross_sectional_assemble`](@ref), with the Return Forecast history and the standardised idiosyncratic returns that the state carries. The block records the position of each fitted row among the kept observations, and no timestamp, because the buffer keeps none.
+ 7. Record the Shared Series cut of the buffer with [`shared_series_record`](@ref), which writes the marks of the dropped observations and maps each position to its observation among the folded observations.
 
 # Arguments
 
@@ -1354,20 +1355,20 @@ function prior(pe::CrossSectionalFactorPrior, st::CrossSectionalCarryState;
     # The histories hold every observation after the warm-up, the last `Tf` of the
     # observations with no Shared Series gap that the fold read, so the fitted rows sit at
     # these positions of the folded returns that a fit keeps. The buffer keeps every folded
-    # observation with its mark, so the kept rows map each position to its observation.
+    # observation with its mark, so the record of the cut maps each position to its
+    # observation, as it does after a batch fit.
     fit = (; csr = csr, W = st.W, vs = st.vs, cnt = variance_count(st.ve, csr.eps),
            amr = view(st.amsk, r, :), bwr = view(st.bw, r, :), Xo = view(st.X, r, :), r = r,
            hist = st.hist, S = st.S, Sc = st.Sc, ce = st.ce,
-           idx = kept_row_positions(buffer_kept_rows(st.buf),
-                                    (buffer_fit_count(st.buf) - Tf) .+ r), ts = nothing,
+           idx = (buffer_fit_count(st.buf) - Tf) .+ r, ts = nothing,
            rf = if folds_forecast_rows(pe.rfe)
                return_forecast_result(pe.rfe, st.fh, st.fst)
            else
                nothing
            end)
-    return cross_sectional_assemble(pe, f_pr, ca, fit,
-                                    cross_sectional_carry_forecast_returns(pe, st);
-                                    kwargs...)
+    pr = cross_sectional_assemble(pe, f_pr, ca, fit,
+                                  cross_sectional_carry_forecast_returns(pe, st); kwargs...)
+    return shared_series_record(pr, st.buf)
 end
 function fold_prior_step(pe::CrossSectionalFactorPrior, rd::ReturnsResult,
                          gaps::Option{<:AbstractVector{Bool}})

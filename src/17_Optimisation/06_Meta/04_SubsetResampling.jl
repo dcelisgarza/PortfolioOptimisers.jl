@@ -756,8 +756,8 @@ function optimise(sr::SubsetResampling{<:Any, <:Any, <:Any, <:Any, <:Any, <:Any,
                   rd::ReturnsResult; branchorder::Symbol = :optimal,
                   str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(sr, "`optimise`")
-    return _optimise(sr, shared_series_args(sr, rd)...; branchorder = branchorder,
-                     str_names = str_names, save = save, kwargs...)
+    return shared_series_solve(sr, rd; branchorder = branchorder, str_names = str_names,
+                               save = save, kwargs...)
 end
 """
     group_frames(opt::NestedClustered) -> ReturnsFrames

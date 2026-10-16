@@ -66,18 +66,19 @@ julia> function PortfolioOptimisers.prior(pe::MyPriorEstimator, X::PortfolioOpti
 
 julia> prior(MyPriorEstimator(), [0.01 0.02; 0.03 0.04])
 LowOrderPrior
-      X ┼ 2×2 Matrix{Float64}
-    o_X ┼ nothing
-     mu ┼ Vector{Float64}: [0.02, 0.03]
-  sigma ┼ 2×2 Matrix{Float64}
-   chol ┼ nothing
-      w ┼ nothing
-    ens ┼ nothing
-    kld ┼ nothing
-     ow ┼ nothing
-     rr ┼ nothing
-    fpr ┼ nothing
-  x_src ┴ nothing
+        X ┼ 2×2 Matrix{Float64}
+      o_X ┼ nothing
+       mu ┼ Vector{Float64}: [0.02, 0.03]
+    sigma ┼ 2×2 Matrix{Float64}
+     chol ┼ nothing
+        w ┼ nothing
+      ens ┼ nothing
+      kld ┼ nothing
+       ow ┼ nothing
+       rr ┼ nothing
+      fpr ┼ nothing
+    x_src ┼ nothing
+  ss_gaps ┴ nothing
 ```
 
 # Related
@@ -408,6 +409,7 @@ This method is the entry point every caller uses, and it is written once here. W
  4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations.
  5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
  6. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E` and `strict` as keyword arguments, and record `x_src` in the prior result it produces with [`stamp_returns_source`](@ref). A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. So the keyword `dims` has no effect.
+ 7. Record the observations that step 4 dropped with [`shared_series_record`](@ref), so a reader that holds `rd` pairs the rows of `X` with the right observations.
 
 The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no `ReturnsResult`, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
@@ -444,11 +446,12 @@ function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = fal
     assert_factor_returns(pe, rd.F)
     x_src = returns_source(pe)
     rf = needs_factor_returns(pe) === true
+    T = size(rd.X, 1)
     rows = shared_series_rows(rd, x_src, rf)
     rd = shared_series_view(rd, x_src, rf)
     pr = prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
                ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1)
-    return stamp_returns_source(shared_series_row_key(pr, rows), pe)
+    return stamp_returns_source(shared_series_record(pr, rows, T), pe)
 end
 """
     reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online}) -> Bool
@@ -804,7 +807,8 @@ $(DocStringExtensions.FIELDS)
         ow::Option{<:VecNum} = nothing,
         rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
         fpr::Option{<:LowOrderPrior} = nothing,
-        x_src::Option{<:AbstractReturnsSource} = nothing
+        x_src::Option{<:AbstractReturnsSource} = nothing,
+        ss_gaps::Option{<:AbstractVector{Bool}} = nothing
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
@@ -851,6 +855,10 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
 
 `x_src` records the frame of `X`. [`prior`](@ref) fills it with the source that the prior estimator states, through [`stamp_returns_source`](@ref), when it fits on a [`ReturnsResult`](@ref) and when it reads out the state of an online fold. A returns-matrix method of `prior` cannot know the frame of the matrix that it receives, so it leaves `nothing`. The field lets a consumer that receives the Result in place of the estimator read the frame: the outer problem of a meta-optimiser adds the benchmark back to `X` when the field is [`ExcessSource`](@ref), see [`outer_returns_source`](@ref). A [`HighOrderPrior`](@ref) holds no field of its own, and answers `x_src` from the `LowOrderPrior` that it wraps.
 
+## The observations of the rows
+
+`ss_gaps` records the observations of the returns data that the fit dropped for a Shared Series gap. A fit drops leading rows too: a Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) drops the rows of its warm-up and of its exposure lag. So the rows of `X` are the last `size(X, 1)` observations that `ss_gaps` keeps, and the last `size(X, 1)` observations of the returns data when it is `nothing`. A reader that holds the returns data that the prior read uses the marks to pair its rows with the rows of `X`, see [`shared_series_kept_rows`](@ref). A reader that holds the returns data after the same cut has fewer observations than the marks, so it pairs the last rows, as it did before the record existed. [`prior`](@ref) writes the marks after it fits on the returns data, and after it reads out an online fold. A returns-matrix method of `prior` drops no observation, so it leaves `nothing`. A [`HighOrderPrior`](@ref) answers `ss_gaps` from the `LowOrderPrior` that it wraps.
+
 ## Validation
 
   - `X`, `mu`, and `sigma` must be non-empty.
@@ -864,6 +872,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
   - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the prior result that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
+  - The rules of [`assert_shared_series_gaps`](@ref) on `ss_gaps`.
 
 ## View parameters
 
@@ -874,6 +883,7 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - `X`, `o_X`, `mu`, `sigma` and `chol` are sliced to `i` on the asset axis. `o_X` takes the same cut as `X`, so a subproblem's original returns stay the caller's returns for that subproblem's assets.
   - `w`, `ens`, `kld` and `ow` pass through unchanged. They live on the observation axis, and `i` indexes assets.
   - `fpr` passes through unchanged, because it is a distribution over factors rather than over assets. It is why the view keeps `rr` and `fpr` together, and so keeps the factor-block rule of `LowOrderPrior` satisfied.
+  - `ss_gaps` passes through unchanged. It lives on the observation axis.
 
 # Examples
 
@@ -881,18 +891,19 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
 julia> LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
                      sigma = [0.0001 0.0002; 0.0002 0.0003])
 LowOrderPrior
-      X ┼ 2×2 Matrix{Float64}
-    o_X ┼ nothing
-     mu ┼ Vector{Float64}: [0.02, 0.03]
-  sigma ┼ 2×2 Matrix{Float64}
-   chol ┼ nothing
-      w ┼ nothing
-    ens ┼ nothing
-    kld ┼ nothing
-     ow ┼ nothing
-     rr ┼ nothing
-    fpr ┼ nothing
-  x_src ┴ nothing
+        X ┼ 2×2 Matrix{Float64}
+      o_X ┼ nothing
+       mu ┼ Vector{Float64}: [0.02, 0.03]
+    sigma ┼ 2×2 Matrix{Float64}
+     chol ┼ nothing
+        w ┼ nothing
+      ens ┼ nothing
+      kld ┼ nothing
+       ow ┼ nothing
+       rr ┼ nothing
+      fpr ┼ nothing
+    x_src ┼ nothing
+  ss_gaps ┴ nothing
 ```
 
 # Related
@@ -954,13 +965,18 @@ LowOrderPrior
     $(field_dict[:x_src_pr])
     """
     x_src
+    """
+    $(field_dict[:ss_gaps])
+    """
+    ss_gaps
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
                            ow::Option{<:VecNum},
                            rr::Option{<:AbstractLoadingsRegressionResult},
                            fpr::Option{<:LowOrderPrior},
-                           x_src::Option{<:AbstractReturnsSource})
+                           x_src::Option{<:AbstractReturnsSource},
+                           ss_gaps::Option{<:AbstractVector{Bool}})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
@@ -1016,9 +1032,11 @@ LowOrderPrior
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
+        assert_shared_series_gaps(ss_gaps, size(X, 1))
         return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
                    typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr), typeof(fpr),
-                   typeof(x_src)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src)
+                   typeof(x_src), typeof(ss_gaps)}(X, o_X, mu, sigma, chol, w, ens, kld, ow,
+                                                   rr, fpr, x_src, ss_gaps)
     end
 end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
@@ -1027,8 +1045,9 @@ function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
                        fpr::Option{<:LowOrderPrior} = nothing,
-                       x_src::Option{<:AbstractReturnsSource} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src)
+                       x_src::Option{<:AbstractReturnsSource} = nothing,
+                       ss_gaps::Option{<:AbstractVector{Bool}} = nothing)::LowOrderPrior
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1090,7 +1109,7 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         fpr = pr.fpr, x_src = pr.x_src)
+                         fpr = pr.fpr, x_src = pr.x_src, ss_gaps = pr.ss_gaps)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1438,18 +1457,19 @@ julia> HighOrderPrior(;
                       V = rand(2, 2))
 HighOrderPrior
     pr ┼ LowOrderPrior
-       │       X ┼ 2×2 Matrix{Float64}
-       │     o_X ┼ nothing
-       │      mu ┼ Vector{Float64}: [0.02, 0.03]
-       │   sigma ┼ 2×2 Matrix{Float64}
-       │    chol ┼ nothing
-       │       w ┼ nothing
-       │     ens ┼ nothing
-       │     kld ┼ nothing
-       │      ow ┼ nothing
-       │      rr ┼ nothing
-       │     fpr ┼ nothing
-       │   x_src ┴ nothing
+       │         X ┼ 2×2 Matrix{Float64}
+       │       o_X ┼ nothing
+       │        mu ┼ Vector{Float64}: [0.02, 0.03]
+       │     sigma ┼ 2×2 Matrix{Float64}
+       │      chol ┼ nothing
+       │         w ┼ nothing
+       │       ens ┼ nothing
+       │       kld ┼ nothing
+       │        ow ┼ nothing
+       │        rr ┼ nothing
+       │       fpr ┼ nothing
+       │     x_src ┼ nothing
+       │   ss_gaps ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
@@ -1745,43 +1765,159 @@ function prior_result_property_pool()
 end
 
 """
-    shared_series_row_key(pr::AbstractPriorResult, rows::Nothing)
-    shared_series_row_key(pr::LowOrderPrior, rows::VecInt)
-    shared_series_row_key(pr::HighOrderPrior, rows::VecInt)
-    shared_series_row_key(pr::AbstractPriorResult, state::SampleBufferState)
+    shared_series_record(pr::AbstractPriorResult, rows::Nothing, T::Integer)
+    shared_series_record(pr::LowOrderPrior, rows::VecInt, T::Integer)
+    shared_series_record(pr::HighOrderPrior, rows::VecInt, T::Integer)
+    shared_series_record(pr::AbstractPriorResult, state::SampleBufferState)
 
-Map the positions in the row key of the factor model block of a prior back to the observations of the returns data that the fit was given.
+Record on a prior the observations of the returns data that its fit kept after a Shared Series cut.
 
-A fit drops each observation with a Shared Series gap before it starts, see [`shared_series_view`](@ref) and [`shared_series_buffer`](@ref), so the batch verb counts the position of each row among the observations it kept. Kept row `k` is observation `rows[k]` of the data. The function replaces each position with its observation, so a realised [`factor_attribution`](@ref) of a cross-validation over the same data matches the right rows. A key that kept the positions of the kept rows matched each row after a gap to the row after it, with no error. The timestamps are read off the kept rows, so they need no change.
+A fit drops each observation with a Shared Series gap before it starts, see [`shared_series_view`](@ref) and [`shared_series_buffer`](@ref). After the cut, no part of the prior states which observation of the data each of its rows is. The function writes two records:
+
+  - `ss_gaps`, the marks of the dropped observations, one for each of the `T` observations of the data. A reader that holds the data pairs the rows of `X` with its own rows through the marks, see [`shared_series_kept_rows`](@ref).
+  - The row key of the factor model block. The batch verb counts the position of each row among the observations it kept, and kept row `k` is observation `rows[k]` of the data. The function replaces each position with its observation, so a realised [`factor_attribution`](@ref) of a cross-validation over the same data matches the right rows. A key that kept the positions of the kept rows matched each row after a gap to the row after it, with no error. The timestamps are read off the kept rows, so they need no change.
+
+[`prior`](@ref) calls it after it fits on the returns data and after it reads out a sample buffer, and an optimiser calls it on the prior that it fits after its own cut, see [`shared_series_solve`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Under `rows`:
+
+ 1. Mark every one of the `T` observations as dropped, giving `ss_gaps`.
+ 2. Unmark the observations that the fit kept. When `pr` already holds marks of the `length(rows)` kept observations, as a prior that an optimiser fits on its cut data can, unmark only `rows` at the positions that those marks keep, so the two cuts compose.
+ 3. Map the row key of the factor model block through `rows` with [`map_row_positions`](@ref), and forward the key and `ss_gaps` onto `pr` with [`forward_prior`](@ref). A [`HighOrderPrior`](@ref) forwards the record of the `LowOrderPrior` that it wraps.
 
 # Arguments
 
   - `pr`: The prior that the fit returned.
   - `rows`: The observations that the fit kept, from [`shared_series_rows`](@ref), or `nothing` when it kept every observation.
-  - `state`: The sample buffer that a refit read. Its kept rows are those of [`buffer_kept_rows`](@ref).
+  - `T`: The number of observations of the data that the fit was given.
+  - `state`: The sample buffer that a refit read. Its kept rows are those of [`buffer_kept_rows`](@ref), and its observations are its `n` rows.
+
+# Validation
+
+  - The rules of [`assert_shared_series_gaps`](@ref) on the marks.
 
 # Returns
 
-  - `pr::AbstractPriorResult`: `pr` itself when the fit kept every observation, and otherwise `pr` with the positions of its block mapped through `rows`.
+  - `pr::AbstractPriorResult`: `pr` itself when the fit kept every observation, and otherwise `pr` with the marks and with the positions of its block mapped through `rows`.
 
 # Related
 
+  - [`shared_series_kept_rows`](@ref)
   - [`map_row_positions`](@ref)
   - [`buffer_row_key`](@ref)
   - [`attribution_row_key`](@ref)
 """
-function shared_series_row_key(pr::AbstractPriorResult, ::Nothing)
+function shared_series_record(pr::AbstractPriorResult, ::Nothing, ::Integer)
     return pr
 end
-function shared_series_row_key(pr::LowOrderPrior, rows::VecInt)
+function shared_series_record(pr::LowOrderPrior, rows::VecInt, T::Integer)
+    ss_gaps = trues(T)
+    kept = shared_series_kept_rows(pr, length(rows))
+    ss_gaps[isnothing(kept) ? rows : view(rows, kept)] .= false
     # The positions are not part of the projection that `o_X` records, so `o_X` stays.
-    return forward_prior(pr; rr = map_row_positions(pr.rr, rows), o_X = pr.o_X)
+    return forward_prior(pr; rr = map_row_positions(pr.rr, rows), o_X = pr.o_X,
+                         ss_gaps = ss_gaps)
 end
-function shared_series_row_key(pr::HighOrderPrior, rows::VecInt)
-    return forward_prior(pr; pr = shared_series_row_key(pr.pr, rows))
+function shared_series_record(pr::HighOrderPrior, rows::VecInt, T::Integer)
+    return forward_prior(pr; pr = shared_series_record(pr.pr, rows, T))
 end
-function shared_series_row_key(pr::AbstractPriorResult, state::SampleBufferState)
-    return shared_series_row_key(pr, buffer_kept_rows(state))
+function shared_series_record(pr::AbstractPriorResult, state::SampleBufferState)
+    return shared_series_record(pr, buffer_kept_rows(state), state.n)
+end
+"""
+    assert_shared_series_gaps(ss_gaps::Nothing, n::Integer)
+    assert_shared_series_gaps(ss_gaps::AbstractVector{Bool}, n::Integer)
+
+Check the Shared Series marks `ss_gaps` of a [`LowOrderPrior`](@ref) against the number of rows `n` of its `X`.
+
+# Validation
+
+  - At least one mark is `true`, else an `ArgumentError` is raised. A prior that dropped no observation records `nothing`. So the returns data after the cut always holds fewer observations than the marks, and [`shared_series_kept_rows`](@ref) tells the two apart by their length.
+  - The marks keep at least `n` observations, else a `DimensionMismatch` is raised, because the rows of `X` are the last observations that the marks keep.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`shared_series_record`](@ref)
+"""
+function assert_shared_series_gaps(::Nothing, ::Integer)
+    return nothing
+end
+function assert_shared_series_gaps(ss_gaps::AbstractVector{Bool}, n::Integer)
+    @argcheck(any(ss_gaps),
+              ArgumentError("ss_gaps marks no observation. A prior that dropped no observation for a Shared Series gap records `nothing`, so that a reader can tell the returns data that the prior read from the returns data after the same cut"))
+    k = count(!, ss_gaps)
+    @argcheck(k >= n,
+              DimensionMismatch("ss_gaps keeps $k observation(s), and X holds $n row(s). The rows of X are the last observations that ss_gaps keeps, so the marks must keep at least size(X, 1) observations"))
+    return nothing
+end
+"""
+    shared_series_kept_rows(pr, T::Integer) -> Option{Vector{Int}}
+
+Return the observations that a prior kept after a Shared Series cut, when the returns data of a reader is the data that the prior read.
+
+A reader holds `T` observations of the returns data. When `T` equals the number of marks in `pr.ss_gaps`, the reader holds the data that the prior read, and the rows of `pr.X` are the last of the observations that the marks keep. Otherwise the reader holds the data after the same cut, or data with no record, and the rows of `pr.X` are its last observations, which is the rule of every reader before the record existed. The marks are `nothing` when the prior dropped no observation, so the cut data never has as many observations as the marks.
+
+# Arguments
+
+  - `pr`: The prior result, the returns data, a prior estimator, or `nothing`. Only a prior result holds marks.
+  - `T`: The number of observations of the returns data that the reader holds.
+
+# Returns
+
+  - `rows::Option{Vector{Int}}`: The positions of the kept observations in the data of the reader, or `nothing` when the reader pairs the last rows.
+
+# Related
+
+  - [`shared_series_record`](@ref)
+  - [`implied_volatility_picker`](@ref)
+  - [`optimiser_shared_series_rows`](@ref)
+"""
+function shared_series_kept_rows(pr::AbstractPriorResult, T::Integer)
+    return shared_series_kept_rows(pr.ss_gaps, T)
+end
+function shared_series_kept_rows(ss_gaps::AbstractVector{Bool}, T::Integer)
+    return length(ss_gaps) == T ? findall(!, ss_gaps) : nothing
+end
+function shared_series_kept_rows(::Any, ::Integer)
+    return nothing
+end
+"""
+    prior_data_rows(pr, T::Integer, n::Integer) -> AbstractVector{Int}
+
+Return the observations of the returns data of a reader that pair the last `n` rows of the `X` of a prior.
+
+A fit drops leading rows, a Scenario Cap and the warm-up of a [`CrossSectionalFactorPrior`](@ref), and the observations of a Shared Series gap. When the reader holds the data that the prior read, the rows of `X` are the last of the observations that the marks `pr.ss_gaps` keep, see [`shared_series_kept_rows`](@ref). Otherwise they are the last `n` observations of the data of the reader.
+
+# Arguments
+
+  - `pr`: The prior result, or the returns data that a reader reads in its place.
+  - `T`: The number of observations of the returns data that the reader holds.
+  - `n`: The number of rows to pair, at most the number of rows of `pr.X`.
+
+# Returns
+
+  - `rows::AbstractVector{Int}`: The positions of the paired observations in the data of the reader, in order.
+
+# Related
+
+  - [`shared_series_kept_rows`](@ref)
+  - [`implied_volatility_picker`](@ref)
+  - [`outer_prior_rows`](@ref)
+"""
+function prior_data_rows(pr, T::Integer, n::Integer)
+    rows = shared_series_kept_rows(pr, T)
+    return if isnothing(rows)
+        ((T - n + 1):T)
+    else
+        view(rows, (length(rows) - n + 1):length(rows))
+    end
 end
 """
     map_row_positions(rr::Option{<:AbstractLoadingsRegressionResult}, rows::VecInt)
@@ -1803,7 +1939,7 @@ Position `k` becomes `rows[k]`, with [`kept_row_positions`](@ref). A block that 
 
 # Related
 
-  - [`shared_series_row_key`](@ref)
+  - [`shared_series_record`](@ref)
   - [`forget_row_positions`](@ref)
   - [`set_row_key`](@ref)
 """
