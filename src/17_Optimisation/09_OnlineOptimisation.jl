@@ -298,7 +298,7 @@ Folds observations into an optimiser, and solves nothing.
 
 The online step of an optimiser has two functions. `partial_fit!(opt, rd)` folds the observations and returns the estimator, and `optimise(opt)` with no returns reads the state out and solves once. The step forwards the observations to the prior alone, through [`fold_prior`](@ref), and records the rest of `rd` in a [`ReturnsBufferState`](@ref), so `optimise(opt)` with no returns can rebuild the [`ReturnsResult`](@ref) that the batch path reads. The step does not change the members above the prior: the clustering estimator, the constraint estimators, the uncertainty sets, and the inner optimisers of a meta-optimiser. `optimise(opt)` with no returns fits each of them as a batch run does.
 
-The step takes a `ReturnsResult`, as `optimise(opt, rd)` does. `rd` holds one observation or a block of them, and the step unpacks it into the arity of the prior's step. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds, and a hierarchical head to its [`HierarchicalOptimiser`](@ref). The optimiser that holds the prior and the context takes the step. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly, so each takes its own step. [`EqualWeighted`](@ref), [`RandomWeighted`](@ref) and [`BestConstantRebalancedPortfolio`](@ref) hold no prior but read the observations, so their context keeps the rows itself. [`PreviousWeights`](@ref) reads no observation, so its step returns it unchanged and it carries no context.
+The step takes a `ReturnsResult`, as `optimise(opt, rd)` does. `rd` holds one observation or a block of them, and the step unpacks it into the arity of the prior's step. A JuMP head forwards to the [`JuMPOptimiser`](@ref) it holds, and a hierarchical head to its [`HierarchicalOptimiser`](@ref). The optimiser that holds the prior and the context takes the step. The three meta-optimisers and [`InverseVolatility`](@ref) hold their prior directly, so each takes its own step. [`EqualWeighted`](@ref), [`RandomWeighted`](@ref) and [`BestConstantRebalancedPortfolio`](@ref) hold no prior but read the observations, so their context keeps the rows itself. [`PreviousWeights`](@ref) reads no observation and carries no context, but its fallback can read them. So its step folds `rd` into its fallback through [`step_fallback`](@ref), and `optimise(opt)` with no returns reads that fallback out when `w` is `nothing`.
 
 After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `ReturnsResult` that `optimise(opt)` with no returns rebuilds equals `rd[1:t]` field by field, in every frame that the readers of the optimiser state. The weights of a family that solves no programme agree to rounding, and the weights of a JuMP family agree to the tolerance of its solver.
 
@@ -308,7 +308,7 @@ After `t` observations, `optimise(opt)` equals `optimise(opt, rd[1:t])`. The `Re
  2. A JuMP head or a hierarchical head steps the bundle it holds in `opt` through [`fold_returns`](@ref), under the source of its own group, see [`group_source`](@ref). It rebuilds itself around the result.
  3. An optimiser that holds a prior steps through [`fold_returns`](@ref).
  4. A head that holds no prior checks that `rd.X` is present. It then folds `rd` into its own context with [`fold_context`](@ref), and the context keeps the returns and the factor column.
- 5. [`PreviousWeights`](@ref) returns `opt` unchanged.
+ 5. [`PreviousWeights`](@ref) steps its fallback through [`step_fallback`](@ref), and rebuilds itself around the result. It keeps `w`.
 
 # Arguments
 
@@ -408,8 +408,83 @@ function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
                               cache = fold_context(opt.cache, rd, max_history, true, true,
                                                    true)))
 end
-function partial_fit!(opt::PreviousWeights, ::ReturnsResult)
-    return opt
+function partial_fit!(opt::PreviousWeights, rd::ReturnsResult)
+    return rebuild_estimator(opt, (; fb = step_fallback(opt.fb, rd)))
+end
+"""
+    step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
+    step_fallback(fb, rd::ReturnsResult)
+
+Folds the rows of an online step into the fallback of a head that rebuilds no returns data.
+
+Two heads read out with no returns data to hand on: an [`OnlinePortfolioSelection`](@ref) head reads out a Recursion Result, and a [`PreviousWeights`](@ref) reads only its `w`. So their fallback gets no rows when `optimise(opt)` runs with no data. A fallback that steps with the head holds its own state, and `optimise(fb)` with no data reads that state out as the online step of any optimiser does. So every fallback that the batch verb admits also answers online, and so does the fallback of a `PreviousWeights` that is itself a fallback. A fallback estimator steps through [`partial_fit!`](@ref). Any other value passes unchanged: `nothing`, a precomputed result, which answers itself, and a [`TimeDependent`](@ref) schedule, whose entries are batch configuration and carry no state.
+
+# Arguments
+
+  - `fb`: The fallback of the head.
+  - `rd`: The returns data of the step.
+
+# Validation
+
+  - Everything [`partial_fit!`](@ref) refuses on `fb`.
+
+# Returns
+
+  - `fb`: The fallback, stepped when it is an estimator.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`read_out_fallback`](@ref)
+  - [`OnlinePortfolioSelection`](@ref)
+  - [`PreviousWeights`](@ref)
+"""
+function step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
+    return partial_fit!(fb, rd)
+end
+function step_fallback(fb, ::ReturnsResult)
+    return fb
+end
+"""
+    read_out_fallback(opt::OptimisationEstimator, res::OptimisationResult; kwargs...)
+
+Walks the fallback chain of a head that reads out with no data, after its own read-out `res`. The two callers are the read-outs of [`OnlinePortfolioSelection`](@ref) and [`PreviousWeights`](@ref).
+
+The batch verb hands the returns data of the head to each fallback. A head that reads out with no data has none to hand on, so each fallback reads itself out with `optimise(fb)` and no data, from the rows that [`step_fallback`](@ref) folded into it. The chain of the answer then starts with the failed pair of the head, and the chain that the fallback walked follows it, as in the batch verb.
+
+# Algorithm
+
+ 1. Return `res` when it succeeded or when `opt.fb` is `nothing`.
+ 2. Otherwise warn, and read the fallback out with `optimise(opt.fb; kwargs...)`, giving `fbres`.
+ 3. Return `fbres` through [`factory`](@ref) with the chain of the failed pair of `opt` and `res`, followed by the chain of `fbres` when the fallback is an estimator that walked one. A precomputed result answers itself, and its own `fb` is not a chain that this read-out walked.
+
+# Arguments
+
+  - `opt`: The head, with its [`TimeDependent`](@ref) schedules reset.
+  - `res`: The read-out of the head.
+  - `kwargs`: The keyword arguments of `optimise` with no data on the fallback, passed on unchanged.
+
+# Returns
+
+  - `res::OptimisationResult`: `res`, or the Result of the fallback chain when `res` failed.
+
+# Related
+
+  - [`step_fallback`](@ref)
+  - [`optimise`](@ref)
+  - [`FbChain`](@ref)
+"""
+function read_out_fallback(opt::OptimisationEstimator, res::OptimisationResult; kwargs...)
+    if isa(res.retcode, OptimisationSuccess) || isnothing(opt.fb)
+        return res
+    end
+    fb = Tuple{OptimisationEstimator, OptimisationResult}[(opt, res)]
+    @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+    fbres = optimise(opt.fb; kwargs...)
+    if isa(opt.fb, OptimisationEstimator) && isa(fbres.fb, FbChain)
+        append!(fb, fbres.fb)
+    end
+    return factory(fbres, fb)
 end
 function partial_fit!(opt::FiniteAllocationOptimisationEstimator, ::ReturnsResult)
     return throw(ArgumentError("a `$(typeof(opt))` has no online step: a finite allocation converts a weight vector and prices into share counts and reads no returns window, so there is nothing to fold. Take the step on the optimiser that produces the weights, and allocate its weights with `optimise(da, w, p)`."))
@@ -800,7 +875,7 @@ Turns a folded optimiser into the batch call that reads it out, an estimator and
 
 The rebuilt `ReturnsResult` holds every observation that the step folded, and the folded prior drops the observations of a Shared Series gap, see [`shared_series_buffer`](@ref). So the function drops the same observations from the `ReturnsResult` with [`optimiser_shared_series_view`](@ref), while `opt` still holds the prior estimator: a prior result reads no factor return, so the batch path would not drop a gap of the factor returns. The prior and every reader that pairs its observations with the last observations of the returns data then read the same observations, as in the batch fit. This function drops the context, because the estimator it returns is a batch configuration over the rebuilt `ReturnsResult`. It never writes the state, so two calls on one estimator give the same answer, and a fallback reads the same `ReturnsResult` as the optimiser it replaces.
 
-The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser, such as [`PreviousWeights`](@ref), with an empty `ReturnsResult`, and its batch function decides whether it answers without returns.
+The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `nothing` has taken no step, and [`batch_without_state`](@ref) answers for it. This function returns any other optimiser with an empty `ReturnsResult`, and its batch function decides whether it answers without returns. `optimise(opt)` with no returns does not reach this function for a [`PreviousWeights`](@ref), because that head has a read-out of its own.
 
 # Algorithm
 
@@ -932,6 +1007,43 @@ res = optimise(mr)                                     # reads out; solves once
 function optimise(opt::OptimisationEstimator; kwargs...)
     opt, rd = batch_from_state(opt)
     return optimise(opt, rd; kwargs...)
+end
+"""
+    optimise(pw::PreviousWeights; kwargs...)
+
+Reads out a [`PreviousWeights`](@ref) that carries a fallback, with no returns data.
+
+The head holds `w` when `w` is set, as the batch verb does. With `w` unset the head fails, and the batch verb hands its returns data to the fallback. Here no returns data exists to hand on, so the fallback reads itself out from the rows that [`partial_fit!`](@ref) folded into it through [`step_fallback`](@ref). So the head answers online as it answers in batch, also when it is the fallback of an [`OnlinePortfolioSelection`](@ref) head. A head with no fallback takes the batch method, with an empty [`ReturnsResult`](@ref).
+
+# Algorithm
+
+ 1. Set every [`TimeDependent`](@ref) field of `pw` to its static default, with [`reset_time_dependent_estimator`](@ref).
+ 2. Hold `w` with [`_optimise`](@ref), giving `res`.
+ 3. Walk the fallback chain after `res` with [`read_out_fallback`](@ref).
+
+# Arguments
+
+  - `pw`: The hold-only head.
+  - `kwargs`: The keyword arguments of `optimise` with no data on the fallback, passed on unchanged.
+
+# Validation
+
+  - Everything that `optimise(fb)` with no data refuses on the fallback `fb`, when `w` is `nothing`.
+
+# Returns
+
+  - `res::OptimisationResult`: The held weights, or the Result of the fallback chain when `w` is `nothing`.
+
+# Related
+
+  - [`PreviousWeights`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`step_fallback`](@ref)
+  - [`read_out_fallback`](@ref)
+"""
+function optimise(pw::PreviousWeights; kwargs...)
+    pw = reset_time_dependent_estimator(pw)
+    return read_out_fallback(pw, _optimise(pw); kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

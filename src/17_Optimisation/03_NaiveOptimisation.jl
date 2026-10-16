@@ -1420,6 +1420,8 @@ A view to an asset subset, such as a cluster of [`NestedClustered`](@ref) or the
 
 The constructor refuses a `w` with a non-finite entry. A fit with `w = nothing` gives an [`OptimisationFailure`](@ref). Fold 1 of a walk-forward and a fold-less `optimise` with no `w` meet that case. [`needs_previous_weights`](@ref) is `true`, so an optimiser that carries the head as a fallback runs its folds in sequence, and the loop writes the previous weights into it.
 
+The online step of the head folds the rows into its fallback, and `optimise(pw)` with no data reads that fallback out when `w` is `nothing`. So the fallback answers from the rows that it reads in batch, also when the head is itself the fallback of an [`OnlinePortfolioSelection`](@ref) head, see [`step_fallback`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)

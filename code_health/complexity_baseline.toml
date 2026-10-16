@@ -5,7 +5,7 @@
 julia = "1.13.2"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "8455afbcd5"
+commit = "3f467969ba"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -390,7 +390,7 @@ commit = "8455afbcd5"
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { cyc = 6, cog = 9, arg = 11, cyc_sum = 29, cog_sum = 27, arg_sum = 61, macros = [] }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { cyc = 9, cog = 14, arg = 7, cyc_sum = 23, cog_sum = 20, arg_sum = 38, macros = [] }
 "src/17_Optimisation/08_RiskMeasureCompatibility.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 15, cog_sum = 6, arg_sum = 15, macros = [] }
-"src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 3, cog = 2, arg = 6, cyc_sum = 63, cog_sum = 21, arg_sum = 89, macros = [] }
+"src/17_Optimisation/09_OnlineOptimisation.jl" = { cyc = 5, cog = 4, arg = 6, cyc_sum = 71, cog_sum = 25, arg_sum = 98, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/01_Base_OnlinePortfolioSelection.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 95, cog_sum = 57, arg_sum = 124, macros = ["@propagatable"] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl" = { cyc = 4, cog = 3, arg = 6, cyc_sum = 59, cog_sum = 30, arg_sum = 100, macros = [] }
 "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl" = { cyc = 7, cog = 8, arg = 8, cyc_sum = 90, cog_sum = 64, arg_sum = 84, macros = [] }

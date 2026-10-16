@@ -2381,7 +2381,8 @@
             pw = PO.factory(PreviousWeights(; fb = PreviousWeights()), [0.25, 0.75])
             @test pw.w == [0.25, 0.75]
             @test pw.fb.w == [0.25, 0.75]
-            # Its online step is the identity.
+            # Its online step steps its fallback alone, so over a fallback that holds no
+            # state it is the identity (#1745).
             @test PO.partial_fit!(pw, rd) === pw
             # As a fallback in a walk-forward, the failed fold holds the threaded weights and
             # becomes a success, so the fold after it reads it.

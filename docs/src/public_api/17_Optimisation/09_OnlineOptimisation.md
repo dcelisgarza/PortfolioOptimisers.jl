@@ -9,4 +9,5 @@ An optimiser updates with two calls. `partial_fit!(opt, rd)` adds the observatio
 ```@docs
 PortfolioOptimisers.partial_fit!(opt::PortfolioOptimisers.JuMPOptimisationEstimator, rd::ReturnsResult)
 optimise(opt::PortfolioOptimisers.OptimisationEstimator; kwargs...)
+optimise(pw::PreviousWeights; kwargs...)
 ```

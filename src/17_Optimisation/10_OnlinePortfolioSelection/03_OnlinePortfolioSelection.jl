@@ -810,38 +810,6 @@ function partial_fit!(opt::OnlinePortfolioSelection{<:Any, <:Any, <:Any, <:Any, 
                               fb = step_fallback(opt.fb, rd)))
 end
 """
-    step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
-    step_fallback(fb, rd::ReturnsResult)
-
-Folds the rows of an online step into the fallback of an [`OnlinePortfolioSelection`](@ref) head.
-
-The head reads out a Recursion Result and rebuilds no returns data, so its fallback gets no rows when `optimise(opt)` runs with no data. A fallback that steps with the head holds its own state, and `optimise(fb)` with no data reads that state out as the online step of any optimiser does. So every fallback that the batch verb admits also answers online. A fallback estimator steps through [`partial_fit!`](@ref). Any other value passes unchanged: `nothing`, a precomputed result, which answers itself, and a [`TimeDependent`](@ref) schedule, whose entries are batch configuration and carry no state.
-
-# Arguments
-
-  - `fb`: The fallback of the head.
-  - `rd`: The returns data of the step.
-
-# Validation
-
-  - Everything [`partial_fit!`](@ref) refuses on `fb`.
-
-# Returns
-
-  - `fb`: The fallback, stepped when it is an estimator.
-
-# Related
-
-  - [`partial_fit!`](@ref)
-  - [`OnlinePortfolioSelection`](@ref)
-"""
-function step_fallback(fb::OptimisationEstimator, rd::ReturnsResult)
-    return partial_fit!(fb, rd)
-end
-function step_fallback(fb, ::ReturnsResult)
-    return fb
-end
-"""
     online_step_fold(opt::OnlinePortfolioSelection, ctx::TimeDependentContext, rd::ReturnsResult)
 
 Folds the fold's rows into the head inside the fold's own Allocation Set.
@@ -1018,9 +986,7 @@ The method refuses a head that has taken no step with an `ArgumentError`. The Re
  1. Refuse a head whose `cache` is `nothing`.
  2. Reset every schedule of the head to its fold-less value through [`reset_time_dependent_estimator`](@ref).
  3. Read the state out through [`online_selection_result`](@ref), giving `res`.
- 4. Return `res` when it succeeded or when the head has no fallback.
- 5. Otherwise warn, and read the fallback out with `optimise(opt.fb; kwargs...)`, giving `fbres`.
- 6. Return `fbres` through [`factory`](@ref) with the chain of the failed pair of `opt` and `res`, followed by the chain of `fbres` when the fallback is an estimator that walked one.
+ 4. Walk the fallback chain after `res` with [`read_out_fallback`](@ref). It returns `res` when `res` succeeded or when the head has no fallback.
 
 # Arguments
 
@@ -1045,19 +1011,7 @@ function optimise(opt::OnlinePortfolioSelection; kwargs...)
     @argcheck(!isnothing(opt.cache),
               ArgumentError("`optimise(opt)` with no returns reads the state the online step wrote, and this `OnlinePortfolioSelection` has taken no step: its `cache` is `nothing`. Fold observations with `partial_fit!(opt, rd)` first, or pass the returns to `optimise(opt, rd)`."))
     opt = reset_time_dependent_estimator(opt)
-    res = online_selection_result(opt, opt.cache)
-    if isa(res.retcode, OptimisationSuccess) || isnothing(opt.fb)
-        return res
-    end
-    fb = Tuple{OptimisationEstimator, OptimisationResult}[(opt, res)]
-    @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-    fbres = optimise(opt.fb; kwargs...)
-    # A precomputed result answers itself, and its own `fb` is not a chain this read-out
-    # walked, as in the batch verb.
-    if isa(opt.fb, OptimisationEstimator) && isa(fbres.fb, FbChain)
-        append!(fb, fbres.fb)
-    end
-    return factory(fbres, fb)
+    return read_out_fallback(opt, online_selection_result(opt, opt.cache); kwargs...)
 end
 """
     batch_from_state(opt::OnlinePortfolioSelection)
@@ -1088,11 +1042,11 @@ function held_timestamps(opt::OnlinePortfolioSelection)
     return isnothing(opt.cache) ? nothing : opt.cache.ts
 end
 """
-    update_online_estimator(opt::OnlinePortfolioSelection)
+    update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
 
 Resolves the [`Online`](@ref) wrappers in the fallback of the head, at the warm-up.
 
-The head steps its fallback through [`step_fallback`](@ref), so a wrapper in the prior of a fallback estimator declares the window that the fallback folds. The method resolves the fallback as the warm-up resolves an optimiser. Any other fallback holds no wrapper to resolve, so the head passes unchanged. The recursion of the head holds no wrapper.
+The two heads step their fallback through [`step_fallback`](@ref), so a wrapper in the prior of a fallback estimator declares the window that the fallback folds. The method resolves the fallback as the warm-up resolves an optimiser. A [`PreviousWeights`](@ref) that is the fallback of the head resolves its own fallback in turn. Any other fallback holds no wrapper to resolve, so the head passes unchanged. The recursion of the head holds no wrapper.
 
 # Related
 
@@ -1100,25 +1054,25 @@ The head steps its fallback through [`step_fallback`](@ref), so a wrapper in the
   - [`step_fallback`](@ref)
   - [`online_unreached_path`](@ref)
 """
-function update_online_estimator(opt::OnlinePortfolioSelection)
+function update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
     if !isa(opt.fb, OptimisationEstimator)
         return opt
     end
     return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
 end
 """
-    online_unreached_path(opt::OnlinePortfolioSelection)
+    online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
 
 Names the first [`Online`](@ref) wrapper in the head that the warm-up leaves unresolved, or answers `nothing`.
 
-The method runs the warm-up of [`update_online_estimator`](@ref) on the head, and names the wrapper that is left, such as one in an inner optimiser of a meta-optimiser that is the fallback.
+The method runs the warm-up of [`update_online_estimator`](@ref) on the head, and names the wrapper that is left, such as one in an inner optimiser of a meta-optimiser that is the fallback. It serves an [`OnlinePortfolioSelection`](@ref) head and a [`PreviousWeights`](@ref), the two heads that step their fallback.
 
 # Related
 
   - [`online_unreached_path`](@ref)
   - [`assert_online_entry`](@ref)
 """
-function online_unreached_path(opt::OnlinePortfolioSelection)
+function online_unreached_path(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
     return online_wrapper_path(update_online_estimator(opt))
 end
 """

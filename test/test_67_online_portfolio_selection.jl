@@ -384,6 +384,33 @@ end
             @test isapprox(o.w, b.w; atol = 1e-14)
             @test length(o.fb) == length(b.fb)
         end
+        # The fallback of a `PreviousWeights` that is itself the fallback steps too, so
+        # the chain answers online at fold 1, where `w` is `nothing` (#1745).
+        for fb in (PreviousWeights(; fb = EqualWeighted()),
+                   PreviousWeights(; fb = InverseVolatility()))
+            head = OPS(; alg = BuyAndHold(), w0 = w0, fb = fb)
+            b = optimise(head, rd1)
+            o = optimise(po.partial_fit!(po.partial_fit!(head, rows(rd1, 1:20)),
+                                         rows(rd1, 21:T)))
+            @test isa(o.retcode, OptimisationSuccess)
+            @test o.w[1:2] == [0.0, 0.0]
+            @test isapprox(o.w, b.w; atol = 1e-14)
+            @test length(o.fb) == length(b.fb) == 2
+        end
+        # A `PreviousWeights` that holds `w` still holds it, and its fallback never runs.
+        pwh = OPS(; alg = BuyAndHold(), w0 = w0,
+                  fb = PreviousWeights(; w = fill(0.25, N), fb = EqualWeighted()))
+        opwh = optimise(po.partial_fit!(pwh, rd1))
+        @test opwh.w == fill(0.25, N) && length(opwh.fb) == 1
+        # The warm-up resolves a wrapper in the prior of the fallback of a
+        # `PreviousWeights`, because that fallback steps.
+        pwo = OPS(; alg = BuyAndHold(), w0 = w0,
+                  fb = PreviousWeights(;
+                                       fb = InverseVolatility(;
+                                                              pe = Online(EmpiricalPrior();
+                                                                          max_history = 10))))
+        @test isnothing(po.online_unreached_path(pwo))
+        @test isa(po.update_online_estimator(pwo).fb.fb.pe, EmpiricalPrior)
         # The identity holds under the time-varying panel too.
         og = po.partial_fit!(po.partial_fit!(opt, rows(rdg, 1:12)), rows(rdg, 13:28))
         @test optimise(og).w == optimise(opt, rows(rdg, 1:28)).w
