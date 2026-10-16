@@ -185,3 +185,43 @@ for the reason that the Alternatives give.
 The rejected reading ran the opinions on the scenarios that `pe2` keeps. It needs a fit of `pe2`
 before the opinions only to learn its row count, which is the cost that this ADR refused for the
 uniform push. And `pe1` already states that composition.
+
+## Amendment (2026-10-16)
+
+Under a caller's `pe.w`, the decision fits the nested prior twice. The first fit reads only the
+count of its rows, and the second fit is the fit under `pe.w`. Most nested priors answer every row
+that they receive, so for them the first fit costs a whole fit and gives nothing.
+
+**A nested prior that promises to keep the observations is fitted once.** `keeps_observations`
+is the public verb with which a preprocessing step promises to keep every observation of a
+window. It now has methods for the prior estimators, and the private helper `ep_wrapped_prior`
+reads it on `pe.pe`. When it returns `true`, the count is `size(X, 1)`, and only the fit under
+`pe.w` runs. When it returns `false`, the first fit runs as before. In both cases the length of
+`pe.w` is checked against the count before the fit under it, because `scenario_weights` pads a
+short vector with zeros and would hide the error.
+
+The methods read the configuration alone:
+
++ An `EmpiricalPrior` returns `true` when it holds no Scenario Cap.
++ A `CrossSectionalFactorPrior` keeps the fallback `false`, because its warm-up and its exposure
+  lag drop rows.
++ A prior whose result carries the rows of the prior in its `pe` field returns the answer of that
+  prior. This holds for the factor priors, the Black-Litterman priors, the two entropy pooling
+  priors and the two high order estimators.
++ An `AugmentedBlackLittermanPrior` returns `true` when both `a_pe` and `f_pe` do, because its
+  result keeps the rows that both keep.
++ An `OpinionPoolingPrior` returns `true` when it has no `pe1`, or when `pe1` returns `true`. It
+  refuses an opinion or a `pe2` that answers fewer rows.
++ An `Online` wrapper returns `false`, because no batch fit reaches it.
+
+This is not the row-count verb that the Alternatives reject. That verb answered a count, and the
+warm-up of a `CrossSectionalFactorPrior` makes the count depend on the data. This verb answers a
+promise, and `false` makes no promise. A Scenario Cap at or above the number of observations drops
+no row, but its prior returns `false` and pays the first fit. So a `false` can cost a fit, and it
+cannot give a wrong count. A wrong `true` can, so a prior returns `true` only when no
+configuration and no data drops a row. The fallback is `false`, so a prior that a user writes
+keeps the two fits until it states the promise.
+
+A new verb with the opposite sense, such as `can_change_num_obs`, was rejected. It states the
+fact that `keeps_observations` already states, under a second name, and its fallback would have
+to be `true` to stay safe.

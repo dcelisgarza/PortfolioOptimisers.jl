@@ -196,6 +196,86 @@ function scenario_tail(pr::LowOrderPrior, n::Integer, name::Symbol)
                          ens = something(pr.ens, t))
 end
 """
+    keeps_observations(pe::AbstractPriorEstimator) -> false
+    keeps_observations(pe::EmpiricalPrior) -> Bool
+    keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                 <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                                 <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
+                                 <:HighOrderPriorEstimator,
+                                 <:HighOrderFactorPriorEstimator}) -> Bool
+    keeps_observations(pe::AugmentedBlackLittermanPrior) -> Bool
+    keeps_observations(pe::OpinionPoolingPrior) -> Bool
+    keeps_observations(pe::Online{<:AbstractPriorEstimator}) -> false
+
+Return `true` when the result of a prior estimator carries one scenario for each observation that it receives.
+
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), states its prior probabilities on the scenarios of the prior that it wraps. A wrapped prior can carry fewer scenarios than it receives, so the reweighting prior fits it once to read the count, and fits it again under the probabilities. A wrapped prior that keeps the observations carries the count that it receives, so that first fit is not necessary.
+
+The fallback returns `false`, which makes no promise, and the reweighting prior then fits the wrapped prior twice. A wrong `true` makes the reweighting prior check the probabilities against the wrong count. So a prior returns `true` only when no configuration and no data makes its result carry fewer scenarios than the observations that it receives. A [`CrossSectionalFactorPrior`](@ref) keeps the fallback, because it drops the observations that its Descriptors warm up over and the observations that its exposure lag uses. The answer reads the configuration alone. A Scenario Cap at or above the number of observations drops no row, but its prior still returns `false`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other prior: return `false`.
+ 2. An [`EmpiricalPrior`](@ref): return `true` when it has no Scenario Cap, that is when `pe.max_scenarios` is `nothing`.
+ 3. A prior whose result carries the scenarios of the prior in its `pe` field: apply this function to `pe.pe`. A factor prior cuts its asset rows to the rows of its factor prior, and the other priors forward the rows of their wrapped prior.
+ 4. An [`AugmentedBlackLittermanPrior`](@ref): return `true` when this function returns `true` for both `pe.a_pe` and `pe.f_pe`, because the result keeps the rows that both nested priors keep.
+ 5. An [`OpinionPoolingPrior`](@ref): return `true` when `pe.pe1` is `nothing`, or when this function returns `true` for `pe.pe1`. The pool works on the rows of `pe.pe1`, and it refuses an opinion or a `pe.pe2` that answers on fewer rows.
+ 6. An [`Online`](@ref) wrapper of a prior: return `false`. A batch fit does not fit the wrapper, and the online flow replaces it with the prior that it wraps before the fit, so the wrapper makes no promise.
+
+# Arguments
+
+  - $(arg_dict[:pe])
+
+# Returns
+
+  - `flag::Bool`: `true` when the result carries one scenario for each observation, in order, and `false` when the prior makes no such promise.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.keeps_observations(EmpiricalPrior())
+true
+
+julia> PortfolioOptimisers.keeps_observations(EmpiricalPrior(; max_scenarios = 50))
+false
+
+julia> PortfolioOptimisers.keeps_observations(EntropyPoolingPrior(; pe = FactorPrior()))
+true
+```
+
+# Related
+
+  - [`keeps_observations`](@ref)
+  - [`ep_wrapped_prior`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`scenario_window`](@ref)
+"""
+function keeps_observations(::AbstractPriorEstimator)::Bool
+    return false
+end
+function keeps_observations(pe::EmpiricalPrior)::Bool
+    return isnothing(pe.max_scenarios)
+end
+function keeps_observations(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                      <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                                      <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
+                                      <:HighOrderPriorEstimator,
+                                      <:HighOrderFactorPriorEstimator})::Bool
+    return keeps_observations(pe.pe)
+end
+function keeps_observations(pe::AugmentedBlackLittermanPrior)::Bool
+    return keeps_observations(pe.a_pe) && keeps_observations(pe.f_pe)
+end
+function keeps_observations(pe::OpinionPoolingPrior)::Bool
+    return isnothing(pe.pe1) || keeps_observations(pe.pe1)
+end
+function keeps_observations(::Online{<:AbstractPriorEstimator})::Bool
+    return false
+end
+"""
     scenario_weights(w::Nothing, t::Integer)
     scenario_weights(w::ObsWeights, t::Integer)
 

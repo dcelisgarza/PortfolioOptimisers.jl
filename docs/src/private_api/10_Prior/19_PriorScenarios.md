@@ -1,5 +1,5 @@
 ```@meta
-Description = "Prior Scenarios, private API of PortfolioOptimisers.jl: scenario_fill_pairs, scenario_fill_msg, resolve_fill_limit, scenario_window, scenario_weights, …"
+Description = "Prior Scenarios, private API of PortfolioOptimisers.jl: scenario_fill_pairs, scenario_fill_msg, resolve_fill_limit, scenario_window, scenario_tail, …"
 ```
 
 # [Prior Scenarios: private API](@id private-api-prior-scenarios)

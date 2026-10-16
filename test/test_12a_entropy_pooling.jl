@@ -2227,3 +2227,71 @@ end
         end
     end
 end
+# A prior that counts its fits. `K` states whether it promises to keep the observations.
+struct FitCountPrior{K, T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    pe::T
+    n::Base.RefValue{Int}
+end
+FitCountPrior{K}(pe, n) where {K} = FitCountPrior{K, typeof(pe)}(pe, n)
+function PortfolioOptimisers.prior(pe::FitCountPrior, X::PortfolioOptimisers.MatNum,
+                                   args...; dims::Int = 1, kwargs...)
+    pe.n[] += 1
+    return prior(pe.pe, X; dims = dims, kwargs...)
+end
+function PortfolioOptimisers.factory(pe::FitCountPrior{K}, w) where {K}
+    return FitCountPrior{K}(PortfolioOptimisers.factory(pe.pe, w), pe.n)
+end
+PortfolioOptimisers.keeps_observations(::FitCountPrior{true}) = true
+@testset "A wrapped prior that keeps the observations is fitted once before the views" begin
+    ko = PortfolioOptimisers.keeps_observations
+    cap = EmpiricalPrior(; max_scenarios = 5)
+    @test ko(EmpiricalPrior())
+    @test !ko(cap)
+    @test ko(EntropyPoolingPrior(; pe = FactorPrior()))
+    @test !ko(MeucciEntropyPoolingPrior(; pe = FactorPrior(; pe = cap)))
+    @test !ko(HighOrderPriorEstimator(; pe = cap))
+    @test ko(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]))
+    @test !ko(OpinionPoolingPrior(; pe1 = cap, pes = [EntropyPoolingPrior()]))
+    @test !ko(Online(EmpiricalPrior()))
+    @test !ko(CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()]))
+    asets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A1"], "nf" => ["F1"]))
+    abl(a, f) = AugmentedBlackLittermanPrior(; a_pe = a, f_pe = f, sets = asets,
+                                             a_views = LinearConstraintEstimator(;
+                                                                                 val = "A1 == 0.001"),
+                                             f_views = LinearConstraintEstimator(;
+                                                                                 val = "F1 == 0.001"))
+    @test ko(abl(EmpiricalPrior(), EmpiricalPrior()))
+    @test !ko(abl(EmpiricalPrior(), cap))
+    # Under a caller's `w`, a wrapped prior that makes no promise is fitted once to read its
+    # rows, once under `w`, and once under the posterior. A promise removes the first fit,
+    # and nothing else changes.
+    rng = StableRNG(1746)
+    X = randn(rng, 60, 4) ./ 100
+    v = collect(range(1, 2; length = 60))
+    w = aweights(v ./ sum(v))
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
+    mv = LinearConstraintEstimator(; val = "A == 0.002")
+    for (mk, alg) in ((EntropyPoolingPrior, H1_EntropyPooling()),
+                      (EntropyPoolingPrior, H0_EntropyPooling()),
+                      (MeucciEntropyPoolingPrior, H1_EntropyPooling()))
+        nc, nk = Ref(0), Ref(0)
+        pc = prior(mk(; pe = FitCountPrior{false}(EmpiricalPrior(), nc), w = w, sets = sets,
+                      alg = alg, mu_views = mv), X)
+        pk = prior(mk(; pe = FitCountPrior{true}(EmpiricalPrior(), nk), w = w, sets = sets,
+                      alg = alg, mu_views = mv), X)
+        @test (nc[], nk[]) == (3, 2)
+        @test pk.mu == pc.mu
+        @test pk.sigma == pc.sigma
+        @test pk.w == pc.w
+        @test pk.kld == pc.kld
+        @test isapprox(pk.mu[1], 0.002; rtol = 1e-6)
+    end
+    # The length of `w` is still checked before the fit under it, and by name.
+    nk = Ref(0)
+    @test_throws DimensionMismatch prior(EntropyPoolingPrior(;
+                                                             pe = FitCountPrior{true}(EmpiricalPrior(),
+                                                                                      nk),
+                                                             w = aweights(fill(1 / 50, 50)),
+                                                             sets = sets, mu_views = mv), X)
+    @test nk[] == 0
+end

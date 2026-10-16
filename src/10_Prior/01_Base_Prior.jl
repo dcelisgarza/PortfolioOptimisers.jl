@@ -44,6 +44,12 @@ A prior that returns `true` also implements `partial_fit!(pe, f::MatNum) -> pe`,
 
 The [`ReturnsResult`](@ref) method of [`prior`](@ref) reads the source through this method, and so does the frame walk of an optimiser. The fallback returns `nothing`, so a prior that implements no method reads the raw returns `rd.X`. A prior that holds another reader in a field refuses a source on it in its keyword constructor with `PortfolioOptimisers.assert_inner_reader`, because the outer prior picks the returns.
 
+## `keeps_observations` (optional)
+
+  - `keeps_observations(pe::MyPriorEstimator) -> Bool`: Returns `true` when the result carries one scenario for each observation that the prior receives, for every configuration and all data.
+
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), reads this method on the prior that it wraps. Under a caller's prior probabilities, it fits a wrapped prior that makes no promise twice: once to read the count of its scenarios, and once under the probabilities. It fits a wrapped prior that returns `true` once. The fallback returns `false`, which is correct for every prior and costs the first fit. A prior that drops rows, such as one that holds a Scenario Cap, keeps the fallback. A prior that wraps another returns the answer of the prior that it wraps.
+
 # Examples
 
 We can create a dummy prior estimator as follows:
