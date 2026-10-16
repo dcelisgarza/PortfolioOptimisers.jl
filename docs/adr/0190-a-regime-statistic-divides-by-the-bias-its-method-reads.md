@@ -58,8 +58,10 @@ to 1.0023 at the steady state, from 0.9716 to 1.1076 at `cor_decay` alone. Throu
 at 8 assets and an equicorrelation of 0.5, the separate path reads the multiplier of one decay to
 within 0.07 % for the three methods, either centring and both directions. Under two HAC lags,
 where the convolution reads the Bartlett weights too, it reads 0.05 % to 0.89 % below one decay,
-from 3.1 % to 5.1 % above it, with the first scored row of a zero block left out (#1730). In the warm-up the
-separate path standardises by the raw running variance, which no table holds (#1729).
+from 3.1 % to 5.1 % above it. That measure left out the first scored row of a zero block, which
+the statistic now skips (#1730). In the warm-up the separate path standardises by the
+bias-corrected variance under the default `cor_vol = BiasCorrectedVolatility()`, as ADR 0218
+states (#1729).
 
 **The default inverse-volatility direction also divides by `1 + Δ`, its second-order excess
 (#1430).** `PortfolioTarget()` builds its direction from the estimate that it divides by, so the

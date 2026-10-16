@@ -13,6 +13,8 @@ All concrete and/or abstract types representing cross-sectional solve algorithms
 
 In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractCrossSectionalSolveAlgorithm` and implement the following methods. A member that only [`CrossSectionalLinearRegression`](@ref) reads needs only [`cross_sectional_solve`](@ref), and a member that only [`CrossSectionalTargetRegression`](@ref) reads needs only [`cross_sectional_target_solve`](@ref).
 
+A new member gets no mask of dropped columns: the regression keeps `dc` at `nothing` for every member except [`DependentColumnDrop`](@ref). So a new member that drops a column gives it no mark, and the regression diagnostics and the factor attribution read the pseudo-inverse of the full design of each observation for it.
+
 ## `cross_sectional_solve`
 
   - [`cross_sectional_solve(alg::AbstractCrossSectionalSolveAlgorithm, A::MatNum, y::VecNum, t::Integer)`](@ref): Returns the factor returns of one observation of a [`CrossSectionalLinearRegression`](@ref).

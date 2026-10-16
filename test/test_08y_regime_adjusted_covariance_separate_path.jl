@@ -601,6 +601,29 @@ it as it is.
     @test K1 == 20
     @test !PO.regime_bias_open(ExactDebias(), na, 2.0^(-1 / 20), K1 - 1, 2)
     @test PO.regime_bias_open(ExactDebias(), na, 2.0^(-1 / 20), K1, 2)
+
+    # A holiday block stays indefinite after the gate opens, and the default rule still scores
+    # it as it is. Half of the cells are holidays, at a correlation of 0.9, and row 29 meets an
+    # old indefinite block over assets 4, 7 and 8 (R16 of #1630).
+    Uh = cholesky(Symmetric(fill(0.9, na, na) + 0.1 * I)).U
+    rng = StableRNG(1)
+    Xh = (randn(rng, 150, na) * Uh) .* transpose(sig)
+    Xh[rand(rng, 150, na) .< 0.5] .= NaN
+    function row_stat(rule, t)
+        ce = sep(rule)
+        cache = partial_fit!(ce, Xh[1:(t - 1), :]).cache
+        idx = findall(!isnan, Xh[t, :])
+        C = PO.regime_covariance_block(cache, ce, idx)
+        K = PO.centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
+        gate = PO.regime_bias_open(ExactDebias(), length(idx), ce.cor_decay, K, ce.hac_lags)
+        stat = PO.regime_target_statistic(ce.regime_target, cache, ce, Xh[t, :], idx)
+        return eigmin(Symmetric(Matrix(C))), gate, stat
+    end
+    lo, gate, stat = row_stat(RefuseIndefiniteWarmUp(), 29)
+    @test findall(!isnan, Xh[29, :]) == [4, 7, 8]
+    @test lo < 0 && gate && !isnothing(stat)
+    @test isequal(stat, row_stat(ScoreIndefiniteBlock(), 29)[3])
+    @test !isequal(stat, row_stat(ClipIndefiniteBlock(), 29)[3])
 end
 
 #=

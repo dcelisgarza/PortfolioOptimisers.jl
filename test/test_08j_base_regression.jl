@@ -1656,6 +1656,21 @@ struct BareTestRegression <: PortfolioOptimisers.AbstractCrossSectionalRegressio
                                                    Zd, Xc, Wc)
                 @test gdrop.f ≈ drop.f
                 @test gdrop.dc == drop.dc
+                # The pseudo-inverse projection of a basis-invariant target is the one of the
+                # linear member (R16 of #1630). The rule refuses the pseudo-inverse target.
+                if tgt isa GeneralisedLinearModel
+                    pif = cross_sectional_regression(CrossSectionalTargetRegression(;
+                                                                                    tgt = tgt,
+                                                                                    alg = PseudoInverseFallback(),
+                                                                                    intercept = intercept),
+                                                     Zd, Xc, Wc)
+                    @test pif.eps ≈ linear.eps
+                    @test pif.f ≈
+                          cross_sectional_regression(CrossSectionalLinearRegression(;
+                                                                                    alg = PseudoInverseFallback(),
+                                                                                    intercept = intercept),
+                                                     Zd, Xc, Wc).f
+                end
                 @test_throws "has rank $(size(Zd, 3) - 1)" cross_sectional_regression(CrossSectionalTargetRegression(;
                                                                                                                      tgt = tgt,
                                                                                                                      alg = RankDeficiencyRefusal(),

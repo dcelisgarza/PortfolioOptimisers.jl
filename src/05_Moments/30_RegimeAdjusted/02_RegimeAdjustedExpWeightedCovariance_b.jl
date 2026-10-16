@@ -790,7 +790,8 @@ function regime_target_statistic(target::PortfolioTarget,
                                  ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                                  idx::AbstractVector{<:Integer})
     K = centring_terms(ce.centring, minimum(view(cache.obs_count, idx)))
-    # The block is young while the gate of the Mahalanobis target for the same assets is closed.
+    # The block is young while the gate of the Mahalanobis target under `ExactDebias()` is closed
+    # for the same assets, under every `debias`.
     young = !regime_bias_open(ExactDebias(), length(idx),
                               has_separate_cor_decay(ce) ? ce.cor_decay : ce.decay, K,
                               ce.hac_lags)

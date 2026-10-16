@@ -379,6 +379,12 @@ end
     @test PortfolioOptimisers.seed_window_path(scored) ==
           "rfe.scores.descriptors[1].ce.rule"
     @test_throws ArgumentError Online(scored)
+    # The third escape that #1638 named: an opinion of an opinion pool (R16 of #1630).
+    pooled = OpinionPoolingPrior(;
+                                 pes = [EntropyPoolingPrior(;
+                                                            pe = EmpiricalPrior(; me = me))])
+    @test PortfolioOptimisers.seed_window_path(pooled) == "pes[1].pe.me.rule"
+    @test_throws "`pes[1].pe.me.rule`" Online(pooled)
     @test isnothing(PortfolioOptimisers.seed_window_path(listed(RollingWindow())))
     @test Online(listed(RollingWindow())) isa Online
     @test PortfolioOptimisers.seed_window_path([[1.0], [seed(ew)]]) == "[2][1].rule"

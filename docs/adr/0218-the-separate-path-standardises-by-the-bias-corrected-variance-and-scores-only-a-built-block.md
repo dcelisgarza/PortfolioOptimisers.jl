@@ -44,7 +44,10 @@ path came out of #1726.
    in the warm-up can also be indefinite. On 8 assets at an equicorrelation of 0.5 and two lags,
    one seed of 20 gave a built block with the smallest eigenvalue −0.68 after 5 rows, and the
    equal-weight direction had the variance −0.024. The floor scored it at about 1e11.
-   `MahalanobisTarget` refuses both blocks, because its Cholesky factor fails.
+   `MahalanobisTarget` refuses the indefinite block, because its Cholesky factor fails. It does
+   not refuse the zero block: `safe_regime_cholesky` adds a ridge of `min_val`, so the factor of
+   a zero block succeeds. Under a debiasing rule its gate keeps the first rows out, and under
+   `debias = RawStatistic()` it scored the zero block too.
 
 ## Decision
 
@@ -67,22 +70,29 @@ path came out of #1726.
    `indefinite::AbstractIndefiniteBlockRule` (#1736). `RefuseIndefiniteWarmUp()`, the default,
    refuses a block with a negative eigenvalue while the block is young, and scores it once the
    block is old. A singular block, such as a block of fewer observations than assets, is kept,
-   because each direction reads a true variance on it. The block is young while the gate of `MahalanobisTarget` for the same assets is closed:
-   `regime_bias_open` at the count of the youngest asset, on the decay of the correlation
-   structure and the HAC lags of the estimator. `ClipIndefiniteBlock()` clips the eigenvalues of
+   because each direction reads a true variance on it. The block is young while the gate that
+   `MahalanobisTarget` reads under `ExactDebias()` is closed for the same assets:
+   `regime_bias_open(ExactDebias(), …)` at the count of the youngest asset, on the decay of the
+   correlation structure and the HAC lags of the estimator. The gate reads `ExactDebias()` under
+   every `debias`, so a `RawStatistic()` estimate has the same young blocks. `ClipIndefiniteBlock()` clips the eigenvalues of
    the correlation of the block at zero with `restore_psd!`, keeps the variances, and scores the
    clipped block at every count. `ScoreIndefiniteBlock()` scores the block as it is, the rule
    before #1736. A new rule is a method of `indefinite_block`. The root is `public`, the three
    rules are exported. The maintainer asked for the three rules behind singleton types, and the
-   strict rule is the default, because it does not move the steady state.
+   strict rule is the default, because it does not move the steady state of an estimate whose
+   gate opens.
 
 ## Consequences
 
-- The steady state does not change: the weight `1 - λ^K` goes to one, and a built block of a
-  long fit is positive definite.
+- Decisions 1 and 2 do not move the steady state: the weight `1 - λ^K` goes to one, and a long
+  fit writes every block. Decisions 3 and 4 act at every count. Decision 3 refuses a row where
+  any direction has a variance at or below `min_val`, such as a direction that holds only a
+  constant asset, where the floor scored that direction at zero. Decision 4 refuses an indefinite
+  block at every count where the gate never opens, as the last consequence states.
 - The warm-up of the separate path moves for every target, in the report and in the regime state.
   The parity cases of the oracle on the separate path, `test_12y` and the `separate corr` case of
-  `test_08y`, state `cor_vol = RawVolatility()`.
+  `test_08y`, state `cor_vol = RawVolatility()`, and the portfolio case of `test_12y` also states
+  `indefinite = ScoreIndefiniteBlock()`.
 - The first rows of the regime statistic under HAC on the separate path are now skipped until the
   block is built, where they scored 1e12. A row whose direction has a variance at or below
   `min_val` is skipped on both paths, for `PortfolioTarget`. On the case of #1730, 8 assets, an

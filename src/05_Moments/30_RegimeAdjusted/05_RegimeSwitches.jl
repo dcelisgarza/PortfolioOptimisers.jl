@@ -424,7 +424,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Refuses a covariance block with a negative eigenvalue while the block is young, and scores it once the block is old. This is the default rule of [`PortfolioTarget`](@ref).
 
-The block is young while the gate of [`MahalanobisTarget`](@ref) for the same assets is closed: [`regime_bias_open`](@ref) at the count of the youngest asset, on the decay of the correlation structure, with the HAC lags of the estimator. Under HAC that gate asks that the effective count of observations of the banded weight matrix pass ``n + 1``, and in the warm-up before it a HAC block need not be positive definite. A block of assets with different histories need not be positive definite at any count, and once the gate is open this rule scores it, so the steady state of a panel with a holiday or a late listing does not move. An estimate whose steady state never opens the gate, such as 12 assets at a half-life of 5 under HAC, is young at every count.
+The block is young while the gate that [`MahalanobisTarget`](@ref) reads under [`ExactDebias`](@ref) is closed for the same assets: [`regime_bias_open`](@ref) under `ExactDebias()` at the count of the youngest asset, under every `debias` of the estimator, on the decay of the correlation structure, with the HAC lags of the estimator. Under HAC that gate asks that the effective count of observations of the banded weight matrix pass ``n + 1``, and in the warm-up before it a HAC block need not be positive definite. A block of assets with different histories need not be positive definite at any count, and once the gate is open this rule scores it, so the steady state of a panel with a holiday or a late listing does not move. An estimate whose steady state never opens the gate, such as 12 assets at a half-life of 5 under HAC, is young at every count.
 
 On a case of iid Normal returns at 8 assets, an equicorrelation of 0.5, a half-life of 10, two lags and 30 seeds of 8 rows, the largest regime state of the inverse-volatility direction was 51.4 on the separate path and 14.8 on one decay where the block was scored as it is. On one decay the young blocks of those rows are singular but have no negative eigenvalue, so this rule scores them, and the state stays at 14.8. The separate path refuses every one of those first rows, and it scores its first row at row 14 in the median and at row 21 at most, where its gate opens at 20.
 
@@ -509,7 +509,7 @@ The covariance block that the portfolio regime statistic reads.
 # Arguments
 
   - `C`: The bias-corrected covariance block of the assets that contribute to the statistic.
-  - `young`: Whether the block is young, that is whether the gate of [`MahalanobisTarget`](@ref) for the same assets is closed.
+  - `young`: Whether the block is young, that is whether the gate that [`MahalanobisTarget`](@ref) reads under `ExactDebias()` is closed for the same assets.
 
 # Returns
 

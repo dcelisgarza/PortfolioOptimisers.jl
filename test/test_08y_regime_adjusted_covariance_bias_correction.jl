@@ -386,4 +386,18 @@ end
               sums.mix ≈ svc - sc &&
               sums.spread ≈ sv - 2 * svc + sc
     end
+    # The factor itself. At R = I a direction on one asset reads its variance alone, so it takes
+    # the table at `decay`, and an equal-weight direction mixes the two tables by
+    # θ = Σ a⁴ / (Σ a²)² with no shift. The table at `cor_decay` alone reads neither (R16 of #1630).
+    K = 30
+    tw = PO.PortfolioTarget(; w = [1.0 0.0 0.0; 1/3 1/3 1/3])
+    sep = RegimeAdjustedExpWeightedCovariance(; decay = a, cor_decay = b,
+                                              regime_target = tw)
+    f = PO.portfolio_regime_bias(PO.regime_bias_store(tw, a, Float64), sep, tw,
+                                 Diagonal(s .^ 2) * 1.0, 1:3, K)
+    fv = PO.regime_bias!(Float64[], PO.FirstMomentRegimeAdjusted(), a, K)
+    fc = PO.regime_bias!(Float64[], PO.FirstMomentRegimeAdjusted(), b, K)
+    @test abs(fv / fc - 1) > 0.005
+    @test f[1] ≈ fv
+    @test f[2] ≈ fc + sum(s .^ 4) / sum(s .^ 2)^2 * (fv - fc)
 end

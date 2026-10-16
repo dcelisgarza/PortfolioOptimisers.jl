@@ -423,6 +423,15 @@ end
         # The Marchenko-Pastur ratio of the block reads the size of the block.
         r = denoise!(Denoise(), copy(S), T / N)
         @test r[p, p] == denoise!(Denoise(), S[p, p], T / length(p))
+        # On this sample the two ratios keep the same count of noise eigenvalues, and the
+        # default replaces them by their mean, so the ratio of the whole matrix gives the same
+        # block. On the next one an eigenvalue lies between the two edges (R16 of #1630).
+        Xq = randn(StableRNG(1), 120, 6) ./ 100
+        Xq[:, 3] .= 0.0
+        Sq = cov(Xq)
+        rq = denoise!(Denoise(), copy(Sq), T / N)
+        @test rq[p, p] == denoise!(Denoise(), Sq[p, p], T / length(p))
+        @test rq[p, p] != denoise!(Denoise(), Sq[p, p], T / N)
         @test all(iszero, r[3, :])
         @test all(iszero, r[:, 3])
         r = detone!(Detone(), copy(S))

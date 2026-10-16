@@ -225,7 +225,8 @@ remains, which that function states.
 A direction reads the block as a covariance. A HAC block in the warm-up, and a block of assets
 with different histories, need not be positive definite, and a direction with a small positive
 variance on it scores a large statistic: at 8 assets, a half-life of 10 and two lags, one row of
-a block whose smallest eigenvalue is ``-0.31`` scored 0.51 and set the regime state to 51. The
+a block whose smallest eigenvalue is ``-0.31`` had ``r^{2} = 0.51`` against a direction variance
+of 0.0057, and it set the regime state to 51. The
 `indefinite` field names what the statistic does with such a block.
 
 # Fields

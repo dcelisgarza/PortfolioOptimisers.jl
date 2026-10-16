@@ -279,6 +279,20 @@ set over every observation.
         e = partial_fit!(e, X[61:200, :], F[61:200, :])
         @test e.pe1.re.included == first_sets
 
+        # An opinion pins over the returns of pe1, the scenarios of its factor model, and not
+        # over the raw rows: the set of asset 1 differs between the two (R16 of #1630).
+        pinned = FactorPrior(; re = StepwiseRegression(; sw..., choice = PinnedChoice()))
+        epp = EntropyPoolingPrior(; sets = sets, pe = pinned,
+                                  mu_views = LinearConstraintEstimator(;
+                                                                       val = "A1 == 0.004"))
+        pe1 = FactorPrior(; re = StepwiseRegression(; sw...))
+        X1 = prior(pe1, X[rows(1), :], F[rows(1), :]).X
+        over_x1 = [po._regression(pinned.re, X1[:, i], F[rows(1), :]) for i in 1:N]
+        over_x = [po._regression(pinned.re, X[rows(1), i], F[rows(1), :]) for i in 1:N]
+        @test over_x1 != over_x
+        e = online(OpinionPoolingPrior(; pes = [epp], pe1 = pe1))
+        @test partial_fit!(e, X[rows(1), :], F[rows(1), :]).pes[1].pe.re.included == over_x1
+
         pool(pe2) = OpinionPoolingPrior(; pes = [ep], pe2 = pe2)
         e = online(pool(dr(; choice = PinnedChoice())))
         @test po.pending_choice(e)
