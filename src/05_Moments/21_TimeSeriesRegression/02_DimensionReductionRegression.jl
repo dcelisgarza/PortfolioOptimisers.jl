@@ -684,6 +684,12 @@ function pin_regression_choice(re::DimensionReductionRegression{<:Any, <:Any, <:
     _, Vp, _, sigma = prep_dim_red_reg(isnothing(w) ? re : factory(re, w), F)
     return rebuild_estimator(re, (; proj = Vp ./ sigma))
 end
+# A method of `pending_choice`, which `src/10_Prior/12_PriorPartialFit.jl` documents. It lives
+# beside the pin it answers for.
+function pending_choice(::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice,
+                                                       Nothing})
+    return true
+end
 """
     returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
 

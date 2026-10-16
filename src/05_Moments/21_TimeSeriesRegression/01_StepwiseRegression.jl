@@ -857,5 +857,10 @@ function pin_regression_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:Pin
     end
     return rebuild_estimator(re, (; included = included))
 end
+# A method of `pending_choice`, which `src/10_Prior/12_PriorPartialFit.jl` documents. It lives
+# beside the pin it answers for.
+function pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
+    return isnothing(re.included) || any(isnothing, re.included)
+end
 
 export PValue, ForwardSelection, BackwardElimination, StepwiseRegression

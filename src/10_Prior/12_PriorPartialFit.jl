@@ -447,8 +447,8 @@ This is the call with no data of the refit route. A buffer that records no Panel
 
 The method that Julia selects is the algorithm.
 
- 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., series..., vols..., kwargs...)` over the rows of the buffer.
- 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; series..., vols..., kwargs...)` over the rows of the buffer.
+ 1. `pnl` is `nothing`: call `prior(pe, X, F; masks..., series..., vols..., kwargs...)` over the rows of the buffer, with the keywords of [`sample_buffer_fit_kwargs`](@ref).
+ 2. `pnl` is an Asset Panel: call `prior(pe, X, F, pnl; series..., vols..., kwargs...)` over the rows of the buffer, with the keywords of [`sample_buffer_fit_kwargs`](@ref).
 
 # Arguments
 
@@ -465,6 +465,7 @@ The method that Julia selects is the algorithm.
 
   - [`prior`](@ref)
   - [`sample_buffer_panel`](@ref)
+  - [`sample_buffer_fit_kwargs`](@ref)
   - [`sample_buffer_kwargs`](@ref)
   - [`exogenous_buffer_kwargs`](@ref)
   - [`implied_volatility_buffer_kwargs`](@ref)
@@ -473,14 +474,12 @@ The method that Julia selects is the algorithm.
 function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, ::Nothing;
                       kwargs...)
     return prior(pe, sample_buffer(state), factor_buffer(state);
-                 sample_buffer_kwargs(state)..., exogenous_buffer_kwargs(state)...,
-                 implied_volatility_buffer_kwargs(state)..., kwargs...)
+                 sample_buffer_fit_kwargs(state, nothing)..., kwargs...)
 end
 function buffer_prior(pe::AbstractPriorEstimator, state::SampleBufferState, pnl::AssetPanel;
                       kwargs...)
     return prior(pe, sample_buffer(state), factor_buffer(state), pnl;
-                 exogenous_buffer_kwargs(state)...,
-                 implied_volatility_buffer_kwargs(state)..., kwargs...)
+                 sample_buffer_fit_kwargs(state, pnl)..., kwargs...)
 end
 """
     needs_factor_returns(pe::AbstractHiLoOrderPriorEstimator_F) -> true
@@ -814,7 +813,7 @@ A prior that reads Panel Fields, as [`reads_panel_fields`](@ref) answers, refuse
  2. Read the buffer out of `pe.cache` with [`assert_sample_buffer`](@ref), giving `state`.
  3. Fold a matrix, its factor block and its masks into `state` through the block method of [`partial_fit!`](@ref), or a vector, its factor observation and its masks through the single-observation method.
  4. Rebuild the prior with its `cache` set to the new `state`.
- 5. Apply the Choice Rule of the regression of the prior over the rows of `state` with [`pin_prior_choice`](@ref), and return the prior.
+ 5. Apply the Choice Rule of the regression of the prior over the rows of `state` with [`pin_buffer_choice`](@ref), and return the prior.
 
 # Arguments
 
@@ -859,8 +858,7 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
         partial_fit!(state, X, F; active_mask = active_mask,
                      estimation_mask = estimation_mask)
     end
-    return pin_prior_choice(Accessors.@set(pe.cache = state), sample_buffer(state),
-                            factor_buffer(state))
+    return pin_buffer_choice(Accessors.@set(pe.cache = state))
 end
 """
     partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
@@ -925,13 +923,13 @@ Takes the step of the refit route of a prior: the fold of [`refit_prior_fold`](@
 
 This is the verb of every route of the step of a prior. [`partial_fit!`](@ref) over a `ReturnsResult` marks the Shared Series gaps of the step and calls it, and the online step of an optimiser, [`fold_prior`](@ref), calls it with the marks of its own Shared Series. The step is a function of its own, and not a method of [`partial_fit!`](@ref), for two reasons. The marks are a fact of the returns data, and a prior at `x_src = ExcessSource()` folds the excess returns, which hold no benchmark, so the caller finds them from the returns data and not the prior. And every method of this verb that reads a family state narrows the `cache` of its estimator, so a buffer reaches the refit route alone.
 
-The marks `gaps` travel into the buffer of the prior, so every fit through it drops the marked observations with [`shared_series_buffer`](@ref). A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_prior_choice`](@ref), over the observations that a fit keeps. A [`CrossSectionalFactorPrior`](@ref) applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The carry of [`EmpiricalPrior`](@ref), the carry of [`CrossSectionalFactorPrior`](@ref), [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) have methods of their own.
+The marks `gaps` travel into the buffer of the prior, so every fit through it drops the marked observations with [`shared_series_buffer`](@ref). A prior that adds no work of its own folds `rd` with [`refit_prior_fold`](@ref), and applies the Choice Rule of a regression that it fits with [`pin_buffer_choice`](@ref), over the observations that a fit keeps. A [`CrossSectionalFactorPrior`](@ref) applies its Choice Rule after the fold, with [`cross_sectional_pin_choice`](@ref). The carry of [`EmpiricalPrior`](@ref), the carry of [`CrossSectionalFactorPrior`](@ref), [`HighOrderPriorEstimator`](@ref) and [`BlackLittermanPrior`](@ref) have methods of their own.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Any prior: fold `rd` and `gaps` with [`refit_prior_fold`](@ref), and apply [`pin_prior_choice`](@ref) over the rows of [`shared_series_buffer`](@ref). A prior with no pending choice, which [`pending_choice`](@ref) answers, pins nothing, so its step copies no row. A buffer whose every observation has a gap pins nothing yet, which [`buffer_fits_none`](@ref) answers with no allocation.
+ 1. Any prior: fold `rd` and `gaps` with [`refit_prior_fold`](@ref), and apply the Choice Rule over the rows of the buffer with [`pin_buffer_choice`](@ref).
  2. A [`CrossSectionalFactorPrior`](@ref): fold `rd` and `gaps` with [`refit_prior_fold`](@ref), and pin the dropped members under a [`PinnedChoice`](@ref).
 
 # Arguments
@@ -953,6 +951,7 @@ The method that Julia selects is the algorithm.
   - [`partial_fit!`](@ref)
   - [`fold_prior`](@ref)
   - [`refit_prior_fold`](@ref)
+  - [`pin_buffer_choice`](@ref)
   - [`pin_prior_choice`](@ref)
   - [`cross_sectional_pin_choice`](@ref)
   - [`shared_series_gaps`](@ref)
@@ -960,31 +959,75 @@ The method that Julia selects is the algorithm.
 """
 function fold_prior_step(pe::AbstractPriorEstimator, rd::ReturnsResult,
                          gaps::Option{<:AbstractVector{Bool}})
-    pe = refit_prior_fold(pe, rd, gaps)
+    return pin_buffer_choice(refit_prior_fold(pe, rd, gaps))
+end
+"""
+    pin_buffer_choice(pe::AbstractPriorEstimator)
+
+Applies the Choice Rule of each regression that a prior fits over the rows of its sample buffer, after a fold of the refit route.
+
+The two folds of the refit route call it: the matrix form of [`partial_fit!`](@ref) and [`fold_prior_step`](@ref). It gives [`pin_prior_choice`](@ref) the data that the call with no data, [`buffer_prior`](@ref), gives the batch verb: the rows that a fit keeps, which [`shared_series_buffer`](@ref) answers, the panel of [`sample_buffer_panel`](@ref), and the keywords of [`sample_buffer_fit_kwargs`](@ref). So a prior in the tree that reads a Panel Field, a mask or the Exogenous Series pins the choice of the batch fit over the same rows (#1749).
+
+# Algorithm
+
+ 1. Return `pe` when [`pending_choice`](@ref) of `pe` is `false`, or when [`buffer_fits_none`](@ref) of `pe.cache` is `true`. The step then copies no row.
+ 2. Read the rows that a fit keeps with [`shared_series_buffer`](@ref), giving `fit`.
+ 3. Read the panel of `fit` with [`sample_buffer_panel`](@ref), and the keywords of `fit` with [`sample_buffer_fit_kwargs`](@ref).
+ 4. Apply [`pin_prior_choice`](@ref) to `pe` over the returns and the factor returns of `fit`, with no weights, the panel and the keywords.
+
+# Arguments
+
+  - `pe`: The prior after the fold, whose `cache` holds a [`SampleBufferState`](@ref).
+
+# Validation
+
+  - The rules of [`pin_prior_choice`](@ref).
+
+# Returns
+
+  - `pe::AbstractPriorEstimator`: The prior that the step returns.
+
+# Related
+
+  - [`pin_prior_choice`](@ref)
+  - [`fold_prior_step`](@ref)
+  - [`partial_fit!`](@ref)
+  - [`buffer_prior`](@ref)
+  - [`sample_buffer_fit_kwargs`](@ref)
+  - [`pending_choice`](@ref)
+"""
+function pin_buffer_choice(pe::AbstractPriorEstimator)
     state = pe.cache
     if !pending_choice(pe) || buffer_fits_none(state)
         return pe
     end
     fit = shared_series_buffer(state)
-    return pin_prior_choice(pe, sample_buffer(fit), factor_buffer(fit))
+    pnl = sample_buffer_panel(fit)
+    return pin_prior_choice(pe, sample_buffer(fit), factor_buffer(fit), nothing, pnl;
+                            sample_buffer_fit_kwargs(fit, pnl)...)
 end
 """
-    pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, X, F, w = nothing)
+    pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, X, F, w = nothing,
+                     pnl = nothing; kwargs...)
     pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
                                <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
-                     w::Option{<:ObsWeights} = nothing)
+                     w::Option{<:ObsWeights} = nothing,
+                     pnl::Option{<:AssetPanel} = nothing; kwargs...)
     pin_prior_choice(pe::Union{<:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator,
                                <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
                                <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior}, X, F,
-                     w = nothing)
+                     w = nothing, pnl = nothing; kwargs...)
     pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
-                     w::Option{<:ObsWeights} = nothing)
+                     w::Option{<:ObsWeights} = nothing,
+                     pnl::Option{<:AssetPanel} = nothing; kwargs...)
 
-Applies the Choice Rule of each regression that a prior fits, after an online step of the refit route.
+Applies the Choice Rule of each regression that a prior fits, after an online step of the refit route, and in the batch fit of an entropy-pooling prior.
 
 A [`StepwiseRegression`](@ref) or a [`DimensionReductionRegression`](@ref) under a [`PinnedChoice`](@ref) keeps the choice of its first fit. The step holds no state for it: it writes the choice into the configuration of the regression, with [`pin_regression_choice`](@ref), over the rows of the buffer. A prior that embeds another prior fits the embedded prior on the same returns and factor returns, so the method passes the same rows to it. A prior with no regression in its tree returns unchanged.
 
 An [`OpinionPoolingPrior`](@ref) does not give each prior the same rows. Its batch fit gives `pe1` the returns of the buffer, gives each prior of `pes` the returns of `pe1`, and refits `pe2` on those returns under the pooled weights. The method gives each prior the rows and the weights that the batch fit gives it, so the choice that it pins is the choice of the batch fit over the same rows. It runs `pe1` and the pool only when a prior of `pes` or `pe2` has a choice to pin, which [`pending_choice`](@ref) answers.
+
+Every method passes `pnl` and `kwargs` to each prior in the tree, as the batch fit passes its panel and its keywords. So a prior that reads a Panel Field, a mask or the Exogenous Series runs the fit of the batch fit (#1749). [`pin_buffer_choice`](@ref) gives the panel and the keywords of the buffer.
 
 An [`EntropyPoolingPrior`](@ref) or a [`MeucciEntropyPoolingPrior`](@ref) fits `pe.pe` under its prior probabilities `w0`, builds its views on that fit, and refits `pe.pe` under the posterior weights. Its batch fit applies this function to itself at the `w0` fit, so every refit reads the choice that the views read. The method pins `pe.pe` under the weights of that fit, which [`embedded_pin_weights`](@ref) answers, so the batch fit and the step pin the same choice, and the step runs no view and no solve.
 
@@ -998,8 +1041,8 @@ The method that Julia selects is the algorithm.
  4. An [`OpinionPoolingPrior`](@ref):
      1. Return `pe` when `F` holds fewer than two rows, or when [`pending_choice`](@ref) of `pe` is `false`.
      2. Apply this function to `pe.pe1` over `X` under `w`.
-     3. When a prior of `pe.pes` or `pe.pe2` has a choice to pin, read the returns `X1` of `pe.pe1` over `X`, or take `X` when `pe.pe1` is `nothing`. Apply this function to each prior of `pe.pes` over `X1` under `w`.
-     4. When `pe.pe2` has a choice to pin, pool the opinions over `X1` with [`opinion_pooling_weights`](@ref), giving the pooled weights, and apply this function to `pe.pe2` over `X1` under them.
+     3. When a prior of `pe.pes` or `pe.pe2` has a choice to pin, read the returns `X1` of `pe.pe1` over `X`, `pnl` and `kwargs`, or take `X` when `pe.pe1` is `nothing`. Apply this function to each prior of `pe.pes` over `X1` under `w`.
+     4. When `pe.pe2` has a choice to pin, pool the opinions over `X1`, `pnl` and `kwargs` with [`opinion_pooling_weights`](@ref), giving the pooled weights, and apply this function to `pe.pe2` over `X1` under them.
      5. Rebuild `pe` with the answers.
 
 When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe, w)`, as a batch fit of `factory(pe, w)` does.
@@ -1010,6 +1053,8 @@ When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe
   - `X`: The returns of the rows of the buffer, `observations × assets`.
   - `F`: The factor returns of the rows of the buffer, `observations × factors`, or `nothing`.
   - $(arg_dict[:w_pin])
+  - $(arg_dict[:pnl_prior])
+  - $(arg_dict[:kwargs])
 
 # Validation
 
@@ -1025,17 +1070,19 @@ When `w` is not `nothing`, the method reads `factory(pe.pe1, w)` and `factory(pe
   - [`pin_regression_choice`](@ref)
   - [`pending_choice`](@ref)
   - [`embedded_pin_weights`](@ref)
+  - [`pin_buffer_choice`](@ref)
   - [`fold_prior_step`](@ref)
   - [`PinnedChoice`](@ref)
   - [`partial_fit!`](@ref)
 """
 function pin_prior_choice(pe::Union{Nothing, <:AbstractPriorEstimator}, ::Any, ::Any,
-                          ::Any = nothing)
+                          ::Any = nothing, ::Any = nothing; kwargs...)
     return pe
 end
 function pin_prior_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
                                     <:AugmentedBlackLittermanPrior}, X::MatNum, F::MatNum,
-                          w::Option{<:ObsWeights} = nothing)
+                          w::Option{<:ObsWeights} = nothing,
+                          ::Option{<:AssetPanel} = nothing; kwargs...)
     # The regression reads every row of `F`. Under a Scenario Cap, `w` weighs the
     # scenarios alone, and the rows that the cap removed take a zero weight, as the batch
     # fit gives them through `prior_probability_factory` (ADR 0209).
@@ -1045,28 +1092,32 @@ end
 function pin_prior_choice(pe::Union{<:HighOrderPriorEstimator,
                                     <:HighOrderFactorPriorEstimator, <:BlackLittermanPrior,
                                     <:BayesianBlackLittermanPrior, <:EntropyPoolingPrior,
-                                    <:MeucciEntropyPoolingPrior}, X, F, w = nothing)
-    inner = pin_prior_choice(pe.pe, X, F, embedded_pin_weights(pe, w))
+                                    <:MeucciEntropyPoolingPrior}, X, F, w = nothing,
+                          pnl = nothing; kwargs...)
+    inner = pin_prior_choice(pe.pe, X, F, embedded_pin_weights(pe, w), pnl; kwargs...)
     return inner === pe.pe ? pe : rebuild_estimator(pe, (; pe = inner))
 end
 function pin_prior_choice(pe::OpinionPoolingPrior, X::MatNum, F::MatNum,
-                          w::Option{<:ObsWeights} = nothing)
+                          w::Option{<:ObsWeights} = nothing,
+                          pnl::Option{<:AssetPanel} = nothing; kwargs...)
     if size(F, 1) < 2 || !pending_choice(pe)
         return pe
     end
-    pe = rebuild_estimator(pe, (; pe1 = pin_prior_choice(pe.pe1, X, F, w)))
+    pe = rebuild_estimator(pe, (; pe1 = pin_prior_choice(pe.pe1, X, F, w, pnl; kwargs...)))
     if !any(pending_choice, pe.pes) && !pending_choice(pe.pe2)
         return pe
     end
     pool = isnothing(w) ? pe : factory(pe, w)
-    X1 = isnothing(pool.pe1) ? X : prior(pool.pe1, X, F).X
-    pe = rebuild_estimator(pe, (; pes = [pin_prior_choice(p, X1, F, w) for p in pe.pes]))
+    X1 = isnothing(pool.pe1) ? X : prior(pool.pe1, X, F, pnl; kwargs...).X
+    pes = [pin_prior_choice(p, X1, F, w, pnl; kwargs...) for p in pe.pes]
+    pe = rebuild_estimator(pe, (; pes = pes))
     if !pending_choice(pe.pe2)
         return pe
     end
     pool = isnothing(w) ? pe : factory(pe, w)
-    wp = first(opinion_pooling_weights(pool, X1, F, nothing))
-    return rebuild_estimator(pe, (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp)))
+    wp = first(opinion_pooling_weights(pool, X1, F, pnl; kwargs...))
+    return rebuild_estimator(pe,
+                             (; pe2 = pin_prior_choice(pe.pe2, X1, F, wp, pnl; kwargs...)))
 end
 """
     pending_choice(est::Union{Nothing, <:AbstractEstimator})
@@ -1111,13 +1162,6 @@ The method that Julia selects is the algorithm.
 """
 function pending_choice(::Union{Nothing, <:AbstractEstimator})
     return false
-end
-function pending_choice(re::StepwiseRegression{<:Any, <:Any, <:Any, <:PinnedChoice})
-    return isnothing(re.included) || any(isnothing, re.included)
-end
-function pending_choice(::DimensionReductionRegression{<:Any, <:Any, <:Any, <:PinnedChoice,
-                                                       Nothing})
-    return true
 end
 function pending_choice(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
                                   <:AugmentedBlackLittermanPrior})

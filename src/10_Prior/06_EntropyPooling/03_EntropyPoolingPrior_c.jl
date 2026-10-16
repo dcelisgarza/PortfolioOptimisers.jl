@@ -503,7 +503,7 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
     w1 = w0
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
-    pe = pin_prior_choice(pe, X, F)
+    pe = pin_prior_choice(pe, X, F, nothing, pnl; strict = strict, kwargs...)
     # A view is a dense linear form over the asset axis, and `0 * NaN` is `NaN`, so every
     # row is built on the investable columns alone. The mask does not move between stages,
     # so it is derived once and each refit is viewed at it. Nothing is expanded: an `epc`
@@ -638,7 +638,7 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
     pe, pr, w0 = ep_wrapped_prior(pe, X, F, pnl; strict = strict, kwargs...)
     # The views read the regressions of this fit. A choice under `PinnedChoice` is pinned
     # here, so every refit under the posterior weights reads the same choice (#1641).
-    pe = pin_prior_choice(pe, X, F)
+    pe = pin_prior_choice(pe, X, F, nothing, pnl; strict = strict, kwargs...)
     # See the note at the same step in the staged method: every row is built on the
     # investable columns, because `0 * NaN` is `NaN`. ADR 0115 and ADR 0125.
     imsk, vsets, ni = investable_views(pr, pe.sets)

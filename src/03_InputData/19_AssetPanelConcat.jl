@@ -651,6 +651,44 @@ function sample_buffer_panel(P::AbstractVector{<:AbstractPanelField},
                       emsk = Matrix{Bool}(view(state.M::AbstractMatrix{Bool}, rows, :)))
 end
 """
+    sample_buffer_fit_kwargs(state::SampleBufferState, pnl::Nothing) -> NamedTuple
+    sample_buffer_fit_kwargs(state::SampleBufferState, pnl::AssetPanel) -> NamedTuple
+
+Gives the keywords that a fit over the rows of a sample buffer passes to the batch verb of a prior, beside the panel `pnl` of [`sample_buffer_panel`](@ref).
+
+The call with no data of a refit prior, [`buffer_prior`](@ref), and the Choice Rule of an online step, [`pin_buffer_choice`](@ref), both read them, so the two fits read the same data. A buffer that records no Panel Field gives its masks as keywords, as a matrix call of the batch verb takes them. A buffer that records Panel Fields gives its masks inside `pnl`, so the keywords hold no mask. Both give the Exogenous Series and the implied volatilities that the buffer records.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `pnl` is `nothing`: merge [`sample_buffer_kwargs`](@ref), [`exogenous_buffer_kwargs`](@ref) and [`implied_volatility_buffer_kwargs`](@ref) of `state`.
+ 2. `pnl` is an Asset Panel: merge [`exogenous_buffer_kwargs`](@ref) and [`implied_volatility_buffer_kwargs`](@ref) of `state`.
+
+# Arguments
+
+  - `state`: The buffer to read.
+  - `pnl`: The panel of the rows of the buffer, which [`sample_buffer_panel`](@ref) gives, or `nothing`.
+
+# Returns
+
+  - `kwargs::NamedTuple`: The keywords of the fit.
+
+# Related
+
+  - [`sample_buffer_panel`](@ref)
+  - [`buffer_prior`](@ref)
+  - [`pin_buffer_choice`](@ref)
+  - [`SampleBufferState`](@ref)
+"""
+function sample_buffer_fit_kwargs(state::SampleBufferState, ::Nothing)
+    return (; sample_buffer_kwargs(state)..., exogenous_buffer_kwargs(state)...,
+            implied_volatility_buffer_kwargs(state)...)
+end
+function sample_buffer_fit_kwargs(state::SampleBufferState, ::AssetPanel)
+    return (; exogenous_buffer_kwargs(state)..., implied_volatility_buffer_kwargs(state)...)
+end
+"""
     buffer_asset_panel(state::SampleBufferState) -> Option{<:AssetPanel}
 
 Rebuilds the Asset Panel of the observations a sample buffer holds, from every part of a panel that the buffer records, or gives `nothing` when the buffer records no active mask.

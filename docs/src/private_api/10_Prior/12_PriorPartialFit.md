@@ -22,6 +22,7 @@ PortfolioOptimisers.assert_factor_returns
 PortfolioOptimisers.assert_prior_fold_returns
 PortfolioOptimisers.fold_prior_step(pe::PortfolioOptimisers.AbstractPriorEstimator, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 PortfolioOptimisers.refit_prior_fold
+PortfolioOptimisers.pin_buffer_choice
 PortfolioOptimisers.pin_prior_choice
 PortfolioOptimisers.pending_choice
 PortfolioOptimisers.refit_step_kwargs

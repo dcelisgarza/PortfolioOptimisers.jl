@@ -1049,4 +1049,39 @@ end
             @test reads(HighOrderFactorPriorEstimator(; pe = ep))
         end
     end
+    @testset "A pool pins its choice over the panel of its buffer (#1749)" begin
+        # `pe1` reads a Panel Field and the estimation mask, so a pin that dropped the panel
+        # raises, and a pin that dropped the mask runs another fit.
+        Xp = randn(rng, T, N) ./ 100
+        Fp = randn(rng, T, 3) ./ 100
+        pnl = AssetPanel(; pf = [cap], amsk = trues(T, N), emsk = Em)
+        rdp = ReturnsResult(; nx = nx, X = Xp, nf = string.("F", 1:3), F = Fp, pnl = pnl)
+        sw(choice) = StepwiseRegression(; alg = ForwardSelection(), choice = choice)
+        function pool(re)
+            return OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                       pe1 = PanelFieldProbe(),
+                                       pe2 = FactorPrior(; re = re))
+        end
+        r = rows(rdp, 1:20)
+        s = partial_fit!(online(pool(sw(PinnedChoice()))), r)
+        @test !po.pending_choice(s)
+        # The pin gives `pe2` the weights that the batch fit pools over the panel. The probe
+        # answers on the rows it reads, so the pool reads `r.X`.
+        wp = first(po.opinion_pooling_weights(pool(sw(BatchChoice())), r.X, r.F, r.pnl))
+        @test s.pe2.re.included ==
+              po.pin_regression_choice(sw(PinnedChoice()), r.X, r.F, wp).included
+        # So the stream is the batch fit over the same rows.
+        b = prior(pool(sw(BatchChoice())), r)
+        @test prior(s).mu ≈ b.mu && prior(s).sigma ≈ b.sigma
+        # A later step keeps the choice, and reads out the batch fit of the pinned pool.
+        s2 = partial_fit!(s, rows(rdp, 21:T))
+        @test s2.pe2.re.included == s.pe2.re.included
+        b2 = prior(pool(s.pe2.re), rdp)
+        @test prior(s2).mu ≈ b2.mu && prior(s2).sigma ≈ b2.sigma
+        # The batch fit of an entropy-pooling prior pins its pool over the same panel.
+        ep = EntropyPoolingPrior(; pe = pool(sw(PinnedChoice())))
+        pinned = po.pin_prior_choice(ep, Xp, Fp, nothing, pnl)
+        @test !po.pending_choice(pinned)
+        @test prior(ep, rdp).mu ≈ prior(pinned, rdp).mu
+    end
 end
