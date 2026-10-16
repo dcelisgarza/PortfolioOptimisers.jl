@@ -154,6 +154,12 @@ end
     for n in 0:2
         @test all(isnan, probabilistic_sharpe_ratio(zeros(n, 3)))
     end
+    # A matrix with no columns gives an empty vector of the type of a value, not of `Any`.
+    @test probabilistic_sharpe_ratio(zeros(5, 0)) isa Vector{Float64}
+    @test isempty(probabilistic_sharpe_ratio(zeros(5, 0)))
+    @test minimum_track_record_length(zeros(Float32, 5, 0); alpha = 0.05f0) isa
+          Vector{Float32}
+    @test deflated_sharpe_ratio(zeros(5, 0), [0.1, 0.2]) isa Vector{Float64}
     # A series with a very small but real dispersion keeps its value.
     quiet = 1e-8 .* sin.(1:250) .+ 1e-9
     @test 0 <= probabilistic_sharpe_ratio(quiet) <= 1

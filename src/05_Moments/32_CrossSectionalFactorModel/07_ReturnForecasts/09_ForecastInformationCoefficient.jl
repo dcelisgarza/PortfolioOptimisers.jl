@@ -320,7 +320,7 @@ julia> fe = forecast_evaluation(alpha, y);
 
 julia> forecast_ic_summary(forecast_ic(fe); window = PortfolioOptimisers.forecast_ic_window(fe),
                            mt = OverlapMeanTest()).spearman
-(mean_ic = 0.3333333333333333, std_ic = 0.7023769168568493, ic_ir = 0.4745789978762494, t_stat = 0.8219949365267862, p_value = 0.49748109237039406, mean_ci_lower = -1.4114676536936916, mean_ci_upper = 2.078134320360358, hit_rate = 0.6666666666666666)
+(mean_ic = 0.3333333333333333, std_ic = 0.7023769168568493, ic_ir = 0.4745789978762494, t_stat = 0.8219949365267862, p_value = 0.49748109237039406, mean_ci_lower = -1.4114676536936914, mean_ci_upper = 2.078134320360358, hit_rate = 0.6666666666666666)
 ```
 
 # Related

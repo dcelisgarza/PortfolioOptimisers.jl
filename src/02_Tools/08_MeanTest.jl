@@ -518,7 +518,7 @@ Keywords correspond to the struct's fields.
 ```jldoctest
 julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, NaN, 0.1], 1,
                                      nothing)
-(t_stat = 1.1952286093343938, p_value = 0.29801481173121036, mean_ci_lower = -0.13229406353851897, mean_ci_upper = 0.332294063538519)
+(t_stat = 1.1952286093343938, p_value = 0.29801481173121036, mean_ci_lower = -0.132294063538519, mean_ci_upper = 0.332294063538519)
 ```
 
 # Related

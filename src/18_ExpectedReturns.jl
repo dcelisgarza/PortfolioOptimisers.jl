@@ -1867,7 +1867,10 @@ function probabilistic_sharpe_ratio(x::VecNum; bsr::Number = 0, rf::Number = 0)
     return Distributions.cdf(Distributions.Normal(zero(z), one(z)), z)
 end
 function probabilistic_sharpe_ratio(X::MatNum; kwargs...)
-    return [probabilistic_sharpe_ratio(x; kwargs...) for x in eachcol(X)]
+    # The `NaN` of an empty column has the type of every column's value, so the vector is
+    # typed even when inference cannot see that type.
+    T = typeof(probabilistic_sharpe_ratio(similar(X, 0); kwargs...))
+    return T[probabilistic_sharpe_ratio(x; kwargs...) for x in eachcol(X)]
 end
 """
     minimum_track_record_length(x::VecNum; bsr::Number = 0, rf::Number = 0,
@@ -1961,7 +1964,9 @@ function minimum_track_record_length(x::VecNum; bsr::Number = 0, rf::Number = 0,
     return isnan(n) || d > zero(d) ? n : oftype(n, Inf)
 end
 function minimum_track_record_length(X::MatNum; kwargs...)
-    return [minimum_track_record_length(x; kwargs...) for x in eachcol(X)]
+    # As the matrix method of `probabilistic_sharpe_ratio`.
+    T = typeof(minimum_track_record_length(similar(X, 0); kwargs...))
+    return T[minimum_track_record_length(x; kwargs...) for x in eachcol(X)]
 end
 """
     expected_max_sharpe_ratio(N::Number, sigma::Number, mu::Number = 0)
