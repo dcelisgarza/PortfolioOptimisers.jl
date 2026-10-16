@@ -209,9 +209,9 @@ end
 
 Return `true` when the result of a prior estimator carries one scenario for each observation that it receives.
 
-A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), states its prior probabilities on the scenarios of the prior that it wraps. A wrapped prior can carry fewer scenarios than it receives, so the reweighting prior fits it once to read the count, and fits it again under the probabilities. A wrapped prior that keeps the observations carries the count that it receives, so that first fit is not necessary.
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), states its prior probabilities on the scenarios of the prior that it wraps. A wrapped prior can carry fewer scenarios than it receives, so the reweighting prior reads the count with [`scenario_count`](@ref) before it fits the wrapped prior under the probabilities. A wrapped prior that keeps the observations carries the count that it receives, so the count needs no fit.
 
-The fallback returns `false`, which makes no promise, and the reweighting prior then fits the wrapped prior twice. A wrong `true` makes the reweighting prior check the probabilities against the wrong count. So a prior returns `true` only when no configuration and no data makes its result carry fewer scenarios than the observations that it receives. A [`CrossSectionalFactorPrior`](@ref) keeps the fallback, because it drops the observations that its Descriptors warm up over and the observations that its exposure lag uses. The answer reads the configuration alone. A Scenario Cap at or above the number of observations drops no row, but its prior still returns `false`.
+The fallback returns `false`, which makes no promise, and [`scenario_count`](@ref) then fits a prior that has no method of its own to read the count. A wrong `true` makes the reweighting prior check the probabilities against the wrong count. So a prior returns `true` only when no configuration and no data makes its result carry fewer scenarios than the observations that it receives. A [`CrossSectionalFactorPrior`](@ref) keeps the fallback, because it drops the observations that its Descriptors warm up over and the observations that its exposure lag uses. The answer reads the configuration alone. A Scenario Cap at or above the number of observations drops no row, but its prior still returns `false`.
 
 # Algorithm
 
@@ -247,7 +247,7 @@ true
 
 # Related
 
-  - [`keeps_observations`](@ref)
+  - [`scenario_count`](@ref)
   - [`ep_wrapped_prior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
@@ -274,6 +274,154 @@ function keeps_observations(pe::OpinionPoolingPrior)::Bool
 end
 function keeps_observations(::Online{<:AbstractPriorEstimator})::Bool
     return false
+end
+"""
+    kept_scenarios(pe::AbstractPriorEstimator, T::Integer)
+    kept_scenarios(pe::EmpiricalPrior, T::Integer)
+    kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                             <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
+                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+                   T::Integer)
+    kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)
+    kept_scenarios(pe::OpinionPoolingPrior, T::Integer)
+
+Return the number of scenarios that a fit of `pe` on `T` observations carries, when the configuration of `pe` alone states it, and `nothing` when the data decides it.
+
+[`scenario_count`](@ref) reads this function first, so a prior whose count the configuration states needs no data to count its scenarios. A Scenario Cap keeps the last `pe.max_scenarios` rows, and a prior that wraps another carries the rows of the prior that it wraps. A [`CrossSectionalFactorPrior`](@ref) drops the rows that its Descriptors warm up over, which the data decides, so it answers `nothing`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other prior: return `T` when [`keeps_observations`](@ref) returns `true` for `pe`, and `nothing` otherwise.
+ 2. An [`EmpiricalPrior`](@ref): return `T`, or `pe.max_scenarios` when it is set and smaller, because [`scenario_window`](@ref) keeps the last `pe.max_scenarios` rows.
+ 3. A prior whose result carries the scenarios of the prior in its `pe` field: return this function of `pe.pe`. A factor prior fits `pe.pe` on the factor returns, which have the rows of the asset returns.
+ 4. An [`AugmentedBlackLittermanPrior`](@ref): return the smaller of this function of `pe.a_pe` and of `pe.f_pe`, because the result keeps the rows that both nested priors keep. Return `nothing` when either one is `nothing`.
+ 5. An [`OpinionPoolingPrior`](@ref): return `T` when `pe.pe1` is `nothing`, and this function of `pe.pe1` otherwise.
+
+# Arguments
+
+  - $(arg_dict[:pe])
+  - `T`: The number of observations that the fit of `pe` receives.
+
+# Returns
+
+  - `n::Option{Int}`: The number of scenarios of the fit, or `nothing` when the data decides it.
+
+# Related
+
+  - [`scenario_count`](@ref)
+  - [`keeps_observations`](@ref)
+  - [`scenario_window`](@ref)
+"""
+function kept_scenarios(pe::AbstractPriorEstimator, T::Integer)::Option{Int}
+    return keeps_observations(pe) ? T : nothing
+end
+function kept_scenarios(pe::EmpiricalPrior, T::Integer)::Option{Int}
+    return isnothing(pe.max_scenarios) ? T : min(pe.max_scenarios, T)
+end
+function kept_scenarios(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior,
+                                  <:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
+                                  <:HighOrderPriorEstimator,
+                                  <:HighOrderFactorPriorEstimator}, T::Integer)::Option{Int}
+    return kept_scenarios(pe.pe, T)
+end
+function kept_scenarios(pe::AugmentedBlackLittermanPrior, T::Integer)::Option{Int}
+    a = kept_scenarios(pe.a_pe, T)
+    f = kept_scenarios(pe.f_pe, T)
+    return isnothing(a) || isnothing(f) ? nothing : min(a, f)
+end
+function kept_scenarios(pe::OpinionPoolingPrior, T::Integer)::Option{Int}
+    return isnothing(pe.pe1) ? T : kept_scenarios(pe.pe1, T)
+end
+"""
+    scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum},
+                   pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, X::MatNum,
+                   F::MatNum, pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                             <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
+                             <:HighOrderPriorEstimator, <:HighOrderFactorPriorEstimator},
+                   X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
+                   pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)
+    scenario_count(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum},
+                   pnl::Option{<:AssetPanel}; kwargs...)
+    scenario_count(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum},
+                   pnl::AssetPanel; strict::Bool = false, ne::Option{<:VecStr} = nothing,
+                   E::Option{<:MatNum} = nothing, iv::Option{<:MatNum} = nothing,
+                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+
+Return the number of scenarios that the fit of `pe` on `X`, `F` and `pnl` carries, with the least work that states it.
+
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), checks a caller's prior probabilities against the scenarios of the prior that it wraps, before it fits that prior under them. A fit states the count, but the count needs only the steps that drop rows. When the configuration states the count, [`kept_scenarios`](@ref) gives it with no fit. A [`CrossSectionalFactorPrior`](@ref) drops the rows that its Descriptors warm up over, which the data decides, so its count runs its exposure stage, and not its regression, its factor moments or its assembly.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Any other prior: return [`kept_scenarios`](@ref) of `pe` on `size(X, 1)` observations when it is not `nothing`. Otherwise fit `pe` and return the row count of its scenarios.
+ 2. A [`FactorPrior`](@ref) or a [`FactorBlackLittermanPrior`](@ref): return this function of `pe.pe` on `F` alone, as the fit of `pe` fits `pe.pe`. The asset rows are cut to the rows of the factor prior.
+ 3. A prior whose result carries the scenarios of the prior in its `pe` field: return this function of `pe.pe` on `X`, `F` and `pnl`.
+ 4. An [`AugmentedBlackLittermanPrior`](@ref): return the smaller of this function of `pe.a_pe` on `X` and `pnl`, and of `pe.f_pe` on `F` alone, because the result keeps the rows that both nested priors keep.
+ 5. An [`OpinionPoolingPrior`](@ref): return `size(X, 1)` when `pe.pe1` is `nothing`, and this function of `pe.pe1` otherwise.
+ 6. A [`CrossSectionalFactorPrior`](@ref): take the rows `rw` after the Descriptor warm-up with [`cross_sectional_exposure_stage`](@ref), and check them against the exposure lag with [`assert_cross_sectional_lag_rows`](@ref). The regression answers `n = length(rw) - pe.lag` factor returns. Return [`kept_scenarios`](@ref) of `pe.pe` on `n` observations when it is not `nothing`. Otherwise take the factor returns with [`cross_sectional_factor_scenarios`](@ref), and return this function of `pe.pe` on them alone.
+
+# Arguments
+
+  - $(arg_dict[:pe])
+  - `X`: Asset returns matrix, already oriented.
+  - `F`: Optional factor returns matrix, already oriented.
+  - $(arg_dict[:pnl_prior])
+  - `strict`: If `true`, throws error for missing assets; otherwise, issue warnings.
+  - `ne`, `E`, `iv`, `ivpa`: As in the returns-matrix method of [`prior`](@ref), with `E` already oriented.
+  - `kwargs...`: Additional keyword arguments of the fit of `pe`.
+
+# Validation
+
+  - The rules of every step of the fit that the method runs.
+
+# Returns
+
+  - `T::Int`: The number of scenarios that the fit of `pe` carries.
+
+# Related
+
+  - [`kept_scenarios`](@ref)
+  - [`keeps_observations`](@ref)
+  - [`ep_wrapped_prior`](@ref)
+  - [`cross_sectional_factor_scenarios`](@ref)
+"""
+function scenario_count(pe::AbstractPriorEstimator, X::MatNum, F::Option{<:MatNum},
+                        pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)::Int
+    n = kept_scenarios(pe, size(X, 1))
+    if !isnothing(n)
+        return n
+    end
+    return size(prior(pe, X, F, pnl; strict = strict, kwargs...).X, 1)
+end
+function scenario_count(pe::Union{<:FactorPrior, <:FactorBlackLittermanPrior}, ::MatNum,
+                        F::MatNum, ::Option{<:AssetPanel}; strict::Bool = false,
+                        kwargs...)::Int
+    return scenario_count(pe.pe, F, nothing, nothing; strict = strict)
+end
+function scenario_count(pe::Union{<:BlackLittermanPrior, <:BayesianBlackLittermanPrior,
+                                  <:EntropyPoolingPrior, <:MeucciEntropyPoolingPrior,
+                                  <:HighOrderPriorEstimator,
+                                  <:HighOrderFactorPriorEstimator}, X::MatNum,
+                        F::Option{<:MatNum}, pnl::Option{<:AssetPanel}; kwargs...)::Int
+    return scenario_count(pe.pe, X, F, pnl; kwargs...)
+end
+function scenario_count(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
+                        pnl::Option{<:AssetPanel}; strict::Bool = false, kwargs...)::Int
+    return min(scenario_count(pe.a_pe, X, nothing, pnl; strict = strict, kwargs...),
+               scenario_count(pe.f_pe, F, nothing, nothing; strict = strict))
+end
+function scenario_count(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum},
+                        pnl::Option{<:AssetPanel}; kwargs...)::Int
+    return isnothing(pe.pe1) ? size(X, 1) : scenario_count(pe.pe1, X, F, pnl; kwargs...)
 end
 """
     scenario_weights(w::Nothing, t::Integer)
@@ -321,6 +469,40 @@ function scenario_weights(w::ObsWeights, t::Integer)
         return w
     end
     return scenario_probabilities(w, vcat(zeros(eltype(w), t - s), w))
+end
+"""
+    assert_cross_sectional_lag_rows(t::Integer, lag::Integer)
+
+Check that the `t` rows after the Descriptor warm-up of a [`CrossSectionalFactorPrior`](@ref) leave at least two factor returns after the exposure lag `lag`.
+
+The regression reads the exposures of the row `lag` observations before each return, so it answers `t - lag` factor returns. The factor prior states a covariance of them, and a covariance of one observation is not a number. [`cross_sectional_regression_stage`](@ref) and [`scenario_count`](@ref) both read this check, so a count refuses the rows that the fit refuses.
+
+# Arguments
+
+  - `t`: The number of rows after the Descriptor warm-up.
+  - `lag`: The exposure lag, `pe.lag`.
+
+# Validation
+
+  - `t > lag`. Raises an `ArgumentError`.
+  - `t - lag >= 2`. Raises an `ArgumentError`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cross_sectional_regression_stage`](@ref)
+  - [`scenario_count`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_cross_sectional_lag_rows(t::Integer, lag::Integer)
+    @argcheck(t > lag,
+              ArgumentError("the exposures lag the returns by lag = $(lag), so a fit needs more than $(lag) observations after the Descriptor warm-up, and $(t) are left. Give more observations, shorten the warm-up of the Descriptors, or lower lag."))
+    @argcheck(t - lag >= 2,
+              ArgumentError("the factor prior states a covariance of the factor returns, and a covariance of one observation is not a number, so a fit needs at least two observations after the Descriptor warm-up and the exposure lag of $(lag), and $(t - lag) is left. Give more observations, or shorten the warm-up of the Descriptors."))
+    return nothing
 end
 """
     cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatNum,
@@ -384,10 +566,7 @@ function cross_sectional_regression_stage(pe::CrossSectionalFactorPrior, X::MatN
     mcw = cross_sectional_rows(mcap, rw)
     cross_sectional_neutralise!(pe.neutralise, Msw, pe.cre, bww, nf, fam)
     fb = cross_sectional_family_basis(pe.families, Msw, bww, nf, fam)
-    @argcheck(length(rw) > pe.lag,
-              ArgumentError("the exposures lag the returns by lag = $(pe.lag), so a fit needs more than $(pe.lag) observations after the Descriptor warm-up, and $(length(rw)) are left. Give more observations, shorten the warm-up of the Descriptors, or lower lag."))
-    @argcheck(length(rw) - pe.lag >= 2,
-              ArgumentError("the factor prior states a covariance of the factor returns, and a covariance of one observation is not a number, so a fit needs at least two observations after the Descriptor warm-up and the exposure lag of $(pe.lag), and $(length(rw) - pe.lag) is left. Give more observations, or shorten the warm-up of the Descriptors."))
+    assert_cross_sectional_lag_rows(length(rw), pe.lag)
     r = (pe.lag + 1):length(rw)
     Zl = fb.Ms[r .- pe.lag, :, :]
     Xr = Xlw[r, :]
@@ -512,6 +691,26 @@ function prior_probability_factory(pe::CrossSectionalFactorPrior, w, X::MatNum,
     (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; kwargs...)
     inner = prior_probability_factory(pe.pe, w, f, nothing, nothing)
     return rebuild_estimator(factory(pe, scenario_weights(w, size(f, 1))), (; pe = inner))
+end
+# The regression answers one factor return for each row after the Descriptor warm-up and the
+# exposure lag, so the count runs the exposure stage alone. The factor prior then counts its
+# scenarios from that number, and only a factor prior that the data decides reads the
+# factor returns. `scenario_count` documents every method.
+function scenario_count(pe::CrossSectionalFactorPrior, X::MatNum, F::Option{<:MatNum},
+                        pnl::AssetPanel; strict::Bool = false,
+                        ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
+                        iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)::Int
+    (; rw) = cross_sectional_exposure_stage(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                            ivpa = ivpa)
+    assert_cross_sectional_lag_rows(length(rw), pe.lag)
+    n = kept_scenarios(pe.pe, length(rw) - pe.lag)
+    if !isnothing(n)
+        return n
+    end
+    (; f) = cross_sectional_factor_scenarios(pe, X, F, pnl; ne = ne, E = E, iv = iv,
+                                             ivpa = ivpa, kwargs...)
+    return scenario_count(pe.pe, f, nothing, nothing; strict = strict)
 end
 function assert_scenario_model(pe::CrossSectionalFactorPrior)
     return assert_scenario_model(pe.pe)

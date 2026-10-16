@@ -554,6 +554,25 @@ scenario mean.
                                                                  mu_views = views,
                                                                  w = wbad), rd)
     end
+    @testset "The count of the scenarios runs the exposure stage, not the fit" begin
+        PO = PortfolioOptimisers
+        sc(p) = PO.scenario_count(p, rd.X, nothing, rd.pnl)
+        # The data decides the rows of the warm-up, so the configuration counts nothing.
+        @test isnothing(PO.kept_scenarios(pe, size(rd.X, 1)))
+        @test sc(pe) == T
+        @test sc(HighOrderPriorEstimator(; pe = pe)) == T
+        pc = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                       pe = EmpiricalPrior(; max_scenarios = 20))
+        @test sc(pc) == size(prior(pc, rd).X, 1) == 20
+        pl = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                       lag = 3)
+        @test sc(pl) == size(prior(pl, rd).X, 1) == T - 2
+        # The count refuses the rows that the fit refuses, by the same check.
+        pb = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                       lag = T)
+        @test_throws ArgumentError sc(pb)
+        @test_throws ArgumentError prior(pb, rd)
+    end
     @testset "strict reaches the factor prior the estimator nests" begin
         # The `pe` slot admits a view-taking prior, whose views name factors on an axis the
         # caller declared. A name the axis lacks is a warning by default and a refusal under
@@ -1426,6 +1445,18 @@ function PortfolioOptimisers.prior(pe::CsfpNaNFactorPrior, X::AbstractMatrix, ar
     sigma[:, pe.k] .= NaN
     return LowOrderPrior(; X = pr.X, mu = mu, sigma = sigma, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow)
+end
+
+@testset "A factor prior that makes no promise is counted on the factor returns" begin
+    PO = PortfolioOptimisers
+    rd = csfp_panel(; n_assets = 20, n_observations = 60, n_industries = 3, seed = 782_001,
+                    late_listing_proba = 0.0, delisting_proba = 0.0, missing_ratio = 0.0).rd
+    pn = CrossSectionalFactorPrior(; lambda = 1, factors = csfp_factors(), minra = 5,
+                                   pe = CsfpNaNFactorPrior(EmpiricalPrior(;
+                                                                          max_scenarios = 30),
+                                                           Int[]))
+    @test isnothing(PO.kept_scenarios(pn.pe, 59))
+    @test PO.scenario_count(pn, rd.X, nothing, rd.pnl) == size(prior(pn, rd).X, 1) == 30
 end
 
 @testset "A factor with no moment gates only the assets that load on it (#1510)" begin

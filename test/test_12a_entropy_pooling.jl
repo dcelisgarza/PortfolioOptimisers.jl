@@ -2295,3 +2295,41 @@ PortfolioOptimisers.keeps_observations(::FitCountPrior{true}) = true
                                                              sets = sets, mu_views = mv), X)
     @test nk[] == 0
 end
+@testset "The count of the scenarios of a wrapped prior runs only the steps that drop rows" begin
+    sc = PortfolioOptimisers.scenario_count
+    ks = PortfolioOptimisers.kept_scenarios
+    rng = StableRNG(1750)
+    X = randn(rng, 60, 4) ./ 100
+    F = randn(rng, 60, 2) ./ 100
+    cap = EmpiricalPrior(; max_scenarios = 25)
+    asets = UniverseSets(; xkey = "nx",
+                         dict = Dict("nx" => ["A1", "A2", "A3", "A4"],
+                                     "nf" => ["F1", "F2"]))
+    abl(a, f) = AugmentedBlackLittermanPrior(; a_pe = a, f_pe = f, sets = asets,
+                                             a_views = LinearConstraintEstimator(;
+                                                                                 val = "A1 == 0.001"),
+                                             f_views = LinearConstraintEstimator(;
+                                                                                 val = "F1 == 0.001"))
+    # The count is the row count of the fit, for every prior that the configuration counts.
+    for (pe, Fi) in ((EmpiricalPrior(), nothing), (cap, nothing),
+                     (EmpiricalPrior(; max_scenarios = 500), nothing), (FactorPrior(; pe = cap), F),
+                     (FactorPrior(), F), (HighOrderPriorEstimator(; pe = cap), nothing),
+                     (EntropyPoolingPrior(; pe = FactorPrior(; pe = cap)), F),
+                     (OpinionPoolingPrior(; pe1 = cap, pes = [EntropyPoolingPrior()]), nothing),
+                     (abl(EmpiricalPrior(; max_scenarios = 30), EmpiricalPrior(; max_scenarios = 40)), F))
+        n = size(prior(pe, X, Fi).X, 1)
+        @test ks(pe, size(X, 1)) == n
+        @test sc(pe, X, Fi, nothing) == n
+    end
+    @test ks(EntropyPoolingPrior(; pe = FactorPrior(; pe = cap)), 10) == 10
+    # A prior that makes no promise is fitted to count, and a factor prior fits only its
+    # factor prior on `F`. One that keeps the observations is not fitted.
+    nc, nk = Ref(0), Ref(0)
+    @test isnothing(ks(FactorPrior(; pe = FitCountPrior{false}(cap, nc)), 60))
+    @test sc(FactorPrior(; pe = FitCountPrior{false}(cap, nc)), X, F, nothing) == 25
+    @test nc[] == 1
+    @test sc(FactorPrior(; pe = FitCountPrior{true}(EmpiricalPrior(), nk)), X, F,
+             nothing) == 60
+    @test nk[] == 0
+    @test isnothing(ks(abl(EmpiricalPrior(), FitCountPrior{false}(cap, nc)), 60))
+end

@@ -454,7 +454,7 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
 
 # Algorithm
 
- 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref), giving `pr` and the prior probabilities `w0` on its rows. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`. The probabilities are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is fitted under it. A wrapped prior that drops rows is fitted once before, to read `T`. A wrapped prior that [`keeps_observations`](@ref) is not, because `T` is then `size(X, 1)`. Where the fit under `pe.w` answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior.
+ 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref), giving `pr` and the prior probabilities `w0` on its rows. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`. The probabilities are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is fitted under it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit to state it. Where the fit under `pe.w` answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior.
  2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Stage one holds the mean, value at risk, conditional, entropic and relativistic value at risk views. Accumulate them into the constraint dictionary `epc` and the tail view vector `tvs`. Where either is non-empty, solve from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`.
  4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Where `epc` or `tvs` is non-empty, solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
@@ -603,7 +603,7 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
 
 # Algorithm
 
- 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref), giving `pr` and the prior probabilities `w0` on its rows. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`. The probabilities are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is fitted under it. A wrapped prior that drops rows is fitted once before, to read `T`. A wrapped prior that [`keeps_observations`](@ref) is not, because `T` is then `size(X, 1)`. Where the fit under `pe.w` answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior.
+ 1. Fit the wrapped prior estimator with [`ep_wrapped_prior`](@ref), giving `pr` and the prior probabilities `w0` on its rows. The fit states the observation axis: `T` is `size(pr.X, 1)`, which a nested prior that drops rows makes smaller than `size(X, 1)`. The probabilities are `pe.w` where the caller set one, `pr.w` where the fit answered one, and the uniform `1/T` otherwise. A caller's `pe.w` reaches the wrapped estimator through [`prior_probability_factory`](@ref), which puts it on the rows that each weighted field reads, and `pr` is fitted under it. Before that fit, [`scenario_count`](@ref) reads `T` with only the steps that drop rows, so most wrapped priors need no fit to state it. Where the fit under `pe.w` answers its own `pr.w`, a nested prior that reweights its scenarios solved its views from `pe.w`, so `w0` is `pr.w`, the posterior of the nested prior.
  2. Pin each choice of `pe.pe` under a [`PinnedChoice`](@ref) at this fit with [`pin_prior_choice`](@ref), so every refit reads the choice that the views read. Every refit goes through [`scenario_prior`](@ref), which holds the model of this fit, its regression and its residual block included, so the refit reads the scenarios that the views read.
  3. Build every view against that one `pr`: the mean, value at risk, conditional, entropic and relativistic value at risk, variance, covariance, skewness, kurtosis and correlation views. Each row that is linear in the posterior probabilities reaches the constraint dictionary `epc`, and each tail view that needs auxiliary variables reaches the tail view vector `tvs`. No asset's mean or variance is pinned.
  4. Where `epc` or `tvs` is non-empty, solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
@@ -701,12 +701,12 @@ end
 
 Fit the prior that an entropy pooling prior wraps, and read the prior probabilities that its solve starts from.
 
-A caller's `pe.w` states the probabilities of the scenarios that the wrapped prior answers, and the wrapped prior is fitted under them. A wrapped prior can answer fewer rows than it receives, so the count of its scenarios is not known before a fit. This function fits it once to read that count, and fits it again under `pe.w`. When [`keeps_observations`](@ref) promises that the wrapped prior answers every row, the count is `size(X, 1)`, and only the fit under `pe.w` runs.
+A caller's `pe.w` states the probabilities of the scenarios that the wrapped prior answers, and the wrapped prior is fitted under them. A wrapped prior can answer fewer rows than it receives, so this function reads the count of its scenarios with [`scenario_count`](@ref) before the fit under `pe.w`. That count runs only the steps of the fit that drop rows. It needs no fit for a prior that [`keeps_observations`](@ref), a Scenario Cap, or a prior that wraps one of these, and it needs only the exposure stage of a [`CrossSectionalFactorPrior`](@ref). A prior that states no count is fitted once to read it.
 
 # Algorithm
 
  1. When `pe.w` is `nothing`, fit `pe.pe`, giving `pr`. Read the prior probabilities `w0` from `pr` with [`ep_prior_probabilities`](@ref), and return `pe`, `pr` and `w0`.
- 2. Otherwise find the count `T` of the scenarios of `pe.pe`. It is `size(X, 1)` when [`keeps_observations`](@ref) returns `true` for `pe.pe`, and the row count of a fit of `pe.pe` otherwise.
+ 2. Otherwise find the count `T` of the scenarios of `pe.pe` with [`scenario_count`](@ref).
  3. Check `pe.w` against `T` with [`ep_prior_probabilities`](@ref), giving `w0`.
  4. Put `w0` on the rows that each weighted field of `pe.pe` reads with [`prior_probability_factory`](@ref), giving a new `pe`, and fit its `pe.pe`, giving `pr`.
  5. Return the new `pe`, `pr`, and `pr.w` through [`scenario_probabilities`](@ref) when it is not `nothing`, or `w0` otherwise. A wrapped prior that reweights its scenarios solved its own views from `w0`, and its posterior is the prior of this estimator.
@@ -732,6 +732,7 @@ A caller's `pe.w` states the probabilities of the scenarios that the wrapped pri
 
 # Related
 
+  - [`scenario_count`](@ref)
   - [`keeps_observations`](@ref)
   - [`ep_prior_probabilities`](@ref)
   - [`prior_probability_factory`](@ref)
@@ -746,13 +747,9 @@ function ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolin
         return pe, pr, ep_prior_probabilities(nothing, pr, size(X, 1))
     end
     # A prior that reweights observations works on the observation axis its nested prior
-    # ANSWERED, not on the axis it was handed: a nested prior may drop rows. Only a fit
-    # states that axis, unless the nested prior promises to keep every row. See ADR 0116.
-    T = if keeps_observations(pe.pe)
-        size(X, 1)
-    else
-        size(prior(pe.pe, X, F, pnl; strict = strict, kwargs...).X, 1)
-    end
+    # ANSWERED, not on the axis it was handed: a nested prior may drop rows. The count runs
+    # only the steps that drop rows, and most priors state it with no fit. See ADR 0116.
+    T = scenario_count(pe.pe, X, F, pnl; strict = strict, kwargs...)
     w0 = ep_prior_probabilities(pe.w, T, size(X, 1))
     # A caller's prior probabilities weight the moments the nested estimator measures, so
     # the estimator is refitted under them. A field that reads more rows than the scenarios,

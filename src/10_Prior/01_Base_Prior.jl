@@ -48,7 +48,7 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref) reads the source through t
 
   - `keeps_observations(pe::MyPriorEstimator) -> Bool`: Returns `true` when the result carries one scenario for each observation that the prior receives, for every configuration and all data.
 
-A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), reads this method on the prior that it wraps. Under a caller's prior probabilities, it fits a wrapped prior that makes no promise twice: once to read the count of its scenarios, and once under the probabilities. It fits a wrapped prior that returns `true` once. The fallback returns `false`, which is correct for every prior and costs the first fit. A prior that drops rows, such as one that holds a Scenario Cap, keeps the fallback. A prior that wraps another returns the answer of the prior that it wraps.
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), reads this method on the prior that it wraps. Under a caller's prior probabilities, it reads the count of the scenarios of the wrapped prior before it fits that prior under them. A wrapped prior that returns `true` states the count with no fit. A wrapped prior that makes no promise is fitted once more to read the count. The fallback returns `false`, which is correct for every prior and costs that fit. A prior that drops rows, such as one that holds a Scenario Cap, keeps the fallback. A prior that wraps another returns the answer of the prior that it wraps.
 
 # Examples
 
