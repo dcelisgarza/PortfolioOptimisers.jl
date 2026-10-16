@@ -11,7 +11,9 @@ The fix of #1637 found
 `GeneralisedLinearModel` fitted under probability weights that sum to one reads one observation.
 
 GLM 1.9.5 reads every weight vector as frequency weights. It takes `nobs` as `sum(w)`, the residual
-degree of freedom as `nobs - p`, and the dispersion as `Σ w r² / (nobs - p)`. The weights that the
+degree of freedom as `nobs - p`, and, for `LinearModel` and the Normal family, the dispersion as
+`Σ w r² / (nobs - p)`. A family with a unit dispersion, such as Bernoulli or Poisson, takes
+`vcov = inv(X'WX)`, so the scale of the weights sets its count through `X'WX` directly. The weights that the
 library gives a regression through `factory` sum to one: the posterior probabilities of
 `EntropyPoolingPrior` and `MeucciEntropyPoolingPrior`, and the pooled weights of
 `OpinionPoolingPrior`. So every such fit had `dof_residual = 1 - p`, every p-value was `1.0`, and
@@ -73,9 +75,10 @@ A caller who wants the row count passes `fweights(w .* (T / sum(w)))`.
   refitted inside a pooling prior with no views selects the factor sets of the unweighted fit.
 - A stepwise set chosen under non-uniform weights moves, under the p-value rule and under `:aic`,
   `:aicc` and `:bic`. The coefficients of a fixed set do not move.
-- The stopping rule of the iterative fit of `GeneralisedLinearModel` reads an absolute tolerance on
-  the deviance, and the deviance scales with the weights. A weighted fit can therefore stop at a
-  different iteration than before, within that tolerance.
+- The iterative fit of `GeneralisedLinearModel` stops when the change of the deviance is below
+  `max(rtol · deviance, atol)`, and the deviance scales with the weights. The relative part does
+  not move with the scale, but the absolute floor `atol` does not scale. A weighted fit can
+  therefore stop at a different iteration than before, within that tolerance.
 - The cross-sectional regression reads the coefficients alone, so its fits do not change.
 - GLM gives no sandwich variance for probability weights. The Kish count is the correction that the
   model-based variance of GLM can carry. It is exact for an intercept and for equal weights on a

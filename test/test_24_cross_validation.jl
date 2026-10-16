@@ -1735,7 +1735,9 @@
         # past it joined no fold: every split trained on them and none tested them.
         for (T, nf, ntf, sizes) in ((10, 5, 2, fill(2, 5)), (11, 5, 2, [2, 2, 2, 2, 3]),
                                     (12, 5, 2, [2, 2, 2, 2, 4]), (13, 5, 2, [2, 2, 2, 2, 5]),
-                                    (89, 10, 2, [fill(8, 9); 17]), (17, 4, 3, [4, 4, 4, 5]))
+                                    (89, 10, 2, [fill(8, 9); 17]), (17, 4, 3, [4, 4, 4, 5]),
+                                    (14, 5, 2, [2, 2, 2, 2, 6]), (19, 10, 2, [fill(1, 9); 10]),
+                                    (19, 5, 2, [3, 3, 3, 3, 7]))
             rdT = ReturnsResult(; nx = rd.nx, X = rd.X[1:T, :])
             cv = CombinatorialCrossValidation(; n_folds = nf, n_test_folds = ntf)
             res = split(cv, rdT)
@@ -1747,6 +1749,15 @@
                 @test sort!([res.train_idx[j]; reduce(vcat, res.test_idx[j])]) == 1:T
             end
         end
+        # Purging takes rows out of the training sets only, so the folds keep every row. The
+        # old index dropped row 19 here.
+        rdT = ReturnsResult(; nx = rd.nx, X = rd.X[1:19, :])
+        cv = CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2, purged_size = 1,
+                                          embargo_size = 1)
+        blocks = unique(reduce(vcat, split(cv, rdT).test_idx))
+        sort!(blocks; by = first)
+        @test length.(blocks) == [3, 3, 3, 3, 7]
+        @test reduce(vcat, blocks) == 1:19
     end
     @testset "Purging and embargoing leave the documented gap" begin
         T = size(rd.X, 1)

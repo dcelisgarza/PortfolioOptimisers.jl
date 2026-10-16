@@ -1291,6 +1291,40 @@ end
         @test PO.mean_test_span_length(FullGridSpan(), 30, 2, 29) == 30
     end
 
+    @testset "A series whose mean is zero has a finite interval" begin
+        # The half-width of the interval reads the standard error, not the mean over the
+        # t-statistic, which is 0 / 0 at a zero mean. The interval is symmetric about zero.
+        c = repeat([0.5, -0.5], 20)
+        @test sum(c) == 0
+        for (t, w) in ((WildBootstrapMeanTest(; n_sim = 19, seed = 1), 1),
+                       (WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(), n_sim = 19, seed = 1), 1), (OverlapMeanTest(), 1),
+                       (OverlapMeanTest(), 3))
+            r = PO.mean_test(t, c, w, PO.mean_test_rng(t))
+            @test r.t_stat == 0 && r.p_value == 1
+            @test isfinite(r.mean_ci_upper) && r.mean_ci_upper > 0
+            @test r.mean_ci_lower == -r.mean_ci_upper
+        end
+    end
+
+    @testset "The default observed sum of the quadratic spectral test is the feature form" begin
+        # The two forms differ by round-off on this series, so only the feature form gives the
+        # t-statistic bit for bit.
+        e = randn(StableRNG(21), 184)
+        v = [sum(view(e, t:(t + 4))) / 5 for t in 1:180]
+        v[[1, 40, 41, 42, 133]] .= NaN
+        k = QuadraticSpectralKernel()
+        t = PO.mean_test(WildBootstrapMeanTest(; kernel = k, b = 0.15, n_sim = 19), v, 5,
+                         StableRNG(1)).t_stat
+        m, n, d, f, T = PO.mean_test_centred(v, FiniteEntrySpan())
+        Phi = PO.quadrature_kernel_features(k, QuadratureSumDraws(), length(d), 0.15 * T)
+        @test t == PO.studentised_mean(m, sum(abs2, transpose(Phi) * d), n, n)
+        te = PO.mean_test(WildBootstrapMeanTest(; kernel = k, b = 0.15, n_sim = 19,
+                                                alg = QuadratureSumDraws(;
+                                                                         form = ExactLongRunForm())),
+                          v, 5, StableRNG(1)).t_stat
+        @test t != te && isapprox(t, te; rtol = 1e-12)
+    end
+
     @testset "The summaries take the wild bootstrap by default" begin
         y = PO.forward_mean_returns(IC_ALPHA, 1, 1)
         ic = forecast_ic(forecast_evaluation(IC_ALPHA, y))

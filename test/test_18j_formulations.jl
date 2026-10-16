@@ -651,6 +651,20 @@ end
     res = ratio(Variance(; rc = rc); ret = LogarithmicReturn(), sets = sets)
     @test haskey(res.model, :sr_risk) && haskey(res.model, :lift_W)
     @test isapprox(res.w, ratio(Variance(); ret = LogarithmicReturn()).w; atol = tol)
+    # The clamp of the derived corner and of the normalisation takes the type of the returns.
+    prq = PortfolioOptimisers.LowOrderPrior(; X = [1//100 -3//100; 2//100 1//100],
+                                            mu = [1//100, -3//100],
+                                            sigma = [1//1 0//1; 0//1 1//1])
+    mq = JuMP.Model()
+    PortfolioOptimisers.set_sdp_lift_corner!(mq, MaximumRatio(; ohf = 1//2), prq)
+    @test mq[:sdp_corner] === 25//1
+    PortfolioOptimisers.set_maximum_ratio_normalisation!(mq, MaximumRatio(), nothing, prq)
+    @test mq[:ohf] === 1//50
+    prt = PortfolioOptimisers.LowOrderPrior(; X = prq.X, mu = [1//10^6, -1//10^6],
+                                            sigma = prq.sigma)
+    mt = JuMP.Model()
+    PortfolioOptimisers.set_sdp_lift_corner!(mt, MaximumRatio(; ohf = 1//2), prt)
+    @test mt[:sdp_corner] === 500//1
     # Every other objective reads one lift.
     res = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = box),
                             opt = JuMPOptimiser(; pe = pr, slv = slv)); save = true)

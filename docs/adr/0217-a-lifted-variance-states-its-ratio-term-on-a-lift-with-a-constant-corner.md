@@ -28,8 +28,10 @@ one, and a corner near the expected `k` does not.
 
 1. A lifted variance under `MaximumRatio` states its objective term on a second lift with a constant
    corner, `set_sdp_objective_lift!`, when the term is a positive term of the objective (`rke` and
-   `scale > 0`). The bound keeps the lift with the corner `k`, and the model builds that lift only
-   when the measure states a bound. Under every other objective `k` is `1`, and the model builds one
+   `scale > 0`), in the return form and in the risk form of the ratio. The bound keeps the lift
+   with the corner `k`, and the measure builds that lift only when it states a bound. A
+   semidefinite phylogeny also builds it under the risk form, where the objective does not
+   minimise the risk. Under every other objective `k` is `1`, and the model builds one
    lift.
 2. `Variance` and `UncertaintySetVariance` take a field `ratio_alg::RatioFormulation`. The default
    `SquareRootRatio()` is the decision above. `LinearRatio()` keeps the degree-one term on the
@@ -42,7 +44,10 @@ one, and a corner near the expected `k` does not.
    number is the constant corner. `nothing`, the default, derives it: the head registers
    `sdp_corner` with `set_sdp_lift_corner!`, `1` when `ohf` is the default, and
    `ohf / clamp(mean(abs, mu), 1e-3, 1e3)` of the prior's `mu` when the caller states `ohf`. The
-   maintainer ruled that the corner is a field of the measure, derived when it is `nothing`.
+   clamp is the one of the normalisation of `ohf`, and its bounds take the type of the mean. A
+   stated corner must be finite and above zero, and the constructor raises a `DomainError`
+   otherwise, `assert_lift_corner`. The maintainer ruled that the corner is a field of the
+   measure, derived when it is `nothing`.
 4. The objective term is `tr(Σ Wc)`, which is `y' Σ y / c` at rank one. It is not multiplied by `c`:
    a constant factor does not move the maximiser, and the product puts the term below the tolerance
    of the solver when a small `ohf` makes `k` small.
@@ -61,12 +66,14 @@ one, and a corner near the expected `k` does not.
   17, 18, 23 and 24 of `MeanRisk1.csv.gz`.
 - Beside a risk term of another degree, the weight of the term changes with `c`, as the weight of a
   term of degree two changes with `ohf`. A ratio of mixed degrees already depends on `ohf`.
-- A model with a lifted objective term and a bound holds two lifted matrices.
+- A model with a lifted objective term and a bound, or a semidefinite phylogeny under the risk
+  form, holds two lifted matrices.
 - Risk-contribution rows under `MaximumRatio` now relax as they do under `MinimumRisk`. On the
   fixture of `test_18l` the rows hold on `Wc`, but its second eigenvalue is 0.81 of the first, so
   the returned weights miss them (largest share 0.29 against a bound of 0.2). The lift with the
   corner `k` was tight on that fixture. A caller who needs the rows on the weights can state
-  `ratio_alg = LinearRatio()` and check the shares, as the `Variance` docstring says.
+  `ratio_alg = LinearRatio()`, which was tight on that fixture, and check the shares, as the
+  `Variance` docstring says.
 
 ## Alternatives considered
 
@@ -82,4 +89,5 @@ one, and a corner near the expected `k` does not.
 
 - Issue #1676, issue #1321.
 - `SquareRootRatio`, `LinearRatio`, `set_sdp_objective_lift!`, `set_sdp_lift_corner!`.
-- The `## The degree of the risk` subsection of `MaximumRatio`.
+- The `# Mathematical definition` of `MaximumRatio`, from "The degree belongs to the expression
+  that the model builds".

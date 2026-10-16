@@ -32,6 +32,12 @@
         @test length(PO.sorting_network(OddEvenMerge(), 500)) == 9511
         @test length(PO.sorting_network(BitonicMerge(), 250)) == 4405
         @test length(PO.sorting_network(BitonicMerge(), 500)) == 11026
+        # At a power of two the counts are Batcher's closed forms, of order T log² T.
+        for k in 1:10
+            @test length(PO.sorting_network(OddEvenMerge(), 2^k)) ==
+                  (k^2 - k + 4) * 2^k ÷ 4 - 1
+            @test length(PO.sorting_network(BitonicMerge(), 2^k)) == k * (k + 1) * 2^k ÷ 4
+        end
         # The wire order keeps the values of one position together, in the order of writing.
         c = PO.sorting_network(OddEvenMerge(), 8)
         cols = PO.sorting_network_columns(WireOrdering(), c)
@@ -68,6 +74,26 @@
             @test isapprox(f(X * ri.w), f(X * re.w); rtol = 1e-6)
             # The model's risk is the risk of its own weights, so it is exact, not a bound.
             @test isapprox(JuMP.value(ri.model[:sowa_risk_1]), f(X * ri.w); rtol = 1e-6)
+        end
+    end
+
+    @testset "The risk at fixed weights is exact for any nondecreasing vector" begin
+        # Not only the builders: a random sorted vector, of one sign or of mixed signs, at
+        # weights that the bounds fix, so the model's risk is the risk of those weights.
+        rng = StableRNG(11)
+        for T in (7, 33), mixed in (false, true), alg in algs
+            Xf = 0.01 * randn(rng, T, 4) .+ 0.0005
+            w0 = rand(rng, 4)
+            w0 ./= sum(w0)
+            ow = sort(mixed ? randn(rng, T) : rand(rng, T))
+            prf = prior(EmpiricalPrior(), ReturnsResult(; nx = string.('A':'D'), X = Xf))
+            res = optimise(MeanRisk(; r = OrderedWeightsArray(; w = ow, alg = alg),
+                                    obj = MinimumRisk(),
+                                    opt = JuMPOptimiser(; pe = prf, slv = slv,
+                                                        wb = WeightBounds(; lb = w0,
+                                                                          ub = w0))))
+            @test isapprox(JuMP.value(res.model[:sowa_risk_1]),
+                           OrderedWeightsArray(; w = ow)(Xf * w0); rtol = 1e-6)
         end
     end
 

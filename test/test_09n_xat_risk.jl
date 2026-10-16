@@ -202,8 +202,9 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
         tslv = Solver(; name = :highs, solver = HiGHS.Optimizer,
                       settings = merge(opts, Dict("mip_feasibility_tolerance" => 1e-9)))
         # With b = 1000 the default tolerance of 1e-6 left these three about 1e-4 apart (#1323).
-        # The levels exempt the 28 and 9 observations of that measurement. A range that exempts
-        # 10 gain observations, as beta = 0.1 now does, takes HiGHS twice as long (#1364).
+        # On 100 rows the levels exempt the 28 and 9 observations of that measurement. A range
+        # that exempts 10 gain observations, as beta = 0.1 does on 100 rows, takes HiGHS twice
+        # as long (#1364). On the 40 rows of the range the levels exempt 11 and 3.
         #
         # The range solves a draw of 40 rows from the same seed. On the 100 rows its two solves
         # took about 490 s (#1634), and on 40 rows each takes about 1 s. The draw still guards
@@ -224,6 +225,13 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
             @test isapprox(JuMP.value(sol.model[:risk]), JuMP.value(tsol.model[:risk]);
                            atol = 1e-12)
         end
+        # The control: the old constant misses on the draw of 40 rows, so the draw still guards
+        # #1323.
+        r = ValueatRiskRange(; alpha = 0.285, beta = 0.095,
+                             alg = MIPValueatRisk(; b = 1000))
+        sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                opt = JuMPOptimiser(; pe = pr40, slv = slv)))
+        @test abs(JuMP.value(sol.model[:risk]) - expected_risk(r, sol.w, X40)) > 1e-5
         # The constant is the gross bound times the largest spread per unit of weight.
         c = [zeros(1, 4); cumsum(X; dims = 1)]
         d_ret = maximum(maximum(X; dims = 1) - minimum(X; dims = 1))

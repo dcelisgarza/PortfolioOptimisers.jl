@@ -426,9 +426,11 @@ Every value of the test is a field, and none is fixed in the code:
 `WildBootstrapMeanTest(; kernel = BartlettKernel(), b = 0.4, span = FiniteEntrySpan(), n_sim = 1_999,
 q = 0.05, min_obs = nothing, min_periods = nothing, rng = Random.default_rng(), seed = nothing)`.
 
-- **The defaults are those of the source.** Its simulations recommend a mid bandwidth and find the
-  Bartlett kernel more powerful than the quadratic spectral one, and its application draws 1,999
-  times. A smaller `b` gives more power and a larger distortion: at `b = 0.1` the AR(1) case was
+- **The defaults of the kernel, `b` and `n_sim` are those of the source.** Its simulations
+  recommend a mid bandwidth and find the Bartlett kernel more powerful than the quadratic spectral
+  one, and its application draws 1,999 times. The level `q = 0.05` is the one of the library: the
+  source uses 0.1 in its simulations and 0.01 in its application. The source also states the
+  residuals of an AR(1) fit as an option for the multipliers, and the test does not take it. A smaller `b` gives more power and a larger distortion: at `b = 0.1` the AR(1) case was
   rejected 10.1% of the time and the power against a shift of 0.6 standard deviations rose from
   0.47 to 0.64.
 - **The kernel** is an extension point, `AbstractLongRunKernel` with `long_run_kernel_weight`. The

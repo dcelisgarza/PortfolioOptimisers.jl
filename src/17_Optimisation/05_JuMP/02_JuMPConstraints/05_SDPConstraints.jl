@@ -335,7 +335,8 @@ function set_sdp_lift_corner!(model::JuMP.Model, obj::MaximumRatio, pr::Abstract
     c = if isnothing(obj.ohf)
         one(eltype(pr.mu))
     else
-        obj.ohf / min(1e3, max(1e-3, Statistics.mean(abs, pr.mu)))
+        m = Statistics.mean(abs, pr.mu)
+        obj.ohf / clamp(m, inv(oftype(m, 1000)), oftype(m, 1000))
     end
     shared_set!(model, :sdp_corner, c)
     return nothing

@@ -615,7 +615,7 @@ $(DocStringExtensions.FIELDS)
 
 Keywords correspond to the struct's fields.
 
-The defaults are those of the source. Its simulations find that a bandwidth of a mid size, such as `b = 0.4`, holds the size of the test, and that the Bartlett kernel has more power than the quadratic spectral kernel. A smaller `b` gives more power and a larger size distortion under strong dependence. The default `alg` is [`QuadratureSumDraws`](@ref) for the [`QuadraticSpectralKernel`](@ref) and [`ObservationDraws`](@ref) for every other kernel, from [`default_bootstrap_draws`](@ref).
+The defaults of `kernel`, `b` and `n_sim` are those of the source. Its simulations find that a bandwidth of a mid size, such as `b = 0.4`, holds the size of the test, and that the Bartlett kernel has more power than the quadratic spectral kernel. The source states an option that the test does not take: it can multiply the residuals of an AR(1) fit in place of the deviations from the mean, to reduce the effect of short-run dynamics. The level `q = 0.05` is the one of the library. The source uses `0.1` in its simulations and `0.01` in its application. A smaller `b` gives more power and a larger size distortion under strong dependence. The default `alg` is [`QuadratureSumDraws`](@ref) for the [`QuadraticSpectralKernel`](@ref) and [`ObservationDraws`](@ref) for every other kernel, from [`default_bootstrap_draws`](@ref).
 
 ## Validation
 
@@ -857,7 +857,7 @@ function mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, ::Any)
         return (; t_stat = t, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
     end
     D = Distributions.TDist(nu)
-    h = Distributions.quantile(D, 1 - mt.q / 2) * m / t
+    h = Distributions.quantile(D, 1 - mt.q / 2) * sqrt(Q / nu) / sqrt(Ts(n))
     return (; t_stat = t, p_value = 2 * Distributions.ccdf(D, abs(t)),
             mean_ci_lower = m - h, mean_ci_upper = m + h)
 end
@@ -885,7 +885,7 @@ function mean_test(mt::WildBootstrapMeanTest, c::VecNum, window::Real,
     at = abs(t)
     K = count(x -> !(x < at), ats)
     k = mt.n_sim + 1 - bootstrap_exceedance_cap(mt.q, mt.n_sim)
-    h = partialsort!(ats, k) * m / t
+    h = partialsort!(ats, k) * sqrt(Q / nd) / sqrt(Ts(n))
     return (; t_stat = t, p_value = (1 + K) / (mt.n_sim + 1), mean_ci_lower = m - h,
             mean_ci_upper = m + h)
 end

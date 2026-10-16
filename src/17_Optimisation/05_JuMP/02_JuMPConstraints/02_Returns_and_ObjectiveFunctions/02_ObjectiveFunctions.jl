@@ -620,7 +620,8 @@ function set_maximum_ratio_normalisation!(model::JuMP.Model, obj::MaximumRatio,
                                           mu::Option{<:Num_VecNum}, pr::AbstractPriorResult)
     ohf = if isnothing(obj.ohf)
         mu = isnothing(mu) ? pr.mu : mu
-        min(1e3, max(1e-3, Statistics.mean(abs, mu)))
+        m = Statistics.mean(abs, mu)
+        clamp(m, inv(oftype(m, 1000)), oftype(m, 1000))
     else
         @argcheck(obj.ohf > zero(obj.ohf), DomainError(obj.ohf, "obj.ohf must be > 0"))
         obj.ohf

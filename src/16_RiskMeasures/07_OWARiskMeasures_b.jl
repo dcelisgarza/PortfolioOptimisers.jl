@@ -78,7 +78,7 @@ struct OddEvenMerge <: AbstractSortingNetworkMerge end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Sorts with Batcher's bitonic merge network, which has a regular structure that a solver factorises with less work.
+Sorts with Batcher's bitonic merge network, which QDLDL, the default linear solver of Clarabel, factorises with less work under its AMD order. Under a supernodal factorisation the two networks cost about the same.
 
 [batcher1968](@citet) states the network for a power of two. The network here splits a sequence of any length `T` into a descending half and an ascending half, and merges the two halves with the largest power of two below the length as the comparator span. It has ``O(T \\log^{2} T)`` comparators: 4405 at `T = 250` and 11026 at `T = 500`, which is more than [`OddEvenMerge`](@ref).
 
@@ -475,11 +475,11 @@ $(DocStringExtensions.TYPEDEF)
 
 OWA formulation that computes the exact OWA risk through a relaxed sorting network of ``O(T \\log^{2} T)`` linear rows.
 
-The formulation runs the net portfolio returns through a sorting network, and relaxes each comparator to three linear rows. [goemans2015](@citet) shows that the relaxation of any sorting network is an extended formulation of the permutahedron. Its linear-programming dual is this formulation. For a nondecreasing weight vector, the minimum of the weighted network outputs is the OWA risk. So the risk is exact, as the risk of [`ExactOrderedWeightsArray`](@ref) is, but the model has ``O(T \\log^{2} T)`` rows in place of ``T^{2}``. It is the exact formulation for a long sample.
+The formulation runs the net portfolio returns through a sorting network, and relaxes each comparator to three linear rows. [goemans2015](@citet) shows that the relaxation of any sorting network is an extended formulation of the permutahedron. The formulation fixes the network inputs to the returns and leaves the outputs free. A relaxed comparator can only spread its two values apart, and a nondecreasing weight vector pays for each spread, so the minimum of the weighted network outputs is the OWA risk. So the risk is exact, as the risk of [`ExactOrderedWeightsArray`](@ref) is, but the model has ``O(T \\log^{2} T)`` rows in place of ``T^{2}``. It is the exact formulation for a long sample.
 
-The formulation needs a nondecreasing weight vector, which is also the condition for the risk measure to be convex. On any other vector the relaxed network has no minimum, so the constructor of the risk measure refuses such a vector.
+The formulation needs a nondecreasing weight vector, which is also the condition for the risk measure to be convex. On any other vector the relaxation is not exact: the model has no minimum, or its minimum falls below the OWA risk. So the constructor of the risk measure refuses such a vector.
 
-One interior-point iteration costs one factorisation of the KKT matrix, and the fill of that factorisation sets the time of the solve, not the row count. QDLDL, the default linear solver of Clarabel, factorises the matrix one column at a time. A supernodal factorisation of the same matrix cuts the time of one iteration by 83 to 85 % at ``T = 500`` and by 90 % at ``T = 1000``. The iterations and the risk do not change.
+One interior-point iteration costs one factorisation of the KKT matrix, and the fill of that factorisation sets the time of the solve, not the row count. QDLDL, the default linear solver of Clarabel, factorises the matrix one column at a time. A supernodal factorisation of the same matrix cuts the time of the solve: MKL Pardiso by 83 to 85 % at ``T = 500`` and by 90 % at ``T = 1000``, and Tulip by 76 to 79 % and by 87 %. The iterations and the risk do not change.
 
 Two setups give a supernodal factorisation. The times below are for the minimum risk of the Gini mean difference weights, `owa_gmd`, on eight assets, with the default network, one thread and tolerances of `1e-9`.
 
@@ -570,7 +570,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuse an OWA weight vector `w` that is not nondecreasing.
 
-The relaxed sorting network lets a comparator raise its larger value and lower its smaller value by the same amount. A weight vector that decreases between two positions then lowers the risk without a limit, so the model has no minimum.
+The relaxed sorting network lets a comparator raise its larger value and lower its smaller value by the same amount. A weight vector that decreases between two positions can then lower the risk by such a spread. The model then has no minimum, or its minimum falls below the OWA risk.
 
 # Arguments
 
@@ -594,7 +594,7 @@ The relaxed sorting network lets a comparator raise its larger value and lower i
 function assert_owa_formulation_weights(::SortingNetworkOrderedWeightsArray, w::VecNum)
     @argcheck(issorted(w),
               DomainError(w,
-                          "SortingNetworkOrderedWeightsArray needs a nondecreasing weight vector. The relaxed sorting network has no minimum for a weight vector that decreases."))
+                          "SortingNetworkOrderedWeightsArray needs a nondecreasing weight vector. The relaxed sorting network is not exact for a weight vector that decreases."))
     return nothing
 end
 """
