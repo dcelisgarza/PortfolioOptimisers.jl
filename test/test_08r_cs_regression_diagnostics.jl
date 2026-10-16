@@ -1210,12 +1210,12 @@ using Statistics
         ic = exposure_ic(Bn, Rn, wn; horizon = H)
         # The sums below read every row, which holds because no row of this fixture is `NaN`.
         @test !any(isnan, ic)
-        s2 = exposure_ic_summary(ic; lags = 2, mt = OverlapMeanTest())
+        s2 = exposure_ic_summary(ic; lags = 2, mt = OverlapMeanTest(; law = BandCountLaw()))
         for k in 1:Kn
             c = ic[:, k]
             m = mean(c)
             g = sum((c[t] - m) * (c[t + j] - m) for j in 1:2 for t in 1:(length(c) - j))
-            # The divisor `n - 2L - 1` removes the bias of the centring at order `L = 2`.
+            # The band count divides by `n - 2L - 1` at order `L = 2`.
             @test s2.t_stat[k] ≈
                   m / sqrt((sum(abs2, c .- m) + 2 * g) / (length(c) - 5)) * sqrt(length(c))
             @test s2.std_ic[k] ≈ std(c)

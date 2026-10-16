@@ -458,23 +458,434 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Tests the mean of a series against zero over the untapered long-run variance at the order that the overlap of its windows sets.
+Abstract supertype for the rules that set the divisor of the long-run variance of an [`OverlapMeanTest`](@ref), and the degrees of freedom of the Student law that its p-value and its interval read.
 
-The test reads the overlap off the `window` that the caller derives from the grid, such as [`forecast_ic_window`](@ref). Its order is ``L = \\lceil w \\rceil - 1``, the number of entries on each side of a given entry that share data with it. It reads no dependence past the overlap. A series that is persistent past the overlap gives a t-statistic that is too large, and the untapered sum can be negative on a short series. [`WildBootstrapMeanTest`](@ref) is the default because of this.
+The untapered sum ``Q`` of the centred products reads the deviations from the sample mean, so its expectation is not ``n`` times the long-run variance. The law sets the divisor ``n_{d}`` of ``Q`` and the degrees of freedom ``\\nu``. At a `window` of at most one every law gives ``n_{d} = \\nu = n - 1``, the classical t-test.
 
-# The divisor removes the bias of the centring
+# Interfaces
 
-The sum ``Q`` of the centred products reads the deviations from the sample mean, not from the true mean, so its expectation is less than ``n`` times the long-run variance. Under the null hypothesis the series is a moving average of order ``L``. The weights of the untapered sum are one on the band of width ``2L + 1``, and to first order in ``L / n`` the expectation is ``(n - 2L - 1)`` times the long-run variance. The test divides by that count. At ``L = 0`` the count is ``n - 1``, and the test is the classical t-test, whose law under independent Gaussian entries is the Student law with ``n - 1`` degrees of freedom. The test reads its p-value and its interval off the Student law with ``n - 2L - 1`` degrees of freedom at every order. At ``L > 0`` that law is an approximation. A divisor of ``n`` or ``n - 1`` with the normal law rejects a no-skill moving average of order four in 60 entries about 10.6% of the time at the 5% level, and this rule about 7.9%.
+In order to implement a new law that works seamlessly with the library, subtype `AbstractOverlapStudentLaw` and implement the following method:
+
+## Law method
+
+  - `overlap_student_law(law::AbstractOverlapStudentLaw, f::AbstractVector{Bool}, window::Real, n::Integer, T::Type) -> Tuple`: The divisor and the degrees of freedom.
+
+### Arguments
+
+  - `law`: Concrete subtype instance.
+  - `f`: Whether each entry of the span of the series, from its first finite entry to its last, is a finite observation.
+  - `window`: Number of entries that the data of one entry spans.
+  - `n`: The number of finite entries, `count(f)`.
+  - `T`: The type of the statistic, which a law that computes its values reads them in.
+
+### Returns
+
+  - `nd::Real`: The divisor of ``Q``. A divisor that is not positive gives a `NaN` test.
+  - `nu::Real`: The degrees of freedom. A value that is not positive gives a `NaN` test.
+
+# Related
+
+  - [`BandCountLaw`](@ref)
+  - [`NullMomentLaw`](@ref)
+  - [`OverlapMeanTest`](@ref)
+  - [`overlap_student_law`](@ref)
+"""
+abstract type AbstractOverlapStudentLaw <: AbstractAlgorithm end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Divides the sum of the centred products by the number of entries less the width of the band, and reads the Student law with as many degrees of freedom.
+
+The rule is ``n_{d} = \\nu = n - 2L - 1``. The divisor is almost unbiased for ``n`` times the variance of the mean under the null hypothesis. The degrees of freedom are not: the untapered sum varies much more than a sum of ``n - 2L - 1`` independent squares, so the test rejects too often at ``L > 0``. At the 5% level it rejects a no-skill moving average of order four in 60 entries 7.8% of the time, and one of order nineteen in 120 entries 12.4% of the time. [`NullMomentLaw`](@ref) holds the level. This law costs nothing past the sum itself.
+
+# Constructors
+
+    BandCountLaw() -> BandCountLaw
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.overlap_student_law(BandCountLaw(), trues(60), 5, 60, Float64)
+(51, 51)
+```
+
+# Related
+
+  - [`AbstractOverlapStudentLaw`](@ref)
+  - [`NullMomentLaw`](@ref)
+  - [`OverlapMeanTest`](@ref)
+"""
+struct BandCountLaw <: AbstractOverlapStudentLaw end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Reads the divisor and the degrees of freedom off the first two moments of the sum of the centred products under the null hypothesis of the test.
+
+Under the null hypothesis each entry is the sum of `window` independent periods, sampled one period apart, so the correlation of two entries ``j`` entries apart is ``\\max(1 - j / w, 0)``. That is the correlation of a no-skill score of overlapping windows, and of an equal-weight moving average of order ``L`` when ``w = L + 1``. The divisor makes the variance of the mean unbiased under that law, at every length, with every gap of the series. The degrees of freedom match the variance of ``Q`` to the variance of a scaled chi-squared law, the rule of the source. Both are exact for a Gaussian series, and their only approximation is the Student law itself.
+
+At the 5% level the test rejects a no-skill moving average of order four in 60 entries 4.9% of the time, and one of order nineteen in 120 entries 4.5% of the time. With gaps it holds the level the same way. The degrees of freedom are much smaller than ``n - 2L - 1``, because the untapered sum varies much more than a sum of independent squares. The computation reads each entry of the band once through two prefix sums of the mask of the finite entries, so its cost is linear in the length of the series and in ``L``, the order of the cost of ``Q``.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-\\gamma_{j} &= \\frac{1}{n - 2L - 1} \\sum_{t,\\, t + j \\in \\mathcal{T}} \\left( c_{t} - \\bar{c} \\right) \\left( c_{t + j} - \\bar{c} \\right)\\,, \\\\
+\\left( \\Sigma_{0} \\right)_{i j} &= \\max\\left( 1 - \\frac{|t_{i} - t_{j}|}{w},\\, 0 \\right)\\,, \\quad A = M W M\\,, \\quad M = I - \\frac{1}{n} \\mathbf{1} \\mathbf{1}^{\\intercal}\\,, \\\\
+n_{d} &= \\frac{n \\operatorname{tr}\\left( A \\Sigma_{0} \\right)}{\\mathbf{1}^{\\intercal} \\Sigma_{0} \\mathbf{1}}\\,, \\\\
+\\nu &= \\frac{\\operatorname{tr}\\left( A \\Sigma_{0} \\right)^{2}}{\\operatorname{tr}\\left( \\left( A \\Sigma_{0} \\right)^{2} \\right)}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``t_{i}``: The position in the series of finite entry ``i``.
+  - ``w``: `window`.
+  - ``\\Sigma_{0}``: The correlation of the finite entries under the null hypothesis.
+  - ``W``: The weights of the untapered sum, one when ``|t_{i} - t_{j}| \\leq L`` and zero after it.
+  - ``M``: The centring matrix of the ``n`` finite entries.
+  - ``n_{d}``: The divisor. ``\\mathbb{E}[Q] = \\operatorname{tr}(A \\Sigma_{0})`` and ``n^{2} \\operatorname{Var}(\\bar{c}) = \\mathbf{1}^{\\intercal} \\Sigma_{0} \\mathbf{1}``, so ``Q / (n\\, n_{d})`` is unbiased for the variance of the mean.
+  - ``\\nu``: The degrees of freedom, ``2 \\mathbb{E}[Q]^{2} / \\operatorname{Var}(Q)`` for a Gaussian series.
+
+A span of at most ``L + 1`` entries puts every pair in the band, so ``Q`` is zero and the law gives ``n_{d} = \\nu = 0``.
+
+# Constructors
+
+    NullMomentLaw() -> NullMomentLaw
+
+# Examples
+
+```jldoctest
+julia> nd, nu = PortfolioOptimisers.overlap_student_law(NullMomentLaw(), trues(60), 5, 60, Float64);
+
+julia> round(nd; digits = 3), round(nu; digits = 3)
+(51.174, 8.111)
+```
+
+# Related
+
+  - [`AbstractOverlapStudentLaw`](@ref)
+  - [`BandCountLaw`](@ref)
+  - [`OverlapMeanTest`](@ref)
+
+# References
+
+  - $(ref_dict[:satterthwaite1946])
+"""
+struct NullMomentLaw <: AbstractOverlapStudentLaw end
+"""
+    overlap_student_law(law::BandCountLaw, f::AbstractVector{Bool}, window::Real,
+                        n::Integer, T::Type) -> Tuple
+    overlap_student_law(law::NullMomentLaw, f::AbstractVector{Bool}, window::Real,
+                        n::Integer, T::Type) -> Tuple
+
+Return the divisor of the long-run variance of an [`OverlapMeanTest`](@ref), and the degrees of freedom of its Student law.
+
+# Arguments
+
+  - `law`: The law.
+  - `f`: Whether each entry of the span of the series is a finite observation.
+  - `window`: Number of entries that the data of one entry spans.
+  - `n`: The number of finite entries.
+  - `T`: The type of the statistic. [`NullMomentLaw`](@ref) computes in the promotion of `T` and the type of `window`.
+
+# Returns
+
+  - `nd::Real`: The divisor.
+  - `nu::Real`: The degrees of freedom.
+
+# Related
+
+  - [`AbstractOverlapStudentLaw`](@ref)
+"""
+function overlap_student_law(::BandCountLaw, ::AbstractVector{Bool}, window::Real,
+                             n::Integer, ::Type)
+    nu = n - 2 * (ceil(Int, window) - 1) - 1
+    return nu, nu
+end
+function overlap_student_law(::NullMomentLaw, f::AbstractVector{Bool}, window::Real,
+                             n::Integer, ::Type{T}) where {T}
+    z = zero(promote_type(T, typeof(window)))
+    L = ceil(Int, window) - 1
+    if iszero(L)
+        # The band is the diagonal and the null law is independence: the classical t-test.
+        return z + (n - 1), z + (n - 1)
+    end
+    if length(f) <= L + 1
+        return z, z
+    end
+    F0, F1 = band_prefix_sums(f)
+    u, v, a, b, uv = overlap_null_rows(f, F0, F1, window, L, z)
+    EQ = b - 2 * uv / n + a * b / n^2
+    tr2 = overlap_null_second_moment(f, F0, F1, window, L, u, v, (a, b, uv), n, z)
+    return n * EQ / b, EQ^2 / tr2
+end
+"""
+    band_prefix_sums(f::AbstractVector{Bool}) -> Tuple
+
+Return the prefix sums of the mask of the finite entries of a series, and of the mask times the position.
+
+# Arguments
+
+  - `f`: Whether each entry is a finite observation.
+
+# Returns
+
+  - `F0::Vector{Int}`: `F0[l + 1]` is the number of finite entries at positions up to `l`, `F0[1] = 0`.
+  - `F1::Vector{Int}`: `F1[l + 1]` is the sum of their positions.
+
+# Related
+
+  - [`band_kernel_sum`](@ref)
+  - [`NullMomentLaw`](@ref)
+"""
+function band_prefix_sums(f::AbstractVector{Bool})
+    P = length(f)
+    F0 = zeros(Int, P + 1)
+    F1 = zeros(Int, P + 1)
+    for l in 1:P
+        F0[l + 1] = F0[l] + f[l]
+        F1[l + 1] = F1[l] + l * f[l]
+    end
+    return F0, F1
+end
+"""
+    band_kernel_sum(F0::AbstractVector{<:Integer}, F1::AbstractVector{<:Integer}, w::Real,
+                    lo::Integer, hi::Integer, k::Integer, z::Number) -> Number
+
+Return the sum of ``w - |l - k|`` over the finite entries ``l`` in `lo:hi`, which is an entry of ``W \\Sigma_{0}`` of [`NullMomentLaw`](@ref).
+
+The sum splits at `k`. On each side the term is linear in ``l``, so the two prefix sums of [`band_prefix_sums`](@ref) give it in a fixed number of operations. The integer part is exact, and only the product with `w` rounds.
+
+# Arguments
+
+  - `F0`, `F1`: The prefix sums of [`band_prefix_sums`](@ref).
+  - `w`: The window.
+  - `lo`, `hi`: The range of ``l``, clipped to the series. The clipped range must not be empty.
+  - `k`: The position that the distance reads.
+  - `z`: The zero of the type the sum is read in.
+
+# Returns
+
+  - `s::Number`: The sum.
+
+# Related
+
+  - [`band_prefix_sums`](@ref)
+  - [`NullMomentLaw`](@ref)
+"""
+function band_kernel_sum(F0::AbstractVector{<:Integer}, F1::AbstractVector{<:Integer},
+                         w::Real, lo::Integer, hi::Integer, k::Integer, z::Number)
+    lo = max(lo, 1)
+    hi = min(hi, length(F0) - 1)
+    m = clamp(k, lo - 1, hi)
+    s0l = F0[m + 1] - F0[lo]
+    s1l = F1[m + 1] - F1[lo]
+    s0r = F0[hi + 1] - F0[m + 1]
+    s1r = F1[hi + 1] - F1[m + 1]
+    return z + w * (s0l + s0r) - ((k * s0l - s1l) + (s1r - k * s0r))
+end
+"""
+    overlap_null_rows(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                      F1::AbstractVector{<:Integer}, w::Real, L::Integer, z::Number) -> Tuple
+
+Return the row sums of the band of weights and of the null correlation of [`NullMomentLaw`](@ref), their totals, and the inner product of the two.
+
+The correlation is scaled by `w`, ``w - j`` at the lag ``j``. The divisor and the degrees of freedom do not read the scale.
+
+# Arguments
+
+  - `f`: Whether each entry is a finite observation.
+  - `F0`, `F1`: The prefix sums of [`band_prefix_sums`](@ref).
+  - `w`: The window.
+  - `L`: The order of the band.
+  - `z`: The zero of the type the sums are read in.
+
+# Returns
+
+  - `u::Vector{Int}`: ``W \\mathbf{1}``, zero at a missing entry.
+  - `v::Vector`: ``w \\Sigma_{0} \\mathbf{1}``, zero at a missing entry.
+  - `a::Int`: ``\\mathbf{1}^{\\intercal} W \\mathbf{1}``.
+  - `b`: ``w \\mathbf{1}^{\\intercal} \\Sigma_{0} \\mathbf{1}``.
+  - `uv`: ``u^{\\intercal} v``.
+
+# Related
+
+  - [`NullMomentLaw`](@ref)
+"""
+function overlap_null_rows(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                           F1::AbstractVector{<:Integer}, w::Real, L::Integer, z::Number)
+    P = length(f)
+    u = zeros(Int, P)
+    v = fill(z, P)
+    a = 0
+    b = z
+    uv = z
+    for i in 1:P
+        if f[i]
+            u[i] = F0[min(i + L, P) + 1] - F0[max(i - L, 1)]
+            v[i] = band_kernel_sum(F0, F1, w, i - L, i + L, i, z)
+            a += u[i]
+            b += v[i]
+            uv += u[i] * v[i]
+        end
+    end
+    return u, v, a, b, uv
+end
+"""
+    overlap_null_second_moment(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                               F1::AbstractVector{<:Integer}, w::Real, L::Integer,
+                               u::AbstractVector{<:Integer}, v::AbstractVector,
+                               abuv::Tuple, n::Integer, z::Number) -> Number
+
+Return ``\\operatorname{tr}((A \\Sigma_{0})^{2})`` of [`NullMomentLaw`](@ref), with the correlation scaled by `w`.
+
+The centring is a correction of rank two, ``M \\Sigma_{0} M = \\Sigma_{0} + U C U^{\\intercal}`` with ``U = [\\mathbf{1}, \\Sigma_{0} \\mathbf{1}]``. So the trace is ``\\operatorname{tr}(W \\Sigma_{0} W \\Sigma_{0})`` of [`overlap_null_square_trace`](@ref), plus terms that read the vectors ``\\Sigma_{0} u`` and ``W v`` and a product of ``2 \\times 2`` matrices.
+
+# Arguments
+
+  - `f`: Whether each entry is a finite observation.
+  - `F0`, `F1`: The prefix sums of [`band_prefix_sums`](@ref).
+  - `w`: The window.
+  - `L`: The order of the band.
+  - `u`, `v`: The row sums of [`overlap_null_rows`](@ref).
+  - `abuv`: Its totals `(a, b, uv)`.
+  - `n`: The number of finite entries.
+  - `z`: The zero of the type the sums are read in.
+
+# Returns
+
+  - `tr2::Number`: The trace.
+
+# Related
+
+  - [`NullMomentLaw`](@ref)
+"""
+function overlap_null_second_moment(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                                    F1::AbstractVector{<:Integer}, w::Real, L::Integer,
+                                    u::AbstractVector{<:Integer}, v::AbstractVector,
+                                    abuv::Tuple, n::Integer, z::Number)
+    a, b, uv = abuv
+    P = length(f)
+    susu = z
+    suwv = z
+    vwv = z
+    for i in 1:P
+        if f[i]
+            su = z
+            wv = z
+            for k in max(1, i - L):min(P, i + L)
+                su += (w - abs(i - k)) * u[k]
+                wv += v[k]
+            end
+            susu += u[i] * su
+            suwv += su * wv
+            vwv += v[i] * wv
+        end
+    end
+    c11 = b / n^2
+    c12 = -one(z) / n
+    g11 = a * c11 + uv * c12
+    g12 = a * c12
+    g21 = uv * c11 + vwv * c12
+    g22 = uv * c12
+    return overlap_null_square_trace(f, F0, F1, w, L, v, z) +
+           2 * (b * susu / n^2 - 2 * suwv / n) +
+           g11^2 +
+           2 * g12 * g21 +
+           g22^2
+end
+"""
+    overlap_null_square_trace(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                              F1::AbstractVector{<:Integer}, w::Real, L::Integer,
+                              v::AbstractVector, z::Number) -> Number
+
+Return ``\\operatorname{tr}(W \\Sigma_{0} W \\Sigma_{0})`` of [`NullMomentLaw`](@ref), with the correlation scaled by `w`.
+
+The trace is ``\\sum_{i, k} K_{i k} K_{k i}`` with ``K = W \\Sigma_{0}``. An entry ``K_{i k}`` sums the correlation with ``k`` over the finite entries that are at most ``L`` from both ``i`` and ``k``, and ``K_{k i}`` sums the correlation with ``i`` over the same entries. So each pair is two calls of [`band_kernel_sum`](@ref), and only the pairs at most ``2L`` apart are not zero. The diagonal entry ``K_{i i}`` is `v[i]`.
+
+# Arguments
+
+  - `f`: Whether each entry is a finite observation.
+  - `F0`, `F1`: The prefix sums of [`band_prefix_sums`](@ref).
+  - `w`: The window.
+  - `L`: The order of the band.
+  - `v`: The row sums of the correlation, from [`overlap_null_rows`](@ref).
+  - `z`: The zero of the type the sum is read in.
+
+# Returns
+
+  - `t::Number`: The trace.
+
+# Related
+
+  - [`overlap_null_second_moment`](@ref)
+"""
+function overlap_null_square_trace(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                                   F1::AbstractVector{<:Integer}, w::Real, L::Integer,
+                                   v::AbstractVector, z::Number)
+    t = z
+    for i in eachindex(f)
+        if f[i]
+            t += v[i]^2 + 2 * band_pair_products(f, F0, F1, w, L, i, z)
+        end
+    end
+    return t
+end
+"""
+    band_pair_products(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                       F1::AbstractVector{<:Integer}, w::Real, L::Integer, i::Integer,
+                       z::Number) -> Number
+
+Return ``\\sum_{k > i} K_{i k} K_{k i}`` of [`overlap_null_square_trace`](@ref), over the finite entries ``k`` at most ``2L`` after ``i``.
+
+# Arguments
+
+  - `f`: Whether each entry is a finite observation.
+  - `F0`, `F1`: The prefix sums of [`band_prefix_sums`](@ref).
+  - `w`: The window.
+  - `L`: The order of the band.
+  - `i`: The row.
+  - `z`: The zero of the type the sum is read in.
+
+# Returns
+
+  - `s::Number`: The sum.
+
+# Related
+
+  - [`overlap_null_square_trace`](@ref)
+"""
+function band_pair_products(f::AbstractVector{Bool}, F0::AbstractVector{<:Integer},
+                            F1::AbstractVector{<:Integer}, w::Real, L::Integer, i::Integer,
+                            z::Number)
+    s = z
+    for k in (i + 1):min(length(f), i + 2 * L)
+        if f[k]
+            s += band_kernel_sum(F0, F1, w, k - L, i + L, k, z) *
+                 band_kernel_sum(F0, F1, w, k - L, i + L, i, z)
+        end
+    end
+    return s
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Tests the mean of a series against zero over the untapered long-run variance at the order that the overlap of its windows sets.
+
+The test reads the overlap off the `window` that the caller derives from the grid, such as [`forecast_ic_window`](@ref). Its order is ``L = \\lceil w \\rceil - 1``, the number of entries on each side of a given entry that share data with it. It reads no dependence past the overlap. A series that is persistent past the overlap gives a t-statistic that is too large, and the untapered sum can be negative on a short series. [`WildBootstrapMeanTest`](@ref) is the default because of this.
+
+# The law sets the divisor and the degrees of freedom
+
+The sum ``Q`` of the centred products reads the deviations from the sample mean, not from the true mean, so its expectation is not ``n`` times the long-run variance. Under the null hypothesis each entry is a sum of `window` independent periods, the score of a no-skill forecast over overlapping windows. The field `law` reads the divisor ``n_{d}`` of ``Q`` and the degrees of freedom ``\\nu`` of the Student law off that null law. The default [`NullMomentLaw`](@ref) makes the variance of the mean unbiased, and matches the variance of ``Q``. It rejects a no-skill moving average of order four in 60 entries 4.9% of the time at the 5% level. [`BandCountLaw`](@ref), the rule ``n_{d} = \\nu = n - 2L - 1``, rejects it 7.8% of the time, and a divisor of ``n`` with the normal law about 10.6%. At ``L = 0`` both laws give ``n - 1``, and the test is the classical t-test, whose law under independent Gaussian entries is the Student law with ``n - 1`` degrees of freedom.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\gamma_{j} &= \\frac{1}{n_{d}} \\sum_{t,\\, t + j \\in \\mathcal{T}} \\left( c_{t} - \\bar{c} \\right) \\left( c_{t + j} - \\bar{c} \\right)\\,, \\\\
 \\sigma^{2} &= \\gamma_{0} + 2 \\sum_{j = 1}^{L} \\gamma_{j}\\,, \\\\
 t &= \\frac{\\bar{c}}{\\sigma} \\sqrt{n}\\,, \\\\
 p &= 2 \\left( 1 - F_{\\nu}(|t|) \\right)\\,, \\\\
-\\bar{c} &\\pm F_{\\nu}^{-1}(1 - q / 2) \\frac{\\sigma}{\\sqrt{n}}\\,, \\quad \\nu = n - 2L - 1\\,.
+\\bar{c} &\\pm F_{\\nu}^{-1}(1 - q / 2) \\frac{\\sigma}{\\sqrt{n}}\\,.
 \\end{align}
 ```
 
@@ -486,13 +897,14 @@ Where:
   - ``\\bar{c}``: The mean over ``\\mathcal{T}``.
   - ``\\gamma_{j}``: The autocovariance at lag ``j``.
   - ``L``: The order, ``\\lceil w \\rceil - 1``, with ``w`` the `window`.
-  - ``\\sigma``: The long-run standard deviation.
-  - ``F_{\\nu}``: The distribution function of the Student law with ``\\nu`` degrees of freedom.
+  - ``n_{d}``: The divisor that `law` sets, [`overlap_student_law`](@ref).
+  - ``\\sigma``: The long-run standard deviation, ``\\sqrt{n}`` times the standard error of the mean.
+  - ``F_{\\nu}``: The distribution function of the Student law with the ``\\nu`` degrees of freedom that `law` sets.
   - ``t``: The t-statistic.
   - ``p``: The two-sided p-value.
   - ``q``: `q`, so the last line is the confidence interval of the mean at the level ``1 - q``.
 
-A long-run variance that is not positive, or a series with ``n \\leq 2L + 1``, gives a `NaN` t-statistic, p-value and interval. At a `window` of at most one the order is zero, and the t-statistic is ``\\mathrm{IR} \\sqrt{n}``. The rules of `min_obs` and `min_periods` are those of [`WildBootstrapMeanTest`](@ref).
+A long-run variance that is not positive, or a divisor or degrees of freedom that are not positive, give a `NaN` t-statistic, p-value and interval. [`BandCountLaw`](@ref) has no positive count when ``n \\leq 2L + 1``, and [`NullMomentLaw`](@ref) none when the span of the series is at most ``L + 1`` entries. At a `window` of at most one the order is zero, and the t-statistic is ``\\mathrm{IR} \\sqrt{n}``. The rules of `min_obs` and `min_periods` are those of [`WildBootstrapMeanTest`](@ref).
 
 # Fields
 
@@ -501,12 +913,15 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     OverlapMeanTest(;
+        law::AbstractOverlapStudentLaw = NullMomentLaw(),
         q::Real = 0.05,
         min_obs::Option{<:Integer} = nothing,
         min_periods::Option{<:Real} = nothing,
     ) -> OverlapMeanTest
 
 Keywords correspond to the struct's fields.
+
+The law [`NullMomentLaw`](@ref) is the default because it holds the level of the test. Its cost is linear in the length of the series and in ``L``. A test under it takes 2 to 15 times a test under [`BandCountLaw`](@ref): 0.35 ms against 0.03 ms for 1,000 entries at a window of 20, and 1.8 ms against 0.12 ms for 5,000. The default [`WildBootstrapMeanTest`](@ref) takes 16 ms and 97 ms there. [`BandCountLaw`](@ref) is the rule of the library before 2026-10-16.
 
 ## Validation
 
@@ -525,10 +940,21 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
 
   - [`AbstractMeanTestEstimator`](@ref)
   - [`WildBootstrapMeanTest`](@ref)
+  - [`AbstractOverlapStudentLaw`](@ref)
+  - [`NullMomentLaw`](@ref)
+  - [`BandCountLaw`](@ref)
   - [`forecast_ic_lags`](@ref)
   - [`mean_test`](@ref)
+
+# References
+
+  - $(ref_dict[:satterthwaite1946])
 """
 @concrete struct OverlapMeanTest <: AbstractMeanTestEstimator
+    """
+    Law that sets the divisor of the long-run variance and the degrees of freedom of the Student law.
+    """
+    law
     """
     Significance level of the test, and one less the confidence level of the interval of the mean, in `(0, 1)`.
     """
@@ -541,15 +967,18 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
     Least number of windows that the span of a series needs before the test answers, the span over `window`, or `nothing` for no rule. For a forward window it is the number of holding periods that the history covers.
     """
     min_periods
-    function OverlapMeanTest(q::Real, min_obs::Option{<:Integer},
-                             min_periods::Option{<:Real})
+    function OverlapMeanTest(law::AbstractOverlapStudentLaw, q::Real,
+                             min_obs::Option{<:Integer}, min_periods::Option{<:Real})
         assert_mean_test_rules(q, min_obs, min_periods)
-        return new{typeof(q), typeof(min_obs), typeof(min_periods)}(q, min_obs, min_periods)
+        return new{typeof(law), typeof(q), typeof(min_obs), typeof(min_periods)}(law, q,
+                                                                                 min_obs,
+                                                                                 min_periods)
     end
 end
-function OverlapMeanTest(; q::Real = 0.05, min_obs::Option{<:Integer} = nothing,
+function OverlapMeanTest(; law::AbstractOverlapStudentLaw = NullMomentLaw(), q::Real = 0.05,
+                         min_obs::Option{<:Integer} = nothing,
                          min_periods::Option{<:Real} = nothing)::OverlapMeanTest
-    return OverlapMeanTest(q, min_obs, min_periods)
+    return OverlapMeanTest(law, q, min_obs, min_periods)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -836,7 +1265,7 @@ The test reads the entries of `c` at which it is finite. A `NaN` entry is in no 
 """
 function mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, ::Any)
     @argcheck(window > zero(window), DomainError(window, "window must be > 0"))
-    m, n, d, _, T = mean_test_centred(c, FiniteEntrySpan())
+    m, n, d, f, T = mean_test_centred(c, FiniteEntrySpan())
     Ts = typeof(sqrt(one(m)))
     nan = Ts(NaN)
     if !mean_test_answers(mt, m, n, T, window)
@@ -851,13 +1280,13 @@ function mean_test(mt::OverlapMeanTest, c::VecNum, window::Real, ::Any)
     for j in 1:lags, t in 1:(P - j)
         Q += 2 * d[t] * d[t + j]
     end
-    nu = n - 2 * lags - 1
-    t = nu > 0 ? studentised_mean(m, Q, n, nu) : nan
+    nd, nu = overlap_student_law(mt.law, f, window, n, Ts)
+    t = min(nd, nu) > zero(nd) ? studentised_mean(m, Q, n, nd) : nan
     if !isfinite(t)
         return (; t_stat = t, p_value = nan, mean_ci_lower = nan, mean_ci_upper = nan)
     end
     D = Distributions.TDist(nu)
-    h = Distributions.quantile(D, 1 - mt.q / 2) * sqrt(Q / nu) / sqrt(Ts(n))
+    h = Distributions.quantile(D, 1 - mt.q / 2) * sqrt(Q / nd) / sqrt(Ts(n))
     return (; t_stat = t, p_value = 2 * Distributions.ccdf(D, abs(t)),
             mean_ci_lower = m - h, mean_ci_upper = m + h)
 end
@@ -956,6 +1385,10 @@ end
 
 Return whether a series carries enough evidence for a Mean Test to answer.
 
+The history rule reads ``T / w`` as the number of holding periods that the history covers. For a forward window of `horizon` base periods scored every `step` of them, ``w`` is `horizon / step`. Each entry stands for its stride of `step` base periods, so ``T`` entries cover ``T \\cdot`` `step` base periods, which is ``T / w`` holding periods. That is also the number of independent windows whose mean has the variance of the mean of the ``T`` overlapping ones. For an integer ``w`` that is exact up to an edge term of order one. So ``T`` windows that do not overlap count as ``T`` periods.
+
+The oracle counts the base periods from the first date to the last, both included, ``(T - 1) \\cdot`` `step` ``+ 1``. That counts the last entry as one base period and every other entry as `step`. So ``T`` windows that do not overlap count as ``T - 1 + 1 /`` `horizon` periods, and at a `step` above one the oracle needs one more entry than this rule. At `step = 1` the two rules are equal. The library keeps its rule.
+
 # Arguments
 
   - `mt`: The test. The function reads its `min_obs` and its `min_periods`.
@@ -1012,6 +1445,8 @@ Return the mean of the finite entries of a series, their count, the series centr
 
 A missing entry is zero in the centred series, so it adds nothing to a sum of products. The centred series starts and stops at a finite entry. The span rule sets the span that the bandwidth and the history rule read.
 
+A series whose spread is round-off of its mean is constant: every entry of `d` is zero, so the long-run variance is not positive and the test answers `NaN`. The sum of a constant series over its count can miss its value, as `sum(fill(0.03, 100)) / 100` does, and two entries one unit in the last place apart, such as `0.3` and `0.1 + 0.2`, have a spread of the same size. The computed mean of ``n`` entries misses the exact mean by at most about ``n \\epsilon / 2`` times the largest absolute entry, the bound of a recursive sum, with ``\\epsilon`` the [`round_off_unit`](@ref) of the type of the mean. A largest absolute deviation of at most ``n \\epsilon`` times the largest absolute entry cannot be told apart from that error, and its t-statistic is of the order of ``1 / \\epsilon``. An exact number type has ``\\epsilon = 0``, so only an exactly constant series is constant.
+
 # Arguments
 
   - `c`: The series.
@@ -1019,20 +1454,21 @@ A missing entry is zero in the centred series, so it adds nothing to a sum of pr
 
 # Returns
 
-  - `m::Real`: The mean, `NaN` when no entry is finite. When every finite entry has one value, the mean is that value, so every entry of `d` is zero and the long-run variance is not positive.
+  - `m::Real`: The mean, `NaN` when no entry is finite.
   - `n::Int`: The number of finite entries.
-  - `d::Vector{<:Real}`: The centred span, empty when no entry is finite.
+  - `d::Vector{<:Real}`: The centred span, empty when no entry is finite, and all zero when the series is constant to round-off.
   - `f::BitVector`: Whether each entry of `d` is a finite observation.
   - `T::Int`: The span of [`mean_test_span_length`](@ref), `0` when no entry is finite.
 
 # Related
 
   - [`mean_test`](@ref)
+  - [`round_off_unit`](@ref)
 """
 function mean_test_centred(c::VecNum, span::AbstractMeanTestSpan)
     Tm = float_if_integer(real(eltype(c)))
     n, s, i1, i2 = finite_sum_bounds(c, Tm)
-    m = constant_series_mean(c, i1, i2, n > 0 ? s / n : Tm(NaN))
+    m = n > 0 ? s / n : Tm(NaN)
     P = iszero(n) ? 0 : i2 - i1 + 1
     d = Vector{typeof(m)}(undef, P)
     f = falses(P)
@@ -1041,35 +1477,65 @@ function mean_test_centred(c::VecNum, span::AbstractMeanTestSpan)
         f[i] = isfinite(v)
         d[i] = f[i] ? Tm(v) - m : zero(m)
     end
+    zero_round_off_spread!(d, f, m, n)
     T = iszero(n) ? 0 : mean_test_span_length(span, length(c), i1, i2)
     return m, n, d, f, T
 end
 """
-    constant_series_mean(c::VecNum, i1::Integer, i2::Integer, m::Number) -> Number
+    zero_round_off_spread!(d::VecNum, f::AbstractVector{Bool}, m::Number, n::Integer) -> VecNum
 
-Return the mean of a series, the common value when every finite entry has one value.
-
-The sum of a constant series over its count can miss its value by round-off, as `sum(fill(0.03, 100)) / 100` does. The centred series would then hold a residue, and the long-run variance of the residue is positive. The check is an equality, so it holds for every number type.
+Set every entry of a centred series to zero when its spread is round-off of its mean, the rule that [`mean_test_centred`](@ref) states.
 
 # Arguments
 
-  - `c`: The series.
-  - `i1`, `i2`: The positions of its first and its last finite entry, `0` when no entry is finite.
-  - `m`: The mean of the finite entries, read as their sum over their count.
+  - `d`: The centred series, with a zero at each missing observation. It is changed in place.
+  - `f`: Whether each entry of `d` is a finite observation.
+  - `m`: The mean.
+  - `n`: The number of finite entries.
 
 # Returns
 
-  - `m::Number`: The value `c[i1]` in the type of `m` when every finite entry equals it, and `m` otherwise.
+  - `d::VecNum`: The series, all zero when its largest absolute entry is at most `n` times the [`round_off_unit`](@ref) of the type of `m` times the largest absolute entry of the series before the centring.
 
 # Related
 
   - [`mean_test_centred`](@ref)
 """
-function constant_series_mean(c::VecNum, i1::Integer, i2::Integer, m::Number)
-    if iszero(i1) || any(v -> isfinite(v) && v != c[i1], view(c, i1:i2))
-        return m
+function zero_round_off_spread!(d::VecNum, f::AbstractVector{Bool}, m::Number, n::Integer)
+    dmax = zero(m)
+    cmax = zero(m)
+    for i in eachindex(d, f)
+        dmax = max(dmax, abs(d[i]))
+        cmax = f[i] ? max(cmax, abs(d[i] + m)) : cmax
     end
-    return oftype(m, c[i1])
+    if dmax <= n * round_off_unit(typeof(m)) * cmax
+        fill!(d, zero(m))
+    end
+    return d
+end
+"""
+    round_off_unit(::Type{T}) where {T <: Real} -> Real
+    round_off_unit(::Type{T}) where {T <: Rational} -> Rational
+
+Return the relative round-off of one operation in a number type: `eps(T)`, and zero for an exact `Rational`.
+
+# Arguments
+
+  - `T`: The number type.
+
+# Returns
+
+  - `e::Real`: The unit.
+
+# Related
+
+  - [`mean_test_centred`](@ref)
+"""
+function round_off_unit(::Type{T}) where {T <: Real}
+    return eps(T)
+end
+function round_off_unit(::Type{T}) where {T <: Rational}
+    return zero(T)
 end
 """
     finite_sum_bounds(c::VecNum, Tm::Type) -> Tuple
@@ -1108,11 +1574,11 @@ function finite_sum_bounds(c::VecNum, Tm::Type)
     return n, s, i1, i2
 end
 """
-    studentised_mean(m::Real, Q::Real, n::Integer, nd::Integer) -> Real
+    studentised_mean(m::Real, Q::Real, n::Integer, nd::Real) -> Real
 
 Return the mean over its long-run standard error.
 
-The long-run variance is ``Q / n_{d}``. [`WildBootstrapMeanTest`](@ref) divides by ``n``, as its source does. Its divisor scales the t-statistic of the observed series and of every bootstrap draw by one factor, so it moves no p-value and no interval. [`OverlapMeanTest`](@ref) divides by ``n - 2L - 1``, which removes the bias of the centring under its null hypothesis, and its p-value reads the divisor.
+The long-run variance is ``Q / n_{d}``. [`WildBootstrapMeanTest`](@ref) divides by ``n``, as its source does. Its divisor scales the t-statistic of the observed series and of every bootstrap draw by one factor, so it moves no p-value and no interval. [`OverlapMeanTest`](@ref) divides by the count of its [`AbstractOverlapStudentLaw`](@ref), which removes the bias of the centring under its null hypothesis, and its p-value reads the divisor.
 
 # Arguments
 
@@ -1129,14 +1595,14 @@ The long-run variance is ``Q / n_{d}``. [`WildBootstrapMeanTest`](@ref) divides 
 
   - [`mean_test`](@ref)
 """
-function studentised_mean(m::Real, Q::Real, n::Integer, nd::Integer)
+function studentised_mean(m::Real, Q::Real, n::Integer, nd::Real)
     Ts = typeof(sqrt(one(Q)))
     lrsd = Q > zero(Q) ? sqrt(Q / nd) : Ts(NaN)
     return isfinite(m) && isfinite(lrsd) ? m / lrsd * sqrt(Ts(n)) : Ts(NaN)
 end
 
 export OverlapMeanTest, WildBootstrapMeanTest, BartlettKernel, QuadraticSpectralKernel,
-       FiniteEntrySpan, FullGridSpan
+       FiniteEntrySpan, FullGridSpan, BandCountLaw, NullMomentLaw
 public AbstractMeanTestEstimator, AbstractLongRunKernel, AbstractMeanTestSpan,
-       AbstractBootstrapDraws, mean_test, mean_test_rng, long_run_kernel_weight,
-       mean_test_span_length
+       AbstractBootstrapDraws, AbstractOverlapStudentLaw, mean_test, mean_test_rng,
+       long_run_kernel_weight, mean_test_span_length, overlap_student_law

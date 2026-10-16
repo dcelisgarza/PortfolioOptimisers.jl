@@ -172,6 +172,7 @@
         :AbstractOrthogonalForecastScaleCalibrationAlgorithm,
         :AbstractOrthogonalScaling,
         :AbstractOrthogonalityMetric,
+        :AbstractOverlapStudentLaw,
         :AbstractPanelCollapseAlgorithm,
         :AbstractPanelField,
         :AbstractPanelFieldInput,

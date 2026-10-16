@@ -14,6 +14,15 @@ mean_test
 mean_test_rng
 ```
 
+## Laws of the overlap test
+
+```@docs
+AbstractOverlapStudentLaw
+BandCountLaw
+NullMomentLaw
+overlap_student_law
+```
+
 ## Long-run kernels
 
 ```@docs

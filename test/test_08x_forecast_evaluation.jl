@@ -679,12 +679,27 @@ end
     end
 end
 
+# Hand computation of the null law of the overlap test, from dense matrices: the divisor that
+# makes the variance of the mean unbiased, and the degrees of freedom that match the variance of
+# the sum of the centred products, when two entries `j` apart have the correlation
+# `max(1 - j / w, 0)`.
+function hand_overlap_law(f, w)
+    idx = findall(f)
+    n = length(idx)
+    L = ceil(Int, w) - 1
+    W = [abs(i - k) <= L ? 1.0 : 0.0 for i in idx, k in idx]
+    S = [max(1 - abs(i - k) / w, 0.0) for i in idx, k in idx]
+    M = I - fill(1 / n, n, n)
+    AS = M * W * M * S
+    return n * tr(AS) / sum(S), tr(AS)^2 / tr(AS * AS)
+end
+
 @testset "The t-statistic reads the overlap of the forward windows" begin
     PO = PortfolioOptimisers
     # Hand computation of the kernel's long-run standard error: the variance plus twice the
     # first `L` autocovariances, every one over `n - 2L - 1`, which removes the bias of the
     # centring under a moving average of order `L`, pairs read at their positions.
-    function hand_t(v, L)
+    function hand_t(v, L; band = false)
         f = isfinite.(v)
         n = count(f)
         m = sum(v[f]) / n
@@ -694,9 +709,9 @@ end
                 g[j + 1] += (v[t] - m) * (v[t + j] - m)
             end
         end
-        nu = n - 2L - 1
-        lrv = (g[1] + 2 * sum(g[2:end])) / nu
-        return nu > 0 && lrv > 0 ? m / sqrt(lrv) * sqrt(n) : NaN
+        nd = band ? n - 2L - 1 : hand_overlap_law(f, L + 1)[1]
+        lrv = (g[1] + 2 * sum(g[2:end])) / nd
+        return nd > 0 && lrv > 0 ? m / sqrt(lrv) * sqrt(n) : NaN
     end
 
     @testset "The lag is one less than the number of strides a window spans" begin
@@ -736,6 +751,10 @@ end
         for L in 0:3
             s = PO.exposure_ic_factor_summary(ic, 1; lags = L, mt = OverlapMeanTest())
             @test s.t_stat ≈ hand_t(v, L)
+            @test PO.exposure_ic_factor_summary(ic, 1; lags = L,
+                                                mt = OverlapMeanTest(;
+                                                                     law = BandCountLaw())).t_stat ≈
+                  hand_t(v, L; band = true)
             # The mean, the deviation, the ratio and the hit rate do not read the lag.
             s0 = PO.exposure_ic_factor_summary(ic, 1; mt = OverlapMeanTest())
             @test (s.mean_ic, s.std_ic, s.ic_ir, s.hit_rate) ==
@@ -781,6 +800,58 @@ end
         @test isnan(s.t_stat)
         @test isfinite(s.ic_ir)
         @test isfinite(PO.exposure_ic_factor_summary(hcat(v), 1; mt = OverlapMeanTest()).t_stat)
+    end
+
+    @testset "The null law of the overlap test reads the first two moments of the sum" begin
+        # The banded form is the dense form, with gaps, a fractional window and an exact one.
+        for (w, P, g) in ((2, 24, Int[]), (5, 60, [3, 9, 10, 40]), (5 // 2, 30, [1, 7]),
+                          (10, 60, [20, 21, 22, 59]), (3.4, 41, [2, 30]), (20, 300, [1, 2, 150, 299]))
+            f = trues(P)
+            f[g] .= false
+            nd, nu = PO.overlap_student_law(NullMomentLaw(), f, w, count(f), Float64)
+            hd, hu = hand_overlap_law(f, w)
+            @test nd ≈ hd
+            @test nu ≈ hu
+            L = ceil(Int, w) - 1
+            @test PO.overlap_student_law(BandCountLaw(), f, w, count(f), Float64) ==
+                  (count(f) - 2L - 1, count(f) - 2L - 1)
+        end
+        # The divisor is almost the band count, and the degrees of freedom are far fewer.
+        nd, nu = PO.overlap_student_law(NullMomentLaw(), trues(60), 5, 60, Float64)
+        @test 51 < nd < 51.2
+        @test 8.1 < nu < 8.2
+        # At no overlap both laws are the classical t-test, exactly.
+        @test PO.overlap_student_law(NullMomentLaw(), trues(20), 1, 20, Float64) == (19, 19)
+        @test PO.overlap_student_law(NullMomentLaw(), trues(20), 1 // 2, 20, Float32) isa
+              Tuple{Float32, Float32}
+        # A span that the band covers has no statistic: every pair is in the band.
+        @test PO.overlap_student_law(NullMomentLaw(), trues(4), 5, 4, Float64) == (0, 0)
+        @test all(isnan,
+                  values(PO.mean_test(OverlapMeanTest(), [0.1, 0.3, -0.2, 0.4], 5, nothing)))
+        @test all(>(0), PO.overlap_student_law(NullMomentLaw(), trues(6), 5, 6, Float64))
+        # The law reads the type of the data and of the window.
+        x32 = Float32.(randn(StableRNG(3), 40))
+        @test PO.mean_test(OverlapMeanTest(), x32, 5 // 2, nothing).t_stat isa Float32
+        xr = Rational{Int}.(rand(StableRNG(3), -3:3, 30)) .// 7
+        @test PO.mean_test(OverlapMeanTest(), xr, 3, nothing).t_stat ≈
+              PO.mean_test(OverlapMeanTest(), float.(xr), 3, nothing).t_stat
+        # The size of the test on no-skill windows of five periods at 60 dates: the band count
+        # rejects too often, and the null law holds the level.
+        rng = StableRNG(17)
+        rej = [0, 0]
+        e = zeros(64)
+        c = zeros(60)
+        for _ in 1:4000
+            e .= randn(rng, 64)
+            for t in 1:60
+                c[t] = sum(view(e, t:(t + 4)))
+            end
+            rej[1] += PO.mean_test(OverlapMeanTest(), c, 5, nothing).p_value <= 0.05
+            rej[2] += PO.mean_test(OverlapMeanTest(; law = BandCountLaw()), c, 5,
+                                   nothing).p_value <= 0.05
+        end
+        @test 0.039 < rej[1] / 4000 < 0.061
+        @test rej[2] / 4000 > 0.065
     end
 
     @testset "The evaluation summaries derive the lag from the window and the stride" begin
@@ -969,6 +1040,8 @@ end
         @test_throws DomainError WildBootstrapMeanTest(; min_periods = 0)
         o = OverlapMeanTest()
         @test o.q == 0.05 && isnothing(o.min_obs) && isnothing(o.min_periods)
+        @test o.law isa NullMomentLaw
+        @test OverlapMeanTest(; law = BandCountLaw()).law isa BandCountLaw
         @test_throws DomainError OverlapMeanTest(; q = 1.5)
         @test_throws DomainError OverlapMeanTest(; min_obs = 0)
         @test isnothing(PO.mean_test_rng(OverlapMeanTest()))
@@ -1230,15 +1303,18 @@ end
         end
         @test mism == 0
         # The overlap test centres its interval on the mean, at the quantile of the Student
-        # law with `n - 2L - 1` degrees of freedom: thirty entries at a window of three.
+        # law with the degrees of freedom of its law: thirty entries at a window of three.
         v = randn(StableRNG(12), 30) .+ 0.3
-        o = PO.mean_test(OverlapMeanTest(; q = 0.1), v, 3, nothing)
-        D = PO.Distributions.TDist(30 - 2 * 2 - 1)
-        se = (sum(v) / 30) / o.t_stat
-        @test o.p_value ≈ 2 * (1 - PO.Distributions.cdf(D, abs(o.t_stat)))
-        @test o.mean_ci_upper - o.mean_ci_lower ≈
-              2 * PO.Distributions.quantile(D, 0.95) * se
-        @test (o.mean_ci_upper + o.mean_ci_lower) / 2 ≈ sum(v) / 30
+        for (law, nu) in ((NullMomentLaw(), hand_overlap_law(trues(30), 3)[2]),
+                          (BandCountLaw(), 30 - 2 * 2 - 1))
+            o = PO.mean_test(OverlapMeanTest(; law = law, q = 0.1), v, 3, nothing)
+            D = PO.Distributions.TDist(nu)
+            se = (sum(v) / 30) / o.t_stat
+            @test o.p_value ≈ 2 * (1 - PO.Distributions.cdf(D, abs(o.t_stat)))
+            @test o.mean_ci_upper - o.mean_ci_lower ≈
+                  2 * PO.Distributions.quantile(D, 0.95) * se
+            @test (o.mean_ci_upper + o.mean_ci_lower) / 2 ≈ sum(v) / 30
+        end
     end
 
     @testset "A series with too little evidence has no test" begin
@@ -1257,6 +1333,26 @@ end
         for v in (fill(0.03, 100), g), t in (mt, OverlapMeanTest())
             @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
         end
+        # A series whose entries are one ulp apart is constant to round-off, in every float
+        # type. A spread forty times the round-off of the mean is not, and an exact type reads
+        # only an exactly constant series as constant.
+        @test 0.1 + 0.2 != 0.3
+        u = repeat([0.3, 0.1 + 0.2], 20)
+        u32 = repeat([0.3f0, nextfloat(0.3f0)], 20)
+        ub = repeat(BigFloat[0.3, nextfloat(BigFloat(0.3))], 20)
+        for v in (u, u32, ub),
+            t in (mt, OverlapMeanTest(), OverlapMeanTest(; law = BandCountLaw()))
+
+            @test all(isnan, values(PO.mean_test(t, v, 1, PO.mean_test_rng(t))))
+        end
+        a = 0.3 .+ repeat([0.0, 1e-13], 20)
+        for t in (mt, OverlapMeanTest())
+            @test isfinite(PO.mean_test(t, a, 1, PO.mean_test_rng(t)).t_stat)
+        end
+        r = repeat([3 // 10, 3 // 10 + 1 // 1000], 20)
+        @test isfinite(PO.mean_test(OverlapMeanTest(), r, 1, nothing).t_stat)
+        @test all(isnan,
+                  values(PO.mean_test(OverlapMeanTest(), fill(3 // 10, 40), 1, nothing)))
         # An alternating series sums the untapered long-run variance below zero, and the
         # Bartlett one stays positive, so only the overlap test answers NaN.
         v = [0.5, -0.4, 0.5, -0.4, 0.5, -0.4, 0.5, -0.4]
@@ -1274,7 +1370,9 @@ end
             @test all(isnan, values(PO.mean_test(t, w, 1, PO.mean_test_rng(t))))
         end
         # Thirty entries hold ten windows of three and seven and a half windows of four. A
-        # window of `5 // 2` entries is a horizon of five at a stride of two: twelve periods.
+        # window of `5 // 2` entries is a horizon of five at a stride of two: twelve periods,
+        # each entry counted as its stride of two base periods. The oracle counts the dates
+        # from the first to the last, 29 * 2 + 1 = 59 base periods, and answers `NaN` here.
         t = WildBootstrapMeanTest(; n_sim = 19, min_periods = 10)
         @test isfinite(PO.mean_test(t, w, 3, PO.mean_test_rng(t)).p_value)
         @test isnan(PO.mean_test(t, w, 4, PO.mean_test_rng(t)).p_value)
@@ -1382,8 +1480,13 @@ end
         @test isequal(PO.exposure_ic_factor_summary(ic, 1; lags = 2, window = 5 // 2,
                                                     mt = o),
                       PO.exposure_ic_factor_summary(ic, 1; window = 5 // 2, mt = o))
-        @test isequal(PO.exposure_ic_factor_summary(ic, 1; window = 5 // 2, mt = o).t_stat,
-                      PO.exposure_ic_factor_summary(ic, 1; lags = 2, mt = o).t_stat)
+        # The band count reads the order alone, and the null law the exact window: five
+        # halves is not three.
+        ob = OverlapMeanTest(; law = BandCountLaw())
+        @test isequal(PO.exposure_ic_factor_summary(ic, 1; window = 5 // 2, mt = ob).t_stat,
+                      PO.exposure_ic_factor_summary(ic, 1; lags = 2, mt = ob).t_stat)
+        @test !isequal(PO.exposure_ic_factor_summary(ic, 1; window = 5 // 2, mt = o).t_stat,
+                       PO.exposure_ic_factor_summary(ic, 1; lags = 2, mt = o).t_stat)
         @test_throws PO.ConflictingArgumentError PO.exposure_ic_factor_summary(ic, 1;
                                                                                lags = 1,
                                                                                window = 5 //
@@ -2606,14 +2709,21 @@ end
             @test isequal(h.spearman_t_stat[p], s.spearman.t_stat)
             @test isequal(h.pearson_t_stat[p], s.pearson.t_stat)
         end
-        # The overlap rows divide by `n - 2L - 1`, five dates less `2L + 1`, where the
-        # released rule divided by `n - 1`: row 2 is the released value times `sqrt(2 / 4)`.
-        @test parity_compare([h.spearman_t_stat[2], h.pearson_t_stat[2]],
+        # The band count divides the overlap rows by `n - 2L - 1`, five dates less `2L + 1`,
+        # where the released rule divided by `n - 1`: row 2 is the released value times
+        # `sqrt(2 / 4)`. Five dates at two lags leave it no degree of freedom at row 3.
+        hb = forecast_holding_period(fe, alpha; n = 3,
+                                     mt = OverlapMeanTest(; law = BandCountLaw()))
+        @test parity_compare([hb.spearman_t_stat[2], hb.pearson_t_stat[2]],
                              [0.8624393618641034, 0.7453765425294355] .* sqrt(2 / 4);
                              rtol = 1e-14, name = "holding t overlap").ok
-        # Five dates at two lags leave no degree of freedom, so row 3 has no statistic.
-        @test isnan(h.spearman_t_stat[3])
-        @test isnan(h.pearson_t_stat[3])
+        @test isnan(hb.spearman_t_stat[3])
+        @test isnan(hb.pearson_t_stat[3])
+        # The default null law divides the same sum by its own count, so row 2 is the band
+        # count's value times `sqrt(nd / 2)`.
+        nd = hand_overlap_law(trues(5), 2)[1]
+        @test [h.spearman_t_stat[2], h.pearson_t_stat[2]] ≈
+              [hb.spearman_t_stat[2], hb.pearson_t_stat[2]] .* sqrt(nd / 2)
         @test parity_compare(hcat(h.rank_ann_return, h.rank_sharpe),
                              [1.0 1.414213562373095; 0.55 0.7928249671720919;
                               0.7333333333333332 0.964763821237732]; rtol = 1e-14,
@@ -4207,7 +4317,9 @@ end
             ic[rand(rng, nr, 2) .< 0.1] .= NaN
             nl = rand(rng, 0:4)
             sm = forecast_ic_summary(ic; lags = nl, mt = OverlapMeanTest())
-            for (k, v) in ((1, sm.spearman), (2, sm.pearson))
+            sb = forecast_ic_summary(ic; lags = nl,
+                                     mt = OverlapMeanTest(; law = BandCountLaw()))
+            for (k, v, vb) in ((1, sm.spearman, sb.spearman), (2, sm.pearson, sb.pearson))
                 c = ic[:, k]
                 f = filter(isfinite, c)
                 n = length(f)
@@ -4219,10 +4331,16 @@ end
                         g += 2 * (c[t] - m) * (c[t + l] - m)
                     end
                 end
-                # The divisor `n - 2L - 1` removes the bias of the centring at order `L`.
+                # The band count divides by `n - 2L - 1`. The null law divides by its own count,
+                # and has none when the band covers the span, every pair in it.
                 nu = n - 2 * nl - 1
                 tt = g > 0 && nu > 0 ? m / sqrt(g / nu) * sqrt(n) : NaN
-                @test isequal(tt, v.t_stat) || isapprox(tt, v.t_stat; rtol = 1e-12)
+                @test isequal(tt, vb.t_stat) || isapprox(tt, vb.t_stat; rtol = 1e-12)
+                fc = isfinite.(c)
+                span = findlast(fc) - findfirst(fc) + 1
+                nd = span > nl + 1 ? hand_overlap_law(fc, nl + 1)[1] : 0.0
+                tn = g > 0 && nd > 0 ? m / sqrt(g / nd) * sqrt(n) : NaN
+                @test isequal(tn, v.t_stat) || isapprox(tn, v.t_stat; rtol = 1e-10)
                 @test v.mean_ic ≈ m
                 @test v.std_ic ≈ sqrt(sum(abs2, f .- m) / (n - 1))
                 @test v.hit_rate == count(>(0), f) / n

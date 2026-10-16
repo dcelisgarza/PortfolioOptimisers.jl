@@ -493,27 +493,41 @@ the p-values and the intervals agree within the Monte Carlo error of two generat
 differences are kept, because each is the
 correct rule. The oracle fixes 32 nodes, which holds at its fixed `b = 0.1` alone. Its interval
 excludes zero when `p < 0.05`, a test of level `499 / 10,000`, where `p <= q` gives the level `q`.
-It calls a series constant when its spread is under `1e-12` of its size, a choice of tolerance,
-where the library answers `NaN` for a series whose finite entries are all equal, exactly. The
+It calls a series constant when its spread is under `1e-12` of its size, a fixed tolerance. The
+library calls a series constant when its largest centred deviation is at most `n * eps(T)` times its
+largest absolute entry, with `T` the type of the mean and zero for a `Rational`: the round-off
+bound of the sum that the mean reads. A series whose entries are one ulp apart, such as `0.3` and
+`0.1 + 0.2`, then answers `NaN`, and not a statistic of the order of `1e16`. The oracle needs one
+entry more than the library at a stride above one: it counts the history as the base periods from
+the first date to the last, `(T - 1) * step + 1`, where the library counts `T * step`, each entry
+as its own stride. The library's count is the number of independent windows with the variance of
+the mean of the overlapping ones, and counts `T` windows that do not overlap as `T`. The
 default of the library holds its size better under strong dependence: an AR(1) series of
 coefficient 0.8 at 60 dates is rejected 11.1% of the time against 16.4% for the oracle's rule, at
 a cost of power under weak dependence, 0.61 to 0.66 against 0.71 to 0.74 for independent series.
 
-The rule of 2026-09-19 stays available as `OverlapMeanTest`, with two corrections. The sum of the
-centred products reads deviations from the sample mean, so under the null hypothesis, a moving
-average of order `L`, its expectation is to first order `(n - 2L - 1)` times the long-run
-variance: `tr(W M Σ M)` with `M` the centring matrix and `W` the band of width `2L + 1`. The
-divisor `n - 1` of 2026-09-19 is unbiased at `L = 0` only, so at every positive order it understated
-the variance and overstated the statistic. The test now divides by `n - 2L - 1`, and reads its
-p-value and its interval off the Student law with `n - 2L - 1` degrees of freedom, which is exact at
-`L = 0` under independent Gaussian entries and an approximation above it. At `L = 0` the statistic
-is bit for bit the one it was, so the parity of the plain statistic at a stride of the horizon holds.
-Measured on a no-skill MA(4) series at the 5% level, over 20,000 seeds: the released rule rejected
-19.9% at 24 dates, 10.6% at 60 and 6.0% at 250, and the corrected one 11.2%, 7.9% and 5.5%. At
-`L = 0` it rejected 4.9% at 24 dates, where the normal law gave 6.2%. The exact expectation agrees
-with `n - 2L - 1` to first order: 14.5 against 15 at 24 dates, 49.8 against 51 at 60. A series with
-`n <= 2L + 1` has no statistic. No divisor reads persistence past the overlap, so the bootstrap test
-stays the default.
+The rule of 2026-09-19 stays available as `OverlapMeanTest`, with two corrections. The sum `Q` of
+the centred products reads deviations from the sample mean, so its expectation is not `n` times the
+long-run variance. Under the null hypothesis each entry is a sum of `window` independent periods, so
+two entries `j` apart have the correlation `max(1 - j / w, 0)`, and `E[Q] = tr(M W M Σ₀)` with `M`
+the centring matrix and `W` the band of width `2L + 1`. The divisor `n - 1` of 2026-09-19 is
+unbiased at `L = 0` only. The field `law` sets the divisor and the degrees of freedom of the
+Student law. The default `NullMomentLaw` divides by `n tr(M W M Σ₀) / 1'Σ₀1`, which makes the
+variance of the mean unbiased at every length and with every gap, and takes the degrees of freedom
+of Satterthwaite (1946), `tr(M W M Σ₀)² / tr((M W M Σ₀)²)`, which match the variance of `Q`. Both
+read every entry of the band once through two prefix sums of the mask, so a test costs 2 to 15
+times a test under `BandCountLaw`: 1.8 ms against 0.12 ms at 5,000 dates and a window of 20, where
+the bootstrap default takes 97 ms. `BandCountLaw` keeps `n - 2L - 1` for both. That divisor is almost unbiased for the variance
+of the mean, 51 against an exact 51.17 at `L = 4` and 60 dates, because two edge terms of order `L`
+cancel. Its degrees of freedom are not: the untapered sum varies as a chi-squared law with 8.1
+degrees of freedom there, not 51. Measured on a no-skill series of overlapping windows at the 5%
+level, the released rule `n - 1` with the normal law rejected 19.9% at `L = 4` and 24 dates and
+10.6% at 60, over 20,000 seeds. Over 100,000 seeds, `BandCountLaw` rejected 11.2% and 7.8%, 5.7% at 250 dates,
+and 12.4% at `L = 19` and 120 dates. `NullMomentLaw` rejected 4.1%, 4.9%, 5.0% and 4.5%, and 4.9%
+and 4.7% with four and five gaps. At `L = 0` both laws are the classical t-test, and the statistic
+is bit for bit the one it was, so the parity of the plain statistic at a stride of the horizon
+holds. A series whose span is at most `L + 1` entries has no statistic. No law reads persistence
+past the overlap, so the bootstrap test stays the default.
 
 Every summary of an information coefficient takes the test as the keyword `mt`:
 `exposure_ic_factor_summary`, `exposure_ic_summary`, `forecast_ic_summary`,
