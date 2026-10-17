@@ -246,7 +246,7 @@ end
     forecast_location(ce::GeneralCovariance)
     forecast_location(ce::Union{<:ExpWeightedCovariance, <:RegimeAdjustedExpWeightedCovariance})
     forecast_location(ce::PortfolioOptimisersCovariance)
-    forecast_location(ce::CorrelationCovariance)
+    forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     forecast_location(ce::AbstractCovarianceEstimator)
     forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false, kwargs...)
     forecast_location(pe::AbstractPriorEstimator; strict::Bool = false, kwargs...)
@@ -257,15 +257,15 @@ A second moment is always taken about some centre, ``\\mathbb{E}[(\\boldsymbol{z
 
 Each family has two arities. The data form answers for a batch fit over `X`. The data-less form answers for the state that the estimator carries after [`partial_fit!`](@ref), so a refit fold and a stepped fold centre on the same quantity. For a family state, the data-less form returns the vector of the state itself, which the next fold writes in place.
 
-  - [`Covariance`](@ref) answers the centre that [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit and the fold are one computation, so the data form folds the window and reads the same `state.mu`. That vector is the diagonal of the per-pair centre, the available-case mean of each asset. The forecast centres each off-diagonal product on the mean of the observations that the pair shares, and one vector cannot carry that centre. The per-asset ratios read the diagonal only.
+  - [`Covariance`](@ref) answers the centre that [`weighted_centre`](@ref) resolves from `ce.me` and `ce.w`, or `state.mu`. Under a [`CoveragePolicy`](@ref) the batch fit and the fold are one computation, so the data form folds the window and reads the same `state.mu`. That fold runs under [`FullMoment`](@ref) whatever `ce.alg` is, because the centre does not depend on the moment algorithm, and the fold refuses every other algorithm. That vector is the diagonal of the per-pair centre, the available-case mean of each asset. The forecast centres each off-diagonal product on the mean of the observations that the pair shares, and one vector cannot carry that centre. The per-asset ratios read the diagonal only.
   - [`GeneralCovariance`](@ref) answers the sample mean, weighted by `ce.w` when it carries observation weights, or `state.mu`.
-  - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location`, or zero for every asset when `centred = true`, because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
+  - [`ExpWeightedCovariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref) answer `state.location` under [`EstimatedCentring`](@ref), or zero for every asset under [`PreCentred`](@ref), because the estimator then assumes a zero mean. The data form runs over the window the same pass that the batch fit runs, and reads the location at the end of the pass.
   - [`PortfolioOptimisersCovariance`](@ref) and [`CorrelationCovariance`](@ref) answer what the estimator that they hold answers, because a matrix transform moves no centre. A `StatsBase.CovarianceEstimator` that they hold is read as a [`GeneralCovariance`](@ref), as `cov` reads it.
   - Any other [`AbstractCovarianceEstimator`](@ref) answers the sample mean of the window, over the finite rows of each column. Its data-less form reads the state through [`forecast_state_location`](@ref), which refuses a state of a shape that it does not know.
-  - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows at every read-out.
-  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone.
+  - Under [`Online`](@ref), every family answers its data form over the rows and masks of the buffer, because a buffer means the batch verb over its rows each time the estimate is made from the state.
+  - An [`AbstractPriorEstimator`](@ref) answers the centre of its `sigma` through [`prior_forecast_location`](@ref). That is the `mu` it publishes for a family that forms both moments about one mean. An [`EmpiricalPrior`](@ref) whose `me` shrinks the mean publishes the shrunk `mu`, but its `ce` centres the covariance on its own estimate of the mean, so it answers the location of its `ce`. A factor prior and a high-order prior answer the centre of the prior that they lift or wrap. The keyword `strict` reaches [`prior`](@ref) alone. The location reads the returns in the frame that the prior fits on, the source that `pe` states through [`returns_source`](@ref). Before the fit and before the location, [`shared_series_view`](@ref) drops the observations of a gap in a vector benchmark under [`ExcessSource`](@ref), and the observations at which a factor return is not finite when the tree of the prior reads the factor returns. So the fit and the location read the same observations.
 
-The Asset Panel form follows the moment seam of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
+The Asset Panel form follows the Asset Panel method of the estimator's own `cov`. Under no policy it reduces the window to its Coverage Universe and frames the answer with `NaN` outside it. Under a policy, and for the two mask-aware exponentially weighted families, it hands the active mask of the panel to the estimator. A [`PortfolioOptimisersCovariance`](@ref) hands the panel to the estimator that it holds, as its `cov` does.
 
 # Arguments
 
@@ -308,7 +308,9 @@ end
 function forecast_location(ce::Covariance, cvg::CoveragePolicy, X::MatNum; dims::Int = 1,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            estimation_mask = nothing, kwargs...)
-    ce = partial_fit!(Covariance(; me = ce.me, ce = ce.ce, alg = ce.alg, w = ce.w,
+    # The centre does not depend on the moment algorithm, and the fold refuses every algorithm
+    # but `FullMoment`, so the location of a `SemiMoment` estimator is read from a full one.
+    ce = partial_fit!(Covariance(; me = ce.me, ce = ce.ce, alg = FullMoment(), w = ce.w,
                                  cvg = cvg), X; dims = dims, active_mask = active_mask)
     return forecast_location(ce)
 end
@@ -363,16 +365,12 @@ function forecast_location(ce::GeneralCovariance)
 end
 function forecast_location(ce::Union{<:ExpWeightedCovariance,
                                      <:RegimeAdjustedExpWeightedCovariance})
-    c = forecast_state_location(ce, ce.cache)
-    # Under `centred = true` the estimator never writes its location, so the state keeps the
-    # seed, which is `NaN` for an asset that was inactive at the first observation; the
-    # location such an estimator is about is zero for every asset.
-    return ce.centred ? zero(c) : c
+    return centring_report_location(ce.centring, forecast_state_location(ce, ce.cache))
 end
 function forecast_location(ce::PortfolioOptimisersCovariance)
     return forecast_state_location(ce, ce.cache)
 end
-function forecast_location(ce::CorrelationCovariance)
+function forecast_location(ce::CorrelationCovariance{<:Any, Nothing})
     return forecast_location(ce.ce)
 end
 function forecast_location(ce::AbstractCovarianceEstimator)
@@ -380,6 +378,7 @@ function forecast_location(ce::AbstractCovarianceEstimator)
 end
 function forecast_location(pe::AbstractPriorEstimator, rd::ReturnsResult;
                            strict::Bool = false, kwargs...)
+    rd = shared_series_view(rd, returns_source(pe), reads_factor_returns(pe))
     return prior_forecast_location(pe, prior(pe, rd; strict = strict, kwargs...), rd;
                                    kwargs...)
 end
@@ -404,7 +403,7 @@ The rule is the same for every family. The location is the `mu` that the prior w
   - [`HighOrderPriorEstimator`](@ref) and [`HighOrderFactorPriorEstimator`](@ref) answer the location of the prior that they wrap, because they publish its `mu` and `sigma` unchanged.
   - Every other family answers `pr.mu`. The Black–Litterman and entropy pooling families and [`OpinionPoolingPrior`](@ref) form `sigma` about their posterior or pooled `mu`. [`CrossSectionalFactorPrior`](@ref) and [`LowDimensionEnsemblePrior`](@ref) publish a forecast of the next return as `mu`.
 
-For the default [`EmpiricalPrior`](@ref), the mean estimator is the centring estimator of `ce`, so every family answers `pr.mu`. The data-less form reads the state as [`prior`](@ref) does, through [`prior_state_location`](@ref).
+For the default [`EmpiricalPrior`](@ref), the mean estimator is the centring estimator of `ce`, so every family answers `pr.mu`. The returns data form reads the asset returns in the frame that `pe` fits on, through [`benchmark_relative_returns`](@ref) under the source of `pe`, as [`prior`](@ref) reads them. The data-less form reads the state as [`prior`](@ref) does, through [`prior_state_location`](@ref).
 
 # Arguments
 
@@ -429,8 +428,9 @@ For the default [`EmpiricalPrior`](@ref), the mean estimator is the centring est
 """
 function prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
                                  rd::ReturnsResult; kwargs...)
-    return prior_forecast_location(pe, pr, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa,
-                                   kwargs..., dims = 1)
+    return prior_forecast_location(pe, pr,
+                                   benchmark_relative_returns(rd, returns_source(pe)), rd.F,
+                                   rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
 end
 function prior_forecast_location(::AbstractPriorEstimator, pr::AbstractPriorResult,
                                  ::MatNum, ::Option{<:MatNum}, ::Option{<:AssetPanel};
@@ -469,7 +469,7 @@ function prior_forecast_location(pe::AbstractPriorEstimator, pr::AbstractPriorRe
     return prior_state_location(pe, pr, cache; kwargs...)
 end
 function prior_forecast_location(pe::HighOrderPriorEstimator, pr::HighOrderPrior; kwargs...)
-    # The host owns no buffer, and `prior(pe)` reads the prior that it wraps.
+    # `pe` owns no buffer, and `prior(pe)` reads the prior that it wraps.
     return prior_forecast_location(pe.pe, pr.pr; kwargs...)
 end
 """
@@ -479,7 +479,7 @@ end
 
 Read the location of a prior out of the state that its estimator carries, by the type of the state.
 
-This is the data-less arm of [`prior_forecast_location`](@ref), and it takes the routes that the data-less [`prior`](@ref) takes:
+This is the data-less arm of [`prior_forecast_location`](@ref), and it takes the routes that the data-less [`prior`](@ref) takes. Each route reads the rows of [`shared_series_buffer`](@ref), which drops the observations of a Shared Series gap, as the data-less [`prior`](@ref) does:
 
   - A [`SampleBufferState`](@ref) is a refit, so the method answers the data form over the rows, the factor rows and the masks of the buffer.
   - The [`PriorCarryState`](@ref) of an [`EmpiricalPrior`](@ref) answers the location of `ce`. A `ce` that folds answers [`forecast_location`](@ref) of its state. A `ce` that does not fold answers the data form over the carried rows, as [`read_member`](@ref) refits it. The horizon arm reads the log-returns of the rows, and maps the location as the data form does.
@@ -508,29 +508,35 @@ function prior_state_location(::AbstractPriorEstimator, pr::AbstractPriorResult,
 end
 function prior_state_location(pe::AbstractPriorEstimator, pr::AbstractPriorResult,
                               state::SampleBufferState; kwargs...)
+    state = shared_series_buffer(state)
     return prior_forecast_location(pe, pr, sample_buffer(state), factor_buffer(state),
                                    nothing; sample_buffer_kwargs(state)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, Nothing},
                               ::AbstractPriorResult, state::PriorCarryState; kwargs...)
-    return carried_location(pe.ce, sample_buffer(state); kwargs...)
+    buf = shared_series_buffer(state.buf)
+    return carried_location(pe.ce, sample_buffer(buf), buffer_asset_panel(buf);
+                            implied_volatility_buffer_kwargs(buf)..., kwargs...)
 end
 function prior_state_location(pe::EmpiricalPrior{<:Any, <:Any, <:Number},
                               pr::AbstractPriorResult, state::PriorCarryState; kwargs...)
-    c = carried_location(pe.ce, log1p.(sample_buffer(state)); kwargs...)
+    buf = shared_series_buffer(state.buf)
+    c = carried_location(pe.ce, log1p.(sample_buffer(buf)), buffer_asset_panel(buf);
+                         implied_volatility_buffer_kwargs(buf)..., kwargs...)
     return horizon_location(c, pr, pe.horizon)
 end
 """
-    carried_location(ce, X::MatNum; kwargs...)
+    carried_location(ce, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
 
 Read the location of a covariance estimator that a fold-and-carry prior holds, out of its state or over the rows that the prior carries.
 
-This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.CovarianceEstimator` does not fold, and it is read as a [`GeneralCovariance`](@ref) over the rows, as `cov` reads it.
+This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.CovarianceEstimator` does not fold, and it is read as a [`GeneralCovariance`](@ref) over the rows, as `cov` reads it. The refit calls the panel form over `pnl`, as the data form of [`prior_forecast_location`](@ref) does over `rd.pnl`, so it answers a gapped sample and reads the active mask that the carried buffer records.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - `X`: The rows that the prior carries, `observations × assets`.
+  - `pnl`: The Asset Panel that [`buffer_asset_panel`](@ref) rebuilds from the carried buffer, or `nothing`.
   - `kwargs...`: Additional keyword arguments, passed to the refit alone.
 
 # Returns
@@ -542,11 +548,11 @@ This is [`read_member`](@ref) for [`forecast_location`](@ref). A `StatsBase.Cova
   - [`read_member`](@ref)
   - [`prior_state_location`](@ref)
 """
-function carried_location(ce, X::MatNum; kwargs...)
+function carried_location(ce, X::MatNum, pnl::Option{<:AssetPanel}; kwargs...)
     return if supports_partial_fit(ce)
         forecast_location(ce)
     else
-        forecast_location(library_covariance_estimator(ce), X; dims = 1, kwargs...)
+        forecast_location(library_covariance_estimator(ce), X, pnl; dims = 1, kwargs...)
     end
 end
 """
@@ -600,7 +606,7 @@ This is the data-less arm of [`forecast_location`](@ref), with one method per sh
 
   - A [`CovarianceState`](@ref) carries `mu`.
   - The two exponentially weighted states carry `location`.
-  - A [`SampleBufferState`](@ref) carries the rows and the masks that it folded. The method answers the data form of the estimator over them, because a buffer means the batch verb over its rows at every read-out.
+  - A [`SampleBufferState`](@ref) carries the rows, the masks and the implied volatilities that it folded. The method answers the data form of the estimator over them, because a buffer means the batch verb over its rows each time the estimate is made from the state.
   - A [`PortfolioOptimisersCovariance`](@ref) whose own `cache` is `nothing` forwards to the estimator that it holds, which carries the state.
 
 The first two methods return the vector of the state itself, and the next fold writes that vector in place. A caller that keeps the location across a fold must copy it, as [`covariance_forecast_evaluation`](@ref) does when it stores the forecasts.
@@ -624,7 +630,8 @@ function forecast_state_location(::Any,
     return state.location
 end
 function forecast_state_location(ce, state::SampleBufferState)
-    return forecast_location(ce, sample_buffer(state); sample_buffer_kwargs(state)...)
+    return forecast_location(ce, sample_buffer(state); sample_buffer_kwargs(state)...,
+                             implied_volatility_buffer_kwargs(state)...)
 end
 function forecast_state_location(ce::PortfolioOptimisersCovariance, ::Nothing)
     return forecast_location(ce.ce)
@@ -640,7 +647,7 @@ end
 
 Read the [`CoveragePolicy`](@ref) that decides the Asset Panel arm of [`forecast_location`](@ref), out of an estimator that may have no such field.
 
-[`coverage_policy`](@ref) answers for the two families that can carry a policy. Every other covariance estimator answers `nothing`, so the panel form reduces the window to the Coverage Universe, as the moment seam does for those estimators. A [`PortfolioOptimisersCovariance`](@ref) does not reach this verb, because its panel form forwards to the estimator that it holds.
+[`coverage_policy`](@ref) answers for the two families that can carry a policy. Every other covariance estimator answers `nothing`, so the panel form reduces the window to the Coverage Universe, as the Asset Panel method of `cov` does for those estimators. A [`PortfolioOptimisersCovariance`](@ref) does not reach this verb, because its panel form forwards to the estimator that it holds.
 
 # Related
 
@@ -713,9 +720,11 @@ Under [`RealisedCovariance`](@ref), ``L^{\\mathrm{QLIKE}}_t`` is ``-2`` times th
 
 ``L^{\\mathrm{P}}_t`` is the univariate QLIKE of the variance of the portfolio. It reads the per-row portfolio returns, whichever target formed ``\\mathbf{S}_t``.
 
+A step with no active asset has nothing to score: no asset has both a forecast and a realised return. That is valid input, for example a test window on a market holiday or a forecast still in its warm-up, so the kernel does not refuse it. It returns the step unscored, with `n_valid = 0` and every diagnostic `NaN`. The step keeps its place, so each step of an evaluation stays the step of its fold, and the summary and the comparison read the scored steps only.
+
 # Algorithm
 
- 1. Find the active subset `a`, the assets whose forecast variance and location are finite and which have at least one finite test return. Refuse an empty subset by name.
+ 1. Find the active subset `a`, the assets whose forecast variance and location are finite and which have at least one finite test return. For an empty subset, check the portfolios through [`resolve_forecast_weights`](@ref) and return the unscored step.
  2. Take the forecast on the active subset, giving `sa = sigma[a, a]`.
  3. Centre the test rows of `a` on `c[a]`, giving `Zc`. A non-finite cell stays non-finite.
  4. Form `(S, H)` through [`realised_target`](@ref), and the effective forecast `seff = H .* sa`.
@@ -737,12 +746,11 @@ Under [`RealisedCovariance`](@ref), ``L^{\\mathrm{QLIKE}}_t`` is ``-2`` times th
 # Validation
 
   - `sigma` is square and `Z`, `c` and every portfolio of `w` have its width. A `DimensionMismatch` is thrown otherwise.
-  - At least one asset is active: a finite forecast variance, a finite location, and a finite test return. An `ArgumentError` is thrown otherwise.
   - The forecast on the active subset is positive definite. A `LinearAlgebra.PosDefException` is thrown otherwise.
 
 # Returns
 
-  - `step::NamedTuple`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio.
+  - `step::NamedTuple`: The diagnostics of the step. `n_valid` is the count of active assets. `mahalanobis_ratio`, `qlike` and `frobenius` are scalars, `diagonal_ratio` is `assets × 1`, and `standardised_return` and `portfolio_qlike` hold one entry per portfolio. A step with no active asset is unscored: `n_valid` is `0` and every diagnostic is `NaN`.
 
 # Related
 
@@ -760,8 +768,14 @@ function covariance_forecast_step(sigma::MatNum, Z::MatNum, c::VecNum,
               DimensionMismatch("the forecast is $(size(sigma, 1)) × $(size(sigma, 2)), the test rows have $(size(Z, 2)) columns and the location $(length(c)) entries; all three must share one asset axis."))
     a = findall(isfinite.(LinearAlgebra.diag(sigma)) .& isfinite.(c) .&
                 vec(any(isfinite, Z; dims = 1)))
-    @argcheck(!isempty(a),
-              ArgumentError("no asset is active at this step: every asset has a non-finite forecast variance or location, or no finite test return, so there is nothing to score. Drop the step, or hand the kernel a forecast and test rows that share at least one active asset."))
+    if isempty(a)
+        ws = resolve_forecast_weights(w, a, sigma[a, a], N)
+        nan = float_if_integer(promote_type(real(eltype(sigma)), real(eltype(Z)),
+                                            real(eltype(c))))(NaN)
+        return (; n_valid = 0, mahalanobis_ratio = nan, diagonal_ratio = fill(nan, N),
+                qlike = nan, frobenius = nan, standardised_return = fill(nan, length(ws)),
+                portfolio_qlike = fill(nan, length(ws)))
+    end
     h = size(Z, 1)
     na = length(a)
     sa = sigma[a, a]
@@ -842,24 +856,24 @@ function resolve_forecast_weights(w::VecVecNum, a::VecInt, sa::MatNum, N::Intege
 end
 """
     partial_fit!(ce::AbstractCovarianceEstimator, rd::ReturnsResult)
-    partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
 
-Fold the observations of a carrier into a covariance estimator, or into a prior.
+Fold the observations of the returns data `rd` into a covariance estimator.
 
-This is the carrier arity that [`online_folds`](@ref), the online arm of the fold loop, calls for the two kinds of estimator that [`covariance_forecast_evaluation`](@ref) threads through it. A prior folds through [`fold_prior`](@ref), the same forward that the step of an optimiser makes. A covariance estimator folds `rd.X` in its own arity. When the Asset Panel varies in time, the method reads its active mask through [`step_active_mask`](@ref) and passes it as the `active_mask` keyword. That verb also refuses a mask that the step cannot carry.
+This is the `ReturnsResult` arity that [`online_folds`](@ref), the online arm of the fold loop, calls for the two kinds of estimator that [`covariance_forecast_evaluation`](@ref) threads through it. A prior has a `ReturnsResult` arity of its own, [`partial_fit!`](@ref) over a `ReturnsResult`, which is the fold of every prior and the forward that the step of an optimiser makes. A covariance estimator folds `rd.X` in its own arity. When the Asset Panel varies in time, the method reads its active mask through [`step_active_mask`](@ref) and passes it as the `active_mask` keyword. That verb also refuses a mask that the step cannot carry.
+
+An estimator that carries a [`SampleBufferState`](@ref) also takes `rd.iv` and `rd.ivpa`, and the buffer records them beside the rows. The call with no data gives them back to the batch verb, so a buffered [`ImpliedVolatility`](@ref) answers what a batch fit over the same rows answers. An exact fold keeps numbers alone, and no exact fold reads an implied volatility, so it does not take them. The batch fit of such an estimator ignores them too.
 
 # Algorithm
 
- 1. For a prior, return [`fold_prior`](@ref)`(pe, rd)`. The steps below are for a covariance estimator.
- 2. Check that `rd.X` is not `nothing`.
- 3. Read the active mask of the step through [`step_active_mask`](@ref), giving `amsk`.
- 4. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`.
+ 1. Check that `rd.X` is not `nothing`.
+ 2. Read the active mask of the step through [`step_active_mask`](@ref), giving `amsk`.
+ 3. Read the implied-volatility keywords of the state through [`step_implied_volatility_kwargs`](@ref).
+ 4. Fold `rd.X` into `ce` through `partial_fit!(ce, rd.X)`, with `active_mask = amsk` when `amsk` is not `nothing`, and with the keywords of step 3.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - $(arg_dict[:pe])
-  - `rd`: The carrier of the observations to fold, `observations × assets`.
+  - `rd`: The returns data to fold, `observations × assets`.
 
 # Validation
 
@@ -868,26 +882,56 @@ This is the carrier arity that [`online_folds`](@ref), the online arm of the fol
 
 # Returns
 
-  - `est`: The estimator, with the observations folded into its state.
+  - `ce`: The estimator, with the observations folded into its state.
 
 # Related
 
-  - [`fold_prior`](@ref)
   - [`step_active_mask`](@ref)
+  - [`step_implied_volatility_kwargs`](@ref)
   - [`online_folds`](@ref)
   - [`covariance_forecast_evaluation`](@ref)
 """
 function partial_fit!(ce::AbstractCovarianceEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     amsk = step_active_mask(rd)
+    # The first fold meets `nothing`, so the state is read without the refusal of
+    # `partial_fit_cache`.
+    cache = hasfield(typeof(ce), :cache) ? getfield(ce, :cache) : nothing
+    vols = step_implied_volatility_kwargs(cache, rd)
     return if isnothing(amsk)
-        partial_fit!(ce, rd.X)
+        partial_fit!(ce, rd.X; vols...)
     else
-        partial_fit!(ce, rd.X; active_mask = amsk)
+        partial_fit!(ce, rd.X; active_mask = amsk, vols...)
     end
 end
-function partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
-    return fold_prior(pe, rd)
+"""
+    step_implied_volatility_kwargs(state::SampleBufferState, rd::ReturnsResult)
+    step_implied_volatility_kwargs(state, rd::ReturnsResult)
+
+Give the implied volatilities of a step to the state that records them, as keywords of [`partial_fit!`](@ref).
+
+A [`SampleBufferState`](@ref) records `iv` and `ivpa` beside its rows, so it takes `rd.iv` and `rd.ivpa`. Any other state is an exact fold, which keeps numbers alone, and it takes nothing. The type of the state selects the method.
+
+# Arguments
+
+  - `state`: The state that the estimator carries.
+  - `rd`: The returns data of the step.
+
+# Returns
+
+  - `kwargs::NamedTuple`: `iv` and `ivpa` for a buffer, or an empty `NamedTuple`.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`implied_volatility_buffer_kwargs`](@ref)
+  - [`ImpliedVolatility`](@ref)
+"""
+function step_implied_volatility_kwargs(::SampleBufferState, rd::ReturnsResult)
+    return (; iv = rd.iv, ivpa = rd.ivpa)
+end
+function step_implied_volatility_kwargs(::Any, ::ReturnsResult)
+    return (;)
 end
 """
     is_time_dependent(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online})
@@ -954,7 +998,7 @@ These are the two arms of the callback of [`covariance_forecast_evaluation`](@re
 
 # Algorithm
 
- 1. With a training window, take the view of the carrier on its rows, giving `rdt`. Fit a covariance estimator through the Asset Panel seam of the moment verbs, `cov(ce, rdt.X, rdt.pnl)` and [`forecast_location`](@ref)`(ce, rdt.X, rdt.pnl)`. Fit a prior once over the view, giving `pr`.
+ 1. With a training window, take the view of `rd` on its rows, giving `rdt`. Fit a covariance estimator through the Asset Panel methods of the moment verbs, `cov(ce, rdt.X, rdt.pnl)` and [`forecast_location`](@ref)`(ce, rdt.X, rdt.pnl)`. Both calls take `iv = rdt.iv` and `ivpa = rdt.ivpa`, as [`prior`](@ref) gives them to its members, so an [`ImpliedVolatility`](@ref) reads its surface and every other estimator ignores it. Fit a prior once over the view, giving `pr`.
  2. With `nothing`, read `cov(ce)` and `forecast_location(ce)` out of the state of a covariance estimator, or `pr = prior(pe)` out of the state of a prior.
  3. Return the forecast and the location. For a prior they are `pr.sigma` and [`prior_forecast_location`](@ref) of `pr`, which reads the centre of `pr.sigma` without a second fit.
 
@@ -962,7 +1006,7 @@ These are the two arms of the callback of [`covariance_forecast_evaluation`](@re
 
   - $(arg_dict[:ce])
   - $(arg_dict[:pe])
-  - `rd`: The carrier.
+  - `rd`: The returns data.
   - `train_idx`: The fold's training window, or `nothing` for a stepped estimator.
 
 # Returns
@@ -980,8 +1024,8 @@ These are the two arms of the callback of [`covariance_forecast_evaluation`](@re
 function forecast_moments(ce::AbstractCovarianceEstimator, rd::ReturnsResult,
                           train_idx::VecInt)
     rdt = port_opt_view(rd, train_idx, :)
-    return Statistics.cov(ce, rdt.X, rdt.pnl; dims = 1),
-           forecast_location(ce, rdt.X, rdt.pnl; dims = 1)
+    return Statistics.cov(ce, rdt.X, rdt.pnl; dims = 1, iv = rdt.iv, ivpa = rdt.ivpa),
+           forecast_location(ce, rdt.X, rdt.pnl; dims = 1, iv = rdt.iv, ivpa = rdt.ivpa)
 end
 function forecast_moments(ce::AbstractCovarianceEstimator, ::ReturnsResult, ::Nothing)
     return Statistics.cov(ce), forecast_location(ce)
@@ -1009,11 +1053,11 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CovarianceForecastEvaluationResult(
-        dates, test_idx, horizon, target, n_valid, mahalanobis_ratio, diagonal_ratio,
+        dates, test_idx, horizon, target, x_src, n_valid, mahalanobis_ratio, diagonal_ratio,
         qlike, frobenius, standardised_return, portfolio_qlike, w, sigma, location
     ) -> CovarianceForecastEvaluationResult
 
-The arguments correspond to the fields of the struct, in the order of their declaration. The type is a Result, which [`covariance_forecast_evaluation`](@ref) builds and a caller reads. It has no keyword constructor, and it validates nothing of its own.
+The arguments correspond to the fields of the struct, in the order of their declaration. The type is a Result, which [`covariance_forecast_evaluation`](@ref) builds and a caller reads. It has no keyword constructor, and it validates nothing of its own. The bound of `x_src` admits an [`AbstractReturnsSource`](@ref) alone, so a positional `Bool` builds no Result.
 
 # Related
 
@@ -1025,7 +1069,7 @@ The arguments correspond to the fields of the struct, in the order of their decl
 """
 @concrete struct CovarianceForecastEvaluationResult <: AbstractResult
     """
-    Label of each step, one entry per step. It is the timestamp of the first test row of the step when the carrier holds timestamps, and the index of that row otherwise.
+    Label of each step, one entry per step. It is the timestamp of the first test row of the step when the returns data holds timestamps, and the index of that row otherwise.
     """
     dates
     """
@@ -1041,7 +1085,11 @@ The arguments correspond to the fields of the struct, in the order of their decl
     """
     target
     """
-    Number of active assets at each step, one entry per step. An active asset has a finite forecast variance, a finite location and at least one finite test return.
+    $(field_dict[:x_src_cfer])
+    """
+    x_src <: AbstractReturnsSource
+    """
+    Number of active assets at each step, one entry per step. An active asset has a finite forecast variance, a finite location and at least one finite test return. A step with no active asset is unscored: its count is `0` and every diagnostic of the step is `NaN`.
     """
     n_valid
     """
@@ -1085,7 +1133,8 @@ end
     covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator, <:AbstractPriorEstimator, <:Online},
                                    rd::ReturnsResult, cv::WFCVER; w::Option{<:VecNum_VecVecNum} = nothing,
                                    target::AbstractRealisedTarget = RealisedCovariance(),
-                                   store_forecasts::Bool = false) -> CovarianceForecastEvaluationResult
+                                   store_forecasts::Bool = false,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing) -> CovarianceForecastEvaluationResult
 
 Evaluate a covariance forecast out of sample over a walk-forward, in batch or online.
 
@@ -1098,16 +1147,19 @@ The verb runs through the one fold loop of the library. At each fold the callbac
 
 The verb reads none of these settings. So the online run gives the rows of the batch expanding run fold for fold, to the tolerance of the estimator's own fold. The date form, the purge, and a listing or a delisting need no code of their own.
 
-The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses, by name, an estimator that enters with a state or that cannot fold. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each read-out is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
+The verb is the outermost reader of the returns in the evaluation, because no estimator in the call receives the returns data of its own. So the verb states the source with `x_src`, and the estimator states none. With `x_src = ExcessSource()` the verb evaluates a forecast of the returns in excess of the benchmark, `X - B`, which is the covariance that a tracking-error portfolio reads. Every reader of the returns in the evaluation reads this one frame: the fit over a training window, the online step, and the test rows. So the verb gives the fold loop the returns data of [`prior_step_returns`](@ref), which holds `X - B` in `X` and keeps `B` and every other field. A vector `B` is one benchmark, which [`benchmark_relative_returns`](@ref) subtracts from every asset. A matrix `B` holds one benchmark per asset. An [`ImpliedVolatility`](@ref) estimator reads the surface `iv` of the assets beside `X - B`, as a prior in the Excess Frame does, because the returns data holds no surface of the excess returns. Under [`ExcessSource`](@ref) a gap in a vector `B` leaves no asset an excess return at its observation, so the verb drops that observation from the returns data before it splits the folds, with [`shared_series_view`](@ref), as every fit drops it. The Result records the frame that the verb read: [`DataSource`](@ref) for `x_src = nothing`, so two evaluations of one frame hold one value.
+
+The loop receives the estimator as a configuration only. Under an Online Scheme it warms up one estimator on the first training window and folds the new rows of each fold into it. So the loop refuses an estimator that enters with a state or that cannot fold, with an error that names it. An estimator that cannot fold but has a `cache` field can be wrapped in [`Online`](@ref), which folds it from a buffer. Each estimate made from the state is then a batch fit over the rows of the buffer. An estimator with no `cache` field has nowhere to carry a buffer, and `Online` refuses it.
 
 # Algorithm
 
- 1. Check `rd.X`, and check that an [`Online`](@ref) at the root comes with an Online Scheme.
- 2. Split the carrier by `cv`, giving `train_idx` and `test_idx`, and check that the folds are not shuffled.
- 3. Run [`fold_loop`](@ref) over the `n` folds, giving `steps`. At each fold, read `(sigma, c)` through [`forecast_moments`](@ref) and score the test rows through [`covariance_forecast_step`](@ref). When `store_forecasts = true`, add copies of `sigma` and `c` to the step record, because an online state writes its location in place.
- 4. Stack the diagonal ratios, the standardised returns and the portfolio QLIKE losses of the steps into the matrices `d`, `b` and `pq`, one row per step.
- 5. Label each step with the timestamp of its first test row, or with the index of that row when `rd.ts` is `nothing`, giving `dates`.
- 6. Build the Result from the columns, the horizons `length.(test_idx)`, `target` and `w`.
+ 1. Check `x_src` and the source of `est`, check `rd.X`, and check that an [`Online`](@ref) at the root comes with an Online Scheme.
+ 2. Take the returns data that every reader reads, `prior_step_returns(rd, x_src)`, giving `rdb`. It is `rd` unless `x_src` is [`ExcessSource`](@ref).
+ 3. Split `rdb` by `cv`, giving `train_idx` and `test_idx`, and check that the folds are not shuffled.
+ 4. Run [`fold_loop`](@ref) over the `n` folds of `rdb`, giving `steps`. At each fold, read `(sigma, c)` through [`forecast_moments`](@ref) and score the test rows through [`covariance_forecast_step`](@ref). When `store_forecasts = true`, add copies of `sigma` and `c` to the step record, because an online state writes its location in place.
+ 5. Stack the diagonal ratios, the standardised returns and the portfolio QLIKE losses of the steps into the matrices `d`, `b` and `pq`, one row per step.
+ 6. Label each step with the timestamp of its first test row, or with the index of that row when `rd.ts` is `nothing`, giving `dates`.
+ 7. Build the Result from the columns, the horizons `length.(test_idx)`, `target`, the frame that the verb read and `w`. The frame is `x_src`, or [`DataSource`](@ref) when `x_src` is `nothing`.
 
 # Arguments
 
@@ -1117,10 +1169,14 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
   - `w`: The test portfolios on the full universe. `nothing` means inverse volatility recomputed from the forecast of each step, a vector is one static portfolio, and a vector of vectors is several.
   - `target`: The realised quantity that the evaluation judges the forecasts against.
   - `store_forecasts`: Whether to keep the forecast and the location of every step in the Result, for [`covariance_forecast_portfolio`](@ref).
+  - $(arg_dict[:x_src_cfe])
 
 # Validation
 
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The source of `est` is `nothing`, because the verb picks the returns that it reads, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise. A prior at `x_src = ExcessSource()` would subtract `B` from the returns that the verb already holds in the Excess Frame.
   - `rd.X` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - The rules of [`benchmark_relative_returns`](@ref).
   - The folds of the scheme are not shuffled, through [`assert_unshuffled_folds`](@ref). An `ArgumentError` is thrown otherwise.
   - An [`Online`](@ref) at the root comes with an Online Scheme. An `ArgumentError` is thrown otherwise, because a batch fold would never seed the buffer.
   - Everything that [`covariance_forecast_step`](@ref) refuses at a step, and everything that the online arm of the fold loop refuses at entry under an Online Scheme.
@@ -1137,6 +1193,7 @@ The loop receives the estimator as a configuration only. Under an Online Scheme 
   - [`covariance_forecast_compare`](@ref)
   - [`covariance_forecast_portfolio`](@ref)
   - [`forecast_location`](@ref)
+  - [`benchmark_relative_returns`](@ref)
   - [`IndexWalkForward`](@ref)
   - [`DateWalkForward`](@ref)
   - [`OnlineIndexWalkForward`](@ref)
@@ -1148,15 +1205,24 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
                                         rd::ReturnsResult, cv::WFCVER;
                                         w::Option{<:VecNum_VecVecNum} = nothing,
                                         target::AbstractRealisedTarget = RealisedCovariance(),
-                                        store_forecasts::Bool = false)
+                                        store_forecasts::Bool = false,
+                                        x_src::Option{<:AbstractReturnsSource} = nothing)
+    assert_returns_source(x_src, DATA_RETURNS_SOURCES, :covariance_forecast_evaluation)
+    assert_inner_reader(est, :est, :covariance_forecast_evaluation)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     @argcheck(!isa(est, Online) || folds_are_stepped(cv),
               ArgumentError("`Online($(typeof(est.est).name.name))` declares a refit from a sample buffer, which only the fold loop's online arm seeds and threads, and this scheme is not an Online Scheme, so every fold would refit the estimator from its training window and the buffer would never exist. Run the evaluation under `OnlineIndexWalkForward` or `OnlineDateWalkForward`, or hand it the estimator unwrapped."))
-    cv_res = split(cv, rd)
+    # Every reader of the evaluation reads the frame of `x_src`, so under `ExcessSource()` the
+    # fold loop folds and scores `X - B`, and the estimator, an inner reader, reads it as given.
+    # A gap in a vector benchmark drops its observation before the split, as every fit drops
+    # it, and every later read of `rd`, the dates included, reads the kept observations.
+    rd = shared_series_view(rd, x_src, false)
+    rdb = prior_step_returns(rd, x_src)
+    cv_res = split(cv, rdb)
     (; train_idx, test_idx) = cv_res
     assert_unshuffled_folds(cv, train_idx)
     n = length(train_idx)
-    steps, _ = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rd,
+    steps, _ = fold_loop(est, n, FLoops.SequentialEx(), NamedTuple; rd = rdb,
                          train_idx = train_idx, test_idx = test_idx, cv = cv) do fold
         sigma, c = forecast_moments(fold.est, fold.rd, fold.train)
         step = covariance_forecast_step(sigma, view(fold.rd.X, fold.test, :), c, w, target)
@@ -1178,6 +1244,7 @@ function covariance_forecast_evaluation(est::Union{<:AbstractCovarianceEstimator
     dates = isnothing(rd.ts) ? firsts : rd.ts[firsts]
     return CovarianceForecastEvaluationResult(dates, test_idx,
                                               [length(t) for t in test_idx], target,
+                                              something(x_src, DataSource()),
                                               [s.n_valid for s in steps],
                                               [s.mahalanobis_ratio for s in steps], d,
                                               [s.qlike for s in steps],

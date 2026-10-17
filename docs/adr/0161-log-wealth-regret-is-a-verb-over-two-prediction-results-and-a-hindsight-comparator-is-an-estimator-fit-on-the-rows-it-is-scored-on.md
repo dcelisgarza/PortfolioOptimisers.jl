@@ -170,7 +170,7 @@ One docs ticket ships after the last build and blocks the map's verification tic
 
 ## Consequences
 
-- `CONTEXT.md` gains *Log-Wealth Regret* and *Hindsight Comparator*; the §4.1 roster names
+- `GLOSSARY.md` gains *Log-Wealth Regret* and *Hindsight Comparator*; the §4.1 roster names
   `BestConstantRebalancedPortfolio` as the naive head beside the family.
 - The evaluation-surface build ticket owes `log_wealth_regret`, `LogWealthRegretResult`,
   `BestConstantRebalancedPortfolio` with a parity test against `MeanRisk` under
@@ -179,3 +179,23 @@ One docs ticket ships after the last build and blocks the map's verification tic
 - The docs ticket owes the chapter, the example, the catalogue rows and the API pages, and blocks
   the map's verification ticket.
 - The map's decisions are complete: every build ticket can now be specified.
+
+## Amendment (2026-10-13)
+
+Issue #1664 found that no score read the benchmark of a prediction. Each fold keeps the benchmark
+of its test rows as one series in `pred.rd.B`, and a multi-period result stacks it in `mrd.B`, in
+batch and online. To compare a walk-forward against that benchmark, a caller had to build a second
+prediction result by hand.
+
+`log_wealth_regret(a; lags = 0)` is a second method of the verb. Its comparator is the benchmark of
+`a`'s own rows, which `regret_benchmark` reads: a vector `B` as it was given, and a matrix `B`
+collapsed by each fold's weights, as `collapse_benchmark` states. A population reads its first
+series, as `regret_series` reads its first path. The method refuses a prediction result with no
+benchmark. The benchmark holds no weights, so `path_length` is `NaN`. It pays no fee, so the
+regret against it is the negated excess log wealth of the strategy net of its fees. Both methods
+form the result through one helper, `series_regret`, so they cannot drift.
+
+The decision "No scorer and no summary column ship" holds. The maintainer chose to take scorers
+against the benchmark (the excess log wealth, the information ratio and the tracking error out of
+sample) to a later enhancement, #1686. The summary of a prediction now reads the same benchmark
+by default (ADR 0165, amendment of 2026-10-13).

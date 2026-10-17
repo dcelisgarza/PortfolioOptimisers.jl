@@ -290,18 +290,18 @@ $(DocStringExtensions.FIELDS)
         wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
         fb::TDO_Option{<:OptE_Opt} = nothing,
         sq::Bool = false,
-        brt::Bool = false,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing
     ) -> InverseVolatility
 
-Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) per-fold schedule in place of a static value. The prior estimator, the weight bounds, the fees, the asset sets, the weight finaliser and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. A fold-less `optimise` sets each of them to its static default. `sq`, `brt` and `strict` control the run and stay static. The result carries `fees`, and a walk-forward fold charges it. A turnover fee reads the previous weights that the loop writes through [`factory`](@ref).
+Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Option`](@ref) or [`TDO_Option`](@ref) can hold a [`TimeDependent`](@ref) per-fold schedule in place of a static value. The prior estimator, the weight bounds, the fees, the asset sets, the weight finaliser and the fallback define the problem, so a cross-validation fold loop resolves them for each fold. A fold-less `optimise` sets each of them to its static default. `sq` and `strict` control the run and stay static. The result carries `fees`, and a walk-forward fold charges it. A turnover fee reads the previous weights that the loop writes through [`factory`](@ref).
 
 ## Validation
 
   - If `wb` is a [`WeightBoundsEstimator`](@ref): `!isnothing(sets)`.
   - If `fees` is a [`FeesEstimator`](@ref): `!isnothing(sets)`.
   - `fb` schedules: `bind !== :nearest`.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -346,7 +346,8 @@ InverseVolatility
          │           me ┼ SimpleExpectedReturns
          │              │   w ┴ nothing
          │      horizon ┼ nothing
-         │   fill_limit ┴ nothing
+         │   fill_limit ┼ nothing
+         │        x_src ┴ nothing
       wb ┼ WeightBounds
          │   lb ┼ Float64: 0.0
          │   ub ┴ Float64: 1.0
@@ -356,7 +357,6 @@ InverseVolatility
          │   iter ┴ Int64: 100
       fb ┼ nothing
       sq ┼ Bool: false
-     brt ┼ Bool: false
   strict ┴ Bool: false
 ```
 
@@ -404,10 +404,6 @@ InverseVolatility
     """
     sq
     """
-    $(field_dict[:brt])
-    """
-    brt
-    """
     $(field_dict[:strict_opt])
     """
     strict
@@ -418,8 +414,8 @@ InverseVolatility
     function InverseVolatility(pe::Onl{<:TD{<:PrE_Pr}}, wb::TD_Option{<:WbE_Wb},
                                fees::TD_Option{<:FeesE_Fees},
                                sets::TD_Option{<:UniverseSets}, wf::TD{<:WeightFinaliser},
-                               fb::TDO_Option{<:OptE_Opt}, sq::Bool, brt::Bool,
-                               strict::Bool, cache::Option{<:ReturnsBufferState})
+                               fb::TDO_Option{<:OptE_Opt}, sq::Bool, strict::Bool,
+                               cache::Option{<:ReturnsBufferState})
         assert_no_nearest_bind_optimiser_schedule(fb, :fb, :InverseVolatility)
         if isa(wb, WeightBoundsEstimator)
             @argcheck(!isnothing(sets),
@@ -430,20 +426,15 @@ InverseVolatility
                       IsNothingError("sets cannot be nothing when fees is a FeesEstimator"))
         end
         assert_time_dependent_substitution(InverseVolatility,
-                                           (; pe, wb, fees, sets, wf, fb, sq, brt, strict),
+                                           (; pe, wb, fees, sets, wf, fb, sq, strict),
                                            merge(naive_optimiser_td_defaults(),
                                                  (; pe = EmpiricalPrior())))
-        return new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(wf),
-                   typeof(fb), typeof(sq), typeof(brt), typeof(strict), typeof(cache)}(pe,
-                                                                                       wb,
-                                                                                       fees,
-                                                                                       sets,
-                                                                                       wf,
-                                                                                       fb,
-                                                                                       sq,
-                                                                                       brt,
-                                                                                       strict,
-                                                                                       cache)
+        est = new{typeof(pe), typeof(wb), typeof(fees), typeof(sets), typeof(wf),
+                  typeof(fb), typeof(sq), typeof(strict), typeof(cache)}(pe, wb, fees, sets,
+                                                                         wf, fb, sq, strict,
+                                                                         cache)
+        warn_raw_readers(est)
+        return est
     end
 end
 function InverseVolatility(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
@@ -452,9 +443,31 @@ function InverseVolatility(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(),
                            sets::TD_Option{<:UniverseSets} = nothing,
                            wf::TD{<:WeightFinaliser} = IterativeWeightFinaliser(),
                            fb::TDO_Option{<:OptE_Opt} = nothing, sq::Bool = false,
-                           brt::Bool = false, strict::Bool = false,
+                           strict::Bool = false,
                            cache::Option{<:ReturnsBufferState} = nothing)::InverseVolatility
-    return InverseVolatility(pe, wb, fees, sets, wf, fb, sq, brt, strict, cache)
+    return InverseVolatility(pe, wb, fees, sets, wf, fb, sq, strict, cache)
+end
+"""
+    group_frames(iv::InverseVolatility) -> ReturnsFrames
+
+Walk the readers of an [`InverseVolatility`](@ref) head, for the warning of a forgotten raw reader and the gap rule of the head. The only reader of the head is its prior `pe`. [`field_frames`](@ref) walks every field, and the walk stops at the fallback.
+
+# Arguments
+
+  - `iv`: The head.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the group of `iv`.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+  - [`group_source`](@ref)
+"""
+function group_frames(iv::InverseVolatility)
+    return field_frames(iv, "", refits_regression(iv.pe))
 end
 function non_investable_universe(iv::InverseVolatility, ni::VecStr)::InverseVolatility
     return rebuild_estimator(iv, (; sets = non_investable_sets(iv.sets, ni)))
@@ -491,15 +504,14 @@ Run the inverse volatility portfolio optimisation.
 # Algorithm
 
  1. Set every [`TimeDependent`](@ref) field of `iv` to its static default, with [`reset_time_dependent_estimator`](@ref).
- 2. Replace `rd` with its returns in excess of the benchmark when `iv.brt` is `true`, with `returns_result_picker`.
- 3. Fit the prior `pr` with `iv.pe` on `rd`.
- 4. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
- 5. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
- 6. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
- 7. Divide `w` by its sum.
- 8. Resolve the weight bounds `wb` over the reduced assets.
- 9. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
-10. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
+ 2. Fit the prior `pr` with `iv.pe` on `rd`. The prior reads the returns in the frame that its own `x_src` states. `rd` keeps its raw returns.
+ 3. Resolve the fee on the full universe of `rd`, and view it on the Investable Mask of `pr`, giving `fees`.
+ 4. Reduce `pr`, `iv` and `rd` to the Investable Mask with [`investable_reduction`](@ref), giving the mask `imsk`.
+ 5. Read the variances off the diagonal of `pr.sigma`, and take their inverse square roots, or their inverses when `iv.sq` is `true`, giving `w`.
+ 6. Divide `w` by its sum.
+ 7. Resolve the weight bounds `wb` over the reduced assets.
+ 8. Impose `wb` on `w` with the weight finaliser `iv.wf`, giving `retcode` and `w`.
+ 9. Build the [`NaiveOptimisationResult`](@ref), which expands `w` onto the full universe.
 
 # Related
 
@@ -510,14 +522,13 @@ Run the inverse volatility portfolio optimisation.
 """
 function _optimise(iv::InverseVolatility, rd::ReturnsResult = ReturnsResult(); kwargs...)
     iv = reset_time_dependent_estimator(iv)
-    rd = returns_result_picker(rd, iv.brt)
     pr = prior(iv.pe, rd)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
     Tf = float_if_integer(eltype(pr.X))
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
-    # for the reason the hierarchical heads do; `investable_fees_view` then places it on
-    # the axes the mask leaves.
+    # Resolve the fee on the caller's own universe, before `investable_reduction` below
+    # narrows `sets`, for the reason the hierarchical heads do; `investable_fees_view` then
+    # places it on the axes the mask leaves.
     fees = investable_fees_view(fees_constraints(iv.fees, iv.sets; strict = iv.strict,
                                                  datatype = Tf), investable_mask(pr),
                                 size(pr.X, 2))
@@ -556,7 +567,7 @@ Run the inverse volatility portfolio optimisation.
 function optimise(iv::InverseVolatility{<:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; kwargs...)::NaiveOptimisationResult
     assert_batch_entry(iv, "`optimise`")
-    return _optimise(iv, rd; kwargs...)
+    return shared_series_solve(iv, rd; kwargs...)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -737,8 +748,8 @@ Run the equal-weighted portfolio optimisation.
 function _optimise(ew::EqualWeighted, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     ew = reset_time_dependent_estimator(ew)
-    # The fee is resolved on the caller's own universe before the door below narrows
-    # `sets`, and placed on the axes the mask leaves after it.
+    # The fee is resolved on the caller's own universe before `coverage_reduction` below
+    # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
@@ -1004,8 +1015,8 @@ function _optimise(rw::RandomWeighted, rd::ReturnsResult; kwargs...)
         @argcheck(length(rw.alpha) == Nf,
                   DimensionMismatch("rw.alpha ($(length(rw.alpha))) must match N ($Nf)"))
     end
-    # The fee is resolved on the caller's own universe before the door below narrows
-    # `sets`, and placed on the axes the mask leaves after it.
+    # The fee is resolved on the caller's own universe before `coverage_reduction` below
+    # narrows `sets`, and placed on the axes the mask leaves after it.
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
     Tf = float_if_integer(eltype(rd.X))
@@ -1347,8 +1358,8 @@ Run the best constant rebalanced portfolio optimisation.
 function _optimise(bcrp::BestConstantRebalancedPortfolio, rd::ReturnsResult; kwargs...)
     @argcheck(!isnothing(rd.X), IsNothingError("rd.X cannot be nothing"))
     bcrp = reset_time_dependent_estimator(bcrp)
-    # The fee is resolved on the caller's own universe before the door below narrows
-    # `sets`, and placed on the axes the mask leaves after it.
+    # The fee is resolved on the caller's own universe before `coverage_reduction` below
+    # narrows `sets`, and placed on the axes the mask leaves after it.
     Nf = size(rd.X, 2)
     # A weight, a bound and a fee hold fractions and infinities, so an integer sample takes
     # a float type for them, and every other sample keeps its own type.
@@ -1408,6 +1419,8 @@ Its main use is as the fallback `fb` of an optimiser inside a walk-forward. A fa
 A view to an asset subset, such as a cluster of [`NestedClustered`](@ref) or the asset subset of a [`MultipleRandomised`](@ref) fold, slices `w` to the subset. The head holds that slice as it is, and does not rescale it to the budget of the subset.
 
 The constructor refuses a `w` with a non-finite entry. A fit with `w = nothing` gives an [`OptimisationFailure`](@ref). Fold 1 of a walk-forward and a fold-less `optimise` with no `w` meet that case. [`needs_previous_weights`](@ref) is `true`, so an optimiser that carries the head as a fallback runs its folds in sequence, and the loop writes the previous weights into it.
+
+The online step of the head folds the rows into its fallback, and `optimise(pw)` with no data reads that fallback out when `w` is `nothing`. So the fallback answers from the rows that it reads in batch, also when the head is itself the fallback of an [`OnlinePortfolioSelection`](@ref) head, see [`step_fallback`](@ref).
 
 # Fields
 

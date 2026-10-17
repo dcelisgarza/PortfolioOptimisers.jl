@@ -13,6 +13,7 @@ reduced_factor_count
 raw_to_reduced_index
 family_retained_indices
 factor_basis_slice
+append_passthrough_factors
 dropped_factor_names
 weighted_family_exposures
 resolve_dropped_member

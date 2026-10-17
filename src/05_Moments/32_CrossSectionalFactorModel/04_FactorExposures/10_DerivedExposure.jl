@@ -58,7 +58,7 @@ DerivedExposure
     """
     source
     """
-    Function applied to the source Factor Exposure. It takes an `observations × assets` matrix and returns one of the same size.
+    Function applied to the source Factor Exposure. It takes an `observations × assets` matrix and returns one of the same size. Each row of the result must depend on the same row of the source alone, because [`lookback`](@ref) counts one row for the member.
     """
     f
     """
@@ -107,13 +107,13 @@ function DerivedExposure(; source::AbstractString, f,
 end
 """
     factor_exposure(xe::DerivedExposure, rd::ReturnsResult) -> Union{}
-    factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum) -> Matrix
+    factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum; strict::Bool = false) -> Matrix
 
 Compute the Factor Exposure derived from the Factor Exposure of another factor.
 
 # Algorithm
 
- 1. Read the benchmark weights and the group labels off the carrier.
+ 1. Read the benchmark weights with [`exposure_benchmark_weights`](@ref), and the group labels, off the `ReturnsResult`.
  2. Apply `f` to the source exposure, and check that it kept the shape.
  3. Apply the outlier slot and then the scoring slot.
  4. Write `NaN` into every cell where the active mask is `false`, with [`exposure_active_fill!`](@ref), so the verb's convention holds whatever `f` returned there.
@@ -123,9 +123,11 @@ Compute the Factor Exposure derived from the Factor Exposure of another factor.
   - `xe`: Derived Exposure Estimator.
   - $(arg_dict[:rd]) It must carry an Asset Panel in `rd.pnl`.
   - `xs`: Factor Exposure of the source factor, `observations × assets`.
+  - $(arg_dict[:strict_bw])
 
 # Validation
 
+  - The rules of [`exposure_benchmark_weights`](@ref) under `strict`.
   - `xs` is `observations × assets`. Raises a `DimensionMismatch`.
   - `f` returns a matrix of the size it was given. Raises a `DimensionMismatch`.
   - The two-argument method always raises an `ArgumentError`, because a derived exposure has no source to read.
@@ -159,10 +161,11 @@ julia> factor_exposure(xe, rd, [1.0 2.0; 3.0 4.0])
   - [`CompositeExposure`](@ref)
 """
 function factor_exposure(xe::DerivedExposure, ::ReturnsResult)
-    return throw(ArgumentError("a derived Factor Exposure is computed from the Factor Exposure of the factor \"$(xe.source)\", which it cannot read from the carrier. The caller that holds the factor list computes the factors in dependency order, and passes the source exposure to the three-argument method factor_exposure(xe, rd, xs)"))
+    return throw(ArgumentError("a derived Factor Exposure is computed from the Factor Exposure of the factor \"$(xe.source)\", which it cannot read from the ReturnsResult. The caller that holds the factor list computes the factors in dependency order, and passes the source exposure to the three-argument method factor_exposure(xe, rd, xs)"))
 end
-function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Matrix
-    w = exposure_benchmark_weights(rd, xe.bw)
+function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum;
+                         strict::Bool = false)::Matrix
+    w = exposure_benchmark_weights(rd, xe.bw; strict = strict)
     @argcheck(size(xs) == size(w),
               DimensionMismatch("the source Factor Exposure is observations × assets, like the Asset Panel it was computed on, got size(xs) = $(size(xs)) and $(size(w))"))
     groups = exposure_group_labels(rd, xe.group)
@@ -174,6 +177,9 @@ function factor_exposure(xe::DerivedExposure, rd::ReturnsResult, xs::MatNum)::Ma
     D = exposure_transform(xe.scoring, D, w, groups)
     exposure_active_fill!(D, rd.pnl)
     return D
+end
+function lookback(::DerivedExposure)::Integer
+    return 1
 end
 
 export DerivedExposure

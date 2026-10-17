@@ -260,7 +260,7 @@ Return the capabilities a component produces.
 # Notes
 
   - **This must be one method per concrete type, declared by its author**, not
-    a walk over the fields. The library's `CONTEXT.md` reaches the same
+    a walk over the fields. The library's `GLOSSARY.md` reaches the same
     conclusion for `deferred_slots`, and for the same reason: the presence of a
     field does not imply the semantics. A `SimpleVariance` inside a `Skewness`
     is a legitimate component, not a promise about what the outer type

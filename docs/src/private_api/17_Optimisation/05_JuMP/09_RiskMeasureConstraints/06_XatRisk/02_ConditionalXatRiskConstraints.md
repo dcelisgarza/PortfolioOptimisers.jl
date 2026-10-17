@@ -1,5 +1,5 @@
 ```@meta
-Description = "Conditional XatRisk Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!, set_conditional_risk_constraints!, …"
+Description = "Conditional XatRisk Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!, set_worst_loss_constraints!, …"
 ```
 
 # [Conditional XatRisk Constraints: private API](@id private-api-conditional-xatrisk-constraints)
@@ -11,6 +11,7 @@ set_risk_constraints!(model::JuMP.Model, i::Any, r::DistributionallyRobustCondit
 set_risk_constraints!(model::JuMP.Model, i::Any, r::DistributionallyRobustConditionalValueatRiskRange, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalDrawdownatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::DistributionallyRobustConditionalDrawdownatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+set_worst_loss_constraints!
 set_conditional_risk_constraints!
 set_dr_conditional_risk_constraints!
 ```

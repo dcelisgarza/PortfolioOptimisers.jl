@@ -1,7 +1,7 @@
 using PortfolioOptimisers
 using Documenter, DocumenterTools, DocumenterCitations, DocumenterCodeBlocks,
       DocumenterLandingPage, Literate, StatsPlots, GraphRecipes, Handcalcs, StatsBase,
-      Dates, JuMP, StatsAPI, Random
+      Dates, JuMP, StatsAPI, Random, DataFrames
 
 f = x -> !contains(string(x), r"#|^eval$|^include$")
 exported_symbols = filter!(f, names(PortfolioOptimisers))
@@ -314,8 +314,13 @@ makedocs(; modules = [PortfolioOptimisers], doctest = false,
 include(joinpath(@__DIR__, "generate_sitemap.jl"))
 generate_sitemap(joinpath(@__DIR__, "build"), CANONICAL_URL)
 
+# A pull request deploys a preview only when it carries the label `docs-preview`, which
+# `Docs.yml` passes as `DOCS_PREVIEW` (#1722). `versions` stays at its default: it shapes
+# only the version selector, and Documenter deletes no version from `gh-pages`. The cap on
+# the versions that `gh-pages` keeps is in `.github/workflows/DocPreviewCleanup.yml`.
 deploydocs(; repo = "github.com/dcelisgarza/PortfolioOptimisers.jl", target = "build",
-           devbranch = "main", branch = "gh-pages", push_preview = true)
+           devbranch = "main", branch = "gh-pages",
+           push_preview = get(ENV, "DOCS_PREVIEW", "false") == "true")
 
 # ---------------------------------------------------------------------------------------
 # Viewing the docs locally

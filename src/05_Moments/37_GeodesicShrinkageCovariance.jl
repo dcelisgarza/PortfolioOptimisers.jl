@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rules that build a covariance shrinkage target from the matrix being shrunk.
 
-Each rule builds a target from the table of Schäfer and Strimmer. The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. The target of the table with perfect positive correlation has rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds the diagonal target of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
+Each rule builds one of the targets of Table 2 of [schaferstrimmer2005](@cite). The target is positive definite when the matrix being shrunk is, so a geodesic reaches it. Target E of that table has perfect positive correlation and rank one, so no rule builds it. [`DiagonalTarget`](@ref) builds target D of the same table. It is a [`RegimeAdjustedTarget`](@ref), so it joins the rules through [`GeodesicShrinkageTarget`](@ref) and not through this type.
 
 # Interfaces
 
@@ -391,7 +391,8 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = Covariance(),
         pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         tgt::GeodesicShrinkageTarget = ScaledIdentityTarget(),
-        alpha::Number = 0.1
+        alpha::Number = 0.1,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> GeodesicShrinkageCovariance
 
 Keywords correspond to the struct's fields.
@@ -406,6 +407,7 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -413,6 +415,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce` recurses through [`port_opt_view`](@ref) with every argument.
   - The view slices a matrix `tgt` on both axes, because it is an asset-by-asset matrix. It keeps a target rule unchanged, because [`shrinkage_target`](@ref) builds the target of a rule from the viewed matrix.
+  - `cache` is sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -470,20 +473,52 @@ true
     Shrinkage intensity, the fraction of the geodesic from the matrix to the target that the estimate travels. `0` returns the matrix unchanged and `1` returns the target.
     """
     alpha
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop cache
     function GeodesicShrinkageCovariance(ce::StatsBase.CovarianceEstimator,
                                          pdm::Option{<:AbstractPosdefEstimator},
-                                         tgt::GeodesicShrinkageTarget, alpha::Number)
+                                         tgt::GeodesicShrinkageTarget, alpha::Number,
+                                         cache::Option{<:AbstractPartialFitState})
         assert_shrinkage_target(tgt)
         assert_closed_unit_interval(alpha, :alpha)
-        return new{typeof(ce), typeof(pdm), typeof(tgt), typeof(alpha)}(ce, pdm, tgt, alpha)
+        return new{typeof(ce), typeof(pdm), typeof(tgt), typeof(alpha), typeof(cache)}(ce,
+                                                                                       pdm,
+                                                                                       tgt,
+                                                                                       alpha,
+                                                                                       cache)
     end
 end
 function GeodesicShrinkageCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
                                      pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
                                      tgt::GeodesicShrinkageTarget = ScaledIdentityTarget(),
-                                     alpha::Number = 0.1)::GeodesicShrinkageCovariance
-    return GeodesicShrinkageCovariance(ce, pdm, tgt, alpha)
+                                     alpha::Number = 0.1,
+                                     cache::Option{<:AbstractPartialFitState} = nothing)::GeodesicShrinkageCovariance
+    return GeodesicShrinkageCovariance(ce, pdm, tgt, alpha, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`GeodesicShrinkageCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:GeodesicShrinkageCovariance, true)` to render it.
+
+# Arguments
+
+  - `::GeodesicShrinkageCovariance`: Geodesic shrinkage covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ce, :pdm, :tgt, :alpha)`.
+
+# Related
+
+  - [`GeodesicShrinkageCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::GeodesicShrinkageCovariance) = (:ce, :pdm, :tgt, :alpha)
 """
     port_opt_view(ce::GeodesicShrinkageCovariance, i, args...) -> GeodesicShrinkageCovariance
 
@@ -495,7 +530,8 @@ A fixed target is an asset-by-asset matrix, so this method slices it on both axe
 
  1. View `ce.ce` with [`port_opt_view`](@ref) and every argument.
  2. Slice a matrix `ce.tgt` with [`nothing_scalar_array_view`](@ref), and keep a target rule as it is.
- 3. Rebuild the estimator with the viewed fields, `ce.pdm` and `ce.alpha`.
+ 3. Slice `ce.cache` to the assets `i` with [`port_opt_view`](@ref).
+ 4. Rebuild the estimator with the viewed fields, `ce.pdm` and `ce.alpha`.
 
 # Arguments
 
@@ -517,7 +553,7 @@ function port_opt_view(ce::GeodesicShrinkageCovariance, i,
                        args...)::GeodesicShrinkageCovariance
     tgt = isa(ce.tgt, AbstractMatrix) ? nothing_scalar_array_view(ce.tgt, i) : ce.tgt
     return GeodesicShrinkageCovariance(port_opt_view(ce.ce, i, args...), ce.pdm, tgt,
-                                       ce.alpha)
+                                       ce.alpha, port_opt_view(ce.cache, i))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -853,12 +889,16 @@ function gap_fill_value(ce::GeodesicShrinkageCovariance)
     return gap_fill_value(ce.ce)
 end
 """
-    partial_fit!(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1, kwargs...)
-    partial_fit!(ce::GeodesicShrinkageCovariance, x::VecNum; kwargs...)
+    partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
+                 X::MatNum; dims::Int = 1, kwargs...)
+    partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
+                 x::VecNum; kwargs...)
 
 Folds observations into a [`GeodesicShrinkageCovariance`](@ref) by forwarding them to `ce.ce`.
 
-The shrinkage reads the matrix that `ce.ce` returns and no observation. So the estimator keeps no state of its own, and it folds when `ce.ce` folds. The read-out applies the shrinkage to the folded matrix.
+The shrinkage reads the matrix that `ce.ce` returns and no observation. So the estimator keeps no state of its own, and it folds when `ce.ce` folds. `cov(ce)` with no data applies the shrinkage to the folded matrix.
+
+The method takes an estimator whose `cache` holds `nothing`. An estimator whose `cache` holds a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, takes the buffering fold of [`partial_fit!`](@ref) instead.
 
 # Algorithm
 
@@ -881,19 +921,23 @@ The shrinkage reads the matrix that `ce.ce` returns and no observation. So the e
   - [`GeodesicShrinkageCovariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function partial_fit!(ce::GeodesicShrinkageCovariance, X::MatNum; dims::Int = 1, kwargs...)
+function partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
+                      X::MatNum; dims::Int = 1, kwargs...)
     return Accessors.@reset ce.ce = partial_fit!(ce.ce, X; dims = dims, kwargs...)
 end
-function partial_fit!(ce::GeodesicShrinkageCovariance, x::VecNum; kwargs...)
+function partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
+                      x::VecNum; kwargs...)
     return Accessors.@reset ce.ce = partial_fit!(ce.ce, x; kwargs...)
 end
 """
-    Statistics.cov(ce::GeodesicShrinkageCovariance; kwargs...)
-    Statistics.cor(ce::GeodesicShrinkageCovariance; kwargs...)
+    Statistics.cov(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing};
+                   kwargs...)
+    Statistics.cor(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing};
+                   kwargs...)
 
 Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkageCovariance`](@ref).
 
-`ce.ce` returns its folded matrix, and the shrinkage runs on it as it runs on a batch fit. So this method returns what a batch fit over the same observations returns.
+`ce.ce` returns its folded matrix, and the shrinkage runs on it as it runs on a batch fit. So this method returns what a batch fit over the same observations returns. An estimator whose `cache` holds a [`SampleBufferState`](@ref) reads its buffer through the generic one-argument `Statistics.cov` instead.
 
 # Algorithm
 
@@ -909,7 +953,7 @@ Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkage
 
 # Validation
 
-  - `ce.ce` carries a partial-fit state. The read-out of `ce.ce` throws an `ArgumentError` otherwise.
+  - `ce.ce` carries a partial-fit state. `cov(ce.ce)` with no data throws an `ArgumentError` otherwise.
 
 # Returns
 
@@ -920,11 +964,13 @@ Reads the shrunk covariance, or its correlation, of a folded [`GeodesicShrinkage
   - [`GeodesicShrinkageCovariance`](@ref)
   - [`partial_fit!`](@ref)
 """
-function Statistics.cov(ce::GeodesicShrinkageCovariance; kwargs...)
+function Statistics.cov(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                        Nothing}; kwargs...)
     sigma = Matrix(Statistics.cov(ce.ce; kwargs...))
     return geodesic_shrinkage!(ce, sigma)
 end
-function Statistics.cor(ce::GeodesicShrinkageCovariance; kwargs...)
+function Statistics.cor(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                        Nothing}; kwargs...)
     sigma = Statistics.cov(ce; kwargs...)
     return frame_cov2cor!(sigma)
 end
@@ -933,7 +979,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`GeodesicShrinkageCovariance`](@ref) method of [`supports_partial_fit`](@ref).
 
-The estimator folds through `ce.ce`, so it folds when `ce.ce` folds.
+The estimator folds through `ce.ce`, so it folds when `ce.ce` folds. An estimator whose `cache` holds a [`SampleBufferState`](@ref) folds whatever `ce.ce` is, because it takes the buffering fold.
 
 # Arguments
 
@@ -941,7 +987,7 @@ The estimator folds through `ce.ce`, so it folds when `ce.ce` folds.
 
 # Returns
 
-  - `folds::Bool`: `true` when [`partial_fit!`](@ref) folds `ce.ce`.
+  - `folds::Bool`: `true` when `ce` carries a buffer, or when [`partial_fit!`](@ref) folds `ce.ce`.
 
 # Related
 
@@ -949,7 +995,7 @@ The estimator folds through `ce.ce`, so it folds when `ce.ce` folds.
   - [`GeodesicShrinkageCovariance`](@ref)
 """
 function supports_partial_fit(ce::GeodesicShrinkageCovariance)
-    return supports_partial_fit(ce.ce)
+    return isa(ce.cache, SampleBufferState) || supports_partial_fit(ce.ce)
 end
 
 export IdentityTarget, ScaledIdentityTarget, CommonCovarianceTarget,

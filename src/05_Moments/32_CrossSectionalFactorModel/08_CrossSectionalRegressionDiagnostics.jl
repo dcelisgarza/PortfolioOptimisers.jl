@@ -175,20 +175,29 @@ end
 
 Return the diagonal of the inverse of every slice of a Gram history.
 
-The verb inverts each slice through its singular value decomposition. One formulation covers both cases a design presents. A full-rank slice gets its inverse, and a collinear slice gets its pseudo-inverse, because a direction whose singular value falls under the tolerance contributes nothing. A branch that inverts and falls back on failure answers the same, but it adds the whole body of the pseudo-inverse to the code of this file.
+The verb inverts each slice through its singular value decomposition. One formulation covers both cases a design presents. A full-rank slice gets its inverse. A collinear slice gets the limit of the inverse of ``\\mathbf{G}_{t} + \\lambda \\mathbf{I}`` as ``\\lambda`` falls to zero. That limit is the diagonal of the pseudo-inverse for a coefficient the design identifies, and `Inf` for one it does not identify, because the variance of such a coefficient has no bound.
+
+A design identifies coefficient ``k`` when the unit vector ``\\boldsymbol{e}_{k}`` lies in the row space of the slice. The directions whose singular value falls under the tolerance span the null space, so the verb reads the share of ``\\boldsymbol{e}_{k}`` that they hold. The share is round-off for an identified coefficient and of order one for another. The diagonal of the pseudo-inverse alone is not the answer for an unidentified coefficient: it is the round-off of the other directions, and a ratio of such round-off looks like a real answer.
 
 The diagonal is the only part any diagnostic of this file reads. The variance inflation factor multiplies it by the diagonal of the slice itself, and the standard error of a factor return scales it by the residual variance.
+
+A Gram matrix formed in floating point squares the condition number of the weighted design, so its rank test drops a direction from a design condition number of about ``10^{8}``, where [`cross_sectional_rank`](@ref) keeps every column up to about ``10^{14} / K``. So a diagnostic that holds the design reads it through [`cs_inverse_diagonal!`](@ref) instead, at the rank of the fit. This verb is for a caller that holds only the Gram history.
 
 # Mathematical definition
 
 ```math
-(\\mathbf{G}_{t}^{+})_{kk} = \\sum_{i \\,:\\, \\sigma_{i} > \\tau} \\frac{u_{ki} \\, v_{ki}}{\\sigma_{i}}
+\\begin{align}
+(\\mathbf{G}_{t}^{-1})_{kk} &= \\begin{cases} \\displaystyle\\sum_{i \\,:\\, \\sigma_{i} > \\tau} \\frac{u_{ki} \\, v_{ki}}{\\sigma_{i}} & \\text{if } m_{k} \\leq \\sqrt{\\varepsilon}\\,,\\\\ \\infty & \\text{otherwise}\\,,\\end{cases}\\\\
+m_{k} &= \\sum_{i \\,:\\, \\sigma_{i} \\leq \\tau} v_{ki}^{2}\\,.
+\\end{align}
 ```
 
 Where:
 
   - ``\\sigma_{i}``, ``\\boldsymbol{u}_{i}``, ``\\boldsymbol{v}_{i}``: ``i``-th singular value and the two singular vectors of the slice.
   - ``\\tau = K \\, \\varepsilon \\, \\max_{i} \\sigma_{i}``: Tolerance below which the verb drops a direction. It is the default tolerance of `LinearAlgebra.pinv`.
+  - ``m_{k}``: Share of ``\\boldsymbol{e}_{k}`` that the null space of the slice holds.
+  - ``\\varepsilon``: Machine epsilon of the element type.
   - $(math_dict[:K])
 
 # Arguments
@@ -197,7 +206,7 @@ Where:
 
 # Returns
 
-  - `D::Matrix{<:Real}`: `observations × factors`. Row `t` is the diagonal of the inverse of slice `t`.
+  - `D::Matrix{<:Real}`: `observations × factors`. Row `t` is the diagonal of the inverse of slice `t`, `Inf` for a coefficient that slice does not identify.
 
 # Related
 
@@ -216,7 +225,7 @@ function cs_gram_inverse_diagonal(G::Arr3Num)
     Gt = Matrix{Tf}(undef, K, K)
     for t in 1:T
         cs_gram_slice!(Gt, G, t)
-        cs_inverse_diagonal!(D, Gt, t)
+        cs_gram_inverse_diagonal!(D, Gt, t)
     end
     return D
 end
@@ -225,7 +234,7 @@ end
 
 Copy one slice of a Gram history into a working matrix.
 
-Two verbs read a slice, [`cs_gram_inverse_diagonal`](@ref) and [`exposure_condition_number`](@ref). Each needs it as a matrix of one concrete element type, and each reuses one buffer across the observations rather than allocating one per slice.
+The verbs that read a Gram history read a slice: [`cs_gram_inverse_diagonal`](@ref), [`cs_regression_t_stats`](@ref) when its caller supplies `G`, and [`exposure_condition_number`](@ref). Each needs it as a matrix of one concrete element type, and each reuses one buffer across the observations rather than allocating one per slice.
 
 # Arguments
 
@@ -251,54 +260,178 @@ function cs_gram_slice!(Gt::AbstractMatrix, G::Arr3Num, t::Integer)::Nothing
     return nothing
 end
 """
-    cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer)
+    cs_inverse_diagonal!(D::AbstractMatrix, Dt::MatNum, t::Integer,
+                         Pt::Option{<:AbstractMatrix} = nothing)
+
+Write the diagonal of the inverse Gram matrix of one weighted design into the answer, at the rank of the fit.
+
+The Gram matrix of the design ``\\mathbf{D}_{t} = \\mathbf{U} \\mathbf{\\Sigma} \\mathbf{V}^{\\intercal}`` is ``\\mathbf{V} \\mathbf{\\Sigma}^{2} \\mathbf{V}^{\\intercal}``, so its inverse is the sum over the singular directions of ``\\boldsymbol{v}_{i} \\boldsymbol{v}_{i}^{\\intercal} / \\sigma_{i}^{2}``. The verb keeps the first `r` directions, where `r` is the rank that [`cross_sectional_rank`](@ref) reads, the rank test of the fit. So the answer is the inverse of a full-rank design, and the pseudo-inverse of a collinear one on each coefficient the design identifies. A coefficient whose unit vector the dropped directions hold by more than the square root of the machine epsilon is not identified, and its entry is `Inf`. [`cs_gram_inverse_diagonal`](@ref) states the rule.
+
+The verb reads the design rather than its Gram matrix, because a Gram matrix formed in floating point squares the condition number. On a design whose condition number lies between about ``10^{8}`` and ``10^{14} / K``, the fit solves at full rank, and a test on the Gram matrix would drop a direction that the fit kept.
+
+At an observation with an Unseen Member, the design is the changed design, and the factor returns are ``\\mathbf{P}_{t}`` times its coefficients. The verb then writes the diagonal of ``\\mathbf{P}_{t} \\mathbf{G}_{t}^{+} \\mathbf{P}_{t}^{\\intercal}``. It changes the singular vectors by ``\\mathbf{P}_{t}``, and it measures the share of row ``k`` of ``\\mathbf{P}_{t}`` that the dropped directions hold against the squared norm of the row. A zero row, an Unseen Member, has a variance of zero, because the rule states its return. A column that [`DependentColumnDrop`](@ref) dropped takes the same route, with a zero column in `Dt` and a zero column in `Pt`.
+
+The count of the kept directions is the numeric rank of the design. The standard error of a factor return subtracts it from the asset count, so the verb returns it rather than a second decomposition finding it again.
+
+# Arguments
+
+  - `D`: Answer `observations × factors`, written in place.
+  - `Dt`: Weighted design of the observation, `eligible assets × factors`, from [`cs_design_slice`](@ref).
+  - `t`: Observation to write.
+  - `Pt`: The change of the observation from [`cs_regression_data`](@ref), or `nothing` when it has none.
+
+# Returns
+
+  - `r::Int`: The numeric rank of the design.
+
+# Related
+
+  - [`cs_gram_inverse_diagonal`](@ref)
+  - [`cs_gram_inverse_diagonal!`](@ref)
+  - [`cs_design_slice`](@ref)
+  - [`cross_sectional_rank`](@ref)
+  - [`unseen_member_design`](@ref)
+"""
+function cs_inverse_diagonal!(D::AbstractMatrix, Dt::MatNum, t::Integer,
+                              Pt::Option{<:AbstractMatrix} = nothing)::Int
+    Tf = eltype(D)
+    K = size(Dt, 2)
+    r = cross_sectional_rank(Dt)
+    # A design of rank zero keeps no direction, so every direction of the identity is null.
+    F = iszero(r) ? nothing : LinearAlgebra.svd(Dt; full = true)
+    V = isnothing(F) ? Matrix{Tf}(LinearAlgebra.I, K, K) : F.V
+    lam = isnothing(F) ? zeros(Tf, K) : inv.(Tf.(F.S) .^ 2)
+    return cs_write_inverse_diagonal!(D, t, isnothing(Pt) ? V : Pt * V, lam, r)
+end
+"""
+    cs_gram_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer,
+                              Pt::Option{<:AbstractMatrix} = nothing)
 
 Write the diagonal of the inverse of one Gram slice into the answer.
 
-The inverse is the sum over the singular directions of the outer product of the two singular vectors, scaled by the reciprocal singular value. The verb drops a direction whose singular value falls under the tolerance. So the answer is the pseudo-inverse of a collinear slice and the inverse of a full-rank one.
+The verb is [`cs_inverse_diagonal!`](@ref) for a caller that holds the Gram slice alone. It drops a direction whose singular value falls under the tolerance ``\\tau`` of [`cs_gram_inverse_diagonal`](@ref), which is a test at the scale of the square of the condition number of the design.
 
 # Arguments
 
   - `D`: Answer `observations × factors`, written in place.
   - `Gt`: One Gram slice `factors × factors`.
   - `t`: Observation to write.
+  - `Pt`: The change of the observation, or `nothing` when it has none.
 
 # Returns
 
-  - `nothing`.
+  - `r::Int`: The numeric rank of the slice.
 
 # Related
 
   - [`cs_gram_inverse_diagonal`](@ref)
+  - [`cs_inverse_diagonal!`](@ref)
   - [`cs_gram_slice!`](@ref)
 """
-function cs_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer)::Nothing
+function cs_gram_inverse_diagonal!(D::AbstractMatrix, Gt::AbstractMatrix, t::Integer,
+                                   Pt::Option{<:AbstractMatrix} = nothing)::Int
     Tf = eltype(D)
     F = LinearAlgebra.svd(Gt)
     tol = minimum(size(Gt)) * eps(Tf) * maximum(F.S)
+    # The singular values fall, so the directions over the tolerance lead.
+    r = count(>(tol), F.S)
+    return cs_write_inverse_diagonal!(D, t, isnothing(Pt) ? F.V : Pt * F.V, inv.(Tf.(F.S)),
+                                      r)
+end
+"""
+    cs_write_inverse_diagonal!(D::AbstractMatrix, t::Integer, V::AbstractMatrix,
+                               lam::AbstractVector, r::Integer)
+
+Write the diagonal of an inverse, given its eigenvectors and the reciprocals of its eigenvalues, into the answer.
+
+The first `r` directions are kept, and the others span the null space. A coefficient whose row of `V` the null space holds by more than the square root of the machine epsilon of its squared norm is not identified, and its entry is `Inf`. A zero row has a variance of zero.
+
+# Arguments
+
+  - `D`: Answer `observations × factors`, written in place.
+  - `t`: Observation to write.
+  - `V`: Eigenvectors of the Gram matrix, one column per direction, already changed by the change of the observation.
+  - `lam`: Reciprocal of the eigenvalue of each kept direction.
+  - `r`: Number of kept directions.
+
+# Returns
+
+  - `r::Int`: The number of kept directions.
+
+# Related
+
+  - [`cs_inverse_diagonal!`](@ref)
+  - [`cs_gram_inverse_diagonal!`](@ref)
+"""
+function cs_write_inverse_diagonal!(D::AbstractMatrix, t::Integer, V::AbstractMatrix,
+                                    lam::AbstractVector, r::Integer)::Int
+    Tf = eltype(D)
+    # The share of a coordinate that the null directions hold is round-off when the design
+    # identifies the coefficient, and of order one when it does not.
+    idtol = sqrt(eps(Tf))
     for k in axes(D, 2)
         d = zero(Tf)
-        for i in eachindex(F.S)
-            if F.S[i] > tol
-                d += Tf(F.U[k, i]) * Tf(F.V[k, i]) / Tf(F.S[i])
+        m = zero(Tf)
+        s = zero(Tf)
+        for i in axes(V, 2)
+            v2 = Tf(V[k, i])^2
+            s += v2
+            if i <= r
+                d += v2 * Tf(lam[i])
+            else
+                m += v2
             end
         end
-        D[t, k] = d
+        # `s` is the squared norm of the row of the change, one without a change.
+        D[t, k] = m > idtol * s ? Tf(Inf) : d
     end
-    return nothing
+    return r
+end
+"""
+    cs_design_slice(B::Arr3Num, u::MatNum, t::Integer, ::Type{T})
+
+Return the weighted design of one observation, over the pairs of positive weight.
+
+The rows are the eligible assets of the observation, each scaled by the square root of its weight, which is the design the fit solved. The verb leaves out a pair outside the mask rather than giving it a zero row, so the tolerance of [`cross_sectional_rank`](@ref) reads the count of eligible assets, as the rank test of the fit does.
+
+# Arguments
+
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
+  - `t`: Observation to read.
+  - `T`: Element type of the answer.
+
+# Returns
+
+  - `Dt::Matrix{T}`: `eligible assets × factors`.
+
+# Related
+
+  - [`cs_inverse_diagonal!`](@ref)
+  - [`cs_score_regressors`](@ref)
+  - [`exposure_vif`](@ref)
+  - [`exposure_condition_number`](@ref)
+"""
+function cs_design_slice(B::Arr3Num, u::MatNum, t::Integer, ::Type{T}) where {T}
+    idx = findall(i -> u[t, i] > zero(u[t, i]), axes(B, 2))
+    Dt = Matrix{T}(undef, length(idx), size(B, 3))
+    for k in axes(Dt, 2), j in eachindex(idx)
+        Dt[j, k] = sqrt(T(u[t, idx[j]])) * T(B[t, idx[j], k])
+    end
+    return Dt
 end
 """
     cs_regression_data(csfm::CrossSectionalFactorModel)
 
 Return the lag-aligned regression history a cross-sectional diagnostic reads off a factor model block.
 
-Every block method of this file starts here. The verb trims the exposures at the tail and the return-like histories at the head, so the exposures of observation ``t - \\ell`` line up with the returns of observation ``t``. When the block carries a family re-basis, the verb maps the exposures and the factor returns onto the reduced axis, and every answer that carries a factor axis is then on the reduced axis too.
+Every block method of this file starts here. The verb trims the exposures at the tail and the return-like histories at the head, so the exposures of observation ``t - \\ell`` line up with the returns of observation ``t``. The answer is the design the regression ran on. `csr.f` holds the factors the fit estimated, on the reduced axis when the block carries a family re-basis, so the verb maps the exposures onto the reduced axis, and it drops the observed factors, which are the trailing columns of that axis and which the regression did not estimate. Every answer that carries a factor axis is then on the axis of `csr.f`.
 
 # Algorithm
 
  1. Refuse a block that carries no exposure history, or no cross-sectional fit.
  2. Trim the exposure history at the tail by `csfm.lag`, and the factor returns, the residuals and the regression weights at the head by the same count.
- 3. When `csfm.fcb` is set, slice the basis to the trimmed observation axis, map the exposures through [`reduce_exposures`](@ref), and map the factor returns through [`reduce_factor_returns`](@ref).
+ 3. Map the exposures onto the design of the regression with [`cs_regression_design`](@ref): onto the reduced axis when `csfm.fcb` is set, changed under the Unseen Member rule `csfm.unseen`, and without the observed factors that `csfm.fx` states. The factor returns `csr.f` are already on that axis.
 
 # Arguments
 
@@ -311,13 +444,17 @@ Every block method of this file starts here. The verb trims the exposures at the
 
 # Returns
 
-  - `data::NamedTuple`: `(; B, f, eps, w)`, the lag-aligned exposures, factor returns, residuals and regression weights. `w` is `nothing` when the block carries no regression weight history.
+  - `data::NamedTuple`: `(; B, f, eps, w, P, dc)`, the lag-aligned exposures, factor returns, residuals and regression weights, on the design of the regression, the `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of the answer, and the lag-aligned dropped-column mask of the fit. `w` is `nothing` when the block carries no regression weight history, and `dc` is `nothing` when the fit states no mask. [`cs_dropped_design`](@ref) composes the mask with the pairs.
+
+# Validation
+
+  - The design and `csr.f` agree on the factor axis. Raises a `DimensionMismatch` that names both counts.
 
 # Related
 
   - [`CrossSectionalFactorModel`](@ref)
   - [`reduce_exposures`](@ref)
-  - [`reduce_factor_returns`](@ref)
+  - [`cs_regression_design`](@ref)
   - [`cs_regression_t_stats`](@ref)
 """
 function cs_regression_data(csfm::CrossSectionalFactorModel)
@@ -341,8 +478,12 @@ function cs_regression_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
     f = csr.f[rows, :]
     eps = csr.eps[rows, :]
     w = cs_lagged_rows(csfm.rw, rows)
-    Br, fr = cs_reduce_regression(csfm.fcb, B, f, lag)
-    return (; B = Br, f = fr, eps = eps, w = w)
+    rd = cs_regression_design(csfm.fcb, csfm.unseen, B, w,
+                              isnothing(csfm.fx) ? 0 : size(csfm.fx, 2))
+    @argcheck(size(rd.B, 3) == size(f, 2),
+              DimensionMismatch("the regression of the block ran on $(size(rd.B, 3)) factors, the reduced axis less the observed ones, and csr.f carries $(size(f, 2)). A block states csr.f on the axis the fit estimated, which is the reduced axis under a family re-basis"))
+    return (; B = rd.B, f = f, eps = eps, w = w, P = rd.P,
+            dc = nothing_scalar_array_getindex_odd_order(csr.dc, rows, :))
 end
 """
     cs_regression_lag(lag::Nothing)
@@ -397,257 +538,50 @@ function cs_lagged_rows(A::MatNum, rows)
     return A[rows, :]
 end
 """
-    cs_reduce_regression(fcb::Nothing, B::Arr3Num, f::MatNum, lag::Integer)
-    cs_reduce_regression(fcb::FactorFamilyBasis, B::Arr3Num, f::MatNum, lag::Integer)
+    cs_regression_design(fcb::Nothing, rule::AbstractUnseenMemberRule, B::Arr3Num,
+                         w::Option{<:MatNum}, no::Integer)
+    cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule, B::Arr3Num,
+                         w::Option{<:MatNum}, no::Integer)
 
-Map a lag-aligned regression history onto the reduced factor axis of a family re-basis.
+Map a lag-aligned exposure history onto the design the cross-sectional regression ran on.
 
-A block that carries no re-basis is already on its own axis, so that case returns the pair unchanged. A block that carries one has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the diagnostics answer on the reduced axis instead. The verb slices the basis to the trimmed observation axis before the basis maps the exposures, because [`cs_regression_data`](@ref) trimmed the exposures at the tail.
+A block that carries a family re-basis has a rank-deficient design on the raw axis, because every constrained family sums to zero, so the regression ran on the reduced axis, and the diagnostics answer there too. The basis has the rows of the exposure history, and [`cs_regression_data`](@ref) trimmed the exposures at the tail, so the verb slices the basis to the rows of `B` before the basis maps the exposures. A block that carries no re-basis is already on its own axis. The observed factors are the last `no` columns of either axis, and the regression did not estimate them, so the verb drops them.
+
+At an observation with an Unseen Member, the fit regressed on the reduced exposures times a change ``\\mathbf{P}_{t}``, so the verb changes the design with [`unseen_member_design`](@ref) under the rule of the block. The sample of each observation is its pairs of positive regression weight, as in the fit. The observed factors are not in a family, so the verb keeps the block of ``\\mathbf{P}_{t}`` on the estimated factors.
 
 # Arguments
 
   - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
-  - `B`: Lag-aligned exposure history `observations × assets × factors`.
-  - `f`: Lag-aligned factor return matrix `observations × factors`.
-  - `lag`: Number of observations by which the exposures lag the returns.
+  - `rule`: The `unseen` field of the block.
+  - `B`: Lag-aligned exposure history `observations × assets × factors`, on the raw axis.
+  - `w`: Lag-aligned regression weight history `observations × assets`, or `nothing` for equal weights.
+  - `no`: The number of observed factors.
 
 # Returns
 
-  - `B::Arr3Num`: The exposure history, on the reduced axis when a re-basis is set.
-  - `f::MatNum`: The factor returns, on the reduced axis when a re-basis is set.
+  - `B::Arr3Num`: The exposure history of the factors the regression estimated, changed at each observation with an Unseen Member.
+  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the estimated factors, empty or `()` when the rule changes no observation.
 
 # Related
 
   - [`FactorFamilyBasis`](@ref)
   - [`reduce_exposures`](@ref)
-  - [`reduce_factor_returns`](@ref)
+  - [`unseen_member_design`](@ref)
   - [`cs_regression_data`](@ref)
-"""
-function cs_reduce_regression(::Nothing, B::Arr3Num, f::MatNum, ::Integer)
-    return B, f
-end
-function cs_reduce_regression(fcb::FactorFamilyBasis, B::Arr3Num, f::MatNum, lag::Integer)
-    Tb = size(fcb.ratios, 1) - lag
-    fcbB = factor_basis_slice(fcb, 1:Tb)
-    return reduce_exposures(fcbB, B), reduce_factor_returns(fcb, f)
-end
-"""
-    exposure_vif(G::Arr3Num) -> Matrix{<:Real}
-    exposure_vif(B::Arr3Num, w::Option{<:MatNum}) -> Matrix{<:Real}
-    exposure_vif(csfm::CrossSectionalFactorModel) -> Matrix{<:Real}
-
-Return the variance inflation factor of every factor, one row per observation.
-
-The factor measures how much the collinearity of the cross-sectional design inflates the variance of a factor return. A value of one says that the factor is orthogonal to the others of that observation, and a large value says that the factor is nearly a combination of them, so its estimated return is unstable rather than wrong.
-
-On a full-rank slice the pseudo-inverse is the inverse, and the answer is at least one. On an exactly collinear slice the answer reads the pseudo-inverse, so it is finite and can fall below one. It then measures no inflation. [`exposure_condition_number`](@ref) shows such a slice.
-
-# Mathematical definition
-
-```math
-\\mathrm{VIF}_{t,k} = (\\mathbf{G}_{t})_{kk} \\, (\\mathbf{G}_{t}^{+})_{kk}
-```
-
-Where:
-
-  - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
-  - ``\\mathbf{G}_{t}^{+}``: Pseudo-inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines.
-  - ``\\mathrm{VIF}_{t,k}``: Variance inflation factor of factor ``k`` at observation ``t``.
-
-# Algorithm
-
- 1. Take the diagonal of the inverse of every slice with [`cs_gram_inverse_diagonal`](@ref).
- 2. Multiply it entry by entry by the diagonal of the slice itself.
- 3. On the method that reads a design, answer `NaN` at an observation whose eligible asset count does not exceed the factor count, because such a design determines no variance.
-
-# Arguments
-
-  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
-  - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
-
-# Validation
-
-  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
-  - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
-
-# Returns
-
-  - `vif::Matrix{<:Real}`: `observations × factors`.
-
-# Examples
-
-```jldoctest
-julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
-
-julia> exposure_vif(cs_gram(B))
-1×2 Matrix{Float64}:
- 1.0  1.0
-```
-
-# Related
-
-  - [`cs_gram`](@ref)
-  - [`cs_gram_inverse_diagonal`](@ref)
-  - [`exposure_condition_number`](@ref)
-  - [`cs_regression_t_stats`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function exposure_vif(G::Arr3Num)
-    T = size(G, 1)
-    K = size(G, 2)
-    D = cs_gram_inverse_diagonal(G)
-    Tf = eltype(D)
-    vif = Matrix{Tf}(undef, T, K)
-    for k in 1:K, t in 1:T
-        vif[t, k] = Tf(G[t, k, k]) * D[t, k]
-    end
-    return vif
+function cs_regression_design(::Nothing, ::AbstractUnseenMemberRule, B::Arr3Num,
+                              ::Option{<:MatNum}, no::Integer)
+    return (; B = B[:, :, 1:(size(B, 3) - no)], P = ())
 end
-function exposure_vif(B::Arr3Num, w::Option{<:MatNum})
-    mask, u = cs_estimation_mask_weights(B, w)
-    return cs_masked_vif(B, mask, u)
-end
-function exposure_vif(csfm::CrossSectionalFactorModel)
-    data = cs_regression_data(csfm)
-    mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
-    return cs_masked_vif(data.B, mask, u)
-end
-"""
-    cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-
-Return the variance inflation factors of a design whose mask a caller has already resolved.
-
-# Arguments
-
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
-  - `mask`: Eligibility mask `observations × assets`.
-  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
-
-# Returns
-
-  - `vif::Matrix{<:Real}`: `observations × factors`, `NaN` at an observation with no degrees of freedom.
-
-# Related
-
-  - [`exposure_vif`](@ref)
-"""
-function cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-    G = cs_gram_from_weights(B, u)
-    vif = exposure_vif(G)
-    K = size(B, 3)
-    for t in axes(vif, 1)
-        if count(view(mask, t, :)) <= K
-            for k in 1:K
-                vif[t, k] = convert(eltype(vif), NaN)
-            end
-        end
-    end
-    return vif
-end
-"""
-    exposure_condition_number(G::Arr3Num) -> Vector{<:Real}
-    exposure_condition_number(B::Arr3Num, w::Option{<:MatNum}) -> Vector{<:Real}
-    exposure_condition_number(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
-
-Return the two-norm condition number of the Gram matrix of the cross-sectional design, one entry per observation.
-
-The condition number reads the whole design at once, where a variance inflation factor reads one factor of it. It is the square of the condition number of the weighted design. A value of one says that the columns of the weighted design are orthogonal and of equal norm, and a large value says that one direction of the factor space carries almost no weighted exposure, so the fit of that observation is sensitive to a small change in the returns. An exactly collinear design answers `Inf` or a value near the reciprocal of the machine epsilon, and which of the two it answers is a property of the singular value decomposition rather than of the design. The smallest singular value of a rank-deficient matrix rounds either to zero or to a value near the machine epsilon. Both answers say that the design of that observation is singular.
-
-# Mathematical definition
-
-```math
-\\kappa_{t} = \\frac{\\sigma_{\\max}(\\mathbf{G}_{t})}{\\sigma_{\\min}(\\mathbf{G}_{t})}
-```
-
-Where:
-
-  - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
-  - ``\\sigma_{\\max}``, ``\\sigma_{\\min}``: Largest and smallest singular values.
-
-# Arguments
-
-  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
-  - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
-
-# Validation
-
-  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
-  - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
-
-# Returns
-
-  - `kappa::Vector{<:Real}`: One entry per observation. The methods that read a design answer `NaN` at an observation whose eligible asset count does not exceed the factor count.
-
-# Examples
-
-```jldoctest
-julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
-
-julia> exposure_condition_number(cs_gram(B))
-1-element Vector{Float64}:
- 1.0
-```
-
-# Related
-
-  - [`cs_gram`](@ref)
-  - [`exposure_vif`](@ref)
-  - [`CrossSectionalFactorModel`](@ref)
-"""
-function exposure_condition_number(G::Arr3Num)
-    T = size(G, 1)
-    K = size(G, 2)
-    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
-    kappa = Vector{Tf}(undef, T)
-    Gt = Matrix{Tf}(undef, K, K)
-    for t in 1:T
-        cs_gram_slice!(Gt, G, t)
-        kappa[t] = LinearAlgebra.cond(Gt)
-    end
-    return kappa
-end
-function exposure_condition_number(B::Arr3Num, w::Option{<:MatNum})
-    mask, u = cs_estimation_mask_weights(B, w)
-    return cs_masked_condition_number(B, mask, u)
-end
-function exposure_condition_number(csfm::CrossSectionalFactorModel)
-    data = cs_regression_data(csfm)
-    mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
-    return cs_masked_condition_number(data.B, mask, u)
-end
-"""
-    cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-
-Return the condition numbers of a design whose mask a caller has already resolved.
-
-# Arguments
-
-  - `B`: Exposure history `observations × assets × factors`, already lagged.
-  - `mask`: Eligibility mask `observations × assets`.
-  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
-
-# Returns
-
-  - `kappa::Vector{<:Real}`: One entry per observation, `NaN` at an observation with no degrees of freedom.
-
-# Related
-
-  - [`exposure_condition_number`](@ref)
-"""
-function cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
-    G = cs_gram_from_weights(B, u)
-    kappa = exposure_condition_number(G)
-    K = size(B, 3)
-    for t in eachindex(kappa)
-        if count(view(mask, t, :)) <= K
-            kappa[t] = convert(eltype(kappa), NaN)
-        end
-    end
-    return kappa
+function cs_regression_design(fcb::FactorFamilyBasis, rule::AbstractUnseenMemberRule,
+                              B::Arr3Num, w::Option{<:MatNum}, no::Integer)
+    fb = factor_basis_slice(fcb, axes(B, 1))
+    u = cs_estimation_weights_only(w, size(B, 1), size(B, 2),
+                                   float_if_integer(real(eltype(B))))
+    ud = unseen_member_design(rule, fb, B, reduce_exposures(fb, B), u)
+    ke = 1:(size(ud.Z, 3) - no)
+    return (; B = ud.Z[:, :, ke], P = map(p -> first(p) => last(p)[ke, ke], ud.P))
 end
 """
     cs_diagnostic_mask_weights(B::Arr3Num, eps::MatNum, w::Option{<:MatNum})
@@ -694,9 +628,10 @@ end
         f::MatNum,
         eps::MatNum,
         w::Option{<:MatNum} = nothing;
-        G::Option{<:Arr3Num} = nothing
+        G::Option{<:Arr3Num} = nothing,
+        P = ()
     ) -> Matrix{<:Real}
-    cs_regression_t_stats(csfm::CrossSectionalFactorModel) -> Matrix{<:Real}
+    cs_regression_t_stats(csfm::CrossSectionalFactorModel) -> FactorDiagnosticResult
 
 Return the t-statistic of every factor return, one row per observation.
 
@@ -707,8 +642,8 @@ The statistic says how many standard errors a factor return of one observation s
 ```math
 \\begin{align}
 t_{t,k} &= \\frac{f_{t,k}}{\\mathrm{SE}_{t,k}}\\,,\\\\
-\\mathrm{SE}_{t,k} &= \\sqrt{\\hat{\\sigma}^{2}_{t} \\, (\\mathbf{G}_{t}^{+})_{kk}}\\,,\\\\
-\\hat{\\sigma}^{2}_{t} &= \\frac{\\mathrm{RSS}_{t}}{n_{t} - K}\\,,\\\\
+\\mathrm{SE}_{t,k} &= \\sqrt{\\hat{\\sigma}^{2}_{t} \\, (\\mathbf{G}_{t}^{-1})_{kk}}\\,,\\\\
+\\hat{\\sigma}^{2}_{t} &= \\frac{\\mathrm{RSS}_{t}}{n_{t} - r_{t}}\\,,\\\\
 \\mathrm{RSS}_{t} &= \\sum_{i} u_{t,i} \\, \\varepsilon_{t,i}^{2}\\,.
 \\end{align}
 ```
@@ -717,7 +652,8 @@ Where:
 
   - ``f_{t,k}``: Factor return of factor ``k`` at observation ``t``, which is the coefficient of the cross-sectional fit.
   - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
-  - ``\\mathbf{G}_{t}^{+}``: Pseudo-inverse of ``\\mathbf{G}_{t}``, which is the inverse on a full-rank slice and which [`cs_gram_inverse_diagonal`](@ref) defines. The degrees of freedom subtract ``K`` also on a collinear slice.
+  - ``(\\mathbf{G}_{t}^{-1})_{kk}``: Diagonal of the inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines. On a collinear slice it is the diagonal of the pseudo-inverse for a coefficient the design identifies, and `Inf` for another. At an observation with an Unseen Member it is the diagonal of ``\\mathbf{P}_{t} \\mathbf{G}_{t}^{+} \\mathbf{P}_{t}^{\\intercal}``, which [`cs_inverse_diagonal!`](@ref) states, because the factor returns are ``\\mathbf{P}_{t}`` times the coefficients of the changed design.
+  - ``r_{t}``: Numeric rank of the weighted design of observation ``t``, which [`cross_sectional_rank`](@ref) reads as the fit reads it. It is ``K`` on a full-rank design. The residuals of a collinear fit span ``n_{t} - r_{t}`` dimensions, so the unbiased variance divides by that count.
   - ``u_{t,i}``: Resolved regression weight of asset ``i`` at observation ``t``, zero outside the mask.
   - ``\\varepsilon_{t,i}``: Residual of asset ``i`` at observation ``t``.
   - ``n_{t}``: Number of eligible assets at observation ``t``.
@@ -726,10 +662,10 @@ Where:
 # Algorithm
 
  1. Resolve the mask and the weights with [`cs_diagnostic_mask_weights`](@ref), which also excludes a pair whose residual is not finite.
- 2. Build the Gram history with [`cs_gram_from_weights`](@ref), or take the one the caller supplied through `G`.
+ 2. Take the diagonal of the inverse Gram matrix and the rank of every observation with [`cs_slice_inverse_diagonal!`](@ref), mapped by the change of the observation in `P` when it has one. Without `G` it reads the weighted design of the observation, so the rank and the inverse are those of the fit. With `G` it reads the slice of `G`.
  3. Take the residual sum of squares of every observation, and divide it by the degrees of freedom.
- 4. Scale the diagonal of the pseudo-inverse of the Gram matrix by that variance, and take the square root, which is the standard error.
- 5. Divide the factor returns by the standard errors. Answer `NaN` where the degrees of freedom are not positive, where a factor return of that observation is not finite, or where the standard error is zero.
+ 4. Scale the diagonal by that variance, and take the square root, which is the standard error.
+ 5. Divide the factor returns by the standard errors. Answer `NaN` where the degrees of freedom are not positive, where a factor return of that observation is not finite, and where the standard error is zero or `Inf`. A coefficient that a collinear design does not identify has no t-statistic, because the fit states no value of it. An Unseen Member has a standard error of zero, so it has no t-statistic either, because the rule states its return and the data do not estimate it.
 
 # Arguments
 
@@ -737,8 +673,9 @@ Where:
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `G`: Gram history `observations × factors × factors` the caller already holds, or `nothing` to build it. A caller that supplies one states that it built the history from the same mask. The verb does not check this.
-  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
+  - `G`: Gram history `observations × factors × factors` the caller already holds, or `nothing` to read the design. A caller that supplies one states that it built the history from the same mask. The verb does not check this. A Gram history formed in floating point squares the condition number of the design, so on a design whose condition number exceeds about ``10^{8}`` it drops a direction that the fit kept, and the t-statistics of the near-dependent factors are `NaN`. Leave `G` unset to read the design.
+  - `P`: The `t => P_t` pairs of [`unseen_member_design`](@ref) on the rows of `B`, where `B` is the changed design and `f` holds the factor returns. The block method passes the pairs of [`cs_regression_data`](@ref). It is `()` for a design that no rule changed.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. When the fit states a dropped-column mask, the block method reads the design after [`cs_dropped_design`](@ref), so a factor that [`DependentColumnDrop`](@ref) dropped has no t-statistic, and the kept factors of its dependent group have the t-statistics of the kept columns.
 
 # Validation
 
@@ -747,7 +684,8 @@ Where:
 
 # Returns
 
-  - `t::Matrix{<:Real}`: `observations × factors`.
+  - `t::Matrix{<:Real}`: `observations × factors`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the design axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Examples
 
@@ -769,19 +707,23 @@ julia> round.(cs_regression_t_stats(B, [2.0 1.0], [0.1 -0.1 0.05]); digits = 4)
 """
 function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
                                w::Option{<:MatNum} = nothing;
-                               G::Option{<:Arr3Num} = nothing)
+                               G::Option{<:Arr3Num} = nothing, P = ())
     K = size(B, 3)
     @argcheck(size(f, 1) == size(B, 1) && size(f, 2) == K,
               DimensionMismatch("f ($(size(f, 1))×$(size(f, 2))) must match B ($(size(B, 1)) observations, $K factors)"))
     mask, u = cs_diagnostic_mask_weights(B, eps, w)
-    Gh = cs_resolved_gram(G, B, u)
-    D = cs_gram_inverse_diagonal(Gh)
-    Tf = promote_type(eltype(D), real(eltype(f)), real(eltype(eps)))
+    cs_assert_gram(G, B)
     T = size(B, 1)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Td = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)),
+                                                       cs_gram_eltype(G))))))
+    D = Matrix{Td}(undef, T, K)
+    Tf = promote_type(Td, real(eltype(f)), real(eltype(eps)))
     # The answer starts absent, so an observation the loop skips needs no branch of its own.
     t = fill(convert(Tf, NaN), T, K)
     for tt in 1:T
-        dof = count(view(mask, tt, :)) - K
+        dof = count(view(mask, tt, :)) -
+              cs_slice_inverse_diagonal!(D, G, B, u, tt, unseen_member_change_at(P, tt))
         if dof > zero(dof) && cs_row_is_finite(f, tt)
             s2 = cs_weighted_rss(eps, u, mask, tt, Tf) / Tf(dof)
             cs_t_stat_row!(t, f, D, s2, tt)
@@ -791,7 +733,9 @@ function cs_regression_t_stats(B::Arr3Num, f::MatNum, eps::MatNum,
 end
 function cs_regression_t_stats(csfm::CrossSectionalFactorModel)
     data = cs_regression_data(csfm)
-    return cs_regression_t_stats(data.B, data.f, data.eps, data.w)
+    dd = cs_dropped_design(data.B, data.P, data.dc)
+    return cs_design_result(csfm,
+                            cs_regression_t_stats(dd.B, data.f, data.eps, data.w; P = dd.P))
 end
 """
     cs_row_is_finite(A::MatNum, t::Integer)
@@ -860,7 +804,7 @@ end
 
 Write the t-statistics of one observation into the answer.
 
-A factor whose standard error is zero keeps the absent answer the caller filled the row with, so this writes only the entries that have one.
+A factor whose standard error is zero, or `Inf` because the design does not identify it, keeps the absent answer the caller filled the row with, so this writes only the entries that have one.
 
 # Arguments
 
@@ -883,49 +827,123 @@ function cs_t_stat_row!(t::MatNum, f::MatNum, D::MatNum, s2, tt::Integer)::Nothi
     Tf = eltype(t)
     for k in axes(t, 2)
         se = sqrt(max(s2 * Tf(D[tt, k]), zero(Tf)))
-        if se > zero(Tf)
+        # An unbounded standard error belongs to a coefficient the design does not
+        # identify, and the ratio `f / Inf = 0` would state a value it does not have.
+        if zero(Tf) < se < Tf(Inf)
             t[tt, k] = Tf(f[tt, k]) / se
         end
     end
     return nothing
 end
 """
-    cs_resolved_gram(G::Nothing, B::Arr3Num, u::MatNum)
-    cs_resolved_gram(G::Arr3Num, B::Arr3Num, u::MatNum)
+    cs_assert_gram(G::Nothing, B::Arr3Num)
+    cs_assert_gram(G::Arr3Num, B::Arr3Num)
 
-Return the Gram history a diagnostic reads, building it only when the caller supplied none.
+Check that a Gram history a caller supplied matches the design.
 
 # Arguments
 
   - `G`: Gram history the caller holds, or `nothing`.
   - `B`: Exposure history `observations × assets × factors`, already lagged.
-  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
+
+# Validation
+
+  - `size(G) == (size(B, 1), size(B, 3), size(B, 3))`, when `G` is present. Raises a `DimensionMismatch`.
 
 # Returns
 
-  - `G::Arr3Num`: The supplied history, or the one [`cs_gram_from_weights`](@ref) builds.
+  - `nothing`.
 
 # Related
 
-  - [`cs_gram`](@ref)
   - [`cs_regression_t_stats`](@ref)
+  - [`cs_slice_inverse_diagonal!`](@ref)
 """
-function cs_resolved_gram(::Nothing, B::Arr3Num, u::MatNum)
-    return cs_gram_from_weights(B, u)
+function cs_assert_gram(::Nothing, ::Arr3Num)::Nothing
+    return nothing
 end
-function cs_resolved_gram(G::Arr3Num, B::Arr3Num, ::MatNum)
+function cs_assert_gram(G::Arr3Num, B::Arr3Num)::Nothing
     @argcheck(size(G, 1) == size(B, 1) &&
               size(G, 2) == size(B, 3) &&
               size(G, 3) == size(B, 3),
               DimensionMismatch("G ($(size(G, 1))×$(size(G, 2))×$(size(G, 3))) must match B ($(size(B, 1)) observations, $(size(B, 3)) factors)"))
-    return G
+    return nothing
+end
+"""
+    cs_gram_eltype(G::Nothing)
+    cs_gram_eltype(G::Arr3Num)
+
+Return the element type that a Gram history a caller supplied adds to the arithmetic of a diagnostic.
+
+`Bool` is the type that adds nothing, because it promotes to every other number type. So a diagnostic without a Gram history takes the type of its design and its weights alone.
+
+# Arguments
+
+  - `G`: Gram history the caller holds, or `nothing`.
+
+# Returns
+
+  - `T::Type`: `Bool` without a history, and the real element type of `G` otherwise.
+
+# Related
+
+  - [`cs_regression_t_stats`](@ref)
+"""
+function cs_gram_eltype(::Nothing)
+    return Bool
+end
+function cs_gram_eltype(G::Arr3Num)
+    return real(eltype(G))
+end
+"""
+    cs_slice_inverse_diagonal!(D::AbstractMatrix, G::Nothing, B::Arr3Num, u::MatNum,
+                               t::Integer, Pt::Option{<:AbstractMatrix})
+    cs_slice_inverse_diagonal!(D::AbstractMatrix, G::Arr3Num, B::Arr3Num, u::MatNum,
+                               t::Integer, Pt::Option{<:AbstractMatrix})
+
+Write the diagonal of the inverse Gram matrix of one observation into the answer, from the design or from the Gram history the caller supplied.
+
+Without a Gram history the verb reads the weighted design through [`cs_inverse_diagonal!`](@ref), at the rank of the fit. With one, it reads the slice through [`cs_gram_inverse_diagonal!`](@ref), whose rank test reads the square of the condition number of the design.
+
+# Arguments
+
+  - `D`: Answer `observations × factors`, written in place.
+  - `G`: Gram history the caller holds, or `nothing`.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
+  - `t`: Observation to write.
+  - `Pt`: The change of the observation, or `nothing`.
+
+# Returns
+
+  - `r::Int`: The numeric rank of the observation.
+
+# Related
+
+  - [`cs_regression_t_stats`](@ref)
+  - [`cs_inverse_diagonal!`](@ref)
+  - [`cs_gram_inverse_diagonal!`](@ref)
+"""
+function cs_slice_inverse_diagonal!(D::AbstractMatrix, ::Nothing, B::Arr3Num, u::MatNum,
+                                    t::Integer, Pt::Option{<:AbstractMatrix})::Int
+    return cs_inverse_diagonal!(D, cs_design_slice(B, u, t, eltype(D)), t, Pt)
+end
+function cs_slice_inverse_diagonal!(D::AbstractMatrix, G::Arr3Num, ::Arr3Num, ::MatNum,
+                                    t::Integer, Pt::Option{<:AbstractMatrix})::Int
+    Gt = Matrix{eltype(D)}(undef, size(G, 2), size(G, 3))
+    cs_gram_slice!(Gt, G, t)
+    return cs_gram_inverse_diagonal!(D, Gt, t, Pt)
 end
 """
     cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2) -> Vector{<:Real}
     cs_regression_t_stat_exceedance_rate(
+        t::FactorDiagnosticResult;
+        threshold::Number = 2
+    ) -> FactorDiagnosticResult
+    cs_regression_t_stat_exceedance_rate(
         csfm::CrossSectionalFactorModel;
         threshold::Number = 2
-    ) -> Vector{<:Real}
+    ) -> FactorDiagnosticResult
 
 Return the fraction of observations at which a factor's t-statistic exceeds a threshold.
 
@@ -944,7 +962,7 @@ Where:
 
 # Arguments
 
-  - `t`: T-statistic matrix `observations × factors`.
+  - `t`: T-statistic matrix `observations × factors`, or the [`FactorDiagnosticResult`](@ref) of [`cs_regression_t_stats`](@ref), whose labels the answer keeps.
   - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis.
   - `threshold`: Absolute t-statistic above which an observation counts as significant.
 
@@ -954,7 +972,8 @@ Where:
 
 # Returns
 
-  - `rate::Vector{<:Real}`: One entry per factor. A factor with no finite t-statistic answers zero.
+  - `rate::Vector{<:Real}`: One entry per factor, on the method over a matrix. A factor with no finite t-statistic answers zero.
+  - `r::FactorDiagnosticResult`: On the other two methods, the same vector in `X`, with the names and the family labels of the factor axis of `t`. The block method returned the bare vector in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Examples
 
@@ -989,6 +1008,12 @@ function cs_regression_t_stat_exceedance_rate(t::MatNum; threshold::Number = 2)
         rate[k] = iszero(n) ? zero(Tf) : Tf(s) / Tf(n)
     end
     return rate
+end
+function cs_regression_t_stat_exceedance_rate(t::FactorDiagnosticResult;
+                                              threshold::Number = 2)
+    return FactorDiagnosticResult(cs_regression_t_stat_exceedance_rate(t.X;
+                                                                       threshold = threshold),
+                                  t.nf, t.fam, (1,))
 end
 function cs_regression_t_stat_exceedance_rate(csfm::CrossSectionalFactorModel;
                                               threshold::Number = 2)
@@ -1028,9 +1053,11 @@ The mask of a score is the finiteness of the asset return, which the exposures, 
   - `n::Vector{Int}`: Eligible asset count of every observation.
   - `rss::Vector{<:Real}`: Weight-normalised residual sum of squares of every observation.
   - `r2::Vector{<:Real}`: Coefficient of determination of every observation.
+  - `Q::Matrix{<:Real}`: `observations × assets`. The normalised weights, zero outside the mask, which [`cs_score_regressors`](@ref) reads for the rank of each design.
 
 # Related
 
+  - [`cs_score_regressors`](@ref)
   - [`cs_regression_r2`](@ref)
   - [`cs_regression_adjusted_r2`](@ref)
   - [`cs_regression_aic`](@ref)
@@ -1049,13 +1076,47 @@ function cs_regression_score_parts(B::Arr3Num, f::MatNum, eps::MatNum, w::Option
     rss = Vector{Tf}(undef, T)
     r2 = Vector{Tf}(undef, T)
     r = Vector{Tf}(undef, N)
-    q = Vector{Tf}(undef, N)
+    Q = Matrix{Tf}(undef, T, N)
     for t in 1:T
+        q = view(Q, t, :)
         n[t] = cs_score_observation!(r, q, B, f, eps, u0, t)
         rss[t], tss = cs_weighted_score_sums(r, q, eps, t)
         r2[t] = iszero(tss) ? Tf(NaN) : one(Tf) - rss[t] / tss
     end
-    return n, rss, r2
+    return n, rss, r2, Q
+end
+"""
+    cs_score_regressors(k::Integer, B::Arr3Num, Q::MatNum)
+    cs_score_regressors(k::Nothing, B::Arr3Num, Q::MatNum)
+
+Return the effective number of regressors of every cross-sectional fit, which a score charges for.
+
+A fit spends one degree of freedom on each direction of its design, which is the rank of the design rather than its column count. The two differ on a collinear observation, such as one where a level of a constrained family has no member. So `nothing` takes the numeric rank of the weighted design of each observation, on the mask of the score, through [`cross_sectional_rank`](@ref), which is the rank test of the fit. A test on the Gram matrix would square the condition number, and count fewer directions than the fit spent on a design whose condition number exceeds about ``10^{8}``. An integer is a count the caller states, and every observation takes it.
+
+# Arguments
+
+  - `k`: Number of regressors, or `nothing` for the rank of each observation.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `Q`: Normalised weight history `observations × assets` of the score, zero outside its mask.
+
+# Returns
+
+  - `k::Vector{<:Integer}`: One count per observation.
+
+# Related
+
+  - [`cs_regression_score_parts`](@ref)
+  - [`cs_regression_adjusted_r2`](@ref)
+  - [`cs_regression_aic`](@ref)
+  - [`cs_regression_bic`](@ref)
+"""
+function cs_score_regressors(k::Integer, B::Arr3Num, ::MatNum)
+    return fill(k, size(B, 1))
+end
+function cs_score_regressors(::Nothing, B::Arr3Num, Q::MatNum)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(Q)))))))
+    return [cross_sectional_rank(cs_design_slice(B, Q, t, Tf)) for t in axes(B, 1)]
 end
 """
     cs_score_observation!(
@@ -1298,7 +1359,7 @@ julia> cs_regression_r2(B, [1.0 1.0], [0.0 0.0])
   - [`CrossSectionalFactorModel`](@ref)
 """
 function cs_regression_r2(B::Arr3Num, f::MatNum, eps::MatNum, w::Option{<:MatNum} = nothing)
-    _, _, r2 = cs_regression_score_parts(B, f, eps, w)
+    _, _, r2, _ = cs_regression_score_parts(B, f, eps, w)
     return r2
 end
 function cs_regression_r2(csfm::CrossSectionalFactorModel)
@@ -1311,9 +1372,12 @@ end
         f::MatNum,
         eps::MatNum,
         w::Option{<:MatNum} = nothing;
-        k::Integer = size(B, 3)
+        k::Option{<:Integer} = nothing
     ) -> Vector{<:Real}
-    cs_regression_adjusted_r2(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    cs_regression_adjusted_r2(
+        csfm::CrossSectionalFactorModel;
+        k::Option{<:Integer} = nothing
+    ) -> Vector{<:Real}
 
 Return the cross-sectional coefficient of determination adjusted for the regressor count, one entry per observation.
 
@@ -1322,14 +1386,14 @@ The adjustment charges the score for every regressor, so a factor that explains 
 # Mathematical definition
 
 ```math
-\\bar{R}^{2}_{t} = 1 - (1 - R^{2}_{t}) \\, \\frac{n_{t} - 1}{n_{t} - k - 1}
+\\bar{R}^{2}_{t} = 1 - (1 - R^{2}_{t}) \\, \\frac{n_{t} - 1}{n_{t} - k_{t} - 1}
 ```
 
 Where:
 
   - ``R^{2}_{t}``: Coefficient of determination of observation ``t``, which [`cs_regression_r2`](@ref) defines.
   - ``n_{t}``: Number of eligible assets at observation ``t``.
-  - ``k``: Effective number of regressors.
+  - ``k_{t}``: Effective number of regressors of observation ``t``.
 
 # Arguments
 
@@ -1337,7 +1401,7 @@ Where:
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `k`: Effective number of regressors. The block method takes the factor count of the reduced axis, which is what the fit spent.
+  - `k`: Effective number of regressors, or `nothing` for the rank of the design of each observation, which [`cs_score_regressors`](@ref) takes. The rank is what the fit spent: the factor count of the reduced axis on a full-rank observation, and less on a collinear one.
   - `csfm`: A cross-sectional factor model block.
 
 # Validation
@@ -1347,7 +1411,7 @@ Where:
 
 # Returns
 
-  - `adj::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k + 1`.
+  - `adj::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k_t + 1`.
 
 # Examples
 
@@ -1367,22 +1431,25 @@ julia> cs_regression_adjusted_r2(B, [1.0 0.0], [0.0 0.0 0.0])
   - [`CrossSectionalFactorModel`](@ref)
 """
 function cs_regression_adjusted_r2(B::Arr3Num, f::MatNum, eps::MatNum,
-                                   w::Option{<:MatNum} = nothing; k::Integer = size(B, 3))
-    n, _, r2 = cs_regression_score_parts(B, f, eps, w)
+                                   w::Option{<:MatNum} = nothing;
+                                   k::Option{<:Integer} = nothing)
+    n, _, r2, Q = cs_regression_score_parts(B, f, eps, w)
+    kt = cs_score_regressors(k, B, Q)
     Tf = eltype(r2)
     adj = Vector{Tf}(undef, length(r2))
     for t in eachindex(adj)
-        adj[t] = if n[t] > k + 1
-            one(Tf) - (one(Tf) - r2[t]) * Tf(n[t] - 1) / Tf(n[t] - k - 1)
+        adj[t] = if n[t] > kt[t] + 1
+            one(Tf) - (one(Tf) - r2[t]) * Tf(n[t] - 1) / Tf(n[t] - kt[t] - 1)
         else
             Tf(NaN)
         end
     end
     return adj
 end
-function cs_regression_adjusted_r2(csfm::CrossSectionalFactorModel)
+function cs_regression_adjusted_r2(csfm::CrossSectionalFactorModel;
+                                   k::Option{<:Integer} = nothing)
     data = cs_regression_data(csfm)
-    return cs_regression_adjusted_r2(data.B, data.f, data.eps, data.w)
+    return cs_regression_adjusted_r2(data.B, data.f, data.eps, data.w; k = k)
 end
 """
     cs_regression_aic(
@@ -1390,9 +1457,12 @@ end
         f::MatNum,
         eps::MatNum,
         w::Option{<:MatNum} = nothing;
-        k::Integer = size(B, 3)
+        k::Option{<:Integer} = nothing
     ) -> Vector{<:Real}
-    cs_regression_aic(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    cs_regression_aic(
+        csfm::CrossSectionalFactorModel;
+        k::Option{<:Integer} = nothing
+    ) -> Vector{<:Real}
 
 Return the Akaike information criterion of every cross-sectional fit, one entry per observation.
 
@@ -1401,14 +1471,14 @@ The criterion trades the fit of an observation against the size of its design, a
 # Mathematical definition
 
 ```math
-\\mathrm{AIC}_{t} = n_{t} \\ln (\\mathrm{RSS}_{t}) + 2 k
+\\mathrm{AIC}_{t} = n_{t} \\ln (\\mathrm{RSS}_{t}) + 2 k_{t}
 ```
 
 Where:
 
   - ``\\mathrm{RSS}_{t}``: Weight-normalised residual sum of squares of observation ``t``.
   - ``n_{t}``: Number of eligible assets at observation ``t``.
-  - ``k``: Effective number of regressors.
+  - ``k_{t}``: Effective number of regressors of observation ``t``.
 
 # Arguments
 
@@ -1416,7 +1486,7 @@ Where:
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `k`: Effective number of regressors. The block method takes the factor count of the reduced axis, which is what the fit spent.
+  - `k`: Effective number of regressors, or `nothing` for the rank of the design of each observation, which [`cs_score_regressors`](@ref) takes. The rank is what the fit spent: the factor count of the reduced axis on a full-rank observation, and less on a collinear one.
   - `csfm`: A cross-sectional factor model block.
 
 # Validation
@@ -1426,7 +1496,7 @@ Where:
 
 # Returns
 
-  - `aic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k`, and `-Inf` where the residual sum of squares is zero.
+  - `aic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k_t`, and `-Inf` where the residual sum of squares is zero.
 
 # Examples
 
@@ -1446,19 +1516,20 @@ julia> cs_regression_aic(B, [1.0 0.0], [0.1 0.1 0.1]; k = 1)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function cs_regression_aic(B::Arr3Num, f::MatNum, eps::MatNum,
-                           w::Option{<:MatNum} = nothing; k::Integer = size(B, 3))
-    n, rss, _ = cs_regression_score_parts(B, f, eps, w)
+                           w::Option{<:MatNum} = nothing; k::Option{<:Integer} = nothing)
+    n, rss, _, Q = cs_regression_score_parts(B, f, eps, w)
+    kt = cs_score_regressors(k, B, Q)
     # A logarithm leaves a `Rational` type.
     Tf = typeof(log(one(eltype(rss))))
     aic = Vector{Tf}(undef, length(rss))
     for t in eachindex(aic)
-        aic[t] = n[t] > k ? Tf(n[t]) * log(rss[t]) + Tf(2 * k) : Tf(NaN)
+        aic[t] = n[t] > kt[t] ? Tf(n[t]) * log(rss[t]) + Tf(2 * kt[t]) : Tf(NaN)
     end
     return aic
 end
-function cs_regression_aic(csfm::CrossSectionalFactorModel)
+function cs_regression_aic(csfm::CrossSectionalFactorModel; k::Option{<:Integer} = nothing)
     data = cs_regression_data(csfm)
-    return cs_regression_aic(data.B, data.f, data.eps, data.w)
+    return cs_regression_aic(data.B, data.f, data.eps, data.w; k = k)
 end
 """
     cs_regression_bic(
@@ -1466,9 +1537,12 @@ end
         f::MatNum,
         eps::MatNum,
         w::Option{<:MatNum} = nothing;
-        k::Integer = size(B, 3)
+        k::Option{<:Integer} = nothing
     ) -> Vector{<:Real}
-    cs_regression_bic(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
+    cs_regression_bic(
+        csfm::CrossSectionalFactorModel;
+        k::Option{<:Integer} = nothing
+    ) -> Vector{<:Real}
 
 Return the Bayesian information criterion of every cross-sectional fit, one entry per observation.
 
@@ -1477,14 +1551,14 @@ The criterion trades the fit of an observation against the size of its design, a
 # Mathematical definition
 
 ```math
-\\mathrm{BIC}_{t} = n_{t} \\ln (\\mathrm{RSS}_{t}) + k \\ln (n_{t})
+\\mathrm{BIC}_{t} = n_{t} \\ln (\\mathrm{RSS}_{t}) + k_{t} \\ln (n_{t})
 ```
 
 Where:
 
   - ``\\mathrm{RSS}_{t}``: Weight-normalised residual sum of squares of observation ``t``.
   - ``n_{t}``: Number of eligible assets at observation ``t``.
-  - ``k``: Effective number of regressors.
+  - ``k_{t}``: Effective number of regressors of observation ``t``.
 
 # Arguments
 
@@ -1492,7 +1566,7 @@ Where:
   - `f`: Factor return matrix `observations × factors`, already lagged.
   - `eps`: Residual matrix `observations × assets`, already lagged.
   - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
-  - `k`: Effective number of regressors. The block method takes the factor count of the reduced axis, which is what the fit spent.
+  - `k`: Effective number of regressors, or `nothing` for the rank of the design of each observation, which [`cs_score_regressors`](@ref) takes. The rank is what the fit spent: the factor count of the reduced axis on a full-rank observation, and less on a collinear one.
   - `csfm`: A cross-sectional factor model block.
 
 # Validation
@@ -1502,7 +1576,7 @@ Where:
 
 # Returns
 
-  - `bic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k`, and `-Inf` where the residual sum of squares is zero.
+  - `bic::Vector{<:Real}`: One entry per observation, `NaN` where the eligible asset count does not exceed `k_t`, and `-Inf` where the residual sum of squares is zero.
 
 # Examples
 
@@ -1522,56 +1596,20 @@ julia> cs_regression_bic(B, [1.0 0.0], [0.1 0.1 0.1]; k = 1)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function cs_regression_bic(B::Arr3Num, f::MatNum, eps::MatNum,
-                           w::Option{<:MatNum} = nothing; k::Integer = size(B, 3))
-    n, rss, _ = cs_regression_score_parts(B, f, eps, w)
+                           w::Option{<:MatNum} = nothing; k::Option{<:Integer} = nothing)
+    n, rss, _, Q = cs_regression_score_parts(B, f, eps, w)
+    kt = cs_score_regressors(k, B, Q)
     Tf = typeof(log(one(eltype(rss))))
     bic = Vector{Tf}(undef, length(rss))
     for t in eachindex(bic)
-        bic[t] = n[t] > k ? Tf(n[t]) * log(rss[t]) + Tf(k) * log(Tf(n[t])) : Tf(NaN)
+        bic[t] = n[t] > kt[t] ? Tf(n[t]) * log(rss[t]) + Tf(kt[t]) * log(Tf(n[t])) : Tf(NaN)
     end
     return bic
 end
-function cs_regression_bic(csfm::CrossSectionalFactorModel)
+function cs_regression_bic(csfm::CrossSectionalFactorModel; k::Option{<:Integer} = nothing)
     data = cs_regression_data(csfm)
-    return cs_regression_bic(data.B, data.f, data.eps, data.w)
+    return cs_regression_bic(data.B, data.f, data.eps, data.w; k = k)
 end
 
-"""
-    cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
-
-Return the factor names of the axis a cross-sectional regression diagnostic answers on.
-
-A diagnostic that carries a factor axis answers on the reduced axis when the block carries a family re-basis, so the names of the raw axis do not label it. This verb maps them, and it is what a plot reads to label its axis. A block that names no factor answers `nothing`, and the caller then labels the axis by position.
-
-# Arguments
-
-  - `csfm`: A cross-sectional factor model block.
-
-# Returns
-
-  - `nf::Option{<:Vector{String}}`: The names of the answer's factor axis, or `nothing` when the block names no factor.
-
-# Related
-
-  - [`CrossSectionalFactorModel`](@ref)
-  - [`reduce_factor_names`](@ref)
-  - [`cs_regression_t_stats`](@ref)
-  - [`exposure_vif`](@ref)
-"""
-function cs_diagnostic_factor_names(csfm::CrossSectionalFactorModel)
-    return cs_diagnostic_factor_names(csfm.fcb, csfm.nf)
-end
-function cs_diagnostic_factor_names(::Option{<:AbstractFactorFamilyBasis},
-                                    ::Nothing)::Nothing
-    return nothing
-end
-function cs_diagnostic_factor_names(::Nothing, nf::VecStr)::Vector{String}
-    return String[String(n) for n in nf]
-end
-function cs_diagnostic_factor_names(fcb::FactorFamilyBasis, nf::VecStr)::Vector{String}
-    return reduce_factor_names(fcb, nf)
-end
-
-export cs_gram, cs_regression_t_stats, cs_regression_t_stat_exceedance_rate, exposure_vif,
-       exposure_condition_number, cs_regression_r2, cs_regression_adjusted_r2,
-       cs_regression_aic, cs_regression_bic
+export cs_gram, cs_regression_t_stats, cs_regression_t_stat_exceedance_rate,
+       cs_regression_r2, cs_regression_adjusted_r2, cs_regression_aic, cs_regression_bic

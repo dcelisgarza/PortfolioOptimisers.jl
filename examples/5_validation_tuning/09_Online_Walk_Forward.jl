@@ -143,6 +143,12 @@ asset's mean uses the rows where that asset has a return, each covariance entry 
 where both assets have one, and an asset enters the estimate when it lists. Under the policy the
 online update gives the batch estimate exactly, because the batch fit under the policy runs the
 same update over the rows. Section 9 returns to that fact.
+
+The clustering of `HierarchicalRiskParity` reads the returns data, not the prior. The returns
+data keep the gap of the seventh asset before it lists, so the clustering takes the covariance
+estimator of the prior, with its policy, and reads the rows where each pair has a return. A
+clustering with no policy cannot read the gap. The optimiser then leaves the asset out with a
+warning, although the prior admitted it.
 =#
 
 cvg = CoveragePolicy()
@@ -153,7 +159,8 @@ slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
                              "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10),
              check_sol = (; allow_local = false, allow_almost = false))
 mr = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv))
-hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe))
+cle = ClustersEstimator(; ce = pe.ce)
+hrp = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pe, cle = cle))
 
 #=
 ## 2. The online run against the batch expanding run, fold by fold
@@ -280,7 +287,7 @@ rolling = IndexWalkForward(w + p, t; purged_size = p)
 stepped = OnlineIndexWalkForward(w + p, t; purged_size = p)
 cap(pe) = Online(pe; max_history = w)
 
-hrp_cap = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = cap(pe)))
+hrp_cap = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = cap(pe), cle = cle))
 b_roll = cross_val_predict(hrp, rd, rolling)
 o_roll = cross_val_predict(hrp_cap, rd, stepped)
 

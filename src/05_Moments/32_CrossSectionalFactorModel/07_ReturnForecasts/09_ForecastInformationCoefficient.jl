@@ -146,7 +146,7 @@ end
 
 Return the number of consecutive evaluation dates whose forward windows overlap a given one.
 
-A window of `horizon` observations, scored every `step` observations, spans `cld(horizon, step)` dates. The dates on each side of a given one that read some of the same returns are one fewer than that. It is the number of autocovariances the t-statistic of [`exposure_ic_factor_summary`](@ref) reads. The function derives it from the window and the stride and does not ask the caller for it, because the overlap is a fact of the grid. Under the default stride of [`forecast_evaluation`](@ref), `step = horizon`, it is `0`.
+A window of `horizon` observations, scored every `step` observations, spans `cld(horizon, step)` dates. The dates on each side of a given one that read some of the same returns are one fewer than that. It is the order of the long-run variance of [`OverlapMeanTest`](@ref) in [`exposure_ic_factor_summary`](@ref). The function derives it from the window and the stride and does not ask the caller for it, because the overlap is a fact of the grid. Under the default stride of [`forecast_evaluation`](@ref), `step = horizon`, it is `0`.
 
 # Mathematical definition
 
@@ -201,19 +201,77 @@ function forecast_ic_lags(fe::ForecastEvaluationResult)
     return forecast_ic_lags(fe.horizon, fe.step)
 end
 """
-    forecast_ic_summary(ic::MatNum; lags::Integer = 0)
+    forecast_ic_window(horizon::Integer, step::Integer) -> Rational{Int}
+    forecast_ic_window(fe::ForecastEvaluationResult) -> Rational{Int}
+
+Return the number of evaluation dates that one forward window spans, as an exact ratio.
+
+A window of `horizon` observations, scored every `step` observations, spans `horizon / step` dates. The ratio is exact, so a history of `T` dates covers `T / window` holding periods, the count that the `min_periods` rule of a Mean Test reads. The overlap order of [`forecast_ic_lags`](@ref) is `ceil(Int, window) - 1`.
+
+# Mathematical definition
+
+```math
+w = \\frac{h}{s}
+```
+
+Where:
+
+  - ``h``: The forward window, in observations.
+  - $(math_dict[:s_eval_stride])
+
+# Arguments
+
+  - `horizon`: Forward window, in observations.
+  - `step`: Number of observations between two evaluation dates.
+  - `fe`: An evaluation. The function reads its `horizon` and its `step`.
+
+# Validation
+
+  - `horizon >= 1` and `step >= 1`. Raise a `DomainError`.
+
+# Returns
+
+  - `w::Rational{Int}`: The window, in dates.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.forecast_ic_window(5, 2)
+5//2
+
+julia> PortfolioOptimisers.forecast_ic_window(5, 5)
+1//1
+```
+
+# Related
+
+  - [`forecast_ic_lags`](@ref)
+  - [`forecast_ic_summary`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
+"""
+function forecast_ic_window(horizon::Integer, step::Integer)
+    @argcheck(horizon >= one(horizon), DomainError(horizon, "horizon must be >= 1"))
+    @argcheck(step >= one(step), DomainError(step, "step must be >= 1"))
+    return Int(horizon) // Int(step)
+end
+function forecast_ic_window(fe::ForecastEvaluationResult)
+    return forecast_ic_window(fe.horizon, fe.step)
+end
+"""
+    forecast_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
+                        mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
 
 Return the summary of the two information coefficient series of an evaluation, by name.
 
-The summary gives five numbers for each series. The mean is the average score, and the standard deviation is how much the score moves. Their ratio is the score per unit of movement. The t-statistic says whether the mean is far enough from zero to believe, over the dates that carried a score. The hit rate is the share of those dates at which the score was positive.
+The summary gives eight numbers for each series. The mean is the average score, and the standard deviation is how much the score moves. Their ratio is the score per unit of movement. The t-statistic, the p-value and the confidence interval of the mean say whether the mean is far enough from zero to believe, over the dates that carried a score. The hit rate is the share of those dates at which the score was positive.
 
 The two series carry names and not positions, because a column of [`forecast_ic`](@ref) carries no name, and a read of the wrong column raises no error. [`exposure_ic_factor_summary`](@ref) summarises each series. The exposure diagnostics call the same function, so a coefficient of a forecast and a coefficient of a factor exposure have the same summary.
 
-# The t-statistic reads the overlap of the windows
+# The test reads the dependence of the dates
 
-Two evaluation dates closer together than the forward window score some of the same returns. When the forecast keeps its ordering from one date to the next, the coefficients of the two dates are correlated. A t-statistic that treats them as independent then overstates the evidence, by up to the root of the number of dates a window spans for a forecast that barely changes. A forecast that draws a new ordering at every date gives coefficients with almost no correlation, and the plain statistic does not overstate its evidence. The standard error of the mean therefore reads the long-run variance of the series over `lags` autocovariances, as [`exposure_ic_factor_summary`](@ref) states.
+Two evaluation dates closer together than the forward window score some of the same returns. When the forecast keeps its ordering from one date to the next, the coefficients of the two dates are correlated. A persistent coefficient correlates the dates past the overlap too. A t-statistic that treats them as independent then overstates the evidence, by up to the root of the number of dates a window spans for a forecast that barely changes. The Mean Test `mt` reads this dependence, as [`exposure_ic_factor_summary`](@ref) states. The default [`WildBootstrapMeanTest`](@ref) reads it at every lag up to its bandwidth, and its p-value comes from a wild bootstrap.
 
-`lags` is the number of dates on each side of a given one whose windows overlap it. [`forecast_ic_lags`](@ref) derives it from the `horizon` and the `step` of the evaluation. It is `0` under the default stride, where the windows are disjoint and the statistic is ``\\mathrm{IR} \\sqrt{n}``. It is `horizon - 1` at a stride of one. [`forecast_evaluation_summary`](@ref), [`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) derive it. A caller who summarises a series by hand passes it.
+`lags` is the number of dates on each side of a given one whose windows overlap it, and `window` is the number of dates that one window spans. [`forecast_ic_lags`](@ref) and [`forecast_ic_window`](@ref) derive them from the `horizon` and the `step` of the evaluation. [`OverlapMeanTest`](@ref) reads the order, and the history rule of a Mean Test reads the window. It is `0` under the default stride, where the windows are disjoint. It is `horizon - 1` at a stride of one. [`forecast_evaluation_summary`](@ref), [`forecast_holding_period`](@ref) and [`forecast_decay`](@ref) derive it. A caller who summarises a series by hand passes it.
 
 # Mathematical definition
 
@@ -224,29 +282,32 @@ t_{k} = \\frac{\\overline{\\mathrm{IC}}_{k}}{\\sigma_{k}} \\sqrt{\\left| \\mathc
 Where:
 
   - ``\\overline{\\mathrm{IC}}_{k}``: Mean of series ``k`` over its finite dates.
-  - ``\\sigma_{k}``: Its long-run standard deviation over `lags` autocovariances, from [`exposure_ic_factor_summary`](@ref), which is its standard deviation at `lags = 0`.
+  - ``\\sigma_{k}``: Its long-run standard deviation, which the Mean Test `mt` defines.
   - ``\\mathcal{T}_{k}``: The dates at which series ``k`` is finite.
 
 # Algorithm
 
  1. Check that `ic` is not empty and carries two columns.
- 2. Summarise the first column with [`exposure_ic_factor_summary`](@ref) at `lags`, into `spearman`.
- 3. Summarise the second column the same way, into `pearson`.
+ 2. Resolve the generator of `mt` once, with [`mean_test_rng`](@ref).
+ 3. Summarise the first column with [`exposure_ic_factor_summary`](@ref) at `lags` and `mt`, into `spearman`.
+ 4. Summarise the second column the same way, into `pearson`.
 
 # Arguments
 
   - `ic`: Information coefficient series `dates × 2`, from [`forecast_ic`](@ref).
-  - `lags`: Number of autocovariances the t-statistic's standard error reads, from [`forecast_ic_lags`](@ref).
+  - `lags`: Number of dates on each side of a given date whose windows overlap it, from [`forecast_ic_lags`](@ref).
+  - `window`: Number of dates that one forward window spans, from [`forecast_ic_window`](@ref). The rules of [`resolve_mean_test_window`](@ref) relate it to `lags`.
+  - `mt`: The Mean Test of the t-statistic, the p-value and the interval.
 
 # Validation
 
   - `!isempty(ic)`. Raises an [`IsEmptyError`](@ref).
   - `size(ic, 2) == 2`. Raises a `DimensionMismatch`.
-  - `lags >= 0`. Raises a `DomainError`.
+  - The rules of [`resolve_mean_test_window`](@ref).
 
 # Returns
 
-  - `summary::NamedTuple`: `(; spearman, pearson)`, each `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`.
+  - `summary::NamedTuple`: `(; spearman, pearson)`, each `(; mean_ic, std_ic, ic_ir, t_stat, p_value, mean_ci_lower, mean_ci_upper, hit_rate)`.
 
 # Examples
 
@@ -257,24 +318,32 @@ julia> y = PortfolioOptimisers.forward_mean_returns(alpha, 1, 1);
 
 julia> fe = forecast_evaluation(alpha, y);
 
-julia> forecast_ic_summary(forecast_ic(fe); lags = PortfolioOptimisers.forecast_ic_lags(fe)).spearman
-(mean_ic = 0.3333333333333333, std_ic = 0.7023769168568493, ic_ir = 0.4745789978762494, t_stat = 0.8219949365267862, hit_rate = 0.6666666666666666)
+julia> forecast_ic_summary(forecast_ic(fe); window = PortfolioOptimisers.forecast_ic_window(fe),
+                           mt = OverlapMeanTest()).spearman
+(mean_ic = 0.3333333333333333, std_ic = 0.7023769168568493, ic_ir = 0.4745789978762494, t_stat = 0.8219949365267862, p_value = 0.49748109237039406, mean_ci_lower = -1.4114676536936914, mean_ci_upper = 2.078134320360358, hit_rate = 0.6666666666666666)
 ```
 
 # Related
 
   - [`forecast_ic`](@ref)
   - [`forecast_ic_lags`](@ref)
+  - [`forecast_ic_window`](@ref)
   - [`forecast_coverage`](@ref)
   - [`exposure_ic_factor_summary`](@ref)
   - [`exposure_ic_summary`](@ref)
+  - [`WildBootstrapMeanTest`](@ref)
 """
-function forecast_ic_summary(ic::MatNum; lags::Integer = 0)
+function forecast_ic_summary(ic::MatNum; lags::Integer = 0, window::Real = lags + 1,
+                             mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())
     @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
     @argcheck(size(ic, 2) == 2,
               DimensionMismatch("ic must carry the two columns forecast_ic answers, the Spearman coefficient and the Pearson one, and it carries $(size(ic, 2))"))
-    return (; spearman = exposure_ic_factor_summary(ic, 1; lags = lags),
-            pearson = exposure_ic_factor_summary(ic, 2; lags = lags))
+    rng = mean_test_rng(mt)
+    return (;
+            spearman = exposure_ic_factor_summary(ic, 1; lags = lags, window = window,
+                                                  mt = mt, rng = rng),
+            pearson = exposure_ic_factor_summary(ic, 2; lags = lags, window = window,
+                                                 mt = mt, rng = rng))
 end
 """
     forecast_coverage(fe::ForecastEvaluationResult,

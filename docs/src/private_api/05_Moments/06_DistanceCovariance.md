@@ -1,5 +1,5 @@
 ```@meta
-Description = "Distance Covariance, private API of PortfolioOptimisers.jl: calc_pairwise_dists, calc_centred_dists, calc_dcov2, cor_distance, cov_distance."
+Description = "Distance Covariance, private API of PortfolioOptimisers.jl: calc_pairwise_dists, calc_centred_dists, calc_dcov2, cor_distance, cov_distance, show_fields."
 ```
 
 # Distance Covariance: private API
@@ -12,4 +12,5 @@ cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBa
 cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
 cor_distance(ce::DistanceCovariance, X::MatNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
 cov_distance(ce::DistanceCovariance, X::MatNum, w::Option{<:StatsBase.AbstractWeights} = nothing)
+PortfolioOptimisers.show_fields(::DistanceCovariance)
 ```

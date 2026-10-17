@@ -39,7 +39,7 @@ there widens and this method never reaches it" — which was never true.
 
 **A Norm Ceiling is its own quantity, and it takes its own rule family and bound.**
 
-The domain noun is a **Norm Ceiling** (`CONTEXT.md` section 3.9), defined against the
+The domain noun is a **Norm Ceiling** (`GLOSSARY.md` section 3.9), defined against the
 Ambiguity Radius it is not. The mechanism is ADR 0095's, unchanged: a family of rules under
 `AbstractCalibrationAlgorithm`, and a `Num_` bound that pairs that family with `Number` and a
 plain `Function`.
@@ -180,7 +180,7 @@ Prior instead of pasted.
     site's order is the only one there is.
 - **A `TD_` wrapper holding a rule is still unspecified.** `l2c` and `linfc` join `l1` and
     `linf` as fields with two deferral channels, and ADR 0030 still considered only one.
-    `test_09i_norm_ceiling_calibration.jl` records what the code does rather than ratifying
+    `test_09f_calibration_slot.jl` records what the code does rather than ratifying
     a design, on the same terms as the radius family's file.
 - **No rule computes a ceiling from anything but the universe size.** A rule that read the
     covariance matrix — a floor on effective *independent* bets rather than on assets — has a

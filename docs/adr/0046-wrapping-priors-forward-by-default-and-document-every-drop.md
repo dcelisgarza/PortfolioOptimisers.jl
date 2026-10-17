@@ -285,7 +285,7 @@ diagnostics that were missing from the `w` they already forwarded:
 
 ### The three silent defects this closed
 
-Each has a regression test in `test/test_12g_forwarding_rule.jl` that carries its own falsification
+Each has a regression test in `test/test_12f_forward_prior.jl` that carries its own falsification
 witness — a carrier rebuilt exactly as the pre-fix site built it, asserted to show the old behaviour.
 
 1. **Pooled observation weights never reached the risk-measure layer.**
@@ -787,7 +787,7 @@ priors it also consults for something else.
 
 The load-time half of the review's finding is already closed. `factor_residual_config` throws for an
 undeclared type (the 2026-08-17 amendment above), and the census at the end of
-`test/test_12g_forwarding_rule.jl` enumerates every concrete `AbstractPriorEstimator` the package
+`test/test_12f_forward_prior.jl` enumerates every concrete `AbstractPriorEstimator` the package
 ships and asserts that each declares. What the census cannot catch is a declaration that is present
 and wrong, which is what this amendment corrects; that failure mode needs a per-type assertion, and
 the file now carries one for `OpinionPoolingPrior`.

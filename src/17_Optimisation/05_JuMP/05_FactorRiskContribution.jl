@@ -118,7 +118,7 @@ The asset weights are recovered from the exposures through the factor loadings, 
 
 Under [`Variance`](@ref) those rows sit on the semidefinite relaxation of [sdprp](@cite), formulation 16, over the factor weights. With `flag = true` the lift covers the off-factor weights ``\\tilde{\\boldsymbol{y}}_{af}`` too, so the variance is that of the returned weights, and each row states the Euler contribution of a factor as a share of the whole variance, as [`factor_risk_contribution`](@ref) reports it. [`set_risk_constraints!`](@ref) states the formulation. A solve can report success while the factor shares of the returned portfolio miss the rows, so compare [`factor_risk_contribution`](@ref) of the result with them. The `## Risk contribution constraints` subsection of [`Variance`](@ref) states the relaxation and the condition under which the rows bind.
 
-A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Its trace has degree one in the factor weights and ``k``, so under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule.
+A [`Variance`](@ref) always takes this semidefinite formulation here, with or without rows. Under [`MaximumRatio`](@ref) the `ratio_alg` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio, and [`LinearRatio`](@ref) gives the excess return per unit of variance. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule, and [`set_sdp_frc_objective_lift!`](@ref) states the lift.
 
 # Mathematical definition
 
@@ -200,6 +200,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - A risk expression that is identically zero is refused. The problem is stated in the
     factor basis, so a model with no risk term bounds nothing. A [`NoRisk`](@ref) measure and
     `settings.rke = false` on every measure are the two routes to it.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - Each estimator of `frc_ple` states no source, because it reads the factor returns that the head picks, see [`assert_inner_reader`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -292,10 +295,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         assert_time_dependent_substitution(FactorRiskContribution,
                                            (; opt, re, r, obj, frc_ple, sets, wi, flag, fb),
                                            factor_risk_contribution_td_defaults())
-        return new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
-                   typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,
-                                                                       frc_ple, sets, wi,
-                                                                       flag, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :FactorRiskContribution, "opt.pe")
+        # The factor phylogeny reads the factor returns that the head picks, so each of its
+        # estimators is an inner reader.
+        foreach(x -> assert_inner_reader(x, :frc_ple, :FactorRiskContribution),
+                vcat(frc_ple))
+        est = new{typeof(opt), typeof(re), typeof(r), typeof(obj), typeof(frc_ple),
+                  typeof(sets), typeof(wi), typeof(flag), typeof(fb)}(opt, re, r, obj,
+                                                                      frc_ple, sets, wi,
+                                                                      flag, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function FactorRiskContribution(; opt::JuMPOptimiser,
@@ -411,11 +421,13 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
     # `rd`. Both are unchanged when every asset is investable.
     frc, rd = investable_view(frc, rd, attrs.pr, attrs.imsk)
+    frc = bind_data_benchmark(frc, rd)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, frc.opt.sc, frc.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, frc.obj)
+    set_sdp_lift_corner!(model, frc.obj, attrs.pr)
     b1, b2, rr = set_factor_risk_contribution_constraints!(model, frc.re, rd, attrs.pr,
                                                            frc.flag, frc.wi)
     # The risk builders read the basis of the whole decision vector, so a variance under
@@ -425,7 +437,8 @@ function _optimise(frc::FactorRiskContribution, rd::ReturnsResult = ReturnsResul
     assemble_jump_model!(model, frc, frc.opt, attrs, rd, frc.r, frc.obj, b, false)
     # After the model is assembled, so the factor phylogeny reads the marks that the
     # variance builders and `mark_risk_minimised!` write, as the asset phylogeny does.
-    frc_plr = phylogeny_constraints(frc.frc_ple, rd.F)
+    # A factor phylogeny reads the factor returns, so it drops their gaps as the loadings do.
+    frc_plr = phylogeny_constraints(frc.frc_ple, shared_series_view(rd, nothing, true).F)
     set_sdp_frc_phylogeny_constraints!(model, frc_plr)
     set_frc_iplg_constraints!(model, frc_plr, attrs.wb, transpose(rr.L), frc.opt.ss)
     set_portfolio_objective_function!(model, frc.obj, frc, attrs)
@@ -469,7 +482,7 @@ function optimise(frc::FactorRiskContribution{<:Any, <:Any, <:Any, <:Any, <:Any,
                                               <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(frc, "`optimise`")
-    return _optimise(frc, rd; str_names = str_names, save = save, kwargs...)
+    return shared_series_solve(frc, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates FactorRiskContribution opt

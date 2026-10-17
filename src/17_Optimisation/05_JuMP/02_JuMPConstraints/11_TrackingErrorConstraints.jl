@@ -75,7 +75,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     T = size(X, 1)
     f = err * norm_factor(tr.alg, T)
     t_tr = state_set!(model, prefix, :t_tr_, i, JuMP.@variable(model))
-    tr = state_set!(model, prefix, :tr_, i, JuMP.@expression(model, net_X - wb * k))
+    tr = state_set!(model, prefix, :tr_, i,
+                    JuMP.@expression(model,
+                                     net_X -
+                                     tracking_benchmark_expression(model, wb, prefix)))
     ctr_noc, ctr = JuMP.@constraints(model,
                                      begin
                                          [sc * t_tr;
@@ -131,7 +134,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     err = tr.err
     f = tracking_error_soc_factor(tr.alg, err, size(X, 1))
     t_tr = state_set!(model, prefix, :t_tr_, i, JuMP.@variable(model))
-    tr = state_set!(model, prefix, :tr_, i, JuMP.@expression(model, net_X - wb * k))
+    tr = state_set!(model, prefix, :tr_, i,
+                    JuMP.@expression(model,
+                                     net_X -
+                                     tracking_benchmark_expression(model, wb, prefix)))
     ctr_soc, ctr = JuMP.@constraints(model,
                                      begin
                                          [sc * t_tr;
@@ -164,7 +170,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
                                  end)
     state_set!(model, prefix, :t_tr_, i, t_tr)
     state_set!(model, prefix, :r_tr_, i, r_tr)
-    tr = state_set!(model, prefix, :tr_, i, JuMP.@expression(model, net_X - wb * k))
+    tr = state_set!(model, prefix, :tr_, i,
+                    JuMP.@expression(model,
+                                     net_X -
+                                     tracking_benchmark_expression(model, wb, prefix)))
     ctr_pnorm, cstr, ctr = JuMP.@constraints(model,
                                              begin
                                                  [i = 1:T],
@@ -191,7 +200,10 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     err = tr.err
     f = err * norm_factor(tr.alg, T)
     t_tr = state_set!(model, prefix, :t_tr_, i, JuMP.@variable(model))
-    tr = state_set!(model, prefix, :tr_, i, JuMP.@expression(model, net_X - wb * k))
+    tr = state_set!(model, prefix, :tr_, i,
+                    JuMP.@expression(model,
+                                     net_X -
+                                     tracking_benchmark_expression(model, wb, prefix)))
     ctr_infnorm, ctr = JuMP.@constraints(model,
                                          begin
                                              [sc * t_tr
@@ -258,6 +270,39 @@ function set_tracking_error_constraints!(model::JuMP.Model, i::Integer,
     state_set!(model, prefix, :cter_noc_, i, cter_noc)
     state_set!(model, prefix, :cter_, i, cter)
     return nothing
+end
+"""
+    tracking_benchmark_expression(model::JuMP.Model, b::VecNum, prefix::Symbol)
+    tracking_benchmark_expression(model::JuMP.Model, B::MatNum, prefix::Symbol)
+
+Return the benchmark return series that a tracking constraint subtracts from the net portfolio returns.
+
+The model states the weights scaled by the budget variable ``k``, so both forms carry that scale and stay linear in the weights.
+
+  - A series is fixed, so it scales with the budget variable: ``\\boldsymbol{b}k``.
+  - A matrix holds one benchmark per asset, the bound benchmark of a [`DataBenchmarkTracking`](@ref), so the series is ``\\mathbf{B}\\boldsymbol{w}`` on the weights of the model under `prefix`. These are the weights of the net portfolio returns under the same `prefix`, and they carry the scale already.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `b`, `B`: The benchmark that [`tracking_benchmark`](@ref) returns.
+  - `prefix::Symbol`: The Model State namespace of the weights.
+
+# Returns
+
+  - The benchmark return series, a vector of affine expressions with one entry per row.
+
+# Related
+
+  - [`set_tracking_error_constraints!`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
+  - [`collapse_benchmark`](@ref): The same rule on a numeric weight vector.
+"""
+function tracking_benchmark_expression(model::JuMP.Model, b::VecNum, ::Symbol)
+    return b * get_k(model)
+end
+function tracking_benchmark_expression(model::JuMP.Model, B::MatNum, prefix::Symbol)
+    return B * get_w(model, prefix)
 end
 function set_tracking_error_constraints!(model::JuMP.Model, pr::AbstractPriorResult,
                                          tres::Tr_VecTr, args...; kwargs...)

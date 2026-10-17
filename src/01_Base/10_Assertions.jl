@@ -456,37 +456,6 @@ function assert_closed_unit_interval(args...)::Nothing
     return nothing
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Assert that a matrix-source selector names one of the two carriers.
-
-Source selectors pick which of the two carriers a matrix is read from: `:prior` reads the prior result, `:data` reads the raw returns result. `x_src` selects the returns matrix `X`.
-
-# Arguments
-
-  - `src`: Selector to check.
-  - $(arg_dict[:sym_msg])
-
-# Validation
-
-  - `src in (:prior, :data)`, which raises an `ArgumentError` naming `sym` and `src`.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`JuMPOptimiser`](@ref)
-  - [`HierarchicalOptimiser`](@ref)
-  - [`NestedClustered`](@ref)
-"""
-function assert_source_selector(src::Symbol, sym::Sym_Str = :x_src)::Nothing
-    @argcheck(src in (:prior, :data),
-              ArgumentError("$sym must be :prior or :data, got $(repr(src))"))
-    return nothing
-end
-"""
     assert_nonempty_nonneg_finite_val(
         val::Union{<:AbstractDict, <:VecPair, <:ArrNum, Pair, Number},
         val_sym::Union{Symbol,<:AbstractString} = :val

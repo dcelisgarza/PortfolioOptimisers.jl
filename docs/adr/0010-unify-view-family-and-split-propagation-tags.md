@@ -16,7 +16,7 @@ struct tree:
   — an observation window) into a struct tree, returning a new struct of the same type
   with every data-bearing field and composed child consistently sub-selected. Used by
   Subset Resampling, Nested Clustered optimisation, Cross-Validation, and windowed moment
-  estimators. (See the **View** entry in `CONTEXT.md`.)
+  estimators. (See the **View** entry in `GLOSSARY.md`.)
 
 View propagation was implemented as ~25 separate, domain-named function families —
 `moment_view`, `opt_view`, `prior_view`, `risk_measure_view`, `tracking_view`,
@@ -185,7 +185,7 @@ over unchanged and now apply to both tags.
 
 Decision 2 said "collapse *every* `*_view` family into a single generic function", but
 `returns_result_view` survived the rollout — the last `*_view` name in the library. It is a
-View by CONTEXT.md's own definition: it restricts a Result to a subset of assets (and, in
+View by GLOSSARY.md's own definition: it restricts a Result to a subset of assets (and, in
 its four-argument form, observations and factors) and returns a new struct of the same type
 with every data-bearing field consistently sub-selected. It is now
 `port_opt_view(rd::ReturnsResult, …)`.

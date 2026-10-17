@@ -35,7 +35,7 @@ So a predicted attribution has two candidates for its total, and they disagree:
 2. **The carrier's total**, `w' pr.sigma w` and `w' pr.mu`. This is what the optimiser saw, what
    `expected_return` reports and what `expected_risk(Variance(), w, pr)` reports.
 
-The reference implementation takes the first, because its predicted attribution takes the model's
+The oracle takes the first, because its predicted attribution takes the model's
 five arrays as arguments and never sees a carrier. Its Result has no place to put a difference, so
 it cannot show one.
 
@@ -63,7 +63,7 @@ reproduces its own carrier, and it is the measured gap under a wrapper.
 
 Three consequences follow from the anchoring, and each is deliberate.
 
-- **The remainder is present on the predicted side.** The reference's predicted Result carries no
+- **The remainder is present on the predicted side.** The oracle's predicted Result carries no
   remainder at all. This one does, and it is the reader's only signal that the block and the
   carrier have parted company.
 - **No guard reports the gap.** A threshold on the remainder would be a numerical guard on a
@@ -83,7 +83,7 @@ two sides row by row.
 
 ## Alternatives rejected
 
-- **Anchor on the model and report no remainder**, as the reference does. Refused because the
+- **Anchor on the model and report no remainder**, as the oracle does. Refused because the
   numbers would then disagree with `expected_return` and `expected_risk` on the same weights and
   the same prior, with nothing in the Result to say why. A reader who tabulates an attribution
   beside a performance summary would find two different portfolio returns.
@@ -139,3 +139,98 @@ it is open, the totals, the four components, the factor rows, the family rows, t
 systematic and idiosyncratic rows and the asset-by-factor matrices are the same under both anchors.
 Only the per-asset `vol_contrib`, `pct_var` and `mu_contrib` move, by that asset's Euler share of
 the remainder.
+
+## Amendment (2026-10-07, #1515)
+
+The last grilling of the differences from the oracle (#1416, rows R65, R95, R96, R97 and R98)
+changed four rules of the attribution. The decision of this ADR stands: the predicted totals still
+anchor on the prior result, and the gap still goes to the remainder.
+
+**A held asset the prior could not estimate is decomposed entry by entry (R96, R65).** Before this
+amendment the attribution zeroed the whole row of a held non-investable asset, in the loadings,
+the orthogonal mean, the idiosyncratic block and the anchors. That is the exact variance of another
+portfolio, one with `w_i = 0` and no renormalisation, and it also misstated `B' w`. The variance is
+`sigma_P^2 = w' B F B' w + w' D w`. When `D_ii` is unknown and `w_i != 0`, `sigma_P` is unknown,
+but the exposures `B' w`, the systematic variance `w' B F B' w` and the systematic mean are known
+exactly. So the keyword `unknown` now takes a rule, a subtype of `AbstractUnknownEntryRule`:
+
+- `EntrywiseUnknown()`, the default, keeps every entry the prior states and gives `NaN` for every
+  number that reads an entry it does not state: the idiosyncratic part, the total, the remainder
+  and every share divided by `sigma_P`. A held asset without loadings makes the exposures that read
+  them unknown too. An entry of an asset with a weight of zero adds nothing, so it reads as zero.
+- `ZeroUnknown()` reads every entry the prior does not state as zero. It gives the oracle's
+  predicted numbers, which fill only the `NaN` entries with zero and keep the finite loadings. An
+  anchor entry the prior does not state reads the model's entry, with every unknown entry of the
+  model read as zero, so the gap of the remainder reads the stated entries alone.
+
+The rule also sets the standalone moments of the asset axis. On the predicted side they read the
+block's own entries, or the entries with every unknown read as zero. On the realised side they read
+the active pairs of the asset, or every observation with a zero at each inactive pair, which is the
+oracle's realised rule. The warning and `strict` stay, and the warning states what the rule does.
+
+**A held pair with no return splits by the active mask (R97).** An active pair is a holiday: the
+asset is listed and its price does not move, so its return is exactly zero, and the pair fills zero
+with no message. An inactive pair, after a delisting for example, can have a return as low as
+`-100 %`, so a zero there is an assumption the caller must see, and it warns, or refuses under
+`strict`. A returns result carries the mask of its Asset Panel. A bare matrix carries none, so every
+held pair with no return warns, as before.
+
+**The realised weight spread takes `ddof` (R95).** The exposure `g_t = B_t' w_t` is linear in the
+weights, so the weight spread takes the divisor of the exposure spread, `T - 1`, by default.
+`ddof = 0` gives the oracle's `T`. The library subtracts `ddof` itself, as ADR 0197 requires of the
+name. A constant weight states its exact spread, zero, and no longer `nothing`.
+
+**A static loadings matrix reads every row (R98).** A lag pairs each return with the exposure known
+before it, and a static matrix has no time index, so a lag means nothing for it. The bare-array
+realised method no longer cuts `lag` rows of a static matrix, as the oracle does not. `trim = true`
+keeps the one use of the cut, a common sample with a run on an exposure history. A negative lag
+still refuses, because it pairs a return with an exposure from after it.
+
+## Amendment (2026-10-08, #1579)
+
+**A Leverage-One Pair is a second kind of unknown entry (#1577).** A pair that the fit marks in `h1`
+has a direction of the design of its own, for example the only member of a level of a one-hot
+family. At its row the data identify only the sum of the factor return of that direction and the
+own return of the asset, so every own variance from zero upwards fits the data equally well. The
+total of the pair is exact, and its split between the systematic and the idiosyncratic part is not
+identified. This is the opposite of an asset in the warm-up of its variance, whose split is exact
+up to its unknown idiosyncratic part. The oracle reads the split as fitted and reports such a pair
+as wholly systematic.
+
+**The rule keyword holds one rule per kind.** `unknown` stays the one keyword of the rule.
+`EntrywiseUnknown()` and `ZeroUnknown()` stay presets that apply one rule to every kind.
+`KindwiseUnknown(; unstated, leverage)` holds the rule of each kind in a field: `unstated` is the
+meaning this ADR gave the rule before, and `leverage` is the split of a Leverage-One Pair. No
+`Bool` or `Symbol` keyword is added. A singleton type holds more than two rules, a rule can carry a
+value later (#1578), a misspelt rule fails at the call site, and users can subtype it.
+
+**Under `EntrywiseUnknown` the split of a held pair is `NaN`.** The volatility, the volatility
+contribution, the variance share and the correlation of the systematic and the idiosyncratic
+component are `NaN`, and so are those of the factor whose only member is the pair, and the
+systematic and idiosyncratic volatility contributions of the asset. The total, the remainder and
+every mean keep their values, because the own return has an expected value of zero. The realised
+side marks a pair at each row the portfolio holds it. The predicted side marks an asset that the
+fit marks at any row, because the factor covariance reads the factor returns of every row. A
+portfolio with a weight of zero at every marked pair is unchanged. `ZeroUnknown` for the `leverage`
+kind reproduces the oracle.
+
+**A GLM fit marks the same pairs.** `h1` tests the column space of the weighted design, and a
+positive weight does not change it. Under any link the fit sets the fitted mean of the pair to its
+return, so the level absorbs the own return, and the split is not identified there either. The rule
+reads `h1` for every fit.
+
+**A standard error that reads the pair is `NaN` (#1580).** The sandwich of a realised standard
+error reads the idiosyncratic variance of every pair of the regression, and the variance of a marked
+pair is not identified. Under the default every standard error whose sandwich gives a marked pair a
+coefficient that is not zero is `NaN`. The test runs the reduction of the sandwich twice more: once
+with the indicator of the marked pairs in place of the variances, and once with the indicator of
+every pair of the regression. The first sum is the leverage index of an output, the sum of the
+squared coefficients of the marked pairs. The second is its scale. An output is `NaN` when the
+index exceeds `eps` times the scale. On the measured panel of #1577 a real coefficient gives a
+ratio of 1.4e-3 or more: the market factor and the sibling levels through the zero-sum constraint,
+and the level of the pair. A coefficient of round-off gives 2.2e-19 at most: the style factors, and
+the systematic error of a portfolio that holds no marked pair. The pair stays in the sandwich.
+Without it the Gram matrix is singular in the direction of the level, and the pseudo-inverse gives
+a minimum-norm number that is not an error: the oracle's drop gives Utilities 2.4e-6 where the
+plug-in sandwich gives 5.0e-4. `ZeroUnknown` for the `leverage` kind reads the plug-in variance,
+which is the oracle's, so a holder of the pair reports a systematic error of zero.

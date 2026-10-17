@@ -20,7 +20,7 @@ and fills it, so a `NaN` on the diagonal reaches the unitary risks of a bisectio
 complement, the inverse volatility, and the distance a clustering is built from. The result is a
 silently wrong number, not a refusal.
 
-The reference implementation reduces in its convex family only. Its hierarchical, nested, naive
+The oracle reduces in its convex family only. Its hierarchical, nested, naive
 and ensemble families derive no mask, its hierarchical base omits the mask from its input cleaner,
 and its nested optimiser gives a lone non-investable asset the whole weight of its cluster. It
 gives no answer for these nine sites.
@@ -141,7 +141,7 @@ it has none. Closed polarity, as ADR 0037's rules have it.
 
 | Question | Refused | Why |
 | --- | --- | --- |
-| Where the reduction happens | The hierarchical and naive families reduce, and the meta families rely on the inner heads, which is the reference's shape. | The outer prior still feeds `NaN` into the fees and the outer bounds, the nested distance is poisoned, and a subset can draw only dead assets. |
+| Where the reduction happens | The hierarchical and naive families reduce, and the meta families rely on the inner heads, which is the oracle's shape. | The outer prior still feeds `NaN` into the fees and the outer bounds, the nested distance is poisoned, and a subset can draw only dead assets. |
 | Where the reduction happens | Cluster the full universe, then drop the non-investable leaves. | The distance needs finite columns, so it hangs on the moment decision, and a pruned dendrogram has no defined branch order. |
 | The verb | Three lines and a condition per site. | Nine copies of one idiom, nine conditions the complexity gate counts, and nine places that drift. |
 | The exit | The `_optimise` body expands one line before the constructor. | Nine sites can each forget the line. |

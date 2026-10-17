@@ -635,10 +635,15 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
         alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters()
+        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters(),
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> ClustersEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
 
 ## Propagated parameters
 
@@ -652,37 +657,38 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 ```jldoctest
 julia> ClustersEstimator()
 ClustersEstimator
-   ce ┼ PortfolioOptimisersCovariance
-      │   ce ┼ Covariance
-      │      │    me ┼ SimpleExpectedReturns
-      │      │       │   w ┴ nothing
-      │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │    w ┴ nothing
-      │      │   alg ┼ FullMoment()
-      │      │     w ┴ nothing
-      │   mp ┼ MatrixProcessing
-      │      │     pdm ┼ Posdef
-      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      │      dn ┼ nothing
-      │      │      dt ┼ nothing
-      │      │     alg ┼ nothing
-      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-   de ┼ Distance
-      │   power ┼ nothing
-      │     alg ┴ CanonicalDistance()
-  alg ┼ HClustAlgorithm
-      │   linkage ┴ Symbol: :ward
-  onc ┼ OptimalNumberClusters
-      │   max_k ┼ nothing
-      │     alg ┼ SecondOrderDifference
-      │         │   alg ┼ StandardisedValue
-      │         │       │   mv ┼ MeanValue
-      │         │       │      │   w ┴ nothing
-      │         │       │   sv ┼ StdValue
-      │         │       │      │           w ┼ nothing
-      │         │       │      │   corrected ┴ Bool: true
+     ce ┼ PortfolioOptimisersCovariance
+        │   ce ┼ Covariance
+        │      │    me ┼ SimpleExpectedReturns
+        │      │       │   w ┴ nothing
+        │      │    ce ┼ GeneralCovariance
+        │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │      │       │    w ┴ nothing
+        │      │   alg ┼ FullMoment()
+        │      │     w ┴ nothing
+        │   mp ┼ MatrixProcessing
+        │      │     pdm ┼ Posdef
+        │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │      │      dn ┼ nothing
+        │      │      dt ┼ nothing
+        │      │     alg ┼ nothing
+        │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+     de ┼ Distance
+        │   power ┼ nothing
+        │     alg ┴ CanonicalDistance()
+    alg ┼ HClustAlgorithm
+        │   linkage ┴ Symbol: :ward
+    onc ┼ OptimalNumberClusters
+        │   max_k ┼ nothing
+        │     alg ┼ SecondOrderDifference
+        │         │   alg ┼ StandardisedValue
+        │         │       │   mv ┼ MeanValue
+        │         │       │      │   w ┴ nothing
+        │         │       │   sv ┼ StdValue
+        │         │       │      │           w ┼ nothing
+        │         │       │      │   corrected ┴ Bool: true
+  x_src ┴ nothing
 ```
 
 # Related
@@ -716,11 +722,20 @@ ClustersEstimator
     $(field_dict[:onc])
     """
     onc
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
     function ClustersEstimator(ce::StatsBase.CovarianceEstimator,
                                de::AbstractDistanceEstimator,
                                alg::AbstractClustersAlgorithm,
-                               onc::AbstractOptimalNumberClustersEstimator)
-        return new{typeof(ce), typeof(de), typeof(alg), typeof(onc)}(ce, de, alg, onc)
+                               onc::AbstractOptimalNumberClustersEstimator,
+                               x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :ClustersEstimator)
+        return new{typeof(ce), typeof(de), typeof(alg), typeof(onc), typeof(x_src)}(ce, de,
+                                                                                    alg,
+                                                                                    onc,
+                                                                                    x_src)
     end
 end
 function ClustersEstimator(;
@@ -728,8 +743,15 @@ function ClustersEstimator(;
                            de::AbstractDistanceEstimator = Distance(;
                                                                     alg = CanonicalDistance()),
                            alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-                           onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())::ClustersEstimator
-    return ClustersEstimator(ce, de, alg, onc)
+                           onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters(),
+                           x_src::Option{<:AbstractReturnsSource} = nothing)::ClustersEstimator
+    return ClustersEstimator(ce, de, alg, onc, x_src)
+end
+function returns_source(cle::ClustersEstimator)
+    return cle.x_src
+end
+function reader_frames(cle::ClustersEstimator, path::AbstractString, ::Bool)
+    return source_frames(cle.x_src, path, true)
 end
 """
     const ClE_Cl = Union{<:AbstractClustersEstimator, <:AbstractClusteringResult}

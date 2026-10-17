@@ -118,6 +118,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
     [`MaximumRatio`](@ref). Every feasible portfolio is optimal under the first, and the second
     is unbounded. A [`NoRisk`](@ref) measure and `settings.rke = false` on every measure are
     the two routes to it.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -163,7 +165,8 @@ MeanRisk
       │           │           me ┼ SimpleExpectedReturns
       │           │              │   w ┴ nothing
       │           │      horizon ┼ nothing
-      │           │   fill_limit ┴ nothing
+      │           │   fill_limit ┼ nothing
+      │           │        x_src ┴ nothing
       │       slv ┼ Solver
       │           │          name ┼ String: ""
       │           │        solver ┼ nothing
@@ -202,7 +205,8 @@ MeanRisk
       │           │            │     fee ┼ Bool: true
       │           │            │     mic ┴ Bool: true
       │           │        ucs ┼ nothing
-      │           │         mu ┴ nothing
+      │           │         mu ┼ nothing
+      │           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
       │       sca ┼ SumScalariser()
       │      ccnt ┼ nothing
       │      cobj ┼ nothing
@@ -218,18 +222,19 @@ MeanRisk
       │        l2 ┼ nothing
       │        lp ┼ nothing
       │      linf ┼ nothing
-      │       brt ┼ Bool: false
-      │     x_src ┼ Symbol: :prior
       │    strict ┴ Bool: false
     r ┼ Variance
-      │   settings ┼ RiskMeasureSettings
-      │            │   scale ┼ Float64: 1.0
-      │            │      ub ┼ nothing
-      │            │     rke ┴ Bool: true
-      │      sigma ┼ nothing
-      │       chol ┼ nothing
-      │         rc ┼ nothing
-      │        alg ┴ SquaredSOCRiskExpr()
+      │    settings ┼ RiskMeasureSettings
+      │             │   scale ┼ Float64: 1.0
+      │             │      ub ┼ nothing
+      │             │     rke ┴ Bool: true
+      │       sigma ┼ nothing
+      │        chol ┼ nothing
+      │          rc ┼ nothing
+      │         alg ┼ SquaredSOCRiskExpr()
+      │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+      │   ratio_alg ┼ SquareRootRatio()
+      │      corner ┴ nothing
   obj ┼ MinimumRisk()
    wi ┼ nothing
    fb ┴ nothing
@@ -324,8 +329,11 @@ Where:
         end
         assert_time_dependent_substitution(MeanRisk, (; opt, r, obj, wi, fb),
                                            mean_risk_td_defaults())
-        return new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
-                                                                                wi, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :MeanRisk, "opt.pe")
+        est = new{typeof(opt), typeof(r), typeof(obj), typeof(wi), typeof(fb)}(opt, r, obj,
+                                                                               wi, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function MeanRisk(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
@@ -764,11 +772,13 @@ function _optimise(mr::MeanRisk, rd::ReturnsResult = ReturnsResult();
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
     # `rd`. Both are unchanged when every asset is investable.
     mr, rd = investable_view(mr, rd, attrs.pr, attrs.imsk)
+    mr = bind_data_benchmark(mr, rd)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, mr.opt.sc, mr.opt.so)
     set_model_observations!(model, size(attrs.pr.X, 1))
     set_maximum_ratio_factor_variables!(model, mr.obj)
+    set_sdp_lift_corner!(model, mr.obj, attrs.pr)
     set_w!(model, attrs.pr.X, mr.wi)
     set_weight_constraints!(model, attrs.wb, mr.opt)
     assemble_jump_model!(model, mr, mr.opt, attrs, rd, mr.r, mr.obj)
@@ -808,7 +818,7 @@ Run the Mean-Risk portfolio optimisation.
 function optimise(mr::MeanRisk{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(mr, "`optimise`")
-    return _optimise(mr, rd; str_names = str_names, save = save, kwargs...)
+    return shared_series_solve(mr, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates MeanRisk opt

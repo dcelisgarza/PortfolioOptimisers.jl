@@ -14,6 +14,7 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
   - [`PropertyPathError`](@ref)
   - [`ObservationWeightsError`](@ref)
   - [`NonPositiveWealthError`](@ref)
+  - [`PosdefRepairError`](@ref)
 """
 abstract type PortfolioOptimisersError <: Exception end
 """
@@ -284,6 +285,46 @@ Stacktrace:
     msg
 end
 """
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when a positive definite repair returns a matrix that is not positive semidefinite.
+
+A repair returns a matrix that a consumer factorises or optimises over. A matrix with an eigenvalue below the round-off of a positive semidefinite matrix gives a negative variance in some direction, so every consumer would read a wrong number or meet a LAPACK refusal with no name. That is why the repair raises rather than returning the matrix. A singular result that is positive semidefinite to round-off is a valid covariance, and it returns with no message.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    PosdefRepairError(msg) -> PosdefRepairError
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(PosdefRepairError(\"the repair of `Newton()` must give a matrix whose smallest eigenvalue is at least -8.881784197001252e-16, but it is -1.0\"))
+ERROR: PosdefRepairError: the repair of `Newton()` must give a matrix whose smallest eigenvalue is at least -8.881784197001252e-16, but it is -1.0
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`Posdef`](@ref)
+  - [`posdef!`](@ref)
+  - [`assert_posdef_repair`](@ref)
+"""
+@concrete struct PosdefRepairError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
@@ -315,4 +356,4 @@ function Base.showerror(io::IO, err::PortfolioOptimisersError)
 end
 
 export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
-       PropertyPathError, ObservationWeightsError, NonPositiveWealthError
+       PropertyPathError, ObservationWeightsError, NonPositiveWealthError, PosdefRepairError

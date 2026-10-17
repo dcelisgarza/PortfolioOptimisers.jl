@@ -7,4 +7,5 @@ Description = "Windowed Coskewness, public API of PortfolioOptimisers.jl: Window
 ```@docs
 WindowedCoskewness
 coskewness(ske::WindowedCoskewness, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, kwargs...)
+coskewness(ske::WindowedCoskewness, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, mean = nothing, kwargs...)
 ```

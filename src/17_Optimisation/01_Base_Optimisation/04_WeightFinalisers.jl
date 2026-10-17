@@ -1,27 +1,27 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for JuMP-based weight finaliser formulations.
+Abstract supertype for the deviations that a JuMP weight finaliser can minimise.
 
-Defines the interface for norm types used when adjusting portfolio weights to satisfy bounds via a JuMP model.
+A subtype is the field `alg` of a [`JuMPWeightFinaliser`](@ref). It selects the norm of the deviation, and whether the deviation is absolute or relative to the weights that the optimisation produced.
 
 # Interfaces
 
-In order to implement a new formulation that works seamlessly with the library, subtype `JuMPWeightFinaliserFormulation` and implement the following method:
+To add a deviation, subtype `JuMPWeightFinaliserFormulation` and implement the method below.
 
 ## `set_clustering_weight_finaliser_alg!`
 
-  - `set_clustering_weight_finaliser_alg!(model::JuMP.Model, alg::MyFormulation, wi::VecNum) -> Nothing`: Adds the deviation objective to a model that already carries the decision vector `w`, the budget equality and the weight bounds.
+  - `set_clustering_weight_finaliser_alg!(model::JuMP.Model, alg::MyFormulation, wi::VecNum) -> Nothing`: Adds the deviation objective to a model that already holds the weights `w`, the budget row and the bound rows.
 
 ### Arguments
 
-  - `model`: The JuMP model, built by [`opt_weight_bounds`](@ref).
+  - `model`: The JuMP model that [`opt_weight_bounds`](@ref) builds.
   - `alg`: The concrete subtype instance.
-  - `wi`: The weights the optimisation produced, which the model repairs.
+  - `wi`: The weights that the optimisation produced. The method must not change them.
 
 ### Returns
 
-  - `nothing`. The method works by adding variables, constraints and the objective to `model`.
+  - `nothing`. The method adds variables, rows and the objective to `model`.
 
 # Related
 
@@ -35,7 +35,9 @@ abstract type JuMPWeightFinaliserFormulation <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Minimises the L1 norm of relative weight deviations when enforcing weight bounds.
+Selects the L1 norm of the relative weight deviation as the objective of a JuMP weight finaliser.
+
+A relative deviation weighs a change to a small weight more than the same change to a large weight. So the finaliser moves mass to the largest free weights first.
 
 # Mathematical definition
 
@@ -52,7 +54,10 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:w_0_finaliser])
   - $(math_dict[:lb_ub_finaliser])
-  - ``\\oslash``: Elementwise division. A zero entry of ``\\boldsymbol{w}_{0}`` is replaced by `eps` before the division, so the ratio stays finite.
+  - $(math_dict[:oslash])
+  - ``\\boldsymbol{1}``: Vector of ones.
+
+The relative deviation is defined only where every entry of ``\\boldsymbol{w}_{0}`` is not zero.
 
 # Constructors
 
@@ -77,7 +82,9 @@ struct RelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Minimises the L2 norm of relative weight deviations when enforcing weight bounds.
+Selects the L2 norm of the relative weight deviation as the objective of a JuMP weight finaliser.
+
+The name comes from the squared error. The programme minimises the norm and not its square, and the two have the same minimiser because the square increases on non-negative values. So the value of the objective is the L2 norm.
 
 # Mathematical definition
 
@@ -94,9 +101,10 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:w_0_finaliser])
   - $(math_dict[:lb_ub_finaliser])
-  - ``\\oslash``: Elementwise division. A zero entry of ``\\boldsymbol{w}_{0}`` is replaced by `eps` before the division, so the ratio stays finite.
+  - $(math_dict[:oslash])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
-The second-order cone bounds the norm itself, so the objective value is the L2 norm and not its square. The name records the squared-error criterion, whose minimiser is the same because the square is monotonic on a non-negative norm. [`RelativeErrorWeightFinaliser`](@ref) differs in the norm, not in the power.
+The relative deviation is defined only where every entry of ``\\boldsymbol{w}_{0}`` is not zero. Where the bounds bind none of the free weights, the minimiser is ``w_{i} = w_{0,i} + c\\, w_{0,i}^{2}``, with one ``c`` that restores the budget.
 
 # Constructors
 
@@ -121,7 +129,9 @@ struct SquaredRelativeErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Minimises the L1 norm of absolute weight deviations when enforcing weight bounds.
+Selects the L1 norm of the absolute weight deviation as the objective of a JuMP weight finaliser.
+
+Every transfer of mass between two weights costs the same, so the minimiser is often not unique. The value of the objective is twice the mass that the finaliser moves.
 
 # Mathematical definition
 
@@ -138,6 +148,7 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:w_0_finaliser])
   - $(math_dict[:lb_ub_finaliser])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Constructors
 
@@ -162,7 +173,9 @@ struct AbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Minimises the L2 norm of absolute weight deviations when enforcing weight bounds.
+Selects the L2 norm of the absolute weight deviation as the objective of a JuMP weight finaliser.
+
+The name comes from the squared error. The programme minimises the norm and not its square, and the two have the same minimiser because the square increases on non-negative values. So the value of the objective is the L2 norm.
 
 # Mathematical definition
 
@@ -179,8 +192,9 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:w_0_finaliser])
   - $(math_dict[:lb_ub_finaliser])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
-The second-order cone bounds the norm itself, so the objective value is the L2 norm and not its square. The name records the squared-error criterion, whose minimiser is the same because the square is monotonic on a non-negative norm. [`AbsoluteErrorWeightFinaliser`](@ref) differs in the norm, not in the power.
+The minimiser is the Euclidean projection of ``\\boldsymbol{w}_{0}`` onto the feasible set, which [`EuclideanWeightFinaliser`](@ref) finds with no solver. Where the bounds bind none of the free weights, the minimiser is ``w_{i} = w_{0,i} + c``, with one ``c`` that restores the budget.
 
 # Constructors
 
@@ -205,22 +219,22 @@ struct SquaredAbsoluteErrorWeightFinaliser <: JuMPWeightFinaliserFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for weight finaliser strategies.
+Abstract supertype for the methods that move the weights of an optimisation into their weight bounds.
 
-A `WeightFinaliser` enforces weight bounds after the optimisation has produced unconstrained weights.
+A subtype runs after the optimisation. It keeps the sum of the weights, and it changes weights that already lie in the bounds not at all.
 
 # Interfaces
 
-In order to implement a new strategy that works seamlessly with the library, subtype `WeightFinaliser` and implement the following method:
+To add a method, subtype `WeightFinaliser` and implement the method below.
 
 ## `opt_weight_bounds`
 
-  - `opt_weight_bounds(wf::MyFinaliser, wb::WeightBounds, w::VecNum) -> VecNum`: Moves `w` into the bounds `wb`, keeping the budget it already carries.
+  - `opt_weight_bounds(wf::MyFinaliser, wb::WeightBounds, w::VecNum) -> VecNum`: Moves `w` into the bounds `wb`, and keeps the sum of `w`.
 
 ### Arguments
 
   - `wf`: The concrete subtype instance.
-  - `wb`: The weight bounds. Either bound may be `nothing`.
+  - `wb`: The weight bounds. Either bound can be `nothing`.
   - `w`: The weights the optimisation produced.
 
 ### Returns
@@ -238,13 +252,25 @@ abstract type WeightFinaliser <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Iteratively projects weights into the feasible region defined by weight bounds.
+Moves the weights into their bounds by a repeated clip and a proportional redistribution of the clipped mass.
 
-Each pass clips the weights to the bounds, then redistributes the clipped mass over the entries that lie strictly inside the bounds, in proportion to their own weights. The pass ends by rescaling the vector to the budget it started with, so the sum is preserved. Passes run until the bounds hold or until `iter` passes are done. An absent bound is read as `typemin` or `typemax` of the weight element type.
+The redistribution keeps the ratios of the free weights, so the answer differs from the Euclidean projection of [`EuclideanWeightFinaliser`](@ref). The loop stops at no answer when no weight lies strictly inside its bounds, for example `[0.6, 0.4, 0.0]` under `ub = 0.4`. It can also diverge on long-short bounds. In both cases step 9 returns the Euclidean projection, which is `[0.4, 0.4, 0.2]` in the example.
 
-The redistribution keeps the ratios of the free weights, so the answer differs from the Euclidean projection of [`EuclideanWeightFinaliser`](@ref). The loop can fail to reach the bounds. It stalls when no weight lies strictly inside its bounds, for example `[0.6, 0.4, 0.0]` under `ub = 0.4`, and it can diverge on long-short bounds. If the last pass still breaks a bound, or is not finite, the finaliser returns the Euclidean projection of the input instead, which is `[0.4, 0.4, 0.2]` in that example. A loop that reaches the bounds keeps its own answer.
+A set of bounds that cannot hold the budget has no feasible vector. Four weights that sum to `1` under `lb = 0.3` become their lower bounds, and [`finalise_weight_bounds`](@ref) reports an [`OptimisationFailure`](@ref).
 
-A bound set that cannot hold the budget has no feasible vector: four assets summing to `1` under `lb = 0.3` return their lower bounds, and [`finalise_weight_bounds`](@ref) reports an [`OptimisationFailure`](@ref).
+# Algorithm
+
+The steps are those of [`opt_weight_bounds`](@ref) for this type.
+
+ 1. Return `w` unchanged when it breaks no bound.
+ 2. Read the budget `s1` as `sum(w)`, and keep the input as `w0`. Read an absent bound as `typemin` or `typemax` of the element type of `w`, which becomes a float type when it is an integer type.
+ 3. Clip `w` to the bounds.
+ 4. Mark the free entries `idx`, which lie strictly inside their bounds after the clip.
+ 5. Subtract the mass that the clip added below `lb` from the mass that it removed above `ub`, giving `delta`.
+ 6. When `delta` is not zero, add `delta` to the free entries, in proportion to their weights.
+ 7. Multiply `w` by `s1 / sum(w)`, which restores the budget.
+ 8. Stop when `w` breaks no bound. Else repeat from step 3, for at most `iter` passes.
+ 9. Return `w` when it is finite and breaks no bound. Else return the Euclidean projection of `w0`, [`euclidean_weight_projection`](@ref).
 
 # Fields
 
@@ -293,9 +319,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Uses a JuMP optimisation model to enforce weight bounds.
+Moves the weights into their bounds with the solution of a JuMP programme.
 
-The programme keeps the budget of the input weights and holds every weight between the bounds, and `alg` states which deviation it minimises over that set. An absent bound adds no constraint. A failed solve raises a warning and falls back to a default [`IterativeWeightFinaliser`](@ref).
+The programme keeps the sum of the input weights and holds every weight between its bounds. The field `alg` selects the deviation from the input that the programme minimises. An absent bound adds no row. When the solve fails, the finaliser logs a warning and uses a default [`IterativeWeightFinaliser`](@ref).
 
 # Fields
 
@@ -375,23 +401,51 @@ end
                                          alg::JuMPWeightFinaliserFormulation,
                                          wi::VecNum)
 
-Add the deviation objective of `alg` to the weight finalisation model.
+Adds the deviation objective of `alg` to the weight finalisation model.
 
-[`opt_weight_bounds`](@ref) has already added the decision vector `w`, the budget equality and the weight bounds. This method adds the epigraph variable `t`, the cone that bounds the deviation of `w` from `wi`, and the objective `Min so * t`. The cone is a `NormOneCone` for the two L1 formulations and a `SecondOrderCone` for the two L2 formulations.
+[`opt_weight_bounds`](@ref) adds the weights `w`, the budget row and the bound rows before it calls this function. The two relative formulations divide by `wi`, so they replace each zero entry of a copy of `wi` with `eps(eltype(wi))`. They do not change `wi`.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: The weights, read from the model.
+  - `t`: The bound on the deviation, created with no key.
+
+## Constraints
+
+One unnamed row, which `alg` selects:
+
+  - [`RelativeErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} \\oslash \\tilde{\\boldsymbol{w}}_{0} - \\boldsymbol{1})) \\in \\mathcal{K}_{1}``.
+  - [`SquaredRelativeErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} \\oslash \\tilde{\\boldsymbol{w}}_{0} - \\boldsymbol{1})) \\in \\mathcal{K}_{2}``.
+  - [`AbsoluteErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} - \\boldsymbol{w}_{0})) \\in \\mathcal{K}_{1}``.
+  - [`SquaredAbsoluteErrorWeightFinaliser`](@ref): ``(s_c t,\\, s_c (\\boldsymbol{w} - \\boldsymbol{w}_{0})) \\in \\mathcal{K}_{2}``.
+
+## Objective
+
+  - `Min`: ``s_o t``. The objective pulls ``t`` down, so ``t`` equals the norm at the optimum.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_0_finaliser])
+  - ``\\tilde{\\boldsymbol{w}}_{0}``: ``\\boldsymbol{w}_{0}`` with each zero entry replaced by `eps(eltype(wi))`, so that the division is defined.
+  - ``t``: Bound on the norm of the deviation.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:so_scale])
+  - $(math_dict[:K_q_norm])
+  - $(math_dict[:oslash])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Arguments
 
-  - `model`: JuMP model, which must already carry `w` and the two scale expressions.
-  - `alg`: The deviation formulation, one of the four [`JuMPWeightFinaliserFormulation`](@ref) subtypes.
-  - `wi`: The weights the optimisation produced, which the model repairs.
+  - `model`: The JuMP model. It must already hold `w` and the two scales `sc` and `so`.
+  - `alg`: The deviation, one of the four [`JuMPWeightFinaliserFormulation`](@ref) subtypes.
+  - `wi`: The weights that the optimisation produced.
 
 # Returns
 
   - `nothing`.
-
-# Details
-
-  - The two relative formulations divide by `wi`, so they first replace each zero entry of `wi` **in place** with `eps(eltype(wi))`. The caller's vector carries that substitution afterwards.
 
 # Related
 
@@ -401,7 +455,11 @@ Add the deviation objective of `alg` to the weight finalisation model.
 """
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::RelativeErrorWeightFinaliser, wi::VecNum)
-    wi[iszero.(wi)] .= eps(eltype(wi))
+    mask = iszero.(wi)
+    if any(mask)
+        wi = copy(wi)
+        wi[mask] .= eps(eltype(wi))
+    end
     w = get_w(model)
     sc = get_constraint_scale(model)
     so = get_objective_scale(model)
@@ -416,7 +474,11 @@ end
 function set_clustering_weight_finaliser_alg!(model::JuMP.Model,
                                               ::SquaredRelativeErrorWeightFinaliser,
                                               wi::VecNum)
-    wi[iszero.(wi)] .= eps(eltype(wi))
+    mask = iszero.(wi)
+    if any(mask)
+        wi = copy(wi)
+        wi[mask] .= eps(eltype(wi))
+    end
     w = get_w(model)
     sc = get_constraint_scale(model)
     so = get_objective_scale(model)
@@ -453,21 +515,63 @@ end
     opt_weight_bounds(wf::EuclideanWeightFinaliser, wb::WeightBounds, w::VecNum) -> VecNum
     opt_weight_bounds(wf::EntropicWeightFinaliser, wb::WeightBounds, w::VecNum) -> VecNum
 
-Move a weight vector into the bounds `wb`, keeping the budget it already carries.
+Moves a weight vector into the bounds `wb`, and keeps the sum of the vector.
 
-The bounds themselves are not changed. Weights that already satisfy the bounds are returned unchanged, without a solve.
+Every method returns weights that break no bound unchanged, with no solve. The bounds do not change.
 
-The [`JuMPWeightFinaliser`](@ref) method builds the programme of its `alg` (see [`set_clustering_weight_finaliser_alg!`](@ref)) and solves it. A failed solve warns and falls back to a default [`IterativeWeightFinaliser`](@ref). The [`IterativeWeightFinaliser`](@ref) method clips and redistributes instead, and returns the Euclidean projection if its passes end with a bound still broken. The [`EuclideanWeightFinaliser`](@ref) method returns the Euclidean projection ([`euclidean_weight_projection`](@ref)). The [`EntropicWeightFinaliser`](@ref) method returns the entropic projection ([`entropic_weight_projection`](@ref)), or the Euclidean one where the entropic one is not defined.
+Each method runs the procedure of its finaliser type:
+
+  - [`JuMPWeightFinaliser`](@ref): the programme of its `alg`, below. When the solve fails, the method logs a warning and runs the method of a default [`IterativeWeightFinaliser`](@ref).
+  - [`IterativeWeightFinaliser`](@ref): the clip and redistribution that its docstring states.
+  - [`EuclideanWeightFinaliser`](@ref): the Euclidean projection, [`euclidean_weight_projection`](@ref).
+  - [`EntropicWeightFinaliser`](@ref): the entropic projection, [`entropic_weight_projection`](@ref), or the Euclidean projection where the entropic one is not defined.
+
+# Algorithm
+
+The steps are those of the [`JuMPWeightFinaliser`](@ref) method.
+
+ 1. Return `wi` unchanged when it breaks no bound.
+ 2. Build an empty model, and register the scales `sc` and `so` of `wf`.
+ 3. Add the weights `w`, the budget row, and a bound row for each bound that is not `nothing`.
+ 4. Add the objective of `wf.alg` with [`set_clustering_weight_finaliser_alg!`](@ref).
+ 5. Solve with the solvers of `wf.slv`. Return the values of `w` when the solve succeeds.
+ 6. Else log a warning, and return the weights of a default [`IterativeWeightFinaliser`](@ref) for `wi`.
+
+# JuMP formulation
+
+## Variables
+
+  - `w`: The weights, created.
+
+## Expressions
+
+  - `sc`: ``s_c``.
+  - `so`: ``s_o``.
+
+## Constraints
+
+  - An unnamed budget row: ``s_c (\\boldsymbol{1}^\\intercal \\boldsymbol{w} - \\boldsymbol{1}^\\intercal \\boldsymbol{w}_{0}) = 0``.
+  - An unnamed lower bound row, when `wb.lb` is not `nothing`: ``s_c (\\boldsymbol{w} - \\boldsymbol{l}) \\geq \\boldsymbol{0}``.
+  - An unnamed upper bound row, when `wb.ub` is not `nothing`: ``s_c (\\boldsymbol{w} - \\boldsymbol{u}) \\leq \\boldsymbol{0}``.
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:w_0_finaliser])
+  - $(math_dict[:lb_ub_finaliser])
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:so_scale])
+  - ``\\boldsymbol{1}``: Vector of ones.
 
 # Arguments
 
-  - `wf`: Weight finaliser algorithm.
-  - `wb`: Weight bounds.
-  - `wi`, `w`: The weights the optimisation produced.
+  - `wf`: The weight finaliser.
+  - `wb`: The weight bounds. Either bound can be `nothing`.
+  - `wi`, `w`: The weights that the optimisation produced.
 
 # Returns
 
-  - `w::VecNum`: The repaired weight vector.
+  - `w::VecNum`: The weights in the bounds, or the input when it breaks no bound.
 
 # Related
 
@@ -499,28 +603,33 @@ function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum
     return if optimise_JuMP_model!(model, wf.slv).success
         JuMP.value.(get_w(model))
     else
-        @warn("Version: $(wf.alg)\nReverting to Heuristic type.")
+        @warn("The weight finalisation model of $(wf.alg) could not be solved, so the weights are finalised with IterativeWeightFinaliser() instead.")
         opt_weight_bounds(IterativeWeightFinaliser(), wb, wi)
     end
 end
 """
     finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum)
 
-Apply weight finalisation to enforce bounds and determine the optimisation return code.
+Moves the weights into their bounds, and gives the return code that states whether the move succeeded.
 
-Runs [`opt_weight_bounds`](@ref) with the given finaliser and bounds. The return code is an [`OptimisationSuccess`](@ref) if the weights are finite, lie in the bounds and keep the budget of the input, each to a tolerance ([`weights_meet_bounds`](@ref)), and an [`OptimisationFailure`](@ref) otherwise. A failure lets the fallback chain run.
+A failure lets the fallback chain of [`optimise`](@ref) run. A set of bounds that cannot hold the budget, `sum(lb) > sum(w)` or `sum(ub) < sum(w)`, always fails.
 
-A bound set that cannot hold the budget, `Σ lb > sum(w)` or `Σ ub < sum(w)`, always fails.
+# Algorithm
+
+ 1. Read the budget `s` as `sum(w)`.
+ 2. Move `w` into the bounds with [`opt_weight_bounds`](@ref).
+ 3. Check the moved weights with [`weights_meet_bounds`](@ref): they are finite, they lie in the bounds, and they sum to `s`, each to a tolerance.
+ 4. Return an [`OptimisationSuccess`](@ref) when the check passes, else an [`OptimisationFailure`](@ref) that names `wf` and `wb`, together with the moved weights.
 
 # Arguments
 
-  - `wf::WeightFinaliser`: Weight finaliser algorithm.
-  - `wb::WeightBounds`: Weight bounds configuration.
-  - `w::VecNum`: Portfolio weights to finalise.
+  - `wf::WeightFinaliser`: The weight finaliser.
+  - `wb::WeightBounds`: The weight bounds.
+  - `w::VecNum`: The weights that the optimisation produced.
 
 # Returns
 
-  - `(retcode, w)`: Tuple of return code and adjusted weights.
+  - `(retcode, w)`: The return code and the moved weights.
 
 # Related
 
@@ -535,7 +644,7 @@ function finalise_weight_bounds(wf::WeightFinaliser, wb::WeightBounds, w::VecNum
     retcode = if weights_meet_bounds(wb, w, s)
         OptimisationSuccess()
     else
-        OptimisationFailure(; res = "Failure to set bounds\n$wf\n$wb.")
+        OptimisationFailure(; res = "The weights do not meet the bounds.\n$wf\n$wb.")
     end
     return retcode, w
 end

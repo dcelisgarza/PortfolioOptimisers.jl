@@ -1,11 +1,13 @@
 ```@meta
-Description = "PortfolioOptimisers pipeline, private API of PortfolioOptimisers.jl: first_duplicate, inject_context, constraint_results, constraint_target_of, …"
+Description = "Pipeline, private API of PortfolioOptimisers.jl: first_duplicate, assert_step_declarations, assert_nested_data_slots, inject_context, constraint_results, …"
 ```
 
-# PortfolioOptimisers pipeline: private API
+# Pipeline: private API
 
 ```@docs
 first_duplicate
+assert_step_declarations
+assert_nested_data_slots
 ```
 
 ## Injection
@@ -23,6 +25,14 @@ maybe_inject_step
 pipe_required_targets
 assert_routable
 assert_constraint_targets
+```
+
+## The group of a pipeline
+
+A `Pipeline` joins the group of its last optimiser, so its constructor warns on a reader that states no source beside a reader of the excess returns. A nested `Pipeline` adds the frames of its last step to the outer group.
+
+```@docs
+group_frames(::Pipeline)
 ```
 
 ## Prediction

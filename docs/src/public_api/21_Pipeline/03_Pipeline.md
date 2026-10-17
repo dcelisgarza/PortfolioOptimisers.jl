@@ -1,8 +1,8 @@
 ```@meta
-Description = "PortfolioOptimisers pipeline, public API of PortfolioOptimisers.jl: Pipeline, PipelineResult, fit, StatsAPI.predict, fit_predict, port_opt_view, …"
+Description = "Pipeline, public API of PortfolioOptimisers.jl: Pipeline, PipelineResult, fit, StatsAPI.predict, fit_predict, port_opt_view, implicit_constraint_target, …"
 ```
 
-# PortfolioOptimisers pipeline
+# Pipeline
 
 The `Pipeline` estimator fits a list of steps as one estimator. The steps can be data preparation, prior estimation, phylogeny, uncertainty sets, constraint generation and optimisation. What a step computes replaces the matching setting of the optimiser at the end of the pipeline. For each step that the pipeline does not have, the optimiser computes the value itself, as it does outside a pipeline.
 

@@ -775,7 +775,7 @@ The two coefficients and the combination follow from them:
 ```math
 \\begin{align}
 \\alpha &= \\frac{(u - N/(T-N))v - w^2}{uv - w^2}\\,, \\\\
-\\beta &= \\frac{(1-\\alpha) w}{u}\\,, \\\\
+\\beta &= \\frac{(1-\\alpha) w}{v}\\,, \\\\
 \\hat{\\boldsymbol{\\mu}}_{BOP} &= \\alpha \\hat{\\boldsymbol{\\mu}} + \\beta \\boldsymbol{b}\\,.
 \\end{align}
 ```
@@ -795,7 +795,9 @@ Three consequences of the form separate this algorithm from the other two.
 
   - ``\\alpha`` and ``\\beta`` are set separately and do not sum to one, so the result is not a point on the segment that joins ``\\hat{\\boldsymbol{\\mu}}`` and ``\\boldsymbol{b}``. Cancelling the ``w^2`` term rewrites the coefficient as ``\\alpha = 1 - \\frac{N}{T-N} \\frac{v}{uv - w^2}``, so ``\\alpha < 1`` always, and ``\\alpha < 0`` exactly when ``\\frac{N}{T-N} v > uv - w^2``. The combination then extrapolates away from the sample mean.
   - ``uv - w^2`` is a Cauchy-Schwarz gap in the inner product ``\\langle \\boldsymbol{x}, \\boldsymbol{y} \\rangle = \\boldsymbol{x}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{y}``, so it vanishes exactly when the target is a multiple of the sample mean. At ``N = 1`` every vector is such a multiple, so a one-asset sample raises a `DomainError` under all three targets.
-  - Every target of this file is a multiple of the vector of ones, so writing ``\\boldsymbol{b} = c \\boldsymbol{1}`` makes ``v`` and ``w`` scale with ``c^2`` and ``c``. The factor cancels in ``\\alpha``, which is therefore the same for the three targets on one sample, and survives in ``\\beta \\boldsymbol{b}``, which is not.
+  - ``\\beta \\boldsymbol{b}`` is the projection of ``(1-\\alpha) \\hat{\\boldsymbol{\\mu}}`` onto the line through ``\\boldsymbol{b}`` in the same inner product, so it reads the direction of the target and not its scale. Every target of this file is a multiple of the vector of ones, ``\\boldsymbol{b} = c \\boldsymbol{1}``, so ``v`` and ``w`` scale with ``c^2`` and ``c``. The factor cancels in ``\\alpha`` and in ``\\beta \\boldsymbol{b}``, and the three targets return the same estimate on one sample.
+
+The coefficient ``\\beta`` is equation 7 of [bodnar2019](@cite), which divides by the quadratic form ``v`` of the target. Equation 3.45 of [cajas2025](@cite) divides by ``u`` instead. That quotient does not minimise the quadratic loss from which [bodnar2019](@cite) derives both coefficients, so this method follows [bodnar2019](@cite).
 
 # Algorithm
 
@@ -806,7 +808,7 @@ Three consequences of the form separate this algorithm from the other two.
  5. Compute the shrinkage target, giving `b`, and transpose it into a row when `dims` is `1`.
  6. Flatten `mu` and `b` into the vectors `vm` and `vb`, which the quadratic forms need whichever way `dims` orients the data.
  7. Form the three quadratic forms `u`, `v` and `w` from `vm`, `vb` and `isigma`.
- 8. Form `alpha` from `u`, `v`, `w`, `N` and `T`, then `beta` from `alpha`, `w` and `u`.
+ 8. Form `alpha` from `u`, `v`, `w`, `N` and `T`, then `beta` from `alpha`, `w` and `v`.
  9. Return the combination `alpha * mu + beta * b`.
 
 # Validation
@@ -857,7 +859,7 @@ function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinP
                           "the Bodnar-Okhrin-Parolya coefficients divide by the Cauchy-Schwarz gap `u * v - w^2`, which is exactly zero because the $(nameof(typeof(me.alg.tgt))) target is a multiple of the sample mean. Every vector is such a multiple at N == 1, got N = $N"))
     alpha = (u - N / (T - N)) * v - w^2
     alpha /= gap
-    beta = (one(alpha) - alpha) * w / u
+    beta = (one(alpha) - alpha) * w / v
     return alpha * mu + beta * b
 end
 

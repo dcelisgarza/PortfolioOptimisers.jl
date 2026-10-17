@@ -326,7 +326,7 @@ quadratic programme.
 - ADR 0155's field list for the head is rewritten in place: `wb`, `sets` and `wf` leave the head
   for the Allocation Set, and the projection replaces the Weight Finaliser as the enforcement.
   ADR 0158's restatement of that list follows.
-- `CONTEXT.md` gains *Allocation Set*, *Projection Geometry*, *Constrained Update* and *Held
+- `GLOSSARY.md` gains *Allocation Set*, *Projection Geometry*, *Constrained Update* and *Held
   Step*, and the *Online Update* entry names the Allocation Set where it said "the constrained
   set once a constraint is stated".
 - The projection build ticket,

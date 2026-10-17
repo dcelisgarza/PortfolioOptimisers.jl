@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the adaptive subgradient and the optimistic step, private API of PortfolioOptimisers.jl: DiagonalProjection, …"
+Description = "Adaptive optimistic, private API of PortfolioOptimisers.jl: DiagonalProjection, AdaptiveSubgradientState, predictor_state_view, copy_predictor_state, …"
 ```
 
-# Online selection rules: the adaptive subgradient and the optimistic step: private API
+# Adaptive optimistic: private API
 
 ```@docs
 PortfolioOptimisers.DiagonalProjection

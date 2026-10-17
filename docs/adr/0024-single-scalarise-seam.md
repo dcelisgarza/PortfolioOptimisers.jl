@@ -50,7 +50,7 @@ per-optimiser copies.**
 
 - Correctness: the `LogSumExpScalariser` reduction is defined once and shared, fixing HERC. The
   `HierarchicalEqualRiskContribution2` reference fixture was regenerated to the corrected values,
-  and [test_09d_scalarise.jl](../../test/test_09d_scalarise.jl) pins the seam directly.
+  and [test_09_risk_measures.jl](../../test/test_09_risk_measures.jl) pins the seam directly.
 - ~350 lines removed across HRP / HERC / NOC; adding a new scalariser is now one `scalarise` method
   rather than a change at every optimiser site.
 - **Internal only** — `Scalariser` types and their meaning are unchanged; this is a consolidation of

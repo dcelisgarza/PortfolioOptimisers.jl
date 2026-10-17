@@ -120,7 +120,7 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
 
   - If `sk` is not `nothing`: `!isempty(sk)` and `size(sk, 1)^2 == size(sk, 2)`.
   - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -205,12 +205,13 @@ Skewness
     function Skewness(settings::MaxRiskMeasureSettings, ve::AbstractVarianceEstimator,
                       sk::Option{<:SkSlot}, w::Option{<:ObsWeights}, mu::Option{<:MuSlot},
                       pe::Option{<:AbstractPriorEstimator})
+        assert_returns_source(returns_source(pe), (nothing,), :Skewness, "pe.x_src")
         if isa(sk, MatNum)
             @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
             @argcheck(size(sk, 1)^2 == size(sk, 2),
                       DimensionMismatch("size(sk, 1)^2 ($(size(sk, 1)^2)) must equal size(sk, 2) ($(size(sk, 2)))"))
         end
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
@@ -549,14 +550,17 @@ VarianceSkewKurtosis
            │      ub ┼ nothing
            │     rke ┴ Bool: true
         vr ┼ Variance
-           │   settings ┼ RiskMeasureSettings
-           │            │   scale ┼ Float64: 1.0
-           │            │      ub ┼ nothing
-           │            │     rke ┴ Bool: false
-           │      sigma ┼ nothing
-           │       chol ┼ nothing
-           │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │    settings ┼ RiskMeasureSettings
+           │             │   scale ┼ Float64: 1.0
+           │             │      ub ┼ nothing
+           │             │     rke ┴ Bool: false
+           │       sigma ┼ nothing
+           │        chol ┼ nothing
+           │          rc ┼ nothing
+           │         alg ┼ SquaredSOCRiskExpr()
+           │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │   ratio_alg ┼ SquareRootRatio()
+           │      corner ┴ nothing
         sk ┼ Skewness
            │   settings ┼ MaxRiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -582,7 +586,8 @@ VarianceSkewKurtosis
            │          N ┼ nothing
            │       alg1 ┼ FullMoment()
            │       alg2 ┼ SOCRiskExpr()
-           │         pe ┴ nothing
+           │         pe ┼ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         pe ┴ nothing
 ```
 
@@ -623,6 +628,8 @@ VarianceSkewKurtosis
     pe
     function VarianceSkewKurtosis(settings::RiskMeasureSettings, vr::Variance, sk::Skewness,
                                   kt::Kurtosis, pe::Option{<:AbstractPriorEstimator})
+        assert_returns_source(returns_source(pe), (nothing,), :VarianceSkewKurtosis,
+                              "pe.x_src")
         vr = no_risk_expr_risk_measure(vr)
         sk = no_risk_expr_risk_measure(sk)
         kt = no_risk_expr_risk_measure(kt)

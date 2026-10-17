@@ -33,7 +33,7 @@
         underscore, and `test/runtests.jl:62` discovers on that prefix. A file named as the
         standard said would never run.
 
-    The second check is a different failure. `STANDARDS.md` § *Precedence* carried a
+    The second check is a different failure. `CODING_STANDARDS.md` § *Precedence* carried a
     measurement: `dev` holds "25 ADRs that `main` has never seen", taken against `main` at a
     named commit. `main` reached that commit, the count fell to zero, and the paragraph went
     on stating it. A measurement in a standards file is a copy of the repository, and a copy
@@ -110,7 +110,7 @@
     is a rendered documentation page, and `.github/workflows/LinkChecker.yml` already walks
     the links of the built documentation.
     =#
-    standards_files = let fs = String["STANDARDS.md", "CONTEXT.md", "CLAUDE.md",
+    standards_files = let fs = String["CODING_STANDARDS.md", "GLOSSARY.md", "CLAUDE.md",
                                       ".github/copilot-instructions.md"]
         for d in (".github/instructions", ".github/prompts")
             for f in sort(readdir(joinpath(root, d)))
@@ -224,13 +224,13 @@
                               "LiveServer.jl, a declared dependency of " *
                               "`docs/Project.toml`",
                           "_A" =>
-                              "a suffix quoted alone in `CONTEXT.md` § Prior; real " *
+                              "a suffix quoted alone in `GLOSSARY.md` § Prior; real " *
                               "only inside `AbstractLowOrderPriorEstimator_A`",
                           "_F" => "the same, for `AbstractLowOrderPriorEstimator_F`",
                           "_AF" => "the same, for `AbstractLowOrderPriorEstimator_AF`",
                           "refit_last" =>
-                              "a keyword of the reference's online runner, cited by " *
-                              "`CONTEXT.md` § Resume as the exit the library does not " *
+                              "a keyword of the oracle's online runner, cited by " *
+                              "`GLOSSARY.md` § Resume as the exit the library does not " *
                               "port")
 
     #=

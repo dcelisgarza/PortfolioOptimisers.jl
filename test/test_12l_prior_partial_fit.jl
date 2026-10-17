@@ -69,6 +69,29 @@ function PortfolioOptimisers.prior(::OptionalFactorProbe, X::PortfolioOptimisers
     end
     return LowOrderPrior(; X = X, mu = mu, sigma = Statistics.cov(X))
 end
+# A caller's own prior that reads a Panel Field and both masks, and refits from a buffer. It
+# stands in for the Cross-Sectional Factor Prior, which gains its `cache` in #1468. Its mean
+# moves with the field and with the estimation mask, so a read-out that lost either differs
+# from the batch fit.
+struct PanelFieldProbe{T1, T2} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    fld::T1
+    cache::T2
+end
+function PanelFieldProbe(; fld::AbstractString = "cap", cache = nothing)
+    return PanelFieldProbe(fld, cache)
+end
+function PortfolioOptimisers.reads_panel_fields(::PanelFieldProbe)
+    return true
+end
+function PortfolioOptimisers.prior(pe::PanelFieldProbe, X::PortfolioOptimisers.MatNum,
+                                   ::Union{Nothing, <:PortfolioOptimisers.MatNum} = nothing,
+                                   pnl::Union{Nothing, <:PortfolioOptimisers.AssetPanel} = nothing;
+                                   dims::Int = 1, kwargs...)
+    v = panel_field(pnl, pe.fld).vals
+    mu = vec(Statistics.mean(X; dims = 1)) .+ vec(Statistics.mean(v; dims = 1)) .+
+         vec(sum(pnl.emsk; dims = 1)) ./ 1000
+    return LowOrderPrior(; X = Matrix(X), mu = mu, sigma = Statistics.cov(X) + I)
+end
 @testset "Prior partial fit: fold and carry, refit from a buffer" begin
     using Test, PortfolioOptimisers, Statistics, StableRNGs, StatsBase, LinearAlgebra
     pe = PortfolioOptimisers
@@ -514,11 +537,13 @@ end
     end
 
     @testset "Rendering: `cache` never, `max_scenarios` only where it is set" begin
-        @test pe.show_fields(EmpiricalPrior()) == (:ce, :me, :horizon, :fill_limit)
+        # `x_src` names the returns that the prior reads since #1678.
+        @test pe.show_fields(EmpiricalPrior()) == (:ce, :me, :horizon, :fill_limit, :x_src)
         @test pe.show_fields(EmpiricalPrior(; max_scenarios = 10)) ==
-              (:ce, :me, :horizon, :fill_limit, :max_scenarios)
+              (:ce, :me, :horizon, :fill_limit, :max_scenarios, :x_src)
         @test pe.show_fields(PortfolioOptimisersCovariance()) == (:ce, :mp)
-        @test pe.show_fields(FactorPrior()) == (:pe, :mp, :re, :ve, :rsd)
+        # `mtx_sqrt` holds the square root algorithm since #1410.
+        @test pe.show_fields(FactorPrior()) == (:pe, :mp, :re, :ve, :rsd, :mtx_sqrt, :x_src)
         blv = pe.BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
         for est in (EmpiricalPrior(), PortfolioOptimisersCovariance(), FactorPrior(),
                     EntropyPoolingPrior(), OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]),
@@ -709,5 +734,354 @@ end
                                                                    views = views)), X)
         @test isapprox(o.mu, b.mu; rtol = 1e-10)
         @test isapprox(o.sigma, b.sigma; rtol = 1e-10)
+    end
+end
+# Issue #1467 (ADR 0193): `partial_fit!(pe, rd)` is the fold of every prior, and it mirrors
+# `prior(pe, rd)`. The route of the prior decides what the step honours: a refit records the
+# estimation mask and the Panel Fields of a prior that reads them, the carry of
+# `EmpiricalPrior` refuses what its exact folds cannot take, and a host forwards `rd`. Each
+# refusal names its route.
+@testset "The fold of every prior over a ReturnsResult, by route" begin
+    using Test, PortfolioOptimisers, Statistics, StableRNGs, LinearAlgebra
+    po = PortfolioOptimisers
+    rng = StableRNG(14670930)
+    T, N = 40, 4
+    X = randn(rng, T, N) ./ 100
+    M = trues(T, N)
+    M[1:6, 2] .= false
+    X[1:6, 2] .= NaN
+    Em = copy(M)
+    Em[1:12, 3] .= false
+    nx = ["A$i" for i in 1:N]
+    cap = NumericPanelField(; name = "cap", vals = randn(rng, T, N))
+    masks = AssetPanel(; amsk = M, emsk = Em)
+    full = AssetPanel(; pf = [cap], amsk = M, emsk = Em)
+    same = AssetPanel(; amsk = M, emsk = copy(M))
+    rd(pnl; kwargs...) = ReturnsResult(; nx = nx, X = X, pnl = pnl, kwargs...)
+    rows(r, i) = po.port_opt_view(r, i, :)
+    steps(est, r) = foldl((e, i) -> partial_fit!(e, rows(r, i:i)), 1:T; init = est)
+    online(est; kwargs...) = po.update_online_estimator(Online(est; kwargs...))
+    function message(f)
+        return try
+            f()
+            ""
+        catch err
+            err.msg
+        end
+    end
+
+    @testset "The refit equals the matrix form and honours the estimation mask" begin
+        a = steps(online(EmpiricalPrior()), rd(masks))
+        b = partial_fit!(online(EmpiricalPrior()), X; active_mask = M, estimation_mask = Em)
+        @test po.sample_buffer_kwargs(a.cache).estimation_mask == Em
+        @test isequal(prior(a).mu, prior(b).mu) && isequal(prior(a).sigma, prior(b).sigma)
+        @test isequal(prior(a).sigma, prior(EmpiricalPrior(), rd(masks)).sigma)
+        # The probe reads the estimation mask, so a refit that dropped it would differ.
+        p = steps(online(PanelFieldProbe()), rd(full))
+        @test isequal(prior(p).mu, prior(PanelFieldProbe(), rd(full)).mu)
+        @test !isequal(prior(p).mu,
+                       prior(PanelFieldProbe(),
+                             rd(AssetPanel(; pf = [cap], amsk = M, emsk = copy(M)))).mu)
+        # No panel and a static panel give no mask to record.
+        static = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(N))])
+        @test isnothing(partial_fit!(online(EmpiricalPrior()), rd(static)).cache.A)
+        @test isnothing(partial_fit!(online(EmpiricalPrior()), rd(nothing)).cache.A)
+    end
+    @testset "The Panel Fields reach only a prior that reads them" begin
+        m = message(() -> partial_fit!(online(EmpiricalPrior()), rd(full)))
+        @test occursin("the refit of `EmpiricalPrior` reads no Panel Field", m)
+        @test occursin("1 Panel Field(s)", m)
+        p = steps(online(PanelFieldProbe()), rd(full))
+        @test isequal(po.panel_field_array(only(p.cache.P)), cap.vals)
+        # A block fold is the same state as a fold row by row.
+        @test isequal(prior(partial_fit!(online(PanelFieldProbe()), rd(full))).mu,
+                      prior(p).mu)
+        # A cap windows the Panel Fields with the rows, so the read-out is the batch fit over
+        # the last rows.
+        w = 15
+        pc = steps(online(PanelFieldProbe(); max_history = w), rd(full))
+        @test isequal(prior(pc).mu,
+                      prior(PanelFieldProbe(), rows(rd(full), (T - w + 1):T)).mu)
+    end
+    @testset "The carry refuses what its exact folds cannot honour, by name" begin
+        m = message(() -> partial_fit!(EmpiricalPrior(), rd(masks)))
+        @test occursin("the carry of `EmpiricalPrior` folds its moments exactly", m)
+        @test occursin("$(count(Em .!= M)) cell(s)", m)
+        m = message(() -> partial_fit!(EmpiricalPrior(), rd(full)))
+        @test occursin("the carry of `EmpiricalPrior` reads no Panel Field", m)
+        # With equal masks the carry folds the active mask, as its matrix form does.
+        a = partial_fit!(EmpiricalPrior(), rd(same))
+        b = partial_fit!(EmpiricalPrior(), X; active_mask = M)
+        @test isequal(a.cache.buf.A, b.cache.buf.A)
+        @test isnothing(partial_fit!(EmpiricalPrior(), rd(nothing)).cache.buf.A)
+        static = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(N))])
+        @test isnothing(partial_fit!(EmpiricalPrior(), rd(static)).cache.buf.A)
+    end
+    @testset "A host forwards the ReturnsResult to the prior it embeds" begin
+        Xg = randn(rng, T, N) ./ 100
+        rg = ReturnsResult(; nx = nx, X = Xg,
+                           pnl = AssetPanel(; pf = [cap], amsk = trues(T, N),
+                                            emsk = trues(T, N)))
+        h = po.update_online_estimator(HighOrderPriorEstimator(;
+                                                               pe = Online(PanelFieldProbe())))
+        ho = prior(partial_fit!(h, rg))
+        hb = prior(HighOrderPriorEstimator(; pe = PanelFieldProbe()), rg)
+        # The read-out reads a view of the buffer and the batch fit reads a matrix, so the
+        # means can differ in the last bit.
+        @test isapprox(ho.mu, hb.mu; rtol = 1e-12)
+        @test isapprox(ho.kt, hb.kt) && isapprox(ho.sk, hb.sk)
+        views = po.BlackLittermanViews(; P = [1.0 zeros(1, N - 1)], Q = [0.01])
+        bl = po.update_online_estimator(BlackLittermanPrior(;
+                                                            pe = Online(PanelFieldProbe()),
+                                                            views = views))
+        @test isapprox(prior(partial_fit!(bl, rg)).mu,
+                       prior(BlackLittermanPrior(; pe = PanelFieldProbe(), views = views),
+                             rg).mu)
+        # The host of a carry refuses what the carry refuses.
+        m = message(() -> partial_fit!(HighOrderPriorEstimator(), rd(masks)))
+        @test occursin("the carry of `EmpiricalPrior`", m)
+    end
+    @testset "The buffer records the implied volatilities beside the returns (#1632)" begin
+        # The regression needs more than two windows of 20 rows, so the block is longer
+        # than the shared fixture. Its returns are complete, so the gap of `ivg` in column
+        # 2 is the surface's own.
+        Xc = randn(rng, 3 * T, N) ./ 100
+        ivm = 0.15 .+ 0.1 .* rand(rng, 3 * T, N)
+        r = ReturnsResult(; nx = nx, X = Xc, iv = ivm, ivpa = 1.1)
+        ivg = copy(ivm)
+        ivg[3:5, 2] .= NaN
+        rg = ReturnsResult(; nx = nx, X = Xc, iv = ivg, ivpa = 1.1)
+        all_steps(est, r) = foldl((e, i) -> partial_fit!(e, rows(r, i:i)), 1:(3 * T);
+                                  init = est)
+        for ce in (ImpliedVolatility(; ppy = 252),
+                   ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium()))
+            pb = prior(EmpiricalPrior(; ce = ce), r)
+            # The refit gives the batch answer, and so does the carry on a complete surface.
+            # The read-out reads a view of the buffer and the batch fit reads a matrix, so
+            # the moments can differ in the last bit.
+            @test isapprox(prior(all_steps(online(EmpiricalPrior(; ce = ce)), r)).sigma,
+                           pb.sigma; rtol = 1e-12)
+            @test isapprox(prior(all_steps(EmpiricalPrior(; ce = ce), r)).sigma, pb.sigma;
+                           rtol = 1e-12)
+            # A gap in the surface drops the asset from the Coverage Universe of the batch
+            # fit. The refit and the carry read the same panel method (#1639).
+            pg = prior(EmpiricalPrior(; ce = ce), rg)
+            @test all(isnan, view(pg.sigma, 2, :))
+            @test isapprox(prior(all_steps(online(EmpiricalPrior(; ce = ce)), rg)).sigma,
+                           pg.sigma; rtol = 1e-12, nans = true)
+            @test isapprox(prior(all_steps(EmpiricalPrior(; ce = ce), rg)).sigma, pg.sigma;
+                           rtol = 1e-12, nans = true)
+            # The plain method refuses the gap by name.
+            m = message(() -> cov(ce, Xc; dims = 1, iv = ivg, ivpa = 1.1))
+            @test occursin("all(isfinite, iv) must hold", m)
+        end
+        # The carry fold of a Cross-Sectional Factor Prior carries the surface in its rows
+        # too: test_12zb_parity_cs_prior_carry_fold.jl (#1647).
+    end
+    @testset "The carry refits a member that does not fold over the panel of its buffer (#1639)" begin
+        r0 = rd(nothing)
+        # Asset 3 is inactive where its returns are finite, so a refit that drops the
+        # panel reads rows that the batch fit does not read.
+        A = copy(M)
+        A[1:12, 3] .= false
+        tv = AssetPanel(; amsk = A, emsk = copy(A))
+        # The buffer gives the panel that it records, or nothing.
+        @test isnothing(po.buffer_asset_panel(steps(EmpiricalPrior(), r0).cache.buf))
+        p = po.buffer_asset_panel(steps(EmpiricalPrior(), rd(tv)).cache.buf)
+        @test p.amsk == A && p.emsk == A && isempty(p.pf)
+        # A gapped sample: the plain method refuses it, the batch fit and the carry answer.
+        for ce in (Covariance(; alg = SemiMoment()), StatsBase.SimpleCovariance()),
+            horizon in (nothing, 5)
+
+            est = EmpiricalPrior(; ce = ce, horizon = horizon)
+            b = prior(est, r0)
+            c = prior(steps(est, r0))
+            @test isapprox(c.sigma, b.sigma; rtol = 1e-12, nans = true)
+            @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
+            @test isequal(c.X, b.X)
+            @test isapprox(po.forecast_location(steps(est, r0)),
+                           po.forecast_location(est, r0); rtol = 1e-12, nans = true)
+        end
+        h = HighOrderPriorEstimator(; kte = Cokurtosis(; alg = SemiMoment()),
+                                    ske = Coskewness(; alg = SemiMoment()))
+        hb = prior(h, r0)
+        hc = prior(steps(h, r0))
+        @test any(isnan, hb.kt)
+        @test isapprox(hc.kt, hb.kt; rtol = 1e-12, nans = true)
+        @test isapprox(hc.sk, hb.sk; rtol = 1e-12, nans = true)
+        @test isapprox(hc.V, hb.V; rtol = 1e-12, nans = true)
+        # A time-varying active mask: the refit reads it, as the batch fit does. The members
+        # that fold read it under a Coverage Policy.
+        cvg = CoveragePolicy(; min_coverage = 0.2)
+        for ce in
+            (Covariance(; alg = SemiMoment(), cvg = cvg), Covariance(; alg = SemiMoment()),
+             StatsBase.SimpleCovariance())
+            est = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg), ce = ce)
+            b = prior(est, rd(tv))
+            c = prior(steps(est, rd(tv)))
+            @test isapprox(c.sigma, b.sigma; rtol = 1e-12, nans = true)
+            @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
+            @test !isapprox(prior(est, r0).sigma, b.sigma; nans = true)
+        end
+        est = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
+                             ce = Covariance(; alg = SemiMoment(), cvg = cvg))
+        c = po.forecast_location(steps(est, rd(tv)))
+        @test isequal(c, po.forecast_location(est, rd(tv)))
+        @test !isequal(c, po.forecast_location(est, r0))
+        # The location does not depend on the moment algorithm.
+        @test isequal(c,
+                      po.forecast_location(EmpiricalPrior(; me = est.me,
+                                                          ce = Covariance(; cvg = cvg)),
+                                           rd(tv)))
+    end
+    @testset "A plain estimator reads an inactive cell as a gap in every form (#1648)" begin
+        # Asset 3 is inactive where its returns are finite. Asset 2 is a non-finite gap.
+        A = copy(M)
+        A[1:12, 3] .= false
+        tv = AssetPanel(; amsk = A, emsk = copy(A))
+        Xc = X[:, [1, 4]]
+        Ac = trues(T, N)
+        # The panel form, the keyword mask through the panel method, and the fold give one
+        # Coverage Universe. The keyword form refuses the gap, as it refuses a NaN.
+        for (est, f) in
+            ((SimpleExpectedReturns(), Statistics.mean), (SimpleVariance(), Statistics.var),
+             (Covariance(), Statistics.cov))
+            b = f(est, X, tv)
+            @test isnan(vec(b)[3]) && isfinite(vec(b)[1])
+            @test isequal(f(est, X, nothing; active_mask = A), b)
+            @test_throws IsNonFiniteError f(est, X[:, [1, 3, 4]];
+                                            active_mask = A[:, [1, 3, 4]])
+            @test isapprox(f(est, Xc; active_mask = Ac[:, [1, 4]]), f(est, Xc))
+            @test_throws DimensionMismatch f(est, Xc; active_mask = Ac)
+            o = f(partial_fit!(est, X; active_mask = A))
+            @test isapprox(vec(o), vec(b); rtol = 1e-12, nans = true)
+        end
+        # The third and the fourth order fold, and the panel form, read the mask too.
+        ske = Coskewness()
+        sb = coskewness(ske, X, tv)
+        so = coskewness(partial_fit!(ske, X; active_mask = A))
+        @test isapprox(so[1], sb[1]; rtol = 1e-12, nans = true)
+        @test isapprox(so[2], sb[2]; rtol = 1e-12, nans = true)
+        @test isapprox(cokurtosis(partial_fit!(Cokurtosis(), X; active_mask = A)),
+                       cokurtosis(Cokurtosis(), X, tv); rtol = 1e-12, nans = true)
+        @test_throws IsNonFiniteError coskewness(ske, X[:, [1, 3, 4]];
+                                                 active_mask = A[:, [1, 3, 4]])
+        @test_throws IsNonFiniteError cokurtosis(Cokurtosis(), X[:, [1, 3, 4]];
+                                                 active_mask = A[:, [1, 3, 4]])
+        # The batch fit, the carry and the refit of the default priors agree, and so does the
+        # matrix form that gives the masks as keywords.
+        for est in (EmpiricalPrior(), HighOrderPriorEstimator())
+            b = prior(est, rd(tv))
+            @test isnan(b.mu[3]) && isnan(b.mu[2]) && isfinite(b.mu[1])
+            c = prior(steps(est, rd(tv)))
+            @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
+            @test isapprox(c.sigma, b.sigma; rtol = 1e-12, nans = true)
+            k = prior(est, X; active_mask = A)
+            @test isequal(k.mu, b.mu) && isequal(k.sigma, b.sigma)
+        end
+        b = prior(EmpiricalPrior(), rd(tv))
+        r = prior(steps(online(EmpiricalPrior()), rd(tv)))
+        @test isequal(r.mu, b.mu) && isequal(r.sigma, b.sigma)
+        h = prior(steps(HighOrderPriorEstimator(), rd(tv)))
+        hb = prior(HighOrderPriorEstimator(), rd(tv))
+        @test isapprox(h.sk, hb.sk; rtol = 1e-12, nans = true)
+        @test isapprox(h.kt, hb.kt; rtol = 1e-12, nans = true)
+    end
+    @testset "A carry refuses a member that holds a state at its first step" begin
+        # Found by R14 of #1630. The carried rows start empty, so a warm member folded the
+        # new observations onto rows that no other part of the prior read: `mu` read all 100
+        # rows, and `sigma` and `X` read the last 50, with no message. The fold loop refuses
+        # such a prior at its entry, and a direct call did not, as in #1642.
+        Xw = randn(StableRNG(1642), 100, 4) ./ 100
+        warm = partial_fit!(SimpleExpectedReturns(), Xw[1:50, :])
+        rdw = ReturnsResult(; nx = string.(1:4), X = Xw[51:100, :])
+        for (pe, path) in ((EmpiricalPrior(; me = warm), "me.cache"),
+                           (EmpiricalPrior(; me = warm, horizon = 5), "me.cache"),
+                           (EmpiricalPrior(; ce = partial_fit!(Covariance(), Xw[1:50, :])), "ce.cache"),
+                           (HighOrderPriorEstimator(; ske = partial_fit!(Coskewness(), Xw[1:50, :])),
+                            "ske.cache"))
+            for x in (Xw[51:100, :], Xw[51, :], rdw)
+                isa(pe, HighOrderPriorEstimator) && isa(x, AbstractVector) && continue
+                @test_throws "`$(path)`" partial_fit!(pe, x)
+            end
+        end
+        # A cold prior folds, and the states that it folds pass the later steps.
+        e = partial_fit!(partial_fit!(EmpiricalPrior(), Xw[1:50, :]), Xw[51:100, :])
+        b = prior(EmpiricalPrior(), Xw)
+        @test prior(e).mu ≈ b.mu && prior(e).sigma ≈ b.sigma
+        h = partial_fit!(partial_fit!(HighOrderPriorEstimator(), Xw[1:50, :]),
+                         Xw[51:100, :])
+        hb = prior(HighOrderPriorEstimator(), Xw)
+        @test prior(h).sk ≈ hb.sk && prior(h).kt ≈ hb.kt
+    end
+    @testset "The fold refuses what no state records" begin
+        @test_throws IsNothingError partial_fit!(online(EmpiricalPrior()),
+                                                 ReturnsResult(; nf = ["F1"],
+                                                               F = randn(rng, T, 1)))
+    end
+    @testset "reads_panel_fields answers from the tree" begin
+        @test po.reads_panel_fields(CrossSectionalFactorPrior(; lambda = 1,
+                                                              factors = ["market" =>
+                                                                             ConstantExposure()]))
+        @test !po.reads_panel_fields(EmpiricalPrior())
+        @test !po.reads_panel_fields(nothing)
+        @test po.reads_panel_fields(Online(PanelFieldProbe()))
+        @test po.reads_panel_fields(HighOrderPriorEstimator(; pe = PanelFieldProbe()))
+        @test po.reads_panel_fields(EntropyPoolingPrior(; pe = PanelFieldProbe()))
+        @test po.reads_panel_fields(MeucciEntropyPoolingPrior(; pe = PanelFieldProbe()))
+        @test !po.reads_panel_fields(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()]))
+        @test po.reads_panel_fields(OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                        pe1 = PanelFieldProbe()))
+        # Every host that passes the panel and the series to the prior it embeds answers for
+        # that prior: the augmented Black-Litterman prior through its asset prior, and the
+        # hosts of a factor-axis prior through an embedding prior.
+        blv = BlackLittermanViews(; P = [1.0 zeros(1, 5)], Q = [0.01])
+        cs = CrossSectionalFactorPrior(; lambda = 1,
+                                       factors = ["market" => ConstantExposure(),
+                                                  "ccy" => CurrencyExposure()])
+        for (inner, reads) in
+            ((PanelFieldProbe(), po.reads_panel_fields), (cs, po.reads_exogenous_series))
+            @test reads(AugmentedBlackLittermanPrior(; a_pe = inner, a_views = blv,
+                                                     f_views = blv))
+            @test !reads(AugmentedBlackLittermanPrior(; a_views = blv, f_views = blv))
+            ep = EntropyPoolingPrior(; pe = inner)
+            @test reads(BayesianBlackLittermanPrior(; pe = ep, views = blv))
+            @test reads(HighOrderFactorPriorEstimator(; pe = ep))
+        end
+    end
+    @testset "A pool pins its choice over the panel of its buffer (#1749)" begin
+        # `pe1` reads a Panel Field and the estimation mask, so a pin that dropped the panel
+        # raises, and a pin that dropped the mask runs another fit.
+        Xp = randn(rng, T, N) ./ 100
+        Fp = randn(rng, T, 3) ./ 100
+        pnl = AssetPanel(; pf = [cap], amsk = trues(T, N), emsk = Em)
+        rdp = ReturnsResult(; nx = nx, X = Xp, nf = string.("F", 1:3), F = Fp, pnl = pnl)
+        sw(choice) = StepwiseRegression(; alg = ForwardSelection(), choice = choice)
+        function pool(re)
+            return OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                       pe1 = PanelFieldProbe(),
+                                       pe2 = FactorPrior(; re = re))
+        end
+        r = rows(rdp, 1:20)
+        s = partial_fit!(online(pool(sw(PinnedChoice()))), r)
+        @test !po.pending_choice(s)
+        # The pin gives `pe2` the weights that the batch fit pools over the panel. The probe
+        # answers on the rows it reads, so the pool reads `r.X`.
+        wp = first(po.opinion_pooling_weights(pool(sw(BatchChoice())), r.X, r.F, r.pnl))
+        @test s.pe2.re.included ==
+              po.pin_regression_choice(sw(PinnedChoice()), r.X, r.F, wp).included
+        # So the stream is the batch fit over the same rows.
+        b = prior(pool(sw(BatchChoice())), r)
+        @test prior(s).mu ≈ b.mu && prior(s).sigma ≈ b.sigma
+        # A later step keeps the choice, and reads out the batch fit of the pinned pool.
+        s2 = partial_fit!(s, rows(rdp, 21:T))
+        @test s2.pe2.re.included == s.pe2.re.included
+        b2 = prior(pool(s.pe2.re), rdp)
+        @test prior(s2).mu ≈ b2.mu && prior(s2).sigma ≈ b2.sigma
+        # The batch fit of an entropy-pooling prior pins its pool over the same panel.
+        ep = EntropyPoolingPrior(; pe = pool(sw(PinnedChoice())))
+        pinned = po.pin_prior_choice(ep, Xp, Fp, nothing, pnl)
+        @test !po.pending_choice(pinned)
+        @test prior(ep, rdp).mu ≈ prior(pinned, rdp).mu
     end
 end

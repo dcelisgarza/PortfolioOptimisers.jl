@@ -22,12 +22,13 @@ one piece.
 
 !!! tip "When to reach for this"
     Reach for the family when you want a portfolio that reacts to every price and, under most
-    rules, needs no solver. Several follow-the-winner rules carry a bound, under the rate and
-    the projection their paper states, on how far they can fall behind the best constant
-    portfolio chosen with hindsight. The follow-the-loser rules carry none. The family also
-    tells you whether a market trended or reverted, and you assume neither beforehand. Run a
-    follow-the-winner rule beside a follow-the-loser rule before you put money on the second,
-    because a reversion rule bets on one property of the market and on nothing else.
+    rules, needs no solver. Several follow-the-winner rules carry a bound on how far they can
+    fall behind the best constant portfolio chosen with hindsight. The bound holds under the
+    rate and the projection that the work cited in the rule's docstring states. The
+    follow-the-loser rules carry none. The family also tells you whether a market trended or
+    reverted, and you assume neither beforehand. Run a follow-the-winner rule beside a
+    follow-the-loser rule before you put money on the second, because a reversion rule bets
+    on one property of the market and on nothing else.
 =#
 
 using PortfolioOptimisers, PrettyTables, DataFrames, Statistics
@@ -118,7 +119,7 @@ free = Dict(name => cross_val_predict(OnlinePortfolioSelection(; alg = alg), rd,
             for (name, alg) in rules)
 
 function summary_table(preds, free)
-    ps = [performance_summary(preds[n]) for n in first.(rules)]
+    ps = [performance_summary(preds[n]; ppy = 252) for n in first.(rules)]
     return DataFrame("Rule" => first.(rules),
                      "Fee-free wealth" => [wealth(free[n]) for n in first.(rules)],
                      "Net wealth" => [wealth(preds[n]) for n in first.(rules)],
@@ -178,7 +179,7 @@ own rule, run through the same walk-forward with no fee.
 
 We reach the best constant rebalanced portfolio two ways. The first is [`MeanRisk`](@ref) with
 a maximum-return objective under a [`LogarithmicReturn`](@ref), solved by Clarabel. The second
-is [`BestConstantRebalancedPortfolio`](@ref), which is Cover's fixed point and needs no solver.
+is [`BestConstantRebalancedPortfolio`](@ref), which is the fixed point of [cover1984](@cite) and needs no solver.
 
 On a real panel the best constant portfolio holds few assets, three of the twenty here. The
 multiplicative iteration of the fixed point approaches such a point slowly, so at its default
@@ -290,8 +291,8 @@ capped = OnlinePortfolioSelection(; alg = MovingAverageReversion(), fees = fees,
                                                                tn = Turnover(; w = zeros(N),
                                                                              val = 0.1)))
 capped_pred = cross_val_predict(capped, rd, cv)
-ps_free = performance_summary(preds["Moving-average reversion"])
-ps_capped = performance_summary(capped_pred)
+ps_free = performance_summary(preds["Moving-average reversion"]; ppy = 252)
+ps_capped = performance_summary(capped_pred; ppy = 252)
 
 pretty_table(DataFrame("Set" => ["Simplex", "Capped and turnover-limited"],
                        "Terminal wealth" =>
@@ -389,8 +390,8 @@ log-wealth loss.
 
 risk_step = MirrorDescent(; obj = RiskLoss(; r = Variance(), window = 60), eta = 50)
 risk_pred = cross_val_predict(head(risk_step), rd, cv)
-ps_eg = performance_summary(preds["Exponentiated gradient"])
-ps_risk = performance_summary(risk_pred)
+ps_eg = performance_summary(preds["Exponentiated gradient"]; ppy = 252)
+ps_risk = performance_summary(risk_pred; ppy = 252)
 
 pretty_table(DataFrame("Loss" => ["Log wealth", "Variance over sixty rows"],
                        "Net wealth" =>
@@ -429,7 +430,7 @@ ceiling = Variance(; settings = RiskMeasureSettings(; ub = (0.25 / sqrt(252))^2)
 ceiled = OnlinePortfolioSelection(; alg = MovingAverageReversion(), fees = fees,
                                   set = ProgrammeAllocationSet(; slv = slv, r = ceiling))
 ceiled_pred = cross_val_predict(ceiled, rd, cv)
-ps_ceiled = performance_summary(ceiled_pred)
+ps_ceiled = performance_summary(ceiled_pred; ppy = 252)
 held_steps(pred) = count(p -> !isnothing(p.res.retcode.res), pred.pred)
 
 pretty_table(DataFrame("Set" => ["Simplex", "Volatility ceiling of 25 %"],

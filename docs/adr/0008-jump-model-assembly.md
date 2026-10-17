@@ -49,7 +49,7 @@ the same object, wrapped in a [`NearOptimalSetup`](../../src/17_Optimisation/05_
 This builds on the Model State interface of [ADR 0004](0004-typed-jump-model-state.md): that
 ADR gave the data the builders share a named interface; this ADR gives the *ordering* of the
 builders a named interface. The two are complementary — `Model State` is the data, `Model
-Assembly` is the sequence (see `CONTEXT.md`).
+Assembly` is the sequence (see `GLOSSARY.md`).
 
 ## Decision
 
@@ -180,7 +180,7 @@ MIP Risk Budgeting (26/26 — exercises `miprb_flag = true`), Relaxed Risk Budge
 exercises the `r = nothing` no-op), Factor Risk Contribution (4/4 — exercises the `b1` splat
 and `sdp_asset_phylogeny = false`), and Near Optimal Centering (24/24, cold load).
 
-The promised solver-free surface is realised in `test/test_03b_jump_model_assembly.jl`: it
+The promised solver-free surface is realised in `test/test_03_optimisation.jl`: it
 runs the head + `assemble_jump_model!` and asserts on the registered Model-State keys
 without solving — `r` routing (one indexed risk key per measure), the `r = nothing` no-op
 (risk keys absent, head and return constraints still present), and `wn2`/`l1` toggling their
@@ -210,7 +210,7 @@ argument lists, and they had drifted. This amendment records the seam that close
    heads whose formulation is fixed pass `MinimumRisk()` and take the second branch instead of
    hand-writing `@expression(model, k, 1)`. Its second method now takes exactly one objective;
    the former `args...` fallback absorbed a wrong-arity call and registered the constant under
-   a ratio objective, which is how `test_03b_jump_model_assembly.jl` called it — so the ratio
+   a ratio objective, which is how `test_03_optimisation.jl` called it — so the ratio
    branch went untested while the call still looked correct.
 
    `RiskBudgeting` is the one head outside this producer. Its log barrier pins the scale, so
@@ -291,8 +291,8 @@ variants share it.
 
 ### Verification
 
-`test_20_near_optimal_centering_optimisation.jl`, `test_03b_jump_model_assembly.jl`,
-`test_19_factor_risk_contribution.jl`, `test_18n_frontier_sweep_cap.jl`,
+`test_20_near_optimal_centering_optimisation.jl`, `test_03_optimisation.jl`,
+`test_19_factor_risk_contribution.jl`, `test_18m_return_multiplicity.jl`,
 `test_18m_return_multiplicity.jl`, `test_18o_no_return.jl`,
 `test_15_relaxed_risk_budgetting_optimisation.jl` (the `r = nothing` no-op),
 `test_16a_asset_risk_budgeting.jl`, `test_18a_mean_risk_1.jl` and `test_28_seam_lock.jl` all

@@ -219,7 +219,7 @@ The `cvg` field of the estimator is passed as the second argument, so the arm is
   - `cvg`: The policy the estimator carries, which selects the arm.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm ignores it.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return.
   - `kwargs...`: Additional keyword arguments passed to [`Statistics.mean`](https://juliastats.org/StatsBase.jl/stable/scalarstats/#Statistics.mean).
 
 # Returns
@@ -236,7 +236,7 @@ function coverage_mean end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_mean`](@ref). The Coverage Universe arm, which is the sample mean of a window every asset covers, and the answer [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) gave before the `cvg` field existed. It refuses a gapped sample with [`assert_finite_sample`](@ref) and ignores the active mask, because an estimator with no policy reads the universe through [`coverage_reduction`](@ref) and never sees a gap.
+`Nothing` method of [`coverage_mean`](@ref). The Coverage Universe arm, which is the sample mean of a window every asset covers, and the answer [`mean(me::SimpleExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref) gave before the `cvg` field existed. It refuses a gapped sample with [`assert_finite_sample`](@ref). A cell is a gap when its return is non-finite or when `active_mask` is `false` there, so the arm refuses an inactive cell too. An estimator with no policy reads the universe through [`coverage_reduction`](@ref), which gives it a block with no gap.
 
 # Related
 
@@ -247,7 +247,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 function coverage_mean(me::SimpleExpectedReturns, ::Nothing, X::MatNum; dims::Int = 1,
                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     assert_dims(dims)
-    assert_finite_sample(X)
+    assert_finite_sample(X, active_mask)
     w = get_observation_weights(me.w, X; dims = dims, kwargs...)
     return if isnothing(w)
         Statistics.mean(X; dims = dims)
@@ -491,7 +491,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)`](@ref), and the active mask is ignored: a plain state carries no per-cell count for the mask to gate, and its universe is the Coverage Universe the read-out already reduces to.
+`Nothing` method of the coverage arm of [`partial_fit!`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -500,8 +500,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`SimpleExpectedReturnsState`](@ref)
 """
 function partial_fit!(state::SimpleExpectedReturnsState, x::VecNum, ::Nothing,
-                      ::Option{<:AbstractVector{<:Bool}})
-    return partial_fit!(state, x)
+                      active_mask::Option{<:AbstractVector{<:Bool}})
+    return partial_fit!(state, inactive_as_nonfinite(x, active_mask))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -523,7 +523,7 @@ for every asset ``j`` that is finite and active at observation ``t``, and neithe
   - $(math_dict[:r_tj])
   - ``\\mu_j``: the running mean of asset ``j``.
 
-An asset with no observation keeps ``\\mu_j = 0`` and ``\\nu_j = 0``, and the read-out answers `NaN` for it, so the zero is never read as an estimate. This is Welford's recursion per asset, so a mean folded observation by observation is the mean of the same rows fitted as a block.
+An asset with no observation keeps ``\\mu_j = 0`` and ``\\nu_j = 0``, and `mean(me)` with no data answers `NaN` for it, so the zero is never read as an estimate. This is Welford's recursion per asset, so a mean folded observation by observation is the mean of the same rows fitted as a block.
 
 # Algorithm
 
@@ -751,9 +751,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the read-out arm of [`coverage_mean`](@ref). Every asset shares one count, so the whole answer is `NaN` before the first observation and the running mean afterwards.
+`Nothing` method of [`coverage_mean`](@ref) for a state, which `mean(me)` with no data calls. Every asset shares one count, so the whole answer is `NaN` before the first observation and the running mean afterwards.
 
-The running mean is **copied** rather than handed out. `partial_fit!` writes the Welford recursion into `state.mu` in place, so a read-out that returned the accumulator itself would hand the caller a vector that the next fold silently rewrites — and a prior that read its `mu` out and carried it into a Result would find the Result changed under it at the next observation. The [`CoveragePolicy`](@ref) method beside this one copies for the same reason, through [`coverage_frame`](@ref).
+The running mean is **copied** rather than handed out. `partial_fit!` writes the Welford recursion into `state.mu` in place, so a `mean(me)` that returned the accumulator itself would hand the caller a vector that the next fold silently rewrites — and a prior that read its `mu` out and carried it into a Result would find the Result changed under it at the next observation. The [`CoveragePolicy`](@ref) method beside this one copies for the same reason, through [`coverage_frame`](@ref).
 
 # Related
 
@@ -772,7 +772,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_mean`](@ref). Each asset's mean is read out against that asset's own count, and an asset the policy refuses is `NaN`.
+[`CoveragePolicy`](@ref) method of [`coverage_mean`](@ref) for a state, which `mean(me)` with no data calls. Each asset's mean is read out against that asset's own count, and an asset the policy refuses is `NaN`.
 
 # Algorithm
 

@@ -18,7 +18,7 @@ In order to implement a new concrete type that works seamlessly with the library
 The implied volatilities are the **second** positional argument and the returns the **third**. The two are matrices of the same size, so a call that swaps them is well typed and silently wrong.
 
   - `alg`: The concrete subtype instance.
-  - `iv`: Implied volatility matrix `observations × assets`, already divided by ``\\sqrt{\\mathrm{af}}`` by the caller.
+  - `iv`: Implied volatility matrix `observations × assets`, already divided by ``\\sqrt{\\mathrm{ppy}}`` by the caller.
   - `X`: Asset returns matrix `observations × assets`.
   - `ivpa`: Implied volatility premium adjustment factor. It is `nothing` when the caller supplies none, so an algorithm that needs one raises on that method.
 
@@ -37,7 +37,7 @@ julia> function PortfolioOptimisers.predict_realised_vols(::MyImpliedVolatilityA
            return vec(iv[end, :])
        end
 
-julia> cov(ImpliedVolatility(; alg = MyImpliedVolatilityAlgorithm(), af = 1),
+julia> cov(ImpliedVolatility(; alg = MyImpliedVolatilityAlgorithm(), ppy = 1),
            [0.1 0.2; 0.3 0.1; 0.2 0.4]; iv = [0.5 0.6; 0.4 0.7; 0.3 0.8])
 2×2 Matrix{Float64}:
   0.09       -0.0785584
@@ -195,14 +195,15 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = Covariance(),
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-        af::Number = 252
+        ppy::Number,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ImpliedVolatility
 
-Keywords correspond to the struct's fields.
+Keywords correspond to the struct's fields. `ppy` has no default. The implied volatility is annual, and `ppy` converts it to the period of the returns, so no value is right at every data frequency: the caller states it, for example `ppy = 252` for daily returns.
 
 ## Validation
 
-  - `af > 0`.
+  - `ppy > 0`.
 
 ## Propagated parameters
 
@@ -210,17 +211,19 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
   - `ce`: Recursively updated via [`factory`](@ref).
   - `alg`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
 ```jldoctest
-julia> ImpliedVolatility()
+julia> ImpliedVolatility(; ppy = 252)
 ImpliedVolatility
    ce ┼ Covariance
       │    me ┼ SimpleExpectedReturns
@@ -247,7 +250,7 @@ ImpliedVolatility
       │   ws ┼ Int64: 20
       │   re ┼ LinearModel
       │      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-   af ┴ Int64: 252
+  ppy ┴ Int64: 252
 ```
 
 # Related
@@ -278,22 +281,53 @@ ImpliedVolatility
     """
     @fprop alg
     """
-    Annualisation factor for converting annualised implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(af)` before the algorithm reads them.
+    Periods per year of the returns, which converts the annual implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(ppy)` before the algorithm reads them.
     """
-    af
+    ppy
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function ImpliedVolatility(ce::StatsBase.CovarianceEstimator,
                                mp::AbstractMatrixProcessingEstimator,
-                               alg::ImpliedVolatilityAlgorithm, af::Number)
-        assert_gt0(af, :af)
-        return new{typeof(ce), typeof(mp), typeof(alg), typeof(af)}(ce, mp, alg, af)
+                               alg::ImpliedVolatilityAlgorithm, ppy::Number,
+                               cache::Option{<:AbstractPartialFitState})
+        assert_gt0(ppy, :ppy)
+        return new{typeof(ce), typeof(mp), typeof(alg), typeof(ppy), typeof(cache)}(ce, mp,
+                                                                                    alg,
+                                                                                    ppy,
+                                                                                    cache)
     end
 end
 function ImpliedVolatility(; ce::StatsBase.CovarianceEstimator = Covariance(),
                            mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                            alg::ImpliedVolatilityAlgorithm = ImpliedVolatilityRegression(),
-                           af::Number = 252)::ImpliedVolatility
-    return ImpliedVolatility(ce, mp, alg, af)
+                           ppy::Number,
+                           cache::Option{<:AbstractPartialFitState} = nothing)::ImpliedVolatility
+    return ImpliedVolatility(ce, mp, alg, ppy, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of an [`ImpliedVolatility`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:ImpliedVolatility, true)` to render it.
+
+# Arguments
+
+  - `::ImpliedVolatility`: Implied volatility covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ce, :mp, :alg, :ppy)`.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::ImpliedVolatility) = (:ce, :mp, :alg, :ppy)
 """
     realised_vol(ce::AbstractVarianceEstimator, X::MatNum, ws::Integer,
                  chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
@@ -685,8 +719,37 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
     return rv_p
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a fit of an [`ImpliedVolatility`](@ref) estimator that receives no implied volatilities.
+
+The estimator scales a correlation by the realised volatilities that it predicts from `iv`, so it has no answer without them. A [`prior`](@ref) over a [`ReturnsResult`](@ref) gives `rd.iv` to every member, and `rd.iv` is `nothing` when the returns carry no implied volatilities. So the keyword `iv` of each method of `cov` and `cor` admits `nothing`, and this function refuses it with an error that names the input and the remedy.
+
+# Arguments
+
+  - `iv`: The implied volatilities, `observations × assets`, or `nothing`.
+
+# Validation
+
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`ReturnsResult`](@ref)
+"""
+function assert_implied_volatility(iv::Option{<:MatNum})
+    @argcheck(!isnothing(iv),
+              IsNothingError("`ImpliedVolatility` predicts the volatility of each asset from the implied volatilities `iv`, `observations × assets`, and none were given. Pass `iv` to `cov` or `cor`, or fit the prior on a `ReturnsResult` that carries `iv`."))
+    return nothing
+end
+"""
     Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                   iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                   iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 
 Compute the covariance matrix using implied volatility scaling.
 
@@ -704,16 +767,16 @@ Where:
 
   - $(math_dict[:Sigma_hat])
   - ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})``: Correlation matrix from asset returns, computed by `ce.ce`.
-  - ``\\hat{\\boldsymbol{\\sigma}}^{\\mathrm{rv}}``: Predicted realised volatilities, from ``\\mathbf{iv} / \\sqrt{\\mathrm{af}}``.
+  - ``\\hat{\\boldsymbol{\\sigma}}^{\\mathrm{rv}}``: Predicted realised volatilities, from ``\\mathbf{iv} / \\sqrt{\\mathrm{ppy}}``, where ``\\mathrm{ppy}`` is `ce.ppy`, the number of periods of `X` in one year.
 
 The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the predicted realised volatility of each asset, and never a unit.
 
 # Algorithm
 
- 1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
- 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
+ 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` or in `iv` with [`assert_finite_sample`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `sigma`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it. Every other shipped estimator absorbs it into its own `kwargs...` and ignores it.
- 4. Divide `iv` by `sqrt(ce.af)`, converting the annualised implied volatility to the frequency of `X`.
+ 4. Divide `iv` by `sqrt(ce.ppy)`, converting the annualised implied volatility to the frequency of `X`.
  5. Call [`predict_realised_vols`](@ref) with `ce.alg`, giving `iv`, one predicted realised volatility per asset. The implied volatilities are the second argument and the returns the third.
  6. Scale `sigma` in place with `StatsBase.cor2cov!`, which applies the closed form above.
  7. Post-process `sigma` in place with [`matrix_processing!`](@ref) and `ce.mp`.
@@ -730,8 +793,10 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 
 # Validation
 
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
+  - Every entry of `X` and of `iv` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
   - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
 
 # Returns
@@ -742,16 +807,19 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 
   - [`ImpliedVolatility`](@ref)
   - [`predict_realised_vols`](@ref)
-  - [`cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
+  - [`cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
 """
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                        iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    assert_implied_volatility(iv)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     assert_finite_sample(X)
+    assert_finite_sample(iv, "iv")
     sigma = Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean,
                            iv = iv, kwargs...)
-    iv = iv / sqrt(ce.af)
+    iv = iv / sqrt(ce.ppy)
     iv = predict_realised_vols(ce.alg, iv, X, ivpa)
     StatsBase.cor2cov!(sigma, iv)
     matrix_processing!(ce.mp, sigma, X; kwargs...)
@@ -759,7 +827,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
 end
 """
     Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                   iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                   iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 
 Compute the correlation matrix using implied volatility scaling.
 
@@ -771,10 +839,10 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
 # Algorithm
 
- 1. Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
- 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
+ 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` or in `iv` with [`assert_finite_sample`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `rho`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it.
- 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.af)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.af)` for it exactly as it is in `cov`.
+ 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.ppy)` for it exactly as it is in `cov`.
  5. Normalise `rho` in place with `StatsBase.cov2cor!`, which divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. The call also mirrors the lower triangle into the upper one, clamps every off-diagonal entry into `[-1, 1]`, and sets the diagonal to exactly one. The exact diagonal is what step 6 needs: [`matrix_processing!`](@ref) reads the value of the diagonal to decide whether it holds a correlation matrix or a covariance matrix.
  6. Post-process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
 
@@ -790,8 +858,10 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
 # Validation
 
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
+  - Every entry of `X` and of `iv` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
   - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
 
 # Returns
@@ -802,17 +872,20 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 
   - [`ImpliedVolatility`](@ref)
   - [`predict_realised_vols`](@ref)
-  - [`cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
+  - [`cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)`](@ref)
 """
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
-                        iv::MatNum, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+    assert_implied_volatility(iv)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     assert_finite_sample(X)
+    assert_finite_sample(iv, "iv")
     rho = Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean,
                          iv = iv, kwargs...)
     # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
-    predict_realised_vols(ce.alg, iv / sqrt(ce.af), X, ivpa)
+    predict_realised_vols(ce.alg, iv / sqrt(ce.ppy), X, ivpa)
     StatsBase.cov2cor!(rho)
     matrix_processing!(ce.mp, rho, X; kwargs...)
     return rho
@@ -849,12 +922,65 @@ function coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector)
     return ivpa[cmsk]
 end
 """
+    reads_implied_volatility(est::Union{<:AbstractEstimator, <:AbstractCovarianceEstimator}) -> Bool
+    reads_implied_volatility(est::ImpliedVolatility) -> Bool
+    reads_implied_volatility(v::AbstractVector) -> Bool
+    reads_implied_volatility(p::Pair) -> Bool
+    reads_implied_volatility(x) -> Bool
+
+Answer whether an estimator tree holds an [`ImpliedVolatility`](@ref), which reads the implied volatility surface `iv`.
+
+The reduce-and-expand root of a moment verb, [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), reads the answer. A gap in the surface puts an asset outside the Coverage Universe only of a fit that reads the surface. A wrapper that holds an `ImpliedVolatility` and has no panel method of its own reaches the root, so the root must know that the tree reads the surface.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. An `ImpliedVolatility` answers `true`.
+ 2. Any other estimator answers `true` when one of its fields answers `true`. A covariance estimator subtypes `StatsBase.CovarianceEstimator` and not `AbstractEstimator`, so the method takes both roots.
+ 3. A vector of estimators answers `true` when one of its entries answers `true`, and a vector of numbers answers `false`. A `Pair` answers for its value.
+ 4. Everything else answers `false`.
+
+# Arguments
+
+  - `est`: An estimator, or one field of an estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the tree reads the implied volatility surface.
+
+# Related
+
+  - [`ImpliedVolatility`](@ref)
+  - [`coverage_keyword_reduction`](@ref)
+"""
+function reads_implied_volatility(est::Union{<:AbstractEstimator,
+                                             <:AbstractCovarianceEstimator})
+    return any(f -> reads_implied_volatility(getfield(est, f)), fieldnames(typeof(est)))
+end
+function reads_implied_volatility(::ImpliedVolatility)
+    return true
+end
+function reads_implied_volatility(v::AbstractVector)
+    return eltype(v) <: Number ? false : any(reads_implied_volatility, v)
+end
+function reads_implied_volatility(p::Pair)
+    return reads_implied_volatility(last(p))
+end
+function reads_implied_volatility(::Any)
+    return false
+end
+"""
     Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                   dims::Int = 1, mean = nothing, iv::MatNum,
-                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> MatNum
+                   dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
+                   ivpa::Option{<:Num_VecNum} = nothing,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                   kwargs...) -> MatNum
     Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                   dims::Int = 1, mean = nothing, iv::MatNum,
-                   ivpa::Option{<:Num_VecNum} = nothing, kwargs...) -> MatNum
+                   dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
+                   ivpa::Option{<:Num_VecNum} = nothing,
+                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                   kwargs...) -> MatNum
 
 Fit an implied volatility estimate on the Coverage Universe, and expand it to the full asset universe.
 
@@ -864,8 +990,8 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
 
 # Algorithm
 
- 1. Check `dims`, and orient `X` and `iv` to `observations × assets`.
- 2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref).
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Check `dims`, and orient `X` and `iv` to `observations × assets`.
+ 2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref). It reads `active_mask` in the place of the active mask of `pnl` when the caller gives one, through [`coverage_mask_source`](@ref).
  3. Slice `X`, `iv` and `ivpa` onto it.
  4. Call the two-argument method on the clean block.
  5. Expand the matrix with [`expand_moment`](@ref).
@@ -879,10 +1005,12 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
   - $(arg_dict[:omean])
   - `iv`: Implied volatility surface `observations × assets`.
   - `ivpa`: Implied volatility premium adjustment.
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Additional keyword arguments passed to the two-argument method.
 
 # Validation
 
+  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - $(val_dict[:dims])
   - `size(X) == size(iv)`.
   - At least one asset must be covered.
@@ -898,22 +1026,28 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
   - [`expand_moment`](@ref)
 """
 function Statistics.cov(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                        dims::Int = 1, mean = nothing, iv::MatNum,
-                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_implied_volatility(iv)
+    src = coverage_mask_source(pnl, active_mask, dims)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
-    cmsk = coverage_mask(X, iv, pnl; dims = 1)
+    cmsk = coverage_mask(X, iv, src; dims = 1)
     Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
     sigma = Statistics.cov(ce, Xc; dims = 1, mean = mean, iv = ivc,
                            ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)
     return expand_moment(sigma, cmsk)
 end
 function Statistics.cor(ce::ImpliedVolatility, X::MatNum, pnl::Option{<:AssetPanel};
-                        dims::Int = 1, mean = nothing, iv::MatNum,
-                        ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
+                        dims::Int = 1, mean = nothing, iv::Option{<:MatNum} = nothing,
+                        ivpa::Option{<:Num_VecNum} = nothing,
+                        active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+    assert_implied_volatility(iv)
+    src = coverage_mask_source(pnl, active_mask, dims)
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
-    cmsk = coverage_mask(X, iv, pnl; dims = 1)
+    cmsk = coverage_mask(X, iv, src; dims = 1)
     Xc, ivc = coverage_reduced_pair(X, iv, cmsk)
     rho = Statistics.cor(ce, Xc; dims = 1, mean = mean, iv = ivc,
                          ivpa = coverage_reduced_ivpa(ivpa, cmsk), kwargs...)

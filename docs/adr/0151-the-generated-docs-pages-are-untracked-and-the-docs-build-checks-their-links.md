@@ -49,7 +49,7 @@ cross-reference check is the gate on the links they carry.**
    longer checked by lychee. A generation step before lychee would have loaded the package and
    every docs dependency into a second runner to check fourteen links; the cost is not paid.
 4. `CLAUDE.md` § Editing says the pages are untracked and that no gate reads one from the tree,
-   so a broken link in a generated page is fixed at the `.jl` source alone. `STANDARDS.md` routes
+   so a broken link in a generated page is fixed at the `.jl` source alone. `CODING_STANDARDS.md` routes
    *a generated docs file* to that section and to this ADR. `.markdownlintignore` keeps the four
    paths, because a local docs build leaves them in the tree and the lint hook would otherwise
    read them.

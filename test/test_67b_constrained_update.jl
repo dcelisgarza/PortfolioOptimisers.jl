@@ -66,6 +66,23 @@ end
         @test_throws TypeError ProgrammeAllocationSet(; slv = slv, tn = -0.1)
         @test_throws DomainError ProgrammeAllocationSet(; slv = slv, card = 0)
         @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv, r = Variance())
+        # The ceiling reads rows that change at every step, so a fixed returns series is
+        # refused by name, in a vector too. The set's `tr` keeps it, cut to the rows (#1656).
+        rtrm = TrackingRiskMeasure(; settings = RiskMeasureSettings(; ub = 0.1),
+                                   tr = ReturnsTracking(; w = zeros(3)))
+        err = try
+            ProgrammeAllocationSet(; slv = slv, r = [rtrm])
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("at `tr`", err.msg)
+        @test isa(ProgrammeAllocationSet(; slv = slv,
+                                         r = TrackingRiskMeasure(;
+                                                                 settings = RiskMeasureSettings(;
+                                                                                                ub = 0.1),
+                                                                 tr = WeightsTracking(;
+                                                                                      w = zeros(3)))),
+                  ProgrammeAllocationSet)
         @test_throws Exception ProgrammeAllocationSet(; slv = slv,
                                                       wb = WeightBoundsEstimator())
         @test isa(ProgrammeAllocationSet(; slv = slv,
@@ -793,7 +810,8 @@ end
         @test isapprox(w0v, w0s; atol = 1e-8)
         # A stated factor is the one the cone reads, and an indefinite matrix is refused by
         # the factor, as the shared builder refuses it.
-        G = Matrix(qr(randn(StableRNG(3), 4, 4)).Q) * po.covariance_factor(S)
+        G = Matrix(qr(randn(StableRNG(3), 4, 4)).Q) *
+            transpose(matrix_square_root(EigenFallbackSquareRoot(), S))
         wch = po.project(EuclideanProjection(),
                          resolve(ProgrammeAllocationSet(; slv = slv,
                                                         r = Variance(; sigma = S, chol = G,
@@ -1103,6 +1121,33 @@ end
             wrt = proj(resolve(ProgrammeAllocationSet(; slv = slv, tr = rte), 3))
             @test dot(wrt - w3, cov(R), wrt - w3) <= 1e-5 * (1 + 1e-4)
             @test !isapprox(wrt, free; atol = 1e-3)
+            # Issue #1660: a tracking or a turnover ceiling that is not fixed takes the
+            # step's book, as the `tr` and `tn` slots do. A tracking ceiling equals the
+            # tracking error of the same bound, in both forms.
+            trc(fixed) = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = TrackingRiskMeasure(;
+                                                                                settings = ub_of(0.002),
+                                                                                tr = WeightsTracking(;
+                                                                                                     w = [0.2,
+                                                                                                          0.3,
+                                                                                                          0.5],
+                                                                                                     fixed = fixed))),
+                                 3)
+            @test isapprox(proj(trc(false)), wt_book; atol = 1e-5)
+            @test isapprox(proj(trc(true)), wt_fixed; atol = 1e-5)
+            tnc(fixed) = resolve(ProgrammeAllocationSet(; slv = slv,
+                                                        r = TurnoverRiskMeasure(;
+                                                                                settings = ub_of(0.1),
+                                                                                w = [0.6,
+                                                                                     0.2,
+                                                                                     0.2],
+                                                                                fixed = fixed)),
+                                 3)
+            wtn_book = proj(tnc(false); q = [1.0, 0.0, 0.0], w = wh)
+            @test sum(abs, wtn_book - wh) <= 0.1 + 1e-6
+            wtn_fixed = proj(tnc(true); q = [1.0, 0.0, 0.0], w = wh)
+            @test sum(abs, wtn_fixed - [0.6, 0.2, 0.2]) <= 0.1 + 1e-6
+            @test sum(abs, wtn_fixed - wh) > 0.1
         end
         @testset "The ceilings, the budgets, the norm ceilings and the return floor" begin
             # A vector of ceilings: every one binds.
@@ -1644,5 +1689,232 @@ end
         show(io, MIME"text/plain"(),
              ProgrammeAllocationSet(; slv = slv, tn = Turnover(; w = zeros(3), val = 0.1)))
         @test occursin("ProgrammeAllocationSet", String(take!(io)))
+    end
+
+    @testset "The set's prior reads the implied volatilities of the rows (#1644)" begin
+        # The set fits its prior on the rows that the head holds, and those rows carry `iv`
+        # and `ivpa`. So a variance ceiling on an `ImpliedVolatility` prior binds on the
+        # surface, and the online fold equals the batch fit.
+        rng = StableRNG(1644)
+        T, N = 30, 3
+        R = 0.01 .* randn(rng, T, N)
+        iv = 0.15 .+ 0.1 .* rand(rng, T, N)
+        rd = ReturnsResult(; nx = ["A", "B", "C"], X = R, iv = iv, ivpa = 1.0)
+        rows(r, i) = po.port_opt_view(r, i, :)
+        pe_iv = EmpiricalPrior(;
+                               ce = PortfolioOptimisersCovariance(;
+                                                                  ce = ImpliedVolatility(;
+                                                                                         alg = ImpliedVolatilityPremium(),
+                                                                                         ppy = 1),
+                                                                  mp = MatrixProcessing(;
+                                                                                        pdm = nothing)))
+        # The ceiling lies above the least variance of every window under the surface,
+        # 0.0135, so each step is feasible. The free path goes above it at eight steps, up
+        # to 0.0168, so it binds there. Under the sample covariance it never binds.
+        mk(pe) = OPS(; alg = ExponentiatedGradient(),
+                     set = ProgrammeAllocationSet(; slv = slv, pe = pe,
+                                                  r = Variance(;
+                                                               settings = RiskMeasureSettings(;
+                                                                                              ub = 0.014))))
+        opt = mk(pe_iv)
+        w = (@test_logs (:warn, r"Held Step at 1") optimise(opt, rd)).w
+        ws = (@test_logs (:warn, r"Held Step at 1") optimise(mk(EmpiricalPrior()), rd)).w
+        @test !isapprox(w, ws; atol = 1e-2)
+        o = opt
+        @test_logs (:warn, r"Held Step at 1") for t in 1:T
+            o = po.partial_fit!(o, rows(rd, t:t))
+        end
+        @test optimise(o).w == w
+    end
+
+    @testset "The set's graph slots read the implied volatilities of the rows" begin
+        # Found by R14 of #1630. #1644 gave `iv` to the set's prior and not to its centrality
+        # and phylogeny slots, so an `ImpliedVolatility` in a slot refused the fit with an
+        # `IsNothingError`, while the same slot of a JuMP head fitted. The set now resolves
+        # each slot as the JuMP head does, and the online fold equals the batch fit.
+        rng = StableRNG(1644)
+        T, N = 30, 3
+        R = 0.01 .* randn(rng, T, N)
+        iv = 0.15 .+ 0.1 .* rand(rng, T, N)
+        rd = ReturnsResult(; nx = ["A", "B", "C"], X = R, iv = iv, ivpa = 1.0)
+        rows(r, i) = po.port_opt_view(r, i, :)
+        ivc = ImpliedVolatility(; alg = ImpliedVolatilityPremium(), ppy = 1)
+        ce = CentralityEstimator(; pl = NetworkEstimator(; ce = ivc))
+        pr = prior(EmpiricalPrior(), rd)
+        cv = centrality_vector(ce, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd).X
+        # The ceiling lies between the least centrality of the simplex and the centrality of
+        # the free path, which stays near equal weights, so it is feasible and it binds.
+        cte = CentralityConstraint(; A = ce, B = (minimum(cv) + sum(cv) / N) / 2, comp = <=)
+        ple = SemiDefinitePhylogenyEstimator(; pl = NetworkEstimator(; ce = ivc))
+        a = po.resolve_allocation_set_rows(ProgrammeAllocationSet(; slv = slv, cte = cte,
+                                                                  ple = ple), pr, rd)
+        c = centrality_constraints(cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
+        p = phylogeny_constraints(ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd)
+        @test a.ctr.A_ineq == c.A_ineq && a.ctr.B_ineq == c.B_ineq
+        @test a.plr.A == p.A
+        wf = (@test_logs optimise(OPS(; alg = ExponentiatedGradient()), rd)).w
+        opt = OPS(; alg = ExponentiatedGradient(),
+                  set = ProgrammeAllocationSet(; slv = slv, cte = cte))
+        r = @test_logs (:warn, r"Held Step at 1") optimise(opt, rd)
+        @test dot(cv, r.w) <= cte.B + 1e-8 < dot(cv, wf)
+        o = opt
+        @test_logs (:warn, r"Held Step at 1") for t in 1:T
+            o = po.partial_fit!(o, rows(rd, t:t))
+        end
+        @test optimise(o).w == r.w
+    end
+
+    @testset "The set's tracking error and ceiling read the benchmark of the rows (#1657)" begin
+        # When the benchmark of the rows is the series of a fixed portfolio, a data
+        # benchmark equals that portfolio as a fixed `WeightsTracking`, which pays no fee.
+        # Both forms bind, and the online fold equals the batch fit.
+        R = 0.02 .* randn(StableRNG(7), 30, 4)
+        wb = [0.1, 0.2, 0.3, 0.4]
+        rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R, nb = ["BM"], B = R * wb,
+                           ts = Date(2020, 1, 1) .+ Day.(0:29))
+        rows(r, i) = po.port_opt_view(r, i, :)
+        fw = WeightsTracking(; w = wb, fixed = true)
+        sets = (tr -> ProgrammeAllocationSet(; slv = slv,
+                                             tr = TrackingError(; tr = tr, err = 0.003)),
+                tr -> ProgrammeAllocationSet(; slv = slv,
+                                             r = TrackingRiskMeasure(; tr = tr,
+                                                                     settings = RiskMeasureSettings(;
+                                                                                                    ub = 0.004))))
+        free = optimise(OPS(; alg = PassiveAggressiveMeanReversion()), rd).w
+        for set in sets
+            opt = OPS(; alg = PassiveAggressiveMeanReversion(),
+                      set = set(DataBenchmarkTracking()))
+            res = (@test_logs (:warn, r"Held Step at 2020-01-01") optimise(opt, rd))
+            @test isa(res.retcode, OptimisationSuccess)
+            ref = (@test_logs (:warn, r"Held Step at 2020-01-01") optimise(OPS(;
+                                                                               alg = PassiveAggressiveMeanReversion(),
+                                                                               set = set(fw)),
+                                                                           rd))
+            @test isapprox(res.w, ref.w; atol = 1e-8)
+            @test !isapprox(res.w, free; atol = 1e-3)
+            o = opt
+            @test_logs (:warn, r"Held Step at 2020-01-01") for t in 1:30
+                o = po.partial_fit!(o, rows(rd, t:t))
+            end
+            @test optimise(o).w == res.w
+        end
+        # A batch walk-forward refuses a returns series in the set: each fold restarts the
+        # head at its first training row, so the cut to the first rows misaligns (#1669).
+        # The walk enters the set, which is an algorithm, and names the field.
+        rtw = ReturnsTracking(; w = R * wb)
+        @test po.returns_tracking_path(OPS(; alg = PassiveAggressiveMeanReversion(),
+                                           set = sets[1](rtw))) == "set.tr.tr"
+        for set in sets
+            @test_throws ArgumentError cross_val_predict(OPS(;
+                                                             alg = PassiveAggressiveMeanReversion(),
+                                                             set = set(rtw)), rd,
+                                                         IndexWalkForward(10, 5))
+        end
+    end
+
+    @testset "The set fits its prior in the frame that its prior states (#1663)" begin
+        # The rows stay raw, and the set gives them to its prior, which reads its own source.
+        # Under `x_src = ExcessSource()` a Variance ceiling is a ceiling on the tracking
+        # variance against the benchmark of the rows.
+        xs = ExcessSource()
+        rng = StableRNG(1663)
+        T, N = 40, 4
+        R = 0.02 .* randn(rng, T, N)
+        Bv = 0.01 .* randn(rng, T)
+        Bm = 0.01 .* randn(rng, T, N)
+        nx = ["A", "B", "C", "D"]
+        ts = Date(2020, 1, 1) .+ Day.(0:(T - 1))
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nx .* "_b", B = Bm, ts = ts)
+        exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
+        rows(r, i) = po.port_opt_view(r, i, :)
+        vset(src) = ProgrammeAllocationSet(; slv = slv, pe = EmpiricalPrior(; x_src = src),
+                                           r = Variance(;
+                                                        settings = RiskMeasureSettings(;
+                                                                                       ub = 2e-4)))
+        # One projection: the ceiling binds on the covariance of `X - B`. The covariance
+        # of the view and that of the hand-built matrix differ by 1e-19, which the solve
+        # takes to 2e-7 at the binding ceiling.
+        win, wine = rows(rdm, 1:20), rows(exm, 1:20)
+        S = cov(wine.X)
+        pj(set, r) = first(po.with_projection_step(() -> po.project(EuclideanProjection(),
+                                                                    resolve(set, N),
+                                                                    [1.0, 0.0, 0.0, 0.0],
+                                                                    fill(0.25, N)), r, 20))
+        wx = pj(vset(xs), win)
+        @test dot(wx, S, wx) ≈ 2e-4 rtol = 1e-8
+        @test isapprox(wx, pj(vset(nothing), wine); atol = 1e-6)
+        @test !isapprox(wx, pj(vset(nothing), win); atol = 1e-2)
+        # The head: the set's prior and the step in the Excess Frame together equal the
+        # plain head on `X - B`. The set's prior alone moves the head, and online equals
+        # batch. The step states `DataSource()`, so the mix is stated and silent.
+        mk(src, hsrc) = OPS(; alg = PassiveAggressiveMeanReversion(), x_src = hsrc,
+                            set = vset(src))
+        held = r"Held Step at 2020-01-01"
+        w2 = (@test_logs (:warn, held) optimise(mk(nothing, nothing), exm)).w
+        @test isapprox((@test_logs (:warn, held) optimise(mk(xs, xs), rdm)).w, w2;
+                       atol = 1e-6)
+        w = (@test_logs (:warn, held) optimise(mk(xs, DataSource()), rdm)).w
+        @test !isapprox(w, (@test_logs (:warn, held) optimise(mk(nothing, nothing), rdm)).w;
+                        atol = 1e-2)
+        o = mk(xs, DataSource())
+        @test_logs (:warn, held) for t in 1:T
+            o = po.partial_fit!(o, rows(rdm, t:t))
+        end
+        @test optimise(o).w == w
+        # A view keeps the source of the set's prior, and so does the resolution of a fold.
+        @test po.port_opt_view(vset(xs), [1, 2]).pe.x_src === xs
+        @test resolve(vset(xs), N).pe.x_src === xs
+        # Rows with no benchmark are refused.
+        rd0 = ReturnsResult(; nx = nx, X = R, ts = ts)
+        @test_throws ArgumentError optimise(mk(xs, DataSource()), rows(rd0, 1:10))
+        # A data benchmark under a prior of the Excess Frame would subtract the benchmark
+        # twice, so the constructor refuses it, in the tracking errors and in the ceilings
+        # (ADR 0208, decision 3). Under a raw prior the set builds.
+        dtr = TrackingError(; tr = DataBenchmarkTracking(), err = 0.01)
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          pe = EmpiricalPrior(; x_src = xs),
+                                                          tr = dtr)
+        @test_throws ArgumentError ProgrammeAllocationSet(; slv = slv,
+                                                          pe = EmpiricalPrior(; x_src = xs),
+                                                          r = TrackingRiskMeasure(;
+                                                                                  tr = DataBenchmarkTracking(),
+                                                                                  settings = RiskMeasureSettings(;
+                                                                                                                 ub = 0.01)))
+        @test ProgrammeAllocationSet(; slv = slv,
+                                     pe = EmpiricalPrior(; x_src = DataSource()),
+                                     tr = dtr).tr === dtr
+    end
+
+    @testset "Each reader of the set joins the group of the head (ADR 0214)" begin
+        # The set holds no source. Its prior, each graph slot and the regression of each
+        # exposure slot state their own, and each one joins the group of the head.
+        xs = ExcessSource()
+        sets4 = UniverseSets(;
+                             dict = Dict("nx" => ["A", "B", "C", "D"],
+                                         "nf" => ["F1", "F2"]))
+        gset(; kw...) = ProgrammeAllocationSet(; slv = slv,
+                                               pe = EmpiricalPrior(; x_src = xs),
+                                               sets = sets4, kw...)
+        raw = r"read the raw returns data: `set.cte`, `set.ple`\."
+        @test_logs (:warn, raw) OPS(; x_src = xs,
+                                    set = gset(; cte = CentralityConstraint(),
+                                               ple = SemiDefinitePhylogenyEstimator()))
+        @test_logs OPS(; x_src = xs,
+                       set = gset(; cte = CentralityConstraint(; x_src = DataSource()),
+                                  ple = SemiDefinitePhylogenyEstimator(; x_src = xs)))
+        # A regression reader at `nothing` counts only when the set's prior gives no
+        # loadings and it refits on the raw rows (ADR 0214, decision 4).
+        space = FactorSpace(; re = StepwiseRegression())
+        ece = ExposureConstraintEstimator(; space = space,
+                                          lce = LinearConstraintEstimator(;
+                                                                          val = "F1 <= 1"))
+        fr = po.group_frames(OPS(; x_src = xs, set = gset(; lcse = ece)))
+        @test fr.excess && fr.raw == ["set.lcse.space.re"]
+        fr = po.group_frames(OPS(; x_src = xs,
+                                 set = gset(; pe = FactorPrior(; x_src = xs), lcse = ece)))
+        @test fr.excess && isempty(fr.raw)
+        # A schedule of sets walks each entry.
+        td = TimeDependent([gset(), gset(; pe = EmpiricalPrior())])
+        @test po.group_frames(OPS(; x_src = xs, set = td)).raw == ["set.val[2].pe"]
     end
 end

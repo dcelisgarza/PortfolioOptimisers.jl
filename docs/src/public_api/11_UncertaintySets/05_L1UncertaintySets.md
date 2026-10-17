@@ -1,8 +1,8 @@
 ```@meta
-Description = "ℓ1 Uncertainty Sets, public API of PortfolioOptimisers.jl: L1UncertaintySet, SignedL1UncertaintySet, L1UncertaintySetAlgorithm, …"
+Description = "L1 uncertainty sets, public API of PortfolioOptimisers.jl: L1UncertaintySet, SignedL1UncertaintySet, L1UncertaintySetAlgorithm, …"
 ```
 
-# ℓ1 Uncertainty Sets
+# L1 uncertainty sets
 
 ```@docs
 L1UncertaintySet

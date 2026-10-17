@@ -155,6 +155,9 @@ function return_forecast(rfe::CustomValueReturnForecast, ::ReturnsResult,
               DimensionMismatch("mu ($(length(rfe.mu))) states one Return Forecast per asset of the coverage universe, so it must match the asset count of the factor model block ($N)"))
     return CustomValueReturnForecastResult(; mu = rfe.mu)
 end
+function lookback(::CustomValueReturnForecast)::Integer
+    return 1
+end
 
 """
     port_opt_view(rf::CustomValueReturnForecastResult, i, args...)

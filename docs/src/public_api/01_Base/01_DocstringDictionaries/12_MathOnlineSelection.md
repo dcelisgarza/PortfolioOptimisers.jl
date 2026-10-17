@@ -1,7 +1,7 @@
 ```@meta
-Description = "Online selection notation has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Math online selection has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Online selection notation
+# Math online selection
 
-This file defines no name. The [private page](@ref private-api-online-selection-notation) says which table it fills.
+This file defines no name. The [private page](@ref private-api-math-online-selection) says which table it fills.

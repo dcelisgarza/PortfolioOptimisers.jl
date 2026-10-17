@@ -17,7 +17,7 @@ running total:
    [`set_return_expression!`](../../src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl),
 4. Schur Complement Hierarchical Risk Parity's blend over its parameter bundles.
 
-`scale` had no ADR and no `CONTEXT.md` entry. ADR 0024 owns the `scalarise` **seam** and never
+`scale` had no ADR and no `GLOSSARY.md` entry. ADR 0024 owns the `scalarise` **seam** and never
 mentions `scale`; ADR 0052 owns the return expression and states an invariance for one term
 only at `scale = 1`. The meaning of the number itself lived in source comments and in
 `field_dict`, and the two axes' field docs had drifted apart: `field_dict[:scale_rm]` carried

@@ -222,6 +222,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - If `w_max_ini` is a vector: `!isempty(w_max_ini)`.
   - If `bins` is a number: `isfinite(bins) && bins > 0`.
   - `fb` schedules: `bind !== :nearest`.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 # Mathematical definition
 
@@ -414,18 +416,20 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
                                            (; opt, r, obj, bins, w_min, w_min_ini, w_opt,
                                             w_opt_ini, w_max, w_max_ini, ucs_flag, alg, fb),
                                            near_optimal_centering_td_defaults())
-        return new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
-                   typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
-                   typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fb)}(opt, r,
-                                                                                 obj, bins,
-                                                                                 w_min,
-                                                                                 w_min_ini,
-                                                                                 w_opt,
-                                                                                 w_opt_ini,
-                                                                                 w_max,
-                                                                                 w_max_ini,
-                                                                                 ucs_flag,
-                                                                                 alg, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :NearOptimalCentering, "opt.pe")
+        est = new{typeof(opt), typeof(r), typeof(obj), typeof(bins), typeof(w_min),
+                  typeof(w_min_ini), typeof(w_opt), typeof(w_opt_ini), typeof(w_max),
+                  typeof(w_max_ini), typeof(ucs_flag), typeof(alg), typeof(fb)}(opt, r, obj,
+                                                                                bins, w_min,
+                                                                                w_min_ini,
+                                                                                w_opt,
+                                                                                w_opt_ini,
+                                                                                w_max,
+                                                                                w_max_ini,
+                                                                                ucs_flag,
+                                                                                alg, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function NearOptimalCentering(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = StandardDeviation(),
@@ -679,6 +683,10 @@ function near_optimal_centering_setup(noc::NearOptimalCentering, rd::ReturnsResu
     # `rd`, so the head is reduced before any of them, and before the optimiser is
     # repackaged from the bundle. `_optimise` takes the same view of its own locals.
     noc, rd = investable_view(noc, rd, attrs.pr, attrs.imsk)
+    # A data benchmark binds to the rows of the view, before the corner solves and the
+    # risks of the corners read it.
+    noc = bind_data_benchmark(noc, rd)
+    r = bind_data_benchmark(r, rd)
     opt = jump_optimiser_from_attributes(noc.opt, attrs)
     # The per-term corner solves need the same unbounded pair the max-return corner uses, so
     # the pair is built whenever a return term declares a frontier bound, even when both

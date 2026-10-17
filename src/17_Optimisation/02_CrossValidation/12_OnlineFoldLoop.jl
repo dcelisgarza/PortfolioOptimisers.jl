@@ -4,18 +4,18 @@
 
 Fits the estimator of one fold. Dispatch on `train_idx` selects the arm.
 
-These are the two arms of the estimator form of [`fit_and_predict`](@ref). A training window selects the refit that every fold of the batch arms runs, `optimise(opt, port_opt_view(rd, train_idx, cols))`. `nothing` means that the estimator holds its window, because the online arm of [`fold_loop`](@ref) folded every row of it. This arm reads the estimator out through `optimise(opt)` with no returns, and the read-out rebuilds the carrier from the state and runs the batch path over it. When `cols` is not `:`, the caller takes the asset view of `opt` before either arm, so it slices a stepped estimator and a cold one by asset in the same way.
+These are the two arms of the estimator form of [`fit_and_predict`](@ref). A training window selects the refit that every fold of the batch arms runs, `optimise(opt, port_opt_view(rd, train_idx, cols))`. `nothing` means that the estimator holds its window, because the online arm of [`fold_loop`](@ref) folded every row of it. This arm calls `optimise(opt)` with no returns. That call rebuilds the returns data from the state and runs the batch path over it. When `cols` is not `:`, the caller takes the asset view of `opt` before either arm, so it slices a stepped estimator and a cold one by asset in the same way.
 
 # Arguments
 
   - `opt`: The estimator of the fold, already viewed by asset.
-  - `rd`: The carrier of the fold. The read-out arm does not read it.
+  - `rd`: The returns data of the fold. The arm with no training window does not read it.
   - `train_idx`: The training window of the fold, or `nothing` for a stepped estimator.
-  - `cols`: The asset columns of the fold. The read-out arm does not read them.
+  - `cols`: The asset columns of the fold. The arm with no training window does not read them.
 
 # Validation
 
-  - On the read-out arm, everything that `optimise(opt)` refuses. A cold estimator holds no window, and the read-out refuses it with an `ArgumentError`.
+  - On the arm with no training window, everything that `optimise(opt)` refuses. A cold estimator holds no window, and `optimise(opt)` refuses it with an `ArgumentError`.
 
 # Returns
 
@@ -57,7 +57,7 @@ end
 
 Folds the rows that a fold gained into the estimator that the online arm threads. The step reads each of its schedules at the entry of that fold.
 
-The default is [`partial_fit!`](@ref), and every family except one takes it. [`assert_stateless_schedule`](@ref) lets a schedule reach only a field that carries no state. On every other family the step reads none of those fields. The read-out of the fold reads them, and it resolves them itself. For example, the programme that the read-out solves reads a scheduled weight bound, and the buffer that the step fills never reads it. [`OnlinePortfolioSelection`](@ref) is the exception. Its step is the optimisation, because the step projects every row onto `set`, so the head has its own method.
+The default is [`partial_fit!`](@ref), and every family except one takes it. [`assert_stateless_schedule`](@ref) lets a schedule reach only a field that carries no state. On every other family the step reads none of those fields. The call with no data that fits the fold reads them, and it resolves them itself. For example, the programme that this call solves reads a scheduled weight bound, and the buffer that the step fills never reads it. [`OnlinePortfolioSelection`](@ref) is the exception. Its step is the optimisation, because the step projects every row onto `set`, so the head has its own method.
 
 `ctx` is `nothing` when the estimator carries no schedule, which is the usual case. The loop then builds no context.
 
@@ -65,7 +65,7 @@ The default is [`partial_fit!`](@ref), and every family except one takes it. [`a
 
   - `est`: The estimator that the loop threads, with its schedules unresolved.
   - `ctx`: The context of the fold, or `nothing`.
-  - `rd`: The carrier of the rows that the fold gained. It holds returns, or the prices that a [`Pipeline`](@ref) host threads.
+  - `rd`: The rows that the fold gained, as returns, or as the prices that a [`Pipeline`](@ref) threads.
 
 # Validation
 
@@ -124,13 +124,13 @@ end
 
 Builds the [`TimeDependentContext`](@ref) of fold `i`. Both places that resolve a schedule against a fold read this record.
 
-The per-fold copy of [`fold_loop`](@ref) builds it and swaps every schedule in before the callback fits the fold. The online arm builds the same record earlier in the same fold, before it folds the rows of the fold, for the schedules that its step reads ([`online_step_fold`](@ref)). Both places call this one constructor, so the step and the read-out of fold `i` resolve a schedule against equal records.
+The per-fold copy of [`fold_loop`](@ref) builds it and swaps every schedule in before the callback fits the fold. The online arm builds the same record earlier in the same fold, before it folds the rows of the fold, for the schedules that its step reads ([`online_step_fold`](@ref)). Both places call this one constructor, so the step and the call with no data of fold `i` resolve a schedule against equal records.
 
 # Arguments
 
   - `i`: The index of the fold, in the enumeration of the scheme.
   - `n`: The number of folds that the scheme enumerates.
-  - `rd`: The carrier of the fold, already viewed by asset where the scheme takes a view.
+  - `rd`: The returns or the prices of the fold, already viewed by asset where the scheme takes a view.
   - `train_idx`: The training windows of every fold, in split order.
   - `test_idx`: The test windows of every fold, in split order.
   - `w_prev`: The weights of the previous fold, or `nothing`.
@@ -199,7 +199,7 @@ The online arm and the resumed arm of [`fold_loop`](@ref) share this body, so a 
   - `est`: The estimator, folded through `last_end`.
   - `folds`: The indices of the folds to run, a contiguous range of the enumeration of the scheme.
   - `prev`: The prediction of the last threadable fold before `first(folds)`, or `nothing`.
-  - `rd`: The carrier.
+  - `rd`: The returns or the prices of the walk-forward.
   - `train_idx`: The training windows of every fold, in split order.
   - `test_idx`: The test windows of every fold, in split order. The context of each fold reads them.
   - `n`: The number of folds that the scheme enumerates. The context of each fold reads it.
@@ -244,7 +244,7 @@ Runs the `n` folds of a walk-forward through the online step, and threads one es
 
 This is the online arm of [`fold_loop`](@ref), which the loop takes when the scheme is an Online Scheme ([`folds_are_stepped`](@ref)). The arm logs no message. The caller chooses an Online Scheme by name through its constructor, so the arm has no accident to report. [`run_folds`](@ref) is different, because it reports a sequential run that the loop chose on its own. A [`Resume`](@ref) in the estimator slot takes the method of `Resume`, which skips the warm-up and the folds that the Result holds, and runs the same body from the fold after them.
 
-Fold for fold, the run reaches the weights of the batch expanding walk-forward, to the tolerance of the moment layer and of the solver. A purged scheme folds a row when the training window reaches it, and it never drops a row. So fold `i` has folded the rows `1:last(train_idx[i])`, which are the rows that the batch expanding fold reads, and the read-out rebuilds the training window of the batch fold.
+Fold for fold, the run reaches the weights of the batch expanding walk-forward, to the tolerance of the moment layer and of the solver. A purged scheme folds a row when the training window reaches it, and it never drops a row. So fold `i` has folded the rows `1:last(train_idx[i])`, which are the rows that the batch expanding fold reads, and the call with no data rebuilds the training window of the batch fold.
 
 # Algorithm
 
@@ -257,12 +257,12 @@ Fold for fold, the run reaches the weights of the batch expanding walk-forward, 
 
 # Arguments
 
-  - `fit_fold`: The per-fold resolution and callback that [`fold_loop`](@ref) builds. It takes `(i, prev, est, rd, train)`: the index of the fold, the prediction of the last threadable fold or `nothing`, the estimator to resolve, the carrier, and the training window, which is `nothing` here. The arm advances `prev` through [`advance_previous_fold`](@ref), as [`run_folds`](@ref) advances it, so a failed step does not move the previous weights.
+  - `fit_fold`: The per-fold resolution and callback that [`fold_loop`](@ref) builds. It takes `(i, prev, est, rd, train)`: the index of the fold, the prediction of the last threadable fold or `nothing`, the estimator to resolve, `rd`, and the training window, which is `nothing` here. The arm advances `prev` through [`advance_previous_fold`](@ref), as [`run_folds`](@ref) advances it, so a failed step does not move the previous weights.
   - `est`: The estimator, as the caller gave it to the loop.
   - `n`: The number of folds.
   - `ElT`: The element type of the per-fold result. It is positional for the reason that [`parallel_folds`](@ref) gives.
   - `path_id`: The path that the folds belong to, or `nothing`. Only the context of a fold reads it.
-  - `rd`: The carrier.
+  - `rd`: The returns or the prices of the walk-forward.
   - `train_idx`: The training windows of every fold, in split order.
   - `test_idx`: The test windows of every fold, in split order. The context of each fold reads them.
   - `fold_view`: The asset view of a multiple-randomised path, or `nothing`.

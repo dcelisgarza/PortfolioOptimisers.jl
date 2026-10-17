@@ -1,8 +1,8 @@
 ```@meta
-Description = "Risk budget estimators, private API of PortfolioOptimisers.jl: RkbE_Rkb."
+Description = "Risk budget constraint generation, private API of PortfolioOptimisers.jl: RkbE_Rkb."
 ```
 
-# Risk budget estimators: private API
+# Risk budget constraint generation: private API
 
 ```@docs
 RkbE_Rkb

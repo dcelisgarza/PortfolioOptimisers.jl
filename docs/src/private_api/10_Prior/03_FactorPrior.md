@@ -10,5 +10,6 @@ factor_lift
 residual_variance_counts
 factor_residual_config
 assert_factor_residual_config
+coverage_regression
 PortfolioOptimisers.show_fields(::FactorPrior)
 ```

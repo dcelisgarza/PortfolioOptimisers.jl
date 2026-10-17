@@ -451,7 +451,7 @@ The `cvg` field of the estimator is passed as the second argument, so the arm is
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `mean`: Optional mean vector. The available-case arm refuses one.
-  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm ignores it.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
@@ -469,7 +469,7 @@ function coverage_cokurtosis end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which centres the whole window on one vector and delegates to [`_cokurtosis`](@ref), and which is the body the verb has always had.
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which centres the whole window on one vector and delegates to [`_cokurtosis`](@ref), and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -481,7 +481,7 @@ function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, ::Noth
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...)
     X = dims_oriented(dims, X)
-    assert_finite_sample(X)
+    assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = X .- mu
@@ -490,7 +490,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero before delegating, and which is the body the verb has always had.
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero before delegating, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -502,7 +502,7 @@ function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::Noth
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...)
     X = dims_oriented(dims, X)
-    assert_finite_sample(X)
+    assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))

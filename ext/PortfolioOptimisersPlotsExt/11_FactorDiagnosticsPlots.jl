@@ -14,9 +14,13 @@ function cs_diagnostic_block(pr::PortfolioOptimisers.AbstractPriorResult)
     PortfolioOptimisers.assert_prior_regression(pr, :pr; lead = NO_CS_DIAGNOSTIC_LEAD)
     return pr.rr
 end
-function cs_diagnostic_labels(csfm, nf::Option{<:AbstractVector}, K::Integer)
-    nf_use = isnothing(nf) ? PortfolioOptimisers.cs_diagnostic_factor_names(csfm) : nf
-    return isnothing(nf_use) ? string.(1:K) : string.(nf_use)
+# A diagnostic answer carries the names of its own factor axis, raw or reduced, so a figure
+# that draws one labels its series off the answer. `nf` overrides them, and a figure falls
+# back to the position of the factor when neither names it.
+function diagnostic_result_labels(r::PortfolioOptimisers.FactorDiagnosticResult,
+                                  nf::Option{<:AbstractVector})
+    nf_use = isnothing(nf) ? r.nf : nf
+    return isnothing(nf_use) ? string.(1:size(r.X, first(r.dims))) : string.(nf_use)
 end
 function cs_diagnostic_series(vals::MatNum, labels::AbstractVector, title::AbstractString,
                               ylabel::AbstractString; kwargs...)
@@ -68,13 +72,17 @@ function PortfolioOptimisers.plot_cs_regression_bic(pr::PortfolioOptimisers.Abst
                                                     kwargs...)
     return PortfolioOptimisers.plot_cs_regression_bic(cs_diagnostic_block(pr); kwargs...)
 end
+function PortfolioOptimisers.plot_cs_regression_t_stats(t::PortfolioOptimisers.FactorDiagnosticResult;
+                                                        nf::Option{<:AbstractVector} = nothing,
+                                                        kwargs...)
+    return cs_diagnostic_series(t.X, diagnostic_result_labels(t, nf),
+                                "Cross-Sectional Regression t-Statistics", "t"; kwargs...)
+end
 function PortfolioOptimisers.plot_cs_regression_t_stats(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
                                                         nf::Option{<:AbstractVector} = nothing,
                                                         kwargs...)
-    t = PortfolioOptimisers.cs_regression_t_stats(csfm)
-    labels = cs_diagnostic_labels(csfm, nf, size(t, 2))
-    return cs_diagnostic_series(t, labels, "Cross-Sectional Regression t-Statistics", "t";
-                                kwargs...)
+    return PortfolioOptimisers.plot_cs_regression_t_stats(PortfolioOptimisers.cs_regression_t_stats(csfm);
+                                                          nf = nf, kwargs...)
 end
 function PortfolioOptimisers.plot_cs_regression_t_stats(pr::PortfolioOptimisers.AbstractPriorResult;
                                                         nf::Option{<:AbstractVector} = nothing,
@@ -86,9 +94,20 @@ function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(csfm::Por
                                                                        nf::Option{<:AbstractVector} = nothing,
                                                                        threshold::Number = 2,
                                                                        kwargs...)
-    rate = PortfolioOptimisers.cs_regression_t_stat_exceedance_rate(csfm;
-                                                                    threshold = threshold)
-    labels = cs_diagnostic_labels(csfm, nf, length(rate))
+    t = PortfolioOptimisers.cs_regression_t_stats(csfm)
+    return PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(t; nf = nf,
+                                                                         threshold = threshold,
+                                                                         kwargs...)
+end
+# The rate is drawn from the t-statistics, so a view of them draws the rate of the factors
+# the view keeps.
+function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(t::PortfolioOptimisers.FactorDiagnosticResult;
+                                                                       nf::Option{<:AbstractVector} = nothing,
+                                                                       threshold::Number = 2,
+                                                                       kwargs...)
+    r = PortfolioOptimisers.cs_regression_t_stat_exceedance_rate(t; threshold = threshold)
+    labels = diagnostic_result_labels(r, nf)
+    rate = r.X
     K = length(rate)
     plt = bar(rate; xticks = (1:K, labels),
               title = "t-Statistic Exceedance Rate (|t| > $threshold)", xlabel = "Factor",
@@ -109,15 +128,19 @@ function PortfolioOptimisers.plot_cs_regression_t_stat_exceedance_rate(pr::Portf
                                                                          threshold = threshold,
                                                                          kwargs...)
 end
+function PortfolioOptimisers.plot_exposure_vif(vif::PortfolioOptimisers.FactorDiagnosticResult;
+                                               nf::Option{<:AbstractVector} = nothing,
+                                               kwargs...)
+    plt = cs_diagnostic_series(vif.X, diagnostic_result_labels(vif, nf),
+                               "Exposure Variance Inflation Factors", "VIF"; kwargs...)
+    hline!(plt, [1.0]; label = "", linewidth = 2, color = :red, linestyle = :dash)
+    return plt
+end
 function PortfolioOptimisers.plot_exposure_vif(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
                                                nf::Option{<:AbstractVector} = nothing,
                                                kwargs...)
-    vif = PortfolioOptimisers.exposure_vif(csfm)
-    labels = cs_diagnostic_labels(csfm, nf, size(vif, 2))
-    plt = cs_diagnostic_series(vif, labels, "Exposure Variance Inflation Factors", "VIF";
-                               kwargs...)
-    hline!(plt, [1.0]; label = "", linewidth = 2, color = :red, linestyle = :dash)
-    return plt
+    return PortfolioOptimisers.plot_exposure_vif(PortfolioOptimisers.exposure_vif(csfm);
+                                                 nf = nf, kwargs...)
 end
 function PortfolioOptimisers.plot_exposure_vif(pr::PortfolioOptimisers.AbstractPriorResult;
                                                nf::Option{<:AbstractVector} = nothing,
@@ -141,10 +164,10 @@ end
 ## Cross-sectional exposure diagnostics
 ## ────────────────────────────────────────────────────────────────────────────
 # The exposure group answers on the RAW factor axis, because it reads the exposure
-# history as the panel wrote it and never the design of the fit, so these figures label
-# their series off `csfm.nf` and not off `cs_diagnostic_factor_names`. The one exception
-# is the cumulative information coefficient under `reduced`, which does map the exposures
-# through the family re-basis and is then labelled on the reduced axis.
+# history as the panel wrote it and never the design of the fit, so its answers carry the
+# names of `csfm.nf`. The one exception is the information coefficient under `reduced`,
+# which maps the exposures through the family re-basis and carries the reduced names.
+# `plot_exposure_distribution` draws the history itself, which carries no names.
 function exposure_diagnostic_labels(csfm, nf::Option{<:AbstractVector}, K::Integer)
     nf_use = isnothing(nf) ? csfm.nf : nf
     return isnothing(nf_use) ? string.(1:K) : string.(nf_use)
@@ -153,8 +176,15 @@ function PortfolioOptimisers.plot_exposure_correlation(csfm::PortfolioOptimisers
                                                        nf::Option{<:AbstractVector} = nothing,
                                                        weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
                                                        kwargs...)
-    C = PortfolioOptimisers.exposure_correlation(csfm; weighting = weighting)
-    labels = exposure_diagnostic_labels(csfm, nf, size(C, 1))
+    return PortfolioOptimisers.plot_exposure_correlation(PortfolioOptimisers.exposure_correlation(csfm;
+                                                                                                  weighting = weighting);
+                                                         nf = nf, kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_correlation(r::PortfolioOptimisers.FactorDiagnosticResult;
+                                                       nf::Option{<:AbstractVector} = nothing,
+                                                       kwargs...)
+    C = r.X
+    labels = diagnostic_result_labels(r, nf)
     K = size(C, 1)
     return heatmap(C; xticks = (1:K, labels), yticks = (1:K, labels), xrotation = 90,
                    clim = (-1.0, 1.0), color = cgrad(:Spectral), yflip = true,
@@ -175,15 +205,18 @@ function PortfolioOptimisers.plot_cumulative_exposure_ic(csfm::PortfolioOptimise
                                                          ties::Symbol = :average, kwargs...)
     ic = PortfolioOptimisers.exposure_ic(csfm; horizon = 1, rank = rank, reduced = reduced,
                                          ties = ties)
-    cum = cumulative_exposure_ic(ic)
-    labels = if reduced
-        cs_diagnostic_labels(csfm, nf, size(ic, 2))
-    else
-        exposure_diagnostic_labels(csfm, nf, size(ic, 2))
-    end
     method = rank ? "Spearman" : "Pearson"
-    return cs_diagnostic_series(cum, labels, "Cumulative Exposure IC ($method)",
-                                "Cumulative IC"; kwargs...)
+    return PortfolioOptimisers.plot_cumulative_exposure_ic(ic; nf = nf,
+                                                           title = "Cumulative Exposure IC ($method)",
+                                                           kwargs...)
+end
+function PortfolioOptimisers.plot_cumulative_exposure_ic(ic::PortfolioOptimisers.FactorDiagnosticResult;
+                                                         nf::Option{<:AbstractVector} = nothing,
+                                                         title::AbstractString = "Cumulative Exposure IC",
+                                                         kwargs...)
+    return cs_diagnostic_series(cumulative_exposure_ic(ic.X),
+                                diagnostic_result_labels(ic, nf), title, "Cumulative IC";
+                                kwargs...)
 end
 function PortfolioOptimisers.plot_cumulative_exposure_ic(pr::PortfolioOptimisers.AbstractPriorResult;
                                                          nf::Option{<:AbstractVector} = nothing,
@@ -242,10 +275,15 @@ function PortfolioOptimisers.plot_exposure_dispersion(csfm::PortfolioOptimisers.
                                                       nf::Option{<:AbstractVector} = nothing,
                                                       weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
                                                       kwargs...)
-    D = PortfolioOptimisers.exposure_dispersion(csfm; weighting = weighting)
-    labels = exposure_diagnostic_labels(csfm, nf, size(D, 2))
-    plt = cs_diagnostic_series(D, labels, "Exposure Cross-Sectional Std", "Std"; kwargs...)
-    return plt
+    return PortfolioOptimisers.plot_exposure_dispersion(PortfolioOptimisers.exposure_dispersion(csfm;
+                                                                                                weighting = weighting);
+                                                        nf = nf, kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_dispersion(D::PortfolioOptimisers.FactorDiagnosticResult;
+                                                      nf::Option{<:AbstractVector} = nothing,
+                                                      kwargs...)
+    return cs_diagnostic_series(D.X, diagnostic_result_labels(D, nf),
+                                "Exposure Cross-Sectional Std", "Std"; kwargs...)
 end
 function PortfolioOptimisers.plot_exposure_dispersion(pr::PortfolioOptimisers.AbstractPriorResult;
                                                       nf::Option{<:AbstractVector} = nothing,
@@ -260,8 +298,15 @@ function PortfolioOptimisers.plot_exposure_stability(csfm::PortfolioOptimisers.C
                                                      weighting = PortfolioOptimisers.BenchmarkWeightMetric(),
                                                      kwargs...)
     S = PortfolioOptimisers.exposure_stability(csfm; step = step, weighting = weighting)
-    labels = exposure_diagnostic_labels(csfm, nf, size(S, 2))
-    plt = cs_diagnostic_series(S, labels, "Exposure Stability (step=$step)", "ρ"; kwargs...)
+    return PortfolioOptimisers.plot_exposure_stability(S; nf = nf,
+                                                       title = "Exposure Stability (step=$step)",
+                                                       kwargs...)
+end
+function PortfolioOptimisers.plot_exposure_stability(S::PortfolioOptimisers.FactorDiagnosticResult;
+                                                     nf::Option{<:AbstractVector} = nothing,
+                                                     title::AbstractString = "Exposure Stability",
+                                                     kwargs...)
+    plt = cs_diagnostic_series(S.X, diagnostic_result_labels(S, nf), title, "ρ"; kwargs...)
     hline!(plt, [1.0]; label = "", linewidth = 2, color = :red, linestyle = :dash)
     return plt
 end
@@ -278,8 +323,8 @@ end
 ## ────────────────────────────────────────────────────────────────────────────
 ## The factor model summary and the factor forecast figures
 ## ────────────────────────────────────────────────────────────────────────────
-# The summary answers on the RAW factor axis, so its figure labels its series off
-# `csfm.nf`. The two forecast figures read `fpr.sigma`, whose axis is the factor axis of
+# The summary answers on the RAW factor axis and carries the names of `csfm.nf`, so its
+# figure labels its series off the summary. The two forecast figures read `fpr.sigma`, whose axis is the factor axis of
 # the factor prior, so they label off the names the caller passes and fall back to the
 # position of the factor.
 const FACTOR_SUMMARY_LABELS = ["Ann. Return", "Ann. Vol", "Sharpe", "Autocorr", "Mean |t|",
@@ -303,7 +348,8 @@ function PortfolioOptimisers.plot_factor_model_summary(fs::PortfolioOptimisers.F
                                                        kwargs...)
     M, labels, partial = factor_summary_columns(fs)
     K = size(M, 2)
-    series = isnothing(nf) ? string.(1:K) : string.(nf)
+    nf_use = isnothing(nf) ? fs.nf : nf
+    series = isnothing(nf_use) ? string.(1:K) : string.(nf_use)
     title = partial ? "Factor Model Summary (no exposure history)" : "Factor Model Summary"
     return groupedbar(M; bar_position = :dodge, xticks = (1:length(labels), labels),
                       label = reshape(series, 1, K), xrotation = 30, title = title,
@@ -320,8 +366,7 @@ function PortfolioOptimisers.plot_factor_model_summary(csfm::PortfolioOptimisers
     fs = PortfolioOptimisers.factor_model_summary(csfm; ppy = ppy, threshold = threshold,
                                                   step = step, weighting = weighting,
                                                   coverage_weighting = coverage_weighting)
-    labels = exposure_diagnostic_labels(csfm, nf, length(fs.ann_return))
-    return PortfolioOptimisers.plot_factor_model_summary(fs; nf = labels, kwargs...)
+    return PortfolioOptimisers.plot_factor_model_summary(fs; nf = nf, kwargs...)
 end
 function PortfolioOptimisers.plot_factor_model_summary(pr::PortfolioOptimisers.AbstractPriorResult;
                                                        nf::Option{<:AbstractVector} = nothing,
@@ -376,12 +421,20 @@ function PortfolioOptimisers.plot_factor_cumulative_returns(csfm::PortfolioOptim
                                                             nf::Option{<:AbstractVector} = nothing,
                                                             compound::Bool = false,
                                                             kwargs...)
-    f = PortfolioOptimisers.factor_summary_returns(csfm)
+    (; f) = PortfolioOptimisers.factor_summary_returns(csfm)
     # An observation whose factor return is not finite contributes nothing to the running
     # sum, so one absent cross-section breaks no series.
     g = [isfinite(x) ? x : zero(x) for x in f]
     cum = cumulative_returns(g, compound)
-    labels = exposure_diagnostic_labels(csfm, nf, size(cum, 2))
+    # The history is on the raw axis when the block carries `fr`, and on the whole reduced
+    # axis otherwise, so the names follow it.
+    names = if isnothing(csfm.fr)
+        PortfolioOptimisers.cs_diagnostic_factor_names(csfm.fcb, csfm.nf)
+    else
+        csfm.nf
+    end
+    nf_use = isnothing(nf) ? names : nf
+    labels = isnothing(nf_use) ? string.(1:size(cum, 2)) : string.(nf_use)
     kind = compound ? "Compounded" : "Uncompounded"
     return cs_diagnostic_series(cum, labels, "Factor Cumulative Returns ($kind)",
                                 "Cumulative Return"; kwargs...)
@@ -413,50 +466,57 @@ function idio_diagnostic_reference!(plt, value::Real)
     return plt
 end
 function PortfolioOptimisers.plot_idio_calibration(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                   kwargs...)
-    plt = idio_diagnostic_series(PortfolioOptimisers.idio_calibration(csfm),
+                                                   ahead::Bool = true, kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_calibration(csfm; ahead = ahead),
                                  "Idiosyncratic Calibration",
                                  "Cross-Sectional Std of Standardised Idio Returns";
                                  kwargs...)
     return idio_diagnostic_reference!(plt, 1.0)
 end
 function PortfolioOptimisers.plot_idio_calibration(pr::PortfolioOptimisers.AbstractPriorResult;
-                                                   kwargs...)
-    return PortfolioOptimisers.plot_idio_calibration(cs_diagnostic_block(pr); kwargs...)
+                                                   ahead::Bool = true, kwargs...)
+    return PortfolioOptimisers.plot_idio_calibration(cs_diagnostic_block(pr); ahead = ahead,
+                                                     kwargs...)
 end
 function PortfolioOptimisers.plot_idio_tail_rate(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                 threshold::Real = 3, kwargs...)
+                                                 threshold::Real = 3, ahead::Bool = true,
+                                                 kwargs...)
     plt = idio_diagnostic_series(PortfolioOptimisers.idio_tail_rate(csfm;
-                                                                    threshold = threshold),
+                                                                    threshold = threshold,
+                                                                    ahead = ahead),
                                  "Idiosyncratic Tail Rate (threshold=$threshold)",
                                  "Fraction of Assets"; kwargs...)
     return idio_diagnostic_reference!(plt, 2 * ccdf(Normal(), threshold))
 end
 function PortfolioOptimisers.plot_idio_tail_rate(pr::PortfolioOptimisers.AbstractPriorResult;
-                                                 threshold::Real = 3, kwargs...)
+                                                 threshold::Real = 3, ahead::Bool = true,
+                                                 kwargs...)
     return PortfolioOptimisers.plot_idio_tail_rate(cs_diagnostic_block(pr);
-                                                   threshold = threshold, kwargs...)
+                                                   threshold = threshold, ahead = ahead,
+                                                   kwargs...)
 end
 function PortfolioOptimisers.plot_idio_kurtosis(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                kwargs...)
-    plt = idio_diagnostic_series(PortfolioOptimisers.idio_kurtosis(csfm),
+                                                ahead::Bool = true, kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_kurtosis(csfm; ahead = ahead),
                                  "Cross-Sectional Excess Kurtosis", "Excess Kurtosis";
                                  kwargs...)
     return idio_diagnostic_reference!(plt, 0.0)
 end
 function PortfolioOptimisers.plot_idio_kurtosis(pr::PortfolioOptimisers.AbstractPriorResult;
-                                                kwargs...)
-    return PortfolioOptimisers.plot_idio_kurtosis(cs_diagnostic_block(pr); kwargs...)
+                                                ahead::Bool = true, kwargs...)
+    return PortfolioOptimisers.plot_idio_kurtosis(cs_diagnostic_block(pr); ahead = ahead,
+                                                  kwargs...)
 end
 function PortfolioOptimisers.plot_idio_skewness(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
-                                                kwargs...)
-    plt = idio_diagnostic_series(PortfolioOptimisers.idio_skewness(csfm),
+                                                ahead::Bool = true, kwargs...)
+    plt = idio_diagnostic_series(PortfolioOptimisers.idio_skewness(csfm; ahead = ahead),
                                  "Cross-Sectional Skewness", "Skewness"; kwargs...)
     return idio_diagnostic_reference!(plt, 0.0)
 end
 function PortfolioOptimisers.plot_idio_skewness(pr::PortfolioOptimisers.AbstractPriorResult;
-                                                kwargs...)
-    return PortfolioOptimisers.plot_idio_skewness(cs_diagnostic_block(pr); kwargs...)
+                                                ahead::Bool = true, kwargs...)
+    return PortfolioOptimisers.plot_idio_skewness(cs_diagnostic_block(pr); ahead = ahead,
+                                                  kwargs...)
 end
 function PortfolioOptimisers.plot_idio_vol_ic(csfm::PortfolioOptimisers.CrossSectionalFactorModel;
                                               kwargs...)

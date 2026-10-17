@@ -14,4 +14,14 @@ prrm_prediction_message
 PortfolioOptimisers.excess_statistics
 PortfolioOptimisers.held_path_turnover
 PortfolioOptimisers.summarise_returns
+PortfolioOptimisers.sharpe_ratio_variance_factor
+PortfolioOptimisers.sharpe_ratio_moments
+PortfolioOptimisers.reader_frames(::Union{<:ExpectedReturn, <:ExpectedReturnRiskRatio}, ::AbstractString, ::Bool)
+```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
 ```

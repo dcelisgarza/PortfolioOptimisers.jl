@@ -87,7 +87,7 @@ once the v1 fit/apply contract has settled.
 ## Consequences
 
 - New concepts `Pipeline`, `Pipeline Context`, `Preprocessing Estimator`, `PricesResult` are in
-  `CONTEXT.md`; the glossary intro now says "workflow" so "Pipeline" unambiguously means the
+  `GLOSSARY.md`; the glossary intro now says "workflow" so "Pipeline" unambiguously means the
   estimator.
 - `PricesResult` follows the `ReturnsResult` precedent (data under the Result tree);
   `FiniteAllocationInput` (ADR 0017) remains the only data-as-Estimator deviation.

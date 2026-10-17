@@ -46,14 +46,17 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 julia> RiskRatio()
 RiskRatio
   r1 ┼ Variance
-     │   settings ┼ RiskMeasureSettings
-     │            │   scale ┼ Float64: 1.0
-     │            │      ub ┼ nothing
-     │            │     rke ┴ Bool: true
-     │      sigma ┼ nothing
-     │       chol ┼ nothing
-     │         rc ┼ nothing
-     │        alg ┴ SquaredSOCRiskExpr()
+     │    settings ┼ RiskMeasureSettings
+     │             │   scale ┼ Float64: 1.0
+     │             │      ub ┼ nothing
+     │             │     rke ┴ Bool: true
+     │       sigma ┼ nothing
+     │        chol ┼ nothing
+     │          rc ┼ nothing
+     │         alg ┼ SquaredSOCRiskExpr()
+     │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+     │   ratio_alg ┼ SquareRootRatio()
+     │      corner ┴ nothing
   r2 ┼ ConditionalValueatRisk
      │   settings ┼ RiskMeasureSettings
      │            │   scale ┼ Float64: 1.0
@@ -153,14 +156,17 @@ NonOptimisationRiskRatio
   settings ┼ HierarchicalRiskMeasureSettings
            │   scale ┴ Float64: 1.0
         r1 ┼ Variance
-           │   settings ┼ RiskMeasureSettings
-           │            │   scale ┼ Float64: 1.0
-           │            │      ub ┼ nothing
-           │            │     rke ┴ Bool: true
-           │      sigma ┼ nothing
-           │       chol ┼ nothing
-           │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │    settings ┼ RiskMeasureSettings
+           │             │   scale ┼ Float64: 1.0
+           │             │      ub ┼ nothing
+           │             │     rke ┴ Bool: true
+           │       sigma ┼ nothing
+           │        chol ┼ nothing
+           │          rc ┼ nothing
+           │         alg ┼ SquaredSOCRiskExpr()
+           │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │   ratio_alg ┼ SquareRootRatio()
+           │      corner ┴ nothing
       sca1 ┼ SumScalariser()
         r2 ┼ ConditionalValueatRisk
            │   settings ┼ RiskMeasureSettings

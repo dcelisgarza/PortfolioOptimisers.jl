@@ -60,7 +60,7 @@ that admits the amendment rule, so the rule keeps its remaining reach.
 - `research/` is unlinted. A file moved out of `research/` enters the gate and must pass it.
 - An ADR amendment may restate `Decision`, `Verification` and `Rejected alternatives`. This closes
   the conflict between `CLAUDE.md` and the lint configuration; neither rule bends further.
-- `STANDARDS.md` routes markdown structure to `.markdownlint.json` and now names
+- `CODING_STANDARDS.md` routes markdown structure to `.markdownlint.json` and now names
   `.markdownlintignore` as the file that sets the scope.
 
 ## Verification

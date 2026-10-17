@@ -777,7 +777,7 @@ with a high-order prior: true
 
 **The value is the message, not the boolean.** The cost is one `provides` or `requires` method per
 concrete type, declared by its author. It must be a **per-type declaration and never a walk over the
-fields**, for exactly the reason `CONTEXT.md` gives for `deferred_slots`: the presence of a field does
+fields**, for exactly the reason `GLOSSARY.md` gives for `deferred_slots`: the presence of a field does
 not imply the semantics.
 
 The check is **necessary and not sufficient**. It catches a missing quantity. It cannot catch one of

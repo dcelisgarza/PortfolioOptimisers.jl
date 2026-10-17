@@ -1,8 +1,8 @@
 ```@meta
-Description = "Phylogeny Constraints, private API of PortfolioOptimisers.jl: AbstractCentralityConstraint, VecCC, CC_VecCC, AbstractPhylogenyConstraintEstimator, …"
+Description = "Phylogeny constraint generation, private API of PortfolioOptimisers.jl: AbstractCentralityConstraint, VecCC, CC_VecCC, AbstractPhylogenyConstraintEstimator, …"
 ```
 
-# Phylogeny Constraints: private API
+# Phylogeny constraint generation: private API
 
 ```@docs
 AbstractCentralityConstraint

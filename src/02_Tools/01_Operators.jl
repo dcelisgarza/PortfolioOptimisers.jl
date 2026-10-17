@@ -366,3 +366,98 @@ end
 function dot_scalar(a::VecNum, b::VecNum)
     return LinearAlgebra.dot(a, b)
 end
+"""
+    support_product(A::MatNum, B::VecNum_MatNum) -> VecNum_MatNum
+    support_product(A::MatNum, S::MatNum, C::MatNum) -> MatNum
+
+Product of matrices that reads the right operand only where a row of `A` has a coefficient that is not zero.
+
+The plain product `A * B` multiplies each coefficient of a row of `A` by each entry of a column of `B`, and `0 * NaN` is `NaN`. So one non-finite entry of `B` makes `NaN` every entry of its column of `A * B`, also where the row of `A` has a zero coefficient at it. This product is `NaN` exactly where the support of the row meets a non-finite entry of the column, and is the plain product everywhere else. When every entry of `B` is finite, the result is `A * B` itself. The method over three matrices states the quadratic form `A * S * transpose(C)` in the same way.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathcal{S}_{i}(\\mathbf{A}) &= \\left\\{k : a_{ik} \\neq 0\\right\\}\\,, \\\\
+\\left(\\mathbf{A} \\odot \\mathbf{B}\\right)_{ij} &= \\begin{cases}
+    \\sum_{k \\in \\mathcal{S}_{i}(\\mathbf{A})} a_{ik} b_{kj} & b_{kj} \\in \\mathbb{R} \\ \\forall k \\in \\mathcal{S}_{i}(\\mathbf{A})\\,, \\\\
+    \\mathrm{NaN} & \\text{otherwise}\\,,
+\\end{cases} \\\\
+\\left(\\mathbf{A} \\odot \\mathbf{S} \\odot \\mathbf{C}^{\\intercal}\\right)_{ij} &= \\begin{cases}
+    \\sum_{k \\in \\mathcal{S}_{i}(\\mathbf{A})} \\sum_{l \\in \\mathcal{S}_{j}(\\mathbf{C})} a_{ik} s_{kl} c_{jl} & s_{kl} \\in \\mathbb{R} \\ \\forall (k, l) \\in \\mathcal{S}_{i}(\\mathbf{A}) \\times \\mathcal{S}_{j}(\\mathbf{C})\\,, \\\\
+    \\mathrm{NaN} & \\text{otherwise}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathcal{S}_{i}(\\mathbf{A})``: Support of row ``i`` of ``\\mathbf{A}``, the columns where its coefficient is not zero. A non-finite coefficient is in the support.
+  - ``a_{ik}``, ``c_{jl}``: Entries of the left operand `A` and of the outer right operand `C`.
+  - ``b_{kj}``, ``s_{kl}``: Entries of the right operand `B` and of the middle operand `S`.
+  - ``\\odot``: The product over the support.
+
+A term outside the support is zero, so the sum over the support equals the plain sum wherever the plain sum is finite. A non-finite coefficient of `A` or `C` is in its support, so it makes its own entries non-finite, as in the plain product.
+
+# Algorithm
+
+ 1. Return the plain product when every entry of `B`, or of `S`, is finite.
+ 2. Replace each non-finite entry of `B`, or of `S`, by zero, and take the plain product.
+ 3. For each entry, count the non-finite entries of `B`, or of `S`, that its supports meet, as the product of the support indicators and the indicator of the non-finite entries.
+ 4. Write `NaN` at each entry whose count is positive.
+
+# Arguments
+
+  - `A`: The left operand, `m × n`.
+  - `B`: The right operand, with `n` rows.
+  - `S`: The middle operand, `n × p`.
+  - `C`: The outer right operand, `q × p`, which enters transposed.
+
+# Returns
+
+  - `P::VecNum_MatNum`: The product, with the shape of `A * B` or of `A * S * transpose(C)`.
+
+# Examples
+
+```jldoctest
+julia> A = [1.0 0.0; 1.0 1.0];
+
+julia> A * [2.0, NaN]
+2-element Vector{Float64}:
+ NaN
+ NaN
+
+julia> PortfolioOptimisers.support_product(A, [2.0, NaN])
+2-element Vector{Float64}:
+   2.0
+ NaN
+
+julia> PortfolioOptimisers.support_product(A, [1.0 0.0; 0.0 NaN], A)
+2×2 Matrix{Float64}:
+ 1.0    1.0
+ 1.0  NaN
+```
+
+# Related
+
+  - [`MatNum`](@ref)
+  - [`VecNum_MatNum`](@ref)
+"""
+function support_product(A::MatNum, B::VecNum_MatNum)
+    bad = .!isfinite.(B)
+    if !any(bad)
+        return A * B
+    end
+    P = A * ifelse.(bad, zero(eltype(B)), B)
+    P[(.!iszero.(A) * bad) .> 0] .= convert(eltype(P), NaN)
+    return P
+end
+function support_product(A::MatNum, S::MatNum, C::MatNum)
+    bad = .!isfinite.(S)
+    if !any(bad)
+        return A * S * transpose(C)
+    end
+    P = A * ifelse.(bad, zero(eltype(S)), S) * transpose(C)
+    P[(.!iszero.(A) * bad * transpose(.!iszero.(C))) .> 0] .= convert(eltype(P), NaN)
+    return P
+end

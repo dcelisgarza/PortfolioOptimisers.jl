@@ -417,10 +417,10 @@ The rates `l`, `s` and `tn` charge on each of the `T` periods, and the fixed amo
 
   - `cftn_ub`: ``s_c (\\boldsymbol{m} - \\boldsymbol{m}_{0} - \\boldsymbol{t}) \\leq \\boldsymbol{0}``.
   - `cftn_lb`: ``s_c (\\boldsymbol{m}_{0} - \\boldsymbol{m} - \\boldsymbol{t}) \\leq \\boldsymbol{0}``.
-  - `cb_ub`: ``s_c (\\boldsymbol{x} - \\lfloor C \\oslash \\boldsymbol{p} \\rfloor \\odot \\boldsymbol{b}) \\leq \\boldsymbol{0}``.
+  - `cb_ub`: ``s_c (\\boldsymbol{x} - \\lfloor C \\oslash (\\boldsymbol{p} \\odot \\boldsymbol{c}) \\rfloor \\odot \\boldsymbol{b}) \\leq \\boldsymbol{0}``, with ``c_i = 1 + T \\min(f_{\\text{p},i}, 0)``.
   - `cb_lb`: ``s_c (\\boldsymbol{b} - \\boldsymbol{x}) \\leq \\boldsymbol{0}``.
 
-`x` is integer and non-negative, so `cb_lb` holds ``b_i`` at zero when ``x_i = 0``, and `cb_ub` holds it at one when ``x_i \\geq 1``. `cb_ub` removes no book: the budget of [`finite_sub_allocation`](@ref) holds ``x_i p_i \\leq C`` under a non-negative fee, so ``x_i \\leq \\lfloor C / p_i \\rfloor``. The binary is an exact indicator.
+`x` is integer and non-negative, so `cb_lb` holds ``b_i`` at zero when ``x_i = 0``, and `cb_ub` holds it at one when ``x_i \\geq 1``. `cb_ub` removes no book: the budget of [`finite_sub_allocation`](@ref) holds ``x_i p_i c_i \\leq C``, so ``x_i \\leq \\lfloor C / (p_i c_i) \\rfloor``. Under a non-negative rate ``c_i = 1``. A negative short rate of [`Fees`](@ref) is a credit, which lowers the cost of a share to ``p_i c_i``. The binary is an exact indicator.
 
 Where:
 
@@ -429,6 +429,7 @@ Where:
   - ``\\boldsymbol{m}_{0}``: Money in each position before the trade, `sf.prev_money`.
   - ``\\boldsymbol{t}``: Epigraph of the money traded, `t_ftn`.
   - ``\\boldsymbol{b}``: Binary indicator of a held position.
+  - ``\\boldsymbol{c}``: Cost of a share per unit of its price, net of the credit of a negative proportional rate over the horizon.
   - $(math_dict[:C_side_cash])
   - $(math_dict[:p_prices])
   - ``T``: Horizon, in periods.
@@ -443,6 +444,10 @@ Where:
 $(val_dict[:relax])
 
 `model[:fee]` lies at or above the fee of the book, ``F(\\boldsymbol{x})``, and the quantity bounded is `t_ftn`, which `fee_tn` and `fee` read. The bound is tight where the solver puts ``\\boldsymbol{t}`` at ``\\lvert \\boldsymbol{m} - \\boldsymbol{m}_{0} \\rvert``, and no objective term pulls it there. The set of books the model admits is exact all the same. A book whose exact fee fits the budget admits ``\\boldsymbol{t} = \\lvert \\boldsymbol{m} - \\boldsymbol{m}_{0} \\rvert``. That is why [`finite_sub_allocation`](@ref) reports [`allocation_fee`](@ref) of the realised book, and not the value of `fee`.
+
+# Validation
+
+  - With a fixed fee, ``c_i > 0`` on every asset, which raises a `DomainError` otherwise. At ``c_i \\leq 0`` the credit over the horizon pays for the whole position, so the cash bounds no share count and the binary has no bound.
 
 # Arguments
 
@@ -499,7 +504,13 @@ function set_allocation_fees!(model::JuMP.Model, p::VecNum, cash::Number, sf::Na
     if !isnothing(fixed)
         # One time: a fixed fee is charged per position held, so it needs a bit saying
         # whether the position is there at all. `ub` is the most shares this cash can buy.
-        ub = floor.(cash ./ p)
+        # A negative rate is a credit, which lowers the cost of a share to `p (1 + T prop)`
+        # and so raises that count. A credit that pays the whole share leaves no count.
+        cf = isnothing(prop) ? 1 : 1 .+ T .* min.(prop, 0)
+        @argcheck(all(>(0), cf),
+                  DomainError(prop,
+                              "a fixed fee needs `1 + horizon * s > 0` on every asset of the short side: the credit of a negative short rate `s` over the horizon must not pay for the whole position, or the cash bounds no share count"))
+        ub = floor.(cash ./ (p .* cf))
         JuMP.@variable(model, b[1:N], Bin)
         JuMP.@constraints(model, begin
                               cb_ub, sc * (x .- ub .* b) .<= 0

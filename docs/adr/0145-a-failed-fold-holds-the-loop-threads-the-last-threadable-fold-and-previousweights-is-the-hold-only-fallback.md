@@ -8,7 +8,7 @@ status: accepted
 
 [#1021](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1021) was found on
 [#871](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/871) while reading the
-reference's online search: `previous_weights` handed the next fold the previous fold's `res.w`, or
+oracle's online search: `previous_weights` handed the next fold the previous fold's `res.w`, or
 its `hw.w` under a Previous-Weights Source, verbatim, and a failed solve writes a vector of `NaN`
 weights ([ADR 0120](0120-a-fold-scores-on-the-investable-mask-a-prior-free-head-and-pre-selection-reduce-to-the-coverage-universe-and-a-failed-candidate-loses-the-search.md)).
 The ticket said the tail of the walk-forward then went `NaN`. Measured, it was worse, twice.
@@ -24,13 +24,13 @@ The ticket said the tail of the walk-forward then went `NaN`. Measured, it was w
 One failed fold therefore ended a walk-forward that would have solved every later fold on its own,
 for any optimiser carrying a term that reads the previous weights.
 
-The reference has two behaviours, and which one applies is the user's configuration.
+The oracle has two behaviours, and which one applies is the user's configuration.
 
 - **A failed step.** Its online loop, `_online_predict`, keeps no separate variable and walks
   nothing back: it skips `set_params(previous_weights = …)` on a `FailedPortfolio`, so the sticky
   parameter still holds the last successful weights and the next step reads them. Its batch
   sequential path has no such guard and threads the failed step's `NaN` weights, which is #1021's
-  defect in the reference. A failed step's weights and returns are `NaN`, and the multi-period
+  defect in the oracle. A failed step's weights and returns are `NaN`, and the multi-period
   series has a hole.
 - **`fallback = "previous_weights"`.** An estimator-level fallback the user opts into.
   `_fallback_to_previous_weights_or_raise` sets `weights_ = previous_weights`, so the step
@@ -39,11 +39,11 @@ The reference has two behaviours, and which one applies is the user's configurat
   used verbatim: shape-validated, a scalar broadcast, a name-keyed mapping zero-filled, no bounds
   and no renormalisation. It raises when there are none.
 
-The reference has no Weight Drift, so it is silent on what a failed fold *held*; its previous
+The oracle has no Weight Drift, so it is silent on what a failed fold *held*; its previous
 weights are always the target weights.
 
 Two facts about this library shaped the shape of the fix. The loop is stateless — `resolve(i,
-prev, …)` is handed a prediction, not a parameter it can leave alone — so the reference's omission
+prev, …)` is handed a prediction, not a parameter it can leave alone — so the oracle's omission
 has to be written as a rule about which prediction is handed on. And a `HeldWeightsResult` rebuilt
 its weight path from the **target** the reader passed in (`weight_path(pred.hw, pred.res.w)`), so
 a failed fold whose drift started anywhere but its own `NaN` target would have rebuilt `NaN` while
@@ -63,10 +63,10 @@ takes #1021 and the previous-weights fallback out of that map, on the maintainer
 the target weights are read, and they are finite exactly when every member's return code is an
 `OptimisationSuccess`; with a source the held weights are read, and they are finite when the drift
 ran. `previous_weights` is unchanged and never yields `NaN`. A failed fold is skipped over by the
-target read, so the fold after it reads the last solved fold — the reference's sticky parameter,
-written stateless — and both arms, batch and online, do it, where the reference guards its online
+target read, so the fold after it reads the last solved fold — the oracle's sticky parameter,
+written stateless — and both arms, batch and online, do it, where the oracle guards its online
 loop alone. A failure at fold 1 threads nothing, so fold 2 reads the estimator's own reference
-weights, as the reference's constructor value stands.
+weights, as the oracle's constructor value stands.
 
 **A failed fold under a drift holds what it was handed.** `Fold` carries `w_prev`, the weights that
 were threaded into its estimator, and `predict` takes it as a keyword through `fit_and_predict`
@@ -89,18 +89,18 @@ ignored on a record, as the record's `X` already was. A record is self-contained
 and a rebuild of a failed fold's path is finite when its drift was. The type is not on `main`, so
 the field costs no amendment.
 
-**`PreviousWeights` is the hold-only head, and the reference's `previous_weights` fallback.**
+**`PreviousWeights` is the hold-only head, and the oracle's `previous_weights` fallback.**
 `PreviousWeights <: NaiveOptimisationEstimator`, fields `w` and `fb`. `factory(leaf, w::VecNum)`
 fills `w` and recurses into `fb` — the same pass that writes the threaded weights into a
 `TurnoverEstimator`, reached through the `@fprop fb` tag every optimiser already carries, so the
 fallback chain, `needs_previous_weights` and the loop all work unchanged. `_optimise` returns `w`
 verbatim on the full universe as a `NaiveOptimisationResult` with `imsk = nothing` and no bounds,
 so a hold is never rewritten; with `w = nothing` it returns an `OptimisationFailure` naming the
-missing weights, so a chain that reaches it walks on — the reference's raise, in the idiom of a
+missing weights, so a chain that reaches it walks on — the oracle's raise, in the idiom of a
 chain that walks on a failure code. `needs_previous_weights(leaf)` is `true`, so an optimiser
-carrying it runs sequentially, as the reference's property forces. Its online step is the
+carrying it runs sequentially, as the oracle's property forces. Its online step is the
 identity. It is also usable as a primary: `PreviousWeights(; w = w)` is a walk-forward that holds
-`w`, which the reference cannot express. A weight on an asset that left the panel is still held
+`w`, which the oracle cannot express. A weight on an asset that left the panel is still held
 and its returns are zeroed as a Held Gap; what a hold does with that weight is
 [#956](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/956)'s.
 
@@ -124,8 +124,8 @@ previous fold's held weights** were considered and withdrawn: the switch threads
 target by design, and the mechanism already covers it.
 
 On the failed fold's returns: **the realised return of the held book, always** was rejected
-because it goes past the reference's loop default, inverts ADR 0120, and makes `res.w` and `rd.X`
-disagree on one record; the reference makes a finite held-book return an opt-in fallback, and so
+because it goes past the oracle's loop default, inverts ADR 0120, and makes `res.w` and `rd.X`
+disagree on one record; the oracle makes a finite held-book return an opt-in fallback, and so
 does this decision.
 
 On the record: **a failed fold always storing `U`** was rejected because the rule is invisible in
@@ -135,7 +135,7 @@ themselves** was rejected because it pushes the loop's job onto every reader.
 On the fallback's delivery: **a stateless sentinel plus an `optimise` keyword** was rejected
 because it threads a keyword through every entry point's `fit` and is dead outside a fold loop;
 **loop-level substitution under a scheme switch** was rejected because it diverges from the
-reference's estimator-level fallback and skips the `fb` record. On the leaf's fields, **re-applying
+oracle's estimator-level fallback and skips the `fb` record. On the leaf's fields, **re-applying
 the weight bounds** was rejected because a hold that is rewritten is no longer a hold, and
 **reducing to the Coverage Universe** was rejected as pre-empting #956.
 

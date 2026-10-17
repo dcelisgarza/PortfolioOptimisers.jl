@@ -76,7 +76,7 @@ end
     for (types, verbs) in families
         @test !isempty(types)
         for S in types, verb in verbs
-            est = S()
+            est = default_instance(S)
             # `ImpliedVolatility` reads its own series; the guard runs before it does.
             kwargs = isa(est, PO.ImpliedVolatility) ? (; iv = X) : (;)
             @test_throws DomainError verb(est, X; dims = 3, kwargs...)
@@ -124,7 +124,7 @@ end
     for (types, verbs) in families
         @test !isempty(types)
         for S in types, verb in verbs
-            est = S()
+            est = default_instance(S)
             # `ImpliedVolatility` reads its own series, which is oriented as the sample is.
             kw1 = isa(est, PO.ImpliedVolatility) ? (; iv = R) : (;)
             kw2 = isa(est, PO.ImpliedVolatility) ? (; iv = Rt) : (;)

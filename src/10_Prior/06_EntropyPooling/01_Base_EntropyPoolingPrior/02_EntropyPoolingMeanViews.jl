@@ -64,7 +64,7 @@ end
 
 Report, once per entropy pooling fit, who left the investable universe and what their leaving cost the view set.
 
-This is the family's call of [`announce_non_investable`](@ref), written once so the four [`ep_prior`](@ref) methods each spend one line on it and none of them can word it differently. It names the process an entropy pooling fit, because the message is otherwise the optimisation door's and would tell a standalone `prior(pe, X)` call that it is inside an optimisation it is not.
+This is the family's call of [`announce_non_investable`](@ref), written once so the four [`ep_prior`](@ref) methods each spend one line on it and none of them can word it differently. It names the process an entropy pooling fit, because the default message names an optimisation and would tell a standalone `prior(pe, X)` call that it is inside an optimisation it is not.
 
 It is said **at the end of the fit**, not at the reduction. A staged algorithm interleaves its view builders with its solves, so the ledger is only complete when the last stage has stated its views; reporting earlier would report a third of the truth and reporting per stage would be three messages for one departure.
 

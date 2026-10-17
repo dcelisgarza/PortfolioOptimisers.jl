@@ -11,6 +11,7 @@ reset_time_dependent_estimator(opt::SubsetResampling)
 subset_resampling_finaliser
 subset_resampling_retcode
 subset_resampling_td_defaults
+PortfolioOptimisers.group_frames(::NestedClustered)
 ```
 
 ## References

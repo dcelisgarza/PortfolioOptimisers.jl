@@ -29,7 +29,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) norm-based error formulation.
 
-`L2Norm` implements a norm-based error formulation using the Euclidean (L2) norm, scaled by the square root of the number of assets minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation.
+`L2Norm` implements a norm-based error formulation using the Euclidean (L2) norm of the difference between the portfolio and the benchmark returns, scaled by the square root of the number of observations minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation.
 
 # Mathematical definition
 
@@ -47,7 +47,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:d_ddof])
 
-The source states the denominator as ``\\sqrt{T}``. The default `ddof = 1` gives the sample denominator ``\\sqrt{T-1}``. Set `ddof = 0` to recover the source.
+[rudolf1999](@cite) minimises the sum of the squared differences, ``(\\boldsymbol{a} - \\boldsymbol{b})^{\\intercal} (\\boldsymbol{a} - \\boldsymbol{b})``, and does not centre them. [beasley2003](@cite) takes the ``\\alpha``-th root of the sum of the ``\\alpha``-th powers, divides it by ``T``, and names the case ``\\alpha = 2`` the root mean squared error. The root mean square divides by ``\\sqrt{T}`` instead, as [cajas2025](@cite) does, and so does this error. The two values differ by the factor ``\\sqrt{T}`` and have the same minimiser, but a bound on the error must be stated with the denominator here. The default `ddof = 1` gives the sample denominator ``\\sqrt{T-1}``. Set `ddof = 0` to recover the root mean square.
 
 # Fields
 
@@ -84,6 +84,8 @@ L2Norm
 
 # References
 
+  - $(ref_dict[:rudolf1999]) Section 2, Equation 2.
+  - $(ref_dict[:beasley2003]) Section 3.5.1, Equation 9.
   - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.16.
 """
 @concrete struct L2Norm <: NormError
@@ -104,9 +106,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Second-order cone (SOC) squared norm-based error formulation.
 
-`SquaredL2Norm` implements a norm-based error formulation using the squared Euclidean (L2) norm, scaled by the number of assets minus the degrees of freedom (`ddof`). This is commonly used for norm error constraints and objectives in portfolio optimisation where squared error is preferred.
+`SquaredL2Norm` implements a norm-based error formulation using the squared Euclidean (L2) norm of the difference between the portfolio and the benchmark returns, scaled by the number of observations minus the degrees of freedom (`ddof`). This is commonly used for norm error constraints and objectives in portfolio optimisation where squared error is preferred.
 
 The value is the square of the [`L2Norm`](@ref) error, so a `settings.ub` on a [`TrackingRiskMeasure`](@ref) carries squared units. The JuMP model converts the bound with a square root, so the two encodings accept the same bound.
+
+[rudolf1999](@cite) minimises the sum of the squared differences, which is this error times ``T - d``, and does not centre the differences. The division by ``T - d`` squares the root mean square of [cajas2025](@cite).
 
 # Mathematical definition
 
@@ -159,6 +163,7 @@ SquaredL2Norm
 
 # References
 
+  - $(ref_dict[:rudolf1999]) Section 2, Equation 2.
   - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.16.
 """
 @concrete struct SquaredL2Norm <: NormError
@@ -179,7 +184,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Norm-one (NOC) error formulation.
 
-`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between portfolio and benchmark weights, scaled by the number of observations minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
+`L1Norm` implements a norm-based error formulation using the L1 (norm-one) distance between the portfolio and the benchmark returns, scaled by the number of observations minus the degrees of freedom (`ddof`). This is commonly used for error constraints and objectives in portfolio optimisation where sparsity or absolute deviations are preferred.
 
 # Mathematical definition
 
@@ -197,7 +202,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:d_ddof])
 
-The default `ddof = 0` gives the denominator ``T`` of the source, so the error is the mean absolute difference. [`LpNorm`](@ref) defaults to `ddof = 1`, so `LpNorm(; p = 1)` and `L1Norm()` differ by a factor of ``T / (T - 1)``.
+[rudolf1999](@cite) states the error as the sum of the absolute differences, ``\\boldsymbol{1}^{\\intercal} \\lvert \\boldsymbol{a} - \\boldsymbol{b} \\rvert``, and names it the mean absolute deviation. [cajas2025](@cite) divides the sum by ``T``, which gives the mean that the name states and does not move the minimiser. The default `ddof = 0` gives that denominator ``T``, so the error is the mean absolute difference. [`LpNorm`](@ref) defaults to `ddof = 1`, so `LpNorm(; p = 1)` and `L1Norm()` differ by a factor of ``T / (T - 1)``.
 
 # Fields
 
@@ -234,6 +239,7 @@ L1Norm
 
 # References
 
+  - $(ref_dict[:rudolf1999]) Section 3, Equations 5 and 7a.
   - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.17.
 """
 @concrete struct L1Norm <: NormError
@@ -255,6 +261,8 @@ $(DocStringExtensions.TYPEDEF)
 L-p norm error estimator.
 
 `LpNorm` takes the Lp-norm of the difference between the portfolio and the benchmark returns, and divides it by ``(T - d)^{1/p}``. It generalises [`L1Norm`](@ref) and [`L2Norm`](@ref) to a free norm order.
+
+[beasley2003](@cite) states this family with the divisor ``T`` outside the root, ``\\lVert \\boldsymbol{a} - \\boldsymbol{b} \\rVert_p / T``. The divisor here is ``(T - d)^{1/p}``, so the error is the ``p``-th root of a mean and keeps the scale of one period as ``T`` changes. At a fixed ``T`` the two values differ by a constant factor and have the same minimiser.
 
 # Mathematical definition
 
@@ -307,6 +315,10 @@ LpNorm
   - [`LInfNorm`](@ref)
   - [`norm_error`](@ref)
   - [`norm_factor`](@ref)
+
+# References
+
+  - $(ref_dict[:beasley2003]) Section 3.5.1, Equation 9.
 """
 @concrete struct LpNorm <: NormError
     """
@@ -330,7 +342,7 @@ $(DocStringExtensions.TYPEDEF)
 
 L-infinity norm (maximum absolute deviation) error estimator.
 
-`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and does not scale it. The factor of [`LpNorm`](@ref) is ``(T - d)^{1/p}``, which goes to ``1`` as ``p`` grows, so the error is the largest single-period difference and carries no degrees of freedom.
+`LInfNorm` takes the largest absolute deviation between the portfolio and the benchmark returns, and does not scale it. The factor of [`LpNorm`](@ref) is ``(T - d)^{1/p}``, which goes to ``1`` as ``p`` grows, so the error is the largest single-period difference and carries no degrees of freedom. It is the MinMax tracking error of [rudolf1999](@cite).
 
 # Mathematical definition
 
@@ -366,6 +378,10 @@ LInfNorm()
   - [`SquaredL2Norm`](@ref)
   - [`norm_error`](@ref)
   - [`norm_factor`](@ref)
+
+# References
+
+  - $(ref_dict[:rudolf1999]) Section 3, Equations 6 and 7c.
 """
 struct LInfNorm <: NormError end
 """

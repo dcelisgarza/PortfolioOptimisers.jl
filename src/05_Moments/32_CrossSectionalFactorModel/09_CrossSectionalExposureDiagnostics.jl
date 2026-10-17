@@ -349,69 +349,9 @@ function cs_spearman_correlation(a::AbstractVector, b::AbstractVector;
     return cs_weighted_correlation(ra, rb, ones(Tf, N); min_count = min_count, eps = eps)
 end
 """
-    exposure_forward_mean_return(R::MatNum, horizon::Integer)
-
-Return the forward mean asset return of every observation but the last `horizon` of them.
-
-The information coefficient scores an exposure against what the asset earned after the exposure was known, and this verb builds that target. An observation whose forward window carries no finite return gets `NaN`, and the verb averages a window that is part finite over the finite part alone.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-y_{ti} &= \\frac{1}{|\\mathcal{H}_{ti}|} \\sum_{h \\in \\mathcal{H}_{ti}} r_{t+h,i}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``y_{ti}``: Forward mean return of asset ``i`` at observation ``t``, `NaN` when ``\\mathcal{H}_{ti}`` is empty.
-  - ``r_{ti}``: Return of asset ``i`` at observation ``t``.
-  - ``\\mathcal{H}_{ti}``: The offsets ``1 \\le h \\le H`` at which ``r_{t+h,i}`` is finite.
-  - ``H``: Forward window, in observations.
-
-# Arguments
-
-  - `R`: Asset return history `observations × assets`.
-  - `horizon`: Forward window, in observations.
-
-# Validation
-
-  - `size(R, 1) > horizon`.
-
-# Returns
-
-  - `y::MatNum`: Forward mean return `(observations - horizon) × assets`. Row `t` averages the returns of observations `t + 1` to `t + horizon`.
-
-# Related
-
-  - [`exposure_ic`](@ref)
-"""
-function exposure_forward_mean_return(R::MatNum, horizon::Integer)
-    T, N = size(R)
-    @argcheck(T > horizon,
-              DimensionMismatch("R ($T observations) must carry more observations than horizon ($horizon)"))
-    Tf = float_if_integer(real(eltype(R)))
-    P = T - horizon
-    y = Matrix{Tf}(undef, P, N)
-    for i in 1:N, t in 1:P
-        s = zero(Tf)
-        c = 0
-        for h in 1:horizon
-            v = R[t + h, i]
-            if isfinite(v)
-                s += Tf(v)
-                c += 1
-            end
-        end
-        y[t, i] = c > 0 ? s / c : Tf(NaN)
-    end
-    return y
-end
-"""
     exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_correlation(csfm::CrossSectionalFactorModel;
-                         weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                         weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the time-averaged correlation between every pair of factor exposures.
 
@@ -461,7 +401,8 @@ Where:
 
 # Returns
 
-  - `C::Matrix{<:Real}`: `factors × factors`, symmetric, with a diagonal of `1`.
+  - `C::Matrix{<:Real}`: `factors × factors`, symmetric, with a diagonal of `1`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis, and `dims = (1, 2)`, so a view selects the rows and the columns of a sub-block together. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -485,8 +426,9 @@ function exposure_correlation(B::Arr3Num, w::Option{<:MatNum} = nothing)
 end
 function exposure_correlation(csfm::CrossSectionalFactorModel;
                               weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_correlation(cs_diagnostic_exposures(csfm),
-                                cs_diagnostic_weights(weighting, csfm))
+    C = exposure_correlation(cs_diagnostic_exposures(csfm),
+                             cs_diagnostic_weights(weighting, csfm))
+    return FactorDiagnosticResult(C, csfm.nf, csfm.fam, (1, 2))
 end
 """
     exposure_pair_correlation(B::Arr3Num, u::MatNum, k::Integer, l::Integer)
@@ -622,331 +564,10 @@ function exposure_pair_sums(B::Arr3Num, u::MatNum, t::Integer, k::Integer, l::In
     return (; nv = nv, W = W, Sk = Sk, Sl = Sl, Qk = Qk, Ql = Ql, C = C)
 end
 """
-    exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
-                horizon::Integer = 1, rank::Bool = true,
-                ties::Symbol = :average) -> Matrix{<:Real}
-    exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1, rank::Bool = true,
-                reduced::Bool = false, ties::Symbol = :average) -> Matrix{<:Real}
-
-Return the information coefficient of every factor exposure, one row per pair of observations.
-
-The information coefficient is the cross-sectional correlation between the exposure known at an observation and the mean asset return over the observations that follow it. It scores the exposure as a forecast of the return.
-
-A risk factor with an information coefficient near zero is not a bad risk factor. The purpose of a risk factor is to explain the covariance and not to predict the mean, so read [`exposure_stability`](@ref) and the variance the factor contributes before you judge one, and never the information coefficient alone.
-
-The block method reconstructs the asset returns as ``\\mathbf{B}_{t-\\ell} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}``, reads `rw` for the weights of the Pearson form, and answers on the raw factor axis. `reduced` maps the exposures through the family re-basis of the block first, and then the answer is on the reduced axis.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathrm{IC}_{tk} &= \\rho \\left( \\mathbf{B}_{t \\cdot k}, \\boldsymbol{y}_{t}, \\boldsymbol{u}_{t} \\right)\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{IC}_{tk}``: Information coefficient of factor ``k`` at observation ``t``.
-  - $(math_dict[:B_tk_cs])
-  - ``\\boldsymbol{y}_{t}``: Forward mean asset return of observation ``t``, over the finite returns of the ``H`` observations that follow it. [`exposure_forward_mean_return`](@ref) defines it.
-  - $(math_dict[:u_t_cs])
-  - ``\\rho``: The rank correlation of [`cs_spearman_correlation`](@ref) when `rank`, which reads no weight, and the weighted correlation of [`cs_weighted_correlation`](@ref) otherwise.
-  - ``H``: Forward window, in observations.
-
-A one-hot exposure, such as an industry, is a block of `0` and a block of `1`, so every asset of it is in a tie. Under the default `ties = :average`, its rank coefficient compares the forward returns of the two blocks. Under `ties = :ordinal`, the order of the assets inside each block sets most of it.
-
-# Algorithm
-
- 1. Resolve the weight history with [`exposure_weights`](@ref).
- 2. Build the forward mean return with [`exposure_forward_mean_return`](@ref).
- 3. Correlate each exposure against it, one observation at a time, with [`cs_spearman_correlation`](@ref) when `rank` and [`cs_weighted_correlation`](@ref) otherwise.
-
-# Arguments
-
-  - `B`: Exposure history `observations × assets × factors`, unlagged.
-  - `R`: Asset return history `observations × assets`, on the observation axis of `B`.
-  - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for equal weights. The rank form reads no weights.
-  - `horizon`: Forward window, in observations.
-  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
-  - `csfm`: A cross-sectional factor model block.
-  - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
-  - $(arg_dict[:cs_ties]) The weighted correlation reads no rank, so it ignores `ties`.
-
-# Validation
-
-  - `!isempty(B)`.
-  - `size(R) == (size(B, 1), size(B, 2))`.
-  - `horizon >= 1` and `size(B, 1) > horizon`.
-  - `csfm.Ms` and `csfm.csr` are not `nothing`. Otherwise the verb raises an `IsNothingError` that names the field.
-  - The rules of [`cs_ranks`](@ref), when `rank`.
-
-# Returns
-
-  - `ic::Matrix{<:Real}`: `(observations - horizon) × factors`. Row `t` scores the exposures of observation `t` against the returns that follow it.
-
-# Related
-
-  - [`exposure_ic_summary`](@ref)
-  - [`exposure_forward_mean_return`](@ref)
-  - [`cs_spearman_correlation`](@ref)
-  - [`cs_weighted_correlation`](@ref)
-  - [`exposure_stability`](@ref)
-  - [`CrossSectionalFactorModel`](@ref)
-"""
-function exposure_ic(B::Arr3Num, R::MatNum, w::Option{<:MatNum} = nothing;
-                     horizon::Integer = 1, rank::Bool = true, ties::Symbol = :average)
-    u = exposure_weights(B, w)
-    T, N, K = size(B)
-    @argcheck(size(R, 1) == T && size(R, 2) == N,
-              DimensionMismatch("R ($(size(R, 1))×$(size(R, 2))) must match B ($T×$N on its first two axes)"))
-    @argcheck(horizon >= 1, DomainError(horizon, "horizon must be >= 1"))
-    y = exposure_forward_mean_return(R, horizon)
-    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(y)),
-                                                       real(eltype(u)))))))
-    P = T - horizon
-    ic = Matrix{Tf}(undef, P, K)
-    for k in 1:K, t in 1:P
-        a = view(B, t, :, k)
-        b = view(y, t, :)
-        ic[t, k] = if rank
-            Tf(cs_spearman_correlation(a, b; ties = ties))
-        else
-            Tf(cs_weighted_correlation(a, b, view(u, t, :)))
-        end
-    end
-    return ic
-end
-function exposure_ic(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
-                     rank::Bool = true, reduced::Bool = false, ties::Symbol = :average)
-    B, R, w = exposure_ic_data(csfm, reduced)
-    return exposure_ic(B, R, w; horizon = horizon, rank = rank, ties = ties)
-end
-"""
-    exposure_ic_summary(ic::MatNum; lags::Integer = 0)
-    exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
-                        rank::Bool = true, reduced::Bool = false,
-                        ties::Symbol = :average)
-
-Return the summary of an information coefficient series, one entry per factor.
-
-The mean states the average score, the standard deviation states how much the score moves, and their ratio states the score per unit of movement. The t-statistic states whether the mean is far enough from zero to believe over the observations that carried a score, and the hit rate states how often the score was positive. All five read the observations that carried a score. An observation whose score is `NaN` is one at which nothing was measured, not a miss, so it is in no denominator here, as it is in none of the library's other summaries. The coverage of the series answers the separate question of how often the series had no score.
-
-The standard error of the t-statistic is the long-run one of [`exposure_ic_factor_summary`](@ref), over `lags` autocovariances. [`exposure_ic`](@ref) scores every observation against a window of `horizon` observations, so each row shares returns with the `horizon - 1` rows on each side of it, and the block method derives `lags` as `horizon - 1`. The bare method takes `lags` from the caller. Its default of `0` is the independent case, which is the case of a series scored at a stride of its window.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\overline{\\mathrm{IC}}_{k} &= \\frac{1}{|\\mathcal{T}_{k}|} \\sum_{t \\in \\mathcal{T}_{k}} \\mathrm{IC}_{tk}\\,, \\\\
-s_{k}^{2} &= \\frac{1}{|\\mathcal{T}_{k}| - 1} \\sum_{t \\in \\mathcal{T}_{k}} \\left( \\mathrm{IC}_{tk} - \\overline{\\mathrm{IC}}_{k} \\right)^{2}\\,, \\\\
-\\mathrm{IR}_{k} &= \\frac{\\overline{\\mathrm{IC}}_{k}}{s_{k}}\\,, \\\\
-t_{k} &= \\frac{\\overline{\\mathrm{IC}}_{k}}{\\sigma_{k}} \\sqrt{\\left| \\mathcal{T}_{k} \\right|}\\,, \\\\
-\\mathrm{hit}_{k} &= \\frac{1}{|\\mathcal{T}_{k}|} \\sum_{t \\in \\mathcal{T}_{k}} \\mathbb{1}\\left[\\mathrm{IC}_{tk} > 0\\right]\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{IC}_{tk}``: Information coefficient of factor ``k`` at observation ``t``.
-  - ``\\mathcal{T}_{k}``: The observations at which it is finite.
-  - ``\\overline{\\mathrm{IC}}_{k}``: Its mean over ``\\mathcal{T}_{k}``.
-  - ``s_{k}``: Its standard deviation over ``\\mathcal{T}_{k}``.
-  - ``\\mathrm{IR}_{k}``: Its information ratio.
-  - ``\\sigma_{k}``: Its long-run standard deviation over ``\\mathcal{T}_{k}``, which [`exposure_ic_factor_summary`](@ref) defines and which is ``s_{k}`` at `lags = 0`.
-  - ``t_{k}``: Its t-statistic.
-  - ``\\mathrm{hit}_{k}``: Its hit rate.
-
-# Arguments
-
-  - `ic`: Information coefficient series `pairs × factors`.
-  - `lags`: Number of autocovariances the t-statistic's standard error reads. It is one less than the number of rows a forward window spans, `horizon - 1` for a series scored at every observation.
-  - `csfm`: A cross-sectional factor model block.
-  - `horizon`: Forward window, in observations.
-  - `rank`: Take the rank correlation when `true`, and the weighted correlation otherwise.
-  - `reduced`: Map the exposures through the family re-basis of the block before the correlation.
-  - $(arg_dict[:cs_ties]) The weighted correlation reads no rank, so it ignores `ties`.
-
-# Validation
-
-  - `!isempty(ic)`.
-  - `lags >= 0`. Raises a `DomainError`.
-
-# Returns
-
-  - `summary::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, each one entry per factor.
-
-# Related
-
-  - [`exposure_ic`](@ref)
-  - [`exposure_ic_factor_summary`](@ref)
-  - [`forecast_factor_correlation`](@ref)
-  - [`CrossSectionalFactorModel`](@ref)
-"""
-function exposure_ic_summary(ic::MatNum; lags::Integer = 0)
-    @argcheck(!isempty(ic), IsEmptyError("ic cannot be empty"))
-    @argcheck(lags >= zero(lags), DomainError(lags, "lags must be >= 0"))
-    P, K = size(ic)
-    Tm = float_if_integer(real(eltype(ic)))
-    Ts = typeof(sqrt(one(Tm)))
-    mean_ic = Vector{Tm}(undef, K)
-    std_ic = Vector{Ts}(undef, K)
-    ic_ir = Vector{Ts}(undef, K)
-    t_stat = Vector{Ts}(undef, K)
-    hit_rate = Vector{Tm}(undef, K)
-    for k in 1:K
-        m = exposure_ic_factor_summary(ic, k; lags = lags)
-        mean_ic[k] = m.mean_ic
-        std_ic[k] = m.std_ic
-        ic_ir[k] = m.ic_ir
-        t_stat[k] = m.t_stat
-        hit_rate[k] = m.hit_rate
-    end
-    return (; mean_ic = mean_ic, std_ic = std_ic, ic_ir = ic_ir, t_stat = t_stat,
-            hit_rate = hit_rate)
-end
-"""
-    exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
-
-Return the five summary numbers of one factor's information coefficient series.
-
-The mean, the standard deviation and the hit rate read the observations at which the coefficient is finite, so an observation with no coefficient is in no denominator and the three agree on their sample. A series with no finite coefficient has no hit rate. The ratio has no answer where either of its two terms has none, and none where the standard deviation is zero. The t-statistic is the mean over the standard error of the mean, so it says whether the mean is far enough from zero to believe over the evidence there was.
-
-[`forecast_ic_summary`](@ref) calls this function too, so a coefficient of a factor exposure and a coefficient of a Return Forecast have the same summary.
-
-# The standard error reads the overlap
-
-A coefficient scored against a forward window that is longer than the stride between two scores reads the same returns at consecutive rows. The rows are then not independent, and the standard error of their mean is not ``s / \\sqrt{n}``. The rows that overlap a given row are the ``L`` on each side of it, where ``L`` is one less than the number of strides a window spans. Under no skill, every autocovariance beyond ``L`` is zero.
-
-The autocovariances up to ``L`` are not zero when the scored quantity keeps its ranking of the assets from one row to the next. An exposure is persistent in this sense, so its series is a moving average of order ``L``. A Return Forecast that draws a new ranking at every row gives autocovariances near zero at every lag, and there the plain statistic ``\\mathrm{IR} \\sqrt{n}`` does not overstate the evidence. The long-run variance then adds sampling noise to the standard error and moves it little.
-
-The standard error therefore reads the long-run variance, the variance plus twice the first ``L`` autocovariances, with no taper. The window and the stride fix the order, so the function does not estimate it from the series. A tapered estimate at the same order under-weights autocovariances that the window and the stride imply, and still overstates the statistic. For a persistent ranking under no skill, the autocovariances fall linearly across the window. The Bartlett taper at that order then keeps two thirds of their sum in the limit of a long window, so the statistic is too large by the root of three halves there, and by less at a short window.
-
-The autocovariances read the rows at their positions in `ic`. A row whose coefficient is `NaN` is in no pair, and the lag between two rows is their distance in the series, not in its finite subsequence. Every autocovariance divides by the same ``n - 1`` as the variance, so at `lags = 0` the standard error is exactly ``s / \\sqrt{n}`` and the statistic is ``\\mathrm{IR} \\sqrt{n}``.
-
-The long-run variance is a sum of signed terms, and a short series can sum it to a number that is not positive. The t-statistic is `NaN` there, as it is where the standard deviation is zero. The function does not clamp it, because a clamped value would report a certainty that the series does not carry.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\gamma_{j} &= \\frac{1}{n - 1} \\sum_{t,\\, t + j \\in \\mathcal{T}} \\left( \\mathrm{IC}_{t} - \\overline{\\mathrm{IC}} \\right) \\left( \\mathrm{IC}_{t + j} - \\overline{\\mathrm{IC}} \\right)\\,, \\\\
-\\sigma^{2} &= \\gamma_{0} + 2 \\sum_{j = 1}^{L} \\gamma_{j}\\,, \\\\
-t &= \\frac{\\overline{\\mathrm{IC}}}{\\sigma} \\sqrt{n}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\mathrm{IC}_{t}``: Coefficient of factor ``k`` at row ``t``.
-  - ``\\mathcal{T}``: The rows at which it is finite.
-  - ``n``: The number of rows in ``\\mathcal{T}``.
-  - ``\\overline{\\mathrm{IC}}``: Mean of the coefficient over ``\\mathcal{T}``.
-  - ``\\gamma_{j}``: Autocovariance at lag ``j``. ``\\gamma_{0}`` is the variance ``s^{2}``.
-  - ``\\sigma``: Long-run standard deviation.
-  - ``t``: The t-statistic.
-  - ``L``: `lags`.
-
-# Arguments
-
-  - `ic`: Information coefficient series `pairs × factors`.
-  - `k`: Position of the factor.
-  - `lags`: Number of autocovariances the standard error reads, `0` for independent rows. [`forecast_ic_lags`](@ref) derives it from a window and a stride.
-
-# Validation
-
-  - `lags >= 0`. Raises a `DomainError`.
-
-# Returns
-
-  - `m::NamedTuple`: `(; mean_ic, std_ic, ic_ir, t_stat, hit_rate)`, five numbers.
-
-# Related
-
-  - [`exposure_ic_summary`](@ref)
-  - [`forecast_ic_summary`](@ref)
-  - [`forecast_ic_lags`](@ref)
-"""
-function exposure_ic_factor_summary(ic::MatNum, k::Integer; lags::Integer = 0)
-    @argcheck(lags >= zero(lags), DomainError(lags, "lags must be >= 0"))
-    P = size(ic, 1)
-    Tm = float_if_integer(real(eltype(ic)))
-    Ts = typeof(sqrt(one(Tm)))
-    n = 0
-    s = zero(Tm)
-    h = 0
-    for t in 1:P
-        v = ic[t, k]
-        if isfinite(v)
-            n += 1
-            s += Tm(v)
-            h += v > 0
-        end
-    end
-    m = n > 0 ? s / n : Tm(NaN)
-    q = zero(Tm)
-    for t in 1:P
-        v = ic[t, k]
-        if isfinite(v)
-            d = Tm(v) - m
-            q += d * d
-        end
-    end
-    sd = n > 1 ? sqrt(q / (n - 1)) : Ts(NaN)
-    ir = isfinite(m) && isfinite(sd) && sd > zero(Ts) ? m / sd : Ts(NaN)
-    return (; mean_ic = m, std_ic = sd, ic_ir = ir,
-            t_stat = exposure_ic_t_stat(view(ic, :, k), m, q, n, lags),
-            hit_rate = n > 0 ? Tm(h) / Tm(n) : Tm(NaN))
-end
-"""
-    exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integer) -> Real
-
-Return the t-statistic of one factor's information coefficient series, over its long-run standard error.
-
-[`exposure_ic_factor_summary`](@ref) gives it the mean, the sum of squared deviations and the count, so the function reads the series once more, for the autocovariances alone. The long-run variance is the sum of squared deviations plus twice the first `lags` autocovariance sums, every one over ``n - 1``. Each pair reads its two positions in the series, so a `NaN` row is in no pair and the lag is a distance in the series. A long-run variance that is not positive, or a count of one, has no statistic.
-
-# Arguments
-
-  - `c`: Information coefficient series of one factor, a column of the `pairs × factors` matrix.
-  - `m`: Mean of the finite entries of `c`.
-  - `q`: Sum of the squared deviations of the finite entries of `c` from `m`.
-  - `n`: Number of finite entries of `c`.
-  - `lags`: Number of autocovariances the standard error reads.
-
-# Returns
-
-  - `t::Real`: `m` over the long-run standard error of the mean, or `NaN`.
-
-# Related
-
-  - [`exposure_ic_factor_summary`](@ref)
-"""
-function exposure_ic_t_stat(c::VecNum, m::Real, q::Real, n::Integer, lags::Integer)
-    Tf = typeof(q)
-    Ts = typeof(sqrt(one(Tf)))
-    P = length(c)
-    lrv = q
-    for j in 1:lags, t in 1:(P - j)
-        v = c[t]
-        u = c[t + j]
-        if isfinite(v) && isfinite(u)
-            lrv += 2 * (Tf(v) - m) * (Tf(u) - m)
-        end
-    end
-    lrsd = n > 1 && lrv > zero(Tf) ? sqrt(lrv / (n - 1)) : Ts(NaN)
-    return isfinite(m) && isfinite(lrsd) ? m / lrsd * sqrt(Ts(n)) : Ts(NaN)
-end
-function exposure_ic_summary(csfm::CrossSectionalFactorModel; horizon::Integer = 1,
-                             rank::Bool = true, reduced::Bool = false,
-                             ties::Symbol = :average)
-    return exposure_ic_summary(exposure_ic(csfm; horizon = horizon, rank = rank,
-                                           reduced = reduced, ties = ties);
-                               lags = horizon - 1)
-end
-"""
     exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing;
                        step::Integer = 21) -> Matrix{<:Real}
     exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
-                       weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                       weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the stability of every factor exposure, one row per pair of observations.
 
@@ -986,7 +607,8 @@ Where:
 
 # Returns
 
-  - `S::Matrix{<:Real}`: `(observations - step) × factors`.
+  - `S::Matrix{<:Real}`: `(observations - step) × factors`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -1013,13 +635,14 @@ function exposure_stability(B::Arr3Num, w::Option{<:MatNum} = nothing; step::Int
 end
 function exposure_stability(csfm::CrossSectionalFactorModel; step::Integer = 21,
                             weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_stability(cs_diagnostic_exposures(csfm),
-                              cs_diagnostic_weights(weighting, csfm); step = step)
+    S = exposure_stability(cs_diagnostic_exposures(csfm),
+                           cs_diagnostic_weights(weighting, csfm); step = step)
+    return FactorDiagnosticResult(S, csfm.nf, csfm.fam, (2,))
 end
 """
     exposure_dispersion(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Matrix{<:Real}
     exposure_dispersion(csfm::CrossSectionalFactorModel;
-                        weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Matrix{<:Real}
+                        weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> FactorDiagnosticResult
 
 Return the weighted cross-sectional standard deviation of every factor exposure, one row per observation.
 
@@ -1055,7 +678,8 @@ Where:
 
 # Returns
 
-  - `D::Matrix{<:Real}`: `observations × factors`.
+  - `D::Matrix{<:Real}`: `observations × factors`, on the method over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
@@ -1133,19 +757,20 @@ function exposure_cross_section_std(B::Arr3Num, u::MatNum, t::Integer, k::Intege
 end
 function exposure_dispersion(csfm::CrossSectionalFactorModel;
                              weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_dispersion(cs_diagnostic_exposures(csfm),
-                               cs_diagnostic_weights(weighting, csfm))
+    D = exposure_dispersion(cs_diagnostic_exposures(csfm),
+                            cs_diagnostic_weights(weighting, csfm))
+    return FactorDiagnosticResult(D, csfm.nf, csfm.fam, (2,))
 end
 """
     exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing) -> Vector{<:Real}
     exposure_coverage(csfm::CrossSectionalFactorModel;
-                      weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric()) -> Vector{<:Real}
+                      weighting::AbstractOrthogonalityMetric = RegressionWeightMetric()) -> FactorDiagnosticResult
 
 Return the coverage of every factor exposure, one entry per factor.
 
 The coverage is the share of the universe at which the exposure is finite, averaged over the observations. The universe of an observation is the assets that carry a finite positive weight, and it is every asset when the verb reads no weight history. A factor whose coverage falls has lost its panel field on part of the universe, and the fit of that observation then rests on fewer assets than the caller believes.
 
-The block method answers on the raw factor axis, and it reads the unlagged history.
+The block method answers on the raw factor axis, and it reads the unlagged history. By default it reads the regression weights, so the universe is the estimation universe of the fit, the assets of positive regression weight, and the answer is the coverage column of [`factor_model_summary`](@ref). A block that carries no regression weights was fitted on every asset, so its universe is every asset. `weighting = BenchmarkWeightMetric()` reads the benchmark universe instead.
 
 # Mathematical definition
 
@@ -1167,22 +792,25 @@ Where:
   - `B`: Exposure history `observations × assets × factors`, unlagged.
   - `w`: Cross-sectional weight history `observations × assets`, or `nothing` for every asset.
   - `csfm`: A cross-sectional factor model block.
-  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that sets the universe, and [`cs_diagnostic_weights`](@ref) resolves it over the whole observation axis.
+  - `weighting`: A member of [`AbstractOrthogonalityMetric`](@ref). It names the weight history that sets the universe, and [`exposure_coverage_weights`](@ref) resolves it over the whole observation axis.
 
 # Validation
 
   - `!isempty(B)`.
   - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
+  - The field that `weighting` names is not `nothing`, except under [`RegressionWeightMetric`](@ref). Otherwise the verb raises an `IsNothingError` that names the field.
 
 # Returns
 
-  - `c::Vector{<:Real}`: One entry per factor, between `0` and `1`. An observation whose universe is empty contributes `0`.
+  - `c::Vector{<:Real}`: One entry per factor, between `0` and `1`, on the method over histories. An observation whose universe is empty contributes `0`.
+  - `r::FactorDiagnosticResult`: On the block method, the same vector in `X`, with the names and the family labels of the raw factor axis. The block method returned the bare vector in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Related
 
   - [`exposure_weights`](@ref)
   - [`exposure_dispersion`](@ref)
-  - [`cs_diagnostic_weights`](@ref)
+  - [`exposure_coverage_weights`](@ref)
+  - [`factor_model_summary`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
 function exposure_coverage(B::Arr3Num, w::Option{<:MatNum} = nothing)
@@ -1256,9 +884,47 @@ function exposure_covered_count(B::Arr3Num, u::MatNum, t::Integer, k::Integer)
     return n
 end
 function exposure_coverage(csfm::CrossSectionalFactorModel;
-                           weighting::AbstractOrthogonalityMetric = BenchmarkWeightMetric())
-    return exposure_coverage(cs_diagnostic_exposures(csfm),
-                             cs_diagnostic_weights(weighting, csfm))
+                           weighting::AbstractOrthogonalityMetric = RegressionWeightMetric())
+    c = exposure_coverage(cs_diagnostic_exposures(csfm),
+                          exposure_coverage_weights(weighting, csfm))
+    return FactorDiagnosticResult(c, csfm.nf, csfm.fam, (1,))
+end
+"""
+    exposure_coverage_weights(weighting::AbstractOrthogonalityMetric,
+                              csfm::CrossSectionalFactorModel)
+    exposure_coverage_weights(weighting::RegressionWeightMetric,
+                              csfm::CrossSectionalFactorModel)
+
+Return the weight history that sets the universe of [`exposure_coverage`](@ref).
+
+The regression weights state the estimation universe of the fit. A block that carries none was fitted with a unit weight on every asset, so under [`RegressionWeightMetric`](@ref) the function returns `csfm.rw` as it stands, and `nothing` reads as the universe of every asset. Every other metric reads its history through [`cs_diagnostic_weights`](@ref), which refuses an absent one by name.
+
+# Arguments
+
+  - `weighting`: The metric that names the history.
+  - `csfm`: A cross-sectional factor model block.
+
+# Validation
+
+  - Under a metric other than [`RegressionWeightMetric`](@ref), the field that the metric names is not `nothing`, else an `IsNothingError` that names the field.
+
+# Returns
+
+  - `u::Option{<:MatNum}`: `observations × assets`, or `nothing` for the universe of every asset.
+
+# Related
+
+  - [`exposure_coverage`](@ref)
+  - [`cs_diagnostic_weights`](@ref)
+  - [`RegressionWeightMetric`](@ref)
+"""
+function exposure_coverage_weights(weighting::AbstractOrthogonalityMetric,
+                                   csfm::CrossSectionalFactorModel)
+    return cs_diagnostic_weights(weighting, csfm)
+end
+function exposure_coverage_weights(::RegressionWeightMetric,
+                                   csfm::CrossSectionalFactorModel)
+    return csfm.rw
 end
 """
     cs_diagnostic_exposures(csfm::CrossSectionalFactorModel)
@@ -1298,111 +964,230 @@ function cs_diagnostic_exposures(Ms::Arr3Num)
     return Ms
 end
 """
-    exposure_ic_data(csfm::CrossSectionalFactorModel, reduced::Bool)
+    exposure_vif(G::Arr3Num) -> Matrix{<:Real}
+    exposure_vif(B::Arr3Num, w::Option{<:MatNum}) -> Matrix{<:Real}
+    exposure_vif(csfm::CrossSectionalFactorModel) -> FactorDiagnosticResult
 
-Return the exposure history, the reconstructed asset returns and the regression weights the information coefficient reads off a factor model block.
+Return the variance inflation factor of every factor, one row per observation.
 
-The block carries no asset returns, so the function reconstructs them from the systematic return of the fit and the residual, which the block does carry. The reconstruction exists from observation ``\\ell + 1``, so the answer starts at observation ``\\max(1, \\ell)``. The return row of that first observation is `NaN`, and no score reads it, because the information coefficient scores an exposure against the returns that follow it.
+The factor measures how much the collinearity of the cross-sectional design inflates the variance of a factor return. A value of one says that the factor is orthogonal to the others of that observation, and a large value says that the factor is nearly a combination of them, so its estimated return is unstable rather than wrong.
+
+The factor is ``1 / (1 - R_{k}^{2})``, where ``R_{k}^{2}`` is the uncentred coefficient of determination of the weighted column ``k`` on the other columns, so it is at least one. On an exactly collinear slice the answer keeps that meaning. A column that the slice identifies gets its finite factor from the pseudo-inverse. A column that the other columns reproduce has ``R_{k}^{2} = 1``, and its factor is `Inf`. A column of zeros has no ``R_{k}^{2}``, and its factor is `NaN`. [`exposure_condition_number`](@ref) shows such a slice.
+
+# Mathematical definition
+
+```math
+\\mathrm{VIF}_{t,k} = (\\mathbf{G}_{t})_{kk} \\, (\\mathbf{G}_{t}^{-1})_{kk}
+```
+
+Where:
+
+  - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
+  - ``(\\mathbf{G}_{t}^{-1})_{kk}``: Diagonal of the inverse of ``\\mathbf{G}_{t}``, which [`cs_gram_inverse_diagonal`](@ref) defines. It is `Inf` for a column the slice does not identify, so the product is `Inf`, or `NaN` when ``(\\mathbf{G}_{t})_{kk}`` is zero.
+  - ``\\mathrm{VIF}_{t,k}``: Variance inflation factor of factor ``k`` at observation ``t``.
 
 # Algorithm
 
- 1. Refuse a block that carries no exposure history, or no cross-sectional fit.
- 2. Reconstruct the return of each observation as ``\\mathbf{B}_{t-\\ell} \\boldsymbol{f}_{t} + \\boldsymbol{\\varepsilon}_{t}``, and write `NaN` where the lag leaves it undefined.
- 3. Map the exposures through the family re-basis when `reduced`, and trim all three histories to the observations from ``\\max(1, \\ell)``.
+ 1. On the method over a Gram history, take the diagonal of the inverse of every slice with [`cs_gram_inverse_diagonal`](@ref), and multiply it entry by entry by the diagonal of the slice itself.
+ 2. On the methods that read a design, take the weighted design of every observation with [`cs_design_slice`](@ref), the diagonal of its inverse Gram matrix with [`cs_inverse_diagonal!`](@ref) at the rank of the fit, and multiply it by the squared norm of each column. A Gram matrix formed in floating point squares the condition number of the design, so these methods do not form one, and they keep a factor that the fit keeps on a design whose condition number exceeds about ``10^{8}``.
+ 3. On the methods that read a design, answer `NaN` at an observation whose eligible asset count does not exceed the factor count, because such a design determines no variance.
 
 # Arguments
 
-  - `csfm`: A cross-sectional factor model block.
-  - `reduced`: Map the exposures through the family re-basis of the block.
+  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes. An Unseen Member has a zero column there, and so has the member that carries the condition when the family drops an Unseen Member, so their factor is `NaN`.
 
 # Validation
 
-  - `csfm.Ms` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `Ms`.
-  - `csfm.csr` is not `nothing`. Otherwise the verb raises an `IsNothingError` that names `csr`.
-  - `size(csfm.Ms, 1) > csfm.lag`, and `csfm.csr.f` carries the observation axis of `csfm.Ms`.
+  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
+  - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
 
 # Returns
 
-  - `B::Arr3Num`: Exposure history of the trimmed observation axis.
-  - `R::MatNum`: Reconstructed asset returns of the same axis.
-  - `w::Option{<:MatNum}`: Regression weights of the same axis, or `nothing`.
+  - `vif::Matrix{<:Real}`: `observations × factors`, on the methods over histories.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the design axis. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
+
+# Examples
+
+```jldoctest
+julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
+
+julia> exposure_vif(cs_gram(B))
+1×2 Matrix{Float64}:
+ 1.0  1.0
+```
 
 # Related
 
-  - [`exposure_ic`](@ref)
-  - [`cs_regression_lag`](@ref)
-  - [`cs_lagged_rows`](@ref)
+  - [`cs_gram`](@ref)
+  - [`cs_gram_inverse_diagonal`](@ref)
+  - [`exposure_condition_number`](@ref)
+  - [`cs_regression_t_stats`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
 """
-function exposure_ic_data(csfm::CrossSectionalFactorModel, reduced::Bool)
-    return exposure_ic_data(csfm, csfm.Ms, csfm.csr, reduced)
-end
-function exposure_ic_data(::CrossSectionalFactorModel, ::Nothing,
-                          ::Option{<:CrossSectionalRegression}, ::Bool)
-    return throw(IsNothingError("Ms cannot be nothing: the exposure information coefficient reads the exposure history of the block"))
-end
-function exposure_ic_data(::CrossSectionalFactorModel, ::Arr3Num, ::Nothing, ::Bool)
-    return throw(IsNothingError("csr cannot be nothing: the exposure information coefficient reads the factor returns and the residuals of the block"))
-end
-function exposure_ic_data(csfm::CrossSectionalFactorModel, Ms::Arr3Num,
-                          csr::CrossSectionalRegression, reduced::Bool)
-    lag = cs_regression_lag(csfm.lag)
-    T, N, K = size(Ms)
-    @argcheck(T > lag,
-              DimensionMismatch("Ms ($T observations) must carry more observations than lag ($lag)"))
-    @argcheck(size(csr.f, 1) == T && size(csr.f, 2) == K,
-              DimensionMismatch("csr.f ($(size(csr.f, 1))×$(size(csr.f, 2))) must match Ms ($T observations, $K factors)"))
-    Tf = float_if_integer(promote_type(real(eltype(Ms)), real(eltype(csr.f)),
-                                       real(eltype(csr.eps))))
-    start = max(1, lag)
-    P = T - start + 1
-    R = fill(Tf(NaN), P, N)
-    for r in 1:P
-        tau = start + r - 1
-        j = tau - lag
-        if j >= 1
-            for i in 1:N
-                s = zero(Tf)
-                for k in 1:K
-                    s += Tf(Ms[j, i, k]) * Tf(csr.f[tau, k])
-                end
-                R[r, i] = s + Tf(csr.eps[tau, i])
-            end
-        end
+function exposure_vif(G::Arr3Num)
+    T = size(G, 1)
+    K = size(G, 2)
+    D = cs_gram_inverse_diagonal(G)
+    Tf = eltype(D)
+    vif = Matrix{Tf}(undef, T, K)
+    for k in 1:K, t in 1:T
+        vif[t, k] = Tf(G[t, k, k]) * D[t, k]
     end
-    Bf = exposure_ic_exposures(csfm.fcb, Ms, reduced)
-    return Bf[start:T, :, :], R, cs_lagged_rows(csfm.rw, start:T)
+    return vif
+end
+function exposure_vif(B::Arr3Num, w::Option{<:MatNum})
+    mask, u = cs_estimation_mask_weights(B, w)
+    return cs_masked_vif(B, mask, u)
+end
+function exposure_vif(csfm::CrossSectionalFactorModel)
+    data = cs_regression_data(csfm)
+    mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
+    return cs_design_result(csfm, cs_masked_vif(data.B, mask, u))
 end
 """
-    exposure_ic_exposures(fcb::Nothing, Ms::Arr3Num, reduced::Bool)
-    exposure_ic_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num, reduced::Bool)
+    cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
 
-Return the exposure history the information coefficient scores, on the raw axis or on the reduced one.
-
-A block that carries no family re-basis has one axis, so that case returns the history unchanged whatever `reduced` states.
+Return the variance inflation factors of a design whose mask a caller has already resolved.
 
 # Arguments
 
-  - `fcb`: The `fcb` field of a [`CrossSectionalFactorModel`](@ref), or `nothing`.
-  - `Ms`: Unlagged exposure history `observations × assets × factors`.
-  - `reduced`: Map the history through the re-basis.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `mask`: Eligibility mask `observations × assets`.
+  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
 
 # Returns
 
-  - `B::Arr3Num`: The history, on the reduced axis when a re-basis is set and `reduced` is `true`.
+  - `vif::Matrix{<:Real}`: `observations × factors`, `NaN` at an observation with no degrees of freedom.
 
 # Related
 
-  - [`FactorFamilyBasis`](@ref)
-  - [`reduce_exposures`](@ref)
-  - [`exposure_ic_data`](@ref)
+  - [`exposure_vif`](@ref)
 """
-function exposure_ic_exposures(::Nothing, Ms::Arr3Num, ::Bool)
-    return Ms
+function cs_masked_vif(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+    T, _, K = size(B)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    # The answer starts absent, so an observation with no degrees of freedom needs no branch.
+    vif = fill(Tf(NaN), T, K)
+    for t in 1:T
+        if count(view(mask, t, :)) <= K
+            continue
+        end
+        Dt = cs_design_slice(B, u, t, Tf)
+        cs_inverse_diagonal!(vif, Dt, t)
+        for k in 1:K
+            vif[t, k] *= sum(abs2, view(Dt, :, k))
+        end
+    end
+    return vif
 end
-function exposure_ic_exposures(fcb::FactorFamilyBasis, Ms::Arr3Num, reduced::Bool)
-    return reduced ? reduce_exposures(fcb, Ms) : Ms
-end
+"""
+    exposure_condition_number(G::Arr3Num) -> Vector{<:Real}
+    exposure_condition_number(B::Arr3Num, w::Option{<:MatNum}) -> Vector{<:Real}
+    exposure_condition_number(csfm::CrossSectionalFactorModel) -> Vector{<:Real}
 
-export exposure_correlation, exposure_ic, exposure_ic_summary, exposure_stability,
-       exposure_dispersion, exposure_coverage
+Return the two-norm condition number of the Gram matrix of the cross-sectional design, one entry per observation.
+
+The condition number reads the whole design at once, where a variance inflation factor reads one factor of it. It is the square of the condition number of the weighted design. A value of one says that the columns of the weighted design are orthogonal and of equal norm, and a large value says that one direction of the factor space carries almost no weighted exposure, so the fit of that observation is sensitive to a small change in the returns. The methods that read a design square the condition number of the weighted design itself rather than form the Gram matrix, which would lose every condition number above about ``10^{8}`` to rounding. An exactly collinear design answers `Inf` or a value near the reciprocal of the square of the machine epsilon, and which of the two it answers is a property of the singular value decomposition rather than of the design. The smallest singular value of a rank-deficient matrix rounds either to zero or to a value near the machine epsilon. Both answers say that the design of that observation is singular. The method over a Gram history answers `Inf` or a value near the reciprocal of the machine epsilon there.
+
+# Mathematical definition
+
+```math
+\\kappa_{t} = \\frac{\\sigma_{\\max}(\\mathbf{G}_{t})}{\\sigma_{\\min}(\\mathbf{G}_{t})} = \\left(\\frac{\\sigma_{\\max}(\\mathbf{D}_{t})}{\\sigma_{\\min}(\\mathbf{D}_{t})}\\right)^{2}
+```
+
+Where:
+
+  - ``\\mathbf{G}_{t}``: Gram matrix of observation ``t``, which [`cs_gram`](@ref) defines.
+  - ``\\mathbf{D}_{t}``: Weighted design of observation ``t``, which [`cs_design_slice`](@ref) defines, so ``\\mathbf{G}_{t} = \\mathbf{D}_{t}^{\\intercal} \\mathbf{D}_{t}``.
+  - ``\\sigma_{\\max}``, ``\\sigma_{\\min}``: Largest and smallest singular values.
+
+# Arguments
+
+  - `G`: Gram history `observations × factors × factors`, which [`cs_gram`](@ref) returns.
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `w`: Regression weight history `observations × assets`, or `nothing` for equal weights.
+  - `csfm`: A cross-sectional factor model block. The answer is on the reduced factor axis when the block carries a family re-basis. At an observation with an Unseen Member the answer reads the design that the fit regressed on, which [`cs_regression_design`](@ref) changes.
+
+# Validation
+
+  - `!isempty(B)`, and `size(w) == (size(B, 1), size(B, 2))` when `w` is present.
+  - On the block method, `csfm.Ms` and `csfm.csr` are not `nothing`.
+
+# Returns
+
+  - `kappa::Vector{<:Real}`: One entry per observation. The methods that read a design answer `NaN` at an observation whose eligible asset count does not exceed the factor count.
+
+# Examples
+
+```jldoctest
+julia> B = reshape([1.0, 0.0, 0.0, 1.0], 1, 2, 2);
+
+julia> exposure_condition_number(cs_gram(B))
+1-element Vector{Float64}:
+ 1.0
+```
+
+# Related
+
+  - [`cs_gram`](@ref)
+  - [`exposure_vif`](@ref)
+  - [`CrossSectionalFactorModel`](@ref)
+"""
+function exposure_condition_number(G::Arr3Num)
+    T = size(G, 1)
+    K = size(G, 2)
+    Tf = typeof(sqrt(one(float_if_integer(real(eltype(G))))))
+    kappa = Vector{Tf}(undef, T)
+    Gt = Matrix{Tf}(undef, K, K)
+    for t in 1:T
+        cs_gram_slice!(Gt, G, t)
+        kappa[t] = LinearAlgebra.cond(Gt)
+    end
+    return kappa
+end
+function exposure_condition_number(B::Arr3Num, w::Option{<:MatNum})
+    mask, u = cs_estimation_mask_weights(B, w)
+    return cs_masked_condition_number(B, mask, u)
+end
+function exposure_condition_number(csfm::CrossSectionalFactorModel)
+    data = cs_regression_data(csfm)
+    mask, u = cs_diagnostic_mask_weights(data.B, data.eps, data.w)
+    return cs_masked_condition_number(data.B, mask, u)
+end
+"""
+    cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+
+Return the condition numbers of a design whose mask a caller has already resolved.
+
+# Arguments
+
+  - `B`: Exposure history `observations × assets × factors`, already lagged.
+  - `mask`: Eligibility mask `observations × assets`.
+  - `u`: Resolved weight history `observations × assets`, zero outside the mask.
+
+# Returns
+
+  - `kappa::Vector{<:Real}`: One entry per observation, `NaN` at an observation with no degrees of freedom.
+
+# Related
+
+  - [`exposure_condition_number`](@ref)
+"""
+function cs_masked_condition_number(B::Arr3Num, mask::AbstractMatrix{Bool}, u::MatNum)
+    T, _, K = size(B)
+    # A decomposition leaves an integer or a `Rational` type, as a square root does.
+    Tf = typeof(sqrt(one(float_if_integer(promote_type(real(eltype(B)), real(eltype(u)))))))
+    kappa = fill(Tf(NaN), T)
+    for t in 1:T
+        if count(view(mask, t, :)) > K
+            kappa[t] = LinearAlgebra.cond(cs_design_slice(B, u, t, Tf))^2
+        end
+    end
+    return kappa
+end
+export exposure_correlation, exposure_stability, exposure_dispersion, exposure_coverage,
+       exposure_vif, exposure_condition_number

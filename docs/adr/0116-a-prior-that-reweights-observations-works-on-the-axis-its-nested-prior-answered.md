@@ -91,15 +91,15 @@ shorter axis carries probabilities over other scenarios, so it is refused by nam
 the opinion's index, its type, both counts, and the fix: move the estimator that drops rows into
 `pe1`.
 
-## What the reference does
+## What the oracle does
 
-The reference fits its nested prior first and pushes no weights into it. It reads the observation
+The oracle fits its nested prior first and pushes no weights into it. It reads the observation
 count off the result, it reads the prior sample weights off the result, and it falls back to uniform
 over that count. It never refits the nested estimator; between stages it recomputes the mean and the
 variance from the scenarios.
 
-So the reference already answers this question the same way. This library keeps two capabilities the
-reference does not have, and both survive the change: the nested estimator is refitted under the
+So the oracle already answers this question the same way. This library keeps two capabilities the
+oracle does not have, and both survive the change: the nested estimator is refitted under the
 posterior weights, so a factor model carries the views; and a caller states prior probabilities in
 `pe.w`.
 
@@ -130,3 +130,98 @@ posterior weights, so a factor model carries the views; and a caller states prio
   reported against the prior that was actually wrapped.
 + An opinion whose wrapped estimator drops rows is refused by name rather than by a bare
   `DimensionMismatch` out of an array write.
+
+## Amendment (2026-10-12)
+
+Context item 3 said that a `ProbabilityWeights` that sums to one gives GLM an effective sample size
+of one, so a `StepwiseRegression` under it chose other factor sets. That was a defect of the
+regression targets, not a property of the weights. [#1640](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1640)
+fixed it: [ADR 0203](0203-a-weighted-regression-reads-the-kish-count-of-its-weights.md) scales the
+weights to their Kish count before the call to GLM. A uniform push now gives the unweighted
+stepwise sets, as it gives the unweighted moments. The decision of this ADR does not change.
+
+## Amendment (2026-10-15)
+
+Source 1 of the decision let a caller's `pe.w` win over the nested result's `w` for the whole
+fit. [#1742](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1742) found that this
+rule gives a result whose moments and weights disagree. A caller's `pe.w` reaches the nested
+estimator, and `pr` is refitted under it. A nested prior that reweights its scenarios (an
+`EntropyPoolingPrior`, a `MeucciEntropyPoolingPrior`, an `OpinionPoolingPrior`, or a `FactorPrior`
+or a `BlackLittermanPrior` over one of them) then solves its own views from `pe.w`, and it
+answers its posterior in `pr.w` and its moments in `pr.mu` and `pr.sigma`. The outer solve
+started from `pe.w`, not from `pr.w`. With no outer view, the result reported `w = pe.w` beside
+the moments of the nested posterior, so `mu != X' * w`. With an outer view, the refit under the
+posterior dropped the views of the nested prior.
+
+**A caller's `pe.w` is the prior of the innermost scenarios.** It reaches the nested estimator
+before the refit, as before. After the refit, where `pr.w` is not `nothing`, `w0` is
+`scenario_probabilities(pr.w)`, the posterior of the nested prior. This is the reading that
+already held when the caller states no `w`. So `EntropyPoolingPrior(; pe = inner, w = w)` gives
+the same result as `EntropyPoolingPrior(; pe = inner_w)`, where `inner_w` is `inner` with
+`w = w`. A nested prior that answers no `w`, such as an `EmpiricalPrior` or a `FactorPrior` over
+one, keeps the caller's `pe.w`, so its results do not move. `kld` and `ens` are measured against
+the nested posterior.
+
+The rejected rule kept the caller's `pe.w` as `w0` and refitted the nested prior through
+`scenario_prior`, which holds its model and drops its views. It removes the disagreement too, but
+it discards the views of the nested prior, and those views are part of its configuration. A
+caller's `w` states the probabilities of the scenarios, not a replacement for the views.
+
+## Amendment (2026-10-15, #1743)
+
+The pool refuses an opinion that answers on a shorter axis than its own, and it held the refit
+`pe2` to no such rule. [#1743](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1743)
+found that a `pe2` that holds a Scenario Cap answers 40 rows under pooled weights over 60, and the
+result raised a bare `DimensionMismatch` from the constructor of `LowOrderPrior`.
+
+**The refit `pe2` answers on the pool's axis too, and a `pe2` that drops rows is refused by
+name.** The pooled weights are over the observations of the pool, so they name no row of a
+shorter result. The message names `pe2`, both counts and the fix that the message for an opinion
+gives: move the estimator that drops rows into `pe1`, where it makes the scenario set for every
+opinion and for `pe2`. The check runs at the fit. A cap at or above the number of observations
+drops no row, so the configuration alone does not decide it, and a row-count verb stays rejected
+for the reason that the Alternatives give.
+
+The rejected reading ran the opinions on the scenarios that `pe2` keeps. It needs a fit of `pe2`
+before the opinions only to learn its row count, which is the cost that this ADR refused for the
+uniform push. And `pe1` already states that composition.
+
+## Amendment (2026-10-16)
+
+Under a caller's `pe.w`, the decision fits the nested prior twice. The first fit reads only the
+count of its rows, and the second fit is the fit under `pe.w`. Most nested priors answer every row
+that they receive, so for them the first fit costs a whole fit and gives nothing.
+
+**A nested prior that promises to keep the observations is fitted once.** `keeps_observations`
+is the public verb with which a preprocessing step promises to keep every observation of a
+window. It now has methods for the prior estimators, and the private helper `ep_wrapped_prior`
+reads it on `pe.pe`. When it returns `true`, the count is `size(X, 1)`, and only the fit under
+`pe.w` runs. When it returns `false`, the first fit runs as before. In both cases the length of
+`pe.w` is checked against the count before the fit under it, because `scenario_weights` pads a
+short vector with zeros and would hide the error.
+
+The methods read the configuration alone:
+
++ An `EmpiricalPrior` returns `true` when it holds no Scenario Cap.
++ A `CrossSectionalFactorPrior` keeps the fallback `false`, because its warm-up and its exposure
+  lag drop rows.
++ A prior whose result carries the rows of the prior in its `pe` field returns the answer of that
+  prior. This holds for the factor priors, the Black-Litterman priors, the two entropy pooling
+  priors and the two high order estimators.
++ An `AugmentedBlackLittermanPrior` returns `true` when both `a_pe` and `f_pe` do, because its
+  result keeps the rows that both keep.
++ An `OpinionPoolingPrior` returns `true` when it has no `pe1`, or when `pe1` returns `true`. It
+  refuses an opinion or a `pe2` that answers fewer rows.
++ An `Online` wrapper returns `false`, because no batch fit reaches it.
+
+This is not the row-count verb that the Alternatives reject. That verb answered a count, and the
+warm-up of a `CrossSectionalFactorPrior` makes the count depend on the data. This verb answers a
+promise, and `false` makes no promise. A Scenario Cap at or above the number of observations drops
+no row, but its prior returns `false` and pays the first fit. So a `false` can cost a fit, and it
+cannot give a wrong count. A wrong `true` can, so a prior returns `true` only when no
+configuration and no data drops a row. The fallback is `false`, so a prior that a user writes
+keeps the two fits until it states the promise.
+
+A new verb with the opposite sense, such as `can_change_num_obs`, was rejected. It states the
+fact that `keeps_observations` already states, under a second name, and its fallback would have
+to be `true` to stay safe.

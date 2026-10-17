@@ -14,6 +14,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :ep_post_probs => "``\\boldsymbol{p}``: ``T \\times 1`` posterior probabilities of the observations, summing to one. They are the unknown of the entropy pooling problem.",#
                  :ep_mu_prior_i => "``\\mu_{i}``: Prior mean of asset ``i``. It is a constant of the view, and a lower moment view or a fixing row holds the posterior mean at it.",#
                  :ep_sigma2_prior_i => "``\\sigma_{i}^{2}``: Prior variance of asset ``i``. It is a constant of the view, and a lower moment view or a fixing row holds the posterior variance at it.",#
+                 :ep_delta_i => "``\\delta_{i}``: Residual block variance of asset ``i``, the variance that the prior covariance carries and the scenarios do not, from [`scenario_residual_variances`](@ref). It is the idiosyncratic variance of a time-series factor prior with a residual block, zero for any other prior, and the posterior holds it.",#
                  :ep_sc1 => "``s_{c1}``: Constraint scale of the entropy pooling optimiser. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
                  :ep_sc2 => "``s_{c2}``: Slack penalty of the fixed equality rows. It weights the norm of the slack in the objective, so a larger value holds those rows tighter.",#
                  :ep_so => "``s_{o}``: Objective scale of the entropy pooling optimiser. It multiplies the objective, so a positive value leaves the argument of the optimum unchanged.",#
@@ -60,13 +61,15 @@ unique_key_dict!(math_dict, :math_dict,
                  :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
                  :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
                  :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
-                 # The online step of the prior family. `12_PriorPartialFit.jl` states each
-                 # read-out as the batch prior of the rows it folded.
+                 # The online step of the prior family. `12_PriorPartialFit.jl` states the
+                 # result of `prior(pe)` with no data as the batch prior of the rows that
+                 # `pe` folded.
                  :P_batch_prior => "``\\mathcal{P}(\\cdot)``: Batch prior, the result that the estimator's batch verb gives on the matrices in the parentheses.",#
-                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's read-out gives after it folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.",#
+                 :P_fold_prior => "``\\mathcal{P}_T``: Folded prior, the result that the estimator's batch verb gives with no data after the estimator folds the observations ``\\boldsymbol{x}_1, \\ldots, \\boldsymbol{x}_T`` in order, one at a time or in blocks of any size.",#
                  # The cross-sectional factor prior. Each symbol below is stated by two or
                  # more Units of `10_Prior/10_Base_CrossSectionalFactorPrior.jl`.
                  :a_ti_pnl => "``a_{ti}``: Panel activity of asset ``i`` at observation ``t``, ``1`` when the active mask of the Asset Panel activates the asset and ``0`` when it does not.",#
+                 :ell_lag_cs => "``\\ell``: Exposure lag, the count of observations by which the exposures lag the returns.",#
                  :e_ti_pnl => "``e_{ti}``: Estimation flag of asset ``i`` at observation ``t``, ``1`` when the estimation mask of the Asset Panel holds the asset and ``0`` when it does not.",#
                  :ztilde_ti_idio => "``\\tilde{z}_{ti}``: Filled standardised idiosyncratic return of asset ``i`` at observation ``t``. It is ``z_{ti}`` where that is finite, ``\\bar{z}_{t}`` where the asset is active and ``z_{ti}`` is not finite, and `NaN` where the asset is inactive.",#
                  :R_idio => "``\\mathbf{R}``: Idiosyncratic square root, lower triangular, with ``\\mathbf{R} \\mathbf{R}^{\\intercal} = \\mathbf{D}_{\\mathcal{I}\\mathcal{I}}``.",#

@@ -125,7 +125,7 @@ module's function, such as `Base.show`, which is an interface by definition.
 
 One build ticket, one branch, commits per directory, so no parallel session contends on the
 sweep manifest or the API pages. The rule is written in
-`.github/instructions/julia-source-code.instructions.md` and routed in `STANDARDS.md` to the
+`.github/instructions/julia-source-code.instructions.md` and routed in `CODING_STANDARDS.md` to the
 gate.
 
 ## Considered options
@@ -162,7 +162,7 @@ gate.
 
 ## Consequences
 
-- `CONTEXT.md`: **Open Family** is written. The *Projection Geometry* entry no longer says every
+- `GLOSSARY.md`: **Open Family** is written. The *Projection Geometry* entry no longer says every
   rule holds its geometry on a `proj` slot, because `AdaptiveSubgradient` builds its own at the
   step.
 - The build owes: the census test and its allow-list; the deletion of `diagonal_geometry` and
@@ -172,7 +172,7 @@ gate.
   reads it; the `return_types` measurement of `summarise_returns` and, on a pass, the ternary;
   the census over the whole library and the removal of every dead-end it flags, with each
   touched file's sweep manifest row and private API page corrected; the rule in the
-  instructions file and its `STANDARDS.md` row. Under the rule above the census found one
+  instructions file and its `CODING_STANDARDS.md` row. Under the rule above the census found one
   dead-end beyond the three named units, the no-op `set_budget_costs!`, and no abstract type.
 - Built by [#1212](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1212).
 - No released number moves. `AdaptiveSubgradient` and `DiagonalProjection` are on `dev` alone,

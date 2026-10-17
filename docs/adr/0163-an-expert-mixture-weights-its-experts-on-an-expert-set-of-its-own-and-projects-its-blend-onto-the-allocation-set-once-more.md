@@ -121,7 +121,7 @@ this one and adds nothing to it.
 - ADR 0159 is rewritten in place at its two sentences on the mixture: the weightings' bound and
   "the mixture projects nothing". ADR 0156's constructor line becomes
   `ExpertMixture(; experts, alg, eset, proj)`; ADR 0165 adds `grad` and `p0`.
-- `CONTEXT.md` gains *Expert Set*; *Expert Mixture* gains the second projection and the `K + 1`
+- `GLOSSARY.md` gains *Expert Set*; *Expert Mixture* gains the second projection and the `K + 1`
   cost.
 - The head's first build,
   [#1161](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1161), owes the two slots

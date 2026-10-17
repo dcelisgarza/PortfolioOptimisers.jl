@@ -94,20 +94,23 @@ Where:
 
 Subtracting a set of eigenmodes takes the diagonal of ``\\mathbf{C}`` below one, so the rescaling is not cosmetic: it changes every entry. The subtraction can also take an eigenvalue of ``\\mathbf{C}`` below zero, which is the reason a detoned matrix may not be positive definite.
 
+Equation 5 of [kim2005](@cite) splits a correlation matrix into the market mode, the group modes and the noise modes, and the subtraction at ``n = 1`` removes the first of those parts. That work does not rescale. Section 2.6 of [mlp1](@cite) states detoning: it subtracts the market components, usually one but possibly more, and rescales the remainder to unit diagonal. No earlier work that states the rescale was found. That section detones a denoised matrix, and this estimator detones the matrix it is given.
+
 # Algorithm
 
 The steps that [`detone!`](@ref) runs under this estimator.
 
  1. Read `dt.n` into `n`, and check that `0 < n <= size(X, 2)`.
- 2. Decrement `n` by one. `n` counts the modes to remove, and steps 5 and 6 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
- 3. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
- 4. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
- 5. Take the trailing block of `vals`, which holds the `dt.n` largest eigenvalues.
- 6. Take the matching trailing columns of `vecs`.
- 7. Subtract `vecs * vals * transpose(vecs)` from `X`, giving the remainder ``\\mathbf{C}``.
- 8. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
- 9. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
-10. When step 3 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 3, so the original diagonal returns exactly.
+ 2. When `X` has a zero variance, set its row and column to zero and detone the block of the positive variances with a recursive call, through [`zero_variance_block!`](@ref), and return `X`. A zero variance has no correlation, so step 4 cannot standardise it. The recursive call checks `dt.n` against the size of the block.
+ 3. Decrement `n` by one. `n` counts the modes to remove, and steps 6 and 7 slice `(end - n):end`, which is a window of the original `dt.n` columns. So `dt.n = 1` removes the single largest component, which is the market mode.
+ 4. Read the diagonal of `X` into `s`. When any entry of `s` is not one, `X` is a covariance matrix: replace `s` with its square roots and convert `X` to a correlation matrix with `StatsBase.cov2cor!`. The test is `any(!isone, s)`, so it is the value of the diagonal that decides, never the type of `X`.
+ 5. Eigendecompose `X`, giving the ascending eigenvalues `vals` and the eigenvectors `vecs`.
+ 6. Take the trailing block of `vals`, which holds the `dt.n` largest eigenvalues.
+ 7. Take the matching trailing columns of `vecs`.
+ 8. Subtract `vecs * vals * transpose(vecs)` from `X`, giving the remainder ``\\mathbf{C}``.
+ 9. Rescale the remainder to unit diagonal with `StatsBase.cov2cor`.
+10. Repair the rescaled matrix with [`posdef!`](@ref), under `dt.pdm`.
+11. When step 4 converted a covariance matrix, convert `X` back with `StatsBase.cor2cov!`. The standard deviations are the ones read in step 4, so the original diagonal returns exactly.
 
 # Fields
 
@@ -145,8 +148,8 @@ Detone
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57.
+  - $(ref_dict[:kim2005]) Equation 5.
+  - $(ref_dict[:mlp1]) Section 2.6.
 """
 @concrete struct Detone <: AbstractDetoneEstimator
     """
@@ -183,7 +186,7 @@ For matrices without unit diagonal, the function converts them into correlation 
 
 # Validation
 
-  - `0 < dt.n <= size(X, 2)`.
+  - `0 < dt.n <= size(X, 2)`. When `X` has a zero variance, `dt.n` is also at most the number of positive variances, which the call on their block checks.
 
 # Returns
 
@@ -219,14 +222,15 @@ julia> detone!(Detone(), X)
 
   - [`detone`](@ref)
   - [`Detone`](@ref): the closed form this function applies, and the steps it runs.
+  - [`zero_variance_block!`](@ref)
   - [`MatNum`](@ref)
   - [`Option`](@ref)
   - [`Posdef`](@ref)
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57.
+  - $(ref_dict[:kim2005]) Equation 5.
+  - $(ref_dict[:mlp1]) Section 2.6.
 """
 function detone!(::Nothing, X::MatNum)::MatNum
     return X
@@ -236,6 +240,11 @@ function detone!(dt::Detone, X::MatNum)
     @argcheck(zero(n) < n <= size(X, 2),
               DomainError(n,
                           "`Detone.n` is $n, and `X` holds $(size(X, 2)) assets. The detoner removes the `n` leading principal components, so `n` is at most the number of assets. State a value in `1:$(size(X, 2))`."))
+    # A zero variance has no correlation, so only the positive block is detoned. The call on
+    # the block checks `dt.n` against the size of the block.
+    if zero_variance_block!((block, _) -> detone!(dt, block), X)
+        return X
+    end
     n -= 1
     s = LinearAlgebra.diag(X)
     iscov = any(!isone, s)
@@ -301,8 +310,8 @@ julia> size(Xd)
 
 # References
 
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:cajas2025]) Section 3.5.3, Equation 3.57.
+  - $(ref_dict[:kim2005]) Equation 5.
+  - $(ref_dict[:mlp1]) Section 2.6.
 """
 function detone(::Nothing, X::MatNum)::MatNum
     return X

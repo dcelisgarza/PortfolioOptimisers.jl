@@ -293,7 +293,7 @@ function optimise(noc::NearOptimalCentering{<:Any, <:Any, <:Any, <:Any, <:Any, <
                                             <:Any, <:Any, <:Any, <:Any, <:Any, Nothing},
                   rd::ReturnsResult; str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(noc, "`optimise`")
-    return _optimise(noc, rd; str_names = str_names, save = save, kwargs...)
+    return shared_series_solve(noc, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates NearOptimalCentering opt

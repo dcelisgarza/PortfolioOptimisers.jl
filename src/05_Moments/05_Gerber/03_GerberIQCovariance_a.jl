@@ -1899,7 +1899,8 @@ $(DocStringExtensions.FIELDS)
                          sc::Option{<:GerberIQScaler} = nothing,
                          kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
                          alg::GerberCovarianceAlgorithm = Gerber1(),
-                         ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
+                         ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
+                         cache::Option{<:AbstractPartialFitState} = nothing)
 
 Keywords correspond to the struct's fields.
 
@@ -1920,6 +1921,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `me`: Recursively updated via [`factory`](@ref).
   - `decay`: Recursively updated via [`factory`](@ref).
   - `alg`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -1927,6 +1929,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -2009,19 +2012,30 @@ GerberIQCovariance
     $(field_dict[:ex]).
     """
     ex
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function GerberIQCovariance(ve::StatsBase.CovarianceEstimator,
                                 me::AbstractExpectedReturnsEstimator,
                                 pdm::Option{<:AbstractPosdefEstimator}, c::Number,
                                 decay::GerberIQDecayEstimator, sc::Option{<:GerberIQScaler},
                                 kind::GerberIQCovarianceAlgorithm,
                                 alg::GerberCovarianceAlgorithm,
-                                ex::FLoops.Transducers.Executor)
+                                ex::FLoops.Transducers.Executor,
+                                cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(c, :c)
         gerber_iq_assert_c_d(c, kind)
         kind = clamp_gerber_iq_n(kind, alg)
         return new{typeof(ve), typeof(me), typeof(pdm), typeof(c), typeof(decay),
-                   typeof(sc), typeof(kind), typeof(alg), typeof(ex)}(ve, me, pdm, c, decay,
-                                                                      sc, kind, alg, ex)
+                   typeof(sc), typeof(kind), typeof(alg), typeof(ex), typeof(cache)}(ve, me,
+                                                                                     pdm, c,
+                                                                                     decay,
+                                                                                     sc,
+                                                                                     kind,
+                                                                                     alg,
+                                                                                     ex,
+                                                                                     cache)
     end
 end
 function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
@@ -2032,204 +2046,9 @@ function GerberIQCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance
                             sc::Option{<:GerberIQScaler} = nothing,
                             kind::GerberIQCovarianceAlgorithm = BasicGerberIQ(),
                             alg::GerberCovarianceAlgorithm = Gerber1(),
-                            ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx())
-    return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the Gerber IQ statistic for a single co-movement.
-
-This is the product of the two halves of the source's squeezing statistic: the spatial weight the template gives the co-movement, and the temporal discount its age earns. The result is the quantity that [`comovement_step`](@ref) adds into one of the pair's three accumulators.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\Delta_{t,\\,i,\\,j} &= \\eta_{t,\\,i,\\,j} \\, v_{t}\\,.
-\\end{align}
-```
-
-Where:
-
-  - ``\\Delta_{t,\\,i,\\,j}``: Contribution of the co-movement of assets ``i`` and ``j`` at observation ``t``.
-  - ``\\eta_{t,\\,i,\\,j}``: Squeezing weight of that co-movement, from the template.
-  - ``v_{t}``: Temporal discount of observation ``t``, from the decay estimator.
-
-# Algorithm
-
- 1. Compute the squeezing weight `w` with [`gerber_iq_weight`](@ref), passing the pair's two scaling factors and the template.
- 2. Compute the temporal discount `p` by calling the `decay` functor with `T` and `k`.
- 3. Return `w * p`.
-
-# Arguments
-
-  - `xi`: Return for asset `i`.
-  - `xj`: Return for asset `j`.
-  - `axi`: Absolute return for asset `i`.
-  - `axj`: Absolute return for asset `j`.
-  - `decay`: The decay estimator for the Gerber IQ statistic.
-  - `T`: The number of observations.
-  - `k`: The current observation.
-  - `sci`: Scaling factor for asset `i`.
-  - `scj`: Scaling factor for asset `j`.
-  - `kind`: The Gerber IQ co-movement template.
-
-# Returns
-
-  - `rho::Number`: The weighted, discounted contribution of one co-movement. It is not itself a correlation.
-
-# Related
-
-  - [`gerber_iq_weight`](@ref)
-  - [`comovement_step`](@ref)
-  - [`gerber_IQ`](@ref)
-  - [`GerberIQDecayEstimator`](@ref)
-  - [`GerberIQCovarianceAlgorithm`](@ref)
-  - [`GerberIQCovariance`](@ref)
-
-# References
-
-  - $(ref_dict[:gerber2025squeezing])
-"""
-function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
-                         decay::GerberIQDecayEstimator, T::Integer, k::Number, sci::Number,
-                         scj::Number, kind::GerberIQCovarianceAlgorithm)
-    w = gerber_iq_weight(xi, xj, axi, axj, sci, scj, kind)
-    p = decay(T, k)
-    return w * p
-end
-"""
-$(DocStringExtensions.TYPEDEF)
-
-Co-movement policy for [`gerber_comovement!`](@ref) implementing the Gerber IQ family.
-
-Observations are thresholded against the pair's scaled thresholds from [`gerber_iq_scaling`](@ref), classified by the sign of the product of returns, and weighted by the IQ noise-compression template and temporal decay via [`gerber_IQ_delta`](@ref). The `alg` marker selects the denominator policy ([`comovement_ratio`](@ref)).
-
-# Fields
-
-  - `alg`: Gerber algorithm marker selecting the denominator policy.
-  - `kind`: Gerber IQ noise-compression template.
-  - `decay`: Regenerated temporal decay estimator.
-  - `sc`: Threshold scaling factor estimator.
-  - `c`: Small co-movement threshold.
-  - `sd`: Vector of asset standard deviations.
-
-# Related
-
-  - [`GerberIQCovariance`](@ref)
-  - [`gerber_IQ`](@ref)
-  - [`gerber_comovement!`](@ref)
-"""
-struct GerberIQKernel{T1 <: GerberCovarianceAlgorithm, T2 <: GerberIQCovarianceAlgorithm,
-                      T3 <: GerberIQDecayEstimator, T4, T5 <: Number, T6 <: ArrNum}
-    alg::T1
-    kind::T2
-    decay::T3
-    sc::T4
-    c::T5
-    sd::T6
-end
-@inline function comovement_pair_state(pol::GerberIQKernel, i::Integer, j::Integer)
-    sci, scj = gerber_iq_scaling(pol.sc, pol.sd[i], pol.sd[j])
-    return (sci = sci, scj = scj, ci = sci * pol.c, cj = scj * pol.c)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Accumulate a neutral (one-sided) observation into the Gerber IQ pair accumulator.
-
-Only [`Gerber1`](@ref) tracks neutral co-movements, adding the [`gerber_IQ_delta`](@ref) weight to the neutral score; the fall-through method returns the accumulator unchanged.
-
-A neutral co-movement is one on which exactly one of the two assets left the noise zone, which [`iq_crossed`](@ref) decides. [`Gerber1`](@ref) is the only branch whose denominator counts it, so the other two branches would carry the sum and never read it.
-
-# Arguments
-
-  - `pol`: The [`GerberIQKernel`](@ref) policy.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
-  - `st`: Pair state from [`comovement_pair_state`](@ref).
-  - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
-  - `axi`, `axj`: Their absolute values.
-  - `T`: Number of observations.
-  - `k`: Observation index.
-
-# Returns
-
-  - The accumulator, with `nn` raised by the [`gerber_IQ_delta`](@ref) contribution under [`Gerber1`](@ref), and unchanged otherwise.
-
-# Related
-
-  - [`comovement_step`](@ref)
-  - [`iq_crossed`](@ref)
-  - [`gerber_IQ_delta`](@ref)
-  - [`GerberIQKernel`](@ref)
-  - [`Gerber1`](@ref)
-"""
-@inline function iq_add_neutral(pol::GerberIQKernel{<:Gerber1}, acc, st, xi::Number,
-                                xj::Number, axi::Number, axj::Number, T::Integer,
-                                k::Integer)
-    return (; acc...,
-            nn = acc.nn +
-                 gerber_IQ_delta(xi, xj, axi, axj, pol.decay, T, k, st.sci, st.scj,
-                                 pol.kind))
-end
-@inline function iq_add_neutral(::GerberIQKernel, acc, args...)
-    return acc
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Accumulate the two diagonal projections of one observation into the Gerber IQ pair accumulator.
-
-Only [`Gerber2`](@ref) reaches the acting method, because only its denominator reads them. The fall-through method returns the accumulator unchanged, so the other two markers pay for no weight they never divide by.
-
-The projection of an observation in the `i` direction is the co-movement `(x_i, x_i)`, judged in **this pair's** units. Both coordinates then fall in the same magnitude class and the co-movement is concordant, so the projection names the diagonal weight of asset `i` at that observation. The `j` direction is the mirror. An asset contributes only when it left the noise zone, which is the same admission test the numerator applies.
-
-The projection is what keeps the statistic inside `[-1, 1]`. An asset's magnitude class moves with its partner whenever `sc` is not pair-separable, and a denominator read from the assembled diagonal reads the class of the pair `(i, i)` instead. Cauchy-Schwarz then has nothing to stand on. Reading the class in the pair's own units restores it for every scaler.
-
-# Arguments
-
-  - `pol`: The [`GerberIQKernel`](@ref) policy.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`.
-  - `st`: Pair state from [`comovement_pair_state`](@ref).
-  - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
-  - `axi`, `axj`: Their absolute values.
-  - `crossi`, `crossj`: Whether each asset left the noise zone, from [`iq_crossed`](@ref).
-  - `T`: Number of observations.
-  - `k`: Observation index.
-
-# Returns
-
-  - The accumulator, with `di` and `dj` raised by the projected [`gerber_IQ_delta`](@ref) contributions under [`Gerber2`](@ref), and unchanged otherwise.
-
-# Related
-
-  - [`comovement_step`](@ref)
-  - [`comovement_finalise`](@ref)
-  - [`iq_crossed`](@ref)
-  - [`gerber_IQ_delta`](@ref)
-  - [`GerberIQKernel`](@ref)
-  - [`Gerber2`](@ref)
-"""
-@inline function iq_add_diagonal(pol::GerberIQKernel{<:Gerber2}, acc, st, xi::Number,
-                                 xj::Number, axi::Number, axj::Number, crossi::Bool,
-                                 crossj::Bool, T::Integer, k::Integer)
-    di = if crossi
-        acc.di +
-        gerber_IQ_delta(xi, xi, axi, axi, pol.decay, T, k, st.sci, st.sci, pol.kind)
-    else
-        acc.di
-    end
-    dj = if crossj
-        acc.dj +
-        gerber_IQ_delta(xj, xj, axj, axj, pol.decay, T, k, st.scj, st.scj, pol.kind)
-    else
-        acc.dj
-    end
-    return (; acc..., di = di, dj = dj)
-end
-@inline function iq_add_diagonal(::GerberIQKernel, acc, args...)
-    return acc
+                            ex::FLoops.Transducers.Executor = FLoops.Transducers.ThreadedEx(),
+                            cache::Option{<:AbstractPartialFitState} = nothing)
+    return GerberIQCovariance(ve, me, pdm, c, decay, sc, kind, alg, ex, cache)
 end
 
 export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerberIQ,

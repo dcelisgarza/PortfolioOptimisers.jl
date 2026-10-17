@@ -1,8 +1,8 @@
 ```@meta
-Description = "Mutual Information Covariance, public API of PortfolioOptimisers.jl: MutualInfoCovariance, cor."
+Description = "Mutual info covariance, public API of PortfolioOptimisers.jl: MutualInfoCovariance, cor."
 ```
 
-# [Mutual Information Covariance](@id api-mutual-information-covariance)
+# [Mutual info covariance](@id api-mutual-info-covariance)
 
 ```@docs
 MutualInfoCovariance

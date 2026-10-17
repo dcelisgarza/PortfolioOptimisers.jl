@@ -17,4 +17,5 @@ fold_evaluation
 folds_are_stepped
 fold_loop
 assert_unshuffled_folds
+assert_prediction_series
 ```

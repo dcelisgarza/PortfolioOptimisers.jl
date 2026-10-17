@@ -442,6 +442,33 @@ function show_fields(ce::Covariance)
     return isnothing(ce.cvg) ? (:me, :ce, :alg, :w) : (:me, :ce, :alg, :w, :cvg)
 end
 """
+    gap_fill_value(ce::Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy}) -> Float64
+
+Answer `NaN`, so a gapped sample reaches the available-case arm of a [`Covariance`](@ref) with its gaps intact.
+
+A [`Covariance`](@ref) with a [`CoveragePolicy`](@ref) fits each pair on the observations at which both of its assets are finite and active, see [`coverage_covariance`](@ref). A finite fill value would make a gapped cell an observation, and the pair would read a return that the asset never had. So the consumer passes the sample as it is, together with the active mask that explains each gap. A [`Covariance`](@ref) with no policy refuses a gap on its own account, so it keeps the fallback of zero.
+
+A wrapper that forwards the sample, such as [`PortfolioOptimisersCovariance`](@ref), answers what this method answers. So the wrapper reads a gapped sample when the `Covariance` inside it carries a policy.
+
+# Arguments
+
+  - `ce`: Covariance estimator with a [`CoveragePolicy`](@ref) in its `cvg` field.
+
+# Returns
+
+  - `fv::Float64`: `NaN`.
+
+# Related
+
+  - [`Covariance`](@ref)
+  - [`CoveragePolicy`](@ref)
+  - [`gap_fill_value`](@ref)
+  - [`coverage_covariance`](@ref)
+"""
+function gap_fill_value(::Covariance{<:Any, <:Any, <:Any, <:Any, <:CoveragePolicy})
+    return NaN
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Resolve the centring vector and the inner covariance estimator that a [`Covariance`](@ref) method computes with.
@@ -595,7 +622,7 @@ The `cvg` field of the estimator is passed as the third argument, so the arm is 
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `mean`: A precomputed centre, or `nothing`.
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms ignore it.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arms refuse an inactive cell, as they refuse a non-finite return.
   - `kwargs...`: Additional keyword arguments passed to the centring estimator and the inner covariance estimator.
 
 # Returns
@@ -613,7 +640,7 @@ function coverage_covariance end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which resolves the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref) and delegates, and which is the body the verb has always had.
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which resolves the centre and the inner estimator with [`covariance_centre_and_estimator`](@ref) and delegates, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -624,6 +651,7 @@ function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment}, :
                              X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...) where {F}
+    assert_finite_sample(X, active_mask)
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     return f(cel, X; dims = dims, mean = mu, kwargs...)
 end
@@ -650,13 +678,13 @@ The centre of a pair is that pair's own mean, which is what a pairwise Welford r
 function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:FullMoment},
                              cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...) where {F}
+                             strict::Bool = false, kwargs...) where {F}
     @argcheck(isnothing(mean),
               ArgumentError("an available-case covariance centres each pair on that pair's own observations, so it cannot take a centre fitted over the whole window. Pass `mean = nothing`, or clear `cvg`."))
     partial_fit_corrected(ce)
     ce = partial_fit!(Covariance(; me = ce.me, ce = ce.ce, alg = ce.alg, w = ce.w,
                                  cvg = cvg), X; dims = dims, active_mask = active_mask)
-    return coverage_correlation(f, Statistics.cov(ce))
+    return coverage_correlation(f, Statistics.cov(ce; strict = strict))
 end
 """
     coverage_correlation(f::typeof(Statistics.cov), sigma::MatNum) -> MatNum
@@ -707,7 +735,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero and delegates with a zero centre, and which is the body the verb has always had.
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_covariance`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero and delegates with a zero centre, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -718,6 +746,7 @@ function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment}, :
                              X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...) where {F}
+    assert_finite_sample(X, active_mask)
     mu, cel = covariance_centre_and_estimator(ce, X; dims = dims, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))
     return f(cel, X; dims = dims, mean = zero(eltype(X)), kwargs...)
@@ -734,7 +763,8 @@ The centre is each asset's available-case mean, its own finite and active observ
  1. Read the valid entries of the block with [`coverage_valid_block`](@ref).
  2. Centre each asset on its own available-case mean, clip the deviations at zero and zero the invalid entries.
  3. Take the numerator as the cross product of the clipped block, and the denominator as the cross product of the valid mask, which counts the observations of each pair.
- 4. Divide and frame with [`coverage_divide`](@ref), and rescale to a unit diagonal when the verb is `Statistics.cor`.
+ 4. Admit the assets with [`coverage_admission`](@ref), then peel the assets of the undetermined pairs with [`coverage_peel`](@ref), which warns, or refuses under `strict`.
+ 5. Divide and frame with [`coverage_divide`](@ref), and rescale to a unit diagonal when the verb is `Statistics.cor`.
 
 # Related
 
@@ -745,7 +775,7 @@ The centre is each asset's available-case mean, its own finite and active observ
 function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment},
                              cvg::CoveragePolicy, X::MatNum; dims::Int = 1, mean = nothing,
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
-                             kwargs...) where {F}
+                             strict::Bool = false, kwargs...) where {F}
     assert_dims(dims)
     assert_partial_fittable(ce.me, ce.w, "Covariance")
     @argcheck(isnothing(mean),
@@ -755,8 +785,11 @@ function coverage_covariance(f::F, ce::Covariance{<:Any, <:Any, <:SemiMoment},
     Y[.!msk] .= zero(eltype(Y))
     mski = Int.(msk)
     nu = transpose(mski) * mski
-    cmsk = coverage_admission(cvg, CoverageCounts(nu, nothing, active, stale), size(Xo, 1))
-    sigma = coverage_divide(transpose(Y) * Y, nu, partial_fit_corrected(ce.ce), cmsk)
+    corrected = partial_fit_corrected(ce.ce)
+    cmsk = coverage_peel(cvg,
+                         coverage_admission(cvg, CoverageCounts(nu, nothing, active, stale),
+                                            size(Xo, 1)), nu, corrected, strict)
+    sigma = coverage_divide(transpose(Y) * Y, nu, corrected, cmsk)
     return coverage_correlation(f, sigma)
 end
 """
@@ -1100,7 +1133,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the [`CovarianceState`](@ref) an incremental covariance fit folds into, seeding one of zeros when the estimator carries none.
 
-Both covariance estimators of the seam seed the same state from the same observation, so the seed is written once here rather than at each [`partial_fit!`](@ref) method.
+Both covariance estimators, [`GeneralCovariance`](@ref) and [`Covariance`](@ref), seed the same state from the same observation, so the seed is written once here rather than at each [`partial_fit!`](@ref) method.
 
 # Arguments
 
@@ -1174,7 +1207,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref), and the active mask is ignored.
+`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`CovarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::CovarianceState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -1183,8 +1216,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`CovarianceState`](@ref)
 """
 function partial_fit!(state::CovarianceState, x::VecNum, ::Nothing,
-                      ::Option{<:AbstractVector{<:Bool}})
-    return partial_fit!(state, x)
+                      active_mask::Option{<:AbstractVector{<:Bool}})
+    return partial_fit!(state, inactive_as_nonfinite(x, active_mask))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1432,9 +1465,10 @@ end
 """
     Statistics.cov(
         ce::Union{<:GeneralCovariance, <:Covariance{<:Any, <:Any, <:FullMoment}},
-        state::CovarianceState
+        state::CovarianceState;
+        strict::Bool = false
     ) -> MatNum
-    Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}) -> MatNum
+    Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false) -> MatNum
 
 Read the covariance matrix of an incremental fit out of a [`CovarianceState`](@ref).
 
@@ -1467,6 +1501,7 @@ Where:
 
   - $(arg_dict[:ce])
   - `state`: The state to read.
+  - `strict`: Whether a peel of the [`CoveragePolicy`](@ref) of `ce` refuses rather than warns. See [`coverage_peel`](@ref).
 
 # Validation
 
@@ -1499,8 +1534,8 @@ julia> cov(ce)
 """
 function Statistics.cov(ce::Union{<:GeneralCovariance,
                                   <:Covariance{<:Any, <:Any, <:FullMoment}},
-                        state::CovarianceState)
-    return coverage_covariance(ce, coverage_policy(ce), state)
+                        state::CovarianceState; strict::Bool = false)
+    return coverage_covariance(ce, coverage_policy(ce), state; strict = strict)
 end
 """
     coverage_policy(ce::GeneralCovariance) -> Nothing
@@ -1508,7 +1543,7 @@ end
 
 Reads the [`CoveragePolicy`](@ref) a covariance estimator carries, out of an estimator that may have no such field.
 
-[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state and one read-out, and only the second has a `cvg` field. The read-out therefore asks for the policy through this verb rather than for the field, so that the arm is still chosen by dispatch and the estimator without the field answers `nothing`.
+[`GeneralCovariance`](@ref) and [`Covariance`](@ref) share one state and one method that makes the estimate from it, `cov(ce)` with no data, and only the second has a `cvg` field. That method therefore asks for the policy through this verb rather than for the field, so that the arm is still chosen by dispatch and the estimator without the field answers `nothing`.
 
 # Arguments
 
@@ -1534,7 +1569,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the read-out arm of [`coverage_covariance`](@ref). Every pair shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+`Nothing` method of [`coverage_covariance`](@ref) for a state, which `cov(ce)` with no data calls. Every pair shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
 
 [`GeneralCovariance`](@ref) carries no `cvg` field and reads the same state, so it always reaches this arm.
 
@@ -1545,31 +1580,35 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 """
 function coverage_covariance(ce::Union{<:GeneralCovariance,
                                        <:Covariance{<:Any, <:Any, <:FullMoment}}, ::Nothing,
-                             state::CovarianceState)
+                             state::CovarianceState; kwargs...)
     k = state.n - partial_fit_corrected(ce)
     return k >= one(k) ? state.M ./ k : fill(convert(eltype(state.M), NaN), size(state.M))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_covariance`](@ref). Each pair's accumulator is divided by that pair's own count less the Bessel correction, and an asset the policy refuses is `NaN` across its whole row and column.
+[`CoveragePolicy`](@ref) method of [`coverage_covariance`](@ref) for a state, which `cov(ce)` with no data calls. Each pair's accumulator is divided by that pair's own count less the Bessel correction, and an asset the policy refuses is `NaN` across its whole row and column.
 
-A pair whose two assets are each admitted but which share no observation is `NaN` on its own, because a covariance of no observations is not a number. That is available-case estimation's own cost, and it is what a consumer of the matrix must be ready for.
+A pair whose two assets are each admitted but which share too few observations has no covariance, because a covariance of no observations is not a number. [`coverage_peel`](@ref) removes the assets of such pairs from the admitted set with the `peel` rule of the policy, and reports the peel through `strict`. Under [`NoPeel`](@ref) the cell stays `NaN`, and the matrix repair refuses it.
 
 # Related
 
   - [`coverage_covariance`](@ref)
   - [`coverage_admission`](@ref)
+  - [`coverage_peel`](@ref)
   - [`coverage_divide`](@ref)
 """
 function coverage_covariance(ce::Covariance{<:Any, <:Any, <:FullMoment},
-                             cvg::CoveragePolicy, state::CovarianceState)
+                             cvg::CoveragePolicy, state::CovarianceState;
+                             strict::Bool = false)
     counts = state.cvg
-    return coverage_divide(state.M, counts.nu, partial_fit_corrected(ce),
-                           coverage_admission(cvg, counts, state.n))
+    corrected = partial_fit_corrected(ce)
+    cmsk = coverage_peel(cvg, coverage_admission(cvg, counts, state.n), counts.nu,
+                         corrected, strict)
+    return coverage_divide(state.M, counts.nu, corrected, cmsk)
 end
-function Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance})
-    return Statistics.cov(ce, partial_fit_cache(ce))
+function Statistics.cov(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false)
+    return Statistics.cov(ce, partial_fit_cache(ce); strict = strict)
 end
 """
     Statistics.cor(ce::Union{<:GeneralCovariance,
@@ -1579,7 +1618,7 @@ end
 
 Reads a correlation matrix out of a folded covariance estimator.
 
-The correlation twin of the state read-out of `Statistics.cov`, and the same two steps the batch method takes: the folded covariance first, then [`coverage_correlation`](@ref), which is the one place the conversion lives. So a folded estimator answers `cor` for the same configurations it answers `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can offer both.
+The correlation twin of `cov(ce)` with no data, and the same two steps the batch method takes: the folded covariance first, then [`coverage_correlation`](@ref), which is the one place the conversion lives. So a folded estimator answers `cor` for the same configurations it answers `cov`, and the composite [`PortfolioOptimisersCovariance`](@ref) can offer both.
 
 # Arguments
 
@@ -1602,12 +1641,13 @@ The correlation twin of the state read-out of `Statistics.cov`, and the same two
 """
 function Statistics.cor(ce::Union{<:GeneralCovariance,
                                   <:Covariance{<:Any, <:Any, <:FullMoment}},
-                        state::CovarianceState)
+                        state::CovarianceState; strict::Bool = false)
     return coverage_correlation(Statistics.cor,
-                                coverage_covariance(ce, coverage_policy(ce), state))
+                                coverage_covariance(ce, coverage_policy(ce), state;
+                                                    strict = strict))
 end
-function Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance})
-    return Statistics.cor(ce, partial_fit_cache(ce))
+function Statistics.cor(ce::Union{<:GeneralCovariance, <:Covariance}; strict::Bool = false)
+    return Statistics.cor(ce, partial_fit_cache(ce); strict = strict)
 end
 
 # `GeneralCovariance` folds in every configuration. `Covariance` folds under `FullMoment`

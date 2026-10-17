@@ -1,5 +1,5 @@
 ```@meta
-Description = "Expected Risk, private API of PortfolioOptimisers.jl: MatNum_Pr, RkRatioRM, missing_returns_carrier_message, resolve_risk_inputs, difference_risk, …"
+Description = "Expected Risk, private API of PortfolioOptimisers.jl: MatNum_Pr, RkRatioRM, missing_returns_data_message, resolve_risk_inputs, difference_risk, …"
 ```
 
 # Expected Risk: private API
@@ -7,12 +7,14 @@ Description = "Expected Risk, private API of PortfolioOptimisers.jl: MatNum_Pr, 
 ```@docs
 MatNum_Pr
 RkRatioRM
-missing_returns_carrier_message
+missing_returns_data_message
 resolve_risk_inputs
 difference_risk
 original_returns
 resolve_factor_risk_inputs
+source_loadings
 resolve_factor_regression
+refit_factor_regression
 supports_precomputed_returns(r::RkRatioRM)
 supports_precomputed_returns(r::MeanReturnRiskRatio)
 adjusted_risk

@@ -44,7 +44,7 @@ by name onto an axis that no longer moves, so it always finds its names.
 
 The failure the check names is *structural* — two windows with different asset sets. The failure a
 gapped panel actually produces is *semantic*: an asset present in both windows and non-investable
-in one of them. `CONTEXT.md` already separates these. A Held Gap "is per observation, and it arises
+in one of them. `GLOSSARY.md` already separates these. A Held Gap "is per observation, and it arises
 where the universe changes after the fit", and `filter_held_gaps` reads the weights and the returns
 directly, needing no panel. An asset live in a test window but outside the training window's
 Coverage Universe is not a Held Gap at all: reduce-and-expand gives it weight zero, and a zero
@@ -86,7 +86,7 @@ The gapless case is an all-true `AbstractMatrix{Bool}` storing no cells, so "alw
 `O(1)` rather than `observations × assets` bits, and a consumer's fast path is chosen by dispatch
 rather than by scanning the mask.
 
-It is **unexported and carries no `CONTEXT.md` entry**, exactly as `ListingSpan` does: it owns
+It is **unexported and carries no `GLOSSARY.md` entry**, exactly as `ListingSpan` does: it owns
 `size`, `getindex` and `show`, and it is an internal compression. The public bound stays
 `AbstractMatrix{Bool}`, which is what a caller writes against and what a caller's own declaration
 enters as. A method specialised on the all-true type is a library-internal optimisation, not a
@@ -144,7 +144,7 @@ put a `NaN` into a cross-sectional fit, and `assert_panel_masks` would not catch
 `emsk ⊆ amsk`, not finiteness. Re-deriving makes the subset invariant hold by construction rather
 than by refusal, and removes the one way a declaration can produce an incoherent panel.
 
-The reference implementation has no door of this kind: its panel's active mask is the caller's,
+The oracle has no door of this kind: its panel's active mask is the caller's,
 all-true when unstated, and its only data-driven adjustment is a caller-invoked trim of an asset's
 leading inactive entries. The layer keeps parity — a caller's own calendar still enters, as `span`
 — and improves on it, since an unstated calendar is derived from the prices at both ends rather
@@ -193,13 +193,13 @@ them.
 `AssetPanel`'s masks gain a third representation alongside a dense mask and `nothing`: an
 `O(assets)` projected span for `amsk`, and an `O(1)` all-true type for both masks of a gapless
 ingestion. Both are unexported internals under an `AbstractMatrix{Bool}` bound, so no consumer's
-signature changes and `CONTEXT.md` mints no term for them.
+signature changes and `GLOSSARY.md` mints no term for them.
 
 `assert_universe_aligned` keeps its call sites and narrows its content to `nx` equality plus
 panel-presence parity, with a message naming the two situations that can still reach it. Its
 docstring's two remedies go: on the layer's path there is nothing to remedy.
 
-`CONTEXT.md`'s **Asset Panel** entry is amended. `nothing` masks read as *static, or hand-built*,
+`GLOSSARY.md`'s **Asset Panel** entry is amended. `nothing` masks read as *static, or hand-built*,
 and never as *gapless* — a panel the ingestion layer emits always carries both.
 
 A caller's declared `AssetPanel` keeps its Panel Fields; both its masks are re-derived, because a

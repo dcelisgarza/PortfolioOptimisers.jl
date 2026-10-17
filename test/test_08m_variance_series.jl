@@ -73,7 +73,7 @@ end
     for ce in
         (RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3),
          RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 4, regime_min_obs = 2,
-                                           centred = true),
+                                           centring = PreCentred()),
          RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
                                            hac_lags = 2),
          RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
@@ -251,14 +251,15 @@ holds.
     end
 
     off = RegimeAdjustedExpWeightedVariance(; decay = decay, min_obs = min_obs,
-                                            centred = true, regime_method = nothing)
+                                            centring = PreCentred(),
+                                            regime_method = nothing)
     expected = plain_series(X, decay, min_obs)
     @test isapprox(PO.variance_series(off, X), expected; rtol = 1e-12, nans = true)
     @test isapprox(vec(var(off, X)), expected[end, :]; rtol = 1e-12, nans = true)
 
     # The default still applies the multiplier, so the switch changes an answer.
     on = RegimeAdjustedExpWeightedVariance(; decay = decay, min_obs = min_obs,
-                                           centred = true)
+                                           centring = PreCentred())
     @test !isapprox(PO.variance_series(on, X), expected; rtol = 1e-12, nans = true)
 
     # The slow route agrees with the fast one, as it does for every other setting.
@@ -347,7 +348,7 @@ carries that half, and `VERB_EXEMPT` in `test/moment_family_setup.jl` still name
     for ce in
         (RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3),
          RegimeAdjustedExpWeightedVariance(; decay = 0.9, min_obs = 4, regime_min_obs = 2,
-                                           centred = true),
+                                           centring = PreCentred()),
          RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
                                            hac_lags = 2),
          RegimeAdjustedExpWeightedVariance(; decay = 0.94, min_obs = 5, regime_min_obs = 3,
@@ -400,8 +401,9 @@ keeps a `Float32` variance.
                                              regime_min_obs = 1),
            RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1, regime_min_obs = 1,
                                              hac_lags = 2),
-           RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1, centred = true,
-                                             hac_lags = 2, regime_method = nothing))
+           RegimeAdjustedExpWeightedVariance(; decay = 0.5, min_obs = 1,
+                                             centring = PreCentred(), hac_lags = 2,
+                                             regime_method = nothing))
     for ce in ves
         @test isequal(var(ce, Xi), var(ce, Xf))
         @test isequal(std(ce, Xi), std(ce, Xf))

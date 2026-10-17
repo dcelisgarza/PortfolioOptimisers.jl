@@ -119,7 +119,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - The constructor checks `l`, `s`, `fl`, `fs`, `dl`, `ds`, `dfl` and `dfs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `l`, `fl`, `fs`, `dl`, `dfl` and `dfs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `s` and `ds` with [`assert_nonempty_finite_val`](@ref). A negative short rate is a credit. The bound `s >= -l` reads both rates on one asset axis, so [`Fees`](@ref) checks it after the resolution, through [`assert_short_fee_convex`](@ref).
 
 ## Propagated parameters
 
@@ -246,11 +247,13 @@ FeesEstimator
                            fa::Option{<:AbstractFeeAmortisation} = nothing,
                            kwargs::NamedTuple = (; atol = 1e-8))::FeesEstimator
         assert_nonempty_nonneg_finite_val(l, :l)
-        assert_nonempty_nonneg_finite_val(s, :s)
+        # A negative short rate is a credit, and `Fees` checks it against `l` after the
+        # resolution, because only then do the two rates sit on one asset axis.
+        assert_nonempty_finite_val(s, :s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
         assert_nonempty_nonneg_finite_val(dl, :dl)
-        assert_nonempty_nonneg_finite_val(ds, :ds)
+        assert_nonempty_finite_val(ds, :ds)
         assert_nonempty_nonneg_finite_val(dfl, :dfl)
         assert_nonempty_nonneg_finite_val(dfs, :dfs)
         return new{typeof(tn), typeof(l), typeof(s), typeof(fl), typeof(fs), typeof(lq),
@@ -278,7 +281,7 @@ Charges a portfolio a turnover fee, a long or short proportional fee, and a long
 
 The long and short components key on the sign of the position, not on the sign of the trade. An asset held long pays `l` and `fl`, and an asset held short pays `s` and `fs`, whatever the direction of the rebalance that reached it. The turnover component keys on the trade instead. It holds a [`Turnover`](@ref) whose `val` is a per-asset fee rate rather than a bound.
 
-Two more carriers charge a forced exit. `lq` is a proportional rate and `flq` a fixed amount, and both price the sale to zero of the positions of the assets that left the Investable Mask. Each is a [`Turnover`](@ref) whose `w` holds the previous weights of those assets.
+Two more fields charge a forced exit. `lq` is a proportional rate and `flq` a fixed amount, and both price the sale to zero of the positions of the assets that left the Investable Mask. Each is a [`Turnover`](@ref) whose `w` holds the previous weights of those assets.
 
 A fixed fee is a charge per position held, whatever its size. Only a non-zero position pays one, and `isapprox` receives `kwargs` to decide how near zero counts as zero.
 
@@ -290,7 +293,7 @@ A fee value is either a scalar, which applies to all assets, or a vector of per-
 
 ## The axis a fee is on
 
-A caller states every field over the full universe, including the two liquidation carriers `lq` and `flq`, because a caller cannot know which asset will delist. The door, [`investable_fees_view`](@ref), then places the fee on the axes the Investable Mask defines. It puts the five holding fields on the investable assets and the two carriers on the complement. The door records the mask it reduced on in `imsk`, so a reader of the returned fee can tell which axes it is on. A `nothing` `imsk` means the fee is a caller's statement on the full universe, and a `BitVector` means a door has run. A caller never writes the field. When an unmarked fee meets a door with no mask, no asset has left, so the door drops the fee's carriers rather than charging the whole book as a forced exit. When a marked fee meets the door a second time, the door returns it untouched.
+A caller states every field over the full universe, including the two liquidation charges `lq` and `flq`, because a caller cannot know which asset will delist. [`investable_fees_view`](@ref) then places the fee on the axes the Investable Mask defines. It puts the five holding fields on the investable assets and `lq` and `flq` on the complement. `investable_fees_view` records the mask it reduced on in `imsk`, so a reader of the returned fee can tell which axes it is on. A `nothing` `imsk` means the fee is a caller's statement on the full universe, and a `BitVector` means `investable_fees_view` has run. A caller never writes the field. When an unmarked fee meets `investable_fees_view` with no mask, no asset has left, so the verb drops `lq` and `flq` rather than charging the whole book as a forced exit. When a marked fee meets `investable_fees_view` a second time, the verb returns it untouched.
 
 # Mathematical definition
 
@@ -345,8 +348,8 @@ Where:
   - ``\\boldsymbol{F}``: `N × 1` per asset vector of portfolio fees. ``\\boldsymbol{F}_{\\text{lq}}`` and ``\\boldsymbol{F}_{\\text{flq}}`` have one entry per asset that left the Investable Mask instead.
   - ``\\boldsymbol{f}``: `N × 1` per asset fee vector. A scalar value applies to all assets.
   - ``\\text{r},\\, \\text{o}``: Subscripts for the term per period and the one-off term.
-  - ``\\text{lq},\\, \\text{flq}``: Subscripts for the proportional and the fixed liquidation charge, the `lq` and `flq` carriers. They price the assets that left the Investable Mask.
-  - ``\\boldsymbol{w}_{\\text{lq}},\\, \\boldsymbol{w}_{\\text{flq}}``: The previous weights of the assets that left, the `w` field of each carrier. A forced exit sells each position to zero, so the traded amount is ``\\left\\lvert \\boldsymbol{w}_{\\text{lq}} \\right\\rvert``, and the fee charges both sides.
+  - ``\\text{lq},\\, \\text{flq}``: Subscripts for the proportional and the fixed liquidation charge, the fields `lq` and `flq`. They price the assets that left the Investable Mask.
+  - ``\\boldsymbol{w}_{\\text{lq}},\\, \\boldsymbol{w}_{\\text{flq}}``: The previous weights of the assets that left, the `w` field of `lq` and of `flq`. A forced exit sells each position to zero, so the traded amount is ``\\left\\lvert \\boldsymbol{w}_{\\text{lq}} \\right\\rvert``, and the fee charges both sides.
   - ``c_t``: Fee charged at observation ``t`` of a return series.
   - $(math_dict[:T])
   - ``\\boldsymbol{Tn}``: `N × 1` turnover vector as defined in [`Turnover`](@ref). The `w` field of the turnover object holds the benchmark weight vector, and the new weight vector is the portfolio weight vector.
@@ -356,7 +359,18 @@ Where:
   - ``\\boldsymbol{w} \\neq 0``: Evaluated as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms use this test, ``\\boldsymbol{w}_{\\text{flq}} \\neq 0`` included, because a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
 
-The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is negative wherever its indicator is one, so the minus sign makes the fee a positive charge.
+The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is negative wherever its indicator is one, so the minus sign makes the fee a positive charge when ``\\boldsymbol{f}_{\\text{p}}^{-}`` is non-negative.
+
+## A negative short rate is a credit
+
+`s` can be negative down to `-l`, asset by asset. Per asset, the proportional term ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)`` has slope ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so it is convex if and only if ``s \\geq -l``. The constructor refuses a rate below that bound, because a model that charges a non-convex fee is no longer convex.
+
+The two ends of the range read a fee in two ways, and both are legitimate:
+
+  - `s = l` charges ``l \\lvert w \\rvert``: a carry or a borrow cost charged to the position, whatever its sign.
+  - `s = -l` charges the linear ``l w``: an expense ratio built into the instrument and absent from the returns, so it lowers the asset's return, and a short position earns it.
+
+The default leaves `s` at `nothing`, which charges a short position nothing.
 
 ## The per asset fees sum to the portfolio fee
 
@@ -369,6 +383,8 @@ The two families compute the same definition. [`calc_asset_fees`](@ref) splits o
 Under a [`PartsBoundWeights`](@ref) head those variables only *bound* the parts of ``\\boldsymbol{w}``, so the model's fee is an upper bound on this definition. The budget pins `sum(lw)` and `sum(sw)` whether or not the portfolio holds a short position, so the model charges both sides in full.
 
 Setting `xbgt = true` on the [`JuMPOptimiser`](@ref) pins the decomposition, and the model's fee then agrees with this definition. The setting adds binary variables, so the same problem then needs a mixed-integer conic solver rather than a conic one.
+
+A negative `s` does not use the parts. A slack `sw` would earn a credit on an exposure the model does not hold, so the bound would fall below the definition. [`set_proportional_fees!`](@ref) charges the whole proportional fee against ``\\boldsymbol{w}`` instead, through the epigraph of ``\\max(l w, -s w)``, which equals the definition exactly.
 
 A long-only model needs no pinning, because it holds no short side to bound.
 
@@ -407,7 +423,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - The constructor checks `l`, `s`, `fl` and `fs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `l`, `fl` and `fs` with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - The constructor checks `s` with [`assert_nonempty_finite_val`](@ref), and checks `s >= -l` entry by entry with [`assert_short_fee_convex`](@ref). A `nothing` `l` reads as zero there.
   - The `val` of `tn`, `lq` and `flq` is finite. [`Turnover`](@ref) accepts a `+Inf` rate, which is an uncapped bound, but a fee rate of `+Inf` gives the model an infinite coefficient.
 
 ## Propagated parameters
@@ -429,7 +446,7 @@ This type spans two axes, so this file defines [`port_opt_view`](@ref) for it by
   - `fs`: Sliced to the selected indices.
   - `lq`: Recursively viewed at the complement of the selected indices.
   - `flq`: Recursively viewed at the complement of the selected indices.
-  - `imsk`: Set to `nothing`. The view only slices, and the door, [`investable_fees_view`](@ref), writes the mark.
+  - `imsk`: Set to `nothing`. The view only slices, and [`investable_fees_view`](@ref) writes the mark.
 
 The pretty-printer shows `imsk` only when it is set, so a fee a caller wrote prints as it did before the field existed. See [`show_fields`](@ref).
 
@@ -459,6 +476,7 @@ Fees
   - [`set_non_fixed_fees!`](@ref)
   - [`set_long_non_fixed_fees!`](@ref)
   - [`set_short_non_fixed_fees!`](@ref)
+  - [`set_proportional_fees!`](@ref)
   - [`set_turnover_fees!`](@ref)
   - [`FeesEstimator`](@ref)
   - [`Option`](@ref)
@@ -469,6 +487,8 @@ Fees
   - [`AmortisedFees`](@ref)
   - [`charge_fees`](@ref)
   - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`assert_nonempty_finite_val`](@ref)
+  - [`assert_short_fee_convex`](@ref)
   - [`fees_constraints`](@ref)
   - [`calc_fees`](@ref)
   - [`calc_asset_fees`](@ref)
@@ -536,7 +556,8 @@ Fees
                   kwargs::NamedTuple = (; atol = 1e-8),
                   imsk::Option{<:BitVector} = nothing)::Fees
         assert_nonempty_nonneg_finite_val(l, :l)
-        assert_nonempty_nonneg_finite_val(s, :s)
+        assert_nonempty_finite_val(s, :s)
+        assert_short_fee_convex(l, s)
         assert_nonempty_nonneg_finite_val(fl, :fl)
         assert_nonempty_nonneg_finite_val(fs, :fs)
         # A `Turnover` lets a `+Inf` rate through, because as a bound it is the uncapped cap.
@@ -560,11 +581,56 @@ function Fees(; tn::Option{<:Turnover} = nothing, l::Option{<:Num_VecNum} = noth
     return Fees(tn, l, s, fl, fs, lq, flq, fa, kwargs, imsk)
 end
 """
+    assert_short_fee_convex(l::Option{<:Num_VecNum}, s::Nothing)
+    assert_short_fee_convex(l::Nothing, s::Num_VecNum)
+    assert_short_fee_convex(l::Num_VecNum, s::Num_VecNum)
+
+Check that the short proportional rate `s` of a [`Fees`](@ref) keeps the proportional fee convex.
+
+Per asset, the proportional fee is ``\\phi(w) = l \\max(w, 0) - s \\min(w, 0)``. Its slope is ``l`` for ``w > 0`` and ``-s`` for ``w < 0``, so ``\\phi`` is convex if and only if ``s \\geq -l``. Convexity keeps every JuMP model that charges the fee convex. A negative `s` is a credit on a short position. At ``s = -l`` the fee is the linear ``l w`` on either sign, which is the reading of an expense ratio built into the instrument: a short position earns it.
+
+# Algorithm
+
+ 1. On a `nothing` `s`, check nothing.
+ 2. On a `nothing` `l`, read `l` as zero, so `s` must be non-negative.
+ 3. Otherwise check `s .>= -l` entry by entry. A scalar applies to every asset.
+
+# Arguments
+
+  - `l`: The long proportional rate, or `nothing`.
+  - `s`: The short proportional rate, or `nothing`.
+
+# Validation
+
+  - `all(s .>= -l)`, which raises a `DomainError` that names the convexity bound.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`Fees`](@ref)
+  - [`set_proportional_fees!`](@ref)
+"""
+function assert_short_fee_convex(::Option{<:Num_VecNum}, ::Nothing)::Nothing
+    return nothing
+end
+function assert_short_fee_convex(::Nothing, s::Num_VecNum)::Nothing
+    return assert_short_fee_convex(zero(eltype(s)), s)
+end
+function assert_short_fee_convex(l::Num_VecNum, s::Num_VecNum)::Nothing
+    @argcheck(all(Broadcast.instantiate(Broadcast.broadcasted((si, li) -> si >= -li, s, l))),
+              DomainError(s,
+                          "the short fee `s` must be at least `-l` on every asset, because the proportional fee `l max(w, 0) - s min(w, 0)` is convex if and only if `s >= -l`. `s = -l` charges the linear fee `l w`, which credits a short position"))
+    return nothing
+end
+"""
     show_fields(fees::Fees)
 
 Return the fields the pretty-printer renders for a [`Fees`](@ref). These are every field but `imsk` when the mark is `nothing`, and every field when it is set.
 
-A door writes `imsk` and a caller never does, so a fee a caller wrote holds `nothing` there and prints exactly as it did before the field existed. A fee a door reduced shows the mask the door reduced it on, so a reader can tell the two states apart at the REPL.
+[`investable_fees_view`](@ref) writes `imsk` and a caller never does, so a fee a caller wrote holds `nothing` there and prints exactly as it did before the field existed. A fee that `investable_fees_view` reduced shows the mask it reduced the fee on, so a reader can tell the two states apart at the REPL.
 
 # Algorithm
 
@@ -608,7 +674,7 @@ A `nothing` `fa` on the scheme inherits the fee's clock, so the verb returns the
 
  1. On a `nothing` `fa`, return `fees` unchanged, whether it is a [`Fees`](@ref) or `nothing`.
  2. On a stated `fa` and a `nothing` `fees`, return `nothing`. There is no fee to charge, so there is no clock to state.
- 3. On a stated `fa` and a [`Fees`](@ref), rebuild the fee with that `fa`. The five fee fields, the two carriers `lq` and `flq`, `kwargs` and the mark `imsk` stay the same.
+ 3. On a stated `fa` and a [`Fees`](@ref), rebuild the fee with that `fa`. The five fee fields, the two liquidation charges `lq` and `flq`, `kwargs` and the mark `imsk` stay the same.
 
 # Arguments
 
@@ -655,9 +721,9 @@ const FeesE_Fees = Union{<:Fees, <:FeesEstimator}
 """
     needs_previous_weights(fe::FeesE_Fees) -> Bool
 
-Check if a fee constraint or estimator requires previous portfolio weights by calling [`needs_previous_weights`](@ref) on its three turnover carriers, `fe.tn`, `fe.lq` and `fe.flq`.
+Check if a fee constraint or estimator requires previous portfolio weights by calling [`needs_previous_weights`](@ref) on its three turnover fields, `fe.tn`, `fe.lq` and `fe.flq`.
 
-Only the three carriers use a previous weight vector. `tn` charges the trade from the previous weights, and `lq` and `flq` charge the forced sale of the previous positions of the assets that left. The proportional and fixed terms key on the sign of the position that `w` already carries, so a [`Fees`](@ref) whose three carriers are `nothing` needs none.
+Only these three fields use a previous weight vector. `tn` charges the trade from the previous weights, and `lq` and `flq` charge the forced sale of the previous positions of the assets that left. The proportional and fixed terms key on the sign of the position that `w` already carries, so a [`Fees`](@ref) whose three turnover fields are `nothing` needs none.
 
 # Algorithm
 
@@ -683,20 +749,20 @@ function needs_previous_weights(fe::FeesE_Fees)::Bool
            needs_previous_weights(fe.flq)
 end
 """
-    strip_liquidation_carriers(fees, imsk)
+    strip_liquidation_charges(fees, imsk)
 
-Drop the two liquidation carriers when no asset left the universe.
+Drop the two liquidation charges, `lq` and `flq`, when no asset left the universe.
 
-A caller states `lq` and `flq` over the full universe, because the caller cannot know in advance which asset will delist. At the door, [`port_opt_view`](@ref) narrows them to the complement of the Investable Mask. A window in which every asset is investable derives no mask, though, and the `nothing` sentinel skips the door so that the all-investable path allocates nothing. The carriers would then keep their full width, and the fee would charge them in full for assets that never left.
+A caller states `lq` and `flq` over the full universe, because the caller cannot know in advance which asset will delist. [`port_opt_view`](@ref) narrows them to the complement of the Investable Mask. A window in which every asset is investable derives no mask, though, and the `nothing` sentinel skips `port_opt_view` so that the all-investable path allocates nothing. `lq` and `flq` would then keep their full width, and the fee would charge them in full for assets that never left.
 
-This verb drops the carriers in that case, rather than taking the view on the common path, so the `nothing` mask stays allocation-free. A `BitVector` mask means the door has already run and the carriers are on the right axis, so the verb returns the fee untouched. A `nothing` mask means no asset exited, so the verb drops both carriers. Under either mask the verb returns a fee that holds neither carrier untouched, so it allocates nothing for a caller who states no liquidation.
+This verb drops `lq` and `flq` in that case, rather than taking the view on the common path, so the `nothing` mask stays allocation-free. A `BitVector` mask means `port_opt_view` has already run and `lq` and `flq` are on the right axis, so the verb returns the fee untouched. A `nothing` mask means no asset exited, so the verb drops both liquidation charges. Under either mask the verb returns a fee that holds neither liquidation charge untouched, so it allocates nothing for a caller who states no liquidation.
 
-The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops the carriers of any fee it receives. A hierarchical fit relies on this when it prices a cluster's risk from a fee the door has already reduced. Only the result charges the exit, so no sub-problem may charge it. [`investable_fees_view`](@ref) is the door that must tell a caller's full-universe carrier from a result's reduced one. It checks `fees.imsk` and calls this verb for an unmarked fee only. This verb keeps the mark, so a reduced fee stays reduced with its carriers gone.
+The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops `lq` and `flq` of any fee it receives. A hierarchical fit relies on this when it prices a cluster's risk from a fee that [`investable_fees_view`](@ref) has already reduced. Only the result charges the exit, so no sub-problem may charge it. `investable_fees_view` is the verb that must tell a fee that the caller states over the full universe from the reduced fee of a result. It checks `fees.imsk` and calls this verb for an unmarked fee only. This verb keeps the mark, so a reduced fee stays reduced with `lq` and `flq` gone.
 
 # Algorithm
 
  1. On a `nothing` `fees`, or a `BitVector` `imsk`, return `fees` unchanged. A stated `nothing` fee under a derived mask matches both, so a third method covers that pair and resolves the dispatch ambiguity.
- 2. On a `nothing` `imsk` with both carriers already `nothing`, return `fees` unchanged, so the common case allocates nothing.
+ 2. On a `nothing` `imsk` with `lq` and `flq` already `nothing`, return `fees` unchanged, so the common case allocates nothing.
  3. Otherwise rebuild the fee with `lq` and `flq` set to `nothing`, carrying every other field through.
 
 # Arguments
@@ -706,7 +772,7 @@ The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops th
 
 # Returns
 
-  - `fees::Option{<:Fees}`: The fee, with no liquidation carrier when none can apply.
+  - `fees::Option{<:Fees}`: The fee, with no liquidation charge when none can apply.
 
 # Related
 
@@ -715,16 +781,16 @@ The verb does not check the mark `fees.imsk`. Under a `nothing` mask it drops th
   - [`investable_mask`](@ref)
   - [`fees_constraints`](@ref)
 """
-function strip_liquidation_carriers(fees, ::BitVector)
+function strip_liquidation_charges(fees, ::BitVector)
     return fees
 end
-function strip_liquidation_carriers(::Nothing, ::Any)
+function strip_liquidation_charges(::Nothing, ::Any)
     return nothing
 end
-function strip_liquidation_carriers(::Nothing, ::BitVector)
+function strip_liquidation_charges(::Nothing, ::BitVector)
     return nothing
 end
-function strip_liquidation_carriers(fees::Fees, ::Nothing)
+function strip_liquidation_charges(fees::Fees, ::Nothing)
     return if isnothing(fees.lq) && isnothing(fees.flq)
         fees
     else
@@ -741,18 +807,18 @@ end
 
 Place a fee resolved over the caller's universe onto the axes an Investable Mask defines, and mark it with that mask.
 
-[`fees_constraints`](@ref) resolves a fee against the `sets` the caller stated before the fee reaches the door, and this verb takes the resolved fee through the door. That order lets a name-keyed fee name an asset the data later delists. After the door, `sets` holds only the investable names, so a departed name is missing and `strict` refuses it. A carrier keyed by name could not resolve at all, because its `w` is already on the complement while `sets` is on the mask. Resolving first and viewing after avoids both problems. It needs no new arithmetic, because [`port_opt_view`](@ref) already splits a resolved [`Fees`](@ref) across its two axes.
+[`fees_constraints`](@ref) resolves a fee against the `sets` the caller stated before the fee reaches this verb, and this verb then reduces the resolved fee. That order lets a name-keyed fee name an asset the data later delists. After the reduction, `sets` holds only the investable names, so a departed name is missing and `strict` refuses it. A liquidation charge keyed by name could not resolve at all, because its `w` is already on the complement while `sets` is on the mask. Resolving first and viewing after avoids both problems. It needs no new arithmetic, because [`port_opt_view`](@ref) already splits a resolved [`Fees`](@ref) across its two axes.
 
-The verb has one arm for each kind of mask. A `BitVector` means assets left, so the view runs at `findall(imsk)` and derives the complement from the width of the unreduced universe. A fit site gives that width through `X`, and a consumer that holds no full-width matrix states it as `n`. Such a consumer is a result-taking verb, which meets a caller's fee beside a result whose own prior is already reduced, and the only width it has is `length(imsk)`. A `nothing` mask means every asset is investable, so there is no complement to slice to. [`strip_liquidation_carriers`](@ref) drops both carriers instead, which keeps that path allocation-free.
+The verb has one arm for each kind of mask. A `BitVector` means assets left, so the view runs at `findall(imsk)` and derives the complement from the width of the unreduced universe. A fit site gives that width through `X`, and a consumer that holds no full-width matrix states it as `n`. Such a consumer is a result-taking verb, which meets a caller's fee beside a result whose own prior is already reduced, and the only width it has is `length(imsk)`. A `nothing` mask means every asset is investable, so there is no complement to slice to. [`strip_liquidation_charges`](@ref) drops `lq` and `flq` instead, which keeps that path allocation-free.
 
-This is the only verb that writes `fees.imsk`. It checks the mark before it acts, so it is idempotent. A caller states the two carriers over the full universe, and a result holds them on the complement of its mask. Their widths cannot tell the two apart, and the same door serves both. `expected_risk(r, w, pr, fees)` on an all-investable prior meets the caller's fee under a `nothing` mask. It must drop the carriers, or it charges the whole book as a forced exit on every period. `expected_risk(r, res)` on a reduced result meets the result's fee under the same `nothing` mask, because the reduced prior holds no `NaN`. It must charge the exit the carriers hold. The mark tells the two cases apart. An unmarked fee is a caller's statement and takes the arm the mask names. A fee marked with this mask has already been through this door, and the verb returns it as it is. The verb refuses a fee marked with another mask, because its carriers hold no rate for an asset that the other reduction kept.
+This is the only verb that writes `fees.imsk`. It checks the mark before it acts, so it is idempotent. A caller states the two liquidation charges over the full universe, and a result holds them on the complement of its mask. Their widths cannot tell the two apart, and this one verb serves both. `expected_risk(r, w, pr, fees)` on an all-investable prior meets the caller's fee under a `nothing` mask. It must drop `lq` and `flq`, or it charges the whole book as a forced exit on every period. `expected_risk(r, res)` on a reduced result meets the result's fee under the same `nothing` mask, because the reduced prior holds no `NaN`. It must charge the exit that `lq` and `flq` hold. The mark tells the two cases apart. An unmarked fee is a caller's statement and takes the arm the mask names. A fee marked with this mask has already been through this verb, and the verb returns it as it is. The verb refuses a fee marked with another mask, because its `lq` and `flq` hold no rate for an asset that the other reduction kept.
 
 # Algorithm
 
  1. On a `nothing` fee, return `nothing`.
  2. On a marked fee, return it untouched when the mark is `imsk`, or when the mark is a `BitVector` and `imsk` is `nothing`. Raise an `ArgumentError` naming both masks when the mark is a `BitVector` other than `imsk`.
- 3. On an unmarked fee and a `nothing` mask, pass the fee to [`strip_liquidation_carriers`](@ref). That verb drops both carriers, and it returns a fee that holds neither carrier untouched.
- 4. On an unmarked fee and a `BitVector` mask, take [`two_axis_fees_view`](@ref) at `findall(imsk)` over the width of the unreduced universe, `size(X, 2)` or `n`. That view slices the five per-asset fields to the mask and the two carriers to its complement. Rebuild the result with `imsk` as its mark.
+ 3. On an unmarked fee and a `nothing` mask, pass the fee to [`strip_liquidation_charges`](@ref). That verb drops `lq` and `flq`, and it returns a fee that holds neither liquidation charge untouched.
+ 4. On an unmarked fee and a `BitVector` mask, take [`two_axis_fees_view`](@ref) at `findall(imsk)` over the width of the unreduced universe, `size(X, 2)` or `n`. That view slices the five per-asset fields to the mask and `lq` and `flq` to its complement. Rebuild the result with `imsk` as its mark.
 
 # Arguments
 
@@ -763,7 +829,7 @@ This is the only verb that writes `fees.imsk`. It checks the mark before it acts
 
 # Validation
 
-  - The verb refuses a fee marked with a `BitVector` other than `imsk`, with an `ArgumentError` naming the two masks. A door sliced its carriers to the complement of its own mask, so they hold no rate for an asset that left under the caller's mask. Charging nothing for that asset would overstate the net return. Lift the fee with [`lift_fees`](@ref) and reduce the caller's statement instead.
+  - The verb refuses a fee marked with a `BitVector` other than `imsk`, with an `ArgumentError` naming the two masks. An earlier call of this verb sliced its `lq` and `flq` to the complement of its own mask, so they hold no rate for an asset that left under the caller's mask. Charging nothing for that asset would overstate the net return. Lift the fee with [`lift_fees`](@ref) and reduce the caller's statement instead.
 
 # Returns
 
@@ -774,7 +840,7 @@ This is the only verb that writes `fees.imsk`. It checks the mark before it acts
   - [`Fees`](@ref)
   - [`two_axis_fees_view`](@ref)
   - [`port_opt_view`](@ref)
-  - [`strip_liquidation_carriers`](@ref)
+  - [`strip_liquidation_charges`](@ref)
   - [`lift_fees`](@ref)
   - [`investable_mask`](@ref)
   - [`investable_reduction`](@ref)
@@ -785,10 +851,10 @@ function investable_fees_view(::Nothing, ::Any, ::Any)
     return nothing
 end
 function investable_fees_view(fees::Fees, ::Nothing, ::Any)
-    # A marked fee has been through this door: its carriers are on the complement of its
-    # own mask and hold the exit charge, so they stay. An unmarked fee is a caller's
+    # A marked fee has been through this verb: its `lq` and `flq` are on the complement of
+    # its own mask and hold the exit charge, so they stay. An unmarked fee is a caller's
     # statement on the full universe, and a `nothing` mask means nothing left it.
-    return isnothing(fees.imsk) ? strip_liquidation_carriers(fees, nothing) : fees
+    return isnothing(fees.imsk) ? strip_liquidation_charges(fees, nothing) : fees
 end
 function investable_fees_view(fees::Fees, imsk::BitVector, X::MatNum)
     return investable_fees_view(fees, imsk, size(X, 2))
@@ -801,7 +867,7 @@ function investable_fees_view(fees::Fees, imsk::BitVector, n::Integer)
                     imsk = imsk)
     end
     @argcheck(fees.imsk == imsk,
-              ArgumentError("a fee reduced on one Investable Mask cannot be reduced on another. Its two liquidation carriers were sliced to the complement of its own mask, so they hold no rate for an asset the caller's mask says left, and charging nothing for it would overstate the net return. Lift the fee with `lift_fees` and reduce the caller's own statement, or pass the fee the caller stated over the full universe.\nGot\nfindall(.!fees.imsk) => $(findall(.!fees.imsk))\nfindall(.!imsk) => $(findall(.!imsk))"))
+              ArgumentError("a fee reduced on one Investable Mask cannot be reduced on another. Its two liquidation charges, `lq` and `flq`, were sliced to the complement of its own mask, so they hold no rate for an asset the caller's mask says left, and charging nothing for it would overstate the net return. Lift the fee with `lift_fees` and reduce the caller's own statement, or pass the fee the caller stated over the full universe.\nGot\nfindall(.!fees.imsk) => $(findall(.!fees.imsk))\nfindall(.!imsk) => $(findall(.!imsk))"))
     return fees
 end
 """
@@ -811,9 +877,9 @@ Sub-select a resolved fee to the assets an optimisation keeps, on both of its ax
 
 This is the only verb that splits a [`Fees`](@ref) across its two axes. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so they are on the investable axis and the verb slices them at `i`. `lq` and `flq` price the positions the portfolio must sell, so they are on the complement of that axis and the verb slices them at the assets `i` leaves out. The verb derives the complement from `i` and `n` and never stores it.
 
-The width is a number rather than a matrix because the two callers hold different things. The fit's door passes the unreduced returns matrix to [`port_opt_view`](@ref), which takes `size(X, 2)` from it. [`result_investable_view`](@ref) also calls [`investable_fees_view`](@ref). It meets a caller's full-universe fee beside a result whose own prior is already reduced, so no full-width matrix exists there, and the width is the length of the mask.
+The width is a number rather than a matrix because the two callers hold different things. A fit passes the unreduced returns matrix to [`port_opt_view`](@ref), which takes `size(X, 2)` from it. [`result_investable_view`](@ref) also calls [`investable_fees_view`](@ref). It meets a caller's full-universe fee beside a result whose own prior is already reduced, so no full-width matrix exists there, and the width is the length of the mask.
 
-The view writes no `imsk`, so it returns an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way the Investable Mask door does. A mark written here would make an inner fit treat a cluster's complement as the assets that left. The door, [`investable_fees_view`](@ref), is the only verb that marks a fee, and it does so after this view returns.
+The view writes no `imsk`, so it returns an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way [`investable_fees_view`](@ref) does. A mark written here would make an inner fit treat a cluster's complement as the assets that left. `investable_fees_view` is the only verb that marks a fee, and it does so after this view returns.
 
 # Algorithm
 
@@ -845,7 +911,7 @@ The view writes no `imsk`, so it returns an unmarked fee. The view is a slice, a
 function two_axis_fees_view(fees::Fees, i, n::Integer)::Fees
     j = setdiff(1:n, i)
     # An empty complement means no asset left the universe, so there is nothing to
-    # liquidate and the carriers go. A `Turnover` refuses an empty `w`, so this is the
+    # liquidate and `lq` and `flq` go. A `Turnover` refuses an empty `w`, so this is the
     # answer the type asks for as well as the one the rule asks for.
     ex = !isempty(j)
     return Fees(; tn = port_opt_view(fees.tn, i), l = nothing_scalar_array_view(fees.l, i),
@@ -865,11 +931,11 @@ Sub-select a fee to the assets an optimisation keeps, on both of its axes.
 
 A [`Fees`](@ref) spans two axes once an optimisation has reduced to its Investable Mask. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so they are on the investable axis and the verb slices them at `i`. `lq` and `flq` price the positions the portfolio must sell, so they are on the complement of that axis and the verb slices them at the assets `i` leaves out.
 
-For this reason neither carrier has a `@vprop` tag, and this file writes the verb by hand rather than generating it. The generated method passes one index to every tagged field, and here the two groups need different indices. The verb derives the complement from `i` and the width of `X` and never stores it. `X` is the unreduced returns matrix, which [`investable_reduction`](@ref) and [`investable_view`](@ref) already pass, so `size(X, 2)` is the width of the full universe. On a resolved [`Fees`](@ref), [`two_axis_fees_view`](@ref) performs the split. It takes that width as a number, so the Investable Mask door can call it without a matrix. The [`FeesEstimator`](@ref) method performs the same split in its own body.
+For this reason neither `lq` nor `flq` has a `@vprop` tag, and this file writes the verb by hand rather than generating it. The generated method passes one index to every tagged field, and here the two groups need different indices. The verb derives the complement from `i` and the width of `X` and never stores it. `X` is the unreduced returns matrix, which [`investable_reduction`](@ref) and [`investable_view`](@ref) already pass, so `size(X, 2)` is the width of the full universe. On a resolved [`Fees`](@ref), [`two_axis_fees_view`](@ref) performs the split. It takes that width as a number, so [`investable_fees_view`](@ref) can call it without a matrix. The [`FeesEstimator`](@ref) method performs the same split in its own body.
 
-The three-argument method serves a caller that passes no matrix. It cannot derive a complement, so it slices the five per-asset fields and returns the two carriers untouched. That is correct, because the carriers are already on their own axis.
+The three-argument method serves a caller that passes no matrix. It cannot derive a complement, so it slices the five per-asset fields and returns `lq` and `flq` untouched. That is correct, because `lq` and `flq` are already on their own axis.
 
-Neither method writes `imsk`, so both return an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way the Investable Mask door does. A mark written here would make an inner fit treat a cluster's complement as the assets that left. The door, [`investable_fees_view`](@ref), is the only verb that marks a fee, and it does so after this view returns.
+Neither method writes `imsk`, so both return an unmarked fee. The view is a slice, and a cluster of a nested optimiser takes it the same way [`investable_fees_view`](@ref) does. A mark written here would make an inner fit treat a cluster's complement as the assets that left. `investable_fees_view` is the only verb that marks a fee, and it does so after this view returns.
 
 # Algorithm
 
@@ -987,17 +1053,17 @@ end
     lift_fees(fees::Nothing)
     lift_fees(fees::Fees)
 
-Put a fee a door reduced back onto the full universe, on both of its axes.
+Put a fee that [`investable_fees_view`](@ref) reduced back onto the full universe, on both of its axes.
 
 This verb is the inverse of [`investable_fees_view`](@ref). An optimisation reduced to its Investable Mask expands the solved weights back to the caller's universe. Its result then pairs a full-length `w` with a fee on two reduced axes, with `tn`, `l`, `s`, `fl` and `fs` on the investable assets and `lq` and `flq` on the complement. A consumer that indexes the fee by the full-length weights meets a four-element field and a five-element selector, and fails on the index.
 
-This verb moves the fee onto the axis of the weights. It lifts at the mask the fee holds in `imsk`, which the door wrote when it reduced the fee, so the fee alone records the axes it is on. Every per-asset field comes back with length `length(imsk)`, with a zero wherever the field states nothing. The five holding fields hold a zero at each asset that left, and the two carriers hold a zero at each asset that stayed. A zero rate charges nothing and a zero reference weight trades nothing, so the lift changes no charge of the reduced fee. A scalar rate applies to every asset whatever the axis is, so the verb returns it untouched. The lifted fee is unmarked, because it is on the full universe again.
+This verb moves the fee onto the axis of the weights. It lifts at the mask the fee holds in `imsk`, which `investable_fees_view` wrote when it reduced the fee, so the fee alone records the axes it is on. Every per-asset field comes back with length `length(imsk)`, with a zero wherever the field states nothing. The five holding fields hold a zero at each asset that left, and `lq` and `flq` hold a zero at each asset that stayed. A zero rate charges nothing and a zero reference weight trades nothing, so the lift changes no charge of the reduced fee. A scalar rate applies to every asset whatever the axis is, so the verb returns it untouched. The lifted fee is unmarked, because it is on the full universe again.
 
 # Algorithm
 
  1. On a `nothing` `fees`, or an unmarked one, return `fees` unchanged. An unmarked fee is a caller's statement on the full universe, or the fee of an optimisation that reduced on nothing, and either is on the full universe already.
  2. Lift `tn` at `fees.imsk` with [`lift_turnover`](@ref), and `l`, `s`, `fl` and `fs` with [`lift_fee_rate`](@ref).
- 3. Lift `lq` and `flq` at `.!fees.imsk`, the complement the two carriers are on, with the same verb as step 2.
+ 3. Lift `lq` and `flq` at `.!fees.imsk`, the complement that `lq` and `flq` are on, with the same verb as step 2.
  4. Rebuild through the keyword constructor, carrying `fa` and `kwargs` unchanged and `imsk` as `nothing`.
 
 # Arguments
@@ -1050,7 +1116,7 @@ function lift_fees(fees::Fees, ::Nothing)
     return fees
 end
 function lift_fees(fees::Fees, imsk::BitVector)::Fees
-    # The complement is where the two carriers live, so it is the mask they lift at.
+    # The complement is where `lq` and `flq` live, so it is the mask they lift at.
     cmsk = .!imsk
     return Fees(; tn = lift_turnover(fees.tn, imsk), l = lift_fee_rate(fees.l, imsk),
                 s = lift_fee_rate(fees.s, imsk), fl = lift_fee_rate(fees.fl, imsk),
@@ -1075,7 +1141,7 @@ This is the per-field step of [`lift_fees`](@ref). A `nothing` field states no f
 # Arguments
 
   - `x`: The rate to lift: `nothing`, a scalar, or one entry per asset of the reduced axis.
-  - `imsk`: The mask a door reduced the rate on.
+  - `imsk`: The mask that [`investable_fees_view`](@ref) reduced the rate on.
 
 # Returns
 
@@ -1100,7 +1166,7 @@ end
     lift_turnover(tn::Nothing, ::BitVector)
     lift_turnover(tn::Turnover, imsk::BitVector)
 
-Put a turnover carrier back onto the full universe, zero where the mask is `false`.
+Put a [`Turnover`](@ref) back onto the full universe, zero where the mask is `false`.
 
 This is the nested step of [`lift_fees`](@ref). A [`Turnover`](@ref) holds a reference weight per asset and a rate that is either a scalar or one entry per asset, so `w` always expands and `val` expands through [`lift_fee_rate`](@ref). A zero reference weight trades nothing, so an asset the mask leaves out is charged nothing.
 
@@ -1112,12 +1178,12 @@ This is the nested step of [`lift_fees`](@ref). A [`Turnover`](@ref) holds a ref
 
 # Arguments
 
-  - `tn`: The carrier to lift, or `nothing`.
-  - `imsk`: The mask a door reduced the carrier on.
+  - `tn`: The turnover to lift, or `nothing`.
+  - `imsk`: The mask that [`investable_fees_view`](@ref) reduced the turnover on.
 
 # Returns
 
-  - `tn`: The carrier on the full universe, or `nothing`.
+  - `tn`: The turnover on the full universe, or `nothing`.
 
 # Related
 
@@ -1138,7 +1204,7 @@ end
 
 Resolve the name-keyed fee fields of a [`FeesEstimator`](@ref) against a universe, giving a [`Fees`](@ref) of plain per-asset vectors.
 
-Seven fields carry a specification keyed by name: the three turnover carriers `tn`, `lq` and `flq`, and the four proportional and fixed fields. Each of the four fills its gaps from its own default. `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`. A default never fills a neighbour's field. The three carriers resolve through [`turnover_constraints`](@ref), so a [`FeesEstimator`](@ref) holding a [`TurnoverEstimator`](@ref) returns a [`Fees`](@ref) holding a [`Turnover`](@ref). `fees.fa` holds no universe-keyed specification, so the result holds it unchanged.
+Seven fields carry a specification keyed by name: the three turnover fields `tn`, `lq` and `flq`, and the four proportional and fixed fields. Each of the four fills its gaps from its own default. `l` draws on `dl`, `s` on `ds`, `fl` on `dfl` and `fs` on `dfs`. A default never fills a neighbour's field. The three turnover fields resolve through [`turnover_constraints`](@ref), so a [`FeesEstimator`](@ref) holding a [`TurnoverEstimator`](@ref) returns a [`Fees`](@ref) holding a [`Turnover`](@ref). `fees.fa` holds no universe-keyed specification, so the result holds it unchanged.
 
 # Algorithm
 
@@ -1147,7 +1213,7 @@ Seven fields carry a specification keyed by name: the three turnover carriers `t
  3. Resolve `fees.s` the same way against `fees.ds`, giving `s`.
  4. Resolve `fees.fl` the same way against `fees.dfl`, giving `fl`.
  5. Resolve `fees.fs` the same way against `fees.dfs`, giving `fs`.
- 6. Resolve `fees.lq` and `fees.flq` the same way as step 1, over the full universe of `sets`. The door [`investable_fees_view`](@ref) moves them to the complement of the Investable Mask later.
+ 6. Resolve `fees.lq` and `fees.flq` the same way as step 1, over the full universe of `sets`. [`investable_fees_view`](@ref) moves them to the complement of the Investable Mask later.
  7. Build a [`Fees`](@ref) from the seven resolved fields, `fees.fa` unchanged, and `fees.kwargs` unchanged. `fees.kwargs` sets how near zero a weight must be for the fixed terms to treat it as zero.
 
 # Arguments
@@ -1792,7 +1858,7 @@ end
 
 Add the two terms of the liquidation axis, either of which may be unset.
 
-A caller sets `lq` and `flq` independently. The verb that prices an unset carrier returns an empty vector rather than a vector of zeros, because it has no length to build one from. The axis is the complement of the Investable Mask, and that verb takes no mask. So a `Fees` that sets `flq` and no `lq` gives one term spanning the complement and one spanning nothing. Adding them elementwise would raise a `DimensionMismatch` on a fee the caller set correctly.
+A caller sets `lq` and `flq` independently. The verb that prices an unset liquidation charge returns an empty vector rather than a vector of zeros, because it has no length to build one from. The axis is the complement of the Investable Mask, and that verb takes no mask. So a `Fees` that sets `flq` and no `lq` gives one term spanning the complement and one spanning nothing. Adding them elementwise would raise a `DimensionMismatch` on a fee the caller set correctly.
 
 An empty term charges nothing, so the sum is the other term. Two set terms span the same complement and add elementwise. The investable axis needs no such verb, because its terms come from `w` and always span it.
 
@@ -1835,7 +1901,7 @@ end
 
 Charge the proportional cost of the positions a forced exit sells.
 
-`lq` is on the complement of the Investable Mask, so its entries are the assets that left, never the assets the programme holds. A forced exit is a trade to zero. The target weight of every entry is therefore zero, the turnover `|target - lq.w|` is `abs.(lq.w)`, and the charge is the rate times the absolute previous weight. The carrier is the only input, so the verb needs no weight vector and takes none.
+`lq` is on the complement of the Investable Mask, so its entries are the assets that left, never the assets the programme holds. A forced exit is a trade to zero. The target weight of every entry is therefore zero, the turnover `|target - lq.w|` is `abs.(lq.w)`, and the charge is the rate times the absolute previous weight. `lq` is the only input, so the verb needs no weight vector and takes none.
 
 The charge is a rate, so it falls on every period beside `l`, `s` and `tn`, and [`calc_periodic_fees`](@ref) adds it there.
 
@@ -1847,7 +1913,7 @@ The charge is a rate, so it falls on every period beside `l`, `s` and `tn`, and 
 
 # Arguments
 
-  - `lq`: The proportional liquidation carrier, or `nothing`.
+  - `lq`: The proportional liquidation rate, or `nothing`.
 
 # Returns
 
@@ -1901,7 +1967,7 @@ The charge is fixed per position, so it falls one time for the whole holding per
 
 # Arguments
 
-  - `flq`: The fixed liquidation carrier, or `nothing`.
+  - `flq`: The fixed liquidation charge, or `nothing`.
   - `kwargs`: Forwarded to `isapprox` to decide how near zero counts as zero.
 
 # Returns
@@ -1940,7 +2006,7 @@ end
 
 Split the proportional cost of a forced exit over the assets that left.
 
-This is the per asset counterpart of [`calc_liquidation_fees`](@ref). Its entries sum to that number, and they are on the complement of the Investable Mask. There is one entry per asset that left, in the order the carrier holds them, so each charge maps to the asset that caused it.
+This is the per asset counterpart of [`calc_liquidation_fees`](@ref). Its entries sum to that number, and they are on the complement of the Investable Mask. There is one entry per asset that left, in the order that `lq` holds them, so each charge maps to the asset that caused it.
 
 `nothing` gives an empty vector rather than a vector of zeros, because the complement is empty when no asset exited. A reader can then tell "no asset left" from "an asset left and owed nothing".
 
@@ -1952,7 +2018,7 @@ This is the per asset counterpart of [`calc_liquidation_fees`](@ref). Its entrie
 # Arguments
 
   - `w`: Portfolio weights, read for their element type.
-  - `lq`: The proportional liquidation carrier, or `nothing`.
+  - `lq`: The proportional liquidation rate, or `nothing`.
 
 # Returns
 
@@ -1998,7 +2064,7 @@ This is the per asset counterpart of [`calc_fixed_liquidation_fees`](@ref). It i
 # Arguments
 
   - `w`: Portfolio weights, read for their element type.
-  - `flq`: The fixed liquidation carrier, or `nothing`.
+  - `flq`: The fixed liquidation charge, or `nothing`.
   - `kwargs`: Forwarded to `isapprox` to decide how near zero counts as zero.
 
 # Returns
@@ -2041,7 +2107,7 @@ Charge the terms of a fee that fall on every observation.
 # Algorithm
 
  1. Charge the long proportional term, the call of [`calc_fees`](@ref) on `fees.l` under `.>=`.
- 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation makes the term a positive charge.
+ 2. Charge the short proportional term, the negated call of the same name on `fees.s` under `.<`. `w` is negative on that side, so the negation makes the term a charge under a non-negative `s` and a credit under a negative one.
  3. Charge the turnover term, the call of [`calc_fees`](@ref) on `fees.tn`.
  4. Charge the proportional forced exit, the call of [`calc_liquidation_fees`](@ref) on `fees.lq`.
  5. Return the sum of the four terms.
@@ -2102,8 +2168,8 @@ This is the per asset counterpart of [`calc_periodic_fees`](@ref). Its entries s
 
 The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
 
-  - `investable::VecNum`: The per period charge of each asset that stayed, from `l`, `s` and `tn`, which the door sliced to the Investable Mask.
-  - `liquidation::VecNum`: The per period charge of each asset that left, from `lq`, which the door sliced to the mask's complement. Empty when `lq` is unset, because the axis has no length to build a vector of zeros from.
+  - `investable::VecNum`: The per period charge of each asset that stayed, from `l`, `s` and `tn`, which [`investable_fees_view`](@ref) sliced to the Investable Mask.
+  - `liquidation::VecNum`: The per period charge of each asset that left, from `lq`, which `investable_fees_view` sliced to the mask's complement. Empty when `lq` is unset, because the axis has no length to build a vector of zeros from.
 
 # Examples
 
@@ -2197,8 +2263,8 @@ This is the per asset counterpart of [`calc_one_off_fees`](@ref). Its entries su
 
 The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
 
-  - `investable::VecNum`: The one-off charge of each asset that stayed, from `fl` and `fs`, which the door sliced to the Investable Mask.
-  - `liquidation::VecNum`: The one-off charge of each asset that left, from `flq`, which the door sliced to the mask's complement. Empty when `flq` is unset, because the axis has no length to build a vector of zeros from.
+  - `investable::VecNum`: The one-off charge of each asset that stayed, from `fl` and `fs`, which [`investable_fees_view`](@ref) sliced to the Investable Mask.
+  - `liquidation::VecNum`: The one-off charge of each asset that left, from `flq`, which `investable_fees_view` sliced to the mask's complement. Empty when `flq` is unset, because the axis has no length to build a vector of zeros from.
 
 # Examples
 
@@ -2295,8 +2361,8 @@ This is the per asset counterpart of [`calc_total_fees`](@ref). Its entries sum 
 
 The verb returns a pair, one entry per axis of a reduced [`Fees`](@ref).
 
-  - `investable::VecNum`: The whole cost of the holding period for each asset that stayed, from `l`, `s`, `tn`, `fl` and `fs`, which the door sliced to the Investable Mask.
-  - `liquidation::VecNum`: The whole cost of the forced exit of each asset that left, from `lq` and `flq`, which the door sliced to the mask's complement. Empty when neither carrier is set.
+  - `investable::VecNum`: The whole cost of the holding period for each asset that stayed, from `l`, `s`, `tn`, `fl` and `fs`, which [`investable_fees_view`](@ref) sliced to the Investable Mask.
+  - `liquidation::VecNum`: The whole cost of the forced exit of each asset that left, from `lq` and `flq`, which `investable_fees_view` sliced to the mask's complement. Empty when neither liquidation charge is set.
 
 # Examples
 

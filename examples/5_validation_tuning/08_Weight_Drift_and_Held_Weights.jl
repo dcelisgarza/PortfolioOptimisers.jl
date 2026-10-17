@@ -19,10 +19,12 @@ the *decision*. A fund does not trade the change in the decision. It trades the 
 it holds to what it now wants, and that distance is larger. The choice of which of the two vectors
 the next fold uses is the previous-weights source.
 
-The two choices are two switches, `wd` and `pws`, and they are independent. With `wd = nothing` a
-fold's return series holds the target weights fixed, and with `pws = nothing` the next fold starts
-from the previous fold's target weights. The two stay apart because a run can want one without
-the other.
+The two choices are two switches, `wd` and `pws`. With `wd = nothing` a fold's return series
+holds the target weights fixed. An unset `pws` follows `wd`: the next fold starts from the previous
+fold's target weights when nothing drifts, and from its drifted weights when the series drifts.
+Those are the two consistent pairs, because a fund that drifts holds the drifted weights when it
+trades next. An explicit `pws`, [`TargetWeights`](@ref) or [`DriftedWeights`](@ref), overrides the
+rule, because a run can want one switch without the other.
 
 !!! tip "When to reach for this"
     Reach for `wd` when the number you report is meant to be the number a fund earned, and the
@@ -212,8 +214,8 @@ mr_cap = MeanRisk(;
                   opt = JuMPOptimiser(; slv = slv,
                                       tn = Turnover(; w = fill(1 / N, N), val = cap)))
 
-wf_decision = IndexWalkForward(252, 126; wd = SelfFinancingDrift())
-wf_trade = IndexWalkForward(252, 126; wd = SelfFinancingDrift(), pws = DriftedWeights())
+wf_decision = IndexWalkForward(252, 126; wd = SelfFinancingDrift(), pws = TargetWeights())
+wf_trade = IndexWalkForward(252, 126; wd = SelfFinancingDrift())
 
 pred_decision = cross_val_predict(mr_cap, rd, wf_decision)
 pred_trade = cross_val_predict(mr_cap, rd, wf_trade)
@@ -328,9 +330,10 @@ println("total charged under the two clocks = $(round(calc_total_fees(w_eq, size
 
 ## 6. What to take away
 
-  - The two switches are independent, and each defaults to `nothing`. Then a fold's return
-    series holds the target weights fixed, and the next fold starts from the previous target
-    weights.
+  - Each switch defaults to `nothing`. Then a fold's return series holds the target weights
+    fixed, and the next fold starts from the previous target weights.
+  - An unset `pws` follows `wd`, so `wd` alone also starts the next fold from the drifted weights.
+    State `pws = TargetWeights()` to drift the series and still measure the change in the decision.
   - `wd` says which return series a fold reports, the decision's or the fund's. It does not change
     a single weight.
   - `pws` says which weights the next fold starts from, and it matters only to the estimators that

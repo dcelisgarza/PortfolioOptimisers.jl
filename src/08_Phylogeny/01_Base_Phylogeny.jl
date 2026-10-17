@@ -123,7 +123,7 @@ The two questions travel together because they share a unit. A hop count is budg
 
 The measuring kernel takes **the structure**, not the estimator that produces one: `separation_matrix(sep, g)` is the interface, and `separation_matrix(sep, nte, X)` is a wrapper that calls [`separation_graph`](@ref) first. The split is [`calc_weighted_adjacency_graph`](@ref)'s two-entry-point shape, for the same reason — the structure is expensive and a caller often holds one already. Under [`VariationInfoDistance`](@ref) building it is `98%` of [`clusterise`](@ref)'s runtime, so a consumer that resolves a budget rule *and* measures the separations must build once and pass the graph, not call two estimator-taking kernels.
 
-It is also the seam a test or an extension enters through. Every structure a shipped estimator can build is connected — a spanning tree or a PMFG — so a disconnected graph, and with it the unreachable sentinel below, is reachable only by handing one in.
+`separation_matrix(sep, g)` is also the method that a test or an extension calls. Every structure a shipped estimator can build is connected — a spanning tree or a PMFG — so a disconnected graph, and with it the unreachable sentinel below, is reachable only by handing one in.
 
 # Two more kernels, and why neither is a third question
 
@@ -135,7 +135,7 @@ The two shipped members widen their budget field to admit a rule — [`HopCountV
 
 # Separation is not decay
 
-[`AbstractSeparationDecayAlgorithm`](@ref) turns a separation into a *score*; this family produces the separation and says where it runs out. The seam is that `sep` decides **which pairs are related** — every consumer of a network needs that — while `decay` decides **how strongly, as a number**, which only the feature producer wants. That is why `sep` sits on [`NetworkEstimator`](@ref) and `decay` sits on [`Proximity`](@ref).
+[`AbstractSeparationDecayAlgorithm`](@ref) turns a separation into a *score*; this family produces the separation and says where it runs out. The difference is that `sep` decides **which pairs are related** — every consumer of a network needs that — while `decay` decides **how strongly, as a number**, which only the feature producer wants. That is why `sep` sits on [`NetworkEstimator`](@ref) and `decay` sits on [`Proximity`](@ref).
 
 # The family is unqualified on purpose
 

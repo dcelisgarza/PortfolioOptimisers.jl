@@ -90,11 +90,11 @@ function PortfolioOptimisers.plot_drawdowns(ret::VecNum;
     dd = drawdowns(cret, compound; cX = true) .* 100
 
     base_risks = 100 * if !compound
-    [-AverageDrawdown(; w = rw)(ret), -UlcerIndex()(ret),
+    [-AverageDrawdown(; w = rw)(ret), -UlcerIndex(; w = rw)(ret),
      -DrawdownatRisk(; alpha = alpha)(ret),
      -ConditionalDrawdownatRisk(; alpha = alpha)(ret), -MaximumDrawdown()(ret)]
 else
-    [-RelativeAverageDrawdown(; w = rw)(ret), -RelativeUlcerIndex()(ret),
+    [-RelativeAverageDrawdown(; w = rw)(ret), -RelativeUlcerIndex(; w = rw)(ret),
      -RelativeDrawdownatRisk(; alpha = alpha)(ret),
      -RelativeConditionalDrawdownatRisk(; alpha = alpha)(ret),
      -RelativeMaximumDrawdown()(ret)]

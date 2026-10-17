@@ -274,8 +274,8 @@ function BubbleCluster8s(Rpm::MatNum, Dpm::MatNum, Hb::MatNum, Mb::MatNum, Mv::M
         Tc[v] .= ci
 
         # Compute the distance between a vertex and the converging bubbles. Scale the sparse
-        # `Mdjv` first, as the reference does: both products then read only its stored
-        # entries, so an unreachable vertex keeps its `Inf` and never meets a zero (#1314).
+        # `Mdjv` first: both products then read only its stored entries, so an unreachable
+        # vertex keeps its `Inf` and never meets a zero (#1314).
         Udjv = Dpm * (Mdjv * LinearAlgebra.Diagonal(1 ⊘ vec(sum(!iszero, Mdjv; dims = 1))))
         Udjv[Adjv .== 0] .= typemax(eltype(Dpm))
 

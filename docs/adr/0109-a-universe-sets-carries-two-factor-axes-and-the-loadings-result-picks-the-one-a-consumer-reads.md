@@ -111,7 +111,7 @@ only the time-series axis under the default key sees no behaviour change at all.
 ## What the build measured
 
 - **The rename touched 14 source files, six test files, three examples, the user guide and
-  `CONTEXT.md`.** `ufkey` contains `fkey`, so one substitution produced both `tfkey` and `utfkey`.
+  `GLOSSARY.md`.** `ufkey` contains `fkey`, so one substitution produced both `tfkey` and `utfkey`.
 - **Eight doctest blocks re-indented, not five.** The pretty-printer right-aligns field names to the
   widest field in the block, and `ucfkey` is one character wider than `utfkey` was, so every line of
   every block that prints a `UniverseSets` moved — nested blocks included. Documenter's `fix = true`

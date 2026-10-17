@@ -111,7 +111,7 @@ uses one. That is the whole argument for the field.
   `ArithmeticReturn.ucs`. Every set it optimises with is hand-built with a bare `eps`, so all of
   them carry no `mu`, land on the fallback, and behave exactly as before. Its outer-prior hijack
   still works.
-- **The glossary changes.** `CONTEXT.md` said the Prior gives the central estimate and the
+- **The glossary changes.** `GLOSSARY.md` said the Prior gives the central estimate and the
   Uncertainty Set only bounds it. On a set-bearing route the set gives the central estimate and
   the Prior is the fallback. Rewritten in the same change.
 - This is a fix to the **single**-characteristic case. It is a prerequisite for multiplicity

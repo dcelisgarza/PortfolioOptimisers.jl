@@ -17,7 +17,11 @@ The kinds read their data at two times. Once per fold, [`resolve_allocation_set`
 
 At every step [`factory`](@ref) replaces the reference of a turnover ceiling, and of a [`WeightsTracking`](@ref), with the Price-Adjusted Allocation of the step. That is the book the fund trades from. A `fixed` object keeps the caller's reference.
 
-A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Read-out is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
+**Each reader of the set states its own source.** The set holds no source. It gives the head's rows to its prior `pe`, to each graph slot in `cte` and `ple`, and to the regression of each exposure slot in `lcse`. Each one reads the rows as its own `x_src` states, as the same slot of a [`JuMPOptimiser`](@ref) does. When `pe` states `x_src = ExcessSource()`, the prior fits the rows on `X - B`, which [`benchmark_relative_returns`](@ref) gives. A [`Variance`](@ref) ceiling then becomes a ceiling on the tracking variance against the benchmark `B` that the rows carry. The head's rows keep the raw returns and the benchmark, so each reader reads its own source, whatever the source of the head's step is.
+
+The readers of the set join the group of the head, see [`group_frames`](@ref). A [`DataBenchmarkTracking`](@ref) in `tr` or `r` refuses a `pe` that states `ExcessSource()`, because it would subtract the benchmark twice. A reader of the Excess Frame refuses rows with no benchmark.
+
+A set that reads the rows, for which [`rows_needed`](@ref) returns `nothing`, fits its prior once over the whole prefix at every step, and then solves its programme. A caller who wants a window states it on `pe`. A covariance of one observation does not exist. So while the head holds fewer than two rows, the set fits no prior, and the step is a Held Step with its reason recorded ([`allocation_set_ready`](@ref)). A caller who wants a covariance ceiling from the first row gives `r` its matrix. A MIP projection is not unique. So the identity between the Causal Pass and the Recursion Result is a property of the code path, the same solves in the same order on the same rows, and it holds exactly only with a deterministic solver.
 
 The set has no field for a budget, fees, the return term as an objective, the scalariser, the execution settings of the optimiser or a `TimeDependent` schedule. At construction [`assert_risk_ceiling`](@ref) refuses a frontier or a per-asset `ub` on a measure, because a ceiling is one number. The set does not read the `rke` or the `scale` of a measure. The ceiling is a constraint, and the objective is the divergence plus the penalties. The Euclidean, Gram and diagonal geometries admit a negative lower bound. The entropic, Tsallis and log-barrier geometries refuse it, at the head's construction when the bound is a value ([`assert_geometry_admits_set`](@ref)) and at the projection when an estimator resolves it. The wealth factor of a leveraged allocation can reach zero on an extreme day. At that point the log wealth and the next gradient are undefined, and the set does not guard against it.
 
@@ -98,12 +102,13 @@ Keywords correspond to the struct's fields. `slv` has no default, because every 
   - If `slv` is a vector: `!isempty(slv)`. An `IsEmptyError` is thrown otherwise.
   - If `sbgt` or `gbgt` is a number: non-negative and finite. A `DomainError` is thrown otherwise.
   - If `gbgt` is given: `sbgt` is not a number, because the budget of one and a number in `sbgt` already fix the gross exposure. If `wb` is a [`WeightBounds`](@ref), one of its bounds admits a short weight. An `ArgumentError` is thrown otherwise.
-  - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
+  - If `r` is given: the `settings.ub` of every measure is a finite non-negative number, the ceiling, and no measure holds a [`ReturnsTracking`](@ref), because the ceiling reads rows that change at every step ([`assert_risk_ceiling`](@ref)). An `ArgumentError` is thrown otherwise, and an `IsEmptyError` for an empty vector.
   - If `cte`, `tn`, `tr`, `l2`, `lp`, `lpc` or `ret` is a vector: `!isempty(x)`. An `IsEmptyError` is thrown otherwise.
   - If `card` is given: `card > 0` and finite. If `l2c`, `linfc`, `l1` or `linf` is a number: `> 0` and finite. A `DomainError` is thrown otherwise.
   - An [`LpRegularisation`](@ref) in `lp` holds no norm ceiling rule, and one in `lpc` holds no ambiguity radius rule. An `ArgumentError` is thrown otherwise.
   - The sub-group and sub-grouped MIP slots agree in shape ([`assert_subgroup_mip_fields`](@ref), [`assert_subgrouped_mip_fields`](@ref)).
   - If a slot holds an estimator keyed by name ([`name_keyed`](@ref)): `!isnothing(sets)`. An `IsNothingError` is thrown otherwise.
+  - If `tr` or `r` holds a [`DataBenchmarkTracking`](@ref): `pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
 
 ## View parameters
 
@@ -141,7 +146,8 @@ ProgrammeAllocationSet
           │           me ┼ SimpleExpectedReturns
           │              │   w ┴ nothing
           │      horizon ┼ nothing
-          │   fill_limit ┴ nothing
+          │   fill_limit ┼ nothing
+          │        x_src ┴ nothing
       slv ┼ Solver
           │          name ┼ String: \"\"
           │        solver ┼ nothing
@@ -423,6 +429,8 @@ ProgrammeAllocationSet
             @argcheck(!isnothing(sets),
                       IsNothingError("sets cannot be nothing when a slot holds an estimator keyed by name"))
         end
+        assert_data_benchmark_prior(tr, pe, :tr, :ProgrammeAllocationSet)
+        assert_data_benchmark_prior(r, pe, :r, :ProgrammeAllocationSet)
         return new{typeof(pe), typeof(slv), typeof(r), typeof(wb), typeof(sbgt),
                    typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
                    typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
@@ -521,6 +529,31 @@ function port_opt_view(set::ProgrammeAllocationSet, i, args...)
                                   scard = set.scard, l2c = set.l2c, lpc = set.lpc,
                                   linfc = set.linfc, l1 = set.l1, l2 = set.l2, lp = set.lp,
                                   linf = set.linf)
+end
+"""
+    reader_frames(set::ProgrammeAllocationSet, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Walk the readers of a [`ProgrammeAllocationSet`](@ref) for the group of the head that holds it.
+
+The set holds no source of its own. Its prior `pe`, each graph slot in `cte` and `ple`, the regression of each exposure slot in `lcse`, and the readers inside its measures are the outermost readers of the head's rows, so the walk counts each one. [`field_frames`](@ref) walks every field. The walk reads the refit rule of the set's own prior, because a regression reader of the set reads the loadings of that prior, see [`refits_regression`](@ref).
+
+# Arguments
+
+  - `set`: The programme set.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit]) The set ignores it and reads the rule of its own prior.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames that the set adds to the group.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`group_frames`](@ref)
+"""
+function reader_frames(set::ProgrammeAllocationSet, path::AbstractString, ::Bool)
+    return field_frames(set, path, refits_regression(set.pe))
 end
 """
     name_keyed(x)
@@ -723,7 +756,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in the Bregman divergence of the Tsallis potential of power `alpha`.
 
-This is the geometry of the Tsallis-entropy steps of Abernethy, Lee and Tewari (2015) and of the Tsallis-INF algorithm of Zimmert and Seldin (2021). The potential of the first paper is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of the second is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. Both papers bound the regret of the multi-armed bandit with bounded losses. At the tuned rate the expected regret is at most ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}`` (Abernethy, Lee and Tewari, 2015, Corollary 3.2). The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
+This is the geometry of the Tsallis-entropy steps of [abernethy2015](@citet) and of the Tsallis-INF algorithm of [zimmertseldin2021](@citet). The potential of [abernethy2015](@citet) is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of [zimmertseldin2021](@citet) is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. [abernethy2015](@citet) and [zimmertseldin2021](@citet) both bound the regret of the multi-armed bandit with bounded losses. At the tuned rate, Corollary 3.2 of [abernethy2015](@cite) bounds the expected regret by ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}``. The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
 
 # Mathematical definition
 
@@ -759,7 +792,7 @@ $(DocStringExtensions.FIELDS)
 
     TsallisProjection(; alpha::Real = 0.5) -> TsallisProjection
 
-Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of Zimmert and Seldin (2021).
+Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of [zimmertseldin2021](@cite).
 
 ## Validation
 
@@ -786,11 +819,11 @@ TsallisProjection
   - $(ref_dict[:abernethy2015])
   - $(ref_dict[:zimmertseldin2021])
 """
-struct TsallisProjection{T1 <: Real} <: AbstractProjectionGeometry
+@concrete struct TsallisProjection <: AbstractProjectionGeometry
     """
     The power of the potential, in `(0, 1)`.
     """
-    alpha::T1
+    alpha
     function TsallisProjection(alpha::Real)
         @argcheck(zero(alpha) < alpha < one(alpha),
                   DomainError(alpha, "alpha must be in (0, 1)"))
@@ -805,7 +838,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in the Itakura–Saito divergence, the Bregman divergence of the Burg entropy.
 
-Orseau, Lattimore and Legg (2017, §7) name the Burg entropy as the natural regulariser of mirror descent on the log loss, the alternative to their Soft-Bayes step. They state, without a proof in the paper, that its regret is ``O(\\sqrt{N T \\log (T / N)})`` and does not depend on the largest gradient. For a portfolio, this means that the bound needs no lower bound on the price relatives. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the logarithm is undefined below zero.
+In Section 7 of [orseau2017](@cite), the Burg entropy is the natural regulariser of mirror descent on the log loss, the alternative to the Soft-Bayes step of [orseau2017](@cite). [orseau2017](@citet) state without a proof that its regret is ``O(\\sqrt{N T \\log (T / N)})`` and does not depend on the largest gradient. For a portfolio, this means that the bound needs no lower bound on the price relatives. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the logarithm is undefined below zero.
 
 # Mathematical definition
 

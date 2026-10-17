@@ -211,7 +211,7 @@ simulate_returns(alg::StationaryBootstrapScenarios, X;       n_obs, rng) -> Matr
 In the library the entry point becomes `simulate(pr::AbstractPriorResult, alg, n; rng)` and returns
 a `ReturnsResult`, so the output feeds straight back into `optimise`. **The generator dispatches on
 the Prior Result, not on the Estimator**, because a draw needs the fitted answer and never the
-configuration. That places it correctly under the rule in `CONTEXT.md`.
+configuration. That places it correctly under the rule in `GLOSSARY.md`.
 
 #### Verification
 

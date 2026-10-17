@@ -24,7 +24,8 @@ $(DocStringExtensions.FIELDS)
         views_conf::Option{<:Num_VecNum} = nothing,
         rf::Number = 0.0,
         tau::Option{<:Number} = nothing,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> BayesianBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
@@ -37,7 +38,7 @@ The views are applied to the **factors** and reach the assets through the regres
   - The factor block `fpr` carries the **posterior** factor moments — `mu_hat` and the inverse of the posterior precision — processed by `f_mp`. Its `chol` is dropped for the same reason; its `w` and that weighting's diagnostics forward untouched, because the views do not touch the observation axis.
   - Everything else forwards: `X` is the wrapped prior's unchanged, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` is a regression over data the views do not modify.
 
-Because both blocks are posterior, the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds, and at the default `rf = 0.0` that is the plain identity. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
+Because both blocks are posterior, the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b + rf` holds, and at the default `rf = 0.0` that is the plain identity. [`FactorBlackLittermanPrior`](@ref) satisfies it too, for the same reason. The other two members do not — see the warnings on [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref).
 
 !!! warning
 
@@ -45,11 +46,11 @@ Because both blocks are posterior, the returned carrier is **internally consiste
 
 ## What this estimator refuses
 
-The update inverts the wrapped prior's factor covariance twice, so it needs a factor axis of full rank. A factor model that states a re-based Factor Family through [`has_family_rebasis`](@ref) carries `fpr` on the **raw** axis, which a re-basis makes a linear image of a smaller one, so that covariance is singular by construction. Such a carrier is refused with an `ArgumentError` naming the wrapped estimator.
+The update inverts the wrapped prior's factor covariance twice, so it needs a factor axis of full rank. A factor model that states a re-based Factor Family through [`has_family_rebasis`](@ref) carries `fpr` on the **raw** axis, which a re-basis makes a linear image of a smaller one, so that covariance is singular by construction. Such a prior result is refused with an `ArgumentError` naming the wrapped estimator.
 
 The refusal is not decoration over a failure that would otherwise be visible. The inversion **raises nothing** on such a matrix: it returns entries of order `1e18`, and the update carries on to a posterior whose scale looks like the prior's, so a caller reading the result sees no sign that it is meaningless. That is why the refusal reads what the result *states* rather than testing its rank, and why it is a refusal rather than a warning.
 
-[`HighOrderFactorPriorEstimator`](@ref) accepts the same carrier, because it only projects through `rr.M` and never inverts the factor covariance.
+[`HighOrderFactorPriorEstimator`](@ref) accepts the same prior result, because it only projects through `rr.M` and never inverts the factor covariance.
 
 ## The views are written on the factor axis
 
@@ -62,6 +63,8 @@ The refusal is not decoration over a failure that would otherwise be visible. Th
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
 ## Propagated parameters
 
@@ -88,66 +91,72 @@ julia> BayesianBlackLittermanPrior(;
                                                                             \"F2 == 0.04\"]))
 BayesianBlackLittermanPrior
           pe ┼ FactorPrior
-             │    pe ┼ EmpiricalPrior
-             │       │           ce ┼ PortfolioOptimisersCovariance
-             │       │              │   ce ┼ Covariance
-             │       │              │      │    me ┼ SimpleExpectedReturns
-             │       │              │      │       │   w ┴ nothing
-             │       │              │      │    ce ┼ GeneralCovariance
-             │       │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │              │      │       │    w ┴ nothing
-             │       │              │      │   alg ┼ FullMoment()
-             │       │              │      │     w ┴ nothing
-             │       │              │   mp ┼ MatrixProcessing
-             │       │              │      │     pdm ┼ Posdef
-             │       │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │              │      │      dn ┼ nothing
-             │       │              │      │      dt ┼ nothing
-             │       │              │      │     alg ┼ nothing
-             │       │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │       │           me ┼ EquilibriumExpectedReturns
-             │       │              │   ce ┼ PortfolioOptimisersCovariance
-             │       │              │      │   ce ┼ Covariance
-             │       │              │      │      │    me ┼ SimpleExpectedReturns
-             │       │              │      │      │       │   w ┴ nothing
-             │       │              │      │      │    ce ┼ GeneralCovariance
-             │       │              │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-             │       │              │      │      │       │    w ┴ nothing
-             │       │              │      │      │   alg ┼ FullMoment()
-             │       │              │      │      │     w ┴ nothing
-             │       │              │      │   mp ┼ MatrixProcessing
-             │       │              │      │      │     pdm ┼ Posdef
-             │       │              │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │              │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │              │      │      │      dn ┼ nothing
-             │       │              │      │      │      dt ┼ nothing
-             │       │              │      │      │     alg ┼ nothing
-             │       │              │      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │       │              │    w ┼ nothing
-             │       │              │    l ┴ Int64: 1
-             │       │      horizon ┼ nothing
-             │       │   fill_limit ┴ nothing
-             │    mp ┼ MatrixProcessing
-             │       │     pdm ┼ Posdef
-             │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-             │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │       │      dn ┼ nothing
-             │       │      dt ┼ nothing
-             │       │     alg ┼ nothing
-             │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-             │    re ┼ StepwiseRegression
-             │       │   crit ┼ PValue
-             │       │        │   t ┴ Float64: 0.05
-             │       │    alg ┼ ForwardSelection()
-             │       │    tgt ┼ LinearModel
-             │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-             │    ve ┼ SimpleVariance
-             │       │          me ┼ SimpleExpectedReturns
-             │       │             │   w ┴ nothing
-             │       │           w ┼ nothing
-             │       │   corrected ┴ Bool: true
-             │   rsd ┴ Bool: true
+             │         pe ┼ EmpiricalPrior
+             │            │           ce ┼ PortfolioOptimisersCovariance
+             │            │              │   ce ┼ Covariance
+             │            │              │      │    me ┼ SimpleExpectedReturns
+             │            │              │      │       │   w ┴ nothing
+             │            │              │      │    ce ┼ GeneralCovariance
+             │            │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │            │              │      │       │    w ┴ nothing
+             │            │              │      │   alg ┼ FullMoment()
+             │            │              │      │     w ┴ nothing
+             │            │              │   mp ┼ MatrixProcessing
+             │            │              │      │     pdm ┼ Posdef
+             │            │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │              │      │      dn ┼ nothing
+             │            │              │      │      dt ┼ nothing
+             │            │              │      │     alg ┼ nothing
+             │            │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │            │           me ┼ EquilibriumExpectedReturns
+             │            │              │   ce ┼ PortfolioOptimisersCovariance
+             │            │              │      │   ce ┼ Covariance
+             │            │              │      │      │    me ┼ SimpleExpectedReturns
+             │            │              │      │      │       │   w ┴ nothing
+             │            │              │      │      │    ce ┼ GeneralCovariance
+             │            │              │      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+             │            │              │      │      │       │    w ┴ nothing
+             │            │              │      │      │   alg ┼ FullMoment()
+             │            │              │      │      │     w ┴ nothing
+             │            │              │      │   mp ┼ MatrixProcessing
+             │            │              │      │      │     pdm ┼ Posdef
+             │            │              │      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │              │      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │              │      │      │      dn ┼ nothing
+             │            │              │      │      │      dt ┼ nothing
+             │            │              │      │      │     alg ┼ nothing
+             │            │              │      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │            │              │    w ┼ nothing
+             │            │              │    l ┴ Int64: 1
+             │            │      horizon ┼ nothing
+             │            │   fill_limit ┼ nothing
+             │            │        x_src ┴ nothing
+             │         mp ┼ MatrixProcessing
+             │            │     pdm ┼ Posdef
+             │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+             │            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │      dn ┼ nothing
+             │            │      dt ┼ nothing
+             │            │     alg ┼ nothing
+             │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+             │         re ┼ StepwiseRegression
+             │            │       crit ┼ PValue
+             │            │            │   t ┴ Float64: 0.05
+             │            │        alg ┼ ForwardSelection()
+             │            │        tgt ┼ LinearModel
+             │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │            │     choice ┼ BatchChoice()
+             │            │   included ┼ nothing
+             │            │      x_src ┴ nothing
+             │         ve ┼ SimpleVariance
+             │            │          me ┼ SimpleExpectedReturns
+             │            │             │   w ┴ nothing
+             │            │           w ┼ nothing
+             │            │   corrected ┴ Bool: true
+             │        rsd ┼ Bool: true
+             │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+             │      x_src ┴ nothing
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -178,7 +187,8 @@ BayesianBlackLittermanPrior
              │     dict ┴ Dict{String, Vector{String}}: Dict("nf" => ["F1", "F2"], "nx" => ["A", "B", "C"])
   views_conf ┼ nothing
           rf ┼ Float64: 0.0
-         tau ┴ nothing
+         tau ┼ nothing
+       x_src ┴ nothing
 ```
 
 ## The incremental fit
@@ -241,20 +251,25 @@ This prior has no exact incremental recursion, so it takes the online step by **
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function BayesianBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_F_AF,
                                          f_mp::AbstractMatrixProcessingEstimator,
                                          mp::AbstractMatrixProcessingEstimator,
                                          views::Lc_BLV, sets::Option{<:UniverseSets},
                                          views_conf::Option{<:Num_VecNum}, rf::Number,
                                          tau::Option{<:Number},
-                                         cache::Option{<:AbstractPartialFitState})
+                                         cache::Option{<:AbstractPartialFitState},
+                                         x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :BayesianBlackLittermanPrior)
+        assert_inner_reader(pe, :pe, :BayesianBlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(views), typeof(sets),
-                   typeof(views_conf), typeof(rf), typeof(tau), typeof(cache)}(pe, f_mp, mp,
-                                                                               views, sets,
-                                                                               views_conf,
-                                                                               rf, tau,
-                                                                               cache)
+                   typeof(views_conf), typeof(rf), typeof(tau), typeof(cache),
+                   typeof(x_src)}(pe, f_mp, mp, views, sets, views_conf, rf, tau, cache,
+                                  x_src)
     end
 end
 function BayesianBlackLittermanPrior(;
@@ -266,9 +281,10 @@ function BayesianBlackLittermanPrior(;
                                      views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
                                      views_conf::Option{<:Num_VecNum} = nothing,
                                      rf::Number = 0.0, tau::Option{<:Number} = nothing,
-                                     cache::Option{<:AbstractPartialFitState} = nothing)::BayesianBlackLittermanPrior
+                                     cache::Option{<:AbstractPartialFitState} = nothing,
+                                     x_src::Option{<:AbstractReturnsSource} = nothing)::BayesianBlackLittermanPrior
     return BayesianBlackLittermanPrior(pe, f_mp, mp, views, sets, views_conf, rf, tau,
-                                       cache)
+                                       cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -292,7 +308,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::BayesianBlackLittermanPrior)
-    return (:pe, :f_mp, :mp, :views, :sets, :views_conf, :rf, :tau)
+    return (:pe, :f_mp, :mp, :views, :sets, :views_conf, :rf, :tau, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -368,8 +384,8 @@ The width of ``\\mathbf{P}`` is enforced rather than assumed: a precomputed [`Bl
 # Algorithm
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
- 2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
- 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`, and check it carries a regression with [`assert_prior_regression`](@ref).
+ 2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref), through [`assert_bbl_views_axis`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
+ 3. Fit the wrapped prior `pe.pe` on `(X, F)`, giving `prior_result`. [`bbl_posterior`](@ref) runs the steps 3 to 16 on it, so the refit of [`scenario_prior`](@ref) under new scenario weights blends the views into a refit `prior_result` with the same code. Check that `prior_result` carries a regression with [`assert_prior_regression`](@ref).
  4. Derive the Investable Mask with [`investable_mask`](@ref) and view the fitted prior at it with [`investable_prior`](@ref). The mask alone, and not [`investable_views`](@ref): the views land on the factors, so there is no Non-Investable Axis to mint and no asset universe this member otherwise reads.
  5. Read `posterior_X`, `prior_sigma`, `fpr` and `rr` off the *reduced* prior, and refuse a `rr` that states a re-based Factor Family through [`has_family_rebasis`](@ref).
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over the **factor** prior covariance and `size(F, 1)` observations, and read `P`, `Q` and `omega` off the result with [`bl_view_block`](@ref). The axis is `:tfkey`, because these views land on the factors. A view set with no row left gives a `0 × K` block, and the steps below then answer the moments this member's factor model implies — see the note under `bl_view_block`, and note that it is *not* the wrapped prior.
@@ -420,6 +436,36 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
                kwargs...)
     X, F = dims_oriented(dims, X, F)
+    assert_bbl_views_axis(pe, F)
+    prior_result = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    return bbl_posterior(pe, prior_result, F, strict; kwargs...)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Refuses a [`BayesianBlackLittermanPrior`](@ref) whose factor universe does not describe the factor returns.
+
+The fit and the refit of [`scenario_prior`](@ref) both run this check before they fit the wrapped prior.
+
+# Arguments
+
+  - `pe`: Bayesian Black-Litterman prior estimator.
+  - `F`: Factor returns, `observations × factors`.
+
+# Validation
+
+  - If `pe.views` is a [`LinearConstraintEstimator`](@ref), `haskey(pe.sets.dict, pe.sets.tfkey)` and `length(pe.sets.dict[pe.sets.tfkey]) == size(F, 2)`, both via [`factor_universe`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`assert_bl_views_axis`](@ref)
+"""
+function assert_bbl_views_axis(pe::BayesianBlackLittermanPrior, F::MatNum)
     # The views update the *factor* distribution — the assets are its projection through the
     # loadings — so they resolve against the declared factor axis, not against `xkey`. Only the
     # views that resolve *names* need a universe: a `BlackLittermanViews` result carries its own
@@ -430,7 +476,39 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
                         "BayesianBlackLittermanPrior, whose views are written in factor names",
                         "F")
     end
-    prior_result = prior(pe.pe, X, F, pnl; strict = strict, kwargs...)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Blends the factor views of a [`BayesianBlackLittermanPrior`](@ref) into the result its wrapped prior answered.
+
+Everything the estimator does after the wrapped prior has answered, written once: the steps 3 to 16 of the returns-matrix method of [`prior`](@ref). The batch fit reaches it with the result of a fit over the caller's matrices, and the refit of [`scenario_prior`](@ref) reaches it with the result of the refit of the wrapped prior under new scenario weights. Nothing here reads the asset returns, which the result already carries. The factor returns give the observation count of the views and the matrix that processes the factor covariance.
+
+# Arguments
+
+  - `pe`: Bayesian Black-Litterman prior estimator.
+  - `prior_result`: The result of the wrapped prior `pe.pe`.
+  - `F`: Factor returns, `observations × factors`.
+  - `strict`: If `true`, enforce strict validation of views and sets.
+  - `kwargs...`: Additional keyword arguments passed to matrix processing.
+
+# Validation
+
+  - The rules of the returns-matrix method of [`prior`](@ref), from step 3 on.
+
+# Returns
+
+  - `pr::LowOrderPrior`: As the returns-matrix method of [`prior`](@ref) states it.
+
+# Related
+
+  - [`BayesianBlackLittermanPrior`](@ref)
+  - [`bl_posterior`](@ref)
+  - [`scenario_prior`](@ref)
+"""
+function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPriorResult,
+                       F::MatNum, strict::Bool; kwargs...)
     assert_prior_regression(prior_result, :pe)
     # The reduction, once, at this estimator's entry. The views land on the *factors*, so the
     # view axis is untouched by a departure and no view row can be dropped for one — which is
@@ -449,7 +527,7 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     # image of a smaller one, so a covariance on that axis is singular by construction.
     #
     # The inversion RAISES NOTHING on such a matrix. Measured on the fixture of
-    # `test/test_12i_cross_sectional_factor_carrier.jl`: the solve returns entries of order
+    # `test/test_12i_cross_sectional_factor_rr_slot.jl`: the solve returns entries of order
     # `1e18` and the update carries on to a posterior whose scale looks like the prior's, so
     # a caller reading the result sees no sign that it is meaningless. That is what the
     # refusal is for, and it is why the refusal reads the result's own statement rather than
@@ -488,9 +566,10 @@ function prior(pe::BayesianBlackLittermanPrior, X::MatNum, F::MatNum,
     posterior_mu = apply_rf(pe.rf, posterior_sigma * v1 * (v2 \ sigma_hat) * mu_hat + b)
     # The views land on the *factors*, so `mu_hat` and `sigma_hat` are the posterior factor
     # moments — `sigma_hat` is a precision (`inv(f_sigma) + P'Ω⁻¹P`), so the covariance is its
-    # inverse. Reporting them rather than the prior ones is what makes this carrier internally
-    # consistent: `mu == rr.M * fpr.mu + rr.b` holds exactly afterwards, where forwarding the
-    # prior block left the asset and factor halves describing different distributions.
+    # inverse. Reporting them rather than the prior ones is what makes this prior result
+    # internally consistent: `mu == rr.M * fpr.mu + rr.b` holds exactly afterwards, where
+    # forwarding the prior block left the asset and factor halves describing different
+    # distributions.
     # `pe.f_mp` processes the factor block for the same reason `pe.mp` processes the asset one,
     # and is separate for the same reason `FactorBlackLittermanPrior` keeps the two apart.
     f_posterior_sigma = sigma_hat \ LinearAlgebra.I

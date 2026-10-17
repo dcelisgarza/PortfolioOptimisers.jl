@@ -185,6 +185,6 @@ dead row only lowers, and ADR 0073 already lets a refresh lower by default.
 **The JET baseline triples to about 588 rows.** That is the price of one expected set per run, and
 it is accepted for the same reason ADR 0073 accepted 128 rows of zeros.
 
-**The vocabulary stays out of `CONTEXT.md`**, for the reason ADRs 0071, 0072 and 0073 all gave.
+**The vocabulary stays out of `GLOSSARY.md`**, for the reason ADRs 0071, 0072 and 0073 all gave.
 That file's preamble scopes it to the library's domain, and a baseline row set is repository
 process.

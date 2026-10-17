@@ -565,9 +565,9 @@ end
 """
     assert_search_entry(est, cv)
 
-Refuse an estimator that is not the configuration alone at the door of a search, once, before any candidate is built.
+Refuse an estimator that is not the configuration alone at the entry to a search, once, before any candidate is built.
 
-A search scores every candidate through the one fold loop, and a lens is applied before that loop's warm-up, so a cold estimator seeds one state per candidate and nothing is shared or reset. A warm one is refused by name here rather than inside the candidate loop, where the workers of `gscv.ex` would raise it up to once per candidate. Under a plain scheme the walk is [`online_entry_state`](@ref), because a search tunes the configuration alone whatever the scheme does with it; under an Online Scheme it is the whole [`assert_online_entry`](@ref), so a schedule on a stateful field is refused at the door too.
+A search scores every candidate through the one fold loop, and a lens is applied before that loop's warm-up, so a cold estimator seeds one state per candidate and nothing is shared or reset. A warm one is refused here, with an error that names the field, rather than inside the candidate loop, where the workers of `gscv.ex` would raise it up to once per candidate. Under a plain scheme the walk is [`online_entry_state`](@ref), because a search tunes the configuration alone whatever the scheme does with it; under an Online Scheme it is the whole [`assert_online_entry`](@ref), so a schedule on a stateful field is refused at the entry too.
 
 # Arguments
 
@@ -627,7 +627,7 @@ end
 
 Run the entry checks of [`cross_val_predict`](@ref) on every candidate of a search, before any candidate is scored.
 
-A search scores each candidate through the fold loop directly, so the checks the one-shot door runs must run here. They run on each candidate and not on `opt` alone, because a lens can write a value the checks refuse, such as a precomputed prior, and it can also replace one.
+A search scores each candidate through the fold loop directly, so the checks that the one-shot `cross_val_predict` runs at its entry must run here. They run on each candidate and not on `opt` alone, because a lens can write a value the checks refuse, such as a precomputed prior, and it can also replace one.
 
 # Arguments
 
@@ -723,9 +723,9 @@ end
 
 View out of `rd` the returns that fold `k` of `cv` was fitted on.
 
-The rows are the fold's own `train_idx`. The columns are every asset, except under a [`MultipleRandomised`](@ref), whose folds each run on a drawn subset of the universe and which records that subset on `asset_idx`. So the view is the returns the fold's own `optimise` call was handed, which is what an optimiser that keeps its carrier stores on the result's `pr`: measured over the eleven schemes the library ships, `res.pr.X` of a fold equals this view element for element.
+The rows are the fold's own `train_idx`. The columns are every asset, except under a [`MultipleRandomised`](@ref), whose folds each run on a drawn subset of the universe and which records that subset on `asset_idx`. So the view is the returns the fold's own `optimise` call was handed, which is what an optimiser that keeps its prior result stores on the result's `pr`: measured over the eleven schemes the library ships, `res.pr.X` of a fold equals this view element for element.
 
-[`candidate_train_score`](@ref) reads it, and only for a result that carries no carrier of its own.
+[`candidate_train_score`](@ref) reads it, and only for a result that holds no prior result of its own.
 
 # Arguments
 
@@ -756,11 +756,11 @@ end
 
 Score a fold's fitted result over its own training sample.
 
-A result that carries a carrier is scored through it, so the figure resolves the measure exactly as the fit did: an unstated slot falls back to the carrier's own field, and a **Deferred Quantity** is fitted. This is the call the search has always made, and it is kept for every such result, because a bare matrix would opt out of that resolution and would refuse a measure like [`Variance`](@ref) whose `sigma` the carrier fills.
+A result that holds a prior result is scored through it, so the figure resolves the measure exactly as the fit did: an unstated slot falls back to the prior result's own field, and a **Deferred Quantity** is fitted. This is the call the search has always made, and it is kept for every such result, because a bare matrix would opt out of that resolution and would refuse a measure like [`Variance`](@ref) whose `sigma` the prior result fills.
 
 A result that carries **none** is scored over `X`, the fold's own training returns from [`fold_train_returns`](@ref). Before this the fallback yielded `nothing` and the call raised a `MethodError`, so no such result could be scored at all — which is every optimiser whose fit reads no returns to keep, the online portfolio selection family first among them.
 
-`X` is `nothing` where the search holds no trustworthy window, which today is the [`Pipeline`](@ref)'s own search alone: its steps transform the data per fold, so the returns the optimiser was handed are not the returns the split names, and a selector narrows the universe by a rule the split does not record. That arm therefore scores through the carrier whatever the result holds, which is what every arm did before, and a carrier-free result under a Pipeline still meets the refusal.
+`X` is `nothing` where the search holds no trustworthy window, which today is the [`Pipeline`](@ref)'s own search alone: its steps transform the data per fold, so the returns the optimiser was handed are not the returns the split names, and a selector narrows the universe by a rule the split does not record. That arm therefore scores through the prior result whatever the result holds, which is what every arm did before, and a result with no prior result under a Pipeline still meets the refusal.
 
 A result that exposes no `pr` property at all keeps the refusal [`extract_pr`](@ref) already gave it.
 

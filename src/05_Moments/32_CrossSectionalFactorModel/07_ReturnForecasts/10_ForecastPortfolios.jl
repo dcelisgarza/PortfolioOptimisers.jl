@@ -243,14 +243,14 @@ Build the weights of the long-short portfolio that a Return Forecast states by i
 
 The portfolio holds the forecast and nothing else. It reads no covariance, no constraint and no solver, so its return measures what the ordering of the forecast is worth. `kind` chooses what the ordering reads. `:rank` reads the rank in the cross-section, which measures the order alone, so one extreme forecast moves the book no more than one ordinary forecast does. `ties` ranks a tie. Under `:average`, equal forecasts take equal weights. Under `:ordinal`, the order of the asset axis gives them different weights. `:zscore` reads the forecast value, so a conviction twice as large takes twice the weight.
 
-[`forecast_centred_weights!`](@ref) centres and rescales both kinds, so both are dollar neutral at 200 % gross. A date with an empty cross-section, one asset or a flat signal holds no book.
+[`forecast_centred_weights!`](@ref) centres and rescales both kinds, so both are dollar neutral at 200 % gross. A date with one asset or a flat signal holds no book, because the forecast states no spread there. A date with an empty cross-section carries the book of the date before it, because the forecast states nothing there at all, so the date is no rebalance. The turnover out of it then reads the trade between the two books around it, and the date is in no statistic of the book, as a date that is not scorable must be.
 
 This builder reads no threshold. A date whose cross-section is smaller than the `min_count` of an evaluation still gets its book, and [`forecast_portfolio`](@ref) decides which dates it scores.
 
 # Algorithm
 
  1. Allocate `w`, one row per evaluation date and one column per asset, and fill it with zeros.
- 2. For each date, mark its cross-section with [`forecast_cross_section!`](@ref), giving `valid`, `key` and the count `n`. An empty cross-section leaves the row at zero.
+ 2. For each date, mark its cross-section with [`forecast_cross_section!`](@ref), giving `valid`, `key` and the count `n`. An empty cross-section copies the row of the date before it, and leaves the first row at zero.
  3. Under `:rank`, rank `key` with [`cs_ranks`](@ref) under `ties`, giving the signal `s`. Under `:zscore`, take `key` itself as `s`.
  4. Centre and rescale `s` into row `k` with [`forecast_centred_weights!`](@ref).
 
@@ -306,6 +306,8 @@ function forecast_portfolio_weights(alpha::AbstractMatrix{<:Real},
         if !iszero(n)
             s = kind === :rank ? cs_ranks(key, valid, ties) : key
             forecast_centred_weights!(w, k, s, valid, n)
+        elseif k > 1
+            w[k, :] .= view(w, k - 1, :)
         end
     end
     return w
@@ -317,7 +319,7 @@ Score the long-short portfolio that a Return Forecast states by itself.
 
 The information coefficient states how well the forecast orders the cross-section. This verb states what that ordering earns as a book, which is the reading a caller acts on. The book reads no covariance, no constraint and no solver, so the forecast is the only thing it measures.
 
-The return series is the return of a portfolio, so it gets the whole of [`performance_summary`](@ref) and not only a mean and a volatility. That is a Sharpe ratio and its standard error, a Sortino ratio, a Calmar ratio, a maximum drawdown and a conditional value at risk. `fe.ppy` annualises it, as the `periods_per_year` of that verb.
+The return series is the return of a portfolio, so it gets the whole of [`performance_summary`](@ref) and not only a mean and a volatility. That is a Sharpe ratio and its standard error, a Sortino ratio, a Calmar ratio, a maximum drawdown and a conditional value at risk. `fe.ppy` annualises it, as the `ppy` of that verb.
 
 # Mathematical definition
 
@@ -351,7 +353,7 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
  1. Build the weights of every evaluation date with [`forecast_portfolio_weights`](@ref) under `fe.ties`, giving `w`.
  2. For each date, contract its weights with its target over the assets that carry both a finite forecast and a finite target, giving `ret`. A date with fewer than `fe.min_count` such assets gets a `NaN` instead.
  3. Take the turnover of `w` with [`calc_turnover`](@ref), and write a `NaN` into every date whose return is a `NaN`, so the two series read the same dates.
- 4. Drop the gaps of `ret` and summarise the remainder with [`performance_summary`](@ref) at `periods_per_year = fe.ppy`.
+ 4. Drop the gaps of `ret` and summarise the remainder with [`performance_summary`](@ref) at `ppy = fe.ppy`.
  5. Read the hit rate of `ret` with [`forecast_hit_rate`](@ref), and the mean of the finite entries of the turnover.
 
 # Arguments
@@ -368,7 +370,7 @@ The book of a gap date stays in `w`, because [`forecast_portfolio_weights`](@ref
 
   - `portfolio::NamedTuple`: `(; w, ret, turnover, summary, hit_rate, mean_turnover)`.
 
-      + `w::MatNum`: Portfolio weights, `evaluation dates × assets`. A date below `fe.min_count` keeps its book.
+      + `w::MatNum`: Portfolio weights, `evaluation dates × assets`. A date below `fe.min_count` keeps its book, and a date with no scorable asset carries the book of the date before it.
       + `ret::VecNum`: Portfolio target return, one entry per evaluation date, `NaN` below `fe.min_count`.
       + `turnover::VecNum`: Turnover, one entry per evaluation date, `NaN` at the first and wherever `ret` is.
       + `summary::PerformanceSummaryResult`: The summary of `ret` with its gaps dropped.
@@ -410,7 +412,7 @@ function forecast_portfolio(fe::ForecastEvaluationResult; kind::Symbol = :rank)
     turnover[.!isfinite.(ret)] .= Tf(NaN)
     ftn = turnover[isfinite.(turnover)]
     return (; w = w, ret = ret, turnover = turnover,
-            summary = performance_summary(ret[isfinite.(ret)]; periods_per_year = ppy),
+            summary = performance_summary(ret[isfinite.(ret)]; ppy = ppy),
             hit_rate = forecast_hit_rate(ret),
             mean_turnover = isempty(ftn) ? Tf(NaN) : sum(ftn) / length(ftn))
 end

@@ -169,7 +169,7 @@ instead of dropping it.
 - ADR 0157 is rewritten in place at its state table row for `X`, its fill section and the
   consequence lines that name the fill; ADR 0162 at its buffer section; ADR 0158 at its sentence
   on the rows a folding forecaster needs.
-- `CONTEXT.md`'s *Rule State* and *Online Update* entries say the buffer keeps the `NaN` and the
+- `GLOSSARY.md`'s *Rule State* and *Online Update* entries say the buffer keeps the `NaN` and the
   mask, the step reads a gap as cash, and a statistic over the rows reduces to its Coverage
   Universe.
 - `test/test_67f_family_verification.jl`'s time-varying block loses the `@test_throws` on the

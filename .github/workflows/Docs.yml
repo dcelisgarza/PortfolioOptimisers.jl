@@ -11,17 +11,26 @@ on:
     branches:
       - main
       - dev*
-    types: [opened, synchronize, reopened]
+    # A pull request deploys a preview under `previews/PR<number>` only when it carries the label
+    # `docs-preview` (#1722). Each preview is a full build of about 0.26 GiB, and GitHub Pages refuses
+    # a site above 10 GiB. `labeled` builds the preview when the label is added after the push.
+    types: [opened, synchronize, reopened, labeled]
 
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
-  group: ${{ github.workflow }}-${{ github.ref }}
+  #
+  # Any other label starts a run that skips every job. It takes a group of its own, so it does not
+  # cancel the build of the pull request that is in progress. `DocPreviewCleanup.yml` names the
+  # group `Docs-<ref>` to cancel a preview build when the pull request closes, so keep that name.
+  group: >-
+    ${{ github.event.action == 'labeled' && github.event.label.name != 'docs-preview' && format('{0}-{1}', github.workflow, github.run_id) || format('{0}-{1}', github.workflow, github.ref) }}
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
   docs:
     name: Documentation
+    if: github.event.action != 'labeled' || github.event.label.name == 'docs-preview'
     runs-on: ubuntu-latest
     # The two jobs need different scopes, so each declares its own. This one deploys: it pushes
     # `gh-pages`, reads the pull request it previews, and reports the preview as a status. These
@@ -45,12 +54,16 @@ jobs:
       - name: Generate and deploy documentation
         run: julia --color=yes --project=docs docs/make.jl
         env:
+          # `true` only on a pull request with the label. `docs/make.jl` reads it as `push_preview`.
+          DOCS_PREVIEW: ${{ contains(github.event.pull_request.labels.*.name, 'docs-preview') }}
           JULIA_PKG_SERVER: ""
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
           GKSwstype: "100" # https://discourse.julialang.org/t/generation-of-documentation-fails-qt-qpa-xcb-could-not-connect-to-display/60988
   doctest:
     name: Doctests
+    # The `docs-preview` label cancels the run of the same commit, doctests included, so run them again.
+    if: github.event.action != 'labeled' || github.event.label.name == 'docs-preview'
     runs-on: ubuntu-latest
     # This job runs `doctest` and deploys nothing.
     permissions:

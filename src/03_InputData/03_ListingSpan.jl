@@ -5,7 +5,7 @@ Stores the listing interval of each asset as two integers and reads it as a matr
 
 `ListingSpan` holds the **Listing Span** of each asset, the interval of the price clock from the first priced observation of the asset to its last. `size` answers `(observations, assets)`, and `getindex(s, t, i)` answers `first[i] <= t <= last[i]`, so every reader sees an ordinary `AbstractMatrix{Bool}`. The type holds two integers per asset in place of one boolean per cell. The compression is exact, because the **Span Rule** keeps an interior gap inside the listing, so the active set of an asset is one interval. A column that is a gap throughout takes the empty interval, `first[i] > last[i]`.
 
-The type is unexported. It owns `size`, `getindex`, `IndexStyle` and `show`. [`PortfolioOptimisers.project_span`](@ref) and [`PortfolioOptimisers.span_carrier_view`](@ref) carry a library-internal fast path for it, which keeps the two integers per asset through a projection and through a window. A caller writes against the public bound, `AbstractMatrix{Bool}`, and a caller's own declaration, such as a listing calendar or a constituency that leaves and joins again, enters under that bound.
+The type is unexported. It owns `size`, `getindex`, `IndexStyle` and `show`. [`PortfolioOptimisers.project_span`](@ref) and [`PortfolioOptimisers.listing_span_view`](@ref) carry a library-internal fast path for it, which keeps the two integers per asset through a projection and through a window. A caller writes against the public bound, `AbstractMatrix{Bool}`, and a caller's own declaration, such as a listing calendar or a constituency that leaves and joins again, enters under that bound.
 
 # Mathematical definition
 
@@ -52,7 +52,7 @@ ListingSpan(3 × 2)
   - [`listing_span`](@ref)
   - [`universe_masks`](@ref)
   - [`PortfolioOptimisers.project_span`](@ref)
-  - [`PortfolioOptimisers.span_carrier_view`](@ref): cuts a span to a window of its clock and keeps the two integers per asset.
+  - [`PortfolioOptimisers.listing_span_view`](@ref): cuts a span to a window of its clock and keeps the two integers per asset.
 """
 struct ListingSpan <: AbstractMatrix{Bool}
     """

@@ -61,7 +61,7 @@ end
 
 Declare the Non-Investable Axis on the [`UniverseSets`](@ref) that an optimisation estimator carries.
 
-A door calls this **after** it has viewed the estimator, and no other code calls it. An axis declared before the view would not survive it: [`port_opt_view`](@ref)`(::UniverseSets, i)` drops the axis, so that a cluster of a nested optimisation does not inherit the departures of its parent and charge each of them again. So the door reads the departed names off the *unreduced* returns data, takes the view, and declares the axis on the viewed estimator.
+[`investable_reduction`](@ref) and [`coverage_reduction`](@ref) call this **after** they have viewed the estimator, and no other code calls it. An axis declared before the view would not survive it: [`port_opt_view`](@ref)`(::UniverseSets, i)` drops the axis, so that a cluster of a nested optimisation does not inherit the departures of its parent and charge each of them again. So each of the two reads the departed names off the *unreduced* returns data, takes the view, and declares the axis on the viewed estimator.
 
 The generic method returns `opt` unchanged. That is correct for every estimator that carries no sets, because it has no axis to declare. A head that owns a `sets` field writes one method beside its own [`port_opt_view`](@ref), and a head that reaches one through a nested optimiser forwards to the method of that optimiser. Each method is one line, and it is written per type rather than derived by reflection, for the same reason as [`port_opt_view`](@ref): the type states what its field means.
 
@@ -143,13 +143,32 @@ function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
                               opt::AbstractOptimisationEstimator, rd::ReturnsResult)
     idx = findall(imsk)
     # Read the departed names before the view, declare them after it: the view drops the
-    # Non-Investable Axis, so this door is the one place a name-keyed constraint stated
+    # Non-Investable Axis, so this function is the one place a name-keyed constraint stated
     # for an asset that left can still be resolved.
     ni = non_investable_names(rd.nx, imsk)
     announce_non_investable(ni)
     return imsk, port_opt_view(pr, idx),
            non_investable_universe(port_opt_view(opt, idx, pr.X), ni),
            port_opt_view(rd, idx)
+end
+# The estimators that hold a distance estimator, each forwarded to the estimator it holds, so
+# that `feature_readable_mask` finds each `FeatureDistance` of a fit. They load after the
+# distance estimators, so their methods live here, beside the reduction that reads them.
+function feature_readable_mask(x::Union{<:ClustersEstimator, <:NetworkEstimator},
+                               imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.de, imsk, rd)
+end
+function feature_readable_mask(x::NetworkClustersEstimator, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.nte, imsk, rd)
+end
+function feature_readable_mask(x::Union{<:CentralityEstimator,
+                                        <:SemiDefinitePhylogenyEstimator,
+                                        <:IntegerPhylogenyEstimator},
+                               imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.pl, imsk, rd)
+end
+function feature_readable_mask(x::CentralityConstraint, imsk::Option{<:BitVector}, rd)
+    return feature_readable_mask(x.A, imsk, rd)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -200,9 +219,9 @@ end
 function coverage_reduction(cmsk::BitVector, opt::AbstractOptimisationEstimator,
                             rd::ReturnsResult)
     idx = findall(cmsk)
-    # A door is a door: the Coverage Universe and the Investable Mask are the same object
-    # downstream, so a prior-free head declares the Non-Investable Axis exactly as a
-    # prior-fitting one does, and a departure behaves the same in every family.
+    # As in `investable_reduction`: the Coverage Universe and the Investable Mask are the
+    # same object downstream, so a prior-free head declares the Non-Investable Axis exactly
+    # as a prior-fitting one does, and a departure behaves the same in every family.
     ni = non_investable_names(rd.nx, cmsk)
     announce_non_investable(ni)
     return cmsk, non_investable_universe(port_opt_view(opt, idx, rd.X), ni),
@@ -339,6 +358,52 @@ function _optimise(res::OptimisationResult, args...; kwargs...)
     return res
 end
 """
+    shared_series_solve(opt, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult
+    shared_series_solve(opt, args...; kwargs...) -> OptimisationResult
+
+Solve `opt` once on the observations that it keeps after a Shared Series gap, and record the cut on the prior that the solve fits.
+
+Every reader inside a solve pairs the observations of the Prior Result with the observations of the returns data: the outer problem of a meta-optimiser, the implied volatilities of an [`ImpliedVolatility`](@ref), the probabilities of a scenario. So the drop happens once, before the solve, and every reader sees the same observations. Each attempt of the fallback chain drops by its own rule, because a fallback is a head with its own group and prior.
+
+The prior that the solve fits then sees no gap, and it counts its rows among the kept observations. So the function maps that prior back to the observations of `rd` with [`shared_series_record`](@ref): its marks `ss_gaps`, and the row key of its factor model block. The prior of the result then states the same rows as `prior(pe, rd)` states for the same prior estimator. A prior that is already a result keeps its own record, see [`fits_prior`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`ReturnsResult`](@ref) first: find the kept observations with [`optimiser_shared_series_rows`](@ref), which reads the group of `opt` and its prior, see [`group_source`](@ref). Solve `opt` with [`_optimise`](@ref) on the cut of [`optimiser_shared_series_view`](@ref). When the cut dropped an observation and the solve fitted its prior, replace the prior of the result with its record, through [`set_result_prior`](@ref).
+ 2. Any other data: solve `opt` with `_optimise` on it unchanged.
+
+# Arguments
+
+  - `opt`: The estimator of the attempt, or a precomputed result.
+  - $(arg_dict[:optargs])
+  - `kwargs...`: The keyword arguments of [`_optimise`](@ref), passed on unchanged.
+
+# Returns
+
+  - `res::OptimisationResult`: The result of the solve.
+
+# Related
+
+  - [`optimise`](@ref)
+  - [`optimiser_shared_series_rows`](@ref)
+  - [`optimiser_shared_series_view`](@ref)
+  - [`shared_series_record`](@ref)
+  - [`set_result_prior`](@ref)
+"""
+function shared_series_solve(opt, rd::ReturnsResult, args...; kwargs...)
+    rows = optimiser_shared_series_rows(rd, opt)
+    res = _optimise(opt, optimiser_shared_series_view(rd, opt, rows), args...; kwargs...)
+    if isnothing(rows) || !fits_prior(opt)
+        return res
+    end
+    return set_result_prior(res, shared_series_record(res.pr, rows, size(rd.X, 1)))
+end
+function shared_series_solve(opt, args...; kwargs...)
+    return _optimise(opt, args...; kwargs...)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Solve an optimisation estimator, and walk its fallback chain when a solve fails.
@@ -347,13 +412,13 @@ The answer is the first attempt that succeeds, or the last failure when every at
 
 This is a fold-less entry point, so a time-dependent schedule has no fold to select an entry from. The estimator is reset to its fold-less values before the solve (see [`reset_time_dependent_estimator`](@ref)). A scheduled fallback resets to its `default`, or to `nothing` when it has none, *before* the chain is walked. Inside a fold loop the reset changes nothing, because the loop resolves every schedule before it optimises.
 
-It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) anywhere in the tree of the estimator before any solve. The wrapper resolves only at the warm-up of the online arm of the fold loop, and a plain `optimise` runs no warm-up. The read-out of a stepped estimator, `optimise(opt)`, never meets this refusal, because the warm-up that seeded its buffer replaced the wrapper.
+It is a batch fit, so [`assert_batch_entry`](@ref) refuses an [`Online`](@ref) anywhere in the tree of the estimator before any solve. The wrapper resolves only at the warm-up of the online arm of the fold loop, and a plain `optimise` runs no warm-up. The call `optimise(opt)` with no data on a stepped estimator never meets this refusal, because the warm-up that seeded its buffer replaced the wrapper.
 
 # Algorithm
 
  1. Refuse an [`Online`](@ref) in the tree of `opt` with [`assert_batch_entry`](@ref).
  2. Reset every time-dependent schedule of `opt` to its fold-less value with [`reset_time_dependent_estimator`](@ref), giving `current_opt`.
- 3. Solve `current_opt` with [`_optimise`](@ref), giving `res`. A precomputed result gives itself.
+ 3. Solve `current_opt` with [`shared_series_solve`](@ref), which drops the observations of a Shared Series gap that `current_opt` reads before [`_optimise`](@ref) runs, giving `res`. A precomputed result gives itself.
  4. Stop when `res.retcode` is an [`OptimisationSuccess`](@ref), when `current_opt` is a precomputed result, or when `current_opt.fb` is `nothing`.
  5. Otherwise record `(current_opt, res)` in the chain `fb`, take `current_opt.fb` as the new `current_opt`, warn that the fallback runs, and return to step 3.
  6. Return `res` when `fb` is empty. Otherwise return `res` rebuilt with `fb` through [`factory`](@ref).
@@ -383,7 +448,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
     assert_batch_entry(opt, "`optimise`")
     fb = Tuple{OptimisationEstimator, OptimisationResult}[]
     current_opt = reset_time_dependent_estimator(opt)
-    res = _optimise(current_opt, args...; kwargs...)
+    res = shared_series_solve(current_opt, args...; kwargs...)
     # A precomputed result answers itself and ends the chain: its own `fb` records how it
     # was answered, and is not a fallback to walk on to.
     while !isa(res.retcode, OptimisationSuccess) &&
@@ -392,7 +457,7 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
         push!(fb, (current_opt, res))
         current_opt = current_opt.fb
         @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
-        res = _optimise(current_opt, args...; kwargs...)
+        res = shared_series_solve(current_opt, args...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)
 end

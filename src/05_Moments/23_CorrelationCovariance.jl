@@ -12,7 +12,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     CorrelationCovariance(;
-        ce::StatsBase.CovarianceEstimator = Covariance()
+        ce::StatsBase.CovarianceEstimator = Covariance(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> CorrelationCovariance
 
 Keywords correspond to the struct's fields.
@@ -22,12 +23,14 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ce`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -56,14 +59,41 @@ CorrelationCovariance
     $(field_dict[:ce])
     """
     @fprop @vprop ce
-    function CorrelationCovariance(ce::StatsBase.CovarianceEstimator)
-        return new{typeof(ce)}(ce)
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
+    function CorrelationCovariance(ce::StatsBase.CovarianceEstimator,
+                                   cache::Option{<:AbstractPartialFitState})
+        return new{typeof(ce), typeof(cache)}(ce, cache)
     end
 end
-function CorrelationCovariance(;
-                               ce::StatsBase.CovarianceEstimator = Covariance())::CorrelationCovariance
-    return CorrelationCovariance(ce)
+function CorrelationCovariance(; ce::StatsBase.CovarianceEstimator = Covariance(),
+                               cache::Option{<:AbstractPartialFitState} = nothing)::CorrelationCovariance
+    return CorrelationCovariance(ce, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`CorrelationCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:CorrelationCovariance, true)` to render it.
+
+# Arguments
+
+  - `::CorrelationCovariance`: Correlation covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ce,)`.
+
+# Related
+
+  - [`CorrelationCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::CorrelationCovariance) = (:ce,)
 """
     Statistics.cov(ce::CorrelationCovariance, X::MatNum; dims::Int = 1,
                    kwargs...)

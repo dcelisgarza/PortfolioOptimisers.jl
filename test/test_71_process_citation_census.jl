@@ -11,7 +11,7 @@
     user-guide pages. A number that names a ticket means nothing to that reader, and sends
     them to a page that is not part of the package.
 
-    `STANDARDS.md` carried the rule as *none -- unenforced* until this file. Four strips
+    `CODING_STANDARDS.md` carried the rule as *none -- unenforced* until this file. Four strips
     on one branch removed about thirty sites, and six survived them, because a strip is
     a grep run once and a rule with no gate holds by memory alone.
 

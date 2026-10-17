@@ -1,8 +1,8 @@
 ```@meta
-Description = "Return Forecast Base, private API of PortfolioOptimisers.jl: AbstractReturnForecastResult, AbstractForecastUnit, forecast_return_units, …"
+Description = "Base Return Forecast, private API of PortfolioOptimisers.jl: AbstractReturnForecastResult, AbstractForecastUnit, forecast_return_units, …"
 ```
 
-# Return Forecast Base: private API
+# Base Return Forecast: private API
 
 ## Types
 
@@ -25,4 +25,12 @@ forecast_unit_target
 forecast_idiosyncratic_returns
 forecast_idiosyncratic_variances
 forward_mean_returns
+fits_idiosyncratic_target
+calibrates_orthogonal_part
+folds_forecast_rows
+forecast_target_gap
+estimated_factor_columns
+orthogonal_forecast_member
+orthogonal_forecast_result
+orthogonal_forecast_rescale
 ```

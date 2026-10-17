@@ -1,12 +1,17 @@
 ```@meta
-Description = "Regression, public API of PortfolioOptimisers.jl: AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator, LinearModel, …"
+Description = "Base regression, public API of PortfolioOptimisers.jl: AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEstimator, …"
 ```
 
-# [Regression](@id api-regression)
+# [Base regression](@id api-base-regression)
 
 ```@docs
 AbstractTimeSeriesRegressionEstimator
 AbstractCrossSectionalRegressionEstimator
+AbstractRegressionTarget
+factory(tgt::AbstractRegressionTarget, w::ObsWeights)
+regression_target_weights(tgt::AbstractRegressionTarget)
+regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
+is_basis_invariant
 LinearModel
 GeneralisedLinearModel
 Regression

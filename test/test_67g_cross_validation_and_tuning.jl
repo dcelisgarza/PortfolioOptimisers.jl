@@ -419,4 +419,33 @@ Eight groups:
         end
         @test fit(op).ctx.opt.w == fit(with_sel(), rd).ctx.opt.w
     end
+
+    @testset "9. A fallback that needs rows steps with the head (#1633)" begin
+        # A and B leave the panel at row 30, and the head holds only them, so every fold
+        # from there reads out a failure and the fallback answers.
+        amsk = trues(T, N)
+        amsk[30:end, 1:2] .= false
+        Rg = copy(R)
+        Rg[30:end, 1:2] .= NaN
+        rdg = ReturnsResult(; nx = nx, X = Rg, ts = ts,
+                            pnl = AssetPanel(; amsk = amsk, emsk = amsk))
+        mk(fb) = OPS(; alg = BuyAndHold(), w0 = [0.5, 0.5, 0.0, 0.0], fb = fb)
+        cv = OnlineIndexWalkForward(20, 5)
+        o = cross_val_predict(mk(EqualWeighted()), rdg, cv)
+        b = cross_val_predict(mk(EqualWeighted()), rdg,
+                              IndexWalkForward(20, 5; expand_train = true))
+        @test any(p -> !isnothing(p.res.fb), o.pred)
+        for (po_, pb) in zip(o.pred, b.pred)
+            @test isa(po_.res.retcode, OptimisationSuccess)
+            @test isapprox(po_.res.w, pb.res.w; atol = 1e-14)
+        end
+        # The warm-up resolves a wrapper in the prior of the fallback, and the fallback
+        # then reads the window that the wrapper declares.
+        fbo = InverseVolatility(; pe = Online(EmpiricalPrior(); max_history = 20))
+        @test isnothing(po.online_unreached_path(mk(fbo)))
+        last_fold = cross_val_predict(mk(fbo), rdg, cv).pred[end]
+        tr = (T - 5 - 20 + 1):(T - 5)
+        @test isapprox(last_fold.res.w, optimise(InverseVolatility(), rows(rdg, tr)).w;
+                       atol = 1e-12)
+    end
 end

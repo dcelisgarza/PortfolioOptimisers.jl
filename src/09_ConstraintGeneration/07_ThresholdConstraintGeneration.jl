@@ -220,7 +220,7 @@ Alias for a threshold constraint result or estimator.
 
 Matches either a [`Threshold`](@ref) result or a [`ThresholdEstimator`](@ref). Used internally for dispatch in threshold constraint generation.
 
-The group exists because a caller writes a threshold in either form and an optimiser field must take both: a resolved [`Threshold`](@ref) needs no universe, and a [`ThresholdEstimator`](@ref) resolves against one. [`threshold_constraints`](@ref) is the seam that maps the second onto the first, so a field typed on this alias accepts either and reaches a [`Threshold`](@ref) in one call. It admits neither `nothing` nor a vector; [`VecOptBtE_Bt`](@ref) and [`BtE_Bt_VecOptBtE_Bt`](@ref) widen it in those two directions.
+The group exists because a caller writes a threshold in either form and an optimiser field must take both: a resolved [`Threshold`](@ref) needs no universe, and a [`ThresholdEstimator`](@ref) resolves against one. [`threshold_constraints`](@ref) is the function that maps the second onto the first, so a field typed on this alias accepts either and reaches a [`Threshold`](@ref) in one call. It admits neither `nothing` nor a vector; [`VecOptBtE_Bt`](@ref) and [`BtE_Bt_VecOptBtE_Bt`](@ref) widen it in those two directions.
 
 # Related
 

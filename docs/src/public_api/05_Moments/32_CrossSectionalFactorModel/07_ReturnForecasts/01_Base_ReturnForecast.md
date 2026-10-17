@@ -1,8 +1,8 @@
 ```@meta
-Description = "Return Forecast Base, public API of PortfolioOptimisers.jl: AbstractReturnForecastEstimator, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit, …"
+Description = "Base Return Forecast, public API of PortfolioOptimisers.jl: AbstractReturnForecastEstimator, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit, …"
 ```
 
-# [Return Forecast Base](@id api-return-forecast-base)
+# [Base Return Forecast](@id api-base-return-forecast)
 
 ## Types
 
@@ -10,6 +10,10 @@ Description = "Return Forecast Base, public API of PortfolioOptimisers.jl: Abstr
 AbstractReturnForecastEstimator
 IdiosyncraticReturnUnit
 IdiosyncraticSharpeUnit
+AbstractOrthogonalForecastFit
+ScoreNeutralisation
+OrthogonalPartCalibration
+UnadjustedForecast
 ```
 
 ## Functions

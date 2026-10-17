@@ -32,7 +32,8 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
     rkc = risk_contribution(r, res.w, pr.X)
     v1, m1 = findmin(rkc)
     v2, m2 = findmax(rkc)
-    success = isapprox(v2 / v1, 20; rtol = 1e-4)
+    # 5e-4 on one of the two CI runner hosts, 1e-4 on the other.
+    success = isapprox(v2 / v1, 20; rtol = 5e-4)
     if !success
         find_tol(v2 / v1, 20)
     end

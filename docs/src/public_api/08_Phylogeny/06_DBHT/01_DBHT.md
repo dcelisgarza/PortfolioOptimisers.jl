@@ -1,8 +1,8 @@
 ```@meta
-Description = "Direct Bubble Hierarchical Tree, public API of PortfolioOptimisers.jl: UniqueRoot, EqualRoot, DBHT."
+Description = "DBHT, public API of PortfolioOptimisers.jl: UniqueRoot, EqualRoot, DBHT."
 ```
 
-# Direct Bubble Hierarchical Tree
+# DBHT
 
 ```@docs
 UniqueRoot

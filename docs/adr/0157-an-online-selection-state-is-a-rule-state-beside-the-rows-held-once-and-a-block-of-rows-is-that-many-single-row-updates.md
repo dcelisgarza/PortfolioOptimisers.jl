@@ -190,7 +190,7 @@ beside an allocation that is not, and the family's parallel route is the Causal 
 ## Consequences
 
 - ADR 0155's state paragraph is rewritten in the one sentence named above.
-- `CONTEXT.md` gains *Rule State* and *Block Step*; *Online Update* gains the rows argument;
+- `GLOSSARY.md` gains *Rule State* and *Block Step*; *Online Update* gains the rows argument;
   *Recursion Read-out* and *Sample Selector* say the rows are held once on the head.
 - The Prior-slot ticket meets a head whose rows buffer already holds what a price-level
   forecast reads, so a forecast estimator over the rows is a reader of `X`, and `OLMAR-2`'s

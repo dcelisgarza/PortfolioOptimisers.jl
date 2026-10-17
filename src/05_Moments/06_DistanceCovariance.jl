@@ -16,16 +16,24 @@ $(DocStringExtensions.FIELDS)
         args::Tuple = (),
         kwargs::NamedTuple = (;),
         w::Option{<:ObsWeights} = nothing,
-        ex::FLoops.Transducers.Executor = ThreadedEx()
+        ex::FLoops.Transducers.Executor = ThreadedEx(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> DistanceCovariance
 
 Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@wprop`-tagged field is automatically propagated:
+When [`factory`](@ref) is called on this type, the following `@wprop`-tagged and `@fprop`-tagged fields are automatically propagated:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged field is automatically subset to the selected indices:
+
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
@@ -82,22 +90,47 @@ DistanceCovariance
     $(field_dict[:ex])
     """
     ex
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function DistanceCovariance(metric::Distances.Metric, args::Tuple, kwargs::NamedTuple,
-                                w::Option{<:ObsWeights}, ex::FLoops.Transducers.Executor)
+                                w::Option{<:ObsWeights}, ex::FLoops.Transducers.Executor,
+                                cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(w, :w)
-        return new{typeof(metric), typeof(args), typeof(kwargs), typeof(w), typeof(ex)}(metric,
-                                                                                        args,
-                                                                                        kwargs,
-                                                                                        w,
-                                                                                        ex)
+        return new{typeof(metric), typeof(args), typeof(kwargs), typeof(w), typeof(ex),
+                   typeof(cache)}(metric, args, kwargs, w, ex, cache)
     end
 end
 function DistanceCovariance(; metric::Distances.Metric = Distances.Euclidean(),
                             args::Tuple = (), kwargs::NamedTuple = (;),
                             w::Option{<:ObsWeights} = nothing,
-                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::DistanceCovariance
-    return DistanceCovariance(metric, args, kwargs, w, ex)
+                            ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                            cache::Option{<:AbstractPartialFitState} = nothing)::DistanceCovariance
+    return DistanceCovariance(metric, args, kwargs, w, ex, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`DistanceCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:DistanceCovariance, true)` to render it.
+
+# Arguments
+
+  - `::DistanceCovariance`: Distance covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:metric, :args, :kwargs, :w, :ex)`.
+
+# Related
+
+  - [`DistanceCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::DistanceCovariance) = (:metric, :args, :kwargs, :w, :ex)
 """
     calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum) -> (MatNum, MatNum)
 

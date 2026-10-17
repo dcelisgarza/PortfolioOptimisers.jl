@@ -191,16 +191,19 @@ FixedWeightedReturnForecast
                │   descriptors ┼ 1-element Vector{Passthrough}
                │               │ Passthrough ⋯
                │    neutralise ┼ nothing
+               │            nw ┼ EstimationMaskWeights()
                │           cre ┼ CrossSectionalLinearRegression
                │               │         alg ┼ PseudoInverseFallback()
-               │               │   intercept ┴ Bool: false
+               │               │   intercept ┼ Bool: true
+               │               │          ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
                │       outlier ┼ CrossSectionalWinsoriser
                │               │    low ┼ Float64: 0.01
                │               │   high ┴ Float64: 0.99
                │       scoring ┼ CrossSectionalStandardiser
                │               │   min_group_size ┼ Int64: 8
                │               │             atol ┴ Float64: 1.0e-12
-               │         group ┴ nothing
+               │         group ┼ nothing
+               │            ex ┴ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
          scale ┼ Float64: 0.02
        weights ┼ nothing
   min_coverage ┼ Float64: 0.0
@@ -306,13 +309,9 @@ Compute the Return Forecast of a fixed signed combination of Descriptor scores.
 
 # Algorithm
 
- 1. Compute the Descriptor scores over the whole carrier through [`descriptor_scores`](@ref), and cut them to the block's rows.
- 2. Normalise the signed weights by their absolute sum.
- 3. Accumulate the finite-aware signed weighted sum and the surviving absolute weight of every cell over the Descriptor axis.
- 4. Divide, and write `NaN` where the surviving absolute weight is zero or below `min_coverage`.
- 5. Score the composite once more when there is more than one Descriptor and the recipe's scoring slot is set.
- 6. Multiply by `scale`, and convert the whole history from the Forecast Unit to return units.
- 7. Read `mu` off the last observation of that history.
+ 1. Compute the Descriptor scores over all the returns data through [`descriptor_panel_scores`](@ref), and cut them, the weights and the group labels to the block's rows with [`return_forecast_rows`](@ref).
+ 2. Compute the history of the block's rows with [`return_forecast_step`](@ref).
+ 3. Read `mu` off the last observation of that history with [`return_forecast_result`](@ref).
 
 # Arguments
 
@@ -365,9 +364,56 @@ julia> rf.hist
 """
 function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
                          csfm::CrossSectionalFactorModel)::FixedWeightedReturnForecastResult
+    rows = return_forecast_rows(rd, csfm)
+    P = map(A -> return_forecast_cut(A, rows), descriptor_panel_scores(rfe.scores, rd))
+    (; hist, fs) = return_forecast_step(rfe, P, csfm, nothing)
+    return return_forecast_result(rfe, hist, fs)
+end
+"""
+    return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
+                         csfm::CrossSectionalFactorModel, fs::Nothing) -> NamedTuple
+
+Compute the Return Forecast history of a fixed signed combination of Descriptor scores, on the rows of a block.
+
+A row of the history reads the scores, the exposures, the regression weights and the idiosyncratic variance of its own observation alone. So the member carries no fold state, the batch fit computes every row of the block here, and a step of the carry fold of a [`CrossSectionalFactorPrior`](@ref) computes its new rows alone.
+
+# Algorithm
+
+ 1. Neutralise the scores with [`descriptor_neutralised_scores`](@ref).
+ 2. Normalise the signed weights by their absolute sum.
+ 3. Accumulate the finite-aware signed weighted sum and the surviving absolute weight of every cell over the Descriptor axis.
+ 4. Divide, and write `NaN` where the surviving absolute weight is zero or below `min_coverage`.
+ 5. Score the composite once more when there is more than one Descriptor and the recipe's scoring slot is set.
+ 6. Multiply by `scale`, and convert the history from the Forecast Unit to return units.
+
+# Arguments
+
+  - `rfe`: Fixed weighted Return Forecast Estimator.
+  - `P`: The scores, the weights and the group labels of the rows of the block, `(; S, w, g)`, as [`descriptor_panel_scores`](@ref) states them. The function can change `P.S` in place.
+  - `csfm`: The factor-model block of the rows of `P`. The member reads its exposure history only under a Neutralisation, and its idiosyncratic variance history only under [`IdiosyncraticSharpeUnit`](@ref).
+  - `fs`: The fold state, always `nothing`.
+
+# Validation
+
+  - The rules of [`descriptor_neutralised_scores`](@ref) and of [`forecast_return_units`](@ref).
+
+# Returns
+
+  - `hist::MatNum`: The Return Forecast history, `observations × assets`, on the rows of `P`.
+  - `fs::Nothing`: The fold state, `nothing`.
+
+# Related
+
+  - [`return_forecast`](@ref)
+  - [`return_forecast_result`](@ref)
+  - [`folds_forecast_rows`](@ref)
+  - [`signed_composite_accumulate!`](@ref)
+  - [`composite_finalise!`](@ref)
+"""
+function return_forecast_step(rfe::FixedWeightedReturnForecast, P::NamedTuple,
+                              csfm::CrossSectionalFactorModel, ::Nothing)::NamedTuple
     ds = rfe.scores
-    (; S, rows) = descriptor_scores(ds, rd, csfm)
-    Sb = return_forecast_cut(S, rows)
+    Sb = descriptor_neutralised_scores(ds, P, csfm, axes(P.S, 1))
     K = size(Sb, 3)
     wv = signed_composite_weights(rfe.weights, K)
     Tf = promote_type(eltype(Sb), eltype(wv))
@@ -375,15 +421,43 @@ function return_forecast(rfe::FixedWeightedReturnForecast, rd::ReturnsResult,
     den = zeros(Tf, size(Sb, 1), size(Sb, 2))
     signed_composite_accumulate!(num, den, Sb, wv)
     composite_finalise!(num, den, rfe.min_coverage)
-    Z = if K > 1
-        exposure_transform(ds.scoring, num,
-                           return_forecast_cut(return_forecast_weights(rd), rows),
-                           return_forecast_cut(exposure_group_labels(rd, ds.group), rows))
-    else
-        num
-    end
-    hist = forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs)
-    return FixedWeightedReturnForecastResult(; mu = hist[end, :], hist = hist, weights = wv)
+    Z = K > 1 ? exposure_transform(ds.scoring, num, P.w, P.g) : num
+    return (; hist = forecast_return_units(rfe.unit, rfe.scale * Z, csfm.vs), fs = nothing)
+end
+"""
+    return_forecast_result(rfe::FixedWeightedReturnForecast, hist::MatNum,
+                           fs::Nothing) -> FixedWeightedReturnForecastResult
+
+Build the Result of a fixed weighted Return Forecast from its history.
+
+The forecast is the last row of the history, and the weights are the normalised signed weights of the member.
+
+# Arguments
+
+  - `rfe`: Fixed weighted Return Forecast Estimator.
+  - `hist`: The Return Forecast history, `observations × assets`, as [`return_forecast_step`](@ref) computes it.
+  - `fs`: The fold state, always `nothing`.
+
+# Returns
+
+  - `rf::FixedWeightedReturnForecastResult`: The fitted forecast, its history and the normalised weights.
+
+# Related
+
+  - [`return_forecast_step`](@ref)
+  - [`FixedWeightedReturnForecastResult`](@ref)
+"""
+function return_forecast_result(rfe::FixedWeightedReturnForecast, hist::MatNum,
+                                ::Nothing)::FixedWeightedReturnForecastResult
+    return FixedWeightedReturnForecastResult(; mu = hist[end, :], hist = hist,
+                                             weights = signed_composite_weights(rfe.weights,
+                                                                                length(rfe.scores.descriptors)))
+end
+function folds_forecast_rows(::FixedWeightedReturnForecast)::Bool
+    return true
+end
+function lookback(rfe::FixedWeightedReturnForecast)::Option{<:Integer}
+    return lookback(rfe.scores.descriptors)
 end
 
 """

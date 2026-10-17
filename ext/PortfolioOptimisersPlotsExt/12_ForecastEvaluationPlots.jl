@@ -279,8 +279,10 @@ function PortfolioOptimisers.plot_forecast_portfolio_by_holding_period(fe::Portf
                                                                        w::Option{<:MatNum} = nothing;
                                                                        n::Integer = 10,
                                                                        min_count::Integer = fe.min_count,
+                                                                       ppy::Number = fe.ppy,
                                                                        kwargs...)
-    t = PortfolioOptimisers.forecast_holding_period(fe, X, w; n = n, min_count = min_count)
+    t = PortfolioOptimisers.forecast_holding_period(fe, X, w; n = n, min_count = min_count,
+                                                    ppy = ppy)
     return forecast_window_book_figure(t.period, t.rank_ann_return, t.rank_sharpe,
                                        t.zscore_ann_return, t.zscore_sharpe,
                                        "Forecast Books by Holding Period"; kwargs...)
@@ -291,6 +293,7 @@ function PortfolioOptimisers.plot_forecast_portfolio_by_holding_period(fe::Portf
                                                                        weighting = PortfolioOptimisers.IdentityMetric(),
                                                                        n::Integer = 10,
                                                                        min_count::Integer = fe.min_count,
+                                                                       ppy::Number = fe.ppy,
                                                                        kwargs...)
     return PortfolioOptimisers.plot_forecast_portfolio_by_holding_period(fe,
                                                                          PortfolioOptimisers.forecast_target_history(fe.target,
@@ -300,6 +303,7 @@ function PortfolioOptimisers.plot_forecast_portfolio_by_holding_period(fe::Portf
                                                                                                                    csfm);
                                                                          n = n,
                                                                          min_count = min_count,
+                                                                         ppy = ppy,
                                                                          kwargs...)
 end
 function PortfolioOptimisers.plot_forecast_ic_decay(fe::PortfolioOptimisers.ForecastEvaluationResult,
@@ -333,8 +337,9 @@ function PortfolioOptimisers.plot_forecast_portfolio_decay(fe::PortfolioOptimise
                                                            w::Option{<:MatNum} = nothing;
                                                            n::Integer = 10,
                                                            min_count::Integer = fe.min_count,
-                                                           kwargs...)
-    t = PortfolioOptimisers.forecast_decay(fe, X, w; n = n, min_count = min_count)
+                                                           ppy::Number = fe.ppy, kwargs...)
+    t = PortfolioOptimisers.forecast_decay(fe, X, w; n = n, min_count = min_count,
+                                           ppy = ppy)
     return forecast_window_book_figure(t.period, t.rank_ann_return, t.rank_sharpe,
                                        t.zscore_ann_return, t.zscore_sharpe,
                                        "Forecast Books by Decay Window"; kwargs...)
@@ -345,7 +350,7 @@ function PortfolioOptimisers.plot_forecast_portfolio_decay(fe::PortfolioOptimise
                                                            weighting = PortfolioOptimisers.IdentityMetric(),
                                                            n::Integer = 10,
                                                            min_count::Integer = fe.min_count,
-                                                           kwargs...)
+                                                           ppy::Number = fe.ppy, kwargs...)
     return PortfolioOptimisers.plot_forecast_portfolio_decay(fe,
                                                              PortfolioOptimisers.forecast_target_history(fe.target,
                                                                                                          rd,
@@ -353,7 +358,7 @@ function PortfolioOptimisers.plot_forecast_portfolio_decay(fe::PortfolioOptimise
                                                              PortfolioOptimisers.cs_diagnostic_weights(weighting,
                                                                                                        csfm);
                                                              n = n, min_count = min_count,
-                                                             kwargs...)
+                                                             ppy = ppy, kwargs...)
 end
 function PortfolioOptimisers.plot_forecast_factor_correlation(fe::PortfolioOptimisers.ForecastEvaluationResult,
                                                               B::Arr3Num,
@@ -380,11 +385,22 @@ function PortfolioOptimisers.plot_forecast_factor_correlation(fe::PortfolioOptim
     return PortfolioOptimisers.plot_forecast_factor_correlation(fe, B,
                                                                 PortfolioOptimisers.cs_diagnostic_weights(weighting,
                                                                                                           csfm);
-                                                                nf = exposure_diagnostic_labels(csfm,
-                                                                                                nf,
-                                                                                                size(B,
-                                                                                                     3)),
-                                                                kwargs...)
+                                                                nf = if isnothing(nf)
+                                                                    csfm.nf
+                                                                else
+                                                                    nf
+                                                                end, kwargs...)
+end
+# The answer of the block method carries its names but not its rows, so `dates` states
+# them, and the default reads every row of the answer.
+function PortfolioOptimisers.plot_forecast_factor_correlation(c::PortfolioOptimisers.FactorDiagnosticResult;
+                                                              nf::Option{<:AbstractVector} = nothing,
+                                                              dates::AbstractVector{<:Integer} = axes(c.X,
+                                                                                                      1),
+                                                              kwargs...)
+    return forecast_plot_series(dates, c.X, diagnostic_result_labels(c, nf),
+                                "Forecast Factor Correlation", "Observation", "ρ";
+                                kwargs...)
 end
 # The summary figure follows `plot_factor_model_summary`: the axis is the statistic, the
 # series is the forecast, and a block the Result carries as `nothing` is not drawn and the

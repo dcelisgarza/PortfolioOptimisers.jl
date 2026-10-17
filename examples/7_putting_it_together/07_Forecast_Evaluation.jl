@@ -234,22 +234,31 @@ values, because the two say different things and you usually want both. Passing 
 block lets the `weighting` keyword take the Pearson weights from the block. The default, used here,
 gives every asset the same weight, and the Spearman column is unweighted.
 
-[`forecast_ic_summary`](@ref) reduces that matrix to five figures per coefficient. `ic_ir` is the
-mean over the standard deviation, the coefficient's own information ratio, and `t_stat` says
-whether the mean is distinguishable from zero at all.
+[`forecast_ic_summary`](@ref) reduces that matrix to six figures per coefficient. `ic_ir` is the
+mean over the standard deviation, the coefficient's own information ratio. `t_stat` and `p_value`
+say whether the mean is distinguishable from zero at all.
+
+The coefficients of consecutive dates can be correlated, so the test of the mean must read that
+dependence. A mean test does this. The default, [`WildBootstrapMeanTest`](@ref), reads the
+dependence at every lag up to a fixed fraction of the sample, and takes its p-value from a wild
+bootstrap. Its t-statistic is not on the scale of the normal law, so read the p-value. The bootstrap
+draws random numbers, so this example passes a seeded test to every summary, and the tables are the
+same at every run.
 =#
 
 ic_signal = forecast_ic(fe_signal, csfm)
 ic_trait = forecast_ic(fe_trait, csfm)
 
-s_signal = forecast_ic_summary(ic_signal)
-s_trait = forecast_ic_summary(ic_trait)
+mt = WildBootstrapMeanTest(; seed = 42)
+s_signal = forecast_ic_summary(ic_signal; mt = mt)
+s_trait = forecast_ic_summary(ic_trait; mt = mt)
 
 pretty_table(DataFrame("Forecast" => ["signal composite", "trait regression"],
                        "Mean IC" => [s_signal.spearman.mean_ic, s_trait.spearman.mean_ic],
                        "Std IC" => [s_signal.spearman.std_ic, s_trait.spearman.std_ic],
                        "IC IR" => [s_signal.spearman.ic_ir, s_trait.spearman.ic_ir],
                        "t-stat" => [s_signal.spearman.t_stat, s_trait.spearman.t_stat],
+                       "p-value" => [s_signal.spearman.p_value, s_trait.spearman.p_value],
                        "Hit rate" =>
                            [s_signal.spearman.hit_rate, s_trait.spearman.hit_rate]);
              formatters = [numfmt], title = "Spearman information coefficient")
@@ -316,11 +325,10 @@ pretty_table(DataFrame("Forecast" => [b[1] for b in books],
 
 #=
 The second question has the same answer as the first. The signal composite's two books earn a high
-Sharpe ratio. The trait regression's rank book earns a fraction of that, and its z-score book earns
-nothing you could tell from zero. Look at the turnover column as well. Both forecasts turn over
-close to their whole gross at every date, because a rank book rebuilt from each cross-section trades
-whatever the ranks moved, and `mean_turnover` is there so you can see that cost before an optimiser
-with a turnover constraint does.
+Sharpe ratio. The trait regression's two books earn nothing you could tell from zero. Look at the
+turnover column as well. Both forecasts turn over close to their whole gross at every date, because
+a rank book rebuilt from each cross-section trades whatever the ranks moved, and `mean_turnover` is
+there so you can see that cost before an optimiser with a turnover constraint does.
 
 !!! note "Every hit rate counts against the dates that scored"
     The hit rate in this table counts against the dates the book scored, because a date the book
@@ -418,25 +426,25 @@ says how quickly the information goes stale.
 
 The stride between two dates stays at the base evaluation's, so from the second row of the
 holding-period table on, consecutive windows use the same returns, and their coefficients are not
-independent. The `t_stat` column corrects for that overlap. Its standard error is the long-run one,
-at the order that the window and the stride imply. A t-statistic that stays large down the column
-therefore reflects the forecast, not the overlap. Without it, a forecast with no skill would look
-more significant at every row.
+independent. The mean test of the table reads that dependence at each row, as it does in the
+summary above. A p-value that stays small down the column therefore reflects the forecast, not the
+overlap. Without the test, a forecast with no skill would look more significant at every row.
 =#
 
-hp = forecast_holding_period(fe_signal, rd, csfm; n = 4)
-dc = forecast_decay(fe_signal, rd, csfm; n = 4)
+hp = forecast_holding_period(fe_signal, rd, csfm; n = 4, mt = mt)
+dc = forecast_decay(fe_signal, rd, csfm; n = 4, mt = mt)
 
 pretty_table(DataFrame("Period" => hp.period, "Horizon" => hp.horizon, "Lag" => hp.lag,
                        "Mean IC" => hp.spearman_mean_ic, "t-stat" => hp.spearman_t_stat,
+                       "p-value" => hp.spearman_p_value,
                        "Rank ann. return" => hp.rank_ann_return,
                        "Rank Sharpe" => hp.rank_sharpe); formatters = [numfmt],
              title = "Holding period: cumulative forward windows")
 
 pretty_table(DataFrame("Period" => dc.period, "Horizon" => dc.horizon, "Lag" => dc.lag,
                        "Mean IC" => dc.spearman_mean_ic, "t-stat" => dc.spearman_t_stat,
-                       "Rank Sharpe" => dc.rank_sharpe); formatters = [numfmt],
-             title = "Decay: disjoint forward windows")
+                       "p-value" => dc.spearman_p_value, "Rank Sharpe" => dc.rank_sharpe);
+             formatters = [numfmt], title = "Decay: disjoint forward windows")
 
 #=
 The two tables give different answers, and the difference comes from the synthetic panel. The
@@ -459,18 +467,23 @@ block, the rows before the common grid of section 2 included, because the alignm
 and not its forecast. The trait regression has a forecast on its grid only. Its column is `NaN`
 between two refits, and the mean below is taken over the rows it was fitted on. Pass
 `dates = fe.dates` for the correlations on the same dates as the coefficients.
+
+The answer is a [`FactorDiagnosticResult`](@ref). It holds the correlations in `X` and the names and
+the families of the factors in `nf` and `fam`, so the table below reads the names off the answer.
+`PortfolioOptimisers.port_opt_view(fc_signal, LabelGroup("industry"))` keeps the columns of one
+family.
 =#
 
 fc_signal = forecast_factor_correlation(fe_signal, csfm)
 fc_trait = forecast_factor_correlation(fe_trait, csfm)
 
-fc_mean(fc, k) = mean(filter(isfinite, view(fc, :, k)))
+fc_mean(fc, k) = mean(filter(isfinite, view(fc.X, :, k)))
 
-pretty_table(DataFrame("Factor" => csfm.nf,
+pretty_table(DataFrame("Factor" => fc_signal.nf,
                        "signal composite" =>
-                           [fc_mean(fc_signal, k) for k in axes(fc_signal, 2)],
+                           [fc_mean(fc_signal, k) for k in axes(fc_signal.X, 2)],
                        "trait regression" =>
-                           [fc_mean(fc_trait, k) for k in axes(fc_trait, 2)]);
+                           [fc_mean(fc_trait, k) for k in axes(fc_trait.X, 2)]);
              formatters = [numfmt], title = "Mean correlation with each factor exposure")
 
 #=
@@ -480,12 +493,15 @@ exactly what the exposures do not explain. It passes this check and fails the fi
 That is why the questions have an order, and why this question is last. A low correlation alone does
 not make a forecast useful.
 
-!!! note "Neutralising a score does not decorrelate it"
-    A forecast whose descriptor scores are neutralised against a factor family does not give zero in
-    that family's columns. Both neutralisation sites build a cross-sectional regression whose
-    `intercept` is `false`, so the residual is orthogonal to its target in the uncentred sense and
-    keeps a real correlation with it. Set `cre` to a regression with `intercept = true` when you
-    want an uncorrelated residual.
+!!! note "A neutralised score is uncorrelated with its targets, and the forecast nearly so"
+    The Neutralisation of [`DescriptorScores`](@ref) fits a cross-sectional regression with an
+    intercept by default, so each score leaves it uncorrelated with its targets. A forecast built
+    from those scores still gives small numbers in the targets' columns, not zero: a grouped scoring
+    step after the fit rescales each group on its own, and this check weighs every scored asset,
+    also those outside the estimation universe that the fit weighs. A Neutralisation under
+    `cre = CrossSectionalLinearRegression(; intercept = false)` fits no intercept. Its residual is
+    then orthogonal to its target in the uncentred sense alone, and keeps a real correlation with it. The Neutralisation of a Factor
+    Exposure reads the regression of the prior, whose `intercept` is `false` by default.
 =#
 
 #=
@@ -505,26 +521,26 @@ Pass `align = true` with the raw evaluations instead, and the summary runs the a
 
 fs = forecast_evaluation_summary([fe_signal, fe_trait], csfm;
                                  names = ["signal composite", "trait regression"],
-                                 quantiles = (0.1, 0.2))
+                                 quantiles = (0.1, 0.2), mt = mt)
 
 pretty_table(DataFrame("Statistic" =>
                            ["Spearman mean IC", "Spearman IC IR", "Spearman t-stat",
-                            "Spearman hit rate", "Rank ann. return", "Rank Sharpe",
-                            "Rank mean turnover", "Z-score Sharpe", "Calibration slope",
-                            "Mean coverage", "Mean assets scored"],
+                            "Spearman p-value", "Spearman hit rate", "Rank ann. return",
+                            "Rank Sharpe", "Rank mean turnover", "Z-score Sharpe",
+                            "Calibration slope", "Mean coverage", "Mean assets scored"],
                        "signal composite" => [fs.spearman_mean_ic[1], fs.spearman_ic_ir[1],
-                                              fs.spearman_t_stat[1], fs.spearman_hit_rate[1],
-                                              fs.rank_ann_return[1], fs.rank_sharpe[1],
-                                              fs.rank_mean_turnover[1], fs.zscore_sharpe[1],
-                                              fs.calibration_slope[1], fs.mean_coverage[1],
-                                              fs.mean_n_scored[1]],
+                                              fs.spearman_t_stat[1], fs.spearman_p_value[1],
+                                              fs.spearman_hit_rate[1], fs.rank_ann_return[1],
+                                              fs.rank_sharpe[1], fs.rank_mean_turnover[1],
+                                              fs.zscore_sharpe[1], fs.calibration_slope[1],
+                                              fs.mean_coverage[1], fs.mean_n_scored[1]],
                        "trait regression" => [fs.spearman_mean_ic[2], fs.spearman_ic_ir[2],
-                                              fs.spearman_t_stat[2], fs.spearman_hit_rate[2],
-                                              fs.rank_ann_return[2], fs.rank_sharpe[2],
-                                              fs.rank_mean_turnover[2], fs.zscore_sharpe[2],
-                                              fs.calibration_slope[2], fs.mean_coverage[2],
-                                              fs.mean_n_scored[2]]); formatters = [numfmt],
-             title = "Eleven of the thirty columns, side by side")
+                                              fs.spearman_t_stat[2], fs.spearman_p_value[2],
+                                              fs.spearman_hit_rate[2], fs.rank_ann_return[2],
+                                              fs.rank_sharpe[2], fs.rank_mean_turnover[2],
+                                              fs.zscore_sharpe[2], fs.calibration_slope[2],
+                                              fs.mean_coverage[2], fs.mean_n_scored[2]]);
+             formatters = [numfmt], title = "Twelve of the columns, side by side")
 
 #=
 The quantile spreads are the only fields of the result with a second axis, and the result fills them

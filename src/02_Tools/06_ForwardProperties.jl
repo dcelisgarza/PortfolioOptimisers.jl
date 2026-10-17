@@ -125,6 +125,47 @@ function forward_walk_expr(path, struct_name, broadcast::Bool)
     push!(stmts, :__v)
     return Expr(:let, Expr(:block), Expr(:block, stmts...))
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Rebuild `x` with the fields named in `patch` replaced, for a type that [`@forward_properties`](@ref) decorates.
+
+This is the body of the `ConstructionBase.setproperties` method the macro generates, which `Accessors.set` and `Accessors.@set` call to rebuild every struct on a lens path. The default method refuses a type whose `propertynames` differ from its `fieldnames`, and reads every field through `getproperty`, so a `swap(L, M)` rule would write `M` into an unset `L`. This one reads the fields with `getfield` and patches only a field. A forwarded or computed property is a view of a nested value with no storage of its own, so a patch that names one is refused, and `source(sym)` gives the path to set instead.
+
+# Algorithm
+
+ 1. For each key `sym` of `patch` that is not a field of `T`:
+     1. `source(sym)` gives a path: refuse it, and name that path as the one to set.
+     2. `sym` is another property of `x`: refuse it as a computed value, and name the fields.
+     3. Otherwise: refuse it as a name `T` does not have, and name the fields.
+ 2. Read every field of `x` with `getfield` into a `NamedTuple` keyed in declaration order.
+ 3. Merge `patch` over it, and call `ctor`, the keyword constructor of `T`, with the result, so every guard of the constructor runs on the new value.
+
+The macro passes `ctor` as the name of `T` without its type parameters, so step 3 calls the ordinary keyword constructor and needs no reflection to find it. A patch that changes a type parameter, such as setting an unset `L`, gives the specialisation the constructor picks. The keyword constructor must take every field of `T` by its field name.
+
+# Related
+
+  - [`@forward_properties`](@ref)
+  - [`forward_prior`](@ref)
+"""
+function forward_setproperties(x::T, patch::NamedTuple, source, ctor) where {T}
+    fnames = fieldnames(T)
+    for sym in keys(patch)
+        if sym in fnames
+            continue
+        end
+        src = source(sym)
+        if !isnothing(src)
+            throw(ArgumentError("`$(sym)` cannot be set on a `$(nameof(T))`: it is a property that `$(nameof(T))` forwards from `$(src)`, and it has no storage of its own. Set `$(src)` of the `$(nameof(T))` instead."))
+        elseif sym in propertynames(x)
+            throw(ArgumentError("`$(sym)` cannot be set on a `$(nameof(T))`: it is a property that `$(nameof(T))` computes from its fields, and it has no storage of its own. Set one of the fields $(fnames) instead."))
+        else
+            throw(ArgumentError("`$(sym)` cannot be set on a `$(nameof(T))`: it is neither a field nor a property of it. Its fields are $(fnames)."))
+        end
+    end
+    vals = NamedTuple{fnames}(getfield.((x,), fnames))
+    return ctor(; merge(vals, patch)...)
+end
 
 """
     @forward_properties T begin
@@ -140,6 +181,9 @@ end
 Generate the `Base.getproperty` / `Base.propertynames` pair for type `T` from a
 block of declarative forwarding rules, so the property-forwarding decision lives
 in one declared surface instead of a hand-written `getproperty` body.
+It also generates the `ConstructionBase.setproperties` method that `Accessors.set`
+needs to rebuild `T` on a lens path, which the default refuses for a type whose
+`propertynames` differ from its `fieldnames`.
 `T` may be a bare type name or a parametric/`UnionAll` signature
 (`Foo{<:Any, Nothing, <:Any}`), so a `swap` can be specialised per type parameter.
 
@@ -178,24 +222,28 @@ resolves **before** the field check.
 # Algorithm
 
  1. `block` is not a `begin … end` block: raise an error.
- 2. Make three empty vectors: `swap_branches`, `getprop_branches` and `propname_contribs`.
+ 2. Make four empty vectors: `swap_branches`, `getprop_branches`, `source_branches` and `propname_contribs`.
  3. For each rule of the block, skipping a `LineNumberNode`:
      1. The rule is not a call: raise an error naming it.
      2. Read `marker`, the rule name, and `args`, its arguments. When the first argument is a `:parameters` node, read the `broadcast` option out of it and drop it from `args`. Any other option raises an error.
-     3. `marker` is `forward`: flatten the locator with [`forward_flatten_path`](@ref) and build `walk` with [`forward_walk_expr`](@ref). With no further argument, push a branch that returns `getproperty(walk, sym)` when `sym` is in `propertynames(walk)`, and contribute every one of those names. With further arguments, check that each is a bare identifier, push a branch that matches `sym` against that name set, and contribute the named subset.
-     4. `marker` is `alias`: check the exposed name, build `walk` from the locator, push a branch that matches the exposed name and returns `walk`, and contribute the name.
-     5. `marker` is `compute`: check the exposed name. An anonymous-function source pushes a branch returning `fn(x)`, and `broadcast` with that form raises an error. A dotted source builds `walk` with the `broadcast` flag and pushes the matching branch. Any other source raises an error. Contribute the exposed name.
+     3. `marker` is `forward`: flatten the locator with [`forward_flatten_path`](@ref) and build `walk` with [`forward_walk_expr`](@ref). With no further argument, push a branch that returns `getproperty(walk, sym)` when `sym` is in `propertynames(walk)`, and contribute every one of those names. With further arguments, check that each is a bare identifier, push a branch that matches `sym` against that name set, and contribute the named subset. Either way, push onto `source_branches` a branch that gives the path `loc.sym` for the same names.
+     4. `marker` is `alias`: check the exposed name, build `walk` from the locator, push a branch that matches the exposed name and returns `walk`, push a source branch that gives the locator path, and contribute the name.
+     5. `marker` is `compute`: check the exposed name. An anonymous-function source pushes a branch returning `fn(x)`, and `broadcast` with that form raises an error. A dotted source builds `walk` with the `broadcast` flag, pushes the matching branch, and pushes a source branch that gives the dotted path. Any other source raises an error. Contribute the exposed name.
      6. `marker` is `swap`: as for `compute`, but a bare name is also a legal source, and the branch is pushed onto `swap_branches` rather than `getprop_branches`.
      7. `marker` is anything else: raise an error naming it.
  4. Build `Base.getproperty(x::T, sym::Symbol)` in this order: the `swap` branches; the own-field check, which returns `getfield(x, sym)`; the remaining branches in declaration order; and `getfield(x, sym)` as the fallthrough, which raises the standard error for an absent field.
  5. Build `Base.propertynames(x::T)` from `fieldnames(T)` followed by every contributed name, and return the unique names as a tuple.
- 6. Return both definitions in one escaped block.
+ 6. Build `ConstructionBase.setproperties(x::T, patch::NamedTuple)`, which calls [`forward_setproperties`](@ref) with two more arguments: a function of `sym` that runs the `source_branches` and gives `nothing` when none matches, and the name of `T` without its type parameters, which is its keyword constructor.
+ 7. Return the three definitions in one escaped block.
 
 Step 4 is where the two orderings in the first paragraph come from: a `swap` runs **before** the own-field check, so it replaces a real field, and every other rule runs **after** it, so it can only add a name. Within each group the first branch that matches wins, and the order of the branches is the declaration order of the rules.
+
+Step 6 gives no source for a `swap`, which names a real field and so is patched as one, nor for the function form of `compute`, which has no path to set.
 
 # Related
 
   - [`PropertyPathError`](@ref)
+  - [`forward_setproperties`](@ref)
   - [`@propagatable`](@ref)
 """
 macro forward_properties(T, block)
@@ -204,6 +252,7 @@ macro forward_properties(T, block)
     end
     getprop_branches = Any[]
     swap_branches = Any[]
+    source_branches = Any[]
     propname_contribs = Any[]
     for stmt in block.args
         if stmt isa LineNumberNode
@@ -243,6 +292,9 @@ macro forward_properties(T, block)
                           end
                       end)
                 push!(propname_contribs, Expr(:..., :(propertynames($walk))))
+                push!(source_branches,
+                      :(sym in propertynames($walk) &&
+                        return string($(join(string.(path), ".")), ".", sym)))
             else
                 names = args[2:end]
                 for n in names
@@ -256,6 +308,9 @@ macro forward_properties(T, block)
                 push!(getprop_branches,
                       :(sym in $nameset && return getproperty($walk, sym)))
                 append!(propname_contribs, (QuoteNode(n) for n in names))
+                push!(source_branches,
+                      :(sym in $nameset &&
+                        return string($(join(string.(path), ".")), ".", sym)))
             end
         elseif marker == :alias
             if !(length(args) == 2)
@@ -268,6 +323,8 @@ macro forward_properties(T, block)
             path = forward_flatten_path(args[2])
             walk = forward_walk_expr(path, T, false)
             push!(getprop_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
+            push!(source_branches,
+                  :(sym === $(QuoteNode(exposed)) && return $(join(string.(path), "."))))
             push!(propname_contribs, QuoteNode(exposed))
         elseif marker == :compute
             if !(length(args) == 2)
@@ -288,6 +345,8 @@ macro forward_properties(T, block)
                 path = forward_flatten_path(src)
                 walk = forward_walk_expr(path, T, broadcast)
                 push!(getprop_branches, :(sym === $(QuoteNode(exposed)) && return $walk))
+                push!(source_branches,
+                      :(sym === $(QuoteNode(exposed)) && return $(join(string.(path), "."))))
             else
                 return error("@forward_properties: `compute` source must be a dotted path (depth ≥ 2) or an anonymous function, got: $(repr(src))")
             end
@@ -334,9 +393,19 @@ macro forward_properties(T, block)
             return Tuple(unique($propertynames_tuple))
         end
     end
+    ctor = T isa Expr && T.head == :curly ? T.args[1] : T
+    setproperties_def = quote
+        function $(Accessors).setproperties(x::$T, patch::NamedTuple)
+            return $(forward_setproperties)(x, patch, sym -> begin
+                                                $(source_branches...)
+                                                return nothing
+                                            end, $ctor)
+        end
+    end
     return esc(quote
                    $getproperty_def
                    $propertynames_def
+                   $setproperties_def
                end)
 end
 

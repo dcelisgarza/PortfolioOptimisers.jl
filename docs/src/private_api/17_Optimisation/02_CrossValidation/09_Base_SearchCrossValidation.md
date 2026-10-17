@@ -11,7 +11,7 @@ AbstractSearchCrossValidationAlgorithm
 finite_candidate_index
 assert_search_entry
 search_candidate
-assert_search_candidates
+assert_search_candidates(::Any, ::Any, ::Any)
 pin_draw
 score_rows
 fold_train_returns
@@ -22,5 +22,4 @@ assert_search_grid_cap
 _expr_to_lens
 _eval_index
 expr_to_lens_chain
-pipeline_asset_view
 ```

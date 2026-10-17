@@ -17,7 +17,7 @@ Widening `ret` the same way raised two questions at once, and they are the same 
 from two sides.
 
 1. **What is it that became plural?** The charting called it a *characteristic vector* — the
-   per-asset quantity ADR 0032 minted for the ℓ1 uncertainty sets, and which `CONTEXT.md`
+   per-asset quantity ADR 0032 minted for the ℓ1 uncertainty sets, and which `GLOSSARY.md`
    §3.9 defines. If that is the plural noun, then §3.9's definition has to widen, and its
    *Avoid* line — which holds a Characteristic Vector apart from a **Feature** (§2) on the
    grounds that one is a *single* per-asset quantity and the other is *one column of many* —
@@ -45,7 +45,7 @@ and two admissible elements have no characteristic at all:
   while its own `settings.lb` still binds. Such a **constraint-only** term shapes the feasible
   set and is never maximised. It is not a characteristic under any reading either.
 
-So the concept `CONTEXT.md` §3.9 defines is **untouched by multiplicity**. Each set-bearing
+So the concept `GLOSSARY.md` §3.9 defines is **untouched by multiplicity**. Each set-bearing
 term still has exactly one per-asset quantity its ball is built around, and ADR 0050 already
 put that quantity **on the set**. An optimisation now simply holds several Characteristic
 Vectors, one per set-bearing term.

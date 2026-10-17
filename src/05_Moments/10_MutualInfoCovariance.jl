@@ -34,7 +34,8 @@ $(DocStringExtensions.FIELDS)
     MutualInfoCovariance(;
         ve::AbstractVarianceEstimator = SimpleVariance(),
         bins::Int_Bin = HacineGharbiRavier(),
-        normalise::Bool = true
+        normalise::Bool = true,
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> MutualInfoCovariance
 
 Keywords correspond to the struct's fields.
@@ -48,12 +49,14 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ve`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -95,20 +98,48 @@ MutualInfoCovariance
     $(field_dict[:normalise])
     """
     normalise
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function MutualInfoCovariance(ve::AbstractVarianceEstimator, bins::Int_Bin,
-                                  normalise::Bool)
+                                  normalise::Bool, cache::Option{<:AbstractPartialFitState})
         if isa(bins, Integer)
             @argcheck(zero(bins) < bins, DomainError(bins, "bins must be positive"))
             assert_resource_cap(bins, RESOURCE_LIMITS[].max_bins, :bins, :max_bins)
         end
-        return new{typeof(ve), typeof(bins), typeof(normalise)}(ve, bins, normalise)
+        return new{typeof(ve), typeof(bins), typeof(normalise), typeof(cache)}(ve, bins,
+                                                                               normalise,
+                                                                               cache)
     end
 end
 function MutualInfoCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
-                              bins::Int_Bin = HacineGharbiRavier(),
-                              normalise::Bool = true)::MutualInfoCovariance
-    return MutualInfoCovariance(ve, bins, normalise)
+                              bins::Int_Bin = HacineGharbiRavier(), normalise::Bool = true,
+                              cache::Option{<:AbstractPartialFitState} = nothing)::MutualInfoCovariance
+    return MutualInfoCovariance(ve, bins, normalise, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`MutualInfoCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:MutualInfoCovariance, true)` to render it.
+
+# Arguments
+
+  - `::MutualInfoCovariance`: Mutual information covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ve, :bins, :normalise)`.
+
+# Related
+
+  - [`MutualInfoCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::MutualInfoCovariance) = (:ve, :bins, :normalise)
 """
     Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 

@@ -45,7 +45,7 @@ the decision.
    the threshold, so a row kept at `t` is dropped at `t + 1` when a column leaves, and the returns
    either side of it move. These are **window-valued**: no state folded at `t` can be corrected,
    so no exact online form exists.
-2. **A populated state is viewable by asset.** `test_08r_partial_fit.jl:240` pins
+2. **A populated state is viewable by asset.** `test_08p_regime_partial_fit.jl:240` pins
    `cov(port_opt_view(cv, i)) == cov(Covariance(), X[:, i])` on a state folded over every column,
    and `ReturnsBufferState`, `PriorCarryState` and `SampleBufferState` each carry
    `port_opt_view`. A state fitted on the full universe, viewed to a column set and read out, is
@@ -56,12 +56,12 @@ the decision.
    `inject_context` routes `ctx.prior` into the optimiser's `pe` before the step runs
    (`03_Pipeline.jl:629`), so the optimiser's own prior is never fitted there. The row owner of a
    Pipeline is therefore not fixed by the optimiser's type but by the steps.
-4. **The reference refuses every Pipeline.** skfolio raises
+4. **The oracle refuses every Pipeline.** It raises
    `TypeError("Pipeline is not supported")` in `online_predict`, `online_score` and
    `OnlineGridSearch` (`model_selection/_online/_validation.py:862`), because scikit-learn 1.9.0's
-   `Pipeline` defines no `partial_fit`; no selector of the reference has one; and the width of
-   every online estimator is pinned at the first call. A caller of the reference cannot run a
-   Pipeline online, and the reference never meets a re-selection between two steps. Any route here
+   `Pipeline` defines no `partial_fit`; no selector of the oracle has one; and the width of
+   every online estimator is pinned at the first call. A caller of the oracle cannot run a
+   Pipeline online, and the oracle never meets a re-selection between two steps. Any route here
    adds capability and removes none.
 
 Two earlier rulings of the map pull apart on the window-valued class.
@@ -317,7 +317,7 @@ Four facts, found on the way and recorded here rather than left to be found agai
   read-out is a batch fit over `w` rows at every fold. The refused configuration folded one block
   into the owner's state at `O(1)` and was exact against nothing; the surviving one costs `O(w)`
   and equals the rolling batch walk-forward.
-- `CONTEXT.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
+- `GLOSSARY.md`: *Pipeline* states its online form, *Fold Context* names the Pipeline as a holder,
   and *Sample Buffer* names the input-carrier buffer `Online(pipe)` seeds.
 - Built by [#1022](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1022) in
   `src/03_InputData/18_PreprocessingPartialFit.jl` and `src/25_Pipeline/06_OnlinePipeline.jl`,

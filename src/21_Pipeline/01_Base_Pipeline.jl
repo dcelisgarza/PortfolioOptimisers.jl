@@ -464,7 +464,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 The [routing targets](@ref PIPELINE_ROUTING_TARGETS) a constraint family's step can write.
 
-This is the one declaration of the estimator → target half of the seam, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
+This is the one declaration of the estimator → target half of the routing of a [`Pipeline`](@ref) slot into an optimiser, and it has three readers, which is why it exists as a table rather than as scattered knowledge:
 
   - [`run_constraint_step`](@ref) resolves the target and pairs it with the computed value.
   - [`pipe_required_targets`](@ref) hands it to [`assert_routable`](@ref), so a step whose target the terminal optimiser cannot receive is refused when the [`Pipeline`](@ref) is built rather than after the first fold has run.
@@ -544,6 +544,8 @@ Most estimators are used as pipeline steps directly: their family determines whi
   - **Slots dispatch cannot infer**: a custom callable, or an estimator routed to a nonstandard slot. `reads` and `writes` supply what the family would otherwise declare. This includes a bare-callable [`TimeDependent`](@ref) schedule of optimisers (`TimeDependent(ctx -> optimiser)`), whose output kind is not in its type: it enters via `PipelineStep(; est = td, writes = :opt)` and its output is type-checked when the fold loop swaps it in (see [`TD_OptE_Opt_Inferable`](@ref)).
   - **Routing intent dispatch must not guess**: an uncertainty-set estimator writes the `uncertainty` slot either way, so the slot is never in doubt; what the wrapper declares through `target` is *which parameters you want bounded* — `:mu`, `:sigma`, or `:both`. Since [`ucs`](@ref) derives both halves from a single fit, this is a statement of intent, not a disambiguation, and every populated half must reach the optimiser or [`inject_context`](@ref) rejects it.
 
+A step that reads the returns, such as a prior, a clustering or an uncertainty set with its own prior, states the source of its returns on its own reader, with the `x_src` field of the reader. So `PipelineStep(; est = EmpiricalPrior(; x_src = ExcessSource()), writes = :prior)` fits the prior on the returns in excess of the benchmark, `X - B`. The wrapper holds no source. The steps whose values the last optimiser receives join the group of that optimiser, so the [`Pipeline`](@ref) warns about a reader that states no source beside a reader of the Excess Frame, see [`group_frames`](@ref).
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -577,6 +579,9 @@ julia> PortfolioOptimisers.pipe_writes(ps)
 
 julia> PortfolioOptimisers.pipe_reads(ps)
 (:returns,)
+
+julia> PipelineStep(; est = EmpiricalPrior(; x_src = ExcessSource()), writes = :prior).est.x_src
+ExcessSource()
 ```
 
 # Related

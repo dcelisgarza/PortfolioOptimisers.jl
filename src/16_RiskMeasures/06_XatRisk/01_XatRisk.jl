@@ -198,7 +198,7 @@ Each indicator exempts one observation from the bound on the risk, and the cardi
 \\begin{align}
 \\underset{r,\\, \\boldsymbol{z}}{\\min} \\quad & r\\\\
 \\text{s.t.} \\quad & r \\geq \\ell_{t} - b z_{t}\\,, \\quad t = 1,\\ldots,T\\\\
-\\quad & \\sum_{t=1}^{T} w_{t} z_{t} \\leq \\left(\\alpha - s\\right) W_{T}\\\\
+\\quad & \\sum_{t=1}^{T} w_{t} z_{t} \\leq \\left(\\alpha + s\\right) W_{T}\\\\
 \\quad & z_{t} \\in \\left\\{0,\\, 1\\right\\}\\,.
 \\end{align}
 ```
@@ -215,9 +215,9 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
-The minimum is the ``k``-th largest loss, the order statistic that [`ValueatRisk`](@ref) defines. The programme exempts the largest losses first, and it can exempt them while their cumulative weight stays within ``(\\alpha - s) W_{T}``. The slack keeps the exempt weight strictly below ``\\alpha W_{T}``, and it absorbs the rounding error of ``\\alpha W_{T}``.
+The minimum is the ``k``-th largest loss, the order statistic that [`ValueatRisk`](@ref) defines. The programme exempts the largest losses first, and it can exempt them while their cumulative weight stays within ``(\\alpha + s) W_{T}``. So the exempt weight reaches ``\\alpha W_{T}`` and does not pass it. The slack only absorbs the rounding error of ``\\alpha W_{T}``.
 
-The programme is exact when ``b`` is at least the largest loss minus the minimum, which the derived default is. It needs ``s < \\alpha``, because the cardinality row has no solution for ``s > \\alpha``.
+The programme is exact when ``b`` is at least the largest loss minus the minimum, which the derived default is. The slack must stay small. When ``s W_{T}`` reaches the gap from ``\\alpha W_{T}`` up to the next cumulative weight, the programme exempts one more observation.
 
 # Fields
 
@@ -257,7 +257,7 @@ MIPValueatRisk
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equations 7.50 and 7.51. The programme of Equation 7.51 subtracts its slack. This one adds it, so that it selects the order statistic of the definition, Equation 7.50.
 """
 @concrete struct MIPValueatRisk <: ValueatRiskFormulation
     """
@@ -280,7 +280,7 @@ MIPValueatRisk
         if bflag && sflag
             @argcheck(b > s,
                       DomainError((b, s),
-                                  "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
+                                  "`b` is $b and `s` is $s. The big-M constant `b` must be larger than the slack `s`."))
         end
         return new{typeof(b), typeof(s)}(b, s)
     end
@@ -294,7 +294,7 @@ end
 
 Resolve the cardinality slack `s` of the empirical quantile programme to a number, and pass the big-M constant `b` on.
 
-A `nothing` slack takes the default, `s = 1e-5`. The `JuMP` builder and the functor read the pair from this one function, so both select the same order statistic. The functor does not read `b`. A `nothing` constant stays `nothing`, and the `JuMP` builder derives it from the data and the weight bounds with [`mip_big_m`](@ref).
+A `nothing` slack takes the default, `s = 1e-9`. It exceeds the rounding error of ``\\alpha W_{T}`` and of a cumulative sum of up to about ``10^{6}`` weights, and ``s T`` stays below ``10^{-3}`` up to ``T = 10^{6}``, so it moves no order statistic on a sample of that size. The `JuMP` builder and the functor read the pair from this one function, so both select the same order statistic. The functor does not read `b`. A `nothing` constant stays `nothing`, and the `JuMP` builder derives it from the data and the weight bounds with [`mip_big_m`](@ref).
 
 # Arguments
 
@@ -313,7 +313,7 @@ A `nothing` slack takes the default, `s = 1e-5`. The `JuMP` builder and the func
   - [`mip_big_m`](@ref)
 """
 function mip_var_bounds(b::Option{<:Number}, s::Option{<:Number})
-    return b, ifelse(isnothing(s), 1e-5, s)
+    return b, ifelse(isnothing(s), 1e-9, s)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -356,7 +356,8 @@ $(DocStringExtensions.FIELDS)
         sigma::Option{<:SigmaSlot} = nothing,
         chol::Option{<:MatNum} = nothing,
         pe::Option{<:AbstractPriorEstimator} = nothing,
-        dist::Distributions.Distribution = Distributions.Normal()
+        dist::Distributions.Distribution = Distributions.Normal(),
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot()
     ) -> DistributionValueatRisk
 
 Keywords correspond to the struct's fields.
@@ -378,18 +379,19 @@ Keywords correspond to the struct's fields.
   - The method slices `mu` to the selected assets. A Deferred Quantity passes through unsliced, and resolves on the subset later.
   - The method slices a stated `sigma` on both axes. A Deferred Quantity passes through unsliced, and resolves on the subset later.
   - The method slices `chol` on its columns alone. Its rows index the factorisation, and the asset selection does not address them.
-  - `pe` and `dist` pass through unchanged. `dist` describes the standardised loss, so it has no asset axis.
+  - `pe`, `dist` and `mtx_sqrt` pass through unchanged. `dist` describes the standardised loss, so it has no asset axis.
 
 # Examples
 
 ```jldoctest
 julia> DistributionValueatRisk()
 DistributionValueatRisk
-     mu ┼ nothing
-  sigma ┼ nothing
-   chol ┼ nothing
-     pe ┼ nothing
-   dist ┴ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
+        mu ┼ nothing
+     sigma ┼ nothing
+      chol ┼ nothing
+        pe ┼ nothing
+      dist ┼ Distributions.Normal{Float64}: Distributions.Normal{Float64}(μ=0.0, σ=1.0)
+  mtx_sqrt ┴ EigenFallbackSquareRoot()
 ```
 
 # Related
@@ -428,10 +430,15 @@ DistributionValueatRisk
     $(field_dict[:dist])
     """
     dist
+    """
+    Square-root algorithm of the covariance matrix that the cone of the parametric quantile reads when no `chol` is at hand, or `nothing` for the plain Cholesky factor, which raises a `LinearAlgebra.PosDefException` on a matrix that is not positive definite. The default takes the square root of the eigendecomposition of a singular positive semidefinite matrix. [`matrix_square_root`](@ref) states each algorithm.
+    """
+    mtx_sqrt
     function DistributionValueatRisk(mu::Option{<:MuSlot}, sigma::Option{<:SigmaSlot},
                                      chol::Option{<:MatNum},
                                      pe::Option{<:AbstractPriorEstimator},
-                                     dist::Distributions.Distribution)
+                                     dist::Distributions.Distribution,
+                                     mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm})
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
@@ -443,19 +450,17 @@ DistributionValueatRisk
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
         end
         assert_derived_slot_has_source(chol, sigma, :chol, :sigma)
-        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(pe), typeof(dist)}(mu,
-                                                                                      sigma,
-                                                                                      chol,
-                                                                                      pe,
-                                                                                      dist)
+        return new{typeof(mu), typeof(sigma), typeof(chol), typeof(pe), typeof(dist),
+                   typeof(mtx_sqrt)}(mu, sigma, chol, pe, dist, mtx_sqrt)
     end
 end
 function DistributionValueatRisk(; mu::Option{<:MuSlot} = nothing,
                                  sigma::Option{<:SigmaSlot} = nothing,
                                  chol::Option{<:MatNum} = nothing,
                                  pe::Option{<:AbstractPriorEstimator} = nothing,
-                                 dist::Distributions.Distribution = Distributions.Normal())::DistributionValueatRisk
-    return DistributionValueatRisk(mu, sigma, chol, pe, dist)
+                                 dist::Distributions.Distribution = Distributions.Normal(),
+                                 mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())::DistributionValueatRisk
+    return DistributionValueatRisk(mu, sigma, chol, pe, dist, mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -521,7 +526,7 @@ Create an instance of [`DistributionValueatRisk`](@ref) by resolving its Deferre
  1. Resolve the Deferred Quantities with [`resolve_deferred_quantities`](@ref).
  2. Select `sigma` and `chol` as a pair with [`sigma_chol_selector`](@ref).
  3. Take `mu` from the formulation, or from `pr` when the formulation states none.
- 4. Build the formulation with the three values, `pe = nothing` and the same `dist`.
+ 4. Build the formulation with the three values, `pe = nothing` and the same `dist` and `mtx_sqrt`.
 
 # Related
 
@@ -534,14 +539,14 @@ function factory(alg::DistributionValueatRisk, pr::AbstractPriorResult, args...;
     alg = resolve_deferred_quantities(alg, pr)
     sigma, chol = sigma_chol_selector(alg.sigma, alg.chol, pr)
     return DistributionValueatRisk(; mu = sel(alg.mu, pr.mu), sigma = sigma, chol = chol,
-                                   pe = nothing, dist = alg.dist)
+                                   pe = nothing, dist = alg.dist, mtx_sqrt = alg.mtx_sqrt)
 end
 function port_opt_view(alg::DistributionValueatRisk, i, args...)::DistributionValueatRisk
     mu = nothing_scalar_array_view(alg.mu, i)
     sigma = nothing_scalar_array_view(alg.sigma, i)
     chol = isnothing(alg.chol) ? nothing : view(alg.chol, :, i)
     return DistributionValueatRisk(; mu = mu, sigma = sigma, chol = chol, pe = alg.pe,
-                                   dist = alg.dist)
+                                   dist = alg.dist, mtx_sqrt = alg.mtx_sqrt)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -570,9 +575,9 @@ Where:
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
-``-x_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-x_{t}``. Without observation weights ``k = \\lfloor (\\alpha - s) T \\rfloor + 1``. This is ``\\lceil \\alpha T \\rceil``, the index of the lower ``\\alpha``-quantile, while ``s T`` is smaller than ``1 - (\\lceil \\alpha T \\rceil - \\alpha T)``. The slack also absorbs the rounding error of ``\\alpha T``. For example, at ``\\alpha = 0.07`` and ``T = 100`` the product rounds to 7.000000000000001, and ``k`` is 7.
+``-x_{(k)}`` is the minimum of the programme of [`MIPValueatRisk`](@ref) over the losses ``-x_{t}``. Without observation weights ``k = \\lfloor (\\alpha + s) T \\rfloor + 1``. This is ``\\lfloor \\alpha T \\rfloor + 1``, the index of the upper ``\\alpha``-quantile, while ``s T`` is smaller than ``\\lfloor \\alpha T \\rfloor + 1 - \\alpha T``. The slack absorbs the rounding error of ``\\alpha T``. For example, at ``\\alpha = 0.29`` and ``T = 100`` the product rounds to 28.999999999999996, and ``k`` is 30.
 
-The definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of the reference, Equation 7.50, with ``F`` the distribution function of the returns, gives the upper ``\\alpha``-quantile on a sample, the position ``\\lfloor \\alpha T \\rfloor + 1``. It differs from ``k`` by one position when ``\\alpha T`` is an integer. The measure follows the programme of the same reference, Equation 7.51, in its model and in its functor.
+``-x_{(k)}`` is the definition ``-\\inf\\{x : F(x) > \\alpha\\}`` of the reference, Equation 7.50, with ``F`` the weighted distribution function of the returns. It is the smallest loss that the portfolio exceeds with a probability of ``\\alpha`` or less. The programme of the same reference, Equation 7.51, subtracts its slack, and it selects ``\\lceil \\alpha T \\rceil``, which is one position higher when ``\\alpha T`` is an integer. At ``\\alpha T = 1`` that position is the largest loss.
 
 # Algorithm
 
@@ -600,7 +605,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 ## Propagated parameters
 
@@ -677,7 +682,7 @@ ValueatRisk
     function ValueatRisk(settings::RiskMeasureSettings, alpha::Num_SigCal,
                          w::Option{<:ObsWeights}, alg::ValueatRiskFormulation)
         assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(alg)}(settings, alpha,
                                                                             w, alg)
     end
@@ -724,7 +729,7 @@ calibration_slots(x::ValueatRisk) = (; alpha = x.alpha)
 # which no rule of specificity can order.
 function (r::ValueatRisk{<:Any, <:Any, <:Any, <:MIPValueatRisk})(x::VecNum)
     _, s = mip_var_bounds(r.alg.b, r.alg.s)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     return empirical_value_at_risk(isnothing(w) ? copy(x) : x, r.alpha, s, w)
 end
 # The parametric formulation is a different estimand from the empirical order statistic
@@ -797,7 +802,7 @@ Keywords correspond to the struct's fields.
 
   - If `alpha` is a number: `0 < alpha < 1`.
   - If `beta` is a number: `0 < beta < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 ## Propagated parameters
 
@@ -879,7 +884,7 @@ ValueatRiskRange
                               alg::ValueatRiskFormulation)
         assert_unit_interval(alpha, :alpha)
         assert_unit_interval(beta, :beta)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(beta), typeof(w), typeof(alg)}(settings,
                                                                                           alpha,
                                                                                           beta,
@@ -949,7 +954,7 @@ end
 # model builds it over the negated series.
 function (r::ValueatRiskRange{<:Any, <:Any, <:Any, <:Any, <:MIPValueatRisk})(x::VecNum)
     _, s = mip_var_bounds(r.alg.b, r.alg.s)
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     loss = empirical_value_at_risk(isnothing(w) ? copy(x) : x, r.alpha, s, w)
     gain = empirical_value_at_risk(-x, r.beta, s, w)
     return loss + gain
@@ -1024,7 +1029,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
   - If `b` is not `nothing`: `b > 0` and finite.
   - If `s` is not `nothing`: `s > 0` and finite.
   - If both `b` and `s` are not `nothing`: `b > s`.
@@ -1093,7 +1098,7 @@ DrawdownatRisk
                             w::Option{<:ObsWeights}, b::Option{<:Number},
                             s::Option{<:Number})
         assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         bflag = !isnothing(b)
         sflag = !isnothing(s)
         if bflag
@@ -1105,7 +1110,7 @@ DrawdownatRisk
         if bflag && sflag
             @argcheck(b > s,
                       DomainError((b, s),
-                                  "`b` is $b and `s` is $s. The big-M constant `b` relaxes a bound the slack `s` tightens, so `b > s` must hold."))
+                                  "`b` is $b and `s` is $s. The big-M constant `b` must be larger than the slack `s`."))
         end
         return new{typeof(settings), typeof(alpha), typeof(w), typeof(b), typeof(s)}(settings,
                                                                                      alpha,
@@ -1206,14 +1211,14 @@ Where:
 
 Without observation weights:
 
- 1. Set `k` to ``\\lfloor (\\alpha - s) T \\rfloor + 1``, clamped to the range from 1 to ``T``.
+ 1. Set `k` to ``\\lfloor (\\alpha + s) T \\rfloor + 1``, clamped to the range from 1 to ``T``.
  2. Partially sort `x`, so that its `k` smallest entries come first, in ascending order.
  3. Return minus the entry at `k`.
 
 With observation weights:
 
  1. Sort `x` with `sortperm`, giving `order`, and accumulate the sorted weights, giving `cum_w`.
- 2. Set `k` to one plus the last position at which `cum_w` does not exceed `(alpha - s)` times the total weight, and cap it at ``T``.
+ 2. Set `k` to one plus the last position at which `cum_w` does not exceed `(alpha + s)` times the total weight, and cap it at ``T``.
  3. Return minus the `k`-th smallest entry of `x`.
 
 # Arguments
@@ -1238,19 +1243,19 @@ With observation weights:
 """
 function empirical_value_at_risk(x::VecNum, alpha::Real, s::Real, ::Nothing)
     T = length(x)
-    k = clamp(floor(Int, (alpha - s) * T) + 1, 1, T)
+    k = clamp(floor(Int, (alpha + s) * T) + 1, 1, T)
     return -partialsort!(x, k)
 end
 function empirical_value_at_risk(x::VecNum, alpha::Real, s::Real, w::VecNum)
     order = sortperm(x)
     cum_w = cumsum(view(w, order))
-    k = min(searchsortedlast(cum_w, (alpha - s) * cum_w[end]) + 1, length(x))
+    k = min(searchsortedlast(cum_w, (alpha + s) * cum_w[end]) + 1, length(x))
     return -x[order[k]]
 end
 function (r::DrawdownatRisk)(x::VecNum)
     _, s = mip_var_bounds(r.b, r.s)
     return empirical_value_at_risk(absolute_drawdown_vec(x), r.alpha, s,
-                                   get_observation_weights(r.w, x))
+                                   checked_observation_weights(r.w, x))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -1309,7 +1314,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `alpha` is a number: `0 < alpha < 1`.
-  - $(val_dict[:oow_nonneg])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -1360,7 +1365,7 @@ RelativeDrawdownatRisk
     function RelativeDrawdownatRisk(settings::HierarchicalRiskMeasureSettings,
                                     alpha::Num_SigCal, w::Option{<:ObsWeights})
         assert_unit_interval(alpha, :alpha)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(alpha), typeof(w)}(settings, alpha, w)
     end
 end
@@ -1430,7 +1435,7 @@ end
 function (r::RelativeDrawdownatRisk)(x::VecNum)
     _, s = mip_var_bounds(nothing, nothing)
     return empirical_value_at_risk(relative_drawdown_vec(x), r.alpha, s,
-                                   get_observation_weights(r.w, x))
+                                   checked_observation_weights(r.w, x))
 end
 
 """

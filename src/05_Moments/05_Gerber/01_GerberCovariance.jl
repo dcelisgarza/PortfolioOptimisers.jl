@@ -227,7 +227,8 @@ $(DocStringExtensions.FIELDS)
         me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
         pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
         t::Number = 0.5,
-        alg::GerberCovarianceAlgorithm = Gerber1()
+        alg::GerberCovarianceAlgorithm = Gerber1(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> GerberCovariance
 
 Keywords correspond to the struct's fields.
@@ -243,6 +244,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
   - `ve`: Recursively updated via [`factory`](@ref).
   - `me`: Recursively updated via [`factory`](@ref).
   - `alg`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -250,6 +252,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -308,22 +311,49 @@ GerberCovariance
     $(field_dict[:gerbalg])
     """
     @fprop alg
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function GerberCovariance(ve::StatsBase.CovarianceEstimator,
                               me::AbstractExpectedReturnsEstimator,
                               pdm::Option{<:AbstractPosdefEstimator}, t::Number,
-                              alg::GerberCovarianceAlgorithm)
+                              alg::GerberCovarianceAlgorithm,
+                              cache::Option{<:AbstractPartialFitState})
         assert_nonempty_nonneg_finite_val(t, :t)
-        return new{typeof(ve), typeof(me), typeof(pdm), typeof(t), typeof(alg)}(ve, me, pdm,
-                                                                                t, alg)
+        return new{typeof(ve), typeof(me), typeof(pdm), typeof(t), typeof(alg),
+                   typeof(cache)}(ve, me, pdm, t, alg, cache)
     end
 end
 function GerberCovariance(; ve::StatsBase.CovarianceEstimator = SimpleVariance(),
                           me::AbstractExpectedReturnsEstimator = SimpleExpectedReturns(),
                           pdm::Option{<:AbstractPosdefEstimator} = Posdef(),
-                          t::Number = 0.5,
-                          alg::GerberCovarianceAlgorithm = Gerber1())::GerberCovariance
-    return GerberCovariance(ve, me, pdm, t, alg)
+                          t::Number = 0.5, alg::GerberCovarianceAlgorithm = Gerber1(),
+                          cache::Option{<:AbstractPartialFitState} = nothing)::GerberCovariance
+    return GerberCovariance(ve, me, pdm, t, alg, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`GerberCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:GerberCovariance, true)` to render it.
+
+# Arguments
+
+  - `::GerberCovariance`: Gerber covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ve, :me, :pdm, :t, :alg)`.
+
+# Related
+
+  - [`GerberCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::GerberCovariance) = (:ve, :me, :pdm, :t, :alg)
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 

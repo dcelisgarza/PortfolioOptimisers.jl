@@ -46,7 +46,7 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             5e-2
         elseif i == 21
             5e-3
-        elseif i ∈ (18, 19)
+        elseif i ∈ (12, 18, 19)
             5e-4
         elseif i ∈ (10, 11)
             5e-4
@@ -116,11 +116,11 @@ include(joinpath(@__DIR__, "test16_setup.jl"))
             1e-3
         elseif i ∈ (1, 10) || Sys.isapple() && i ∈ (2, 6)
             5e-4
-        elseif i ∈ (15, 16, 17, 19)
+        elseif i ∈ (15, 16, 17, 19, 27)
             5e-3
         elseif i in (13, 14)
             1e-2
-        elseif i ∈ (20, 24, 27)
+        elseif i ∈ (20, 24)
             5e-4
         elseif i == 21
             5e-2

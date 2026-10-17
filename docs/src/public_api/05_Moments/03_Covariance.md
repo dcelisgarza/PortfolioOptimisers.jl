@@ -1,8 +1,8 @@
 ```@meta
-Description = "Simple covariance, public API of PortfolioOptimisers.jl: GeneralCovariance, cov, cor, Covariance, partial_fit!, port_opt_view, merge_states, fold_inactive!."
+Description = "Covariance, public API of PortfolioOptimisers.jl: GeneralCovariance, cov, cor, Covariance, partial_fit!, port_opt_view, merge_states, fold_inactive!."
 ```
 
-# [Simple covariance](@id api-covariance)
+# [Covariance](@id api-covariance)
 
 The covariance matrix measures how the returns of the assets vary together. The mean-variance portfolio of Markowitz [markowitz1952](@cite) takes the portfolio variance as its risk, which is `w' Σ w` for the weights `w` and the covariance matrix `Σ`. This page has the sample covariance and correlation estimators.
 

@@ -36,7 +36,7 @@ A k-fold enumeration is not a timeline, so this scheme carries no Previous-Weigh
 ## Validation
 
   - `n` must be non-empty, greater than zero, and finite.
-  - `purged_size` and `embargo_size` must be non-empty and finite.
+  - `purged_size` and `embargo_size` must be non-empty, finite, and non-negative.
   - [`Base.split`](@ref) additionally checks `purged_size + embargo_size < div(T, n)`, because a gap as wide as the smallest fold would empty a training fold.
 
 # Examples
@@ -99,8 +99,8 @@ KFold
                    wd::Option{<:AbstractWeightDrift}, fa::Option{<:AbstractFeeAmortisation},
                    store_weight_path::Bool, strict::Bool)
         assert_nonempty_gt0_finite_val(n, :n)
-        assert_nonempty_finite_val(purged_size, :purged_size)
-        assert_nonempty_finite_val(embargo_size, :embargo_size)
+        assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
+        assert_nonempty_nonneg_finite_val(embargo_size, :embargo_size)
         return new{typeof(n), typeof(purged_size), typeof(embargo_size), typeof(wd),
                    typeof(fa), typeof(store_weight_path), typeof(strict)}(n, purged_size,
                                                                           embargo_size, wd,

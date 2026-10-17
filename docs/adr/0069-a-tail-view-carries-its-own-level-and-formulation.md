@@ -127,7 +127,7 @@ observations. `test/test_12h_entropy_pooling_tail_views.jl` holds the check.
 
 **Naming.** A **Tail View** is not a **View**. The latter is the library's index-selection
 mechanism; the collision is inherited from the entropy pooling literature, in which every
-`*_views` field is a statement about the distribution. `CONTEXT.md` holds both terms and the
+`*_views` field is a statement about the distribution. `GLOSSARY.md` holds both terms and the
 warning.
 
 ## Amendment (2026-09-01)
@@ -167,7 +167,7 @@ A search bracket takes one of two shapes, and the default decides which:
     whose constructor states that rule once.
 
 A fourth tail-view family takes shape 1 for a knob whose default needs the data, and shape 2 for a
-group of knobs whose defaults do not. `CONTEXT.md` holds the **Search Bracket** term and the
+group of knobs whose defaults do not. `GLOSSARY.md` holds the **Search Bracket** term and the
 warning that its two readings are not interchangeable.
 
 ## Amendment (2026-09-03)

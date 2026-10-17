@@ -42,7 +42,7 @@ end
     `ZeroVarianceFilter` is the 21st factory and the only one whose body raises. Its two
     prose claims -- the exclusive bound, so `tol = 0` still drops an exactly-constant asset,
     and the `DomainError` on a negative tolerance -- are pinned by
-    `test_35_asset_selection.jl`, which owns the selector. They are not repeated here.
+    `test_30_pipeline_base.jl`, which owns the selector. They are not repeated here.
     =#
 
     PO = PortfolioOptimisers
@@ -357,7 +357,7 @@ end
                                                                k = 4), alg = ex))
 
         # The 21st. Its `score` is `SCM()` and not `Variance`, which its docstring explains
-        # and `test_35_asset_selection.jl` proves by raising on `Variance`.
+        # and `test_30_pipeline_base.jl` proves by raising on `Variance`.
         @test alias_equal(ZeroVarianceFilter(; tol = 1e-8),
                           ScoreSelector(; score = SCM(), rule = ThresholdRule(; lo = 1e-8)))
 

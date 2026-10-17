@@ -184,7 +184,7 @@ steps, which is also the only place the layer's pieces are visible.
   takes one directly, and a carrier stating no span states no universe, which is ADR 0132's single
   meaning for `pnl === nothing`.
 
-- **`CONTEXT.md` mints no term.** Its **Coverage Universe** *Avoid* line gains one clause: an
+- **`GLOSSARY.md` mints no term.** Its **Coverage Universe** *Avoid* line gains one clause: an
   estimator reading a second input narrows further within its own fit, which is that estimator's
   reduction rather than a different Coverage Universe. The definition itself is unchanged, because
   the Coverage Universe is still finiteness of the return and the active mask.

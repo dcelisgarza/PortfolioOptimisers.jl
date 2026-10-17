@@ -1,8 +1,8 @@
 ```@meta
-Description = "The exact projection weight finalisers, private API of PortfolioOptimisers.jl: weights_break_bounds, euclidean_weight_projection, …"
+Description = "Projection weight finalisers, private API of PortfolioOptimisers.jl: weights_break_bounds, euclidean_weight_projection, entropic_weight_projection, …"
 ```
 
-# The exact projection weight finalisers: private API
+# Projection weight finalisers: private API
 
 ```@docs
 PortfolioOptimisers.weights_break_bounds

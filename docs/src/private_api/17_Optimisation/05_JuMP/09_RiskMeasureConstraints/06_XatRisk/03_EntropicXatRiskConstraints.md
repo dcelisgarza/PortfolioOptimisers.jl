@@ -10,3 +10,10 @@ set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRiskRange, op
 set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicDrawdownatRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_entropic_risk_constraints!
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```

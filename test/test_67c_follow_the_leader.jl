@@ -61,6 +61,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test_throws DomainError NearestNeighbourMatch(; neighbours = 1.0)
         @test_throws DomainError CorrelationMatch(; rho = 1.5)
         @test_throws DomainError ClusterMatch(; window = 0)
+        # The clusterer reads the windows of the selector, in the frame of the step, so it
+        # is an inner reader and states no source (ADR 0211, decisions 3 and 7).
+        @test_throws ArgumentError ClusterMatch(;
+                                                clusterer = ClustersEstimator(;
+                                                                              x_src = ExcessSource()))
         @test isnothing(po.rows_needed(Prefix()))
         @test po.rows_needed(LastRows(; W = 7)) == 7
         @test isnothing(po.rows_needed(CorrelationMatch()))
@@ -204,7 +209,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test v.alg.sel === Prefix()
         # The buffer holds returns; the selector reads relatives.
         st = po.partial_fit!(ftl, rows(rd, 1:5)).cache
-        @test po.sample_buffer(st.X) == R[1:5, :]
+        @test po.sample_buffer(st.X.X) == R[1:5, :]
     end
 
     @testset "Follow the leader over a JuMP head equals the walk-forward" begin
@@ -313,6 +318,74 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test maximum(abs.(rl.w .- w30)) < 2e-9
         @test isapprox(optimise(OPS(; alg = FollowTheLeader(; opt = long)), rows(rd, 1:30)).w,
                        w30; atol = 1e-8)
+    end
+
+    @testset "A leader in the Excess Frame fits the excess returns its rows carry (#1646)" begin
+        # The rows buffer of the head keeps every field of the rows, the benchmark among
+        # them, so the leader picks `X - B` as a batch fit over the same window does
+        # (ADR 0204).
+        Bv = 0.01 .* randn(StableRNG(1646), T)
+        rdB = ReturnsResult(; nx = nx, X = R, ts = ts, nb = ["BM"], B = Bv)
+        minv(xs = nothing) = MeanRisk(; obj = MinimumRisk(),
+                                      opt = JuMPOptimiser(;
+                                                          pe = EmpiricalPrior(; x_src = xs),
+                                                          slv = slv))
+        lead = minv(ExcessSource())
+        ftl = OPS(; alg = FollowTheLeader(; opt = lead))
+        win = po.buffer_returns_result(po.partial_fit!(ftl, rows(rdB, 1:8)).cache.X)
+        @test win.X == R[1:8, :] &&
+              win.B == Bv[1:8] &&
+              win.nb == ["BM"] &&
+              win.ts == ts[1:8]
+        # Follow the leader equals the walk-forward of its leader, fold for fold.
+        k = 5
+        pred = cross_val_predict(lead, rdB, IndexWalkForward(k, 1; expand_train = true))
+        for i in 1:4
+            @test isapprox(pred.pred[i].res.w, optimise(ftl, rows(rdB, 1:(k + i - 1))).w;
+                           atol = 1e-5)
+        end
+        # The benchmark moves a minimum-variance leader: var(x'w - b) is not var(x'w).
+        @test !isapprox(optimise(ftl, rows(rdB, 1:12)).w,
+                        optimise(OPS(; alg = FollowTheLeader(; opt = minv())),
+                                 rows(rdB, 1:12)).w; atol = 1e-2)
+        # A leader in the Excess Frame on rows with no benchmark refuses: no excess return
+        # exists without one.
+        @test_throws ArgumentError optimise(ftl, rows(rd, 1:8))
+    end
+
+    @testset "The built-in programmes take the source of the leader's prior (#1663)" begin
+        # SPOLC and OLDEM give their prior to the `MeanRisk` they build, so each equals the
+        # walk-forward of its own leader over the window of its selector, fold for fold. The
+        # turnover fee of OLDEM measures from the head's book, and that of a walk-forward
+        # from its own last weights, so the parity takes `xi = 0`.
+        Bm = 0.01 .* randn(StableRNG(1663), T, N)
+        rdm = ReturnsResult(; nx = nx, X = R, ts = ts, nb = nx .* "_b", B = Bm)
+        sp(xs) = ShortTermLossControlPortfolio(; slv = slv,
+                                               pe = EmpiricalPrior(;
+                                                                   ce = RankOneCovariance(),
+                                                                   x_src = xs))
+        ld(xs; xi = 0.002) = LowDimensionEnsemblePortfolio(; N = N, slv = slv,
+                                                           pe = LowDimensionEnsemblePrior(;
+                                                                                          x_src = xs),
+                                                           xi = xi)
+        @test po.returns_source(sp(ExcessSource()).opt.opt.pe) === ExcessSource()
+        @test isnothing(po.returns_source(sp(nothing).opt.opt.pe))
+        @test po.returns_source(ld(ExcessSource()).opt.opt.pe) === ExcessSource()
+        @test isnothing(po.returns_source(ld(nothing).opt.opt.pe))
+        for (alg, k) in ((sp(ExcessSource()), 5), (ld(ExcessSource(); xi = 0.0), 6))
+            ftl = OPS(; alg = alg)
+            pred = cross_val_predict(alg.opt, rdm, IndexWalkForward(k, 1))
+            for i in 1:6
+                @test isapprox(pred.pred[i].res.w,
+                               optimise(ftl, rows(rdm, 1:(k + i - 1))).w; atol = 1e-6)
+            end
+        end
+        # The benchmark moves the leader.
+        for alg in (sp, ld)
+            @test !isapprox(optimise(OPS(; alg = alg(ExcessSource())), rows(rdm, 1:16)).w,
+                            optimise(OPS(; alg = alg(nothing)), rows(rdm, 1:16)).w;
+                            atol = 0.5)
+        end
     end
 
     @testset "The Allocation Set Constraint (ADR 0164)" begin
@@ -578,11 +651,13 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         @test eltype(S32) == Float32 && isapprox(S32, S; rtol = 1e-4)
         # The factor: bitwise the Cholesky where it exists, a PSD factor where it does not.
         A = cov(R)
-        @test po.covariance_factor(A) == cholesky(A).U
-        G = po.covariance_factor(S)
-        @test isapprox(G' * G, S; atol = 1e-12)
-        @test_throws LinearAlgebra.PosDefException po.covariance_factor([1.0 0.5; 0.4 1.0])
-        @test_throws LinearAlgebra.PosDefException po.covariance_factor(-A)
+        ef = EigenFallbackSquareRoot()
+        @test matrix_square_root(ef, A) == cholesky(A).L
+        L = matrix_square_root(ef, S)
+        @test isapprox(L * L', S; atol = 1e-12)
+        @test_throws LinearAlgebra.PosDefException matrix_square_root(ef,
+                                                                      [1.0 0.5; 0.4 1.0])
+        @test_throws LinearAlgebra.PosDefException matrix_square_root(ef, -A)
     end
 
     @testset "ShortTermLossControlPortfolio" begin
@@ -829,7 +904,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
                 string(@doc(RankOneCovariance)),
                 string(@doc(ShortTermLossControlPortfolio)),
                 string(@doc(po.AllocationSetConstraint)),
-                string(@doc(po.AbstractSampleSelector)), string(@doc(po.covariance_factor))]
+                string(@doc(po.AbstractSampleSelector)), string(@doc(matrix_square_root))]
         @test all(d -> !occursin("No documentation found", d), docs)
         @test occursin("follow-the-leader rule", docs[1])
     end

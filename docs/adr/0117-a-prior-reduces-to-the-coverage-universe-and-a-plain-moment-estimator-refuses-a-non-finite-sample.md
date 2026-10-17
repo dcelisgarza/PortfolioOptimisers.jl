@@ -26,10 +26,10 @@ sample whose fourth asset lists at observation 31:
 - `MutualInfoCovariance` throws `InexactError: Int64(NaN)`.
 - `RegimeAdjustedExpWeightedVariance` handles the gap through its `active_mask` keyword.
 
-The reference implementation refuses a `NaN` in every plain estimator and handles a gap in its
+The oracle refuses a `NaN` in every plain estimator and handles a gap in its
 exponentially weighted family alone, through an `active_mask` input, a per-asset observation count,
 a freeze on a holiday, a reset on an inactive period, a warm-up `NaN` and a bias correction. Its
-prior reduces nowhere. A caller of the reference cannot fit a Gerber or a sample covariance on a
+prior reduces nowhere. A caller of the oracle cannot fit a Gerber or a sample covariance on a
 gapped panel at all.
 
 The glossary already says that a Prior Estimator fits on the coverage universe and returns a result
@@ -53,9 +53,9 @@ includes a regression result: its rows outside the Coverage Universe are `NaN`.
 ### The Coverage Universe is finite and active at every row
 
 An asset is in the Coverage Universe of one fit when its return is finite and the panel's active
-mask is `true` at every row of the window. That is the reference's per-cell rule,
+mask is `true` at every row of the window. That is the oracle's per-cell rule,
 `valid = isfinite(X) & active_mask`, taken over the whole window. The estimation mask is not read:
-the reference reads it for a regime signal only, never for a moment. With no panel, or a panel
+the oracle reads it for a regime signal only, never for a moment. With no panel, or a panel
 with no masks, the rule is finiteness alone.
 
 A complete window yields `nothing`, and that sentinel skips the slice and the expansion, as the
@@ -157,7 +157,7 @@ Two assets whose observed rows do not intersect — each quoting on rows the oth
 at the last row — are each admitted on their own share and share no observation, so their pair is
 `NaN` while both diagonals are finite. The refusal therefore cannot live only in the framed branch:
 a matrix whose diagonal is finite everywhere still reaches it, and the caller is told which pair and
-why. The reference's own peel is defensive for a pairwise estimator, which the library does not
+why. The oracle's own peel is defensive for a pairwise estimator, which the library does not
 have.
 
 ### The third and fourth order take the policy, and the block rule is one law
@@ -205,7 +205,7 @@ named.
 
 ### The exponentially weighted family is ported on the same seam
 
-The reference's three exponentially weighted estimators, and the fit that
+The oracle's three exponentially weighted estimators, and the fit that
 [#692](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/692) found missing on
 `RegimeAdjustedExpWeightedCovariance`, are the mask-aware answer for a young asset. They enter
 through the panel override, and the identities the census of
@@ -233,7 +233,7 @@ for a covariance.
 | The third and fourth order | Filling an empty cell before the spectral step, with zero or the complete-case value. | It fabricates a number, which is what the plain path refuses to do, and the library has just removed its last silent fill. |
 | The mixed configuration | Refusing a policy on the low order without one on `ske` and `kte`. | The configuration is well defined once the mask reads every order, and refusing it would make an opt-in field mandatory in a place the caller did not ask for it. |
 | The block repair | `matrix_processing!` derives the block for every caller. | Every plain path then accepts a frame, which relaxes a finiteness check in advance. |
-| The block repair | The reference's greedy peel. | No estimator can make it fire, and a peel hides a defect. |
+| The block repair | The oracle's greedy peel. | No estimator can make it fire, and a peel hides a defect. |
 
 ## Consequences
 
@@ -261,7 +261,7 @@ for a covariance.
   derived at every optimiser entry and a derivation owes no side effect, so `assert_matched_coverage`
   runs once, where the high-order prior is assembled, and the mask narrows in silence.
 - Under the exponentially weighted family a young asset is investable while its early scenario
-  rows are `NaN`. The reference zero-fills those rows and warns. What the library does with them
+  rows are `NaN`. The oracle zero-fills those rows and warns. What the library does with them
   is the measures decision of the map.
 - `prices_to_returns` dropped every row that still held a missing entry when this was decided, so
   a gapped panel reached the moments only through a hand-built `ReturnsResult`. Map
@@ -272,3 +272,249 @@ for a covariance.
   own fell to the generic `cor`, which called `cov` again. A defect of the fallback chain and not of
   this decision; `c42ec32d12` gave `AbstractVarianceEstimator` a `cov` and a `cor` that throw a
   `MethodError` naming the verb, and a `std` that resolves from `var` alone.
+
+## Amendment (2026-09-29)
+
+**The block holds the variances that are finite and not zero.** A variance that is exactly zero
+belongs to a constant variable, such as cash at a zero return or a bootstrap deviation that every
+resample reproduces to the bit. It is finite, so it stayed inside the block, and every step that
+converts to a correlation, the positive definite repair, the denoising and the detoning, divided
+its row by zero and met LAPACK's `matrix contains Infs or NaNs`.
+[#1429](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1429) found it on the
+circular bootstrap ellipsoid at `block_size >= T`.
+
+The answer is forced, not chosen. The repair keeps the diagonal, and every 2×2 principal minor of a
+positive semidefinite matrix is non-negative, `Σᵢᵢ Σⱼⱼ − Σᵢⱼ² ≥ 0`, so `Σᵢᵢ = 0` forces a zero row
+and column. The maintainer chose that rule over a named refusal and over an invented variance.
+
+- `zero_variance_rows!` sets the row and column of each zero variance to zero, inside the finite
+  rows alone, and returns the block of the others. The test is `iszero`, with no tolerance.
+- `matrix_processing_block!`, both methods, takes its block from that helper. Every step runs on
+  the positive block, and the `NaN` frame around it stays as it is.
+- The bare `posdef!` applies the same rule above its algorithm, so every direct caller and every
+  `Posdef` algorithm gets it. This is the one change to the sentence above that the bare
+  `posdef!` keeps its whole-matrix refusal: it still refuses a `NaN`, and no longer a zero variance.
+- The result is positive semidefinite and not positive definite. No warning comes for the zero
+  rows, because they are the correct answer. The docstrings state the rule, and the warning of
+  `posdef!` fires only when the positive block stays indefinite.
+
+The oracle of map [#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375)
+refuses a variance that is not positive, so this is a **Better** row of that map. A negative
+variance is out of scope and keeps its `DomainError`.
+
+## Amendment (2026-10-07)
+
+**The factor side of the Cross-Sectional Factor Prior gates each asset, as its idiosyncratic side
+already did.** The prior states `mu_i = b_i + B_i' mu_f` and `sigma_ij = B_i' F B_j + D_ij`. Entry
+`i` reads the factor moments only on the support of `B_i`, the factors where its loading is not
+zero. So a factor that the factor prior states no moment for cannot change an entry of an asset
+with a zero loading on it. Before this amendment, the prior refused the whole fit when one factor
+moment was not finite, and the oracle of map
+[#1375](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1375) does the same. The
+maintainer chose the third rule on row R83 of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416), and
+[#1510](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1510) built it.
+
+- A factor is **ready** when its mean and its variance are finite, which is the rule of the
+  Investable Mask read over the factors. `cross_sectional_ready_factors` states it, and refuses a
+  non-finite covariance between two ready factors by name. A factor prior that is a
+  `LowOrderPrior` already keeps that rule, so only a processing step or a direct call reaches the
+  refusal.
+- An asset is **determined** when its loadings are finite and its support holds only ready
+  factors. `cross_sectional_determined` states it. The Investable Mask of the prior holds a
+  determined asset only, so an asset that loads on a factor with no moment leaves through it, as an
+  asset with no idiosyncratic variance does.
+- Every product of the loadings with a factor moment reads the support alone, through
+  `support_product`, because `0 * NaN` is `NaN`. An entry is `NaN` exactly where its product reads
+  a `NaN` factor moment. The same product expands the factor covariance under a constrained family,
+  so a `NaN` of one family does not reach a dropped factor of another.
+- The factor covariance is processed with `matrix_processing_block!`: the block of the finite
+  variances is processed, and the `NaN` frame stays as it is. A hole inside that block takes the
+  refusal of that verb.
+- The named `IsNonFiniteError` of `assert_cross_sectional_factor_moments` fires only when no asset
+  is determined. It keeps the counts of the non-finite factor means and covariance entries, and the
+  advice about the cumulative warm-ups.
+- A Spanned Shrinkage rule reads the estimated factors with a finite mean and a finite variance
+  alone, and the blend at `lambda = 0` reads no factor mean.
+
+The observed factors keep their own refusal: an observed factor return that is not finite on a
+fitted observation still refuses the fit before the factor prior runs. So a gap in one factor
+reaches this rule only through the factor prior itself.
+[#1530](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1530) holds the decision on
+a late observed series.
+
+**A repair that leaves the block indefinite refuses, and it does not warn.** The amendment of
+2026-09-29 says that the warning of `posdef!` fires when the positive block stays indefinite.
+[#1506](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1506) removed that warning.
+Every `Posdef` repair now ends with `assert_posdef_repair`, which raises a `PosdefRepairError`
+when the result is not finite or its smallest eigenvalue is below the tolerance of the eigen square
+root. A result that passes returns with no message, singular or not, so the zero rows of a zero
+variance still pass. [ADR 0186](0186-an-oracle-mode-is-built-when-a-caller-cannot-reach-its-output-and-ten-differences-are-deliberate.md)
+states the rule.
+
+## Amendment (2026-10-07, #1511)
+
+**A Coverage Policy peels the assets of an undetermined pair at admission.** The sentence "There
+is no peel" above describes the library up to this date. Row R86 of
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) replaced it with a
+family of rules, and [#1511](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1511)
+built it.
+
+A pair is **undetermined** when both of its assets are admitted and have a variance, and the pair
+shares too few observations for a covariance (`nu_ij - corrected < 1`). The undetermined pairs
+make a graph, and a set of assets removes every pair exactly when it is a vertex cover of that
+graph. The smallest cover keeps the most assets.
+
+- `CoveragePolicy` has a field `peel`, bound to the public abstract type `AbstractPeel`. Its verb
+  `peel_assets(peel, U)` returns the vertices to remove from the adjacency matrix `U`.
+- `MinimalPeel()` is the default. It is the exact minimum vertex cover. It returns the greedy
+  cover when that cover is minimum, and the lexicographically smallest minimum cover otherwise.
+- `GreedyPeel()` is the oracle's rule: the asset with the most undetermined pairs first, the
+  smallest index on a tie. It can remove more than the minimum. On the star X-(A1, A2, A3) whose
+  leaves each carry one edge Ai-Li it removes four assets, where three suffice.
+- `NoPeel()` removes nothing. The `NaN` reaches `matrix_processing_block!`, which refuses it with
+  the `IsNonFiniteError` and the message it had before.
+
+**The peel runs at admission, not in the matrix repair.** `coverage_peel` runs after
+`coverage_admission` in each available-case covariance: the state arm, which the batch
+`FullMoment` arm reads, and the two-pass `SemiMoment` arm. A peeled asset is `NaN` across its row
+and column, so the Investable Mask drops it, and every consumer of the result reads one universe.
+A peel inside `matrix_processing_block!` would remove the asset from the covariance and keep it in
+the Coverage Universe. The refusal of that function stays for every other source of the `NaN`.
+
+**A peel removes data, so the caller is told.** `coverage_peel` reports through
+`strict_diagnostic`: a warning names the peeled assets, the count of undetermined pairs and the
+rule, and `strict = true` refuses with an `ArgumentError`. The covariance verbs take `strict`, and
+`EmpiricalPrior` passes its own `strict` to its covariance, in the batch fit and in the readout of
+a fold. The second argument of this decision, that a peel is a second silent universe rule, holds
+no more: the peel is part of admission, and it is never silent.
+
+A mean and a variance have no pairs, so the rule binds on a covariance and a correlation alone.
+The third and fourth co-moments keep the refusal of the block rule for an undetermined triple or
+quadruple. The table row "The block repair" of *Considered options* records the choice of that
+date.
+
+## Amendment (2026-10-12, #1648)
+
+**A plain moment estimator reads an inactive cell as a non-finite return, in every form.** The
+rule of the Coverage Universe is the per-cell rule `valid = isfinite(X) & active_mask`. The panel
+form applied it, but the two other forms of a plain estimator did not.
+[#1648](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1648) measured the gap: on a
+40×4 sample whose third asset is inactive for 12 rows where its returns are finite, `mean(me, X,
+pnl)` and `prior(EmpiricalPrior(), rd)` answered `NaN` for that asset. `mean(me, X; active_mask)`,
+`partial_fit!(me, X; active_mask)`, the carry route and the `Online` refit route answered a finite
+mean over every row. So the batch fit of a prior and its two online routes disagreed.
+
+The issue offered two rules. The second, a panel form that reads the mask as the keyword form did,
+would break the per-cell rule above and the oracle. The first keeps one rule, so it is the
+decision. Each form now gives the answer that it already gave for a non-finite return:
+
+- **The panel form, and the panel form with mask keywords.** `coverage_reduction` takes an
+  `active_mask` keyword, and `coverage_mask_source` reads it in the place of the mask of the panel.
+  The root of each moment verb, the Coverage Universe route of `coverage_panel_moment`, the panel
+  methods of `ImpliedVolatility` and `PriceLevelExpectedReturns`, `FactorPrior`,
+  `FactorBlackLittermanPrior` and `LowDimensionEnsemblePrior` pass it there, and do not pass it on
+  to the plain fit, whose block is active at every row. So `prior(pe, X; active_mask = A)`, the
+  call of the refit route, reaches the Coverage Universe of `prior(pe, rd)`. The keyword takes the
+  place of the mask of the panel when a caller gives both, as it already did on the route of a
+  mask-aware estimator.
+- **The keyword form.** Each plain arm that takes `active_mask`, of `SimpleExpectedReturns`,
+  `SimpleVariance`, `Covariance`, `Coskewness` and `Cokurtosis`, refuses an inactive cell through
+  `assert_finite_sample(X, active_mask)`, with the `IsNonFiniteError` that it gives for a `NaN`.
+  It ignored the mask before.
+- **The fold.** A plain state carries one count for every asset, so it cannot skip one cell.
+  `inactive_as_nonfinite` writes `NaN` in an inactive cell before the plain fold reads it, and the
+  `NaN` stays in the running moments of that asset, as a non-finite return already did. Over an
+  expanding window this is the reduce-and-expand: an asset with one inactive row in `[1..t]` is
+  outside the Coverage Universe of every fit that holds the row.
+
+The carry route of `EmpiricalPrior()` and `HighOrderPriorEstimator()` now equals the batch fit to
+the rounding of the recursion, and the refit route equals it exactly. Under a Coverage Policy
+nothing changes.
+
+## Amendment (2026-10-13, #1672)
+
+The Coverage Universe read `X` alone. The benchmark `B`, the implied volatilities `iv` and the
+factor returns `F` had no rule, and one gap in each did more damage than a gap in `X` at the same
+cells. A `NaN` in a vector `B[t]` under `brt = true` made row `t` of every excess return `NaN`, so
+every asset left the Coverage Universe and the prior threw `IsEmptyError`. A `NaN` in `F[t, k]`
+gave factor `k` `NaN` moments and went into the regression. A wrapper that held an
+`ImpliedVolatility` read `N` columns of `iv` against fewer columns of `X`.
+
+### A gap in a Shared Series drops the observation
+
+A **Shared Series** is a series that every asset reads at the same observation: a vector benchmark
+under `brt`, and each column of the factor returns of a fit that reads them. The rule above removes
+an asset because a gap in `X[t, i]` damages the data of asset `i` alone. A gap in a Shared Series at
+`t` leaves no asset a value at `t`, so the fit drops observation `t` and keeps every asset. The drop
+removes no value that an asset still had. The maintainer chose it over the old answer, which failed
+for every input, and over a factor mask carried on the Asset Panel or the `ReturnsResult`: a
+regression needs complete rows, and a mask would cost a field on every carrier for no reader.
+
+`shared_series_view(rd, brt, rf)` makes the drop through `port_opt_view(rd, rows, :)`, so every
+field loses the same observations. It runs once, at the outermost entry that holds the data,
+because about fifteen readers pair the observations of a prior with the last observations of the
+returns data, and a drop inside a prior would misalign each of them. The entries are `prior(pe,
+rd)`, the uncertainty sets over a `ReturnsResult`, `regression(re, rd)`,
+`resolve_factor_regression`, `forecast_location`, the batch entry of every optimiser through
+`shared_series_args` (the generic entry, and the `optimise` method of each head with no fallback
+since #1688), the uncertainty step of a `Pipeline`, and `covariance_forecast_evaluation`
+under `brt`, before it splits the folds. A fit reads `F` when `needs_factor_returns` answers `true`,
+which `reads_factor_returns` states. A regression on matrices refuses a non-finite factor row with
+`IsNonFiniteError`, because its caller chose the observations.
+
+An online step keeps the observation and marks it (#1675). An optimiser appends each observation
+to the buffer of its prior and to its Fold Context together, and `optimise(opt)` rebuilds the
+returns data from both, row by row, so neither can skip a row. `fold_prior` finds the marks with
+`shared_series_gaps` under the `brt` of the optimiser, because a prior under `brt` reads `X - B` and
+cannot see a gap of `B`, and `partial_fit!(pe, rd)` finds them from the factor returns. The marks
+travel through `fold_prior_step`, the verb of every route of the step, into the field `G` of the
+`SampleBufferState`. Every fit through the buffer reads `shared_series_buffer`, which drops the
+marked rows: the refit, the read of a carry, the high order co-moments, the Choice Rule and the
+forecast location. A carry fold leaves the marked rows out of its running moments, and the carry of
+a Cross-Sectional Factor Prior out of its histories, whose offsets count the kept rows with
+`buffer_fit_count`. `batch_from_state` cuts the rebuilt returns data with the rule of the prior
+estimator, before the prior becomes a result. So the call with no data equals the batch fit over
+the observations folded, and the last-rows pairing holds.
+
+The step keeps the row, and does not cut it before both buffers, for two reasons. A cap counts every
+row, so `Online(pe; max_history = w)` stays the rolling batch fit over the last `w` observations of
+the data, as the training window of a walk-forward counts them before the drop. And `Resume` aligns
+the state with the data by a contiguous span of the held timestamps, which a cut would break.
+
+A step with no gap costs what it cost before. `G` is `nothing` until the first gap, it is a declared
+field and not a type parameter, so the type of the estimator does not depend on the data, and every
+reader on the path of a step returns early when `G` is `nothing`. A step after a gap stays amortised
+`O(1)`: the Choice Rule copies the kept rows only while a choice is pending. A fit through a buffer
+with a gap copies the kept rows, which costs the same order as the refit that reads them.
+
+The cost is stated here. A fit now deletes an observation, which this ADR and ADR 0130 did not do.
+An estimator that reads observations by position, an exponentially weighted moment or a lagged
+Descriptor, moves each older observation by one step. The positions of the row key of a factor
+model block count the observations of the view, and its timestamps name them exactly.
+
+### A per-asset series acts as `X`
+
+A matrix `B` and `iv` hold one series for each asset, so a gap in them acts as a gap in `X` at the
+same cell.
+
+- Under `brt`, a gap in a matrix `B` is a `NaN` excess return, so it leaves the Coverage Universe
+  through `X - B`. `benchmark_estimation_mask` also writes it into the estimation mask, for a
+  cross-sectional reader. With `brt = false` no fit reads `B`, so the ingestion layer still derives
+  the estimation mask from `X` alone.
+- The reduce-and-expand root of every moment verb reduces the per-asset keywords `iv` and `ivpa`
+  with `X`, through `coverage_keyword_reduction`. A gap in `iv` narrows the Coverage Universe when
+  `reads_implied_volatility` finds an `ImpliedVolatility` in the tree of the estimator, on every
+  route and not only on the panel method of `ImpliedVolatility`.
+- A product with weights reads the cells that the portfolio reads. `benchmark_cells` zeroes a cell
+  of a matrix `B` where `B` or `X` is not finite or the asset is inactive, as `filter_held_gaps`
+  zeroes the cell of `X`. `collapse_rate` reads the finite active cells of `iv`, and the fold of a
+  cross-validation collapses `iv` and `ivpa` through `collapse_fold_rate`, with the active mask and
+  `RenormaliseActive`, as a meta-optimiser does.
+
+### `MissingDataFilter` counts the same gaps
+
+The column decision counts a gap in the implied volatility or in the own column of a per-asset
+benchmark as a missing observation of that asset. The row decision counts a gap in a one-column
+benchmark or in a factor as an observation that misses every asset. The default `row_thr = 1`
+drops no observation, so the default output does not change.

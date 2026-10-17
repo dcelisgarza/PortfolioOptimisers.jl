@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the first set, private API of PortfolioOptimisers.jl: NewtonStepState, ExpertMixtureState, expert_start_allocation, …"
+Description = "Online Selection Rules, private API of PortfolioOptimisers.jl: NewtonStepState, ExpertMixtureState, expert_start_allocation, expert_start_weights, …"
 ```
 
-# Online selection rules: the first set: private API
+# Online Selection Rules: private API
 
 ```@docs
 PortfolioOptimisers.NewtonStepState

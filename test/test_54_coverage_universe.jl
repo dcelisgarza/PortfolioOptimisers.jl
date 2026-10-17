@@ -153,7 +153,7 @@ end
     keep = [1, 2, 3]
     iv = fill(0.25, T, N)
     ivpav = [1.1, 1.2, 1.3, 1.4]
-    ce = ImpliedVolatility(; alg = ImpliedVolatilityPremium())
+    ce = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
     sigma = Statistics.cov(ce, Xlist, pnl_full; iv = iv, ivpa = 1.2)
     @test all(isnan, sigma[4, :])
     @test sigma[keep, keep] ==

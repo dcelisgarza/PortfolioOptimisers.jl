@@ -1,7 +1,12 @@
 ```@meta
-Description = "Windowed variance has no private API in PortfolioOptimisers.jl; its names are in the public API."
+Description = "Windowed variance, private API of PortfolioOptimisers.jl: variance_series."
 ```
 
 # Windowed variance: private API
 
-Every name of this topic is public. The [public page](@ref api-windowed-variance) documents them.
+## Functions
+
+```@docs
+variance_series(ve::WindowedVariance, X::MatNum; dims::Int = 1, kwargs...)
+variance_series(ve::WindowedVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+```

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Weight bounds constraints, public API of PortfolioOptimisers.jl: WeightBounds, UniformValues, WeightBoundsEstimator, weight_bounds_constraints."
+Description = "Weight bounds constraint generation, public API of PortfolioOptimisers.jl: WeightBounds, UniformValues, WeightBoundsEstimator, weight_bounds_constraints."
 ```
 
-# Weight bounds constraints
+# Weight bounds constraint generation
 
 ```@docs
 WeightBounds

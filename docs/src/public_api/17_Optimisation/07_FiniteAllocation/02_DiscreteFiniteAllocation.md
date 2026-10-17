@@ -1,8 +1,8 @@
 ```@meta
-Description = "Discrete allocation, public API of PortfolioOptimisers.jl: DiscreteAllocationResult, DiscreteAllocation, factory, optimise."
+Description = "Discrete finite allocation, public API of PortfolioOptimisers.jl: DiscreteAllocationResult, DiscreteAllocation, factory, optimise."
 ```
 
-# Discrete allocation
+# Discrete finite allocation
 
 ```@docs
 DiscreteAllocationResult

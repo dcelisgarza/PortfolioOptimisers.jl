@@ -261,7 +261,7 @@ is no other.
   `PriceGapFill`'s bound — and both paragraphs are replaced. A carrier with no span now states no
   universe and is not filled; `PriceGapFill` keeps its `strict` field, because it now reports that
   it filled nothing and why, and refuses under `strict`, rather than guessing a span from a window.
-- **`CONTEXT.md`** mints no term. Its **Universe Policy** entry loses the exception the conversion
+- **`GLOSSARY.md`** mints no term. Its **Universe Policy** entry loses the exception the conversion
   was, and its **Span Rule** *Avoid* line is unchanged.
 - **What this ADR left open is now settled.** What `PriceIngestion`'s own defaults are once a bare
   `TimeArray` call runs it is answered by

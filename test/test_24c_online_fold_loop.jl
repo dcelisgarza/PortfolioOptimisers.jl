@@ -85,6 +85,27 @@ assets is what keeps the JuMP families cheap.
         @test seen == 1:n
     end
 
+    @testset "A benchmark-relative walk fits X - B at every fold (#1645, #1651)" begin
+        # A prior that states `x_src = ExcessSource()` fits `X - B` at every fold. The step
+        # folds `X - B` into the prior and keeps the raw rows, so the online walk reaches the
+        # batch weights fold for fold (ADR 0215, decision 1).
+        Bv = randn(StableRNG(1645), T) ./ 100
+        rdb = ReturnsResult(; nx = nx, X = X, ts = ts, nb = ["BM"], B = Bv)
+        epx = EmpiricalPrior(; x_src = ExcessSource())
+        for opt in (MeanRisk(; opt = JuMPOptimiser(; pe = epx, slv = slv)),
+                    HierarchicalRiskParity(;
+                                           opt = HierarchicalOptimiser(; pe = epx,
+                                                                       cle = ClustersEstimator(;
+                                                                                               x_src = ExcessSource()))))
+            b = cross_val_predict(opt, rdb, batch_cv)
+            o = cross_val_predict(opt, rdb, online_cv)
+            @test length(o.pred) == length(b.pred)
+            for (pb, po_) in zip(b.pred, o.pred)
+                @test isapprox(po_.res.w, pb.res.w; atol = weight_tol(opt))
+            end
+        end
+    end
+
     @testset "The capped identity: a rolling scheme equals an online one with a capped prior" begin
         rolling = IndexWalkForward(w + p, t; purged_size = p)
         stepped = OnlineIndexWalkForward(w + p, t; purged_size = p)
@@ -232,6 +253,27 @@ assets is what keeps the JuMP families cheap.
         @test po.online_entry_state(partial_fit!(mr, rows(rd, 1:5))) == "opt.cache"
         @test isnothing(po.online_entry_state(nothing))
         @test isnothing(po.online_entry_state(TimeDependent([me]; default = me)))
+        # Found by #1638: the walk read the fields of `estimator_fields` alone, which skips a
+        # vector, so a Descriptor that the caller folded in a factor list escaped it, and the
+        # first step of the carry fold read its state.
+        pnl = asset_panel([NumericPanelInput(; name = "market_cap", vals = ones(20, N))])
+        cold = RollingLogReturn(; window = 5)
+        warm = partial_fit!(cold, ReturnsResult(; nx = nx, X = X[1:20, :], pnl = pnl))
+        function listed(de)
+            return CrossSectionalFactorPrior(;
+                                             factors = ["market" => ConstantExposure(),
+                                                        "mom" => CompositeExposure(;
+                                                                                   descriptors = [de],
+                                                                                   family = "style")])
+        end
+        @test po.online_entry_state(listed(warm)) == "factors[2].descriptors[1].cache"
+        @test isnothing(po.online_entry_state(listed(cold)))
+        scored = CrossSectionalFactorPrior(; factors = ["market" => ConstantExposure()],
+                                           rfe = ExpWeightedReturnForecast(;
+                                                                           scores = DescriptorScores(;
+                                                                                                     descriptors = [warm])))
+        @test po.online_entry_state(scored) == "rfe.scores.descriptors[1].cache"
+        @test po.online_entry_state([[nothing], [me]]) == "[2][1].cache"
         # The batch arms read a stepped estimator as configuration, as they always did.
         @test isapprox(weights(cross_val_predict(partial_fit!(mr, rows(rd, 1:5)), rd,
                                                  batch_cv)),
@@ -447,7 +489,7 @@ assets is what keeps the JuMP families cheap.
     end
 
     @testset "A failed step leaves the previous weights where they were (#1021)" begin
-        # The reference's online loop skips `set_params(previous_weights = …)` on a failed
+        # The oracle's online loop skips `set_params(previous_weights = …)` on a failed
         # step. Here the online arm advances `prev` by the same rule as the batch arm, so a
         # failed step threads nothing and the step after it reads the last threadable one.
         ok = WeightBounds(; lb = zeros(N), ub = ones(N))
@@ -490,6 +532,14 @@ assets is what keeps the JuMP families cheap.
         @test isa(of.pred[2].res.retcode, OptimisationSuccess)
         @test of.pred[2].res.w == of.pred[1].res.w
         @test threaded(of.pred[3]) == of.pred[1].res.w
+        # An estimator fallback fits its own prior over the window that the read-out
+        # rebuilds, not the carried prior of the primary, so it answers the step as it
+        # answers the batch fold (#1633).
+        ofi = cross_val_predict(mk(2; fb = InverseVolatility()), rd, online_cv)
+        bfi = cross_val_predict(mk(2; fb = InverseVolatility()), rd, batch_cv)
+        @test isa(ofi.pred[2].res.retcode, OptimisationSuccess)
+        @test isa(only(ofi.pred[2].res.fb)[1], MeanRisk)
+        @test isapprox(ofi.pred[2].res.w, bfi.pred[2].res.w; atol = 1e-10)
         # A failure at step 1 threads nothing, so step 2 reads the estimator's own `w`.
         o1 = cross_val_predict(mk(1), rd, online_d)
         @test isa(o1.pred[1].res.retcode, OptimisationFailure)

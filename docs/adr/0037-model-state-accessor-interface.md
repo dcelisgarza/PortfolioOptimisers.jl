@@ -89,7 +89,7 @@ And the OWA weight-fitting solve and the discrete-allocation MIP build a **diffe
 
 ### 6. The seam-lock inverts its polarity — the key decision
 
-[test_28_seam_lock.jl](../../test/test_28_seam_lock.jl) now enforces two rules:
+[test_28_seam_lock.jl](../../test/test_28_model_state_lock.jl) (renamed `test_28_model_state_lock.jl` by #1362) now enforces two rules:
 
 1. **Construction** — no `Symbol(prefix` outside the interface. This rule names *no keys*,
    so it is closed: it covers entries that do not exist yet.

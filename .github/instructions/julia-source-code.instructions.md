@@ -37,6 +37,7 @@ These three abstract hierarchies form the backbone of the library. Understanding
 - **Struct types**:
 
   - Use `@concrete` from `ConcreteStructs.jl` — it auto-generates type parameters so `struct MyType{T1, T2}` boilerplate is not needed.
+  - Do not bound a type parameter in the header, neither as `struct MyType{T1 <: Real}` nor as a `@concrete` field `x <: Real`. Bound the argument of the inner constructor instead (see *Constructor Pattern*). A bound in the header is one that every signature naming the type must meet, and inference can fail or take very long on it. A struct that `@concrete` cannot write, because its parameters reach a parametric supertype or two fields share one, declares its parameters by hand with no bound. `test/test_75_concrete_struct_census.jl` gates the rule and holds each exception with its reason.
   - Use `DocStringExtensions.TYPEDEF` in the docstring header for struct types.
   - All fields must be documented using inline `"$(field_dict[:key])"` strings and reflected in the `# Fields` section via `$(DocStringExtensions.FIELDS)`.
   - Call `@define_pretty_show(TypeName)` immediately after any new struct that should display nicely in the REPL (all estimators, algorithms, and results).
@@ -169,6 +170,54 @@ method converts internally. An index is the usual case.
 `<:Number` over a narrower bound, so a caller may bring a number type from another package. Narrow
 to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
 that exact representation.
+
+## A divisor's correction is named by who makes it
+
+The divisor of a spread is the number of observations, less a correction. Two keywords name that
+correction, and each one names who makes it.
+
+- **`ddof::Integer` where the library makes the correction itself.** The code subtracts the integer
+  from the number of observations, `T - ddof`, and refuses a negative one. The members of
+  `NormError` and `EvenMoment` take it.
+- **`corrected::Bool` where `Statistics` or `StatsBase` makes it.** The code passes the flag on, to
+  `Statistics.std`, `Statistics.var`, `StatsBase.SimpleCovariance` or `StatsBase.varcorrection`.
+  `SimpleVariance`, `StdValue` and `VarValue` take it. Under observation weights the flag selects a
+  divisor for each weight type, and no integer states that divisor.
+
+One definition never names both, and a definition that names `ddof` never calls an upstream
+spread. Such a site states an integer and applies a flag, so `ddof = 2` either raises or silently
+means `ddof = 1`. To offer an integer, subtract it yourself. To delegate, take `corrected` and pass
+it on.
+
+A partial fit that reproduces a correction `StatsBase` makes on the batch path subtracts the flag
+itself, as `n - corrected`. It keeps the name `corrected`, because it reads the field of an
+estimator whose batch path delegates. One field cannot carry two names.
+
+The default of each keyword is written at its site and is the site's own decision.
+[ADR 0087](../../docs/adr/0087-one-written-bias-correction-default-not-the-upstream-one.md) fixes
+`corrected = true`.
+
+## A Returns Result drops no field that the mathematics lets it carry
+
+Code that builds a `ReturnsResult` from another one, or from a buffer, a state or a window of one,
+carries every field: `nx`, `X`, `nf`, `F`, `nb`, `B`, `ne`, `E`, `ts`, `iv`, `ivpa` and `pnl`. A
+field that a consumer does not read today is carried too, because the next consumer cannot see
+that it was dropped.
+
+- **Drop a field only when it has no meaning on the new axis.** An asset-indexed field after a
+  collapse to synthetic assets with no collapse rule is an example. State the reason in a comment
+  or in the docstring at the site.
+- **Subtract at the point of use rather than rebuild.** A flag that changes the returns a reader
+  fits on, such as `brt`, never rebuilds the `ReturnsResult`. Each reader takes the flag as an
+  argument and reads `benchmark_relative_returns(rd, brt)`, a matrix, so `rd` keeps its raw `X`
+  and `B`, and no reader subtracts twice. A reader that a change adds takes `brt` too.
+- **Refuse by name where a field cannot travel.** A fold that holds numbers alone refuses `iv` with
+  an error that names it. A silent drop is never correct.
+- **Refuse a flag that needs a field the data does not carry.** `brt = true` on returns with no `B`
+  is an `ArgumentError`, not a pass-through.
+
+[ADR 0204](../../docs/adr/0204-a-returns-result-drops-no-field-that-the-mathematics-lets-it-carry.md)
+owns the rule.
 
 ## Union Type Aliases and Dispatch Groups
 
