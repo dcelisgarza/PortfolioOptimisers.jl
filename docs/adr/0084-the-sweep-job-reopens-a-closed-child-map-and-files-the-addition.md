@@ -319,7 +319,9 @@ number, and that REST read of an issue opened a moment before can answer 404 for
 `set -e` then stopped the loop, so #1712 had no parent and the rest of the plan was not opened.
 
 Two calls now go through `retry`, five attempts two seconds apart: the read of the id, and the post
-to the sub-issues endpoint. If a call still fails after five attempts, `apply` names the issue and
+to the sub-issues endpoint. A failed `gh api` prints its error body to stdout, so `retry` prints the
+output of the attempt that succeeded alone, and `apply` attaches only an id that is a number. If a
+call still fails after five attempts, `apply` names the issue and
 its map, opens the rest of the plan, and then prints one command per orphan that attaches it by hand
 and exits with status 1. **An orphan does not stop the plan**, because the plan cannot open it again.
 The next dump reports the orphan as an existing sweep issue, so a re-run skips its path, and the

@@ -138,7 +138,7 @@ disagree, and each one throws:
     The file moved, or the title names it by its bare name. `already_filed` cannot see that issue,
     so the job would file a duplicate of it (#1755).
 
-A loud refusal is the right outcome for all three. This job writes to a tracker, and a wrong parent
+A loud refusal is the right outcome for all four. This job writes to a tracker, and a wrong parent
 or a wrong title is work a person must undo by hand.
 """
 function reconcile(rows, map_names, maps, existing)

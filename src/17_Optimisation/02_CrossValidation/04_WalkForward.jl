@@ -938,6 +938,8 @@ computes the folds.
   - The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`.
   - Every fold must have a training window that is not empty after `expand_train` and
     `purged_size`, else an [`IsEmptyError`](@ref) is thrown.
+  - The data must hold at least one fold, else [`WalkForwardResult`](@ref) throws an
+    [`IsEmptyError`](@ref).
 
 # Returns
 
@@ -962,7 +964,9 @@ end
 Return the number of walk-forward folds that `dwf` produces for the returns data `rd`.
 
 The count reads the same fold bounds as [`Base.split(dwf::DateWalkForward, rd::Prices_RR)`](@ref),
-so it equals the number of folds that `split` returns, and it throws where `split` throws.
+so it equals the number of folds that `split` returns. It throws where a fold has an empty training
+window, as `split` does. Where the data holds no fold, it returns zero, and `split` throws an
+[`IsEmptyError`](@ref).
 
 # Arguments
 

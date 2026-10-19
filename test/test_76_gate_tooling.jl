@@ -652,4 +652,36 @@ end
         @test err isa ErrorException
         @test occursin("issue #2 names `src/old/c.jl`, `02_D.jl`", err.msg)
     end
+    @testset "retry prints the output of the run that succeeded alone" begin
+        #=
+        `sweep_issues.sh apply` reads the database id of a new issue through `retry`, because the
+        read can answer 404 for a short time (#1713). A failed `gh api` prints the error body to
+        stdout, and `retry` printed the output of every run, so after two 404s the id read
+        `{…}{…}42` and the attach failed five times. The flaky command here fails twice with a
+        404 body on stdout, and a command that always fails prints a body every time.
+        =#
+        script = """
+                 source "\$1"
+                 c="\$2/count"
+                 echo 0 > "\$c"
+                 flaky() {
+                     local n=\$(( \$(cat "\$c") + 1 ))
+                     echo "\$n" > "\$c"
+                     if [ "\$n" -lt 3 ]; then
+                         echo '{"message":"Not Found","status":"404"}'
+                         return 1
+                     fi
+                     echo 42
+                 }
+                 broken() { echo '{"message":"Not Found","status":"404"}'; return 1; }
+                 id=\$(retry flaky)
+                 echo "id=[\$id] runs=\$(cat "\$c")"
+                 if out=\$(retry broken); then echo "broken passed"; else echo "broken=[\$out]"; fi
+                 """
+        dir = mktempdir()
+        sweep_issues = joinpath(@__DIR__, "..", "code_health", "sweep_issues.sh")
+        out = read(`bash -c $script _ $sweep_issues $dir`, String)
+        @test occursin("id=[42] runs=3", out)
+        @test occursin("broken=[]", out)
+    end
 end

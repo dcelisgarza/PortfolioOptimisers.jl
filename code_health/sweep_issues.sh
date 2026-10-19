@@ -62,12 +62,15 @@ require_home_repo() {
 }
 
 # Runs its arguments until they succeed, at most five times, two seconds apart, and prints what the
-# last run printed. The REST read of an issue that `gh issue create` opened a moment before can
-# answer 404 for a short time (#1713), and so can the sub-issues endpoint that names it.
+# run that succeeded printed. The REST read of an issue that `gh issue create` opened a moment before
+# can answer 404 for a short time (#1713), and so can the sub-issues endpoint that names it. A failed
+# `gh api` prints the error body to stdout, so the output of a failed run is dropped: a caller that
+# captures the output would read the bodies of the 404s in front of the id.
 retry() {
-    local attempt
+    local attempt out
     for attempt in 1 2 3 4 5; do
-        if "$@"; then
+        if out=$("$@"); then
+            [ -z "$out" ] || printf '%s\n' "$out"
             return 0
         fi
         [ "$attempt" -lt 5 ] && sleep 2
@@ -136,6 +139,7 @@ do_apply() {
         # it again, because the dump reports it, so the rest of this plan is opened and the orphan
         # is named at the end with the command that attaches it.
         if child=$(retry gh api "repos/$repo/issues/${url##*/}" --jq .id </dev/null) &&
+           [[ $child =~ ^[0-9]+$ ]] &&
            retry gh api "repos/$repo/issues/$parent/sub_issues" \
                  -F sub_issue_id="$child" --silent </dev/null; then
             echo "Attached it to child map #$parent."
@@ -174,4 +178,7 @@ main() {
     esac
 }
 
-main "$@"
+# A test sources the file to reach `retry`, so `main` runs only when the file is run.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
+fi
