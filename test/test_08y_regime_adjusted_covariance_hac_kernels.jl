@@ -567,4 +567,19 @@ estimate and the dependence of the deviation on it; `LawDebias()` reads the law 
                                        EstimatedCentring(), ExactDebias())
         @test all(isfinite, nd.exact) && all(isfinite, nd.ratio)
     end
+    # The grid of #1724 (#1773). The round-off of the cause grows as the count of assets and
+    # the half-life fall, so at a half-life of 5 every count of 2 to 12 assets, every method
+    # and every debias rule is checked, with and without lags (52 s). At half-lives of 10 and
+    # 40 the six pairs of a method and a rule rotate over the counts (61 s). The whole grid
+    # took 417 s and every factor was finite.
+    rules = [(m, d) for m in methods for d in (ExactDebias(), LawDebias())]
+    for lags in (nothing, 2), n in 2:12, (m, d) in rules
+        nd = PO.mahalanobis_bias_nodes(m, 2.0^(-1 / 5), n, lags, EstimatedCentring(), d)
+        @test all(isfinite, nd.exact) && all(isfinite, nd.ratio)
+    end
+    for hl in (10, 40), lags in (nothing, 2), n in 2:12
+        m, d = rules[mod1(n + (isnothing(lags) ? 0 : 3) + (hl == 40 ? 1 : 0), 6)]
+        nd = PO.mahalanobis_bias_nodes(m, 2.0^(-1 / hl), n, lags, EstimatedCentring(), d)
+        @test all(isfinite, nd.exact) && all(isfinite, nd.ratio)
+    end
 end

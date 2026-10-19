@@ -479,6 +479,41 @@ holds `1 - λ^K` times the variance. A product divided by the raw state carries 
                                                           regime_method = nothing,
                                                           cor_vol = rule)
     @test cov(one_decay(BiasCorrectedVolatility()), X) == cov(one_decay(RawVolatility()), X)
+    # Under `EstimatedCentring()`, the default, the first row of an asset gives no term, so the
+    # weight of the variance state counts one step less (#1773). The replica takes each
+    # deviation from the normalised location of the rows before it, divided by the root of its
+    # factor `1 + S₂ / S₁²`. Measured: 1.6e-15 under the default rule and 2.1e-15 under the raw
+    # rule. A weight that counts the first row as a term misses by 0.20 under the default rule.
+    function centred_replica(X, corrected)
+        T, n = size(X)
+        v = zeros(n)
+        Q = zeros(n, n)
+        num = zeros(n)
+        s1 = s2 = 0.0
+        for t in 1:T
+            x = X[t, :]
+            if t > 1
+                u = (x .- num ./ s1) ./ sqrt(1 + s2 / s1^2)
+                v .= lam .* v .+ (1 - lam) .* u .^ 2
+                s = u ./ sqrt.(corrected ? v ./ (1 - lam^(t - 1)) : v)
+                Q .= lamc .* Q .+ (1 - lamc) .* s .* transpose(s)
+            end
+            num .= lam .* num .+ (1 - lam) .* x
+            s1 = lam * s1 + (1 - lam)
+            s2 = lam^2 * s2 + (1 - lam)^2
+        end
+        vh = v ./ (1 - lam^(T - 1))
+        return Q ./ sqrt.(LinearAlgebra.diag(Q) * transpose(LinearAlgebra.diag(Q))) .*
+               sqrt.(vh * transpose(vh))
+    end
+    csep(rule) = RegimeAdjustedExpWeightedCovariance(; decay = lam, cor_decay = lamc,
+                                                     min_obs = 1, regime_method = nothing,
+                                                     cor_vol = rule)
+    @test csep(RawVolatility()).centring === EstimatedCentring()
+    Xm = X .+ transpose(0.5:0.5:2.5)
+    @test isapprox(cov(csep(BiasCorrectedVolatility()), Xm), centred_replica(Xm, true);
+                   rtol = 1e-12)
+    @test isapprox(cov(csep(RawVolatility()), Xm), centred_replica(Xm, false); rtol = 1e-12)
 end
 
 #=
