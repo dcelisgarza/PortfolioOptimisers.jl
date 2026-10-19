@@ -15,6 +15,8 @@ PortfolioOptimisers.panel_table_column
 PortfolioOptimisers.panel_table_cell
 PortfolioOptimisers.panel_table_read!
 PortfolioOptimisers.panel_table_eltype
+PortfolioOptimisers.panel_table_types
+PortfolioOptimisers.panel_code_eltype
 PortfolioOptimisers.panel_table_mask
 PortfolioOptimisers.panel_field_table_mask
 PortfolioOptimisers.panel_read_field

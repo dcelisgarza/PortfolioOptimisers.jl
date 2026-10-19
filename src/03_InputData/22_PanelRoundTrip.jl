@@ -393,14 +393,7 @@ end
 
 Return the element type that holds every value of the table columns of one Panel Field.
 
-The type is derived from the columns, and never forced: it is the promoted element type of the columns with `Missing` removed. A reader that gives an integer column and a floating-point column for two labels of one tensor Panel Field gets the floating-point type.
-
-# Algorithm
-
-The method that Julia selects is the algorithm.
-
- 1. The long layout reads the columns `cols`.
- 2. The wide layout reads the column `"<col>@<asset>"` of each column and each asset.
+The type is derived from the columns, and never forced: it is the promoted element type of the columns with `Missing` removed, which [`panel_table_types`](@ref) reads. A reader that gives an integer column and a floating-point column for two labels of one tensor Panel Field gets the floating-point type.
 
 # Arguments
 
@@ -421,21 +414,97 @@ The method that Julia selects is the algorithm.
 
   - [`asset_panel`](@ref)
   - [`panel_table_read!`](@ref)
+  - [`panel_table_types`](@ref)
 """
-function panel_table_eltype(::AbstractVector{<:Integer}, tab::NamedTuple, cols::VecStr)
-    T = mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))), promote_type,
-                  cols)
+function panel_table_eltype(lin::AbstractVector{<:Integer}, tab::NamedTuple, cols::VecStr)
+    T = panel_table_types(lin, tab, cols)
     #! A reader types a column with no value as `Missing`, so the column states no type.
     @argcheck(T !== Union{},
               ArgumentError("the columns $(cols) of the table hold no value, so the reader of the table gave them no type to read. Read them with a type, for example `CSV.File(path; types = Dict(\"$(first(cols))\" => Float64))`."))
     return T
 end
-function panel_table_eltype(::Nothing, tab::NamedTuple, cols::VecStr)
-    T = mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))), promote_type,
-                  ("$c@$a" for c in cols for a in tab.nx); init = Union{})
+function panel_table_eltype(lin::Nothing, tab::NamedTuple, cols::VecStr)
+    T = panel_table_types(lin, tab, cols)
     @argcheck(T !== Union{},
               ArgumentError("the columns of $(cols) in the table hold no value, so the reader of the table gave them no type to read. Read them with a type, for example `CSV.File(path; types = Dict(\"$(first(cols))@<asset>\" => Float64))`."))
     return T
+end
+"""
+    panel_table_types(lin::AbstractVector{<:Integer}, tab::NamedTuple, cols::VecStr) -> Type
+    panel_table_types(lin::Nothing, tab::NamedTuple, cols::VecStr) -> Type
+
+Return the promoted element type of the table columns of one Panel Field, with `Missing` removed.
+
+A column that holds no value states no type, so the answer is `Union{}` when no column holds a value. [`panel_table_eltype`](@ref) refuses that answer, and [`panel_code_eltype`](@ref) reads it as a column that states no code type.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. The long layout reads the columns `cols`.
+ 2. The wide layout reads the column `"<col>@<asset>"` of each column and each asset.
+
+# Arguments
+
+  - `lin`: The linear indices of a long table, or `nothing` for a wide table. See [`panel_table_read!`](@ref).
+  - `tab`: The named tuple `(; df, nx)` of the table and the asset names of the manifest.
+  - `cols`: The column names of the Panel Field in the long layout. See [`VecStr`](@ref).
+
+# Validation
+
+  - The table holds each column. Raises a `KeyError`. See [`panel_table_column`](@ref).
+
+# Returns
+
+  - `T::Type`: The promoted element type, or `Union{}`.
+
+# Related
+
+  - [`panel_table_eltype`](@ref)
+  - [`panel_code_eltype`](@ref)
+"""
+function panel_table_types(::AbstractVector{<:Integer}, tab::NamedTuple, cols::VecStr)
+    return mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))),
+                     promote_type, cols; init = Union{})
+end
+function panel_table_types(::Nothing, tab::NamedTuple, cols::VecStr)
+    return mapreduce(c -> nonmissingtype(eltype(panel_table_column(tab.df, c))),
+                     promote_type, ("$c@$a" for c in cols for a in tab.nx); init = Union{})
+end
+"""
+    panel_code_eltype(s::NamedTuple, lin, tab::NamedTuple) -> Type
+
+Return the element type of the codes of a categorical Panel Field that [`asset_panel`](@ref) reads from a table.
+
+The type is derived from the table when the table holds it. A column of codes that a reader typed as an integer type states the type of the codes, so an `Int32` code column gives `Int32` codes. A column of levels holds text, and a code is then the position of its level in the levels. A position in Julia is an `Int`, so such codes are `Int`. A column of codes that holds text or no value states no code type either, and its codes are `Int` too.
+
+# Algorithm
+
+ 1. When the manifest entry `s` records that the column holds the levels, return `Int`.
+ 2. Otherwise read the type of the column with [`panel_table_types`](@ref). Return it when it is an integer type, and `Int` when it is not, or when the column holds no value.
+
+# Arguments
+
+  - `s`: The manifest entry of the categorical Panel Field, from [`panel_manifest_fields`](@ref).
+  - `lin`: The linear indices of a long table, or `nothing` for a wide table. See [`panel_table_read!`](@ref).
+  - `tab`: The named tuple `(; df, nx)` of the table and the asset names of the manifest.
+
+# Returns
+
+  - `T::Type{<:Integer}`: The element type of the codes.
+
+# Related
+
+  - [`panel_read_field`](@ref)
+  - [`panel_code_reader`](@ref)
+  - [`panel_table_types`](@ref)
+"""
+function panel_code_eltype(s::NamedTuple, lin, tab::NamedTuple)
+    if s.decode
+        return Int
+    end
+    T = panel_table_types(lin, tab, [s.name])
+    return T !== Union{} && T <: Integer ? T : Int
 end
 """
     panel_table_mask(lin, tab::NamedTuple, name::AbstractString, sz::Tuple) -> BitArray
@@ -473,7 +542,7 @@ A cell that a long table does not hold is outside the universe, and no consumer 
 # Algorithm
 
  1. `"numeric"`: read the column named after the Panel Field into an array of the element type of the column, through [`panel_table_read!`](@ref).
- 2. `"categorical"`: read the same column. When the manifest records that the column holds the levels, find the code of the level in each cell. When it records the codes, each cell holds the code.
+ 2. `"categorical"`: read the same column into an array of the code type of [`panel_code_eltype`](@ref). When the manifest records that the column holds the levels, find the code of the level in each cell. When it records the codes, each cell holds the code.
  3. `"tensor"`: read the column `"<field>=<label>"` of each label into its slice of the trailing axis.
  4. Read the observed mask from the columns named `"<column>::observed"` when the manifest records one, and the placeholder mask from the columns named `"<column>::placeholder"` in the same way.
 
@@ -499,6 +568,7 @@ A cell that a long table does not hold is outside the universe, and no consumer 
   - [`asset_panel`](@ref)
   - [`panel_table_read!`](@ref)
   - [`panel_table_eltype`](@ref)
+  - [`panel_code_eltype`](@ref)
   - [`panel_table_mask`](@ref)
   - [`panel_field_table_mask`](@ref)
 """
@@ -512,8 +582,9 @@ function panel_read_field(s::NamedTuple, lin, tab::NamedTuple, sz::Tuple)
                                  panel_field_table_mask(s.placeholder, lin, tab,
                                                         "$(s.name)::placeholder", sz))
     elseif s.kind == "categorical"
-        codes = ones(Int, sz)
-        panel_table_read!(codes, lin, tab, s.name, panel_code_reader(s))
+        T = panel_code_eltype(s, lin, tab)
+        codes = ones(T, sz)
+        panel_table_read!(codes, lin, tab, s.name, panel_code_reader(s, T))
         return CategoricalPanelField(s.name, s.labels, codes,
                                      panel_field_table_mask(s.observed, lin, tab,
                                                             "$(s.name)::observed", sz),
@@ -573,23 +644,24 @@ function panel_field_table_mask(on::Bool, lin, tab::NamedTuple, cols::VecStr, sz
     return M
 end
 """
-    panel_code_reader(s::NamedTuple)
+    panel_code_reader(s::NamedTuple, ::Type{T}) where {T <: Integer}
 
-Return the function that converts a cell of a categorical column to its integer code.
+Return the function that converts a cell of a categorical column to its integer code of the type `T`.
 
 # Algorithm
 
  1. When the manifest entry `s` records that the column holds the levels, the cell holds a level. Return the position of the level, as text, in the levels of `s`.
- 2. When `s` records the codes, the cell holds the code. Return it as an `Int`. A reader that gives the cell as text gets it parsed.
+ 2. When `s` records the codes, the cell holds the code. Return it as a `T`. A reader that gives the cell as text gets it parsed.
 
 # Arguments
 
   - `s`: The manifest entry of the categorical Panel Field, from [`panel_manifest_fields`](@ref). Its `decode` tells whether the cell holds the level or the code.
+  - `T`: The element type of the codes, from [`panel_code_eltype`](@ref).
 
 # Validation
 
   - When the column holds the levels, the cell is a level of the manifest. Raises a `KeyError`.
-  - When the column holds the codes, the cell is an integer. Raises an `ArgumentError`.
+  - When the column holds the codes, the cell is an integer that `T` holds. Raises an `ArgumentError`.
 
 # Returns
 
@@ -598,12 +670,13 @@ Return the function that converts a cell of a categorical column to its integer 
 # Related
 
   - [`panel_read_field`](@ref)
+  - [`panel_code_eltype`](@ref)
   - [`panel_text`](@ref)
 """
-function panel_code_reader(s::NamedTuple)
+function panel_code_reader(s::NamedTuple, ::Type{T}) where {T <: Integer}
     if !s.decode
         return function (x)
-            c = tryparse(Int, panel_text(x))
+            c = tryparse(T, panel_text(x))
             @argcheck(!isnothing(c),
                       ArgumentError("the manifest records that the column of the categorical Panel Field \"$(s.name)\" holds the integer codes, as panel_dataframe writes it with decode = false, got $(repr(x)). Write the manifest with the decode of the panel_dataframe call."))
             return something(c)
@@ -901,6 +974,8 @@ The function reads the long and the wide layouts, and tells them apart by the `"
   - **Long**: the table holds only the rows where the active mask is `true`. The function makes the active mask from the rows that the table holds, and the manifest gives the axes. The value of a cell outside the universe does not come back: the cell gets zero, the first level of a categorical Panel Field, and an observed mask of `false`. No consumer reads a cell outside the universe, so this is lossless for every consumer.
 
 The function compares names and labels as text, so a reader that types a column still matches the manifest. A reader that changes the text of a name does not match it: CSV.jl reads the asset name `"007"` as the integer `7`. Read such a column as text. The manifest records whether each categorical column holds the levels or the codes, so the function reads the column as [`panel_dataframe`](@ref) wrote it.
+
+The codes of a categorical column that holds the codes keep the integer type of the column, so `Int32` codes come back as `Int32` codes when the reader keeps the column type. A column that holds the levels carries no code type, and its codes are the positions of the levels, which are `Int`. See [`panel_code_eltype`](@ref).
 
 A static Panel Field that a time-varying panel lifts, see [`RepeatedLeading`](@ref), comes back as an ordinary array with the same values.
 

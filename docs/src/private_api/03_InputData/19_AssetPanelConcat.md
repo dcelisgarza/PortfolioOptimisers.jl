@@ -13,6 +13,8 @@ PortfolioOptimisers.panel_field_vcat
 PortfolioOptimisers.panel_values_vcat
 PortfolioOptimisers.panel_omsk_vcat
 PortfolioOptimisers.panel_pmsk_vcat
+PortfolioOptimisers.panel_field_isequal
+PortfolioOptimisers.panel_mask_isequal
 PortfolioOptimisers.panel_mask_vcat
 PortfolioOptimisers.panel_fields_panel
 PortfolioOptimisers.assert_buffer_panel_shape

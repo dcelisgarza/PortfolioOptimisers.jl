@@ -14,7 +14,7 @@ The element types promote as `vcat` promotes them: a `Float32` part and a `Float
 The method that Julia selects is the algorithm.
 
  1. Check each part `b` against `a` with [`assert_panel_concat`](@ref): the shape, the asset count, the Panel Field names in their order, and the schema of each field.
- 2. `a` is static: check that the Feature Matrix of each part, which [`panel_feature_matrix`](@ref) derives, equals the one of `a`, and that the placeholder mask of each field equals the one of `a`. Return `a`.
+ 2. `a` is static: check that each Panel Field of each part holds the data of its field in `a`, with [`panel_field_isequal`](@ref). A field with no observed mask equals a field whose observed mask is `true` everywhere, and a field with no placeholder mask equals a field whose placeholder mask is `false` everywhere, as in step 3. Return `a`.
  3. `a` is time-varying: concatenate the parts of each Panel Field with [`panel_field_vcat`](@ref), and the parts of each mask with [`panel_mask_vcat`](@ref). Make the `AssetPanel` of the results.
 
 # Arguments
@@ -61,7 +61,7 @@ julia> pnl.emsk
 # Related
 
   - [`AssetPanel`](@ref)
-  - [`panel_feature_matrix`](@ref)
+  - [`panel_field_isequal`](@ref)
   - [`port_opt_view`](@ref): the inverse operation, which takes observations out of a panel.
   - [`vcat_observations`](@ref)
 """
@@ -83,10 +83,8 @@ end
 function Base.vcat(a::AssetPanel{<:Any, Nothing, Nothing}, bs::AssetPanel...)
     for (k, b) in enumerate(bs)
         assert_panel_concat(a, b, k + 1)
-        #! The Feature Matrix holds no placeholder mask, so the masks are compared apart.
-        @argcheck(isequal(panel_feature_matrix(a), panel_feature_matrix(b)) &&
-                  all(i -> isequal(a.pf[i].pmsk, b.pf[i].pmsk), eachindex(a.pf)),
-                  ArgumentError("a static Asset Panel has no observation axis, so it states the same values at each observation, and a concatenation of static panels needs equal parts; part $(k + 1) holds values or placeholder masks that differ from the ones of the first part"))
+        @argcheck(all(i -> panel_field_isequal(a.pf[i], b.pf[i]), eachindex(a.pf)),
+                  ArgumentError("a static Asset Panel has no observation axis, so it states the same values at each observation, and a concatenation of static panels needs equal parts; part $(k + 1) holds values, observed masks or placeholder masks that differ from the ones of the first part. A missing observed mask reads as true in each cell, and a missing placeholder mask as false"))
     end
     return a
 end
@@ -352,6 +350,84 @@ function panel_pmsk_vcat(::AbstractVector{Nothing}, ::AbstractVector)
 end
 function panel_pmsk_vcat(ms::AbstractVector, vals::AbstractVector)
     return reduce(vcat, [isnothing(m) ? falses(size(v)) : m for (m, v) in zip(ms, vals)])
+end
+"""
+    panel_field_isequal(f::AbstractPanelField, g::AbstractPanelField) -> Bool
+
+Tests whether two Panel Fields of one schema hold the same data: the same stored cells, the same observed mask and the same placeholder mask.
+
+A missing mask is read as the concatenation along the observation axis reads it. A field with no observed mask holds data in each cell, as a mask that is `true` everywhere states, and a field with no placeholder mask holds no placeholder, as a mask that is `false` everywhere states. [`assert_panel_concat`](@ref) checked the schema before the call: the kind, the levels, the axis name, the labels and the groups.
+
+# Algorithm
+
+ 1. Compare the stored arrays, which [`panel_field_array`](@ref) reads, with `isequal`.
+ 2. Compare the observed masks with [`panel_mask_isequal`](@ref), with `true` for a missing mask.
+ 3. Compare the placeholder masks with [`panel_mask_isequal`](@ref), with `false` for a missing mask.
+
+# Arguments
+
+  - `f`: The field of the first part.
+  - `g`: The field of the same name in a later part.
+
+# Returns
+
+  - `flag::Bool`: `true` when the two fields hold the same data.
+
+# Related
+
+  - [`Base.vcat(a::AssetPanel, bs::AssetPanel...)`](@ref)
+  - [`panel_omsk_vcat`](@ref)
+  - [`panel_pmsk_vcat`](@ref)
+"""
+function panel_field_isequal(f::AbstractPanelField, g::AbstractPanelField)::Bool
+    return isequal(panel_field_array(f), panel_field_array(g)) &&
+           panel_mask_isequal(f.omsk, g.omsk, true) &&
+           panel_mask_isequal(f.pmsk, g.pmsk, false)
+end
+"""
+    panel_mask_isequal(m::Nothing, n::Nothing, fill::Bool) -> Bool
+    panel_mask_isequal(m::AbstractArray{Bool}, n::Nothing, fill::Bool) -> Bool
+    panel_mask_isequal(m::Nothing, n::AbstractArray{Bool}, fill::Bool) -> Bool
+    panel_mask_isequal(m::AbstractArray{Bool}, n::AbstractArray{Bool}, fill::Bool) -> Bool
+
+Tests whether two masks of one Panel Field are equal, with `fill` in each cell of a missing mask.
+
+The caller compared the stored arrays of the two fields first, so a mask has the shape of the values, and a missing mask needs no array to compare.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. Two missing masks: return `true`.
+ 2. One missing mask: return whether each cell of the other mask is `fill`.
+ 3. Two masks: compare them with `isequal`.
+
+# Arguments
+
+  - `m`: The mask of the first field, or `nothing`.
+  - `n`: The mask of the second field, or `nothing`.
+  - `fill`: The value of each cell of a missing mask.
+
+# Returns
+
+  - `flag::Bool`: `true` when the two masks are equal.
+
+# Related
+
+  - [`panel_field_isequal`](@ref)
+  - [`Option`](@ref)
+"""
+function panel_mask_isequal(::Nothing, ::Nothing, ::Bool)::Bool
+    return true
+end
+function panel_mask_isequal(m::AbstractArray{Bool}, ::Nothing, fill::Bool)::Bool
+    return all(==(fill), m)
+end
+function panel_mask_isequal(::Nothing, n::AbstractArray{Bool}, fill::Bool)::Bool
+    return all(==(fill), n)
+end
+function panel_mask_isequal(m::AbstractArray{Bool}, n::AbstractArray{Bool}, ::Bool)::Bool
+    return isequal(m, n)
 end
 """
     panel_mask_vcat(ms::AbstractVector{<:AllTrueMask}) -> AllTrueMask

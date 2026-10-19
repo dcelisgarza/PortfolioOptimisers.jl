@@ -2060,3 +2060,37 @@ end
         @test panel_1399_equal(pnl, l; active_only = true)
     end
 end
+
+# #1769: a column of codes states the type of the codes, and a column of levels holds the
+# positions of the levels, which are `Int`.
+@testset "asset_panel(df, mf): the codes keep the type of a code column (#1769)" begin
+    nx = ["A", "B", "C"]
+    static = AssetPanel(;
+                        pf = [CategoricalPanelField(; name = "sector",
+                                                    levels = ["Tech", "Energy"],
+                                                    codes = Int32[1, 2, 1])])
+    tv = AssetPanel(;
+                    pf = [CategoricalPanelField(; name = "sector",
+                                                levels = ["Tech", "Energy"],
+                                                codes = Int32[1 2 1; 2 2 1])],
+                    amsk = trues(2, 3), emsk = trues(2, 3))
+    for pnl in (static, tv), layout in (:long, :wide), decode in (true, false)
+        df = panel_dataframe(pnl; nx, layout, decode)
+        p2 = asset_panel(df, panel_manifest(pnl; nx, decode))
+        c = panel_field(p2, "sector").codes
+        @test c == panel_field(pnl, "sector").codes
+        @test eltype(c) === (decode ? Int : Int32)
+    end
+    # A reader that gives the codes as text states no code type.
+    df = panel_dataframe(static; nx, layout = :long, decode = false)
+    df.sector = string.(df.sector)
+    p2 = asset_panel(df, panel_manifest(static; nx, decode = false))
+    @test panel_field(p2, "sector").codes == [1, 2, 1]
+    @test eltype(panel_field(p2, "sector").codes) === Int
+    # A code that the type of the column cannot hold is refused.
+    df = panel_dataframe(static; nx, layout = :long, decode = false)
+    df.sector = ["1", "2", "1.5"]
+    @test_throws "holds the integer codes" asset_panel(df,
+                                                       panel_manifest(static; nx,
+                                                                      decode = false))
+end

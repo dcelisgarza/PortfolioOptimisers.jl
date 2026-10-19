@@ -214,8 +214,8 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :coverage_keyword_reduction => "a step of the moments on a panel: the active mask, through coverage_mask, whose case is below",
                                            :coverage_mask_source => "chooses the active mask coverage_mask reads, whose case is below",
                                            :benchmark_estimation_mask => "narrows the estimation mask to the finite benchmark returns",
-                                           # The static vcat compares this stack. It is an export of every stored cell, and
-                                           # FeatureDistance reads the stack of feature_matrix beside the readable mask.
+                                           # An export of every stored cell. FeatureDistance reads the stack of feature_matrix
+                                           # beside the readable mask.
                                            :panel_feature_matrix => "an export of every stored cell beside its observed-mask column",
                                            :feature_matrix => "the stack FeatureDistance reads, whose cases are below",
                                            :select_fields => "a step of feature_matrix",

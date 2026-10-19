@@ -3048,7 +3048,9 @@ end
                    pf = [NumericPanelField(; name = "mcap", vals = [1.0, 3.0]),
                          CategoricalPanelField(; name = "sector", levels = ["A", "B"],
                                                codes = [2, 1])])
-    @test_throws "part 3 holds values or placeholder masks that differ" vcat(a, mk(), b)
+    @test_throws "part 3 holds values, observed masks or placeholder masks that differ" vcat(a,
+                                                                                             mk(),
+                                                                                             b)
     # The Feature Matrix holds no placeholder mask, so a placeholder `0.0` and a datum `0.0`
     # derived one Feature Matrix, and the answer was the first part, whichever it was (R7 of
     # #1630).
@@ -3058,9 +3060,40 @@ end
     d = AssetPanel(;
                    pf = [NumericPanelField(; name = "x", vals = [0.0, 1.0],
                                            omsk = [false, true])])
-    @test_throws "part 2 holds values or placeholder masks that differ" vcat(p, d)
-    @test_throws "part 2 holds values or placeholder masks that differ" vcat(d, p)
+    @test_throws "part 2 holds values, observed masks or placeholder masks that differ" vcat(p,
+                                                                                             d)
+    @test_throws "part 2 holds values, observed masks or placeholder masks that differ" vcat(d,
+                                                                                             p)
     @test vcat(p, p) === p
+    # A missing mask reads as the time-varying concatenation reads it: no observed mask is
+    # `true` in each cell, and no placeholder mask is `false` in each cell (#1769).
+    v = [1.0, 2.0, 3.0]
+    nump(; kw...) = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = v, kw...)])
+    o = [true, false, true]
+    for (x, y) in ((nump(), nump(; omsk = trues(3))),
+                   (nump(; omsk = o), nump(; omsk = o, pmsk = falses(3))),
+                   (nump(), nump(; omsk = trues(3), pmsk = falses(3))))
+        @test vcat(x, y) === x
+        @test vcat(y, x) === y
+    end
+    msg = "part 2 holds values, observed masks or placeholder masks that differ"
+    @test_throws msg vcat(nump(), nump(; omsk = o))
+    @test_throws msg vcat(nump(; omsk = o, pmsk = [false, true, false]), nump(; omsk = o))
+    @test_throws msg vcat(nump(; omsk = o), nump(; omsk = [true, true, false]))
+    # The codes of a categorical field and the values of a tensor field are compared.
+    catp(c; kw...) = AssetPanel(;
+                                pf = [CategoricalPanelField(; name = "sector",
+                                                            levels = ["A", "B"], codes = c,
+                                                            kw...)])
+    @test vcat(catp([1, 2]), catp([1, 2]; omsk = trues(2))) isa AssetPanel
+    @test_throws msg vcat(catp([1, 2]), catp([2, 1]))
+    tenp(x; kw...) = AssetPanel(;
+                                pf = [TensorPanelField(; name = "beta", axis = "factor",
+                                                       labels = ["size", "value"], vals = x,
+                                                       kw...)])
+    @test vcat(tenp(ones(2, 2)),
+               tenp(ones(2, 2); omsk = trues(2, 2), pmsk = falses(2, 2))) isa AssetPanel
+    @test_throws msg vcat(tenp(ones(2, 2)), tenp([1.0 1.0; 1.0 2.0]))
 end
 
 @testset "A part whose schema differs is refused" begin
