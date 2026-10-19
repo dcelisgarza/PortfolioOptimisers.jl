@@ -308,6 +308,47 @@ already carries the shape and names the symbol the caller passed.
   function prior(pr::AbstractPriorResult, args...; kwargs...) = pr  # passthrough
   ```
 
+### A branch that a type decides is a method
+
+An early exit is the usual place where an `if` on a type hides: `isnothing(x) && return y`, or
+`if !(r.sigma isa DeferredQuantity) return r end`, which more statements follow. When the
+condition only tests the type of a positional argument, or of a field of one, the definition is
+two cases, and each case is a method. Split it by dispatch on that type:
+
+- a `::Nothing` method beside the method for a value;
+- one method for each type that the `isa` tests;
+- for a field, a method that forwards the field as an argument, and one method for each type
+  of the field:
+
+  ```julia
+  set_sdp_variance_risk!(model, i, r, pr) = set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg)
+  function set_sdp_variance_risk!(model, i, r, pr, ::LinearRatio) ... end
+  function set_sdp_variance_risk!(model, i, r, pr, ::SquareRootRatio) ... end
+  ```
+
+The split changes the source, not the compiled code. The compiler knows the type of each
+argument of a method, and it removes the dead arm of a branch on that type: under `LinearRatio`
+the typed body of the early-return form of `set_sdp_variance_risk!` held no call to the lift of
+the objective (#1752). The gain is that a method states one case, its signature names the case,
+and the reader finds the case by dispatch, not inside the body of another case.
+
+Keep the branch when only the run time decides the type, because a dispatch on such a value is
+a dynamic dispatch:
+
+- a field that declares a `Union`, such as `SampleBufferState.G`;
+- a keyword argument, because a keyword does not dispatch;
+- a local, or an argument that the body assigns again.
+
+A condition that also tests a value, such as `isnothing(x) || isempty(x)`, is a run-time branch
+and stays. An early exit on a value is not a breach of this rule. A mix of type tests that two
+methods cannot state also stays, such as `isnothing(a) && !isa(b, T)` or
+`isnothing(a) || isnothing(b)`: it needs a method for each combination, and more methods to
+settle their ambiguities, which is harder to read than the branch.
+
+`test/test_79_type_decided_early_return_census.jl` gates the rule over `src/` and `ext/`. Its
+`RUN_TIME` list names each site that stays, with its reason. Its `DEBT` list names the sites that
+existed when the gate was written, and it can only shrink.
+
 ## A unit that offers nothing but indirection is inlined
 
 A unit is a dead-end when it has **one method**, a body that is **one depth-one forward**, and

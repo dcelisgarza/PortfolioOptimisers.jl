@@ -403,7 +403,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the semidefinite variance expression, the trace of the covariance matrix times the lifted weight matrix.
 
-The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
+The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The method dispatches on `r.ratio_alg`: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
 
 # JuMP formulation
 
@@ -459,14 +459,26 @@ $(val_dict[:relax])
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::Option{<:AbstractPriorResult};
                                 prefix::Symbol = Symbol(""))
+    return set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg; prefix = prefix)
+end
+function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
+                                pr::Option{<:AbstractPriorResult}, ::LinearRatio;
+                                prefix::Symbol = Symbol(""))
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
-    if !sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
-        W = set_sdp_constraints!(model; prefix = prefix)
-        sigma_W = state_set!(model, prefix, :sigma_W_, i,
-                             JuMP.@expression(model, sigma * W))
-        return state_set!(model, prefix, :variance_risk_, i,
-                          JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
+    W = set_sdp_constraints!(model; prefix = prefix)
+    sigma_W = state_set!(model, prefix, :sigma_W_, i, JuMP.@expression(model, sigma * W))
+    return state_set!(model, prefix, :variance_risk_, i,
+                      JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
+end
+function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
+                                pr::Option{<:AbstractPriorResult},
+                                ratio_alg::SquareRootRatio; prefix::Symbol = Symbol(""))
+    # Outside a positive term of `MaximumRatio` the term reads the lift with the corner
+    # `k`, which is the term of `LinearRatio`.
+    if !sdp_objective_lift_flag(model, ratio_alg, r.settings)
+        return set_sdp_variance_risk!(model, i, r, pr, LinearRatio(); prefix = prefix)
     end
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
     # The objective term reads the lift with a constant corner, so it has degree two
     # under `MaximumRatio`. The bound reads the lift with the corner `k` (#1676).
     if !isnothing(r.settings.ub)
