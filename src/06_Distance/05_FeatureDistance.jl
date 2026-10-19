@@ -78,9 +78,7 @@ function Distances._pairwise!(::AngularDist, r::AbstractMatrix, a::AbstractMatri
     T = eltype(r)
     z = [iszero(LinearAlgebra.norm(view(a, :, j))) for j in axes(a, 2)]
     @inbounds for j in axes(r, 2), i in axes(r, 1)
-        r[i, j] = if i == j
-            zero(T)
-        elseif z[i] && z[j]
+        r[i, j] = if i == j || (z[i] && z[j])
             zero(T)
         elseif z[i] || z[j]
             one(T)

@@ -156,9 +156,7 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
                 3 * e2[j] * sigma[j, i]
             elseif i == j && k == l
                 e2[k] * sigma[i, i] + e2[i] * sigma[k, k] + e2[i] * e2[k]
-            elseif i == k && j == l
-                e2[j] * sigma[i, i] + e2[i] * sigma[j, j] + e2[i] * e2[j]
-            elseif i == l && j == k
+            elseif (i == k && j == l) || (i == l && j == k)
                 e2[j] * sigma[i, i] + e2[i] * sigma[j, j] + e2[i] * e2[j]
             elseif i == j
                 e2[i] * sigma[k, l]

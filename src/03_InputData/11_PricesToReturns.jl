@@ -534,8 +534,10 @@ function prices_to_returns(pr::PricesResult; ret_method::Symbol = :simple,
     F = isempty(nf) ? nothing : Matrix(X[!, nf])
     B = if isempty(nb)
         nothing
+    elseif length(nb) == 1
+        X[!, nb[1]]
     else
-        length(nb) == 1 ? X[!, nb[1]] : Matrix(X[!, nb])
+        Matrix(X[!, nb])
     end
     ne = exogenous_names
     E = isempty(ne) ? nothing : Matrix(X[!, ne])

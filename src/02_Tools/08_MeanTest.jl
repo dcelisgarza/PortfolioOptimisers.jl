@@ -1407,13 +1407,10 @@ The oracle counts the base periods from the first date to the last, both include
 """
 function mean_test_answers(mt::AbstractMeanTestEstimator, m::Real, n::Integer, T::Integer,
                            window::Real)
-    if n < 2 || !isfinite(m)
-        return false
-    end
-    if !isnothing(mt.min_obs) && n < mt.min_obs
-        return false
-    end
-    if !isnothing(mt.min_periods) && T / window < mt.min_periods
+    if n < 2 ||
+       !isfinite(m) ||
+       (!isnothing(mt.min_obs) && n < mt.min_obs) ||
+       (!isnothing(mt.min_periods) && T / window < mt.min_periods)
         return false
     end
     return true

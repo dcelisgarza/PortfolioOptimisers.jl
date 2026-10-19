@@ -254,20 +254,17 @@ function pre_order(a::ClusterNode, preorder_by::AbstractPreorderBy = PreorderTre
         if is_leaf(nd)
             push!(preorder, get_node_property(preorder_by, nd))
             k = k - one(k)
+        elseif ndid ∉ lvisited
+            k = k + one(k)
+            curNode[k] = nd.left
+            push!(lvisited, ndid)
+        elseif ndid ∉ rvisited
+            k = k + one(k)
+            curNode[k] = nd.right
+            push!(rvisited, ndid)
         else
-            if ndid ∉ lvisited
-                k = k + one(k)
-                curNode[k] = nd.left
-                push!(lvisited, ndid)
-            elseif ndid ∉ rvisited
-                k = k + one(k)
-                curNode[k] = nd.right
-                push!(rvisited, ndid)
-                # If we've visited the left and right of this non-leaf
-                # node already, go up in the tree.
-            else
-                k = k - 1
-            end
+            # Both children of this non-leaf node are visited, so go up in the tree.
+            k = k - 1
         end
     end
     return preorder

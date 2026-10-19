@@ -385,6 +385,47 @@ application, and the allow-list is where that application is named.
 the list fails the build, and an entry whose name is no longer flagged is stale and fails too, so
 the list can only shrink on its own.
 
+## Branches that share an outcome are one branch
+
+When two branches do the same thing, write one branch whose condition joins theirs. Each branch
+is a path that the reader must follow and that a test must reach, so a chain of branches with one
+outcome costs more to read and to test than one branch. Merge these four shapes:
+
+- **Two exits in a row with the same body**, which ends in `return`, `continue`, `break`, `throw`
+  or `error`. Join the conditions with `||`. The form `c || return x` exits when `c` is false,
+  so its condition is `!c`.
+
+  ```julia
+  if n < 2 ||
+     !isfinite(m) ||
+     (!isnothing(mt.min_obs) && n < mt.min_obs) ||
+     (!isnothing(mt.min_periods) && T / window < mt.min_periods)
+      return false
+  end
+  ```
+
+- **Two adjacent arms of an `if` chain with the same body.** Join the conditions with `||`, as in
+  `elseif (i == k && j == l) || (i == l && j == k)`.
+- **An `if` with no `else` whose body is only an `if` with no `else`.** Join the conditions with
+  `&&`.
+- **An `else` whose body is only an `if`**, a ternary included. Write it as an `elseif`.
+
+The merge costs nothing at run time. `||` and `&&` evaluate from left to right and stop at the
+first operand that decides the result, so the merged condition tests the same conditions in the
+same order.
+
+Keep the branches apart in two cases, because the merge makes the text harder to read:
+
+- A later exit whose condition calls a function whose name ends in `!`. In a merged
+  `posdef_accepts(pdm.alg, X) || zero_variance_block!(f, X)`, the change of `X` happens only
+  when the first test fails, and the reader of the condition does not see that.
+- An `else` whose `if` tests the same condition as the last `if` of the first arm. The two arms
+  are a table of two rows and two columns, and the nesting shows the table.
+
+`test/test_81_one_outcome_branch_census.jl` gates the rule over `src/` and `ext/`. A site whose
+merge makes the text harder to read for a different reason goes on its `KEEP` list with that
+reason.
+
 ## Return Type Annotations
 
 - See `.github/instructions/julia-return-types.instructions.md` for full guidelines.

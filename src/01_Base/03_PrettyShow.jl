@@ -172,8 +172,10 @@ function pretty_show_vector_summary(val::AbstractVector)
     et = eltype(val)
     tname = if allequal(names)
         first(names)
+    elseif et isa Union
+        string(et)
     else
-        (et isa Union ? string(et) : string(Base.typename(et).wrapper))
+        string(Base.typename(et).wrapper)
     end
     return "$(length(val))-element Vector{$(tname)}"
 end

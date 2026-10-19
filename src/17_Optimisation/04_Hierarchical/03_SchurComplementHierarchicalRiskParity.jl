@@ -1043,14 +1043,12 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                 catch e
                     throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchurComplement()` or reduce gamma: $gamma. Original error: $(sprint(showerror, e))"))
                 end
-            else
-                if !LinearAlgebra.isposdef(A_aug) || !LinearAlgebra.isposdef(C_aug)
-                    # Three values, like every other return of this method, and the real
-                    # `gamma` so a caller can name the value that failed. The monotonic
-                    # search reads `[1]` and treats `nothing` as an infinite risk; a caller
-                    # that destructures three names must not get a `BoundsError` instead.
-                    return nothing, gamma, r
-                end
+            elseif !LinearAlgebra.isposdef(A_aug) || !LinearAlgebra.isposdef(C_aug)
+                # Three values, like every other return of this method, and the real
+                # `gamma` so a caller can name the value that failed. The monotonic
+                # search reads `[1]` and treats `nothing` as an infinite risk; a caller
+                # that destructures three names must not get a `BoundsError` instead.
+                return nothing, gamma, r
             end
             # After the repair, so that a later split reads the repaired blocks.
             sigma[lc, lc] = A_aug

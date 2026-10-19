@@ -36,7 +36,7 @@ commit = "9a0a31331d"
 "src/01_Base/01_DocstringDictionaries/12_MathOnlineSelection.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
 "src/01_Base/01_DocstringDictionaries/13_References.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
 "src/01_Base/02_TypeRoots.jl" = { cyc = 2, cog = 2, arg = 2, cyc_sum = 4, cog_sum = 4, arg_sum = 4, macros = [] }
-"src/01_Base/03_PrettyShow.jl" = { cyc = 27, cog = 50, arg = 2, cyc_sum = 39, cog_sum = 62, arg_sum = 8, macros = ["@define_pretty_show"] }
+"src/01_Base/03_PrettyShow.jl" = { cyc = 27, cog = 50, arg = 2, cyc_sum = 39, cog_sum = 60, arg_sum = 8, macros = ["@define_pretty_show"] }
 "src/01_Base/04_ScopedConfig.jl" = { cyc = 7, cog = 6, arg = 8, cyc_sum = 38, cog_sum = 12, arg_sum = 69, macros = [] }
 "src/01_Base/05_Preferences.jl" = { cyc = 26, cog = 33, arg = 1, cyc_sum = 33, cog_sum = 38, arg_sum = 3, macros = [] }
 "src/01_Base/06_Messages.jl" = { cyc = 5, cog = 9, arg = 6, cyc_sum = 26, cog_sum = 27, arg_sum = 37, macros = [] }
@@ -71,7 +71,7 @@ commit = "9a0a31331d"
 "src/03_InputData/08_PriceGapFill.jl" = { cyc = 5, cog = 6, arg = 6, cyc_sum = 27, cog_sum = 20, arg_sum = 35, macros = [] }
 "src/03_InputData/09_PriceFilters.jl" = { cyc = 2, cog = 1, arg = 3, cyc_sum = 13, cog_sum = 2, arg_sum = 7, macros = [] }
 "src/03_InputData/10_ReturnsResult.jl" = { cyc = 18, cog = 25, arg = 12, cyc_sum = 86, cog_sum = 84, arg_sum = 76, macros = [] }
-"src/03_InputData/11_PricesToReturns.jl" = { cyc = 12, cog = 21, arg = 4, cyc_sum = 42, cog_sum = 45, arg_sum = 29, macros = [] }
+"src/03_InputData/11_PricesToReturns.jl" = { cyc = 12, cog = 19, arg = 4, cyc_sum = 42, cog_sum = 43, arg_sum = 29, macros = [] }
 "src/03_InputData/12_TrainTestSplit.jl" = { cyc = 6, cog = 6, arg = 4, cyc_sum = 17, cog_sum = 9, arg_sum = 16, macros = [] }
 "src/03_InputData/13_Base_AssetSelection.jl" = { cyc = 2, cog = 1, arg = 2, cyc_sum = 5, cog_sum = 1, arg_sum = 4, macros = [] }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { cyc = 6, cog = 11, arg = 8, cyc_sum = 98, cog_sum = 99, arg_sum = 75, macros = [] }
@@ -194,7 +194,7 @@ commit = "9a0a31331d"
 "src/07_JuMPModelOptimisation.jl" = { cyc = 5, cog = 7, arg = 2, cyc_sum = 17, cog_sum = 16, arg_sum = 2, macros = [] }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { cyc = 5, cog = 5, arg = 1, cyc_sum = 27, cog_sum = 13, arg_sum = 4, macros = [] }
 "src/08_Phylogeny/02_Clusters.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 19, cog_sum = 9, arg_sum = 25, macros = ["@propagatable"] }
-"src/08_Phylogeny/03_Hierarchical.jl" = { cyc = 17, cog = 32, arg = 5, cyc_sum = 82, cog_sum = 123, arg_sum = 47, macros = [] }
+"src/08_Phylogeny/03_Hierarchical.jl" = { cyc = 17, cog = 32, arg = 5, cyc_sum = 82, cog_sum = 120, arg_sum = 47, macros = [] }
 "src/08_Phylogeny/04_NonHierarchicalClustering.jl" = { cyc = 5, cog = 8, arg = 4, cyc_sum = 18, cog_sum = 17, arg_sum = 20, macros = [] }
 "src/08_Phylogeny/05_Phylogeny.jl" = { cyc = 3, cog = 2, arg = 3, cyc_sum = 6, cog_sum = 3, arg_sum = 7, macros = [] }
 "src/08_Phylogeny/06_DBHT/01_DBHT.jl" = { cyc = 1, cog = 1, arg = 2, cyc_sum = 2, cog_sum = 1, arg_sum = 2, macros = [] }
@@ -330,7 +330,7 @@ commit = "9a0a31331d"
 "src/17_Optimisation/03_NaiveOptimisation.jl" = { cyc = 3, cog = 3, arg = 10, cyc_sum = 66, cog_sum = 35, arg_sum = 74, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/01_Base_ClusteringOptimisation.jl" = { cyc = 3, cog = 2, arg = 9, cyc_sum = 31, cog_sum = 16, arg_sum = 49, macros = ["@forward_properties", "@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/02_HierarchicalRiskParity.jl" = { cyc = 4, cog = 3, arg = 8, cyc_sum = 24, cog_sum = 18, arg_sum = 29, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
-"src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 11, cog = 24, arg = 10, cyc_sum = 64, cog_sum = 76, arg_sum = 66, macros = ["@propagatable"] }
+"src/17_Optimisation/04_Hierarchical/03_SchurComplementHierarchicalRiskParity.jl" = { cyc = 11, cog = 20, arg = 10, cyc_sum = 64, cog_sum = 72, arg_sum = 66, macros = ["@propagatable"] }
 "src/17_Optimisation/04_Hierarchical/04_HierarchicalEqualRiskContribution.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 35, cog_sum = 30, arg_sum = 54, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/01_JuMPOptimisationTypes.jl" = { cyc = 3, cog = 2, arg = 5, cyc_sum = 27, cog_sum = 14, arg_sum = 48, macros = [] }
 "src/17_Optimisation/05_JuMP/01_Base_JuMPOptimisation/02_JuMPModelAccessors.jl" = { cyc = 2, cog = 2, arg = 3, cyc_sum = 18, cog_sum = 3, arg_sum = 23, macros = [] }
@@ -356,7 +356,7 @@ commit = "9a0a31331d"
 "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl" = { cyc = 5, cog = 7, arg = 9, cyc_sum = 30, cog_sum = 26, arg_sum = 57, macros = [] }
 "src/17_Optimisation/05_JuMP/04_MeanRisk.jl" = { cyc = 5, cog = 5, arg = 7, cyc_sum = 42, cog_sum = 24, arg_sum = 85, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl" = { cyc = 4, cog = 4, arg = 9, cyc_sum = 21, cog_sum = 16, arg_sum = 34, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_sigma_ucs", "@propagatable"] }
-"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { cyc = 12, cog = 14, arg = 14, cyc_sum = 59, cog_sum = 40, arg_sum = 134, macros = ["@propagatable"] }
+"src/17_Optimisation/05_JuMP/06_NearOptimalCentering_a.jl" = { cyc = 12, cog = 12, arg = 14, cyc_sum = 59, cog_sum = 38, arg_sum = 134, macros = ["@propagatable"] }
 "src/17_Optimisation/05_JuMP/06_NearOptimalCentering_b.jl" = { cyc = 12, cog = 12, arg = 14, cyc_sum = 22, cog_sum = 13, arg_sum = 67, macros = ["@pipe_delegates", "@pipe_route_sigma_ucs"] }
 "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl" = { cyc = 4, cog = 3, arg = 5, cyc_sum = 45, cog_sum = 21, arg_sum = 77, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@pipe_route_sigma_ucs", "@propagatable"] }
 "src/17_Optimisation/05_JuMP/08_RelaxedRiskBudgeting.jl" = { cyc = 3, cog = 3, arg = 9, cyc_sum = 29, cog_sum = 20, arg_sum = 66, macros = ["@forward_properties", "@pipe_delegates", "@pipe_route_rkb", "@propagatable"] }
