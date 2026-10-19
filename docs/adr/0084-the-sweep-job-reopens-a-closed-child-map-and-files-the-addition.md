@@ -308,3 +308,19 @@ sweep issue that names it, and files no second ticket.
 A colon now ends a path in `CodeHealth.title_tokens`, which `names_path` reads. A title that reads
 `Sweep src/A.jl: 23 units` named `src/A.jl:`, which matched no path. A path holds no colon, so
 the code-health job of ADR 0078, which reads titles through the same function, is unchanged.
+
+## Amendment (2026-10-19) — from [#1713](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1713)
+
+`apply` retries the attach of a sub-issue, and an attach that still fails does not stop the plan.
+
+`apply` opened #1712 and stopped on `gh: Not Found (HTTP 404)` before it attached the issue to its
+child map. The sub-issues endpoint takes the database id of the child, which `apply` reads back by
+number, and that REST read of an issue opened a moment before can answer 404 for a short time.
+`set -e` then stopped the loop, so #1712 had no parent and the rest of the plan was not opened.
+
+Two calls now go through `retry`, five attempts two seconds apart: the read of the id, and the post
+to the sub-issues endpoint. If a call still fails after five attempts, `apply` names the issue and
+its map, opens the rest of the plan, and then prints one command per orphan that attaches it by hand
+and exits with status 1. **An orphan does not stop the plan**, because the plan cannot open it again.
+The next dump reports the orphan as an existing sweep issue, so a re-run skips its path, and the
+orphan is attached only by the printed command. A red step in `Sweep.yml` shows the orphan.
