@@ -106,13 +106,17 @@ set over every observation.
             r = 61:200
             rr = regression(p, X[r, :], F[r, :])
             Fc = F[r, :] .- mean(F[r, :]; dims = 1)
+            C = zeros(N, size(p.proj, 2))
             for i in 1:N
                 c = po.StatsAPI.coef(po.StatsAPI.fit(LinearModel(),
                                                      [ones(length(r)) Fc * p.proj],
                                                      X[r, i]))
                 @test isapprox(rr.M[i, :], p.proj * c[2:end]; rtol = 1e-12)
-                @test isapprox(rr.L[i, :], c[2:end]; rtol = 1e-10)
+                C[i, :] = c[2:end]
             end
+            # `L` holds the same coefficients up to the sign of each component (#1756).
+            s = map(c -> sum(c) < 0 ? -1 : 1, eachcol(C))
+            @test isapprox(rr.L, C .* transpose(s); rtol = 1e-10)
             # The prediction in the factors equals the prediction in the components.
             pred = rr.b' .+ F[r, :] * rr.M'
             fits = [po.StatsAPI.predict(po.StatsAPI.fit(LinearModel(),

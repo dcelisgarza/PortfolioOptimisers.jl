@@ -1112,11 +1112,12 @@ end
         reg = regression(DimensionReductionRegression(), X, F)
 
         # `L` undoes the rescaling and the projection in turn, so it returns the reduced-space
-        # coefficients the per-asset fits produced.
+        # coefficients the per-asset fits produced, up to the sign of each component (#1756).
         x1, Vp, _, _ = PO.prep_dim_red_reg(DimensionReductionRegression(), F)
         betapc = hcat([StatsAPI.coef(StatsAPI.fit(LinearModel(), x1, X[:, i]))[2:end]
                        for i in axes(X, 2)]...)
-        @test isapprox(reg.L, transpose(betapc); atol = 1e-14)
+        s = map(c -> sum(c) < 0 ? -1 : 1, eachrow(betapc))
+        @test isapprox(reg.L, transpose(betapc) .* transpose(s); atol = 1e-14)
         @test size(reg.L) == (size(X, 2), N)
         @test size(reg.M) == (size(X, 2), N)
 
@@ -1139,6 +1140,23 @@ end
         reg1 = regression(DimensionReductionRegression(), reshape(y, :, 1), F)
         @test isapprox(reg.M[1, :], reg1.M[1, :])
         @test isapprox(reg.b[1], reg1.b[1])
+    end
+
+    @testset "The sign of each component of a dimension reduction fit (#1756)" begin
+        # `--check-bounds=yes` flipped the sign of both principal components of a fit, so a
+        # factor risk budget, whose factor weights must be positive, found no long-only
+        # portfolio. A flip of the components of `proj` is the same flip, and it must not
+        # move `L`.
+        _, Vp, _, sigma = PO.prep_dim_red_reg(DimensionReductionRegression(), F)
+        P = Vp ./ sigma
+        reg = regression(DimensionReductionRegression(; proj = P), X, F)
+        @test all(c -> sum(c) >= 0, eachcol(reg.L))
+        for s in ([-1, 1, 1, 1, 1], [1, -1, 1, -1, 1], -ones(Int, N))
+            regs = regression(DimensionReductionRegression(; proj = P .* transpose(s)), X,
+                              F)
+            @test isapprox(regs.L, reg.L; atol = 1e-14)
+            @test isapprox(regs.M, reg.M; atol = 1e-14)
+        end
     end
 
     @testset "factory leaves a dimension reduction target alone" begin
