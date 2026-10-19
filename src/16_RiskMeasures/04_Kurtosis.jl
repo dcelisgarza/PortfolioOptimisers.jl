@@ -271,13 +271,7 @@ function resolve_deferred_quantities(r::Kurtosis, pr::AbstractPriorResult,
         kt = deferred_quantity(fitted, :kt)
         mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
     end
-    if isnothing(r.pe)
-        return rebuild_with_slots(r, (; mu = mu, kt = kt))
-    end
-    fitted = fit_deferred_quantity(r.pe, pr)
-    return rebuild_with_slots(r,
-                              (; mu = fan_out_slot(fitted, mu, :mu),
-                               kt = fan_out_slot(fitted, kt, :kt), pe = nothing))
+    return fan_out_pe(r, r.pe, pr, (; mu = mu, kt = kt))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::Kurtosis) = (; mu = r.mu, kt = r.kt, pe = r.pe)

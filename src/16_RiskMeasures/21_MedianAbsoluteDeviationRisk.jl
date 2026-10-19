@@ -201,9 +201,11 @@ This is the only thing `factory` does to `mu`. The field is tagged [`@vprop`](@r
 """
 function resolve_deferred_quantities(r::MedianAbsoluteDeviation, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(r.mu, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::MedianAbsoluteDeviation{<:Any, <:Any,
+                                                                <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     return rebuild_with_slots(r, (; mu = resolve_slot(r.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`. A centring strategy in `mu` is not deferred: it

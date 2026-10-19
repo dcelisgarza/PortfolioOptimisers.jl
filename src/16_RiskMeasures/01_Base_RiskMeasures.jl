@@ -2045,6 +2045,48 @@ function fan_out_slot(fitted, slot, key::Symbol)
     return isnothing(slot) ? deferred_quantity(fitted, key) : slot
 end
 """
+    fan_out_pe(x, pe::Nothing, pr::AbstractPriorResult, slots::NamedTuple)
+    fan_out_pe(x, pe::AbstractPriorEstimator, pr::AbstractPriorResult, slots::NamedTuple)
+
+Rebuild a measure with its resolved slots, and fill the slots that are still `nothing` from its fan-out estimator `pe`.
+
+A measure with two or more deferrable slots resolves each deferred slot first, and then gives the resolved slots to this function. The type of `pe` selects the method. Without a `pe` the measure takes the resolved slots as they are. With a `pe` the function runs [`fit_deferred_quantity`](@ref) one time and fills each slot with [`fan_out_slot`](@ref), so a resolved slot wins over the fan-out. The rebuilt measure holds `pe = nothing`, because the fit is done.
+
+A measure whose slots carry a derived quantity, such as `chol` beside `sigma`, declares its own method for a `pe`, because the derived quantity comes from the fan-out only when the fan-out also gives its source.
+
+# Algorithm
+
+ 1. `pe` is `nothing`: rebuild `x` with `slots`.
+ 2. Otherwise fit `pe` against `pr` one time. Fill each slot of `slots` with [`fan_out_slot`](@ref) under its own name, and rebuild `x` with the filled slots and `pe = nothing`.
+
+# Arguments
+
+  - `x`: The measure, or the algorithm of a measure, that holds the slots.
+  - `pe`: The fan-out estimator of `x`, or `nothing`.
+  - `pr`: The prior result that `pe` is fitted against.
+  - `slots`: The resolved slots, keyed by field name.
+
+# Returns
+
+  - The rebuilt `x`.
+
+# Related
+
+  - [`fan_out_slot`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function fan_out_pe(x, ::Nothing, ::AbstractPriorResult, slots::NamedTuple)
+    return rebuild_with_slots(x, slots)
+end
+function fan_out_pe(x, pe::AbstractPriorEstimator, pr::AbstractPriorResult,
+                    slots::NamedTuple)
+    fitted = fit_deferred_quantity(pe, pr)
+    ks = keys(slots)
+    filled = NamedTuple{ks}(map((k, v) -> fan_out_slot(fitted, v, k), ks, values(slots)))
+    return rebuild_with_slots(x, merge(filled, (; pe = nothing)))
+end
+"""
     deferred_derived_quantity(fitted, key::Symbol)
 
 Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`; `V`, the negative spectral part that travels with `sk`; `mu`, the centre a higher moment was taken about; `skmp`, the processor that built `V`.

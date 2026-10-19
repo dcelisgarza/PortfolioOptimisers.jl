@@ -542,9 +542,10 @@ Resolve a **Deferred Quantity** in the `sigma` slot of a [`Variance`](@ref) agai
   - [`fit_deferred_quantity`](@ref)
 """
 function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult, ::Any = nothing)
-    if !isa(r.sigma, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::Variance{<:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     fitted = fit_deferred_quantity(r.sigma, pr)
     return rebuild_with_slots(r,
                               (; sigma = deferred_quantity(fitted, :sigma),
@@ -747,9 +748,10 @@ Resolve a **Deferred Quantity** in the `sigma` slot of a [`StandardDeviation`](@
 """
 function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(r.sigma, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::StandardDeviation{<:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     fitted = fit_deferred_quantity(r.sigma, pr)
     return rebuild_with_slots(r,
                               (; sigma = deferred_quantity(fitted, :sigma),
@@ -1012,9 +1014,11 @@ The measure has one slot that the prior supplies, and no derived slot, so [`reso
 """
 function resolve_deferred_quantities(r::UncertaintySetVariance, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(r.sigma, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::UncertaintySetVariance{<:Any, <:Any,
+                                                               <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     return rebuild_with_slots(r, (; sigma = resolve_slot(r.sigma, :sigma, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a

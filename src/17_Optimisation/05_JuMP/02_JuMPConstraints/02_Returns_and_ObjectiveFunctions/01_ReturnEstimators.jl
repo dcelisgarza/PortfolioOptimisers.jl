@@ -307,9 +307,10 @@ The estimator has one slot that the prior can supply, so the slot itself admits 
 """
 function resolve_deferred_quantities(rt::ArithmeticReturn, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(rt.mu, DeferredQuantity)
-        return rt
-    end
+    return rt
+end
+function resolve_deferred_quantities(rt::ArithmeticReturn{<:Any, <:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     return rebuild_with_slots(rt, (; mu = resolve_slot(rt.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `ucs` holds an Estimator by design, not a Deferred

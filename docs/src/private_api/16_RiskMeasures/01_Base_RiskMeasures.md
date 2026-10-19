@@ -40,6 +40,7 @@ centring_target
 fit_deferred_moment
 deferred_quantity
 fan_out_slot
+fan_out_pe
 deferred_derived_quantity
 resolve_slot
 deferred_slots

@@ -495,12 +495,16 @@ function resolve_deferred_quantities(alg::DistributionValueatRisk, pr::AbstractP
         alg.sigma, alg.chol
     end
     mu = resolve_slot(alg.mu, :mu, pr)
-    if isnothing(alg.pe)
-        return rebuild_with_slots(alg, (; mu = mu, sigma = sigma, chol = chol))
-    end
-    fitted = fit_deferred_quantity(alg.pe, pr)
-    # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
-    # also supplies the `sigma` it factorises. Read before `sigma` is filled.
+    return fan_out_pe(alg, alg.pe, pr, (; mu = mu, sigma = sigma, chol = chol))
+end
+# `chol` is derived from `sigma`, so the fan-out of this algorithm is its own method of
+# `fan_out_pe`.
+function fan_out_pe(alg::DistributionValueatRisk, pe::AbstractPriorEstimator,
+                    pr::AbstractPriorResult, slots::NamedTuple)
+    (; mu, sigma, chol) = slots
+    fitted = fit_deferred_quantity(pe, pr)
+    # `chol` comes from the fan-out only when the fan-out also supplies the `sigma` it
+    # factorises. Read before `sigma` is filled.
     chol = isnothing(sigma) ? deferred_derived_quantity(fitted, :chol) : chol
     return rebuild_with_slots(alg,
                               (; mu = fan_out_slot(fitted, mu, :mu),

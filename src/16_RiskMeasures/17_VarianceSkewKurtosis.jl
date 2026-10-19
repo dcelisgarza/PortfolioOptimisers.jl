@@ -260,13 +260,7 @@ function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult,
         sk = deferred_quantity(fitted, :sk)
         mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
     end
-    if isnothing(r.pe)
-        return rebuild_with_slots(r, (; sk = sk, mu = mu))
-    end
-    fitted = fit_deferred_quantity(r.pe, pr)
-    return rebuild_with_slots(r,
-                              (; sk = fan_out_slot(fitted, sk, :sk),
-                               mu = fan_out_slot(fitted, mu, :mu), pe = nothing))
+    return fan_out_pe(r, r.pe, pr, (; sk = sk, mu = mu))
 end
 # Deferrable slots — see `deferred_slots`. `ve` holds a variance estimator by design, not a
 # Deferred Quantity, so it is not declared here.
@@ -680,10 +674,14 @@ function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorR
     vr = resolve_deferred_quantities(r.vr, pr, slv)
     sk = resolve_deferred_quantities(r.sk, pr, slv)
     kt = resolve_deferred_quantities(r.kt, pr, slv)
-    if isnothing(r.pe)
-        return rebuild_with_slots(r, (; vr = vr, sk = sk, kt = kt))
-    end
-    fitted = fit_deferred_quantity(r.pe, pr)
+    return fan_out_pe(r, r.pe, pr, (; vr = vr, sk = sk, kt = kt))
+end
+# The children carry their own slots, and `chol` is derived from `sigma`, so the fan-out of
+# this measure is its own method of `fan_out_pe`.
+function fan_out_pe(r::VarianceSkewKurtosis, pe::AbstractPriorEstimator,
+                    pr::AbstractPriorResult, slots::NamedTuple)
+    (; vr, sk, kt) = slots
+    fitted = fit_deferred_quantity(pe, pr)
     # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
     # also supplies the `sigma` it factorises.
     chol = isnothing(vr.sigma) ? deferred_derived_quantity(fitted, :chol) : vr.chol

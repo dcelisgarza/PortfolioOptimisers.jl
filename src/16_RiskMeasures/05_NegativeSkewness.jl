@@ -208,9 +208,11 @@ The measure carries one deferrable slot, so there is no fan-out to make and it t
 """
 function resolve_deferred_quantities(r::NegativeSkewness, pr::AbstractPriorResult,
                                      ::Any = nothing)::NegativeSkewness
-    if !isa(r.sk, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::NegativeSkewness{<:Any, <:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult,
+                                     ::Any = nothing)::NegativeSkewness
     fitted = fit_deferred_quantity(r.sk, pr)
     skmp = deferred_derived_quantity(fitted, :skmp)
     return rebuild_with_slots(r,

@@ -1464,9 +1464,10 @@ Resolve a **Deferred Quantity** in [`LowOrderMoment`](@ref)'s `mu` slot against 
 """
 function resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(r.mu, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::LowOrderMoment{<:Any, <:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     return rebuild_with_slots(r, (; mu = resolve_slot(r.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`. `alg` holds a variance estimator by design, not a
@@ -1521,9 +1522,10 @@ Resolve a **Deferred Quantity** in [`HighOrderMoment`](@ref)'s `mu` slot against
 """
 function resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(r.mu, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::HighOrderMoment{<:Any, <:Any, <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     return rebuild_with_slots(r, (; mu = resolve_slot(r.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`.
