@@ -1052,8 +1052,8 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     HindsightSplit(;
-        prefix::Bool = true,
         start::Integer = 1,
+        prefix::Bool = true,
         wd::Option{<:AbstractWeightDrift} = nothing,
         pws::Option{<:AbstractPreviousWeightsSource} = nothing,
         fa::Option{<:AbstractFeeAmortisation} = nothing,
@@ -1073,10 +1073,10 @@ than to the estimator, so [`Base.split`](@ref) checks it.
 # Examples
 
 ```jldoctest
-julia> HindsightSplit(; prefix = false, start = 21)
+julia> HindsightSplit(; start = 21, prefix = false)
 HindsightSplit
-             prefix ┼ Bool: false
               start ┼ Int64: 21
+             prefix ┼ Bool: false
                  wd ┼ nothing
                 pws ┼ nothing
                  fa ┼ nothing
@@ -1098,13 +1098,13 @@ HindsightSplit
 """
 @concrete struct HindsightSplit <: WalkForwardEstimator
     """
-    `prefix`: If `true`, fold `t` trains on rows `1:t`, the prefix through its test row; if `false`, on row `t` alone.
-    """
-    prefix
-    """
     `start`: First row scored. Every row from it to the last is a fold, so a scheme over the rows of an [`IndexWalkForward`](@ref)`(train_size, 1)` sets `start = train_size + 1`.
     """
     start
+    """
+    `prefix`: If `true`, fold `t` trains on rows `1:t`, the prefix through its test row; if `false`, on row `t` alone.
+    """
+    prefix
     """
     $(field_dict[:wd])
     """
@@ -1125,22 +1125,22 @@ HindsightSplit
     $(field_dict[:cv_strict])
     """
     strict
-    function HindsightSplit(prefix::Bool, start::Integer, wd::Option{<:AbstractWeightDrift},
+    function HindsightSplit(start::Integer, prefix::Bool, wd::Option{<:AbstractWeightDrift},
                             pws::Option{<:AbstractPreviousWeightsSource},
                             fa::Option{<:AbstractFeeAmortisation}, store_weight_path::Bool,
                             strict::Bool)
         assert_nonempty_gt0_finite_val(start, :start)
-        return new{typeof(prefix), typeof(start), typeof(wd), typeof(pws), typeof(fa),
-                   typeof(store_weight_path), typeof(strict)}(prefix, start, wd, pws, fa,
+        return new{typeof(start), typeof(prefix), typeof(wd), typeof(pws), typeof(fa),
+                   typeof(store_weight_path), typeof(strict)}(start, prefix, wd, pws, fa,
                                                               store_weight_path, strict)
     end
 end
-function HindsightSplit(; prefix::Bool = true, start::Integer = 1,
+function HindsightSplit(; start::Integer = 1, prefix::Bool = true,
                         wd::Option{<:AbstractWeightDrift} = nothing,
                         pws::Option{<:AbstractPreviousWeightsSource} = nothing,
                         fa::Option{<:AbstractFeeAmortisation} = nothing,
                         store_weight_path::Bool = false, strict::Bool = false)
-    return HindsightSplit(prefix, start, wd, pws, fa, store_weight_path, strict)
+    return HindsightSplit(start, prefix, wd, pws, fa, store_weight_path, strict)
 end
 """
     OnlineHindsightSplit(;
@@ -1162,8 +1162,8 @@ The keywords are the scheme's, minus `prefix`, which is set `true`: fold `t` the
 julia> OnlineHindsightSplit(; start = 21)
 Online
           est ┼ HindsightSplit
-              │              prefix ┼ Bool: true
               │               start ┼ Int64: 21
+              │              prefix ┼ Bool: true
               │                  wd ┼ nothing
               │                 pws ┼ nothing
               │                  fa ┼ nothing
@@ -1186,7 +1186,7 @@ function OnlineHindsightSplit(; start::Integer = 1,
                               pws::Option{<:AbstractPreviousWeightsSource} = nothing,
                               fa::Option{<:AbstractFeeAmortisation} = nothing,
                               store_weight_path::Bool = false, strict::Bool = false)
-    cv = HindsightSplit(true, start, wd, pws, fa, store_weight_path, strict)
+    cv = HindsightSplit(start, true, wd, pws, fa, store_weight_path, strict)
     return Online{typeof(cv), Nothing}(cv, nothing)
 end
 """

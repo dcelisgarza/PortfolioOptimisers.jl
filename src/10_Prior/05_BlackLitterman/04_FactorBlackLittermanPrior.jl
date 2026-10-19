@@ -17,6 +17,7 @@ $(DocStringExtensions.FIELDS)
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
+        rsd::Bool = true,
         views::Lc_BLV,
         sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
@@ -24,7 +25,6 @@ $(DocStringExtensions.FIELDS)
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
-        rsd::Bool = true,
         mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
         cache::Option{<:AbstractPartialFitState} = nothing,
         x_src::Option{<:AbstractReturnsSource} = nothing
@@ -139,6 +139,7 @@ FactorBlackLittermanPrior
              │             │   w ┴ nothing
              │           w ┼ nothing
              │   corrected ┴ Bool: true
+         rsd ┼ Bool: true
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
@@ -156,7 +157,6 @@ FactorBlackLittermanPrior
           rf ┼ Float64: 0.0
            l ┼ nothing
          tau ┼ nothing
-         rsd ┼ Bool: true
     mtx_sqrt ┼ EigenFallbackSquareRoot()
        x_src ┴ nothing
 ```
@@ -205,6 +205,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
     """
     @fprop @vprop ve
     """
+    $(field_dict[:rsd])
+    """
+    rsd
+    """
     $(field_dict[:views])
     """
     views
@@ -233,10 +237,6 @@ This prior has no exact incremental recursion, so it takes the online step by **
     """
     tau
     """
-    $(field_dict[:rsd])
-    """
-    rsd
-    """
     $(field_dict[:mtx_sqrt])
     """
     mtx_sqrt
@@ -252,11 +252,11 @@ This prior has no exact incremental recursion, so it takes the online step by **
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractTimeSeriesRegressionEstimator,
-                                       ve::AbstractVarianceEstimator, views::Lc_BLV,
-                                       sets::Option{<:UniverseSets},
+                                       ve::AbstractVarianceEstimator, rsd::Bool,
+                                       views::Lc_BLV, sets::Option{<:UniverseSets},
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
-                                       tau::Option{<:Number}, rsd::Bool,
+                                       tau::Option{<:Number},
                                        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
                                        cache::Option{<:AbstractPartialFitState},
                                        x_src::Option{<:AbstractReturnsSource})
@@ -265,10 +265,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
         assert_inner_reader(re, :re, :FactorBlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
-                   typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
-                   typeof(l), typeof(tau), typeof(rsd), typeof(mtx_sqrt), typeof(cache),
-                   typeof(x_src)}(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf, l,
-                                  tau, rsd, mtx_sqrt, cache, x_src)
+                   typeof(rsd), typeof(views), typeof(sets), typeof(views_conf), typeof(w),
+                   typeof(rf), typeof(l), typeof(tau), typeof(mtx_sqrt), typeof(cache),
+                   typeof(x_src)}(pe, f_mp, mp, re, ve, rsd, views, sets, views_conf, w, rf,
+                                  l, tau, mtx_sqrt, cache, x_src)
     end
 end
 function FactorBlackLittermanPrior(;
@@ -277,16 +277,17 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
+                                   rsd::Bool = true, views::Lc_BLV,
+                                   sets::Option{<:UniverseSets} = nothing,
                                    views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
-                                   tau::Option{<:Number} = nothing, rsd::Bool = true,
+                                   tau::Option{<:Number} = nothing,
                                    mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
                                    cache::Option{<:AbstractPartialFitState} = nothing,
                                    x_src::Option{<:AbstractReturnsSource} = nothing)::FactorBlackLittermanPrior
-    return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
-                                     l, tau, rsd, mtx_sqrt, cache, x_src)
+    return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, rsd, views, sets, views_conf, w,
+                                     rf, l, tau, mtx_sqrt, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -301,7 +302,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd, :mtx_sqrt, :x_src)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :rsd, :views, :sets, :views_conf, :w, :rf, :l, :tau, :mtx_sqrt, :x_src)`.
 
 # Related
 
@@ -310,7 +311,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::FactorBlackLittermanPrior)
-    return (:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd,
+    return (:pe, :f_mp, :mp, :re, :ve, :rsd, :views, :sets, :views_conf, :w, :rf, :l, :tau,
             :mtx_sqrt, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access

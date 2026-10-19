@@ -179,7 +179,6 @@ MeanRisk
       │       bgt ┼ Float64: 1.0
       │      sbgt ┼ nothing
       │      gbgt ┼ nothing
-      │      xbgt ┼ Bool: false
       │        lt ┼ nothing
       │        st ┼ nothing
       │      lcse ┼ nothing
@@ -222,6 +221,7 @@ MeanRisk
       │        l2 ┼ nothing
       │        lp ┼ nothing
       │      linf ┼ nothing
+      │      xbgt ┼ Bool: false
       │    strict ┴ Bool: false
     r ┼ Variance
       │    settings ┼ RiskMeasureSettings

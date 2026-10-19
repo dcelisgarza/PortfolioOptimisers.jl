@@ -454,7 +454,6 @@ $(DocStringExtensions.FIELDS)
         bgt::TD_Option{<:Num_BgtCE} = 1.0,
         sbgt::TD_Option{<:Num_BgtRg} = nothing,
         gbgt::TD_Option{<:Num_BgtRg} = nothing,
-        xbgt::Bool = false,
         lt::TD_Option{<:BtE_Bt} = nothing,
         st::TD_Option{<:BtE_Bt} = nothing,
         lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
@@ -488,6 +487,7 @@ $(DocStringExtensions.FIELDS)
         l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
         lp::TD_Option{<:LpReg_VecLpReg} = nothing,
         linf::TD_Option{<:Num_AmbRadCal} = nothing,
+        xbgt::Bool = false,
         strict::Bool = false,
         cache::Option{<:ReturnsBufferState} = nothing,
     ) -> JuMPOptimiser
@@ -547,10 +547,6 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     $(field_dict[:gbgt])
     """
     gbgt
-    """
-    $(field_dict[:xbgt])
-    """
-    xbgt
     """
     $(field_dict[:lt])
     """
@@ -684,6 +680,10 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     """
     linf
     """
+    $(field_dict[:xbgt])
+    """
+    xbgt
+    """
     $(field_dict[:strict_opt]) Under `true` the fit also refuses an asset with a gap in the rows that a plain graph reader reads, which it otherwise drops with a warning, see [`graph_reader_mask`](@ref).
     """
     strict
@@ -694,7 +694,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
     function JuMPOptimiser(pe::Onl{<:TD{<:PrE_Pr}}, slv::Slv_VecSlv,
                            wb::TD_Option{<:WbE_Wb}, bgt::TD_Option{<:Num_BgtCE},
                            sbgt::TD_Option{<:Num_BgtRg}, gbgt::TD_Option{<:Num_BgtRg},
-                           xbgt::Bool, lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
+                           lt::TD_Option{<:BtE_Bt}, st::TD_Option{<:BtE_Bt},
                            lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc},
                            cte::TD_Option{<:Lc_CC_VecCC}, gcarde::TD_Option{<:LcE_Lc},
                            sgcarde::TD_Option{<:LcE_Lc_VecLcE_Lc},
@@ -717,7 +717,7 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                            linfc::TD_Option{<:Num_NormCeilCal},
                            l1::TD_Option{<:Num_AmbRadCal}, l2::TD_Option{<:L2Reg_VecL2Reg},
                            lp::TD_Option{<:LpReg_VecLpReg},
-                           linf::TD_Option{<:Num_AmbRadCal}, strict::Bool,
+                           linf::TD_Option{<:Num_AmbRadCal}, xbgt::Bool, strict::Bool,
                            cache::Option{<:ReturnsBufferState})
         if isa(slv, VecSlv)
             @argcheck(!isempty(slv), IsEmptyError("slv cannot be empty"))
@@ -814,36 +814,36 @@ Keywords correspond to the struct's fields. Fields typed [`TD_Option`](@ref) or 
                       IsNothingError("sets cannot be nothing when estimator-type fields are provided"))
         end
         assert_time_dependent_substitution(JuMPOptimiser,
-                                           (; pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st,
-                                            lcse, cte, gcarde, sgcarde, smtx, sgmtx, slt,
-                                            sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
-                                            sca, ccnt, cobj, sc, so, ss, card, scard, l2c,
-                                            lpc, linfc, l1, l2, lp, linf, strict),
+                                           (; pe, slv, wb, bgt, sbgt, gbgt, lt, st, lcse,
+                                            cte, gcarde, sgcarde, smtx, sgmtx, slt, sst,
+                                            sglt, sgst, tn, fees, sets, tr, ple, ret, sca,
+                                            ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
+                                            linfc, l1, l2, lp, linf, xbgt, strict),
                                            jump_optimiser_td_defaults())
         return new{typeof(pe), typeof(slv), typeof(wb), typeof(bgt), typeof(sbgt),
-                   typeof(gbgt), typeof(xbgt), typeof(lt), typeof(st), typeof(lcse),
-                   typeof(cte), typeof(gcarde), typeof(sgcarde), typeof(smtx),
-                   typeof(sgmtx), typeof(slt), typeof(sst), typeof(sglt), typeof(sgst),
-                   typeof(tn), typeof(fees), typeof(sets), typeof(tr), typeof(ple),
-                   typeof(ret), typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc),
-                   typeof(so), typeof(ss), typeof(card), typeof(scard), typeof(l2c),
-                   typeof(lpc), typeof(linfc), typeof(l1), typeof(l2), typeof(lp),
-                   typeof(linf), typeof(strict), typeof(cache)}(pe, slv, wb, bgt, sbgt,
-                                                                gbgt, xbgt, lt, st, lcse,
-                                                                cte, gcarde, sgcarde, smtx,
+                   typeof(gbgt), typeof(lt), typeof(st), typeof(lcse), typeof(cte),
+                   typeof(gcarde), typeof(sgcarde), typeof(smtx), typeof(sgmtx),
+                   typeof(slt), typeof(sst), typeof(sglt), typeof(sgst), typeof(tn),
+                   typeof(fees), typeof(sets), typeof(tr), typeof(ple), typeof(ret),
+                   typeof(sca), typeof(ccnt), typeof(cobj), typeof(sc), typeof(so),
+                   typeof(ss), typeof(card), typeof(scard), typeof(l2c), typeof(lpc),
+                   typeof(linfc), typeof(l1), typeof(l2), typeof(lp), typeof(linf),
+                   typeof(xbgt), typeof(strict), typeof(cache)}(pe, slv, wb, bgt, sbgt,
+                                                                gbgt, lt, st, lcse, cte,
+                                                                gcarde, sgcarde, smtx,
                                                                 sgmtx, slt, sst, sglt, sgst,
                                                                 tn, fees, sets, tr, ple,
                                                                 ret, sca, ccnt, cobj, sc,
                                                                 so, ss, card, scard, l2c,
                                                                 lpc, linfc, l1, l2, lp,
-                                                                linf, strict, cache)
+                                                                linf, xbgt, strict, cache)
     end
 end
 function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_VecSlv,
                        wb::TD_Option{<:WbE_Wb} = WeightBounds(),
                        bgt::TD_Option{<:Num_BgtCE} = 1.0,
                        sbgt::TD_Option{<:Num_BgtRg} = nothing,
-                       gbgt::TD_Option{<:Num_BgtRg} = nothing, xbgt::Bool = false,
+                       gbgt::TD_Option{<:Num_BgtRg} = nothing,
                        lt::TD_Option{<:BtE_Bt} = nothing, st::TD_Option{<:BtE_Bt} = nothing,
                        lcse::TD_Option{<:EcE_LcE_Lc_VecEcE_LcE_Lc} = nothing,
                        cte::TD_Option{<:Lc_CC_VecCC} = nothing,
@@ -872,14 +872,14 @@ function JuMPOptimiser(; pe::Onl{<:TD{<:PrE_Pr}} = EmpiricalPrior(), slv::Slv_Ve
                        linfc::TD_Option{<:Num_NormCeilCal} = nothing,
                        l1::TD_Option{<:Num_AmbRadCal} = nothing,
                        l2::TD_Option{<:L2Reg_VecL2Reg} = nothing,
-
                        lp::TD_Option{<:LpReg_VecLpReg} = nothing,
-                       linf::TD_Option{<:Num_AmbRadCal} = nothing, strict::Bool = false,
+                       linf::TD_Option{<:Num_AmbRadCal} = nothing, xbgt::Bool = false,
+                       strict::Bool = false,
                        cache::Option{<:ReturnsBufferState} = nothing)::JuMPOptimiser
-    return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, xbgt, lt, st, lcse, cte, gcarde,
-                         sgcarde, smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr,
-                         ple, ret, sca, ccnt, cobj, sc, so, ss, card, scard, l2c, lpc,
-                         linfc, l1, l2, lp, linf, strict, cache)
+    return JuMPOptimiser(pe, slv, wb, bgt, sbgt, gbgt, lt, st, lcse, cte, gcarde, sgcarde,
+                         smtx, sgmtx, slt, sst, sglt, sgst, tn, fees, sets, tr, ple, ret,
+                         sca, ccnt, cobj, sc, so, ss, card, scard, l2c, lpc, linfc, l1, l2,
+                         lp, linf, xbgt, strict, cache)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

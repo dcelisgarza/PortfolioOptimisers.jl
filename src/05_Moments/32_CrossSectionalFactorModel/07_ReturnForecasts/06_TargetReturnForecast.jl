@@ -370,15 +370,15 @@ $(DocStringExtensions.TYPEDFIELDS)
     TargetReturnForecast(; scores::DescriptorScores,
                          tgt::AbstractRegressionTarget = LinearModel(),
                          horizon::Integer = 1, lag::Integer = 1,
-                         whole_history::Bool = true,
                          target_outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                          target_scoring::Option{<:AbstractCrossSectionalTransform} = nothing,
-                         calibrate::Bool = true, scale::Real = 1.0,
+                         scale::Real = 1.0,
                          half_life::Real = 20.0, decay::Real = half_life_decay(half_life),
                          min_obs::Integer = 1,
                          cv::Union{Nothing, CrossValidationEstimator, PrequentialCalibration} = PrequentialCalibration(),
                          warmup::AbstractCalibrationWarmup = NaNWarmup(),
                          unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
+                         whole_history::Bool = true, calibrate::Bool = true,
                          intercept::Bool = false) -> TargetReturnForecast
 
 Every keyword but `half_life` corresponds to a field. `half_life` is not a field. It fixes the default of `decay` of the calibration, and the constructor keeps a value passed for `decay` as it stands. The default `min_obs = 1` calibrates from the first observation that states a slope. The weight ``1 - \\lambda^{n}`` that the first ``n`` observations carry multiplies both accumulators and the ridge alike, so the coefficient after ``n`` observations is the weighted least squares slope of those observations, with no start-up bias for a warm-up to wait out.
@@ -418,16 +418,16 @@ TargetReturnForecast
                  │   kwargs ┴ @NamedTuple{}: NamedTuple()
          horizon ┼ Int64: 1
              lag ┼ Int64: 1
-   whole_history ┼ Bool: true
   target_outlier ┼ nothing
   target_scoring ┼ nothing
-       calibrate ┼ Bool: false
            scale ┼ Float64: 1.0
            decay ┼ Float64: 0.7071067811865476
          min_obs ┼ Int64: 1
               cv ┼ PrequentialCalibration()
           warmup ┼ NaNWarmup()
             unit ┼ IdiosyncraticReturnUnit()
+   whole_history ┼ Bool: true
+       calibrate ┼ Bool: false
        intercept ┴ Bool: false
 ```
 
@@ -459,10 +459,6 @@ TargetReturnForecast
     """
     lag
     """
-    $(field_dict[:rf_whole_history])
-    """
-    whole_history
-    """
     Cross-sectional transform the member applies first to the target of the fit, or `nothing` to skip the step.
     """
     target_outlier
@@ -470,10 +466,6 @@ TargetReturnForecast
     Cross-sectional transform the member applies to the target of the fit after `target_outlier`, or `nothing` to skip the step. It is `nothing` by default, so under the default `target_outlier` the fit predicts the winsorised return itself.
     """
     target_scoring
-    """
-    Whether the member puts its prediction back into return units by an exponentially weighted scalar regression of the forward return on it.
-    """
-    calibrate
     """
     $(field_dict[:rf_scale])
     """
@@ -499,19 +491,27 @@ TargetReturnForecast
     """
     unit
     """
+    $(field_dict[:rf_whole_history])
+    """
+    whole_history
+    """
+    Whether the member puts its prediction back into return units by an exponentially weighted scalar regression of the forward return on it.
+    """
+    calibrate
+    """
     Whether the fit appends a column of ones to the scores, so that the model carries an intercept.
     """
     intercept
     function TargetReturnForecast(scores::DescriptorScores, tgt::AbstractRegressionTarget,
-                                  horizon::Integer, lag::Integer, whole_history::Bool,
+                                  horizon::Integer, lag::Integer,
                                   target_outlier::Option{<:AbstractCrossSectionalTransform},
                                   target_scoring::Option{<:AbstractCrossSectionalTransform},
-                                  calibrate::Bool, scale::Real, decay::Real,
-                                  min_obs::Integer,
+                                  scale::Real, decay::Real, min_obs::Integer,
                                   cv::Union{Nothing, CrossValidationEstimator,
                                             PrequentialCalibration},
                                   warmup::AbstractCalibrationWarmup,
-                                  unit::AbstractForecastUnit, intercept::Bool)
+                                  unit::AbstractForecastUnit, whole_history::Bool,
+                                  calibrate::Bool, intercept::Bool)
         assert_nonempty_gt0_finite_val(horizon, :horizon)
         assert_nonempty_gt0_finite_val(lag, :lag)
         assert_finite(scale, :scale)
@@ -519,41 +519,40 @@ TargetReturnForecast
         assert_ew_decay(decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         return new{typeof(scores), typeof(tgt), typeof(horizon), typeof(lag),
-                   typeof(whole_history), typeof(target_outlier), typeof(target_scoring),
-                   typeof(calibrate), typeof(scale), typeof(decay), typeof(min_obs),
-                   typeof(cv), typeof(warmup), typeof(unit), typeof(intercept)}(scores, tgt,
+                   typeof(target_outlier), typeof(target_scoring), typeof(scale),
+                   typeof(decay), typeof(min_obs), typeof(cv), typeof(warmup), typeof(unit),
+                   typeof(whole_history), typeof(calibrate), typeof(intercept)}(scores, tgt,
                                                                                 horizon,
                                                                                 lag,
-                                                                                whole_history,
                                                                                 target_outlier,
                                                                                 target_scoring,
-                                                                                calibrate,
                                                                                 scale,
                                                                                 decay,
                                                                                 min_obs, cv,
                                                                                 warmup,
                                                                                 unit,
+                                                                                whole_history,
+                                                                                calibrate,
                                                                                 intercept)
     end
 end
 function TargetReturnForecast(; scores::DescriptorScores,
                               tgt::AbstractRegressionTarget = LinearModel(),
                               horizon::Integer = 1, lag::Integer = 1,
-                              whole_history::Bool = true,
                               target_outlier::Option{<:AbstractCrossSectionalTransform} = CrossSectionalWinsoriser(),
                               target_scoring::Option{<:AbstractCrossSectionalTransform} = nothing,
-                              calibrate::Bool = true, scale::Real = 1.0,
-                              half_life::Real = 20.0,
+                              scale::Real = 1.0, half_life::Real = 20.0,
                               decay::Real = half_life_decay(half_life),
                               min_obs::Integer = 1,
                               cv::Union{Nothing, CrossValidationEstimator,
                                         PrequentialCalibration} = PrequentialCalibration(),
                               warmup::AbstractCalibrationWarmup = NaNWarmup(),
                               unit::AbstractForecastUnit = IdiosyncraticReturnUnit(),
+                              whole_history::Bool = true, calibrate::Bool = true,
                               intercept::Bool = false)::TargetReturnForecast
-    return TargetReturnForecast(scores, tgt, horizon, lag, whole_history, target_outlier,
-                                target_scoring, calibrate, scale, decay, min_obs, cv,
-                                warmup, unit, intercept)
+    return TargetReturnForecast(scores, tgt, horizon, lag, target_outlier, target_scoring,
+                                scale, decay, min_obs, cv, warmup, unit, whole_history,
+                                calibrate, intercept)
 end
 function fits_idiosyncratic_target(::TargetReturnForecast)::Bool
     return true
