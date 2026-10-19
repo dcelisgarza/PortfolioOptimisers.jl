@@ -335,12 +335,15 @@ end
         # ∇Ψ(w) − ∇Ψ(q) + λ w / ‖w‖ is the same in every entry. The Tsallis arm wrote
         # (1 − α) D_Ψ, which gave the penalty 1 / (1 − α) times its weight: at α = 1/2 the
         # spread below was 0.046. On one CI host type, Clarabel stops at a spread of 2.5e-6
-        # in one case, so every geometry takes the tolerance 1e-5.
+        # in one case, so every geometry takes the tolerance 1e-5. Under the CI flags
+        # `--check-bounds=yes --code-coverage=user`, the Tsallis arm at α = 1/2 stops at
+        # 1.04e-5 on a local host, and the other arms stop at 1.3e-7 or less, so that arm
+        # takes 5e-5 (#1757).
         qp = [0.35, 0.25, 0.4]
         A = [2.0 0.3 0.1; 0.3 1.0 0.2; 0.1 0.2 1.5]
         cases = ((EuclideanProjection(), w -> w, 0.2, 1e-5),
                  (EntropicProjection(), w -> log.(w), 0.2, 1e-5),
-                 (TsallisProjection(; alpha = 0.5), w -> w .^ -0.5 ./ -0.5, 0.2, 1e-5),
+                 (TsallisProjection(; alpha = 0.5), w -> w .^ -0.5 ./ -0.5, 0.2, 5e-5),
                  (TsallisProjection(; alpha = 0.3), w -> w .^ -0.7 ./ -0.7, 0.1, 1e-5),
                  (LogBarrierProjection(), w -> -1 ./ w, 0.2, 1e-5),
                  (GramProjection(; slv = slv, A = A), w -> A * w, 0.2, 1e-5),
@@ -1767,7 +1770,10 @@ end
     @testset "The set's tracking error and ceiling read the benchmark of the rows (#1657)" begin
         # When the benchmark of the rows is the series of a fixed portfolio, a data
         # benchmark equals that portfolio as a fixed `WeightsTracking`, which pays no fee.
-        # Both forms bind, and the online fold equals the batch fit.
+        # Both forms bind, and the online fold equals the batch fit. The two forms differ
+        # by rounding, which the solve takes to a norm of 3.0e-7 at the binding ceiling on
+        # one CI host type in 41 runs, and to 7.7e-9 on a local host, so they agree to
+        # 1e-6 (#1757).
         R = 0.02 .* randn(StableRNG(7), 30, 4)
         wb = [0.1, 0.2, 0.3, 0.4]
         rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R, nb = ["BM"], B = R * wb,
@@ -1790,7 +1796,7 @@ end
                                                                                alg = PassiveAggressiveMeanReversion(),
                                                                                set = set(fw)),
                                                                            rd))
-            @test isapprox(res.w, ref.w; atol = 1e-8)
+            @test isapprox(res.w, ref.w; atol = 1e-6)
             @test !isapprox(res.w, free; atol = 1e-3)
             o = opt
             @test_logs (:warn, r"Held Step at 2020-01-01") for t in 1:30
@@ -1827,7 +1833,15 @@ end
         rdm = ReturnsResult(; nx = nx, X = R, nb = nx .* "_b", B = Bm, ts = ts)
         exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
         rows(r, i) = po.port_opt_view(r, i, :)
-        vset(src) = ProgrammeAllocationSet(; slv = slv, pe = EmpiricalPrior(; x_src = src),
+        # On one CI host type, the solve at the tolerances of `slv` fails at the binding
+        # ceiling of the step at 2020-02-03 (38 of 41 red runs), and the step holds. A
+        # second trial at the default tolerances of Clarabel solves every step under the CI
+        # flags (#1757).
+        loose = Solver(; name = :clarabel_loose, solver = Clarabel.Optimizer,
+                       settings = Dict("verbose" => false),
+                       check_sol = (; allow_local = true, allow_almost = true))
+        vset(src) = ProgrammeAllocationSet(; slv = [slv, loose],
+                                           pe = EmpiricalPrior(; x_src = src),
                                            r = Variance(;
                                                         settings = RiskMeasureSettings(;
                                                                                        ub = 2e-4)))
