@@ -136,6 +136,7 @@ LinearBound
 SquareRootBound
 SquaredBound
 risk_input_kind
+coskewness_processor
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 needs_previous_weights(::AbstractBaseRiskMeasure)

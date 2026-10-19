@@ -2693,3 +2693,5 @@ public risk_input_kind
 # extension must implement.
 public AbstractRiskMeasureSettings, FrontierBoundEstimator, variance_risk_bounds_val,
        Scalariser, scalarise, scalarise_risk_expression!
+# The `# Interfaces` section of `CoskewnessEstimator` names this verb (#1776).
+public coskewness_processor

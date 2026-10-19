@@ -179,6 +179,200 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     return kt_res
 end
 """
+    cokurtosis_processor(kte::CokurtosisEstimator) -> Option{<:AbstractMatrixProcessingEstimator}
+    cokurtosis_processor(kte::Cokurtosis) -> AbstractMatrixProcessingEstimator
+    cokurtosis_processor(kte::WindowedCokurtosis) -> Option{<:AbstractMatrixProcessingEstimator}
+
+Gives the matrix processing estimator with which [`HighOrderFactorPriorEstimator`](@ref) processes the cokurtosis that it lifts onto the asset axis.
+
+The prior processes the lifted cokurtosis under this estimator. Under `rsd = true` it adds the residual cokurtosis, and it repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for this one.
+
+# Interfaces
+
+A subtype of [`CokurtosisEstimator`](@ref) that names a matrix processing estimator adds a method of this verb. The fallback gives `nothing`, as [`coskewness_processor`](@ref) does for a [`CoskewnessEstimator`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`Cokurtosis`](@ref) gives `kte.mp`.
+ 2. A [`WindowedCokurtosis`](@ref) gives the processor of the estimator that it wraps.
+ 3. Every other subtype gives `nothing`. The prior then does not process the lifted cokurtosis, and it does not repair the sum.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator.
+
+# Returns
+
+  - `mp::Option{<:AbstractMatrixProcessingEstimator}`: The matrix processing estimator, `nothing` when `kte` names none.
+
+# Related
+
+  - [`CokurtosisEstimator`](@ref)
+  - [`coskewness_processor`](@ref)
+  - [`matrix_processing_posdef`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function cokurtosis_processor(::CokurtosisEstimator)
+    return nothing
+end
+function cokurtosis_processor(kte::Cokurtosis)
+    return kte.mp
+end
+function cokurtosis_processor(kte::WindowedCokurtosis)
+    return cokurtosis_processor(kte.kte)
+end
+"""
+    cokurtosis_expected_returns(kte::CokurtosisEstimator) -> AbstractExpectedReturnsEstimator
+    cokurtosis_expected_returns(kte::Cokurtosis) -> AbstractExpectedReturnsEstimator
+    cokurtosis_expected_returns(kte::WindowedCokurtosis) -> AbstractExpectedReturnsEstimator
+
+Gives the expected returns estimator with which [`HighOrderFactorPriorEstimator`](@ref) averages the residual moments of its cokurtosis correction.
+
+[`cokurtosis_residuals`](@ref) averages the squared and the fourth-power residuals under this estimator. The prior reads it only under `rsd = true`.
+
+# Interfaces
+
+A subtype of [`CokurtosisEstimator`](@ref) that goes into a [`HighOrderFactorPriorEstimator`](@ref) with `rsd = true` adds a method of this verb.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`Cokurtosis`](@ref) gives `kte.me`.
+ 2. A [`WindowedCokurtosis`](@ref) gives the estimator of the estimator that it wraps.
+ 3. Every other subtype is refused. An average has no `nothing` value, and a default rule chosen for the caller would hide a missing method.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator.
+
+# Validation
+
+  - The type of `kte` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `me::AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments.
+
+# Related
+
+  - [`coskewness_expected_returns`](@ref)
+  - [`cokurtosis_residuals`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function cokurtosis_expected_returns(kte::CokurtosisEstimator)
+    return throw(ArgumentError("`cokurtosis_expected_returns` is not defined for `$(nameof(typeof(kte)))`. A HighOrderFactorPriorEstimator with rsd = true averages the residual moments of its cokurtosis under the expected returns estimator of `kte`. Add a method `PortfolioOptimisers.cokurtosis_expected_returns(kte::$(nameof(typeof(kte))))` that returns an `AbstractExpectedReturnsEstimator`, or set rsd = false."))
+end
+function cokurtosis_expected_returns(kte::Cokurtosis)
+    return kte.me
+end
+function cokurtosis_expected_returns(kte::WindowedCokurtosis)
+    return cokurtosis_expected_returns(kte.kte)
+end
+"""
+    coskewness_expected_returns(ske::CoskewnessEstimator) -> AbstractExpectedReturnsEstimator
+    coskewness_expected_returns(ske::Coskewness) -> AbstractExpectedReturnsEstimator
+    coskewness_expected_returns(ske::WindowedCoskewness) -> AbstractExpectedReturnsEstimator
+
+Gives the expected returns estimator with which [`HighOrderFactorPriorEstimator`](@ref) averages the residual moments of its coskewness correction.
+
+[`coskewness_residuals`](@ref) averages the cubed residuals under this estimator. The prior reads it only under `rsd = true`.
+
+# Interfaces
+
+A subtype of [`CoskewnessEstimator`](@ref) that goes into a [`HighOrderFactorPriorEstimator`](@ref) with `rsd = true` adds a method of this verb.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`Coskewness`](@ref) gives `ske.me`.
+ 2. A [`WindowedCoskewness`](@ref) gives the estimator of the estimator that it wraps.
+ 3. Every other subtype is refused, for the reason that [`cokurtosis_expected_returns`](@ref) states.
+
+# Arguments
+
+  - `ske`: Coskewness estimator.
+
+# Validation
+
+  - The type of `ske` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `me::AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments.
+
+# Related
+
+  - [`cokurtosis_expected_returns`](@ref)
+  - [`coskewness_residuals`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function coskewness_expected_returns(ske::CoskewnessEstimator)
+    return throw(ArgumentError("`coskewness_expected_returns` is not defined for `$(nameof(typeof(ske)))`. A HighOrderFactorPriorEstimator with rsd = true averages the residual moments of its coskewness under the expected returns estimator of `ske`. Add a method `PortfolioOptimisers.coskewness_expected_returns(ske::$(nameof(typeof(ske))))` that returns an `AbstractExpectedReturnsEstimator`, or set rsd = false."))
+end
+function coskewness_expected_returns(ske::Coskewness)
+    return ske.me
+end
+function coskewness_expected_returns(ske::WindowedCoskewness)
+    return coskewness_expected_returns(ske.ske)
+end
+"""
+    assert_factor_comoment_residuals(kte::Option{<:CokurtosisEstimator},
+                                     ske::Option{<:CoskewnessEstimator}) -> nothing
+
+Checks at construction that a [`HighOrderFactorPriorEstimator`](@ref) with `rsd = true` can read what its residual corrections need from `kte` and `ske`.
+
+The check moves the refusal of a co-moment estimator with no method from the fit to the constructor.
+
+# Algorithm
+
+ 1. When `kte` is not `nothing`, get its expected returns estimator from [`cokurtosis_expected_returns`](@ref), and check its type. Check the repair of its processor from [`cokurtosis_processor`](@ref) with [`assert_matrix_processing_posdef`](@ref).
+ 2. When `ske` is not `nothing`, get its expected returns estimator from [`coskewness_expected_returns`](@ref), and check its type.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator, or `nothing`.
+  - `ske`: Coskewness estimator, or `nothing`.
+
+# Validation
+
+  - The fallbacks of [`cokurtosis_expected_returns`](@ref) and [`coskewness_expected_returns`](@ref) refuse a type with no method. An `ArgumentError` is thrown.
+  - Each method returns an `AbstractExpectedReturnsEstimator`. An `ArgumentError` is thrown otherwise.
+  - The processor of `kte` passes [`assert_matrix_processing_posdef`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cokurtosis_expected_returns`](@ref)
+  - [`coskewness_expected_returns`](@ref)
+  - [`cokurtosis_processor`](@ref)
+  - [`assert_matrix_processing_posdef`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function assert_factor_comoment_residuals(kte::Option{<:CokurtosisEstimator},
+                                          ske::Option{<:CoskewnessEstimator})
+    if !isnothing(kte)
+        me = cokurtosis_expected_returns(kte)
+        @argcheck(isa(me, AbstractExpectedReturnsEstimator),
+                  ArgumentError("`cokurtosis_expected_returns(::$(nameof(typeof(kte))))` must return an `AbstractExpectedReturnsEstimator`. Got\nme => $(me)::$(typeof(me))."))
+        assert_matrix_processing_posdef(cokurtosis_processor(kte))
+    end
+    if !isnothing(ske)
+        me = coskewness_expected_returns(ske)
+        @argcheck(isa(me, AbstractExpectedReturnsEstimator),
+                  ArgumentError("`coskewness_expected_returns(::$(nameof(typeof(ske))))` must return an `AbstractExpectedReturnsEstimator`. Got\nme => $(me)::$(typeof(me))."))
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Projects factor coskewness and cokurtosis onto the asset axis through the regression loadings.
@@ -207,7 +401,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
-  - When `rsd` is `true` and `kte` is a [`Cokurtosis`](@ref), `kte.mp` states the estimator of its repair, see [`assert_matrix_processing_posdef`](@ref).
+  - When `rsd` is `true`, `kte` and `ske` state what the residual corrections read, see [`assert_factor_comoment_residuals`](@ref).
 
 ## Propagated parameters
 
@@ -363,8 +557,8 @@ HighOrderFactorPriorEstimator
                                            x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :HighOrderFactorPriorEstimator)
         assert_inner_reader(pe, :pe, :HighOrderFactorPriorEstimator)
-        if rsd && isa(kte, Cokurtosis)
-            assert_matrix_processing_posdef(kte.mp)
+        if rsd
+            assert_factor_comoment_residuals(kte, ske)
         end
         return new{typeof(pe), typeof(kte), typeof(ske), typeof(ex), typeof(rsd),
                    typeof(cache), typeof(x_src)}(pe, kte, ske, ex, rsd, cache, x_src)
@@ -460,14 +654,14 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`. When the low or
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
  2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole prior result to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the prior result, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on `pr` itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
- 3. Read the probabilities `w = pr.w` of the scenarios, and cut `F` to the rows `Fw` that they weigh with [`scenario_rows`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
+ 3. Read the probabilities `w = pr.w` of the scenarios, and cut `F` to the rows `Fw` that they weigh with [`scenario_rows`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it under [`cokurtosis_processor`](@ref)`(pe.kte)`.
  4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `factory(pe.ske, w)` on `Fw`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
  5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the **full** asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The asset count is the full one because step 12 expands the co-moments, and the constructor validates the triple against `length(pr.mu)`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
  6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`. Under a Scenario Cap `posterior_X` holds the last rows alone, so the error reads `F * transpose(M) .+ transpose(b)` over every row instead, as the residual block of `sigma` does.
- 7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
+ 7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, me)` to the `posterior_sk`, with `me` from [`coskewness_expected_returns`](@ref)`(pe.ske)`, of step 4, when there is one.
  8. Still under `pe.rsd`, and when step 3 produced a `posterior_kt`, read the wrapped estimator's residual declaration with [`factor_residual_config`](@ref) and check its shape with [`assert_factor_residual_config`](@ref).
  9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise read the block as `err_sigma`, the residual variances that the wrapped estimator added, with [`idiosyncratic_variances`](@ref) of `rpr.rr`. They were measured under the weights of that fit, which a variance of `err` under `rsd_cfg.ve` does not read. Subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
-10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for `pe.kte.mp`.
+10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, me, pe.ex)` to `posterior_kt`, with `me` from [`cokurtosis_expected_returns`](@ref)`(pe.kte)`. Re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for the processor of step 3.
 11. When step 4 produced a `posterior_sk`, recompute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), so `V` describes the corrected coskewness rather than the projected one.
 12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` back to the full asset universe with [`expand_moment`](@ref), `NaN` outside the investable block. `V` is expanded rather than recomputed, because it is a spectral quantity of the reduced coskewness and the frame carries no reduced returns to rebuild it from. The all-investable sentinel needs no branch of its own: [`expand_moment`](@ref) on a `nothing` mask hands the block straight back, at every one of its arities.
 13. Build the nested factor prior result `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
@@ -564,7 +758,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     if !isnothing(f_kt)
         kM = kron(M, M)
         posterior_kt = kM * f_kt * transpose(kM)
-        matrix_processing!(pe.kte.mp, posterior_kt, posterior_X; kwargs...)
+        matrix_processing!(cokurtosis_processor(pe.kte), posterior_kt, posterior_X;
+                           kwargs...)
     end
     f_sk, f_V = coskewness(factory(pe.ske, w), Fw; kwargs...)
     if !isnothing(f_sk)
@@ -598,7 +793,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         end
         err = Xr - Xm
         if !isnothing(f_sk)
-            posterior_sk .+= coskewness_residuals(err, pe.ske.me)
+            posterior_sk .+= coskewness_residuals(err, coskewness_expected_returns(pe.ske))
         end
         if !isnothing(f_kt)
             # `cokurtosis_residuals` is defined on the *systematic* covariance, so a residual
@@ -630,9 +825,10 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
                 posdef!(rsd_cfg.pdm, sigma)
                 sigma
             end
-            err_kt = cokurtosis_residuals(sigma, err, pe.kte.me, pe.ex)
+            err_kt = cokurtosis_residuals(sigma, err, cokurtosis_expected_returns(pe.kte),
+                                          pe.ex)
             posterior_kt .+= err_kt
-            posdef!(matrix_processing_posdef(pe.kte.mp), posterior_kt)
+            posdef!(matrix_processing_posdef(cokurtosis_processor(pe.kte)), posterior_kt)
         end
     end
     if !isnothing(f_sk)
@@ -683,3 +879,4 @@ function factor_residual_config(pe::HighOrderFactorPriorEstimator)
 end
 
 export HighOrderFactorPriorEstimator
+public cokurtosis_processor, cokurtosis_expected_returns, coskewness_expected_returns

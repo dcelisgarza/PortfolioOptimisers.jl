@@ -553,6 +553,7 @@ end
 """
     matrix_processing_posdef(mp::MatrixProcessing) -> Option{<:AbstractPosdefEstimator}
     matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}
+    matrix_processing_posdef(mp::Nothing) -> Nothing
 
 Gives the positive definite matrix estimator with which a factor prior repairs a covariance after the matrix processing.
 
@@ -568,10 +569,11 @@ The method that Julia selects is the algorithm.
 
  1. A [`MatrixProcessing`](@ref) gives `mp.pdm`.
  2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. The fallback cannot tell whether the type of a caller repairs a matrix. A `nothing` answer would skip the repair, and the covariance could be indefinite.
+ 3. `nothing` gives `nothing`. No matrix processing estimator names no repair, as [`matrix_processing!`](@ref) of `nothing` is a no-op. [`cokurtosis_processor`](@ref) gives `nothing` for a cokurtosis estimator that names no processor.
 
 # Arguments
 
-  - $(arg_dict[:mp])
+  - $(arg_dict[:omp])
 
 # Validation
 
@@ -595,11 +597,14 @@ The method that Julia selects is the algorithm.
 function matrix_processing_posdef(mp::MatrixProcessing)
     return mp.pdm
 end
+function matrix_processing_posdef(::Nothing)
+    return nothing
+end
 function matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator)
     return throw(ArgumentError("`matrix_processing_posdef` is not defined for `$(nameof(typeof(mp)))`. A factor prior repairs its covariance after the matrix processing, under the positive definite matrix estimator of `mp`. Add a method `PortfolioOptimisers.matrix_processing_posdef(mp::$(nameof(typeof(mp))))` that returns an `AbstractPosdefEstimator`, or `nothing` to skip the repair."))
 end
 """
-    assert_matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> nothing
+    assert_matrix_processing_posdef(mp::Option{<:AbstractMatrixProcessingEstimator}) -> nothing
 
 Checks at construction that a factor prior can read the repair of its matrix processing estimator.
 
@@ -612,7 +617,7 @@ A factor prior calls this check when its fit repairs a covariance under [`matrix
 
 # Arguments
 
-  - $(arg_dict[:mp])
+  - $(arg_dict[:omp])
 
 # Validation
 
@@ -630,8 +635,9 @@ A factor prior calls this check when its fit repairs a covariance under [`matrix
   - [`FactorBlackLittermanPrior`](@ref)
   - [`HighOrderFactorPriorEstimator`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
 """
-function assert_matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator)
+function assert_matrix_processing_posdef(mp::Option{<:AbstractMatrixProcessingEstimator})
     pdm = matrix_processing_posdef(mp)
     @argcheck(isa(pdm, Option{<:AbstractPosdefEstimator}),
               ArgumentError("`matrix_processing_posdef(::$(nameof(typeof(mp))))` must return `nothing` or an `AbstractPosdefEstimator`. Got\npdm => $(pdm)::$(typeof(pdm))."))

@@ -34,7 +34,6 @@ scalarise_logsumexp
 nothing_scalar_array_selector
 deferred_factors
 fit_deferred_quantity
-coskewness_processor
 deferred_centre
 centring_target
 fit_deferred_moment

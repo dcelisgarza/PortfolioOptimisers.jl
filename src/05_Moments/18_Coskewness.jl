@@ -52,6 +52,13 @@ In order to implement a new coskewness estimator which will work seamlessly with
 
   - $(ret_dict[:skev])
 
+## Processor and factor prior
+
+Two more verbs of a coskewness estimator are read by the library:
+
+  - `PortfolioOptimisers.coskewness_processor(ske::CoskewnessEstimator) -> Option{<:AbstractMatrixProcessingEstimator}`: Optional. The matrix processing estimator that builds the negative spectral coskewness `V`. The fallback gives `nothing`. See [`coskewness_processor`](@ref).
+  - `PortfolioOptimisers.coskewness_expected_returns(ske::CoskewnessEstimator) -> AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments of a [`HighOrderFactorPriorEstimator`](@ref). It is necessary under `rsd = true`. The fallback refuses the type by name, and the prior calls it at construction. See [`coskewness_expected_returns`](@ref).
+
 # Examples
 
 We can create a dummy coskewness estimator as follows:
@@ -108,6 +115,8 @@ MyCoskewnessEstimator
 
   - [`Coskewness`](@ref)
   - [`AbstractEstimator`](@ref)
+  - [`coskewness_processor`](@ref)
+  - [`coskewness_expected_returns`](@ref)
 
 # References
 

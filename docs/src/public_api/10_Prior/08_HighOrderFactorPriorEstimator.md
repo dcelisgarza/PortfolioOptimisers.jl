@@ -7,6 +7,9 @@ Description = "High order factor Prior estimator, public API of PortfolioOptimis
 ```@docs
 HighOrderFactorPriorEstimator
 prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+cokurtosis_processor
+cokurtosis_expected_returns
+coskewness_expected_returns
 ```
 
 ## References

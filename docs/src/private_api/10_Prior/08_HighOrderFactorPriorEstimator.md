@@ -8,5 +8,6 @@ Description = "High order factor Prior estimator, private API of PortfolioOptimi
 AbstractHiLoOrderPriorEstimator_F
 coskewness_residuals
 cokurtosis_residuals
+PortfolioOptimisers.assert_factor_comoment_residuals
 PortfolioOptimisers.show_fields(::HighOrderFactorPriorEstimator)
 ```

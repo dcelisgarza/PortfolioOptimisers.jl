@@ -284,6 +284,102 @@ end
     end
 end
 
+# Issue #1776. A high order factor prior reads the processor and the expected returns estimator
+# of its `kte` and `ske` through verbs, because the interfaces of `CokurtosisEstimator` and
+# `CoskewnessEstimator` state no field `mp` or `me`. The two `My*1776` types state no verb, as
+# the docstring types do, and the two `MyFull*1776` types state the default verbs.
+struct MyCokurtosis1776 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::MyCokurtosis1776, X::PortfolioOptimisers.MatNum;
+                                        kwargs...)
+    kte = Cokurtosis(; alg = FullMoment(), mp = MatrixProcessing(; pdm = nothing))
+    return cokurtosis(kte, X; kwargs...)
+end
+struct MyFullCokurtosis1776 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::MyFullCokurtosis1776,
+                                        X::PortfolioOptimisers.MatNum; kwargs...)
+    return cokurtosis(Cokurtosis(; alg = FullMoment()), X; kwargs...)
+end
+function PortfolioOptimisers.cokurtosis_processor(::MyFullCokurtosis1776)
+    return MatrixProcessing()
+end
+function PortfolioOptimisers.cokurtosis_expected_returns(::MyFullCokurtosis1776)
+    return SimpleExpectedReturns()
+end
+struct MyCoskewness1776 <: PortfolioOptimisers.CoskewnessEstimator end
+function PortfolioOptimisers.coskewness(::MyCoskewness1776, X::PortfolioOptimisers.MatNum;
+                                        kwargs...)
+    return coskewness(Coskewness(; alg = FullMoment()), X; kwargs...)
+end
+struct MyFullCoskewness1776 <: PortfolioOptimisers.CoskewnessEstimator end
+function PortfolioOptimisers.coskewness(::MyFullCoskewness1776,
+                                        X::PortfolioOptimisers.MatNum; kwargs...)
+    return coskewness(Coskewness(; alg = FullMoment()), X; kwargs...)
+end
+function PortfolioOptimisers.coskewness_processor(::MyFullCoskewness1776)
+    return MatrixProcessing()
+end
+function PortfolioOptimisers.coskewness_expected_returns(::MyFullCoskewness1776)
+    return SimpleExpectedReturns()
+end
+@testset "A high order factor prior reads its co-moment estimators through verbs (#1776)" begin
+    PO = PortfolioOptimisers
+    kt = MyCokurtosis1776()
+    sk = MyCoskewness1776()
+    @testset "The verbs are public, and the library types answer them" begin
+        for name in (:cokurtosis_processor, :cokurtosis_expected_returns,
+                     :coskewness_expected_returns, :coskewness_processor)
+            @test Base.ispublic(PortfolioOptimisers, name)
+            @test !Base.isexported(PortfolioOptimisers, name)
+        end
+        k = Cokurtosis(; alg = FullMoment())
+        s = Coskewness(; alg = FullMoment())
+        @test PO.cokurtosis_processor(k) === k.mp
+        @test PO.cokurtosis_expected_returns(k) === k.me
+        @test PO.coskewness_expected_returns(s) === s.me
+        wk = WindowedCokurtosis(; kte = k, window = 50)
+        ws = WindowedCoskewness(; ske = s, window = 50)
+        @test PO.cokurtosis_processor(wk) === k.mp
+        @test PO.cokurtosis_expected_returns(wk) === k.me
+        @test PO.coskewness_expected_returns(ws) === s.me
+        @test isnothing(PO.cokurtosis_processor(kt))
+        @test isnothing(PO.matrix_processing_posdef(nothing))
+        @test isnothing(PO.assert_matrix_processing_posdef(nothing))
+        @test_throws "`cokurtosis_expected_returns` is not defined for `MyCokurtosis1776`" PO.cokurtosis_expected_returns(kt)
+        @test_throws "`coskewness_expected_returns` is not defined for `MyCoskewness1776`" PO.coskewness_expected_returns(sk)
+    end
+    @testset "A type with no method is refused at construction under rsd = true" begin
+        @test_throws "`cokurtosis_expected_returns` is not defined for `MyCokurtosis1776`" HighOrderFactorPriorEstimator(;
+                                                                                                                         kte = kt)
+        @test_throws "`coskewness_expected_returns` is not defined for `MyCoskewness1776`" HighOrderFactorPriorEstimator(;
+                                                                                                                         ske = sk)
+        @test isnothing(PO.assert_factor_comoment_residuals(nothing, nothing))
+    end
+    @testset "Under rsd = false the types with no verb fit" begin
+        kref = Cokurtosis(; alg = FullMoment(), mp = MatrixProcessing(; pdm = nothing))
+        ref = prior(HighOrderFactorPriorEstimator(; kte = kref, rsd = false), rd)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = kt, ske = sk, rsd = false), rd)
+        @test pr.kt == ref.kt
+        @test pr.sk == ref.sk
+    end
+    @testset "The types that state the default verbs fit as the default does" begin
+        ref = prior(HighOrderFactorPriorEstimator(), rd)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = MyFullCokurtosis1776(),
+                                                 ske = MyFullCoskewness1776()), rd)
+        @test pr.kt == ref.kt
+        @test pr.sk == ref.sk
+        @test pr.V == ref.V
+    end
+    @testset "The windowed estimators fit, where the prior read a field they do not hold" begin
+        T = size(rd.F, 1)
+        wk = WindowedCokurtosis(; kte = Cokurtosis(; alg = FullMoment()), window = T)
+        ws = WindowedCoskewness(; ske = Coskewness(; alg = FullMoment()), window = T)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = wk, ske = ws), rd)
+        ref = prior(HighOrderFactorPriorEstimator(), rd)
+        @test isapprox(pr.kt, ref.kt)
+        @test isapprox(pr.sk, ref.sk)
+    end
+end
+
 # Issue #776. A prior that lifts the factor moments writes the residual variances onto the
 # loadings block, so a consumer reads them off `pr.rr` instead of recomputing them from the
 # reconstruction error.
