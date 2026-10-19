@@ -782,7 +782,7 @@ Where:
   - $(math_dict[:eta_t_lr])
   - $(math_dict[:g_t_loss])
 
-The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref).
+The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref). On a [`ProgrammeAllocationSet`](@ref) a weight that the set forces to zero stays zero, as under [`EntropicProjection`](@ref).
 
 # Fields
 
@@ -864,7 +864,7 @@ Where:
   - $(math_dict[:eta_t_lr])
   - $(math_dict[:g_t_loss])
 
-The mirror image is ``\\nabla \\Psi(\\boldsymbol{w})_i = -1 / w_i``, so the projection sets ``\\nabla \\Psi(\\boldsymbol{w}) - \\nabla \\Psi(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``1 / q_i + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. The Hessian of ``\\Psi`` is ``\\mathrm{diag}(1 / w_i^2)``, so the step moves a small weight in proportion to its square.
+The mirror image is ``\\nabla \\Psi(\\boldsymbol{w})_i = -1 / w_i``, so the projection sets ``\\nabla \\Psi(\\boldsymbol{w}) - \\nabla \\Psi(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``1 / q_i + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. The Hessian of ``\\Psi`` is ``\\mathrm{diag}(1 / w_i^2)``, so the step moves a small weight in proportion to its square. On a [`ProgrammeAllocationSet`](@ref) a weight that the set forces to zero stays zero, as under [`EntropicProjection`](@ref).
 
 # Examples
 

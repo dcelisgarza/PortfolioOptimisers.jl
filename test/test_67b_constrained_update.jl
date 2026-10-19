@@ -838,6 +838,13 @@ end
         @test po.clip_at_zero([-1e-12, 0.5, 0.5]) == [0.0, 0.5, 0.5]
         @test po.clip_at_zero([-1 // 10, 11 // 10]) == [0 // 1, 11 // 10]
         @test eltype(po.clip_at_zero(Float32[-1.0f-7, 1])) === Float32
+        # An entry within the tolerance of its type is zero whatever the sign of its
+        # rounding, so a weight that the set forces to zero is zero on every host (#1760).
+        # The raw answer at 2020-03-14 of the old graph-slot case of test_78 kept 2.0e-16.
+        @test po.clip_at_zero([0.4, -4.24e-17, 0.2, 2.02e-16, -4.98e-17, 0.4]) ==
+              [0.4, 0.0, 0.2, 0.0, 0.0, 0.4]
+        @test po.clip_at_zero([1.4e-8, 1.6e-8, 1.0]) == [0.0, 1.6e-8, 1.0]
+        @test po.clip_at_zero([1 // 10^12, 1 // 1]) == [1 // 10^12, 1 // 1]
         # The measure's `rke` is cleared and its expression joins no objective: the model
         # holds the bound and no risk vector, whichever the measure states.
         rke = ConditionalValueatRisk(;

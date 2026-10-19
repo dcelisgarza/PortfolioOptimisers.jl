@@ -342,15 +342,15 @@ end
 """
     clip_at_zero(w::AbstractVector)
 
-Raises every negative entry of a projection programme's answer to zero.
+Sets to zero every entry of a projection programme's answer at or below the tolerance of its element type.
 
-A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes can come back slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds, and would then take `log w` of a negative number. The clip does not renormalise, so the sum rises by the clipped mass, which is at the size of the solver's tolerance.
+A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes comes back slightly above or slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds. It would take `log w` of a negative number, and an exact zero of the raw step keeps the weight at zero. So the clip reads every entry within the tolerance as zero, whatever the sign of the rounding, and a weight that the set forces to zero is zero on every host (#1760). The tolerance is [`weights_bound_tolerance`](@ref): ``\\sqrt{\\epsilon}`` for a floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a `Rational`. The clip does not renormalise, so the sum moves by the clipped mass, which is at most ``N \\tau``.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-w'_i &= \\max(w_i, 0)\\,.
+w'_i &= \\begin{cases} 0 & w_i \\leq \\tau\\,, \\\\ w_i & w_i > \\tau\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -358,6 +358,8 @@ Where:
 
   - ``w_i``: Entry ``i`` of the programme's answer.
   - ``w'_i``: Entry ``i`` of the clipped answer.
+  - $(math_dict[:tau_wb_tol])
+  - $(math_dict[:N])
 
 # Arguments
 
@@ -365,13 +367,15 @@ Where:
 
 # Returns
 
-  - `w'::Vector`: `w` with no entry below zero, in the element type of `w`.
+  - `w'::Vector`: `w` with every entry at or below ``\\tau`` set to zero, in the element type of `w`.
 
 # Related
 
   - [`project`](@ref)
   - [`projection_programme`](@ref)
+  - [`weights_bound_tolerance`](@ref)
 """
 function clip_at_zero(w::AbstractVector)
-    return map(x -> max(x, zero(x)), w)
+    tol = weights_bound_tolerance(float_if_integer(eltype(w)))
+    return map(x -> x <= tol ? zero(x) : x, w)
 end

@@ -349,3 +349,26 @@ quadratic programme.
 - The map's build sequence is now phrasable: the constraint route was the last decision it waited
   on. The start-weights-and-drift decision, ADR 0160, ruled that the loop threads nothing into the
   update and that the turnover ceiling measures against the Price-Adjusted Allocation.
+
+## Amendment (2026-10-19): a weight that a programme set forces to zero is zero on every host
+
+The Decision states that "an entropic projection cannot zero a positive entry". That holds on a
+`BoundedAllocationSet`. On a `ProgrammeAllocationSet` it does not: a constraint can force a weight
+to zero, for example the phylogeny constraint, which lets no two adjacent assets both hold weight.
+The projection in the entropic, Tsallis or log-barrier geometry then gives that weight at the level
+of the rounding of the solver, above or below zero. The arm clipped a value below zero to an exact
+zero and kept a value above zero. An exact zero of the next raw step forces the weight to zero,
+because the divergence from a zero entry is infinite. So the sign of the rounding decided whether
+the weight could recover. In issue #1756 it decided 34 Held Steps of one online path, and the path
+differed under `--check-bounds=yes`.
+
+Issue #1760 settles it in favour of the exact rule. `clip_at_zero` sets to zero every entry of the
+answer at or below `weights_bound_tolerance` of its element type: `sqrt(eps(T))` for a
+floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a
+`Rational`. A weight that the set forces to zero is then zero on every host, and it stays zero at
+every later step, as it does in exact arithmetic. When the set later needs that asset, each
+projection is infeasible and the step is a Held Step.
+
+The rejected option kept a zero as a small positive floor in the next raw step, so that the rule
+could recover. It is not the projection of the rule in its own geometry, which is the Decision
+above, and the floor would be one more number with no source.
