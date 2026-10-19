@@ -363,7 +363,7 @@
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { map = 12, units = 15, algorithm = 7, swept = true, bindings = ["Fold", "advance_previous_fold", "assert_prediction_series", "assert_unshuffled_folds", "cv_sequential_info", "fit_and_predict", "fit_predict", "fold_evaluation", "fold_loop", "folds_are_stepped", "folds_are_time_ordered", "parallel_folds", "predict", "run_folds", "sort_predictions"] }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { map = 12, units = 4, swept = false }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { map = 12, units = 12, swept = false }
-"src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 29, swept = false }
+"src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { map = 12, units = 28, swept = false }
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { map = 12, units = 21, swept = false }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { map = 12, units = 1, swept = false }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { map = 12, units = 11, algorithm = 1, swept = true, bindings = ["AbstractCrossValidationScorer", "NearestQuantilePrediction", "PopulationCrossValScorer", "PopulationScorer", "PredictionCrossValScorer", "PredictionScorer", "lacks_id", "member_solved", "population_ids", "successful_members", "with_position_id"] }

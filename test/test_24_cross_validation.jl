@@ -580,15 +580,6 @@
         @test_throws DomainError IndexWalkForward(10, 5; purged_size = 10)
         @test_throws DomainError IndexWalkForward(10, 5; purged_size = 11)
         @test IndexWalkForward(10, 5; purged_size = 9) isa IndexWalkForward
-
-        # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it
-        # is `div(a - 1, b)` and never a guarded division.
-        for a in 1:40, b in 1:7
-            @test PortfolioOptimisers.special_div(a, b) == div(a - 1, b)
-            @test PortfolioOptimisers.special_div(a, b) ==
-                  length(1:b:a) - 1 ==
-                  count(k -> 1 + k * b <= a, 0:a) - 1
-        end
     end
     @testset "n_splits and split agree on short data" begin
         # `n_splits` had no guard, so a `train_size` of `T` or more returned a count of zero
@@ -660,6 +651,82 @@
                 end
             end
         end
+    end
+    @testset "A date walk-forward drops empty test windows and refuses empty training" begin
+        # Business days, so a daily `period` maps the two days of every weekend to the
+        # Monday. Two dates of the range then share a row, and a test window between them
+        # held no observation. Such a fold was returned, and `n_splits` counted it.
+        bd = [d for d in Date(2024, 1, 1):Day(1):Date(2024, 3, 31) if dayofweek(d) <= 5]
+        rdb = ReturnsResult(; nx = ["a", "b"], X = zeros(length(bd), 2), ts = bd)
+        cv = DateWalkForward(5, 1; period = Day(1))
+        (; train_idx, test_idx) = split(cv, rdb)
+        @test length(test_idx) == n_splits(cv, rdb) == 59
+        # Three dates always hold a weekday, so each training window keeps a row.
+        for train_size in (3, 5, Day(4), Day(10)), test_size in (1, 3),
+            previous in (false, true), reduce_test in (false, true),
+            expand_train in (false, true), period_offset in (nothing, Day(1), Day(-1))
+
+            cv = DateWalkForward(train_size, test_size; period = Day(1),
+                                 previous = previous, reduce_test = reduce_test,
+                                 expand_train = expand_train, period_offset = period_offset)
+            (; train_idx, test_idx) = split(cv, rdb)
+            @test n_splits(cv, rdb) == length(test_idx)
+            @test !any(isempty, test_idx)
+            @test !any(isempty, train_idx)
+            # The dropped folds leave no hole: each test window starts after the last one.
+            @test all(first(test_idx[k + 1]) == last(test_idx[k]) + 1
+                      for k in 1:(length(test_idx) - 1))
+        end
+
+        # A positive `period_offset` moves the last dates of the range past the data. Under
+        # `previous = true`, such a date mapped to the last row, so a fold that the data
+        # cannot fill counted as full and the last row left its test window.
+        tsd = collect(Date(2024, 1, 1):Day(1):Date(2024, 1, 20))
+        rdd = ReturnsResult(; nx = ["a", "b"], X = zeros(20, 2), ts = tsd)
+        dr = PortfolioOptimisers.walk_forward_date_range(tsd, Day(3), Day(2), identity)
+        @test last(dr) > last(tsd)
+        @test PortfolioOptimisers.date_index_positions(tsd, dr, true) ==
+              [1, 4, 7, 10, 13, 16, 19]
+        cv = DateWalkForward(2, 1; period = Day(3), period_offset = Day(2), previous = true)
+        @test split(cv, rdd).test_idx == [7:9, 10:12, 13:15, 16:18]
+        @test n_splits(cv, rdd) == 4
+
+        # A purge as wide as the training window empties it. The width of a window in rows
+        # depends on the data, so `split` and `n_splits` refuse it, not the constructor.
+        for expand_train in (false, true)
+            cv = DateWalkForward(1, 1; period = Day(1), purged_size = 1,
+                                 expand_train = expand_train)
+            @test_throws IsEmptyError split(cv, rdb)
+            @test_throws IsEmptyError n_splits(cv, rdb)
+        end
+        cv = DateWalkForward(Day(1), 1; period = Day(1), purged_size = 1)
+        @test_throws IsEmptyError split(cv, rdb)
+        @test_throws IsEmptyError n_splits(cv, rdb)
+        # Two dates can be a weekend: the test that starts on a Monday trains on no row.
+        cv = DateWalkForward(2, 1; period = Day(1))
+        @test_throws IsEmptyError split(cv, rdb)
+        @test_throws IsEmptyError n_splits(cv, rdb)
+        # A training window longer than the data leaves no fold to count.
+        for train_size in (1000, Day(1000))
+            cv = DateWalkForward(train_size, 1; period = Day(1))
+            @test n_splits(cv, rdb) == 0
+            @test_throws IsEmptyError split(cv, rdb)
+        end
+        # An integer `train_size` of zero dates is empty on any data.
+        @test_throws DomainError DateWalkForward(0, 1)
+        @test DateWalkForward(1, 1) isa DateWalkForward
+    end
+    @testset "A scheme with a shuffle property set to true is refused" begin
+        # No scheme of the library shuffles, but a scheme a user defines can carry a
+        # `shuffle` property, and the fold loop refuses it.
+        @test_throws ArgumentError PortfolioOptimisers.assert_unshuffled_folds((;
+                                                                                shuffle = true),
+                                                                               [1:3])
+        @test isnothing(PortfolioOptimisers.assert_unshuffled_folds((; shuffle = false),
+                                                                    [1:3]))
+        @test isnothing(PortfolioOptimisers.assert_unshuffled_folds(KFold(), [1:3]))
+        @test_throws ArgumentError PortfolioOptimisers.assert_unshuffled_folds(KFold(),
+                                                                               [[3, 1, 2]])
     end
     @testset "A zero test_size is refused" begin
         # A `test_size` of zero advances the walk-forward window by nothing, so each of the

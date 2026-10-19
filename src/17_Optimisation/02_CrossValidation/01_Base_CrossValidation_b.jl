@@ -421,7 +421,7 @@ purging, embargoing and the combinatorial splits do, but it must never reorder r
 
 # Validation
 
-  - `cv` does not have a `shuffle` field set to `true`. The check reads the field by `hasfield`, so it holds for a scheme a user defines. No scheme of the library has such a field.
+  - `cv` does not have a `shuffle` property set to `true`. The check reads the property by `hasproperty`, so it holds for a scheme a user defines. No scheme of the library has such a property.
   - The training indices of every fold increase strictly.
   - Either failure raises an `ArgumentError`.
 
@@ -436,7 +436,9 @@ purging, embargoing and the combinatorial splits do, but it must never reorder r
   - [`cross_val_predict`](@ref)
 """
 function assert_unshuffled_folds(cv, train_idx)
-    @argcheck(!(hasfield(typeof(cv), :shuffle) && cv.shuffle),
+    # `hasproperty`, not `hasfield`: JET does not fold `hasfield` over a `Union` of schemes, and
+    # reports the read of the field on every scheme of the `Union` that lacks it.
+    @argcheck(!(hasproperty(cv, :shuffle) && getproperty(cv, :shuffle)),
               "Cross validation estimator must not be shuffled.")
     @argcheck(all(x -> all(>(zero(eltype(x))), diff(x)), train_idx),
               "Cross validation estimator must not be shuffled.")

@@ -317,10 +317,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { raw = 8, reviewed = 8 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { raw = 1, reviewed = 1 }
+"src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { raw = 0, reviewed = 0 }

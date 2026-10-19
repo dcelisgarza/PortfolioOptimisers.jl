@@ -516,7 +516,8 @@ Each switch is `nothing` by default. An unset `pws` follows `wd`, so `wd` alone 
 
   - `test_size` must be non-empty, greater than zero, and finite.
   - `purged_size` must be non-empty, non-negative, and finite.
-  - If `train_size` is an integer, it must be non-empty, non-negative, and finite.
+  - If `train_size` is an integer, it must be non-empty, greater than zero, and finite. A training window of zero dates holds no observation.
+  - [`Base.split(dwf::DateWalkForward, rd::Prices_RR)`](@ref) and [`n_splits`](@ref) throw an [`IsEmptyError`](@ref) if a fold of the data has a training window that is empty after the purge. They drop a fold whose test window holds no observation, which happens when many dates of the range map to one timestamp, for example the two days of a weekend under a daily `period` over business-day data.
 
 # Examples
 
@@ -621,7 +622,7 @@ DateWalkForward
                              strict::Bool)
         assert_nonempty_gt0_finite_val(test_size, :test_size)
         if isa(train_size, Integer)
-            assert_nonempty_nonneg_finite_val(train_size, :train_size)
+            assert_nonempty_gt0_finite_val(train_size, :train_size)
         end
         assert_nonempty_nonneg_finite_val(purged_size, :purged_size)
         return new{typeof(train_size), typeof(test_size), typeof(period),
@@ -797,147 +798,146 @@ function date_index_positions(ts::AbstractVector, date_range, previous::Bool,
                               ::Type{T} = Int) where {T <: Integer}
     idx = Vector{T}(undef, 0)
     for date in date_range
+        # A date after the data closes no window, whatever `previous` says.
+        if date > ts[end]
+            break
+        end
         i = searchsortedlast(ts, date)
         if iszero(i) || !previous && ts[i] != date
             i += 1
-        end
-        if i > length(ts)
-            break
         end
         push!(idx, i)
     end
     return idx
 end
 """
-    Base.split(dwf::DateWalkForward{<:Integer}, rd::Prices_RR) -> WalkForwardResult
+    date_walk_forward_train_starts(train_size, ts::AbstractVector, date_range,
+                                   idx::AbstractVector{<:Integer})
 
-Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
-where `train_size` is specified as an integer number of date-range steps.
+Return the row where the training window of each test start begins, one entry per position of
+`idx`, and zero where no training window fits inside the data.
 
-The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`. Training and test windows are aligned
-to the `period` date range and advanced by `test_size` steps at a time.
+An `Integer` `train_size` counts dates of the range, so the training window of the test that starts
+at the date in position `p` starts at the row of the date in position `p - train_size`. A `Period`
+`train_size` is subtracted from the date in position `p`, and the training window starts at the last
+timestamp on or before the result.
 
 # Arguments
 
-  - `dwf::DateWalkForward{<:Integer}`: Date-based walk-forward estimator with an integer
-    `train_size`.
-  - `rd`: Returns-level or price-level data with timestamps ([`Prices_RR`](@ref)).
+  - `train_size`: Training size of the [`DateWalkForward`](@ref) estimator.
+  - `ts`: Sorted timestamp vector ([`cv_timestamps`](@ref)).
+  - `date_range`: Date range from [`walk_forward_date_range`](@ref).
+  - `idx`: Rows of the dates of the range, from [`date_index_positions`](@ref).
 
 # Returns
 
-  - `WalkForwardResult`: Result containing train and test index ranges for each fold.
+  - `Vector{<:Integer}`: The first training row for each position of `idx`, or zero.
+
+# Related
+
+  - [`date_walk_forward_bounds`](@ref)
+"""
+function date_walk_forward_train_starts(train_size::Integer, ::AbstractVector, ::Any,
+                                        idx::AbstractVector{<:Integer})
+    # Compare before subtracting, so a large `train_size` cannot overflow.
+    return [p > train_size ? idx[p - train_size] : zero(eltype(idx))
+            for p in eachindex(idx)]
+end
+function date_walk_forward_train_starts(train_size::DatesUnionPeriod, ts::AbstractVector,
+                                        date_range, idx::AbstractVector{<:Integer})
+    return [searchsortedlast(ts, date - train_size)
+            for date in Iterators.take(date_range, length(idx))]
+end
+"""
+    date_walk_forward_bounds(dwf::DateWalkForward, rd::Prices_RR)
+
+Compute the bounds of every fold that the date walk-forward `dwf` makes over the returns data `rd`.
+
+Fold `k` trains on `train_lo[k]:(test_lo[k] - purged_size - 1)` and tests on
+`test_lo[k]:test_hi[k]`. `train_lo` already holds the start that `expand_train` sets. The first test
+starts at the first position whose training window starts inside the data
+([`date_walk_forward_train_starts`](@ref)).
+
+Two dates of the range can map to one timestamp, for example the two days of a weekend under a daily
+`period` over business-day data. A fold whose test window holds no observation for this reason is
+dropped. A fold that is kept must have at least one training observation after the purge.
+
+# Arguments
+
+  - `dwf`: Date-based walk-forward estimator.
+  - `rd`: Returns-level or price-level data with timestamps ([`Prices_RR`](@ref)).
+
+# Validation
+
+  - The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`.
+  - Every fold that is kept must have a training window that is not empty after `expand_train` and
+    `purged_size`, else an [`IsEmptyError`](@ref) is thrown before a fold is returned.
+
+# Returns
+
+  - `(train_lo, test_lo, test_hi)`: Three vectors with one entry per fold.
 
 # Related
 
   - [`DateWalkForward`](@ref)
-  - [`WalkForwardResult`](@ref)
-  - [`n_splits`](@ref)
+  - [`walk_forward_date_range`](@ref)
+  - [`date_index_positions`](@ref)
 """
-function Base.split(dwf::DateWalkForward{<:Integer}, rd::Prices_RR)
+function date_walk_forward_bounds(dwf::DateWalkForward, rd::Prices_RR)
     ts = cv_timestamps(rd)
     @argcheck(!isnothing(ts), IsNothingError)
     (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
     T = cv_nobs(rd)
-    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
     tt = typeof(T)
+    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
     idx = date_index_positions(ts, date_range, previous, tt)
     N = length(idx)
-    i = 1
-    train_indices = Vector{UnitRange{tt}}(undef, 0)
-    test_indices = Vector{UnitRange{tt}}(undef, 0)
-    while true
-        if i + train_size > N
-            break
-        end
-        if i + train_size + test_size > N
-            if !reduce_test
-                break
-            end
-            push!(test_indices, idx[i + train_size]:T)
-        else
-            push!(test_indices, idx[i + train_size]:(idx[i + train_size + test_size] - 1))
-        end
-        train_start = expand_train ? 1 : idx[i]
-        push!(train_indices, train_start:(idx[i + train_size] - purged_size - 1))
-        i += test_size
+    starts = date_walk_forward_train_starts(train_size, ts, date_range, idx)
+    train_lo = Vector{tt}(undef, 0)
+    test_lo = Vector{tt}(undef, 0)
+    test_hi = Vector{tt}(undef, 0)
+    first_p = findfirst(!iszero, starts)
+    if isnothing(first_p)
+        return train_lo, test_lo, test_hi
     end
-    return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
+    last_p = reduce_test ? N : N - test_size
+    for p in first_p:test_size:last_p
+        lo = idx[p]
+        hi = test_size <= N - p ? idx[p + test_size] - 1 : T
+        if hi < lo
+            continue
+        end
+        train_start = expand_train ? one(tt) : starts[p]
+        @argcheck(lo - purged_size - 1 >= train_start,
+                  IsEmptyError("the training window of the fold whose test starts on $(ts[lo]) holds no observation (train_size = $train_size, period = $period, expand_train = $expand_train, purged_size = $purged_size). Increase train_size, or reduce purged_size."))
+        push!(train_lo, train_start)
+        push!(test_lo, lo)
+        push!(test_hi, hi)
+    end
+    return train_lo, test_lo, test_hi
 end
 """
-    special_div(a::Integer, b::Integer)
+    Base.split(dwf::DateWalkForward, rd::Prices_RR) -> WalkForwardResult
 
-Return the number of steps of size `b` that fit in the span `1:a`.
+Split the returns data `rd` into sequential walk-forward folds using date-aligned indices.
 
-The result is the largest `k` for which `1 + k * b <= a`, which is `div(a - 1, b)` for a positive
-`a`. A walk-forward fold count uses it this way: the first window starts at the first position of
-the span and every later window starts `b` positions after the previous one, so the number of
-windows is `special_div(a, b) + 1`. The caller passes the **length** of the span, not the difference
-between its last and its first position. `b` must not be zero.
+The test windows are aligned to the `period` date range and advance by `test_size` dates at a time.
+An `Integer` `train_size` is a number of dates of the range. A `Period` `train_size` (e.g.
+`Dates.Month(6)`) is subtracted from the first date of each test window, which gives a calendar
+length to the training window. A fold whose test window holds no observation is dropped, which
+happens when many dates of the range map to one timestamp. [`date_walk_forward_bounds`](@ref)
+computes the folds.
 
 # Arguments
 
-  - `a`: Length of the span of positions at which a window may start.
-  - `b`: Step between two window starts.
-
-# Returns
-
-  - `Integer`: The number of steps after the first window, `div(a - 1, b)`.
-
-# Related
-
-  - [`DateWalkForward`](@ref)
-  - [`n_splits`](@ref)
-"""
-function special_div(a::Integer, b::Integer)
-    q, r = divrem(a, b)
-    return q - ifelse(iszero(r), 1, 0)
-end
-"""
-    n_splits(dwf::DateWalkForward{<:Integer}, rd::Prices_RR) -> Integer
-
-Return the number of walk-forward folds that would be produced by `dwf` for the given
-returns data `rd` when the training window size is specified as an integer number of
-date-range steps.
-
-# Arguments
-
-  - `dwf::DateWalkForward{<:Integer}`: Date-based walk-forward estimator with an integer
-    `train_size`.
+  - `dwf::DateWalkForward`: Date-based walk-forward estimator.
   - `rd`: Returns-level or price-level data with timestamps ([`Prices_RR`](@ref)).
 
-# Returns
+# Validation
 
-  - `Integer`: The number of folds.
-
-# Related
-
-  - [`DateWalkForward`](@ref)
-  - [`WalkForwardResult`](@ref)
-  - [`Base.split(dwf::DateWalkForward{<:Integer}, rd::Prices_RR)`](@ref)
-"""
-function n_splits(dwf::DateWalkForward{<:Integer}, rd::Prices_RR)
-    ts = cv_timestamps(rd)
-    @argcheck(!isnothing(ts), IsNothingError)
-    (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
-    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
-    N = length(date_index_positions(ts, date_range, previous))
-    max_start = N - train_size - ifelse(reduce_test, 0, test_size)
-    return max_start > 0 ? special_div(max_start, test_size) + 1 : 0
-end
-"""
-    Base.split(dwf::DateWalkForward{<:Any}, rd::Prices_RR) -> WalkForwardResult
-
-Split the returns data `rd` into sequential walk-forward folds using date-aligned indices,
-where `train_size` is specified as a date `Period` (e.g., `Dates.Month(6)`).
-
-The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`. Training windows are defined by
-subtracting `train_size` from the split date, allowing calendar-based window lengths.
-
-# Arguments
-
-  - `dwf::DateWalkForward{<:Any}`: Date-based walk-forward estimator with a `Period`
-    `train_size`.
-  - `rd`: Returns-level or price-level data with timestamps ([`Prices_RR`](@ref)).
+  - The timestamp vector ([`cv_timestamps`](@ref)) must not be `nothing`.
+  - Every fold must have a training window that is not empty after `expand_train` and
+    `purged_size`, else an [`IsEmptyError`](@ref) is thrown.
 
 # Returns
 
@@ -949,54 +949,24 @@ subtracting `train_size` from the split date, allowing calendar-based window len
   - [`WalkForwardResult`](@ref)
   - [`n_splits`](@ref)
 """
-function Base.split(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
-    ts = cv_timestamps(rd)
-    @argcheck(!isnothing(ts), IsNothingError)
-    (; train_size, test_size, period, period_offset, purged_size, adjuster, previous, expand_train, reduce_test) = dwf
-    T = cv_nobs(rd)
-    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
-    idx = date_index_positions(ts, date_range, previous, typeof(T))
-    train_idx = Vector{typeof(T)}(undef, 0)
-    for date in date_range
-        date = date - train_size
-        i = searchsortedlast(ts, date)
-        if i > length(ts)
-            break
-        end
-        push!(train_idx, i)
-    end
-    N = length(idx)
-    i = searchsortedlast(train_idx, 0) + 1
-    train_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
-    test_indices = Vector{UnitRange{typeof(T)}}(undef, 0)
-    while true
-        if i > N
-            break
-        end
-        if i + test_size > N
-            if !reduce_test
-                break
-            end
-            push!(test_indices, idx[i]:T)
-        else
-            push!(test_indices, idx[i]:(idx[i + test_size] - 1))
-        end
-        train_start = expand_train ? 1 : train_idx[i]
-        push!(train_indices, train_start:(idx[i] - purged_size - 1))
-        i += test_size
-    end
+function Base.split(dwf::DateWalkForward, rd::Prices_RR)
+    train_lo, test_lo, test_hi = date_walk_forward_bounds(dwf, rd)
+    purged_size = dwf.purged_size
+    train_indices = [a:(b - purged_size - 1) for (a, b) in zip(train_lo, test_lo)]
+    test_indices = [a:b for (a, b) in zip(test_lo, test_hi)]
     return WalkForwardResult(; train_idx = train_indices, test_idx = test_indices)
 end
 """
-    n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR) -> Integer
+    n_splits(dwf::DateWalkForward, rd::Prices_RR) -> Integer
 
-Return the number of walk-forward folds that would be produced by `dwf` for the given
-returns data `rd` when the training window size is specified as a date `Period`.
+Return the number of walk-forward folds that `dwf` produces for the returns data `rd`.
+
+The count reads the same fold bounds as [`Base.split(dwf::DateWalkForward, rd::Prices_RR)`](@ref),
+so it equals the number of folds that `split` returns, and it throws where `split` throws.
 
 # Arguments
 
-  - `dwf::DateWalkForward{<:Any}`: Date-based walk-forward estimator with a `Period`
-    `train_size`.
+  - `dwf::DateWalkForward`: Date-based walk-forward estimator.
   - `rd`: Returns-level or price-level data with timestamps ([`Prices_RR`](@ref)).
 
 # Returns
@@ -1007,32 +977,10 @@ returns data `rd` when the training window size is specified as a date `Period`.
 
   - [`DateWalkForward`](@ref)
   - [`WalkForwardResult`](@ref)
-  - [`Base.split(dwf::DateWalkForward{<:Any}, rd::Prices_RR)`](@ref)
+  - [`date_walk_forward_bounds`](@ref)
 """
-function n_splits(dwf::DateWalkForward{<:Any}, rd::Prices_RR)
-    ts = cv_timestamps(rd)
-    @argcheck(!isnothing(ts), IsNothingError)
-    (; train_size, test_size, period, period_offset, adjuster, previous, reduce_test) = dwf
-    date_range = walk_forward_date_range(ts, period, period_offset, adjuster)
-    N = length(date_index_positions(ts, date_range, previous))
-    M = -1
-    for (j, date) in enumerate(date_range)
-        date = date - train_size
-        i = searchsortedlast(ts, date)
-        if i > length(ts)
-            break
-        end
-        M = ifelse(iszero(i), j, M)
-    end
-    M += 1
-    if iszero(M)
-        return 0
-    end
-    last_allowed_start = reduce_test ? N : N - test_size
-    if M > last_allowed_start
-        return 0
-    end
-    return special_div(last_allowed_start - M + 1, test_size) + 1
+function n_splits(dwf::DateWalkForward, rd::Prices_RR)
+    return length(date_walk_forward_bounds(dwf, rd)[2])
 end
 """
 $(DocStringExtensions.TYPEDEF)
