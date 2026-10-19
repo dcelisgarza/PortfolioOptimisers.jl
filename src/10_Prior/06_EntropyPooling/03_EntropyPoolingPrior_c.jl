@@ -731,6 +731,7 @@ Each fit of `pe.pe` passes `cache_reg = true`, so a prior that stores a cache gi
 # Validation
 
   - The rules of [`ep_prior_probabilities`](@ref).
+  - Under a caller's `pe.w`, the fit of `pe.pe` answers the `T` rows that [`scenario_count`](@ref) counted. A `DimensionMismatch` that names both counts is thrown otherwise.
 
 # Returns
 
@@ -765,6 +766,10 @@ function ep_wrapped_prior(pe::Union{<:EntropyPoolingPrior, <:MeucciEntropyPoolin
     # under a Scenario Cap, takes them with a zero weight on the rows the cap removed.
     pe = prior_probability_factory(pe, w0, X, F, pnl; kwargs...)
     pr = prior(pe.pe, X, F, pnl; strict = strict, kwargs..., cache_reg = true)
+    # The count and the fit are two authorities on one axis, so the fit must answer the
+    # counted rows: `pe.w` names no row of a result on another axis (ADR 0116).
+    @argcheck(size(pr.X, 1) == T,
+              DimensionMismatch("the wrapped prior, a $(nameof(typeof(pe.pe))), was counted at $T scenarios and its fit under `w` answered $(size(pr.X, 1)). A method of `kept_scenarios`, `scenario_count` or `keeps_observations` for it states a count that its fit does not keep."))
     # A nested prior that reweights its scenarios solves its own views from the caller's
     # probabilities, and its posterior is the prior of this estimator, as it is when the
     # caller states none. A nested prior that answers no `w` keeps the caller's (ADR 0116).
@@ -776,7 +781,7 @@ end
 
 Return the observation weights of the fit of `pe.pe`, the prior that `pe` embeds, so that [`pin_prior_choice`](@ref) pins the choice of that fit.
 
-A prior that embeds a prior fits it under the weights `w` that the prior around it gives it. An entropy pooling prior fits it under the caller's prior probabilities `pe.w`, builds its views on that fit, and refits under the posterior weights. Each refit reads the choice of the `w0` fit. [`factory`](@ref) writes the weights of the outer prior into `pe.w`, so `w0` is `w` when `w` is set, and `pe.w` otherwise. When both are `nothing`, the fit is unweighted.
+A prior that embeds a prior fits it under the weights `w` that the prior around it gives it. An entropy pooling prior fits it under the caller's prior probabilities `pe.w`, builds its views on that fit, and refits under the posterior weights. Each refit reads the choice of that first fit. [`factory`](@ref) writes the weights of the outer prior into `pe.w`, so the weights of the first fit are `w` when `w` is set, and `pe.w` otherwise. They are not the `w0` of [`ep_prior`](@ref), which is the posterior of a nested prior that reweights its scenarios. When both are `nothing`, the fit is unweighted.
 
 # Algorithm
 

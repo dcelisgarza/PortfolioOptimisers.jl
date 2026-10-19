@@ -571,8 +571,9 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     # pooled weights — see the note at the same step in `03_EntropyPoolingPrior_c.jl`.
     pr2 = prior(pe2, X, F, pnl; strict = strict, kwargs..., cache_reg = cache_reg)
     # The refit of an entropy pooling prior around the pool reads the rows of the opinions
-    # and the pooled weights from the cache, so no opinion runs again (#1751).
-    pc = ifelse(cache_reg, (; X = X1, w = w), nothing)
+    # and the pooled weights from the cache, so no opinion runs again (#1751). The cache of
+    # `pe2` rides inside it, because a `pe2` that is a pool reads its own pooled weights.
+    pc = ifelse(cache_reg, (; X = X1, w = w, pe2 = opinion_pooling_cache(pr2)), nothing)
     # The pooled weights are over the pool's own observation axis, so the refit must answer
     # on it, as every opinion must. A `pe2` that drops rows, such as one that holds a
     # Scenario Cap, answers on a shorter axis, and the weights then name no row of its
@@ -592,7 +593,7 @@ end
 
 Return the cache of the opinion pool that answered `pr`, or `nothing`.
 
-A fit of an [`OpinionPoolingPrior`](@ref) with `cache_reg = true` stores the rows that its opinions read and its pooled weights in `pr.pc`. Its refits through [`scenario_prior`](@ref) and [`scenario_factory`](@ref) read them here, so they run no opinion and no `pe1`. A result with no cache gives `nothing`, and the refit then pools the opinions again.
+A fit of an [`OpinionPoolingPrior`](@ref) with `cache_reg = true` stores the rows that its opinions read, its pooled weights and the cache of its `pe2` in `pr.pc`. Its refits through [`scenario_prior`](@ref) and [`scenario_factory`](@ref) read them here, so they run no opinion and no `pe1`. A result with no cache gives `nothing`, and the refit then pools the opinions again.
 
 # Arguments
 
@@ -707,7 +708,8 @@ function scenario_prior(pe::OpinionPoolingPrior, w, pr::Option{<:AbstractPriorRe
                         kwargs...)
     pc = opinion_pooling_cache(pr)
     sc = opinion_pooling_scenarios(pe, pc, X, F, pnl; kwargs...)
-    res = scenario_prior(factory(pe.pe2, sc.w), w, pr, sc.X, F, pnl; kwargs...)
+    res = scenario_prior(factory(pe.pe2, sc.w), w, opinion_pooling_inner(pr, pc), sc.X, F,
+                         pnl; kwargs...)
     return opinion_pooling_kept(res, pc)
 end
 # A pool that a factor prior or a Black-Litterman prior embeds is rebuilt as an estimator,
@@ -717,8 +719,10 @@ end
 function scenario_factory(pe::OpinionPoolingPrior, w, pr::Option{<:AbstractPriorResult},
                           X::MatNum, F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                           kwargs...)
-    wp = opinion_pooling_scenarios(pe, opinion_pooling_cache(pr), X, F, pnl; kwargs...).w
-    return scenario_factory(factory(pe.pe2, wp), w, pr, X, F, pnl; kwargs...)
+    pc = opinion_pooling_cache(pr)
+    wp = opinion_pooling_scenarios(pe, pc, X, F, pnl; kwargs...).w
+    return scenario_factory(factory(pe.pe2, wp), w, opinion_pooling_inner(pr, pc), X, F,
+                            pnl; kwargs...)
 end
 """
     opinion_pooling_scenarios(pe::OpinionPoolingPrior, pc::Nothing, X::MatNum,
@@ -801,6 +805,42 @@ function opinion_pooling_kept(res::AbstractPriorResult, ::Option{<:NamedTuple})
 end
 function opinion_pooling_kept(res::LowOrderPrior, pc::NamedTuple)
     return forward_prior(res; pc = pc)
+end
+"""
+    opinion_pooling_inner(pr::Option{<:AbstractPriorResult}, pc::Option{<:NamedTuple})
+    opinion_pooling_inner(pr::LowOrderPrior, pc::NamedTuple)
+
+Give the refit of `pe2` the result of the pool with the cache that the fit of `pe2` stored.
+
+The result of a pool carries the fields of the result of `pe2`, and its own cache in `pc`. The refit of `pe2` reads its cache from that result. A `pe2` that is a pool, or an entropy pooling prior over one, would then read the pooled weights of the outer pool as its own. So the cache of the pool keeps the cache of `pe2` in `pc.pe2`, and this function puts it back in `pc` before the refit of `pe2`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No cache, or a result of a type with no field `pc`: return `pr`.
+ 2. A [`LowOrderPrior`](@ref) and a cache: forward `pr` with `pc.pe2` through [`forward_prior`](@ref).
+
+# Arguments
+
+  - `pr`: The result of the fit of the pool, or `nothing`.
+  - `pc`: The cache of the pool, or `nothing`.
+
+# Returns
+
+  - `pr::Option{<:AbstractPriorResult}`: The result that the refit of `pe2` reads.
+
+# Related
+
+  - [`opinion_pooling_cache`](@ref)
+  - [`opinion_pooling_kept`](@ref)
+  - [`scenario_prior`](@ref)
+"""
+function opinion_pooling_inner(pr::Option{<:AbstractPriorResult}, ::Option{<:NamedTuple})
+    return pr
+end
+function opinion_pooling_inner(pr::LowOrderPrior, pc::NamedTuple)
+    return forward_prior(pr; pc = pc.pe2)
 end
 # A caller's prior probabilities weigh the scenarios of the pool, the rows of `pe1` when it
 # is set. A Scenario Cap in `pe1` keeps the last rows, so `pe1` takes them on the rows that

@@ -48,7 +48,7 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref) reads the source through t
 
   - `keeps_observations(pe::MyPriorEstimator) -> Bool`: Returns `true` when the result carries one scenario for each observation that the prior receives, for every configuration and all data.
 
-A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), reads this method on the prior that it wraps. Under a caller's prior probabilities, it reads the count of the scenarios of the wrapped prior before it fits that prior under them. A wrapped prior that returns `true` states the count with no fit. A wrapped prior that makes no promise is fitted once more to read the count. The fallback returns `false`, which is correct for every prior and costs that fit. A prior that drops rows, such as one that holds a Scenario Cap, keeps the fallback. A prior that wraps another returns the answer of the prior that it wraps.
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), reads this method on the prior that it wraps. Under a caller's prior probabilities, it reads the count of the scenarios of the wrapped prior before it fits that prior under them. A wrapped prior that returns `true` states the count with no fit. The count of a wrapped prior that makes no promise runs only the steps that drop rows, and the wrapped prior is fitted once more to read the count only when no method of `PortfolioOptimisers.scenario_count` states it. The fallback returns `false`, which is correct for every prior and costs at most that fit. A prior that drops rows, such as one that holds a Scenario Cap, keeps the fallback. A prior that wraps another returns the answer of the prior that it wraps.
 
 # Examples
 
@@ -1060,7 +1060,7 @@ The cache weighs the scenarios of the pool, so its pooled weights and its rows h
 
 # Arguments
 
-  - `pc`: The cache of the pool, `(; X, w)`, or `nothing`.
+  - `pc`: The cache of the pool, `(; X, w, pe2)` with the cache of `pe2` in `pe2`, or `nothing`.
   - `T`: The number of scenarios of the result.
 
 # Validation

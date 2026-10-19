@@ -178,9 +178,9 @@ result raised a bare `DimensionMismatch` from the constructor of `LowOrderPrior`
 name.** The pooled weights are over the observations of the pool, so they name no row of a
 shorter result. The message names `pe2`, both counts and the fix that the message for an opinion
 gives: move the estimator that drops rows into `pe1`, where it makes the scenario set for every
-opinion and for `pe2`. The check runs at the fit. A cap at or above the number of observations
-drops no row, so the configuration alone does not decide it, and a row-count verb stays rejected
-for the reason that the Alternatives give.
+opinion and for `pe2`. The check runs at the fit, where the rows of `pe2` are known, so it costs
+no step more. The count of the amendment of 2026-10-16 assumes that `pe2` answers on the axis of
+the pool, and this check is what makes that assumption hold.
 
 The rejected reading ran the opinions on the scenarios that `pe2` keeps. It needs a fit of `pe2`
 before the opinions only to learn its row count, which is the cost that this ADR refused for the
@@ -192,36 +192,38 @@ Under a caller's `pe.w`, the decision fits the nested prior twice. The first fit
 count of its rows, and the second fit is the fit under `pe.w`. Most nested priors answer every row
 that they receive, so for them the first fit costs a whole fit and gives nothing.
 
-**A nested prior that promises to keep the observations is fitted once.** `keeps_observations`
-is the public verb with which a preprocessing step promises to keep every observation of a
-window. It now has methods for the prior estimators, and the private helper `ep_wrapped_prior`
-reads it on `pe.pe`. When it returns `true`, the count is `size(X, 1)`, and only the fit under
-`pe.w` runs. When it returns `false`, the first fit runs as before. In both cases the length of
-`pe.w` is checked against the count before the fit under it, because `scenario_weights` pads a
-short vector with zeros and would hide the error.
+**The count of the rows runs only the steps that drop rows.** The private helper
+`ep_wrapped_prior` reads the count with `scenario_count` before the fit under `pe.w`, and it checks
+the length of `pe.w` against the count before that fit, because `scenario_weights` pads a short
+vector with zeros and would hide the error. After the fit under `pe.w`, it checks that the fit
+answered the counted rows, so a count that drifts from the fit is refused by name.
 
-The methods read the configuration alone:
+The count has two layers:
 
-+ An `EmpiricalPrior` returns `true` when it holds no Scenario Cap.
-+ A `CrossSectionalFactorPrior` keeps the fallback `false`, because its warm-up and its exposure
-  lag drop rows.
-+ A prior whose result carries the rows of the prior in its `pe` field returns the answer of that
-  prior. This holds for the factor priors, the Black-Litterman priors, the two entropy pooling
-  priors and the two high order estimators.
-+ An `AugmentedBlackLittermanPrior` returns `true` when both `a_pe` and `f_pe` do, because its
-  result keeps the rows that both keep.
-+ An `OpinionPoolingPrior` returns `true` when it has no `pe1`, or when `pe1` returns `true`. It
-  refuses an opinion or a `pe2` that answers fewer rows.
-+ An `Online` wrapper returns `false`, because no batch fit reaches it.
++ `kept_scenarios(pe, T)` reads the configuration alone. It returns `T` for a prior that
+  `keeps_observations`, `min(pe.max_scenarios, T)` for a Scenario Cap, the answer of `pe.pe` for a
+  prior whose result carries the rows of `pe.pe` (the factor priors, the Black-Litterman priors,
+  the two entropy pooling priors and the two high order estimators), the smaller of the two answers
+  for an `AugmentedBlackLittermanPrior`, and the answer of `pe1` or `T` for an
+  `OpinionPoolingPrior`. It returns `nothing` when the data decides the count.
++ `scenario_count(pe, X, F, pnl)` returns `kept_scenarios` when it is not `nothing`. A factor prior
+  counts `pe.pe` on `F`. A `CrossSectionalFactorPrior` runs its exposure stage and its lag check,
+  which give the rows after the warm-up, and not its regression, its factor moments or its
+  assembly. A prior that states no count is fitted once to read it, as before.
 
-This is not the row-count verb that the Alternatives reject. That verb answered a count, and the
-warm-up of a `CrossSectionalFactorPrior` makes the count depend on the data. This verb answers a
-promise, and `false` makes no promise. A Scenario Cap at or above the number of observations drops
-no row, but its prior returns `false` and pays the first fit. So a `false` can cost a fit, and it
-cannot give a wrong count. A wrong `true` can, so a prior returns `true` only when no
-configuration and no data drops a row. The fallback is `false`, so a prior that a user writes
-keeps the two fits until it states the promise.
+`keeps_observations` is the public verb with which a preprocessing step promises to keep every
+observation of a window. It has methods for the prior estimators. A prior returns `true` only when
+no configuration and no data drops a row. The fallback is `false`, which costs at most the first
+fit, so a prior that a user writes keeps the two fits until it states the promise or a count.
+`Online` returns `false`, because no batch fit reaches it.
 
-A new verb with the opposite sense, such as `can_change_num_obs`, was rejected. It states the
-fact that `keeps_observations` already states, under a second name, and its fallback would have
-to be `true` to stay safe.
+This is the row-count verb that the Alternatives rejected, with the two conditions that the
+rejection named. The data-dependent warm-up is not rebuilt by a second authority: the count of a
+`CrossSectionalFactorPrior` calls the same exposure stage and the same lag check as its fit. And
+each wrapper has its recursion rule, one method per type, beside its `keeps_observations` method.
+The check after the fit closes the drift that the rejection feared: a count that disagrees with the
+fit raises, where the rejected verb would have weighted the wrong rows.
+
+A new verb with the opposite sense of `keeps_observations`, such as `can_change_num_obs`, was
+rejected. It states the fact that `keeps_observations` already states, under a second name, and its
+fallback would have to be `true` to stay safe.

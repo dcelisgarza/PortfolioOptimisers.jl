@@ -37,8 +37,8 @@ Result.**
    on its block `CrossSectionalFactorModel`, and the Return Forecast history `hist` when a
    Calibration Slot reads it. Its regression `CrossSectionalRegression` records the live-factor
    mask `lv` on every fit, because the mask is a fact of the regression and costs one entry per
-   factor. An `OpinionPoolingPrior` stores the rows of `pe1` and its pooled weights in the new
-   field `pc` of `LowOrderPrior`, and passes `cache_reg` to `pe2`. A prior that fits a factor
+   factor. An `OpinionPoolingPrior` stores the rows of `pe1`, its pooled weights and the cache
+   of `pe2` in the new field `pc` of `LowOrderPrior`, and passes `cache_reg` to `pe2`. A prior that fits a factor
    prior passes its keywords to that fit and carries its result in `fpr`: a `FactorPrior`, an
    `AugmentedBlackLittermanPrior`, and a `CrossSectionalFactorPrior`, whose `fpr` keeps the
    `pc` of a pool in its factor slot. An `AugmentedBlackLittermanPrior` keeps the `pc` of a
@@ -56,7 +56,9 @@ Result.**
    the Return Forecast that the block carries, and runs the steps of the assembly that read the
    factor moments, `cross_sectional_moment_prior`. It reads the scenarios `pr0.X` and the
    base-currency returns `pr0.o_X`, which no weight moves. The refit of a pool reads its rows and
-   its pooled weights from `pc`, and runs no opinion and no `pe1`. Its result keeps `pc`, and an
+   its pooled weights from `pc`, and runs no opinion and no `pe1`. It gives `pe2` the result
+   with the cache of `pe2` in `pc`, so a `pe2` that is a pool, or an entropy pooling prior over
+   one, reads its own pooled weights and not those of the outer pool. Its result keeps `pc`, and an
    entropy pooling result forwards it, so a nested entropy pooling prior finds it too. The
    refit of a `CrossSectionalFactorPrior` fits the model of a pool in its factor slot, which
    keeps no cache, so its `fpr` keeps the `pc` of the fit for the same reason.

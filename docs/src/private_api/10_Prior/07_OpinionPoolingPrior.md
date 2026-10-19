@@ -10,5 +10,6 @@ PortfolioOptimisers.opinion_pooling_weights
 PortfolioOptimisers.opinion_pooling_cache
 PortfolioOptimisers.opinion_pooling_scenarios
 PortfolioOptimisers.opinion_pooling_kept
+PortfolioOptimisers.opinion_pooling_inner
 PortfolioOptimisers.show_fields(::OpinionPoolingPrior)
 ```

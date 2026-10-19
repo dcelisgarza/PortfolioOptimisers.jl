@@ -258,7 +258,7 @@ end
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Tabulates the mean field of one level, ``D``, ``\\rho`` and ``z \\rho'``, on a uniform grid of
-``\\ln z`` of step ``1/16`` from ``-40`` to ``60``, for [`level_closure_kernel`](@ref), which reads
+``\\ln z`` of step ``1/16`` from ``-40`` to ``40``, for [`level_closure_kernel`](@ref), which reads
 them at about a million points. The derivative is a central difference of ``\\rho`` in ``\\ln z`` of
 step ``10^{-4}``, on the interpolants of the grid, which are polynomials.
 

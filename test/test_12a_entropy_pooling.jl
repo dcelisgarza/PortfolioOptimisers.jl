@@ -2302,6 +2302,14 @@ PortfolioOptimisers.keeps_observations(::FitCountPrior{true}) = true
                                                              w = aweights(fill(1 / 50, 50)),
                                                              sets = sets, mu_views = mv), X)
     @test nk[] == 0
+    # A wrong promise counts 60 rows where the fit keeps 30. The fit under `w` is checked
+    # against the count, and the refusal names both, so `w` never weights another axis.
+    wrong = FitCountPrior{true}(EmpiricalPrior(; max_scenarios = 30), nk)
+    both = r"counted at 60 scenarios and its fit under `w` answered 30"
+    for mk in (EntropyPoolingPrior, MeucciEntropyPoolingPrior)
+        ep = mk(; pe = wrong, w = w, sets = sets, mu_views = mv)
+        @test_throws both prior(ep, X)
+    end
 end
 @testset "The count of the scenarios of a wrapped prior runs only the steps that drop rows" begin
     sc = PortfolioOptimisers.scenario_count
@@ -2434,6 +2442,34 @@ end
         a = PO.prior_probability_factory(p, w0, X[1:30, :], F[1:30, :], nothing)
         b = PO.prior_probability_factory(p, w0, 30)
         @test prior(a, X[1:30, :], F[1:30, :]).mu == prior(b, X[1:30, :], F[1:30, :]).mu
+    end
+    # A pool in `pe2` reads its own pooled weights in the refit, not those of the pool that
+    # holds it. The factor model of the inner `pe2` is fitted under the inner weights, so a
+    # refit that read the outer weights moved `mu` by 76 % on these data.
+    inner = OpinionPoolingPrior(;
+                                pes = [EntropyPoolingPrior(; sets = sets,
+                                                           mu_views = lce("A1 == 0.003")),
+                                       EntropyPoolingPrior(; sets = sets,
+                                                           mu_views = lce("A2 == -0.002"))],
+                                pe2 = FactorPrior())
+    for pe2 in (inner,
+                EntropyPoolingPrior(; pe = inner, sets = sets, mu_views = lce("A2 == 0.001")))
+        outer = OpinionPoolingPrior(;
+                                    pes = [EntropyPoolingPrior(; sets = sets,
+                                                               mu_views = lce("A3 == 0.002")),
+                                           EntropyPoolingPrior(; sets = sets,
+                                                               mu_views = lce("A4 == -0.003"))],
+                                    pe2 = pe2)
+        prc = prior(outer, X, F; cache_reg = true)
+        # The cache of the inner pool rides in the cache of the outer one.
+        @test !isnothing(prc.pc.pe2)
+        @test prc.pc.pe2.w != prc.pc.w
+        full = PO.scenario_prior(outer, w, nothing, X, F, nothing)
+        cached = PO.scenario_prior(outer, w, prc, X, F, nothing)
+        @test cached.X == full.X
+        @test cached.mu ≈ full.mu
+        @test cached.sigma ≈ full.sigma
+        @test cached.pc === prc.pc
     end
 end
 
