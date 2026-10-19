@@ -273,17 +273,7 @@ end
     The sites that existed when the census was written. Turn each one into methods, then remove
     its entry. Do not add an entry: a new early exit on a type is a method from the start.
     =#
-    DEBT = ["ext/PortfolioOptimisersPlotsExt/08_AttributionPlots.jl: attribution_plot_rows: isnothing(N)",
-            "src/02_Tools/05_Propagatable.jl: extract_field_name: expr isa Symbol",
-            "src/02_Tools/05_Propagatable.jl: propagatable_bare_name: n isa Symbol",
-            "src/02_Tools/05_Propagatable.jl: try_field_name: expr isa Symbol",
-            "src/03_InputData/02_AssetPanelBuilder.jl: panel_build_observations: !(isnothing(amsk))",
-            "src/03_InputData/02_AssetPanelBuilder.jl: panel_build_observations: !(isnothing(emsk))",
-            "src/03_InputData/02_AssetPanelBuilder.jl: panel_input_mask: isnothing(amsk)",
-            "src/03_InputData/10_ReturnsResult.jl: check_exogenous_series: isnothing(E)",
-            "src/03_InputData/15_FeatureSelector.jl: select_fields: isnothing(sel)",
-            "src/03_InputData/21_AssetPanelSummary.jl: panel_field_missing: isnothing(f.omsk)",
-            "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl: process_observation!: isnothing(active_mask)",
+    DEBT = ["src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl: process_observation!: isnothing(active_mask)",
             "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl: update_regime!: isnothing(ce.regime_method)",
             "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl: mahalanobis_transform: isnothing(grid.cut)",
             "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl: assert_cs_block_rows: isnothing(idx) && isnothing(ts)",
@@ -295,8 +285,6 @@ end
             "src/10_Prior/07_OpinionPoolingPrior.jl: prior_probability_factory: isnothing(pe.pe1)",
             "src/10_Prior/15_CrossSectionalPriorFold.jl: cross_sectional_fold_choice: isnothing(pe.families)",
             "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl: cross_sectional_carry_standardised: isnothing(st.csr)",
-            "src/13_Fees.jl: investable_fees_view: isnothing(fees.imsk)",
-            "src/13_Fees.jl: mark_fees: isnothing(fees.imsk)",
             "src/16_RiskMeasures/02_Variance.jl: resolve_deferred_quantities: !(r.sigma isa DeferredQuantity)",
             "src/16_RiskMeasures/02_Variance.jl: resolve_deferred_quantities: !(r.sigma isa DeferredQuantity)",
             "src/16_RiskMeasures/02_Variance.jl: resolve_deferred_quantities: !(r.sigma isa DeferredQuantity)",

@@ -69,11 +69,9 @@ function PortfolioOptimisers.plot_attribution_mu_vs_vol(fa::FactorAttributionRes
 end
 # The rows one attribution plot draws, largest in magnitude first and then back in axis order, so a
 # plot with an `N` shows the rows that matter without reordering the axis it draws.
-function attribution_plot_rows(v::VecNum, N::Option{<:Number})
+attribution_plot_rows(v::VecNum, ::Nothing) = 1:length(v)
+function attribution_plot_rows(v::VecNum, N::Number)
     M = length(v)
-    if isnothing(N)
-        return 1:M
-    end
     if !(N > zero(N))
         throw(DomainError(N, "N must be > 0"))
     end

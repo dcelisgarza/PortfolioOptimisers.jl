@@ -93,11 +93,11 @@ A cell is missing when the observed mask of the Panel Field is false there. A Pa
   - [`panel_align_active`](@ref)
 """
 function panel_field_missing(f::AbstractPanelField)
-    ax = panel_field_axes(f)
-    if isnothing(f.omsk)
-        return zeros(Int, ax)
-    end
-    return reshape(count(!, reshape(f.omsk, prod(ax), :); dims = 2), ax)
+    return panel_field_missing(f.omsk, panel_field_axes(f))
+end
+panel_field_missing(::Nothing, ax::Tuple) = zeros(Int, ax)
+function panel_field_missing(omsk::AbstractArray{Bool}, ax::Tuple)
+    return reshape(count(!, reshape(omsk, prod(ax), :); dims = 2), ax)
 end
 """
     panel_active_cells(pnl::AssetPanel) -> AbstractArray{Bool}

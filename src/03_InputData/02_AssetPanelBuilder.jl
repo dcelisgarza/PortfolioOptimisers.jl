@@ -1169,10 +1169,11 @@ function panel_input_mask(inp::AbstractPanelFieldInput,
     if panel_input_is_static(inp)
         return nothing
     end
-    ax = (size(inp.vals, 1), size(inp.vals, 2))
-    if isnothing(amsk)
-        return trues(ax)
-    end
+    return panel_input_mask(inp, amsk, (size(inp.vals, 1), size(inp.vals, 2)))
+end
+panel_input_mask(::AbstractPanelFieldInput, ::Nothing, ax::Tuple) = trues(ax)
+function panel_input_mask(inp::AbstractPanelFieldInput, amsk::AbstractMatrix{Bool},
+                          ax::Tuple)
     @argcheck(size(amsk) == ax,
               DimensionMismatch("the active mask of an Asset Panel is observations × assets, so it matches the first two axes of the Panel Field \"$(inp.name)\", got size(amsk) = $(size(amsk)) and a Panel Field of $(ax[1]) observations and $(ax[2]) assets"))
     return amsk
@@ -1527,14 +1528,12 @@ function panel_build_observations(inputs::AbstractVector{<:AbstractPanelFieldInp
             return size(inp.vals, 1)
         end
     end
-    if !isnothing(amsk)
-        return size(amsk, 1)
-    end
-    if !isnothing(emsk)
-        return size(emsk, 1)
-    end
-    return nothing
+    return panel_build_observations(amsk, emsk)
 end
+# The masks are the second signal, the active mask before the estimation mask.
+panel_build_observations(amsk::AbstractMatrix{Bool}, ::Any) = size(amsk, 1)
+panel_build_observations(::Nothing, emsk::AbstractMatrix{Bool}) = size(emsk, 1)
+panel_build_observations(::Nothing, ::Nothing) = nothing
 
 """
     asset_panel(

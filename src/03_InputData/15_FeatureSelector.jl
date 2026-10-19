@@ -532,13 +532,15 @@ function select_fields(pnl::AssetPanel, sel, strict::Bool)
     @argcheck(!isempty(pnl.pf),
               IsEmptyError("a Feature Matrix stacks the Panel Fields of an Asset Panel, and this panel carries none: it states a universe and carries no feature data, which is what a ReturnsResult built from prices alone holds. Build the panel the Feature Matrix is to stack with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds one from the prior it is handed."))
     assert_feature_selector(sel)
-    cols = Tuple{Int, Int, Symbol}[]
-    if isnothing(sel)
-        for (k, f) in pairs(pnl.pf)
-            panel_value_columns!(cols, k, f)
-        end
-        return cols
+    return select_fields(Tuple{Int, Int, Symbol}[], pnl, sel, strict)
+end
+function select_fields(cols::AbstractVector, pnl::AssetPanel, ::Nothing, ::Bool)
+    for (k, f) in pairs(pnl.pf)
+        panel_value_columns!(cols, k, f)
     end
+    return cols
+end
+function select_fields(cols::AbstractVector, pnl::AssetPanel, sel, strict::Bool)
     pool = [String(f.name) for f in pnl.pf]
     for entry in sel
         select_fields_push!(cols, pnl, entry, pool, strict)

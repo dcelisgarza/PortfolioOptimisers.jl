@@ -860,13 +860,17 @@ function investable_fees_view(fees::Fees, imsk::BitVector, X::MatNum)
     return investable_fees_view(fees, imsk, size(X, 2))
 end
 function investable_fees_view(fees::Fees, imsk::BitVector, n::Integer)
-    if isnothing(fees.imsk)
-        red = two_axis_fees_view(fees, findall(imsk), n)
-        return Fees(; tn = red.tn, l = red.l, s = red.s, fl = red.fl, fs = red.fs,
-                    lq = red.lq, flq = red.flq, fa = red.fa, kwargs = red.kwargs,
-                    imsk = imsk)
-    end
-    @argcheck(fees.imsk == imsk,
+    return investable_fees_view(fees, fees.imsk, imsk, n)
+end
+# The mark of the fee, `fees.imsk`, picks the arm: an unmarked fee is reduced, and a marked
+# one is checked.
+function investable_fees_view(fees::Fees, ::Nothing, imsk::BitVector, n::Integer)
+    red = two_axis_fees_view(fees, findall(imsk), n)
+    return Fees(; tn = red.tn, l = red.l, s = red.s, fl = red.fl, fs = red.fs, lq = red.lq,
+                flq = red.flq, fa = red.fa, kwargs = red.kwargs, imsk = imsk)
+end
+function investable_fees_view(fees::Fees, mark::BitVector, imsk::BitVector, ::Integer)
+    @argcheck(mark == imsk,
               ArgumentError("a fee reduced on one Investable Mask cannot be reduced on another. Its two liquidation charges, `lq` and `flq`, were sliced to the complement of its own mask, so they hold no rate for an asset the caller's mask says left, and charging nothing for it would overstate the net return. Lift the fee with `lift_fees` and reduce the caller's own statement, or pass the fee the caller stated over the full universe.\nGot\nfindall(.!fees.imsk) => $(findall(.!fees.imsk))\nfindall(.!imsk) => $(findall(.!imsk))"))
     return fees
 end
@@ -1040,12 +1044,17 @@ function mark_fees(fees::Fees, ::Nothing)
     return fees, fees.imsk
 end
 function mark_fees(fees::Fees, imsk::BitVector)
-    if isnothing(fees.imsk)
-        return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
-                    lq = fees.lq, flq = fees.flq, fa = fees.fa, kwargs = fees.kwargs,
-                    imsk = imsk), imsk
-    end
-    @argcheck(fees.imsk == imsk,
+    return mark_fees(fees, fees.imsk, imsk)
+end
+# The mark of the fee, `fees.imsk`, picks the arm: an unmarked fee takes the mark, and a
+# marked one is checked.
+function mark_fees(fees::Fees, ::Nothing, imsk::BitVector)
+    return Fees(; tn = fees.tn, l = fees.l, s = fees.s, fl = fees.fl, fs = fees.fs,
+                lq = fees.lq, flq = fees.flq, fa = fees.fa, kwargs = fees.kwargs,
+                imsk = imsk), imsk
+end
+function mark_fees(fees::Fees, mark::BitVector, imsk::BitVector)
+    @argcheck(mark == imsk,
               ArgumentError("the fee is marked with one Investable Mask and the caller states another, and only one can be the axes the fee is on. Pass the mask the fee was reduced on, or no mask at all.\nGot\nfindall(.!fees.imsk) => $(findall(.!fees.imsk))\nfindall(.!imsk) => $(findall(.!imsk))"))
     return fees, imsk
 end
