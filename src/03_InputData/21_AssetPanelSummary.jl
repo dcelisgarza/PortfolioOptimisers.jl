@@ -95,8 +95,8 @@ A cell is missing when the observed mask of the Panel Field is false there. A Pa
 function panel_field_missing(f::AbstractPanelField)
     return panel_field_missing(f.omsk, panel_field_axes(f))
 end
-panel_field_missing(::Nothing, ax::Tuple) = zeros(Int, ax)
-function panel_field_missing(omsk::AbstractArray{Bool}, ax::Tuple)
+panel_field_missing(::Nothing, ax::Dims) = zeros(Int, ax)
+function panel_field_missing(omsk::AbstractArray{Bool}, ax::Dims)
     return reshape(count(!, reshape(omsk, prod(ax), :); dims = 2), ax)
 end
 """

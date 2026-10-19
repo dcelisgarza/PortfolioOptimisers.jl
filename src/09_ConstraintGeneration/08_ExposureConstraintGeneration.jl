@@ -354,7 +354,7 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
   - [`source_loadings`](@ref)
   - [`refit_factor_regression`](@ref)
 """
-function factor_space_regression(re::Option{<:RegE_Reg},
+function factor_space_regression(re::AbstractTimeSeriesRegressionEstimator,
                                  rr::Option{<:AbstractLoadingsRegressionResult},
                                  rd::Option{<:ReturnsResult})
     rr = source_loadings(returns_source(re), rr, re)

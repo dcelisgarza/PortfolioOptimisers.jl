@@ -398,7 +398,8 @@ function shared_series_solve(opt, rd::ReturnsResult, args...; kwargs...)
     if isnothing(rows) || !fits_prior(opt)
         return res
     end
-    return set_result_prior(res, shared_series_record(res.pr, rows, size(rd.X, 1)))
+    T = size(rd.X, 1)
+    return set_result_prior(res, pr -> shared_series_record(pr, rows, T))
 end
 function shared_series_solve(opt, args...; kwargs...)
     return _optimise(opt, args...; kwargs...)

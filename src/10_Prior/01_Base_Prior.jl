@@ -1917,7 +1917,7 @@ A reader holds `T` observations of the returns data. When `T` equals the number 
 
 # Arguments
 
-  - `pr`: The prior result, the returns data, a prior estimator, or `nothing`. Only a prior result holds marks.
+  - `pr`: The prior result, the returns data, a prior estimator, or `nothing`. Only a prior result holds marks: a [`LowOrderPrior`](@ref) in its field `ss_gaps`, and a [`HighOrderPrior`](@ref) in the low order prior that it wraps.
   - `T`: The number of observations of the returns data that the reader holds.
 
 # Returns
@@ -1930,8 +1930,11 @@ A reader holds `T` observations of the returns data. When `T` equals the number 
   - [`implied_volatility_picker`](@ref)
   - [`optimiser_shared_series_rows`](@ref)
 """
-function shared_series_kept_rows(pr::AbstractPriorResult, T::Integer)
-    return shared_series_kept_rows(pr.ss_gaps, T)
+function shared_series_kept_rows(pr::LowOrderPrior, T::Integer)
+    return shared_series_kept_rows(getfield(pr, :ss_gaps), T)
+end
+function shared_series_kept_rows(pr::HighOrderPrior, T::Integer)
+    return shared_series_kept_rows(getfield(pr, :pr), T)
 end
 function shared_series_kept_rows(ss_gaps::AbstractVector{Bool}, T::Integer)
     return length(ss_gaps) == T ? findall(!, ss_gaps) : nothing

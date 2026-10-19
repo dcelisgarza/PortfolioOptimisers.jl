@@ -528,23 +528,23 @@ end
                                 <:StackingResult, <:SubsetResamplingResult,
                                 <:SchurComplementHierarchicalRiskParityResult,
                                 <:HierarchicalResult, <:ProcessedJuMPOptimiserAttributes},
-                     pr::AbstractPriorResult)
-    set_result_prior(res::JuMPOptimisationResult, pr::AbstractPriorResult)
+                     f::Function)
+    set_result_prior(res::JuMPOptimisationResult, f::Function)
     set_result_prior(res::Union{<:RiskJuMPOptimisationResult,
                                 <:NonRiskJuMPOptimisationResult,
                                 <:HierarchicalRiskParityResult,
                                 <:HierarchicalEqualRiskContributionResult},
-                     pr::AbstractPriorResult)
+                     f::Function)
 
-Rebuild an optimisation result with the prior result `pr` in place of its own.
+Rebuild an optimisation result with the prior result `f(pr)` in place of its own prior `pr`.
 
-[`shared_series_solve`](@ref) is the one caller. It replaces the prior with the same prior plus the record of the cut, so every other field stays correct.
+[`shared_series_solve`](@ref) is the one caller. It replaces the prior with the same prior plus the record of the cut, so every other field stays correct. The function reads the prior from the field that holds it, by the type of the result, so no caller reads `res.pr` of a result whose type it does not know.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. A result that holds the prior in its first field `pr`, and the processed attributes of a JuMP head: rebuild it through its positional constructor with `pr` as the first field.
+ 1. A result that holds the prior `pr` in its first field, and the processed attributes of a JuMP head: rebuild it through its positional constructor with `f(pr)` as the first field.
  2. The shared core of a JuMP head: rebuild it with the processed attributes of step 1, through the inner constructor, as [`set_retcode`](@ref) does.
  3. A JuMP head, or a hierarchical head, that holds the core in its first field `jr` or `hr`: rebuild it through its positional constructor with the core of step 1 or step 2.
 
@@ -565,22 +565,21 @@ function set_result_prior(res::Union{<:NaiveOptimisationResult, <:NestedClustere
                                      <:StackingResult, <:SubsetResamplingResult,
                                      <:SchurComplementHierarchicalRiskParityResult,
                                      <:HierarchicalResult,
-                                     <:ProcessedJuMPOptimiserAttributes},
-                          pr::AbstractPriorResult)
+                                     <:ProcessedJuMPOptimiserAttributes}, f::Function)
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
-    return (typeof(res).name.wrapper)(pr, Base.tail(flds)...)
+    return (typeof(res).name.wrapper)(f(first(flds)), Base.tail(flds)...)
 end
-function set_result_prior(res::JuMPOptimisationResult, pr::AbstractPriorResult)
-    return JuMPOptimisationResult(set_result_prior(res.pa, pr), res.retcode, res.sol,
-                                  res.model)
+function set_result_prior(res::JuMPOptimisationResult, f::Function)
+    return JuMPOptimisationResult(set_result_prior(getfield(res, :pa), f), res.retcode,
+                                  res.sol, res.model)
 end
 function set_result_prior(res::Union{<:RiskJuMPOptimisationResult,
                                      <:NonRiskJuMPOptimisationResult,
                                      <:HierarchicalRiskParityResult,
                                      <:HierarchicalEqualRiskContributionResult},
-                          pr::AbstractPriorResult)
+                          f::Function)
     flds = ntuple(i -> getfield(res, i), Val(fieldcount(typeof(res))))
-    return (typeof(res).name.wrapper)(set_result_prior(first(flds), pr), Base.tail(flds)...)
+    return (typeof(res).name.wrapper)(set_result_prior(first(flds), f), Base.tail(flds)...)
 end
 function partial_fit!(opt::Union{<:EqualWeighted, <:RandomWeighted,
                                  <:BestConstantRebalancedPortfolio}, rd::ReturnsResult)
