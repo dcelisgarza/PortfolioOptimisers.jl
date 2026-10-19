@@ -24,14 +24,11 @@ function covariance_windows(scored::AbstractVector{Bool}, window::Integer,
 end
 # The windows of an evaluation, and the first point its series draws: the first step under
 # `whole_windows = false`, and the first whole window under `true`. `wo` holds the three
-# window keywords of a figure: `window`, `scored_steps` and `whole_windows`. An evaluation
-# with no scored step has nothing to draw, so it is refused as the summary refuses it.
+# window keywords of a figure: `window`, `scored_steps` and `whole_windows`.
 function covariance_plot_windows(cfer::PortfolioOptimisers.CovarianceForecastEvaluationResult,
                                  wo::NamedTuple)
     scored = cfer.n_valid .> 0
-    if !any(scored)
-        throw(PortfolioOptimisers.IsEmptyError("the evaluation scored no step: every step had no active asset, so there is nothing to draw."))
-    end
+    covariance_plot_check_scored(scored)
     M = wo.scored_steps ? count(scored) : length(scored)
     if !(1 <= wo.window <= M)
         throw(DomainError(wo.window,
@@ -51,6 +48,14 @@ end
 function covariance_plot_check_levels(levels)
     if isempty(levels) || !all(q -> zero(q) < q < one(q), levels)
         throw(DomainError(levels, "levels must hold at least one level, each in (0, 1)"))
+    end
+    return nothing
+end
+# An evaluation with no scored step has nothing to draw, so it is refused as the summary
+# refuses it.
+function covariance_plot_check_scored(scored::AbstractVector{Bool})
+    if !any(scored)
+        throw(PortfolioOptimisers.IsEmptyError("the evaluation scored no step: every step had no active asset, so there is nothing to draw."))
     end
     return nothing
 end

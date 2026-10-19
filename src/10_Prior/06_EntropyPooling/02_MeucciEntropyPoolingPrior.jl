@@ -32,7 +32,7 @@ A skewness, kurtosis or correlation view divides by the variance of an asset, an
 The constructor derives the prior probabilities, and validates everything else.
 
  1. When `w` is `nothing`, derive nothing. [`prior`](@ref) builds the uniform weights `1/T` at solve time, one per observation.
- 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. A mutable `w.values` is normalised in place with `LinearAlgebra.normalize!`, and an immutable one is replaced by new weights of the same kind over the normalised values, through [`scenario_probabilities`](@ref). The kind fixes the bias correction of the posterior covariance, see [`ScenarioProbabilities`](@ref).
+ 2. When `w` is not `nothing`, normalise it to sum to one, giving the prior probabilities the pooling starts from. The caller's `w` is left as it is: new weights of the same kind hold the normalised values, through [`scenario_probabilities`](@ref). The kind fixes the bias correction of the posterior covariance, see [`ScenarioProbabilities`](@ref).
 
 # Fields
 
@@ -277,11 +277,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
         assert_scenario_refit(pe)
         if !isnothing(w)
             @argcheck(!isempty(w), IsEmptyError("w cannot be empty"))
-            if ismutable(w.values)
-                LinearAlgebra.normalize!(w, 1)
-            else
-                w = scenario_probabilities(w, LinearAlgebra.normalize(w.values, 1))
-            end
+            w = scenario_probabilities(w, LinearAlgebra.normalize(w.values, 1))
         end
         if !isnothing(mu_views) ||
            !isnothing(var_views) ||

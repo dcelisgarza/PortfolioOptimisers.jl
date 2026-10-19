@@ -114,10 +114,14 @@
         @test pred.rd.nx == rd.nx
         @test pred.rd.X == calc_net_returns(pred.res, rd.X)
         @test pred.rd.ts == rd.ts
-        @test pred.rd.iv ==
-              [rd.iv * PortfolioOptimisers.synthetic_asset_weights(w) for w in pred.res.w]
-        @test pred.rd.ivpa == [dot(rd.ivpa, PortfolioOptimisers.synthetic_asset_weights(w))
-                               for w in pred.res.w]
+        # The collapse multiplies by every column of the weights at once, and these lines by
+        # one column at a time, so the two products round apart: 1 ulp measured (G9 of #1630).
+        @test all(isapprox.(pred.rd.iv,
+                            [rd.iv * PortfolioOptimisers.synthetic_asset_weights(w)
+                             for w in pred.res.w]; rtol = 1e-14))
+        @test isapprox(pred.rd.ivpa,
+                       [dot(rd.ivpa, PortfolioOptimisers.synthetic_asset_weights(w))
+                        for w in pred.res.w]; rtol = 1e-14)
         res2 = optimise(NearOptimalCentering(;
                                              r = StandardDeviation(;
                                                                    settings = RiskMeasureSettings(;

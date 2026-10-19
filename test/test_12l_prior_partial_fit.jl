@@ -985,7 +985,9 @@ end
         h = prior(steps(HighOrderPriorEstimator(), rd(tv)))
         hb = prior(HighOrderPriorEstimator(), rd(tv))
         @test isapprox(h.sk, hb.sk; rtol = 1e-12, nans = true)
-        @test isapprox(h.kt, hb.kt; rtol = 1e-12, nans = true)
+        # The step and the batch fit sum the fourth moments in a different order: under the
+        # flags of the CI test job the cell gap reaches 1.0003e-12 (G9 of #1630).
+        @test isapprox(h.kt, hb.kt; rtol = 1e-11, nans = true)
     end
     @testset "A carry refuses a member that holds a state at its first step" begin
         # Found by R14 of #1630. The carried rows start empty, so a warm member folded the

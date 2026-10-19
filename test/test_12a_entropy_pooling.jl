@@ -790,15 +790,21 @@ end
     vv = [ValueatRiskView(; views = LinearConstraintEstimator(; val = "AAPL == 0.03"))]
     @test isa(MeucciEntropyPoolingPrior(; sets = sets, var_views = vv).var_views,
               AbstractVector)
-    # The constructor normalises `w` to sum to one. A mutable value is normalised in place and
-    # an immutable one is rebuilt, so both reach the field summing to one.
+    # The constructor normalises `w` to sum to one into new weights of the same kind, so a
+    # mutable and an immutable value both reach the field summing to one. The caller's
+    # weights stay as they are: an in-place normalisation moved every value of a vector that
+    # already summed to one by an ulp, and left its stored sum stale (G9 of #1630).
     T0 = size(rd.X, 1)
     wmut = StatsBase.pweights(collect(range(1.0, 2.0; length = T0)))
     wimm = StatsBase.pweights(range(1.0, 2.0; length = T0))
+    vmut = copy(wmut.values)
     @test !isapprox(sum(wmut), 1; rtol = 1e-3)
-    for pe in
-        (MeucciEntropyPoolingPrior(; w = wmut), MeucciEntropyPoolingPrior(; w = wimm))
+    for mk in (MeucciEntropyPoolingPrior, EntropyPoolingPrior), w in (wmut, wimm)
+        pe = mk(; w = w)
         @test isapprox(sum(pe.w), 1; rtol = 1e-10)
+        @test pe.w isa StatsBase.ProbabilityWeights
+        @test wmut.values == vmut
+        @test wmut.sum == sum(vmut)
     end
 end
 
@@ -1131,8 +1137,8 @@ end
 end
 
 # #539: prior observation weights reach both `ep_prior` routes. Every `MeucciEntropyPoolingPrior`
-# in the suite left `w` at `nothing`, so the branch that reads `pe.w` was never taken. The
-# constructor normalises `w` in place, so each case builds its own.
+# in the suite left `w` at `nothing`, so the branch that reads `pe.w` was never taken. Each
+# case builds its own `w`.
 #
 # #574 gave this testset `EP_TIGHT`, for the reason #573 records: under the default stopping rule
 # the CVaR search lands on a different root depending on what ran before it, and the testsets
@@ -2047,7 +2053,8 @@ end
     @test isapprox(pr.sigma[3, 3], 2.0e-5 / (1 - sum(abs2, pr.w)); rtol = 1e-6)
     # With no view, a caller's prior probabilities are the posterior.
     pr = prior(EntropyPoolingPrior(; pe = cap, w = w0), X)
-    @test pr.w == w0
+    # The constructor normalises a copy of `w0`, whose sum a host can round an ulp off one.
+    @test isapprox(pr.w, w0; rtol = 1e-14)
     @test isapprox(pr.mu, transpose(pr.X) * w0; rtol = 1e-12)
     # A nested entropy pooling prior keeps a caller's prior probabilities on its scenarios.
     inner = EntropyPoolingPrior(; sets = sets, sigma_views = sv, pe = cap)

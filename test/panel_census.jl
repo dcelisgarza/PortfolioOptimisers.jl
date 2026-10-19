@@ -202,6 +202,12 @@ const CENSUS_EXEMPT = Dict{Symbol, String}(
                                            :opinion_pooling_weights => "passes the panel to the prior of each opinion",
                                            :scenario_rows => "a cut to the rows of the scenarios",
                                            :read_comoment => "passes the panel to cokurtosis or coskewness, whose cases are below",
+                                           # The refit and the pin of a prior that reweights its scenarios (G9 of #1630).
+                                           :ep_wrapped_prior => "a step of ep_prior: passes the panel to the prior it wraps",
+                                           :scenario_count => "counts the rows the nested prior answers, through prior on the panel",
+                                           :opinion_pooling_scenarios => "passes the panel to the prior of pe1",
+                                           :pin_prior_choice => "passes the panel to the prior that the pin of the Choice Rule fits",
+                                           :sample_buffer_fit_kwargs => "the panel picks the keywords of a buffer, and no cell is read",
                                            :cross_sectional_regression_stage => "a step of prior on a CrossSectionalFactorPrior",
                                            :cross_sectional_factor_scenarios => "the regression stage of prior on a CrossSectionalFactorPrior",
                                            # Masks: the active mask and the estimation mask, and no cell value.

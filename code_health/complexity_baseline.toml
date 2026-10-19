@@ -5,7 +5,7 @@
 julia = "1.13.2"
 code_complexity = "0.2.0"
 julia_syntax = "1.0.2"
-commit = "9a0a31331d"
+commit = "cb8a940636"
 
 [file]
 "ext/PortfolioOptimisersPlotsExt/01_CumulativeReturnsPlots.jl" = { cyc = 5, cog = 7, arg = 8, cyc_sum = 53, cog_sum = 57, arg_sum = 99, macros = [] }
@@ -20,7 +20,7 @@ commit = "9a0a31331d"
 "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { cyc = 5, cog = 9, arg = 16, cyc_sum = 18, cog_sum = 20, arg_sum = 66, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { cyc = 6, cog = 10, arg = 8, cyc_sum = 85, cog_sum = 44, arg_sum = 202, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { cyc = 5, cog = 8, arg = 8, cyc_sum = 63, cog_sum = 44, arg_sum = 179, macros = [] }
-"ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 60, cog_sum = 31, arg_sum = 127, macros = [] }
+"ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { cyc = 4, cog = 5, arg = 8, cyc_sum = 64, cog_sum = 33, arg_sum = 130, macros = [] }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { cyc = 3, cog = 3, arg = 3, cyc_sum = 4, cog_sum = 3, arg_sum = 5, macros = [] }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { cyc = 4, cog = 4, arg = 3, cyc_sum = 4, cog_sum = 4, arg_sum = 3, macros = [] }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = [] }
@@ -239,14 +239,14 @@ commit = "9a0a31331d"
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/02_EntropyPoolingMeanViews.jl" = { cyc = 6, cog = 9, arg = 7, cyc_sum = 20, cog_sum = 19, arg_sum = 36, macros = [] }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/03_EntropyPoolingViewTypes.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 28, cog_sum = 17, arg_sum = 40, macros = [] }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl" = { cyc = 16, cog = 17, arg = 8, cyc_sum = 46, cog_sum = 53, arg_sum = 35, macros = [] }
-"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl" = { cyc = 20, cog = 44, arg = 6, cyc_sum = 60, cog_sum = 76, arg_sum = 91, macros = [] }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl" = { cyc = 20, cog = 44, arg = 7, cyc_sum = 60, cog_sum = 76, arg_sum = 95, macros = [] }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/06_EntropyPoolingTailViewSolve.jl" = { cyc = 6, cog = 7, arg = 8, cyc_sum = 19, cog_sum = 13, arg_sum = 30, macros = [] }
-"src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl" = { cyc = 19, cog = 23, arg = 17, cyc_sum = 65, cog_sum = 69, arg_sum = 59, macros = ["@forward_properties", "@propagatable"] }
+"src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl" = { cyc = 19, cog = 23, arg = 17, cyc_sum = 64, cog_sum = 66, arg_sum = 59, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl" = { cyc = 8, cog = 11, arg = 16, cyc_sum = 63, cog_sum = 60, arg_sum = 135, macros = [] }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl" = { cyc = 6, cog = 6, arg = 16, cyc_sum = 96, cog_sum = 68, arg_sum = 264, macros = [] }
-"src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl" = { cyc = 19, cog = 23, arg = 17, cyc_sum = 82, cog_sum = 66, arg_sum = 163, macros = ["@forward_properties", "@propagatable"] }
+"src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_c.jl" = { cyc = 19, cog = 23, arg = 17, cyc_sum = 81, cog_sum = 63, arg_sum = 163, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/07_OpinionPoolingPrior.jl" = { cyc = 4, cog = 5, arg = 9, cyc_sum = 32, cog_sum = 23, arg_sum = 78, macros = ["@propagatable"] }
-"src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 22, cog = 37, arg = 7, cyc_sum = 48, cog_sum = 65, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
+"src/10_Prior/08_HighOrderFactorPriorEstimator.jl" = { cyc = 23, cog = 40, arg = 7, cyc_sum = 49, cog_sum = 68, arg_sum = 21, macros = ["@forward_properties", "@propagatable"] }
 "src/10_Prior/09_AssetPanelEstimators.jl" = { cyc = 3, cog = 4, arg = 4, cyc_sum = 27, cog_sum = 13, arg_sum = 27, macros = ["@propagatable"] }
 "src/10_Prior/10_Base_CrossSectionalFactorPrior.jl" = { cyc = 10, cog = 16, arg = 10, cyc_sum = 116, cog_sum = 88, arg_sum = 133, macros = [] }
 "src/10_Prior/11_CrossSectionalFactorPrior.jl" = { cyc = 6, cog = 7, arg = 31, cyc_sum = 72, cog_sum = 54, arg_sum = 135, macros = ["@propagatable"] }
