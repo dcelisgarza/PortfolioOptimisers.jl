@@ -1,7 +1,9 @@
 ```@meta
-Description = "Assertions has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Assertions, public API of PortfolioOptimisers.jl: resolve_rng."
 ```
 
 # Assertions
 
-Every name of this topic is private. The [private page](@ref private-api-assertions) documents them.
+```@docs
+resolve_rng
+```

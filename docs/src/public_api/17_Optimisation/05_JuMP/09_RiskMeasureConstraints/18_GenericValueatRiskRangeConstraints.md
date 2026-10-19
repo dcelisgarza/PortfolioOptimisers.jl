@@ -1,7 +1,9 @@
 ```@meta
-Description = "Generic Value at Risk Range Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Generic Value at Risk Range Constraints, public API of PortfolioOptimisers.jl: set_risk_constraints!."
 ```
 
-# Generic Value at Risk Range Constraints
+# [Generic Value at Risk Range Constraints](@id api-generic-value-at-risk-range-constraints)
 
-Every name of this topic is private. The [private page](@ref private-api-generic-value-at-risk-range-constraints) documents them.
+```@docs
+set_risk_constraints!(model::JuMP.Model, i::Any, r::GenericValueatRiskRange, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+```

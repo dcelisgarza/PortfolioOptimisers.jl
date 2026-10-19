@@ -1774,7 +1774,7 @@ The two walk-forward schemes carry this family in their `pws` field, bound to `O
 
 # Interfaces
 
-In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource` with a `wd::AbstractWeightDrift` field, the Weight Drift [`held_weights_drift`](@ref) runs when the scheme sets no drift of its own, and implement the following method:
+In order to implement a new previous-weights source which will work seamlessly with the library, subtype `AbstractPreviousWeightsSource` with a `wd::AbstractWeightDrift` field, the Weight Drift `held_weights_drift` runs when the scheme sets no drift of its own, and implement the following method:
 
   - `previous_weights(pws::AbstractPreviousWeightsSource, prev::PredictionResult) -> VecNum_VecVecNum`: Read the weights the previous fold threads into the fold that follows it. A fallback method reads the held weights of the previous fold, `prev.hw.w`, so it is only needed when the source threads something else.
 

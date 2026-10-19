@@ -678,7 +678,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `pmsk::Option{AbstractArray{Bool}}`: The placeholder mask, the same size as the resolved values, or `nothing`.
 
-The fallback returns `nothing`, so every value that the input's fill writes is data. [`asset_panel`](@ref) gives the mask to the Panel Field with [`panel_field_placeholder`](@ref).
+The fallback returns `nothing`, so every value that the input's fill writes is data. [`asset_panel`](@ref) gives the mask to the Panel Field with `panel_field_placeholder`.
 
 # Related
 

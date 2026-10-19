@@ -27,6 +27,7 @@ factory(r::ExpectedReturn, args...; kwargs...)
 factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
 brinson_attribution
 needs_previous_weights(r::ExpectedReturnRiskRatio)
+supports_precomputed_returns(::PrRM)
 ```
 
 ## References

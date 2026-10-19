@@ -19,7 +19,7 @@ In order to implement a new centrality algorithm that works seamlessly with the 
 
 ## `calc_centrality`
 
-  - `calc_centrality(ct::MyCentrality, g::Graphs.AbstractGraph) -> VecNum`: Score every vertex of `g`. [`centrality_graph`](@ref) has already weighted `g` in the polarity the algorithm declares, so the method forwards to the routine and inspects nothing.
+  - `calc_centrality(ct::MyCentrality, g::Graphs.AbstractGraph) -> VecNum`: Score every vertex of `g`. `centrality_graph` has already weighted `g` in the polarity the algorithm declares, so the method forwards to the routine and inspects nothing.
 
 ### Arguments
 

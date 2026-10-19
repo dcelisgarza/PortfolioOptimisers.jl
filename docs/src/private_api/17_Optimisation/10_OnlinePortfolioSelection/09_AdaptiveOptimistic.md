@@ -1,5 +1,5 @@
 ```@meta
-Description = "Adaptive optimistic, private API of PortfolioOptimisers.jl: DiagonalProjection, AdaptiveSubgradientState, predictor_state_view, copy_predictor_state, …"
+Description = "Adaptive optimistic, private API of PortfolioOptimisers.jl: DiagonalProjection, AdaptiveSubgradientState, OptimisticStepState, hint_residual, half_step."
 ```
 
 # Adaptive optimistic: private API
@@ -7,8 +7,6 @@ Description = "Adaptive optimistic, private API of PortfolioOptimisers.jl: Diago
 ```@docs
 PortfolioOptimisers.DiagonalProjection
 PortfolioOptimisers.AdaptiveSubgradientState
-PortfolioOptimisers.predictor_state_view
-PortfolioOptimisers.copy_predictor_state
 PortfolioOptimisers.OptimisticStepState
 PortfolioOptimisers.hint_residual
 PortfolioOptimisers.half_step

@@ -1,7 +1,11 @@
 ```@meta
-Description = "Worst Realisation Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Worst Realisation Constraints, public API of PortfolioOptimisers.jl: set_risk_constraints!."
 ```
 
 # Worst Realisation Constraints
 
-Every name of this topic is private. The [private page](@ref private-api-worst-realisation-constraints) documents them.
+The methods below are public. The other names of this topic are private, and the [private page](@ref private-api-worst-realisation-constraints) documents them.
+
+```@docs
+set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+```

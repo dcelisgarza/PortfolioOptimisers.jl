@@ -702,15 +702,18 @@ end
     @test length(s) == 1
     @test s[1] === s
     @test collect(s) == [s]
-    # The root is not exported. The seam's whole public surface is the two verbs, so nothing
-    # here reaches a caller by its bare name. The root and `merge_states` are `public`,
-    # which `names` also lists, so those two read `Base.isexported`.
+    # The root is not exported. The seam's whole exported surface is the two verbs, so nothing
+    # here reaches a caller by its bare name. The root, `merge_states`, and the two helpers
+    # that a new state's merge calls are `public` (#1775), which `names` also lists, so those
+    # read `Base.isexported`.
     @test :partial_fit! in names(PortfolioOptimisers)
     @test :partial_fit in names(PortfolioOptimisers)
     @test !Base.isexported(PortfolioOptimisers, :AbstractPartialFitState)
     @test !Base.isexported(PortfolioOptimisers, :merge_states)
-    @test !(:chan_merge in names(PortfolioOptimisers))
-    @test !(:assert_mergeable_states in names(PortfolioOptimisers))
+    @test :chan_merge in names(PortfolioOptimisers)
+    @test :assert_mergeable_states in names(PortfolioOptimisers)
+    @test !Base.isexported(PortfolioOptimisers, :chan_merge)
+    @test !Base.isexported(PortfolioOptimisers, :assert_mergeable_states)
 end
 @testset "A view drops a state on the observation axis, whatever the family" begin
     pe = PortfolioOptimisers

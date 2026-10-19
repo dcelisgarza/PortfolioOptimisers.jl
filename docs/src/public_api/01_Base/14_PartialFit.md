@@ -1,5 +1,5 @@
 ```@meta
-Description = "Partial fit, public API of PortfolioOptimisers.jl: partial_fit!, partial_fit, merge_states, obs_weights_view."
+Description = "Partial fit, public API of PortfolioOptimisers.jl: partial_fit!, partial_fit, merge_states, obs_weights_view, assert_mergeable_states, chan_merge."
 ```
 
 # Partial fit
@@ -12,6 +12,8 @@ partial_fit
 partial_fit(est::Union{<:PortfolioOptimisers.AbstractEstimator, <:StatsBase.CovarianceEstimator}, args...; kwargs...)
 merge_states
 PortfolioOptimisers.obs_weights_view(::PortfolioOptimisers.AbstractPartialFitState, ::Any)
+PortfolioOptimisers.assert_mergeable_states
+PortfolioOptimisers.chan_merge
 ```
 
 ## References

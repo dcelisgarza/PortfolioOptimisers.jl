@@ -471,4 +471,4 @@ function shared_series_member_rows(X::MatNum, gaps::AbstractVector{Bool};
     return view(X, rows, :), kw
 end
 export partial_fit!, partial_fit
-public merge_states
+public merge_states, assert_mergeable_states, chan_merge

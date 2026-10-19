@@ -140,6 +140,13 @@ coskewness_processor
 factory(rs::AbstractBaseRiskMeasure, args...; kwargs...)
 port_opt_view(rs::AbstractBaseRiskMeasure, ::Any, ::Any, args...)
 needs_previous_weights(::AbstractBaseRiskMeasure)
+bigger_is_better
+range_tails
+supports_precomputed_returns(r::AbstractBaseRiskMeasure)
+supports_precomputed_returns(rs::VecBaseRM)
+supports_precomputed_returns(::NetReturnsInput, ::Any)
+supports_precomputed_returns(::WeightsInput, ::Any)
+supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
 ```
 
 ## References

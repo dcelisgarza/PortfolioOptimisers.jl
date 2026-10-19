@@ -1509,4 +1509,5 @@ export PrecisionBlend, CurrentForecastError, ForecastHistoryError, SteinShrinkag
 public AbstractForecastErrorAlgorithm, AbstractForecastScaleWarmUpAlgorithm,
        spanned_forecast_sample, forecast_scale_warm_up
 export SystematicRepair, NoSystematicRepair, FoldOrRefit, FoldOnly
-public AbstractSystematicRepair, systematic_processing!, AbstractCarryRule
+public AbstractSystematicRepair, systematic_processing!, AbstractCarryRule,
+       assert_carry_rule

@@ -33,7 +33,48 @@ A subtype is a **squeezing template**. It cuts the plane of the two assets' retu
 
 # Interfaces
 
-A subtype must implement [`gerber_iq_weight`](@ref), which returns the weight of one co-movement, and [`gerber_iq_assert_c_d`](@ref), which checks the noise threshold `c` against the template's boundaries. It may implement [`clamp_gerber_iq_n`](@ref); the fall-through leaves the template unchanged.
+In order to implement a new squeezing template that works seamlessly with the library, subtype `GerberIQCovarianceAlgorithm` with its boundaries and its weights as fields, and implement the following methods:
+
+## `gerber_iq_weight`
+
+  - `gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number, scj::Number, kind::MyGerberIQ) -> Number`: The weight of one co-movement, from the channel of the template that it falls into.
+
+### Arguments
+
+  - `xi`, `xj`: Returns of assets `i` and `j`.
+  - `axi`, `axj`: Absolute returns of assets `i` and `j`.
+  - `sci`, `scj`: Scaling for movement of assets `i` and `j`.
+  - `kind`: The concrete subtype instance.
+
+### Returns
+
+  - `res::Number`: Co-movement weight.
+
+## `gerber_iq_assert_c_d`
+
+  - `gerber_iq_assert_c_d(c::Number, kind::MyGerberIQ) -> Nothing`: Checks the small movement threshold `c` against the boundaries of the template, and raises a `DomainError` when `c` is above one of them.
+
+### Arguments
+
+  - `c`: Small movement threshold.
+  - `kind`: The concrete subtype instance.
+
+### Returns
+
+  - `nothing`. The method is called for its raise alone.
+
+## `clamp_gerber_iq_n` (optional)
+
+  - `clamp_gerber_iq_n(kind::MyGerberIQ, alg::GerberCovarianceAlgorithm) -> MyGerberIQ`: The template with the weights that `alg` needs lowered. The fall-through returns `kind` unchanged.
+
+### Arguments
+
+  - `kind`: The concrete subtype instance.
+  - `alg`: The [`GerberCovarianceAlgorithm`](@ref) marker.
+
+### Returns
+
+  - `kind::MyGerberIQ`: A new template, or `kind` itself when no weight needs a clamp.
 
 # Related
 
@@ -88,7 +129,20 @@ A subtype computes the **delay** of the source's temporal vector, the number of 
 
 # Interfaces
 
-A subtype must implement `PortfolioOptimisers.gerber_iq_eps(e::MySubtype, X::MatNum) -> Number`. A subtype that implements no method takes the fall-through of [`gerber_iq_eps`](@ref).
+In order to implement a new delay estimator that works seamlessly with the library, subtype `GerberIQEpsEstimator` and implement the following method:
+
+## `gerber_iq_eps`
+
+  - `gerber_iq_eps(e::MyGerberIQEps, X::MatNum) -> Number`: The delay, in periods, computed from `X`. A subtype that implements no method takes the fall-through of [`gerber_iq_eps`](@ref).
+
+### Arguments
+
+  - `e`: The concrete subtype instance.
+  - `X`: Returns matrix, `observations × assets`.
+
+### Returns
+
+  - `eps::Number`: The delay.
 
 # Related
 
@@ -197,7 +251,20 @@ A subtype computes the **decay rate** of the source's temporal vector, the disco
 
 # Interfaces
 
-A subtype must implement `PortfolioOptimisers.gerber_iq_gamma(y::MySubtype, X::MatNum) -> Number`. A subtype that implements no method takes the fall-through of [`gerber_iq_gamma`](@ref).
+In order to implement a new decay rate estimator that works seamlessly with the library, subtype `GerberIQGammaEstimator` and implement the following method:
+
+## `gerber_iq_gamma`
+
+  - `gerber_iq_gamma(y::MyGerberIQGamma, X::MatNum) -> Number`: The decay rate, computed from `X`. A subtype that implements no method takes the fall-through of [`gerber_iq_gamma`](@ref).
+
+### Arguments
+
+  - `y`: The concrete subtype instance.
+  - `X`: Returns matrix, `observations × assets`.
+
+### Returns
+
+  - `gamma::Number`: The decay rate.
 
 # Related
 
@@ -304,7 +371,20 @@ A subtype answers one question for a pair of assets: in whose units are the pair
 
 # Interfaces
 
-A subtype must implement `PortfolioOptimisers.gerber_iq_scaling(sca::MySubtype, sdi::Number, sdj::Number) -> (Number, Number)`. A subtype that implements no method takes the fall-through of [`gerber_iq_scaling`](@ref).
+In order to implement a new scaler that works seamlessly with the library, subtype `GerberIQScalerEstimator` and implement the following method:
+
+## `gerber_iq_scaling`
+
+  - `gerber_iq_scaling(sca::MyGerberIQScaler, sdi::Number, sdj::Number) -> (Number, Number)`: The scales of the thresholds of assets `i` and `j`, computed from their standard deviations. A subtype that implements no method takes the fall-through of [`gerber_iq_scaling`](@ref).
+
+### Arguments
+
+  - `sca`: The concrete subtype instance.
+  - `sdi`, `sdj`: Standard deviations of assets `i` and `j`.
+
+### Returns
+
+  - `(sci, scj)::Tuple{Number, Number}`: The scales of assets `i` and `j`.
 
 # Related
 
@@ -2055,4 +2135,5 @@ export AssetVolatilityGerberIQScaler, BasicGerberIQ, PartialGerberIQ, FullGerber
        ExpGerberIQDecay, GerberIQCovariance
 public BaseGerberIQCovariance, GerberIQCovarianceAlgorithm, GerberIQEpsEstimator,
        GerberIQGammaEstimator, GerberIQScalerEstimator, GerberIQDecayEstimator,
-       regenerate_decay
+       regenerate_decay, clamp_gerber_iq_n, gerber_iq_eps, gerber_iq_gamma,
+       gerber_iq_scaling, gerber_iq_assert_c_d, gerber_iq_weight

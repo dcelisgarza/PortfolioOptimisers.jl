@@ -19,7 +19,7 @@ Abstract supertype for the configurations that an optimiser holds.
 
 # Interfaces
 
-A subtype gets from this supertype the methods that resolve the schedules in its fields: [`is_time_dependent`](@ref), [`update_time_dependent_estimator`](@ref), [`reset_time_dependent_estimator`](@ref) and [`assert_time_dependent_fold_count`](@ref). Each of them reads the fields through [`time_dependent_fields`](@ref). A subtype can implement one method.
+A subtype gets from this supertype the methods that resolve the schedules in its fields: `is_time_dependent`, `update_time_dependent_estimator`, `reset_time_dependent_estimator` and `assert_time_dependent_fold_count`. Each of them reads the fields through `time_dependent_fields`. A subtype can implement one method.
 
 ## `time_dependent_field_defaults`
 

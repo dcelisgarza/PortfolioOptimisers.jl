@@ -505,7 +505,12 @@ In order to implement a new transform, subtype `AbstractGradientTransform` and i
   - `gradient_state_seed(grad::AbstractGradientTransform, w::AbstractVector)`: The state the transform keeps on the Rule State before the first row, such as a moving average of the gradient, or `nothing`, the default. `w` is the Start Allocation, and the state takes its length and its element type.
   - `transform_gradient!(grad::AbstractGradientTransform, gs, g::AbstractVector) -> AbstractVector`: The transformed gradient of the period, computed from the raw gradient `g`. It writes the state `gs` of the transform in place.
 
-The head's state already slices and copies a transform state that is `nothing`, a vector or a pair of vectors. A transform state of another shape needs its own methods of the two private helpers [`gradient_state_view`](@ref) and [`copy_gradient_state`](@ref).
+A transform whose state is not `nothing`, a vector or a pair of vectors also implements:
+
+  - `gradient_state_view(gs::MyGradientState, i) -> MyGradientState`: The state of the transform, sliced to the assets `i`, as a copy.
+  - `copy_gradient_state(gs::MyGradientState) -> MyGradientState`: A copy of the state of the transform that shares no array with it.
+
+The head's state already slices and copies a transform state of the other three shapes.
 
 # Related
 
@@ -1901,4 +1906,4 @@ export MirrorDescent, ExponentiatedGradient, GradientProjection, EGE, EGR, EGA, 
        WindowedBestRate, MAEG, AEG, PlainGradient, GradientMomentum, RootMeanSquareGradient,
        AdaptiveMomentGradient
 public AbstractGradientTransform, gradient_state_seed, transform_gradient!,
-       gradient_state_view, AbstractOnlineObjective, loss_gradient
+       gradient_state_view, copy_gradient_state, AbstractOnlineObjective, loss_gradient

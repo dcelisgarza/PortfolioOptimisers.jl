@@ -18,7 +18,7 @@ All concrete types that name a source of the returns should subtype `AbstractRet
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractReturnsSource` and implement the following methods. A reader refuses a source that its admitted set does not name, see [`assert_returns_source`](@ref), so a new source reaches only a reader whose keyword constructor admits it. A new source reads no benchmark gap: only [`ExcessSource`](@ref) drops the gap rows of a vector benchmark, see [`shared_series_view`](@ref).
+In order to implement a new concrete type that works seamlessly with the library, subtype `AbstractReturnsSource` and implement the following methods. A reader refuses a source that its admitted set does not name, see `assert_returns_source`, so a new source reaches only a reader whose keyword constructor admits it. A new source reads no benchmark gap: only [`ExcessSource`](@ref) drops the gap rows of a vector benchmark, see `shared_series_view`.
 
 ## benchmark_relative_returns
 

@@ -709,3 +709,4 @@ function dims_oriented(dims::Integer, A::Option{<:AbstractMatrix},
     assert_dims(dims)
     return map(x -> dims_oriented(dims, x), (A, B, Cs...))
 end
+public resolve_rng

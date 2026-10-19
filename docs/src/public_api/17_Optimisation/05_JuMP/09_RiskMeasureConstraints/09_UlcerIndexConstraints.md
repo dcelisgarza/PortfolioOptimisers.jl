@@ -1,7 +1,9 @@
 ```@meta
-Description = "Ulcer Index Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Ulcer Index Constraints, public API of PortfolioOptimisers.jl: set_risk_constraints!."
 ```
 
-# Ulcer Index Constraints
+# [Ulcer Index Constraints](@id api-ulcer-index-constraints)
 
-Every name of this topic is private. The [private page](@ref private-api-ulcer-index-constraints) documents them.
+```@docs
+set_risk_constraints!(model::JuMP.Model, ::Any, r::UlcerIndex, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+```

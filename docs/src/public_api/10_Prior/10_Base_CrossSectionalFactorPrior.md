@@ -22,6 +22,7 @@ The leverage-one rule of a [`CrossSectionalFactorPrior`](@ref) says how the prio
 AbstractLeverageOneMask
 MaskedLeverageOne
 UnmaskedLeverageOne
+PortfolioOptimisers.leverage_one_residuals
 ```
 
 Every other name of this topic is private. The [private page](@ref private-api-base-cross-sectional-factor-prior) documents them.

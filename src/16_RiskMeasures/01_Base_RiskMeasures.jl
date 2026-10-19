@@ -630,7 +630,7 @@ Subtype `RiskMeasure` to implement concrete risk measures that quantify portfoli
 
 # Interfaces
 
-In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — [`set_risk_expression!`](@ref) reads its `scale` and `rke`, [`set_risk_upper_bound!`](@ref) its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
+In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — `set_risk_expression!` reads its `scale` and `rke`, `set_risk_upper_bound!` its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
 
 ## `risk_input_kind`
 
@@ -652,19 +652,23 @@ In order to implement a new risk measure that works seamlessly with the library,
   - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
   - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
 
-A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+## `supports_precomputed_returns`
 
-## The model builder
+  - `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`: Whether the risk of the measure is a function of the net return series alone. A [`WeightsReturnsFeesInput`](@ref) measure declares it, and the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
 
-A `JuMP` optimiser, or a programme Allocation Set, builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
+## `set_risk_constraints!`
+
+  - `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`: Builds the measure into the model of a `JuMP` optimiser, or of a programme Allocation Set. There is no fallback.
+
+The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
 
 ## Optional methods
 
 Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 
-  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
-  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
-  - [`range_tails`](@ref): the two point measures a range measure is the sum of; the fallback throws.
+  - `needs_previous_weights(r::MyRiskMeasure) -> Bool`: `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - `bigger_is_better(r::MyRiskMeasure) -> Bool`: `true` for a measure a caller maximises; the fallback answers `false`.
+  - `range_tails(r::MyRiskMeasure) -> NamedTuple`: The two point measures `(; loss, gain)` that a range measure is the sum of; the fallback throws.
   - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
 
 # Related
@@ -731,14 +735,16 @@ A hierarchical measure is only ever evaluated at the value level, through [`expe
   - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
   - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
 
-A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+## `supports_precomputed_returns`
+
+  - `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`: Whether the risk of the measure is a function of the net return series alone. A [`WeightsReturnsFeesInput`](@ref) measure declares it, and the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
 
 ## Optional methods
 
 Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 
-  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
-  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
+  - `needs_previous_weights(r::MyRiskMeasure) -> Bool`: `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - `bigger_is_better(r::MyRiskMeasure) -> Bool`: `true` for a measure a caller maximises; the fallback answers `false`.
   - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
 
 # Related
@@ -763,7 +769,7 @@ In order to implement a new concrete settings type, subtype `AbstractRiskMeasure
 
 ## Required fields
 
-  - `scale::Number`: Combination weight, read by [`set_risk_expression!`](@ref) and by the value-level readers.
+  - `scale::Number`: Combination weight, read by `set_risk_expression!` and by the value-level readers.
   - `rke::Bool`: Whether the measure contributes to the model's aggregate risk expression.
 
 ## Optional field
@@ -815,7 +821,7 @@ In order to implement a new bound transformation, subtype `FrontierBoundEstimato
 
   - The converted bound, in the units of the risk expression.
 
-The [`Frontier`](@ref) arm of `variance_risk_bounds_val` is generic and needs no method. The sweep applies the same transformation to both ends of its span in [`rebuild_risk_frontier`](@ref), which reads `bound` off the `Frontier` and branches on it there.
+The [`Frontier`](@ref) arm of `variance_risk_bounds_val` is generic and needs no method. The sweep applies the same transformation to both ends of its span in `rebuild_risk_frontier`, which reads `bound` off the `Frontier` and branches on it there.
 
 # Related
 
@@ -2684,10 +2690,10 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound
-# The verb the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
-# (ADR 0154). Public, not exported: it is only ever extended, and an extension must qualify
-# it as `PortfolioOptimisers.risk_input_kind` anyway.
-public risk_input_kind
+# The verbs the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
+# (ADR 0154, #1775). Public, not exported: they are only ever extended, and an extension must
+# qualify them as `PortfolioOptimisers.risk_input_kind` and so on anyway.
+public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails
 # The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
 # names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
 # extension must implement.

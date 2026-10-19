@@ -26,6 +26,7 @@ MirrorDescent
 PortfolioOptimisers.gradient_state_seed
 PortfolioOptimisers.transform_gradient!
 PortfolioOptimisers.gradient_state_view
+PortfolioOptimisers.copy_gradient_state
 PortfolioOptimisers.loss_gradient
 PortfolioOptimisers.rows_needed(::LogWealth)
 ExponentiatedGradient

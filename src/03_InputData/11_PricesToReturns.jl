@@ -24,7 +24,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
 ### Returns
 
-  - `out::Vector`: The same length as `r`. [`apply_gap_return`](@ref) reads back only the cells that [`gap_return_writable`](@ref) admits. So a method can return every other cell unchanged, and it does not need to check the rule itself.
+  - `out::Vector`: The same length as `r`. `apply_gap_return` reads back only the cells that `gap_return_writable` admits. So a method can return every other cell unchanged, and it does not need to check the rule itself.
 
 # Related
 
@@ -778,4 +778,4 @@ function apply_preprocessing(ptr::PricesToReturns, pr::PricesResult)::ReturnsRes
     return prices_to_returns(ptr, pr)
 end
 export prices_to_returns, PricesToReturns, CatchUpGapReturn, currency_excess_index
-public AbstractGapReturnAlgorithm, gap_return
+public AbstractGapReturnAlgorithm, gap_return, gap_return_value

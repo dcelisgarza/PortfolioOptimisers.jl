@@ -112,7 +112,7 @@ To implement a new geometry, subtype `AbstractProjectionGeometry` and implement 
 
   - `w'::AbstractVector`: The projected allocation.
 
-A geometry with no closed form on any set carries its own solver, as [`GramProjection`](@ref) does, and [`projection_solver`](@ref) reads that solver before the solver of the set.
+A geometry with no closed form on any set carries its own solver, as [`GramProjection`](@ref) does, and `projection_solver` reads that solver before the solver of the set.
 
 # Examples
 
@@ -1867,4 +1867,4 @@ public AbstractOnlinePortfolioSelectionAlgorithm, AbstractProjectionGeometry,
        AbstractAllocationSet, online_update!, rule_state_seed, projection_geometry, project,
        resolve_allocation_set, AbstractLearningRateSchedule, learning_rate, restart,
        schedule_state_seed, schedule_update!, mixing_share, reads_period_row,
-       schedule_state_view
+       schedule_state_view, price_relative

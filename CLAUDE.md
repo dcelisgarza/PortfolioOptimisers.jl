@@ -126,6 +126,9 @@ before you merge so you lower the number that is current.
   maintainer only when it is ambiguous whether users extend or use the name at all.
   - An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
     names are `public`. A family whose concrete members are exported is an extension point.
+  - A helper that the section tells an implementer to call is `public` too, and a caller or a
+    check that the library runs is named in plain code, with no link. ADR 0154 states the rule,
+    and `test/test_66_public_declaration_census.jl` gates it.
   - An abstract type is extended, not used, so it is `public`, not exported. Export one only when
     users plainly write it by name in their own code, and ask when that is not plain.
   - Internal machinery stays undeclared. A name that only the library calls is neither.

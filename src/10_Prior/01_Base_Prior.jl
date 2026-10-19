@@ -309,7 +309,7 @@ In order to implement a new prior result type which will work seamlessly with th
   - `reconstruct_prior(pr::AbstractPriorResult, patch::NamedTuple) -> AbstractPriorResult`: Rebuild `pr` through its own constructor with `patch` applied. This is what makes [`forward_prior`](@ref) work on `pr`, and it is written per result type because the constructor is named rather than recovered by reflection.
   - `port_opt_view(pr::AbstractPriorResult, i, args...) -> AbstractPriorResult`: Restrict `pr` to the assets at index `i`, for hierarchical and subset optimisation.
 
-The field list is derived by [`prior_field_values`](@ref), so a result type that gains a field needs no further method. An `@pprop` field may only name a property of the two result types that [`prior_result_property_pool`](@ref) hard-codes today — [`LowOrderPrior`](@ref) and [`HighOrderPrior`](@ref); the own property of a third-party result type is refused by [`check_propagatable_contracts`](@ref) rather than recognised.
+The field list is derived by `prior_field_values`, so a result type that gains a field needs no further method. An `@pprop` field may only name a property of the two result types that `prior_result_property_pool` hard-codes today — [`LowOrderPrior`](@ref) and [`HighOrderPrior`](@ref); the own property of a third-party result type is refused by `check_propagatable_contracts` rather than recognised.
 
 ## Arguments
 

@@ -14,6 +14,8 @@ MeanGradient
 ForecastGradient
 PortfolioOptimisers.predictor_state_seed
 PortfolioOptimisers.predict_gradient!
+PortfolioOptimisers.predictor_state_view
+PortfolioOptimisers.copy_predictor_state
 HintResidualRate
 OptimisticStep
 ```

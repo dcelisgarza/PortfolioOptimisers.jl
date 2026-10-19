@@ -55,17 +55,10 @@ sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
 solver_selector
-bigger_is_better
-range_tails
 assert_observation_weights
 checked_observation_weights
 assert_half_open_unit_interval
 worst_positive_weight_loss
-supports_precomputed_returns(r::AbstractBaseRiskMeasure)
-supports_precomputed_returns(rs::VecBaseRM)
-supports_precomputed_returns(::NetReturnsInput, ::Any)
-supports_precomputed_returns(::WeightsInput, ::Any)
-supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
 weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)

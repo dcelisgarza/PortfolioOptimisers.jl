@@ -1,9 +1,7 @@
 ```@meta
-Description = "Turnover Risk Measure Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!."
+Description = "Turnover Risk Measure Constraints has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
 # [Turnover Risk Measure Constraints: private API](@id private-api-turnover-risk-measure-constraints)
 
-```@docs
-set_risk_constraints!(model::JuMP.Model, i::Any, r::TurnoverRiskMeasure, opt::RiskConstraintOwner, ::AbstractPriorResult, args...; kwargs...)
-```
+Every name of this topic is public. The [public page](@ref api-turnover-risk-measure-constraints) documents them.

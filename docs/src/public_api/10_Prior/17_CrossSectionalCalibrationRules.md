@@ -34,6 +34,7 @@ The two members of the carry rule of a [`CrossSectionalFactorPrior`](@ref) are o
 ```@docs
 FoldOrRefit
 FoldOnly
+PortfolioOptimisers.assert_carry_rule
 ```
 
 ## References

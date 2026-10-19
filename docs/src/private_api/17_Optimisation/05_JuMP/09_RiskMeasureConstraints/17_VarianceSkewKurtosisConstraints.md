@@ -1,9 +1,7 @@
 ```@meta
-Description = "Variance Skew Kurtosis Constraints, private API of PortfolioOptimisers.jl: set_risk_constraints!."
+Description = "Variance Skew Kurtosis Constraints has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
 # [Variance Skew Kurtosis Constraints: private API](@id private-api-variance-skew-kurtosis-constraints)
 
-```@docs
-set_risk_constraints!(model::JuMP.Model, i::Any, r::VarianceSkewKurtosis, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
-```
+Every name of this topic is public. The [public page](@ref api-variance-skew-kurtosis-constraints) documents them.

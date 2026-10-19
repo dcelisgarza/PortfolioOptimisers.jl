@@ -180,7 +180,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `q`: Significance level.
   - `X`: Matrix of sampled estimation errors, one row per sample. An algorithm that runs no simulation absorbs it.
   - `sigma_X`: Shape matrix of the ellipsoid.
-  - `df`: Dimension of the set, which [`ucs_dimension`](@ref) gives. It is less than the first dimension of `sigma_X` on a full covariance shape, because a symmetric matrix has ``N(N+1)/2`` free entries of its ``N^{2}``. An algorithm that reads no dimension absorbs it.
+  - `df`: Dimension of the set, which `ucs_dimension` gives. It is less than the first dimension of `sigma_X` on a full covariance shape, because a symmetric matrix has ``N(N+1)/2`` free entries of its ``N^{2}``. An algorithm that reads no dimension absorbs it.
 
 ### Returns
 
@@ -194,7 +194,7 @@ In order to implement a new concrete type that works seamlessly with the library
 
   - `km`, `q`, `X`: As for `k_ucs`.
   - `L`: Geometry map of the ball, in place of the shape. The shape is `L * L'`.
-  - `df`: Dimension of the ball. The caller reads [`ucs_dimension`](@ref) for a map factorised from a shape, and `LinearAlgebra.rank(L)` for a map of deviations. An algorithm that reads no dimension absorbs it.
+  - `df`: Dimension of the ball. The caller reads `ucs_dimension` for a map factorised from a shape, and `LinearAlgebra.rank(L)` for a map of deviations. An algorithm that reads no dimension absorbs it.
 
 ### Returns
 

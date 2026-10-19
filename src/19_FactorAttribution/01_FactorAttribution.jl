@@ -875,7 +875,7 @@ In order to implement a new rule for an unknown entry which will work seamlessly
 
 ### Returns
 
-  - `lv::Option{<:NamedTuple}`: `nothing` when the rule marks nothing. Otherwise the asset mask `assets` and the factor mask `factors`. [`attribution_leverage_nan`](@ref) puts `NaN` in every variance number that the marks read.
+  - `lv::Option{<:NamedTuple}`: `nothing` when the rule marks nothing. Otherwise the asset mask `assets` and the factor mask `factors`. `attribution_leverage_nan` puts `NaN` in every variance number that the marks read.
 
 ## The standard errors of a Leverage-One Pair
 
@@ -887,7 +887,7 @@ In order to implement a new rule for an unknown entry which will work seamlessly
   - `h1`: The leverage-one mask, `observations × assets`, or `nothing` when the model marks no pair.
   - `reg`: Whether each pair is in the regression, `observations × assets`.
   - `ses`: The standard errors, with the fields `sys`, `factor` and `family`.
-  - `pass`: The reduction of [`attribution_error_pass`](@ref), a function of a matrix of variances, `observations × assets`.
+  - `pass`: The reduction of `attribution_error_pass`, a function of a matrix of variances, `observations × assets`.
 
 ### Returns
 

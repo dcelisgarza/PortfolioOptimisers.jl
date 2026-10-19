@@ -18,4 +18,5 @@ PricesToReturns
 prices_to_returns
 gap_return
 currency_excess_index
+PortfolioOptimisers.gap_return_value
 ```

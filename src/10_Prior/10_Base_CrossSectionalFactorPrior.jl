@@ -963,7 +963,21 @@ A Leverage-One Pair, which the `h1` field of [`CrossSectionalRegression`](@ref) 
 
 # Interfaces
 
-A rule is a marker for dispatch, and it holds no data. The prior holds it in its `l1mask` field, and [`leverage_one_residuals`](@ref) dispatches on it. The batch fit and the carry fold both call that function before [`cross_sectional_standardised_residuals`](@ref), so a new rule adds one method of it.
+A rule is a marker for dispatch, and it holds no data. The prior holds it in its `l1mask` field. In order to implement a new rule, subtype `AbstractLeverageOneMask` and implement the following method:
+
+## `leverage_one_residuals`
+
+  - `leverage_one_residuals(l1mask::MyLeverageOneMask, h1::Option{<:AbstractMatrix{Bool}}, eps::MatNum) -> MatNum`: The idiosyncratic returns that the prior standardises. The batch fit and the carry fold both call it before `cross_sectional_standardised_residuals`.
+
+### Arguments
+
+  - `l1mask`: The concrete subtype instance.
+  - `h1`: The leverage-one mask of [`CrossSectionalRegression`](@ref), `observations × assets`, or `nothing`.
+  - `eps`: Idiosyncratic returns, `observations × assets`.
+
+### Returns
+
+  - `eps::MatNum`: The idiosyncratic returns that the prior standardises.
 
 # Related
 
@@ -1646,7 +1660,22 @@ The carry fold folds each part that has a fold of its own. It fits every other p
 
 # Interfaces
 
-A rule is a marker for dispatch, and it holds no data. The constructor of [`CrossSectionalFactorPrior`](@ref) passes the rule and the configuration to [`assert_carry_rule`](@ref), which dispatches on the type of the rule. A new rule needs its own method of that check. The carry fold runs the same step under every rule, so a rule that changes the step needs its own method of the step too.
+A rule is a marker for dispatch, and it holds no data. In order to implement a new rule, subtype `AbstractCarryRule` and implement the following method:
+
+## `assert_carry_rule`
+
+  - `assert_carry_rule(carry::MyCarryRule, cfg) -> Nothing`: Applies the rule to the configuration of the prior. The constructor of [`CrossSectionalFactorPrior`](@ref) calls it.
+
+### Arguments
+
+  - `carry`: The concrete subtype instance.
+  - `cfg`: The prior, or a `NamedTuple` of its fields `factors`, `pe`, `ve`, `rfe`, `th`, `ce`, `choice` and `families`.
+
+### Returns
+
+  - `nothing`. The method raises an `ArgumentError` for a configuration that the rule refuses.
+
+The carry fold runs the same step under every rule, so a rule that changes the step needs its own method of the step too.
 
 # Related
 
@@ -2001,4 +2030,4 @@ function cross_sectional_forecast_mu(lambda::Real, mu::VecNum, g::VecNum)
 end
 
 export MaskedLeverageOne, UnmaskedLeverageOne
-public AbstractLeverageOneMask
+public AbstractLeverageOneMask, leverage_one_residuals

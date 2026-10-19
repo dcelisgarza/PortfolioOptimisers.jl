@@ -24,7 +24,7 @@ In order to implement a new concrete type that works seamlessly with the library
   - `xe`: The concrete subtype instance.
   - `rd`: The returns data that carries the Asset Panel and the Exogenous Series.
 
-A member that gives one factor takes the name the caller pairs with it, and a member that gives several names each factor by its series. [`exposure_axis_names`](@ref) states both, so the member needs no method of it.
+A member that gives one factor takes the name the caller pairs with it, and a member that gives several names each factor by its series. `exposure_axis_names` states both, so the member needs no method of it.
 
 # Related
 

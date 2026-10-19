@@ -14,6 +14,8 @@ risk_contribution
 risk_gradient
 factor_risk_contribution
 rolling_window_measure
+supports_precomputed_returns(r::RkRatioRM)
+supports_precomputed_returns(r::MeanReturnRiskRatio)
 ```
 
 ## References

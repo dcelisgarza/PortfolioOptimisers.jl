@@ -75,7 +75,7 @@ The functor returns an [`OptE_Opt`](@ref), so a [`TimeDependent`](@ref) that hol
 
 # Interfaces
 
-The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states that the functor returns an [`OptE_Opt`](@ref), and [`assert_time_dependent_optimiser`](@ref) checks the value when the fold loop puts it into the field.
+The methods are those of [`TimeDependentCallable`](@ref): the functor `(x::MySubtype)(ctx::TimeDependentContext)`, and the optional `needs_previous_weights`. This child adds no method. It states that the functor returns an [`OptE_Opt`](@ref), and `assert_time_dependent_optimiser` checks the value when the fold loop puts it into the field.
 
 # Related
 

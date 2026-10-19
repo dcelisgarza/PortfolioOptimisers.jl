@@ -239,7 +239,7 @@ To add a method, subtype `WeightFinaliser` and implement the method below.
 
 ### Returns
 
-  - `w::VecNum`: The repaired weight vector. [`finalise_weight_bounds`](@ref) then pairs it with a return code.
+  - `w::VecNum`: The repaired weight vector. `finalise_weight_bounds` then pairs it with a return code.
 
 # Related
 

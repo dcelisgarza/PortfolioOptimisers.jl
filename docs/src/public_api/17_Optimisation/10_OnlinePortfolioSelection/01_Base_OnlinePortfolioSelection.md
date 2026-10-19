@@ -29,6 +29,7 @@ PortfolioOptimisers.reads_period_row
 PortfolioOptimisers.schedule_state_view
 PortfolioOptimisers.merge_states(::PortfolioOptimisers.OnlinePortfolioSelectionState, ::PortfolioOptimisers.OnlinePortfolioSelectionState)
 PortfolioOptimisers.port_opt_view(x::PortfolioOptimisers.OnlinePortfolioSelectionState, i, args...)
+PortfolioOptimisers.price_relative
 ```
 
 ## References

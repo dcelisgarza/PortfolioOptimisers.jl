@@ -146,3 +146,28 @@ The first application declared seven families `public`, with their verbs, that `
 `AbstractLastObservationAlgorithm`, `AbstractEmptyPairAlgorithm`,
 `AbstractPanelCollapseAlgorithm`, `AbstractWindowRule`, `AbstractChoiceRule`,
 `AbstractNeutralisationWeights` and `AbstractOrthogonalForecastFit`.
+
+## Amendment (2026-10-19)
+
+[Issue #1764](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1764) found that a
+section can name its verbs in prose, as `` [`verb`](@ref) ``, and that `test_66` then read no verb
+from it. `test_66` now also checks every function of the package that a section links: each one is
+`public` or exported. The first measurement found 62 such links to private functions, in 38
+sections, and [issue #1775](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1775)
+decided each one.
+
+A link in a section names one of three kinds of function, and the maintainer decided the third:
+
+- **A verb of the contract**, which a new subtype implements, is `public`, and the section writes it
+  as a call-shaped bullet. This was the rule already.
+- **A caller or a check that the library runs** is not part of the contract. The section names it
+  in plain code, with no link.
+- **A helper that the section tells an implementer to call** inside its own method is `public`, as
+  `get_k` and `get_constraint_scale` already were. `chan_merge` and `assert_mergeable_states`, which
+  a new Partial Fit State calls in its `merge_states` under
+  [ADR 0106](0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md), were pinned private
+  by `test_48` until then.
+
+A method entry of a `public` function belongs on the public page of its file, so the
+`set_risk_constraints!` method of each risk measure moved there, and eight private pages of the
+risk constraint files became empty mirrors.

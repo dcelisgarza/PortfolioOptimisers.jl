@@ -7,7 +7,21 @@ A Neutralisation regresses each score on the named Factor Exposures under one we
 
 # Interfaces
 
-A member is a marker for dispatch, and it holds no data. [`DescriptorScores`](@ref) holds it in its `nw` field. A new member adds a method of [`neutralisation_base_weights`](@ref) that returns its base weights, `observations × assets`, on the rows of the block.
+A member is a marker for dispatch, and it holds no data. [`DescriptorScores`](@ref) holds it in its `nw` field. In order to implement a new member, subtype `AbstractNeutralisationWeights` and implement the following method:
+
+## `neutralisation_base_weights`
+
+  - `neutralisation_base_weights(nw::MyNeutralisationWeights, w::MatNum, csfm::CrossSectionalFactorModel) -> MatNum`: The base weights of the Neutralisation, on the rows of the block.
+
+### Arguments
+
+  - `nw`: The concrete subtype instance.
+  - `w`: Cross-sectional weights of the estimation mask, `observations × assets`, on the rows of the block.
+  - `csfm`: The fitted factor-model block.
+
+### Returns
+
+  - `W::MatNum`: The base weights, `observations × assets`, on the rows of the block.
 
 # Related
 
@@ -570,4 +584,4 @@ function descriptor_carry(ds::DescriptorScores, rd::ReturnsResult, m::Integer)
 end
 
 export DescriptorScores, descriptor_scores, EstimationMaskWeights, BlockRegressionWeights
-public AbstractNeutralisationWeights
+public AbstractNeutralisationWeights, neutralisation_base_weights

@@ -16,6 +16,9 @@ no_risk_expr_risk_measure(r::Skewness)
 no_bounds_no_risk_expr_risk_measure(r::Skewness)
 bounds_risk_measure(r::Skewness, ub::Number)
 factory(r::VarianceSkewKurtosis, pr::AbstractPriorResult, args...; kwargs...)
+bigger_is_better(::Skewness)
+supports_precomputed_returns(r::Skewness)
+supports_precomputed_returns(::VarianceSkewKurtosis)
 ```
 
 ## References

@@ -15,8 +15,6 @@ resolve_factor_risk_inputs
 source_loadings
 resolve_factor_regression
 refit_factor_regression
-supports_precomputed_returns(r::RkRatioRM)
-supports_precomputed_returns(r::MeanReturnRiskRatio)
 adjusted_risk
 finite_difference_gradient
 measure_gradient

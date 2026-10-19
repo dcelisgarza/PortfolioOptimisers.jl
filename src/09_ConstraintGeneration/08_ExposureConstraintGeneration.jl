@@ -32,7 +32,7 @@ There is no fallback. Every check the basis needs is made here, so that the asse
 
 ### Returns
 
-  - `basis`: The change of basis, in whatever form [`rebase_linear_constraints`](@ref) reads for this space.
+  - `basis`: The change of basis, in whatever form `rebase_linear_constraints` reads for this space.
   - `key::AbstractString`: The key of `sets.dict` the row's names resolve against.
 
 ## Asset view

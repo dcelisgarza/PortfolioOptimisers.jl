@@ -317,7 +317,12 @@ To implement a new predictor, subtype `AbstractGradientPredictor` and implement:
   - `predict_gradient!(pred::AbstractGradientPredictor, ps, obj::AbstractOnlineObjective, g::AbstractVector, v::AbstractVector, x::AbstractVector, xm::AbstractVector, rows, t::Integer) -> Tuple`: Returns the state of the predictor after the period, and the hint. The arguments are the objective `obj` of the wrapped rule, the gradient `g` of the period at the played allocation, the secondary iterate `v` that the second half-step starts from, the price relative `x` of the period as traded, the same relative `xm` after the uniform mix of the wrapped rule, the rows that the head holds through the period, and the period count `t`. `g` reads `xm`, and `xm` is `x` where the wrapped rule does not mix. A predictor that reads the relative as a price folds `x`. A predictor that evaluates the loss of the wrapped rule again reads `xm`, so the hint sees the loss that `g` saw.
   - `rows_needed(pred::AbstractGradientPredictor)`: The rows the predictor reads at a step, `0` by default.
 
-The head's state already slices and copies a predictor state that is `nothing`, a vector or a Partial Fit State. A predictor state of another shape needs its own methods of [`predictor_state_view`](@ref) and [`copy_predictor_state`](@ref).
+A predictor whose state is not `nothing`, a vector or a Partial Fit State also implements:
+
+  - `predictor_state_view(ps::MyPredictorState, i) -> MyPredictorState`: The state of the predictor, sliced to the assets `i`, as a copy.
+  - `copy_predictor_state(ps::MyPredictorState) -> MyPredictorState`: A copy of the state of the predictor that shares no array with it.
+
+The head's state already slices and copies a predictor state of the other three shapes.
 
 # Related
 
@@ -1008,4 +1013,5 @@ function online_update!(alg::OptimisticStep, st::OptimisticStepState, w::Abstrac
 end
 export AdaptiveSubgradient, OptimisticStep, LastGradient, MeanGradient, ForecastGradient,
        HintResidualRate
-public AbstractGradientPredictor, predictor_state_seed, predict_gradient!
+public AbstractGradientPredictor, predictor_state_seed, predict_gradient!,
+       predictor_state_view, copy_predictor_state

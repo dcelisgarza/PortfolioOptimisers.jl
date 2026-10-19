@@ -11,7 +11,7 @@ In order to implement a new norm-based error algorithm which will work seamlessl
 
   - `norm_factor(f::NormError, T::Number) -> Number`: Returns the divisor that scales the norm. The `T === nothing` case is already covered by a generic method that returns `1`.
 
-The functor side is [`norm_error`](@ref), and the model side is `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref). All three read `norm_factor`, so a new norm declares its factor once.
+The functor side is `norm_error`, and the model side is `set_risk_constraints!` for [`TrackingRiskMeasure`](@ref) and `set_tracking_error_constraints!` for [`TrackingError`](@ref). All three read `norm_factor`, so a new norm declares its factor once.
 
 # Related
 

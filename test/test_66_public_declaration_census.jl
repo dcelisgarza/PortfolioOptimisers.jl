@@ -165,71 +165,13 @@ end
     or a helper that is not a verb of the contract leaves the section: the section is the
     contract, and a reader who extends it cannot reach a private name.
 
-    The debt list holds every such link measured on 2026-10-19 against `3ae1815f03`: 62 links
-    in 34 sections. Each one needs a decision, verb or not, and #1775 holds the work. A commit
-    that decides an entry removes it here; the list never grows.
+    The debt list held every such link measured on 2026-10-19 against `3ae1815f03`: 62 links
+    in 38 sections. #1775 decided each one. A verb of the contract, and a helper that the
+    section tells an implementer to call, became `public`; a caller or a check the library
+    runs left the section. The list stays, empty, so a future exemption has a named place;
+    it never grows.
     =#
-    link_debt = Set([(:AbstractCarryRule, :assert_carry_rule),
-                     (:AbstractCentralityAlgorithm, :centrality_graph),
-                     (:AbstractConstraintEstimator, :pipe_reads),
-                     (:AbstractConstraintEstimator, :pipe_writes),
-                     (:AbstractConstraintEstimator, :resolve_constraint_target),
-                     (:AbstractConstraintResult, :add_constraint_result),
-                     (:AbstractConstraintSpace, :rebase_linear_constraints),
-                     (:AbstractGapReturnAlgorithm, :apply_gap_return),
-                     (:AbstractGapReturnAlgorithm, :gap_return_value),
-                     (:AbstractGapReturnAlgorithm, :gap_return_writable),
-                     (:AbstractGradientPredictor, :copy_predictor_state),
-                     (:AbstractGradientPredictor, :predictor_state_view),
-                     (:AbstractGradientTransform, :copy_gradient_state),
-                     (:AbstractLeverageOneMask, :cross_sectional_standardised_residuals),
-                     (:AbstractLeverageOneMask, :leverage_one_residuals),
-                     (:AbstractLongRunForm, :quadrature_kernel_features),
-                     (:AbstractMeanTestEstimator, :resolve_rng),
-                     (:AbstractNeutralisationWeights, :neutralisation_base_weights),
-                     (:AbstractObservedExposureEstimator, :exposure_axis_names),
-                     (:AbstractOnlinePortfolioSelectionAlgorithm, :price_relative),
-                     (:AbstractPanelFieldInput, :panel_field_placeholder),
-                     (:AbstractPartialFitState, :assert_mergeable_states),
-                     (:AbstractPartialFitState, :chan_merge),
-                     (:AbstractPreviousWeightsSource, :held_weights_drift),
-                     (:AbstractPriorResult, :check_propagatable_contracts),
-                     (:AbstractPriorResult, :prior_field_values),
-                     (:AbstractPriorResult, :prior_result_property_pool),
-                     (:AbstractProjectionGeometry, :projection_solver),
-                     (:AbstractRedundancyAlgorithm, :bigger_is_better),
-                     (:AbstractReturnsSource, :assert_returns_source),
-                     (:AbstractReturnsSource, :shared_series_view),
-                     (:AbstractRiskMeasureSettings, :set_risk_expression!),
-                     (:AbstractSampleSelector, :price_relative),
-                     (:AbstractSelectionRule, :bigger_is_better),
-                     (:AbstractUncertaintyKAlgorithm, :ucs_dimension),
-                     (:AbstractUnknownEntryRule, :attribution_error_pass),
-                     (:AbstractUnknownEntryRule, :attribution_leverage_nan),
-                     (:BaseOptimisationEstimator, :assert_time_dependent_fold_count),
-                     (:BaseOptimisationEstimator, :is_time_dependent),
-                     (:BaseOptimisationEstimator, :reset_time_dependent_estimator),
-                     (:BaseOptimisationEstimator, :time_dependent_fields),
-                     (:BaseOptimisationEstimator, :update_time_dependent_estimator),
-                     (:CrossValidationSearchScorer, :finite_candidate_index),
-                     (:FrontierBoundEstimator, :rebuild_risk_frontier),
-                     (:GerberIQCovarianceAlgorithm, :clamp_gerber_iq_n),
-                     (:GerberIQCovarianceAlgorithm, :gerber_iq_assert_c_d),
-                     (:GerberIQCovarianceAlgorithm, :gerber_iq_weight),
-                     (:GerberIQEpsEstimator, :gerber_iq_eps),
-                     (:GerberIQGammaEstimator, :gerber_iq_gamma),
-                     (:GerberIQScalerEstimator, :gerber_iq_scaling),
-                     (:HierarchicalRiskMeasure, :bigger_is_better),
-                     (:HierarchicalRiskMeasure, :supports_precomputed_returns),
-                     (:NormError, :norm_error), (:RiskMeasure, :bigger_is_better),
-                     (:RiskMeasure, :range_tails),
-                     (:RiskMeasure, :set_risk_bounds_and_expression!),
-                     (:RiskMeasure, :set_risk_constraints!),
-                     (:RiskMeasure, :set_risk_expression!),
-                     (:RiskMeasure, :set_risk_upper_bound!),
-                     (:RiskMeasure, :supports_precomputed_returns),
-                     (:TimeDependentOptimiserCallable, :assert_time_dependent_optimiser),
-                     (:WeightFinaliser, :finalise_weight_bounds)])
+    link_debt = Set{Tuple{Symbol, Symbol}}()
 
     # A function the package owns: a method it adds to a foreign function (`Base.copy`) is
     # declared by its owner, and a type is a constructor, not a verb.

@@ -46,7 +46,7 @@ In order to implement a new rule that works seamlessly with the library, subtype
   - `d`: The centred series, with a zero at each missing observation.
   - `B`: The bandwidth, in entries.
   - `buf`: Work buffer of length `length(d) + 1`.
-  - `Phi`: The quadrature features of every entry of the span, from [`quadrature_kernel_features`](@ref).
+  - `Phi`: The quadrature features of every entry of the span, from `quadrature_kernel_features`.
 
 ### Returns
 
