@@ -693,6 +693,12 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         JuMP.optimize!(m)
         @test isapprox(w25, JuMP.value.(b); atol = 1e-5)
         @test !isapprox(w25, w0; atol = 1e-4)
+        # The scales reach the programme's optimiser and leave its leader as it is (#1756).
+        @test alg25.opt.opt.sc == 1 && alg25.opt.opt.so == 1
+        algs = ShortTermLossControlPortfolio(; window = 6, gamma = 0.025, slv = slv, sc = 2,
+                                             so = 1e-3)
+        @test algs.opt.opt.sc == 2 && algs.opt.opt.so == 1e-3
+        @test isapprox(optimise(OPS(; alg = algs), rd6).w, w25; atol = 1e-5)
         # The window fills before the rule reads five rows: one row is uniform, two rows
         # is the programme on two.
         @test optimise(OPS(; alg = alg25), rows(rd, 1:1)).w == fill(0.25, 4)

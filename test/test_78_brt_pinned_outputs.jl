@@ -21,6 +21,9 @@ starts with "the default x_src: " spells no source, and compares to the pin of i
 hold the default of a migration to `rd.X`. No pin moved in #1689: every other case at the
 default reads an `EmpiricalPrior`, whose `X` equals the excess data. #1689 added the pins of a
 `ProgrammeAllocationSet` with graph slots under a `FactorPrior`, which read the new default.
+#1756 changed the rule of those two cases from `ExponentiatedGradient` to
+`PassiveAggressiveMeanReversion` and recorded new pins: the old pins recorded the sign of the
+rounding of the solver, which differs under `--check-bounds=yes`.
 
 Not pinned: the refusals (no benchmark, a data benchmark under `brt`, a frame mismatch in a
 Pipeline), which the decision tickets of the map can change.
@@ -59,6 +62,10 @@ Pipeline), which the decision tickets of the map can change.
                  check_sol = (; allow_local = true, allow_almost = true),
                  settings = Dict("verbose" => false, "tol_gap_abs" => 1e-10,
                                  "tol_gap_rel" => 1e-10, "tol_feas" => 1e-10))
+    # A second trial at the default tolerances of Clarabel, for the graph slots of a set.
+    loose = Solver(; name = :clarabel_loose, solver = Clarabel.Optimizer,
+                   check_sol = (; allow_local = true, allow_almost = true),
+                   settings = Dict("verbose" => false))
     rows(r, i) = po.port_opt_view(r, i, :)
     stepall(opt, r) = foldl((o, i) -> partial_fit!(o, rows(r, i:i)), 1:size(r.X, 1);
                             init = opt)
@@ -149,8 +156,13 @@ Pipeline), which the decision tickets of the map can change.
     excess_selection(; kw...) = OnlinePortfolioSelection(; x_src = ExcessSource(), kw...)
     excess_risk_loss(; kw...) = excess_head(RiskLoss(; kw...))
     excess_programme_set(; kw...) = excess_head(ProgrammeAllocationSet(; slv = slv, kw...))
+    # The rank-one covariance is near `zeta * u * u'` with `zeta` near 2000 and `u` near
+    # `ones(6) / sqrt(6)`, so the objective is large against the constraints.
+    # At `so = 1` Clarabel finds the programme infeasible at two steps of the vector panel
+    # under `--check-bounds=yes`, the last step among them, and both steps hold. `so = 1e-3`
+    # solves every step, and it moves the pins by 1.3e-9 or less (#1756).
     function excess_loss_control(; kw...)
-        return ShortTermLossControlPortfolio(; slv = slv,
+        return ShortTermLossControlPortfolio(; slv = slv, so = 1e-3,
                                              pe = EmpiricalPrior(; ce = RankOneCovariance(),
                                                                  x_src = ExcessSource()),
                                              kw...)
@@ -414,14 +426,22 @@ Pipeline), which the decision tickets of the map can change.
                                                                   set = vset()), r).w))
         # The graph slots of a set read the rows of the step at the default (#1689), as the
         # same slots of a JuMP head do. Under its `FactorPrior` the rows differ from `pr.X`.
-        gset() = excess_programme_set(; pe = FactorPrior(),
+        # The rule is Euclidean (#1756). The phylogeny constraint forces some weights to
+        # zero, and the solver gives them at the level of rounding, above or below zero.
+        # `ExponentiatedGradient` clips a value below zero to an exact zero, and its
+        # entropic geometry keeps an exact zero at zero. So the sign of the rounding at
+        # 2020-03-14 decided 34 Held Steps, because the set needed that asset from
+        # 2020-03-16 on (#1760).
+        # The `loose` trial solves the step at 2020-01-14 of the matrix panel, which stops
+        # on a numerical error at the tolerances of `slv`.
+        gset() = excess_programme_set(; slv = [slv, loose], pe = FactorPrior(),
                                       wb = WeightBounds(; lb = 0.0, ub = 0.4),
                                       ple = SemiDefinitePhylogenyEstimator(),
                                       cte = CentralityConstraint())
         case!("ProgrammeAllocationSet, phylogeny and centrality constraints, FactorPrior, $b",
               :solved,
               () -> quiet(() -> optimise(OnlinePortfolioSelection(;
-                                                                  alg = ExponentiatedGradient(),
+                                                                  alg = PassiveAggressiveMeanReversion(),
                                                                   set = gset()), r).w))
     end
 
@@ -831,9 +851,9 @@ Pipeline), which the decision tickets of the map can change.
                                               0.2265169425, 3.782446104e-13, 0.7734830575,
                                               8.007670099e-13],
                                          "ProgrammeAllocationSet, phylogeny and centrality constraints, FactorPrior, vector B" =>
-                                             [0.3857172058, 3.197206944e-12,
-                                              3.069346349e-12, 0.2291650155,
-                                              9.300215467e-12, 0.3851177787],
+                                             [1.773843989e-9, 1.103736526e-9,
+                                              -2.009991642e-10, 0.2000000017, 0.4000000007,
+                                              0.3999999949],
                                          "MeanRisk, matrix B" =>
                                              [0.3454040729, 4.36098608e-9, 5.205926575e-9,
                                               0.05423798722, 0.3819628689, 0.2183950614],
@@ -1153,9 +1173,9 @@ Pipeline), which the decision tickets of the map can change.
                                               7.438787603e-12, 0.843064573,
                                               1.238477654e-11],
                                          "ProgrammeAllocationSet, phylogeny and centrality constraints, FactorPrior, matrix B" =>
-                                             [0.2795395589, 3.888780199e-12,
-                                              3.879465287e-12, 1.072079122e-11,
-                                              0.3602314672, 0.3602289738],
+                                             [1.77494763e-9, 1.104632417e-9,
+                                              -2.011692681e-10, 0.2000000017, 0.4000000007,
+                                              0.3999999949],
                                          "prior, CrossSectionalFactorPrior, vector B" =>
                                              [0.0004917174546, 0.0002342595329,
                                               0.000306925665, 0.0006236643089,

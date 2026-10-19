@@ -650,6 +650,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, StatsBas
         @test isa(alg.opt.opt.pe, LowDimensionEnsemblePrior)
         @test alg.opt.opt.fees.tn.val == 0.002
         @test alg.opt.opt.fees.tn.w == fill(0.25, N)
+        @test alg.opt.opt.sc == 1 && alg.opt.opt.so == 1
+        algs = LowDimensionEnsemblePortfolio(; N = N, slv = slv, sc = 2, so = 1e-3)
+        @test algs.opt.opt.sc == 2 && algs.opt.opt.so == 1e-3
         @test_throws DomainError LowDimensionEnsemblePortfolio(; N = 0, slv = slv)
         @test_throws DomainError LowDimensionEnsemblePortfolio(; N = N, window = 1,
                                                                slv = slv)

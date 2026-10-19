@@ -1215,7 +1215,7 @@ function online_update!(alg::FollowTheLeader, st, w::AbstractVector, x::Abstract
     return st, blend_projection(alg.proj, set, mix, wh)
 end
 """
-    ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025, slv::Slv_VecSlv, pe::AbstractPriorEstimator = EmpiricalPrior(; ce = RankOneCovariance()), proj::EuclideanProjection = EuclideanProjection())
+    ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.025, slv::Slv_VecSlv, pe::AbstractPriorEstimator = EmpiricalPrior(; ce = RankOneCovariance()), proj::EuclideanProjection = EuclideanProjection(), sc::Number = 1, so::Number = 1)
 
 Builds the short-term portfolio optimisation with loss control (SPOLC).
 
@@ -1252,6 +1252,8 @@ This is Equation 51 of [lai2020spolc](@cite) at period ``t``. On the simplex ``\
   - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme, whose covariance is the rank-one estimate. When it states `x_src = ExcessSource()`, the leader fits on the returns in excess of the benchmark that the head's rows carry, so the programme bounds the worst excess return and the tracking variance.
   - `proj`: The geometry of the damped mix. The rule's `gamma = 0` does not read it.
+  - $(arg_dict[:sc]) The [`JuMPOptimiser`](@ref) of the programme takes it.
+  - $(arg_dict[:so]) The [`JuMPOptimiser`](@ref) of the programme takes it. The rank-one covariance is near ``\\zeta \\boldsymbol{1} \\boldsymbol{1}^\\intercal / N`` on a window of correlated assets, with a large ``\\zeta``, so the objective can be large against the constraints. A value below one can then help the solver, and it does not change the leader.
 
 # Validation
 
@@ -1292,10 +1294,12 @@ function ShortTermLossControlPortfolio(; window::Integer = 5, gamma::Real = 0.02
                                        slv::Slv_VecSlv,
                                        pe::AbstractPriorEstimator = EmpiricalPrior(;
                                                                                    ce = RankOneCovariance()),
-                                       proj::EuclideanProjection = EuclideanProjection())::FollowTheLeader
+                                       proj::EuclideanProjection = EuclideanProjection(),
+                                       sc::Number = 1, so::Number = 1)::FollowTheLeader
     @argcheck(gamma >= zero(gamma), DomainError(gamma, "gamma must be non-negative"))
     return FollowTheLeader(; sel = LastRows(; W = window),
-                           opt = loss_control_programme(gamma, slv, pe), proj = proj)
+                           opt = loss_control_programme(gamma, slv, pe, sc, so),
+                           proj = proj)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1309,6 +1313,8 @@ The programme is [`MeanRisk`](@ref) under [`MinimumRisk`](@ref) over [`WorstReal
   - `gamma`: The weight of the variance.
   - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme.
+  - $(arg_dict[:sc])
+  - $(arg_dict[:so])
 
 # Returns
 
@@ -1318,17 +1324,18 @@ The programme is [`MeanRisk`](@ref) under [`MinimumRisk`](@ref) over [`WorstReal
 
   - [`ShortTermLossControlPortfolio`](@ref)
 """
-function loss_control_programme(gamma::Real, slv::T1,
-                                pe::T2) where {T1 <: Slv_VecSlv,
-                                               T2 <: AbstractPriorEstimator}
+function loss_control_programme(gamma::Real, slv::T1, pe::T2, sc::Number,
+                                so::Number) where {T1 <: Slv_VecSlv,
+                                                   T2 <: AbstractPriorEstimator}
     return MeanRisk(;
                     r = [WorstRealisation(),
                          Variance(; alg = QuadRiskExpr(),
                                   settings = RiskMeasureSettings(; scale = gamma))],
-                    obj = MinimumRisk(), opt = JuMPOptimiser(; pe = pe, slv = slv))
+                    obj = MinimumRisk(),
+                    opt = JuMPOptimiser(; pe = pe, slv = slv, sc = sc, so = so))
 end
 """
-    LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5, gamma::Real = 0.25, xi::Real = 0.002, slv::Slv_VecSlv, pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(), proj::EuclideanProjection = EuclideanProjection())
+    LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5, gamma::Real = 0.25, xi::Real = 0.002, slv::Slv_VecSlv, pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(), proj::EuclideanProjection = EuclideanProjection(), sc::Number = 1, so::Number = 1)
 
 Builds the online low-dimension ensemble method (OLDEM).
 
@@ -1370,6 +1377,8 @@ This is Equation 14 of [xi2023oldem](@cite), with one change. [xi2023oldem](@cit
   - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme, the ensemble by default. Any prior gives the two moments that the programme reads. When it states `x_src = ExcessSource()`, the leader fits on the returns in excess of the benchmark that the head's rows carry, so the programme maximises the forecast excess return less the tracking variance.
   - `proj`: The geometry of the damped mix. The rule's `gamma = 0` does not read it.
+  - $(arg_dict[:sc]) The [`JuMPOptimiser`](@ref) of the programme takes it.
+  - $(arg_dict[:so]) The [`JuMPOptimiser`](@ref) of the programme takes it.
 
 # Validation
 
@@ -1421,7 +1430,8 @@ function LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5,
                                        gamma::Real = 0.25, xi::Real = 0.002,
                                        slv::Slv_VecSlv,
                                        pe::AbstractPriorEstimator = LowDimensionEnsemblePrior(),
-                                       proj::EuclideanProjection = EuclideanProjection())::FollowTheLeader
+                                       proj::EuclideanProjection = EuclideanProjection(),
+                                       sc::Number = 1, so::Number = 1)::FollowTheLeader
     @argcheck(N >= 1, DomainError(N, "N must be at least 1"))
     @argcheck(window >= 2,
               DomainError(window,
@@ -1433,7 +1443,7 @@ function LowDimensionEnsemblePortfolio(; N::Integer, window::Integer = 5,
                            opt = ensemble_programme(gamma,
                                                     Fees(;
                                                          tn = Turnover(; w = w, val = xi)),
-                                                    slv, pe), proj = proj)
+                                                    slv, pe, sc, so), proj = proj)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1448,6 +1458,8 @@ The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk a
   - `fees`: The fees of the programme, a [`Turnover`](@ref) fee for the rule.
   - `slv`: The solver of the programme.
   - `pe`: The prior estimator of the programme.
+  - $(arg_dict[:sc])
+  - $(arg_dict[:so])
 
 # Returns
 
@@ -1457,11 +1469,13 @@ The programme is [`MeanRisk`](@ref) under [`MaximumUtility`](@ref) at the risk a
 
   - [`LowDimensionEnsemblePortfolio`](@ref)
 """
-function ensemble_programme(gamma::Real, fees::Fees, slv::T1,
-                            pe::T2) where {T1 <: Slv_VecSlv, T2 <: AbstractPriorEstimator}
+function ensemble_programme(gamma::Real, fees::Fees, slv::T1, pe::T2, sc::Number,
+                            so::Number) where {T1 <: Slv_VecSlv,
+                                               T2 <: AbstractPriorEstimator}
     return MeanRisk(; r = Variance(; alg = QuadRiskExpr()),
                     obj = MaximumUtility(; l = gamma),
-                    opt = JuMPOptimiser(; pe = pe, slv = slv, fees = fees))
+                    opt = JuMPOptimiser(; pe = pe, slv = slv, fees = fees, sc = sc,
+                                        so = so))
 end
 """
 $(DocStringExtensions.TYPEDEF)
