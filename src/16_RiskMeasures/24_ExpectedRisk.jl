@@ -1114,7 +1114,7 @@ Where:
 
 # Algorithm
 
- 1. Copy `w` into both columns of the `N × 2` work matrix `ws`.
+ 1. Copy `w` into both columns of the `N × 2` work matrix `ws`, whose type promotes the type of `w` with the type of `delta`.
  2. For each asset `i`, add `delta` to entry `i` of the first column, and subtract `delta` from entry `i` of the second column.
  3. Set `g[i]` to the difference of `f` at the two columns, times `id2 = inv(2 * delta)`.
  4. Restore entry `i` of both columns to `w[i]`, and go to the next asset.
@@ -1136,8 +1136,10 @@ Where:
 """
 function finite_difference_gradient(f, w::VecNum, delta::Number)
     N = length(w)
-    g = Vector{eltype(w)}(undef, N)
-    ws = Matrix{eltype(w)}(undef, N, 2)
+    # The step widens the type of the weights, so a narrow type cannot round `delta` away.
+    T = promote_type(eltype(w), typeof(delta))
+    g = Vector{T}(undef, N)
+    ws = Matrix{T}(undef, N, 2)
     ws .= w
     id2 = inv(2 * delta)
     for i in eachindex(w)

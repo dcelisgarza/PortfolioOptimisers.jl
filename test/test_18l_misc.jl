@@ -468,6 +468,23 @@ end
     @test sharpe(resd.w) > sharpe(res.w)
 end
 
+@testset "A narrow weight type keeps the step of the finite difference" begin
+    # The step widens the type of the weights. Before, `Float16` weights rounded the step
+    # away, so every contribution was zero, `Float32` weights rounded it 1.3 % off, and
+    # integer weights raised `InexactError`. The differences left are the rounding of the
+    # weights themselves.
+    r = StandardDeviation()
+    N = length(pr.mu)
+    w = fill(inv(N), N)
+    rc = risk_contribution(r, w, pr)
+    @test isapprox(sum(rc), expected_risk(r, w, pr); rtol = 1e-8)
+    @test isapprox(risk_contribution(r, Float32.(w), pr), rc; rtol = 1e-6)
+    @test isapprox(risk_contribution(r, Float16.(w), pr), rc; rtol = 1e-3)
+    @test isapprox(risk_gradient(r, Float32.(w), pr), risk_gradient(r, w, pr); rtol = 1e-6)
+    @test isapprox(risk_contribution(r, [1; zeros(Int, N - 1)], pr),
+                   risk_contribution(r, [1.0; zeros(N - 1)], pr))
+end
+
 @testset "Weighted risk expressions" begin
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     mip_opt = JuMPOptimiser(; pe = pr, slv = mip_slv)
