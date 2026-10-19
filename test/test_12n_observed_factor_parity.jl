@@ -15,7 +15,7 @@ currencies, so the fit must recover the local model through the derived local re
 The `*Default*` files hold the default fit on the same fixture (#1373, #1374): the factor mean,
 the factor covariance, `mu`, `sigma` and the idiosyncratic variance of the latest observation.
 Its factor prior decays on the half-life of the idiosyncratic variance, and both of them measure
-a second moment about zero.
+a second moment about zero. The oracle of today wrote them again on the same exchange (#1762).
 
 The last testsets fit the fixture on the assets of one industry, which leaves the other
 industry factors empty (#1372).
@@ -83,9 +83,10 @@ end
         pr = prior(CrossSectionalFactorPrior(; lambda = 1, factors = factors,
                                              families = fam, pe = PARITY_PE,
                                              ve = PARITY_VE), fx.rd)
-        # Measured cell by cell, Plain and Family: maxrel 2.7e-13 and 2.9e-13 (factor mean),
-        # 8.1e-14 and 3.9e-13 (factor covariance), 3.0e-13 and 2.4e-13 (`mu`), 7.4e-15 and
-        # 7.6e-15 (idiosyncratic variance).
+        # Measured cell by cell, Plain and Family: maxrel 9.9e-15 and 2.3e-14 (factor mean),
+        # 6.1e-15 and 2.5e-14 (factor covariance), 1.1e-13 and 1.4e-14 (`mu`), 6.8e-16 and
+        # 1.1e-15 (idiosyncratic variance). The files of an older oracle gave 2.7e-13 to
+        # 3.9e-13, the rounding of that oracle (#1762).
         @test parity_compare(pr.fpr.mu, vec(ccy_asset("$(nm)DefaultFactorMu"));
                              name = "$(nm) default factor mean").ok
         @test parity_compare(pr.fpr.sigma, ccy_asset("$(nm)DefaultFactorCov");
@@ -97,9 +98,10 @@ end
         @test parity_compare(pr.rr.vs[end, :], vec(ccy_asset("$(nm)DefaultIdioVar"));
                              name = "$(nm) default idiosyncratic variance").ok
         # `sigma` compares against its largest entry: an off-diagonal entry of two assets near
-        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 6.5e-15
-        # and 6.0e-15, and maxrel 2.7e-12 and 2.4e-13 cell by cell. They were 5.3e-13 and
-        # 6.0e-13, and 3.8e-11 and 5.1e-11, when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
+        # zero correlation is a cancellation in `L F L'` (#1376). Measured maxscaled 4.4e-16
+        # and 5.4e-16, and maxrel 1.3e-13 and 1.1e-13 cell by cell (#1762). The files of an
+        # older oracle gave 6.5e-15 and 6.0e-15, and 2.7e-12 and 2.4e-13. They gave 5.3e-13
+        # and 6.0e-13, and 3.8e-11 and 5.1e-11, when the lift repaired the systematic block `L F L'`, which the oracle does not repair (#1576).
         @test parity_compare(pr.sigma, ccy_asset("$(nm)DefaultSigma"); scale = :array,
                              name = "$(nm) default sigma").ok
     end
