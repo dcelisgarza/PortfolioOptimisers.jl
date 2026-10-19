@@ -2083,7 +2083,9 @@ function fan_out_pe(x, pe::AbstractPriorEstimator, pr::AbstractPriorResult,
                     slots::NamedTuple)
     fitted = fit_deferred_quantity(pe, pr)
     ks = keys(slots)
-    filled = NamedTuple{ks}(map((k, v) -> fan_out_slot(fitted, v, k), ks, values(slots)))
+    # Map over the keys, not over `values(slots)`: the keys are a constant, and `values` of a
+    # `NamedTuple` whose field types are abstract infers to a `Tuple` of any length.
+    filled = NamedTuple{ks}(map(k -> fan_out_slot(fitted, slots[k], k), ks))
     return rebuild_with_slots(x, merge(filled, (; pe = nothing)))
 end
 """
@@ -2140,6 +2142,37 @@ function resolve_slot(slot, ::Symbol, ::AbstractPriorResult)
 end
 function resolve_slot(dq::DeferredQuantity, key::Symbol, pr::AbstractPriorResult)
     return deferred_quantity(fit_deferred_quantity(dq, pr), key)
+end
+"""
+    resolve_sigma_chol(sigma, chol, pr::AbstractPriorResult)
+
+Resolve the `sigma` slot of a measure against prior result `pr`, and return it with the `chol` slot as one pair.
+
+`chol` is a factorisation of `sigma`, so both come from the same fit. A covariance estimator gives no factorisation, so `chol` becomes `nothing` and the model derives it from the resolved `sigma`. A prior estimator gives both. The type of `sigma` selects the method, so an analysis of a measure whose `sigma` is a matrix never reaches the fit.
+
+# Algorithm
+
+ 1. Return `sigma` and `chol` unchanged when `sigma` is not a [`DeferredQuantity`](@ref).
+ 2. Run the Deferred Quantity against `pr` with [`fit_deferred_quantity`](@ref), giving `fitted`.
+ 3. Read `sigma` off `fitted` with [`deferred_quantity`](@ref), and `chol` with [`deferred_derived_quantity`](@ref).
+
+# Returns
+
+  - `(; sigma, chol)`: the pair, to give to [`rebuild_with_slots`](@ref).
+
+# Related
+
+  - [`resolve_slot`](@ref)
+  - [`sigma_chol_selector`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function resolve_sigma_chol(sigma, chol, ::AbstractPriorResult)
+    return (; sigma = sigma, chol = chol)
+end
+function resolve_sigma_chol(sigma::DeferredQuantity, ::Any, pr::AbstractPriorResult)
+    fitted = fit_deferred_quantity(sigma, pr)
+    return (; sigma = deferred_quantity(fitted, :sigma),
+            chol = deferred_derived_quantity(fitted, :chol))
 end
 """
     deferred_slots(x)

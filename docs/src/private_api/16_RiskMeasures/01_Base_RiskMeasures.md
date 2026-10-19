@@ -43,6 +43,7 @@ fan_out_slot
 fan_out_pe
 deferred_derived_quantity
 resolve_slot
+resolve_sigma_chol
 deferred_slots
 functor_slots
 resolve_calibration_slots(x, pr::AbstractPriorResult)

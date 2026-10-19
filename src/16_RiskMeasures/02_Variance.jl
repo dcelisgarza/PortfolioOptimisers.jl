@@ -539,17 +539,10 @@ Resolve a **Deferred Quantity** in the `sigma` slot of a [`Variance`](@ref) agai
 
   - [`Variance`](@ref)
   - [`resolve_deferred_quantities`](@ref)
-  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_sigma_chol`](@ref)
 """
 function resolve_deferred_quantities(r::Variance, pr::AbstractPriorResult, ::Any = nothing)
-    return r
-end
-function resolve_deferred_quantities(r::Variance{<:Any, <:DeferredQuantity},
-                                     pr::AbstractPriorResult, ::Any = nothing)
-    fitted = fit_deferred_quantity(r.sigma, pr)
-    return rebuild_with_slots(r,
-                              (; sigma = deferred_quantity(fitted, :sigma),
-                               chol = deferred_derived_quantity(fitted, :chol)))
+    return rebuild_with_slots(r, resolve_sigma_chol(r.sigma, r.chol, pr))
 end
 # Deferrable slots — see `deferred_slots`. `chol` is derived and never defers on its own.
 deferred_slots(r::Variance) = (; sigma = r.sigma)
@@ -744,18 +737,11 @@ Resolve a **Deferred Quantity** in the `sigma` slot of a [`StandardDeviation`](@
 
   - [`StandardDeviation`](@ref)
   - [`resolve_deferred_quantities`](@ref)
-  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_sigma_chol`](@ref)
 """
 function resolve_deferred_quantities(r::StandardDeviation, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    return r
-end
-function resolve_deferred_quantities(r::StandardDeviation{<:Any, <:DeferredQuantity},
-                                     pr::AbstractPriorResult, ::Any = nothing)
-    fitted = fit_deferred_quantity(r.sigma, pr)
-    return rebuild_with_slots(r,
-                              (; sigma = deferred_quantity(fitted, :sigma),
-                               chol = deferred_derived_quantity(fitted, :chol)))
+    return rebuild_with_slots(r, resolve_sigma_chol(r.sigma, r.chol, pr))
 end
 # Deferrable slots — see `deferred_slots`.
 deferred_slots(r::StandardDeviation) = (; sigma = r.sigma)

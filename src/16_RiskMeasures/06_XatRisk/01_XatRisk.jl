@@ -488,12 +488,7 @@ The formulation holds three fields that the prior can fill, and `mu` and `sigma`
 """
 function resolve_deferred_quantities(alg::DistributionValueatRisk, pr::AbstractPriorResult,
                                      ::Any = nothing)::DistributionValueatRisk
-    sigma, chol = if isa(alg.sigma, DeferredQuantity)
-        fitted = fit_deferred_quantity(alg.sigma, pr)
-        deferred_quantity(fitted, :sigma), deferred_derived_quantity(fitted, :chol)
-    else
-        alg.sigma, alg.chol
-    end
+    (; sigma, chol) = resolve_sigma_chol(alg.sigma, alg.chol, pr)
     mu = resolve_slot(alg.mu, :mu, pr)
     return fan_out_pe(alg, alg.pe, pr, (; mu = mu, sigma = sigma, chol = chol))
 end
