@@ -781,10 +781,12 @@ function push_memory(alg::AbstractPriceLevelStatistic, hist::Option{<:AbstractMa
     if iszero(m)
         return nothing
     end
-    row = reshape(collect(x), 1, :)
-    if isnothing(hist)
-        return row
-    end
+    return push_memory(hist, reshape(collect(x), 1, :), m)
+end
+# The first row starts the memory. A later row appends, and the memory keeps its last `m`
+# rows.
+push_memory(::Nothing, row::AbstractMatrix, ::Integer) = row
+function push_memory(hist::AbstractMatrix, row::AbstractMatrix, m::Integer)
     H = vcat(hist, row)
     return H[max(1, size(H, 1) - m + 1):end, :]
 end

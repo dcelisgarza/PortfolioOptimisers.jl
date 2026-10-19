@@ -809,18 +809,20 @@ function prior_probability_factory(pe::OpinionPoolingPrior, w, X::MatNum,
                                    F::Option{<:MatNum}, pnl::Option{<:AssetPanel};
                                    kwargs...)
     pool = factory(pe, w)
-    if isnothing(pe.pe1)
-        return pool
-    end
     pe1 = prior_probability_factory(pe.pe1, w, X, F, pnl; kwargs...)
     return rebuild_estimator(pool, (; pe1 = pe1))
 end
 function prior_probability_factory(pe::OpinionPoolingPrior, w, n::Integer)
     pool = factory(pe, w)
-    if isnothing(pe.pe1)
-        return pool
-    end
     return rebuild_estimator(pool, (; pe1 = prior_probability_factory(pe.pe1, w, n)))
+end
+# A pool with no first prior has nothing below it to reweight.
+function prior_probability_factory(pe::OpinionPoolingPrior{<:Any, Nothing}, w, ::MatNum,
+                                   ::Option{<:MatNum}, ::Option{<:AssetPanel}; kwargs...)
+    return factory(pe, w)
+end
+function prior_probability_factory(pe::OpinionPoolingPrior{<:Any, Nothing}, w, ::Integer)
+    return factory(pe, w)
 end
 function assert_scenario_model(pe::OpinionPoolingPrior)
     @argcheck(isnothing(pe.pe1),

@@ -40,10 +40,13 @@ end
     - a test of a local, or of an argument name that the body assigns;
     - an `if` with an `else`, a ternary, and an exit inside a loop.
 
-    `RUN_TIME` holds the sites whose tested value has a type that only the run time decides,
-    each with its reason. A field that declares a `Union` is the usual case. Those sites stay.
-    `DEBT` holds the sites that existed when the census was written. Each one becomes methods,
-    and its entry then leaves the list, so the list can only shrink.
+    Inside a method, the type of an argument is known, and so is the type of a field that the
+    type of the argument carries as a parameter, or as an entry of a `NamedTuple`. A field that
+    declares a `Union` is not: one struct type holds a value of either type. `RUN_TIME` holds
+    the sites whose tested value has such a type, each with its reason. Those sites stay.
+
+    The census was written with a list of the sites that existed, and the commits of #1752
+    split every one of them, so every other early exit on a type fails the census.
     =#
     CH = TypeDecidedEarlyReturnCensusHealth.CodeHealth
     root = normpath(joinpath(@__DIR__, ".."))
@@ -269,23 +272,6 @@ end
                 "src/01_Base/15_Online_a.jl: merge_buffer_gaps: isnothing(a.G) && isnothing(b.G)",
                 "src/01_Base/15_Online_a.jl: shared_series_buffer: isnothing(state.G)"]
 
-    #=
-    The sites that existed when the census was written. Turn each one into methods, then remove
-    its entry. Do not add an entry: a new early exit on a type is a method from the start.
-    =#
-    DEBT = ["src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl: process_observation!: isnothing(active_mask)",
-            "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl: update_regime!: isnothing(ce.regime_method)",
-            "src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl: mahalanobis_transform: isnothing(grid.cut)",
-            "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl: assert_cs_block_rows: isnothing(idx) && isnothing(ts)",
-            "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl: currency_level_columns: isnothing(xe.base)",
-            "src/05_Moments/34_PriceLevelExpectedReturns.jl: push_memory: isnothing(hist)",
-            "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl: factor_space_regression: isnothing(re)",
-            "src/09_ConstraintGeneration/08_ExposureConstraintGeneration.jl: factor_space_regression: re isa AbstractLoadingsRegressionResult",
-            "src/10_Prior/07_OpinionPoolingPrior.jl: prior_probability_factory: isnothing(pe.pe1)",
-            "src/10_Prior/07_OpinionPoolingPrior.jl: prior_probability_factory: isnothing(pe.pe1)",
-            "src/10_Prior/15_CrossSectionalPriorFold.jl: cross_sectional_fold_choice: isnothing(pe.families)",
-            "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl: cross_sectional_carry_standardised: isnothing(st.csr)"]
-
     found = String[]
     for d in ("src", "ext"), (r, _, fs) in walkdir(joinpath(root, d)), f in fs
         endswith(f, ".jl") || continue
@@ -306,14 +292,14 @@ end
         return sort!(out)
     end
 
-    # A census that parses nothing passes on empty lists, so the runtime sites must be found.
+    # A census that parses nothing passes on an empty list, so the runtime sites must be found.
     @test length(found) >= length(RUN_TIME) > 0
 
     # A new entry here is an early exit that a type decides. Split the definition into methods
     # by dispatch on that type. If only the run time decides the type, add the site to
     # `RUN_TIME` with its reason.
-    @test minus(found, vcat(RUN_TIME, DEBT)) == String[]
+    @test minus(found, RUN_TIME) == String[]
 
-    # A stale entry names a site that is gone. Remove it, so the lists can only shrink.
-    @test minus(vcat(RUN_TIME, DEBT), found) == String[]
+    # A stale entry names a site that is gone. Remove it.
+    @test minus(RUN_TIME, found) == String[]
 end

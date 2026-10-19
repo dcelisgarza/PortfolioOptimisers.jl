@@ -870,9 +870,6 @@ function cross_sectional_fold_choice(::PinnedChoice, ::CrossSectionalFactorPrior
 end
 function cross_sectional_fold_choice(::BatchChoice, pe::CrossSectionalFactorPrior,
                                      st::CrossSectionalCarryState)
-    if isnothing(pe.families)
-        return nothing
-    end
     C = reshape(st.sums, 1, :)
     return map(eachindex(pe.families)) do j
         idx = st.fcb.fi[j]
@@ -880,6 +877,11 @@ function cross_sectional_fold_choice(::BatchChoice, pe::CrossSectionalFactorPrio
                                    st.nf, C)
         return first(pe.families[j]) => st.nf[idx[d]]
     end
+end
+function cross_sectional_fold_choice(::BatchChoice,
+                                     ::CrossSectionalFactorPrior{<:Any, <:Any, Nothing},
+                                     ::CrossSectionalCarryState)
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

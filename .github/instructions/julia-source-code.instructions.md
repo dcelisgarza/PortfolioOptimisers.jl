@@ -335,10 +335,13 @@ the typed body of the early-return form of `set_sdp_variance_risk!` held no call
 the objective (#1752). The gain is that a method states one case, its signature names the case,
 and the reader finds the case by dispatch, not inside the body of another case.
 
-Keep the branch when only the run time decides the type, because a dispatch on such a value is
-a dynamic dispatch:
+Inside a method, the type of each argument is known, and so is the type of a field that the
+type of the argument carries as a parameter or as an entry of a `NamedTuple`. That holds also
+when the caller holds a `Union`, because the call splits the union before it reaches the
+method. Keep the branch when no dispatch can take it:
 
-- a field that declares a `Union`, such as `SampleBufferState.G`;
+- a field that declares a `Union`, such as `SampleBufferState.G`, because one struct type holds
+  a value of either type;
 - a keyword argument, because a keyword does not dispatch;
 - a local, or an argument that the body assigns again.
 
@@ -349,8 +352,8 @@ methods cannot state also stays, such as `isnothing(a) && !isa(b, T)` or
 settle their ambiguities, which is harder to read than the branch.
 
 `test/test_79_type_decided_early_return_census.jl` gates the rule over `src/` and `ext/`. Its
-`RUN_TIME` list names each site that stays, with its reason. Its `DEBT` list names the sites that
-existed when the gate was written, and it can only shrink.
+`RUN_TIME` list names each site of a field that declares a `Union`, with its reason, and every
+other early exit on a type fails it.
 
 ## A unit that offers nothing but indirection is inlined
 

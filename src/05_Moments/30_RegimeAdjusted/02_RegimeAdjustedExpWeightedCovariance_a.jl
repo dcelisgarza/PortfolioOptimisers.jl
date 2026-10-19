@@ -1312,9 +1312,6 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
                         ce::RegimeAdjustedExpWeightedCovariance, X::VecNum,
                         valid::AbstractVector{<:Bool},
                         estimation_mask::Option{<:AbstractVector{<:Bool}})
-    if isnothing(ce.regime_method)
-        return cache
-    end
     regime_mask = valid .& cache.active .&
                   centring_ready.(Ref(ce.centring), cache.obs_count, ce.min_obs) .&
                   regime_bias_open.(Ref(ce.debias), 1, ce.decay,
@@ -1344,6 +1341,13 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
 
     Accessors.@reset cache.n_regime_obs += 1
 
+    return cache
+end
+function update_regime!(cache::RegimeAdjustedCovarianceState,
+                        ::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,
+                                                              <:Any, <:Any, <:Any, Nothing},
+                        ::VecNum, ::AbstractVector{<:Bool},
+                        ::Option{<:AbstractVector{<:Bool}})
     return cache
 end
 """
@@ -1423,11 +1427,40 @@ function process_observation!(cache::RegimeAdjustedCovarianceState,
     centring_overlap!(cache.overlap, valid, ce.decay)
     cache.obs_count[valid] .+= 1
 
-    if isnothing(active_mask)
-        cache.active .= true
-        return cache
-    end
+    return apply_active_mask!(cache, ce, active_mask)
+end
+"""
+    apply_active_mask!(cache, ce, active_mask::Nothing)
+    apply_active_mask!(cache, ce, active_mask::AbstractVector{<:Bool})
 
+Applies the active mask of one observation to the online state of a [`RegimeAdjustedExpWeightedCovariance`](@ref), as the last step of [`process_observation!`](@ref).
+
+The type of `active_mask` selects the method. Without a mask every asset is active. With a mask, an asset that leaves the universe at this observation loses its state, so it starts again from zero when it comes back.
+
+# Algorithm
+
+ 1. `active_mask` is `nothing`: mark every asset active, and return `cache`.
+ 2. Otherwise find the assets that were active and are now inactive. For each one, set its rows and columns of the covariance to zero, and of the weights and the correlation state when the state holds them. Set its count to zero and its location to `NaN`, and reset its overlap, its return buffer and its lag records.
+ 3. Store `active_mask` as the active assets, and return `cache`.
+
+# Arguments
+
+  - `cache`: The online covariance state.
+  - `ce`: The covariance estimator.
+  - `active_mask`: The assets in the universe at this observation, or `nothing`.
+
+# Returns
+
+  - `cache::RegimeAdjustedCovarianceState`: The updated state.
+
+# Related
+
+  - [`process_observation!`](@ref)
+  - [`RegimeAdjustedCovarianceState`](@ref)
+"""
+apply_active_mask!(cache, ::Any, ::Nothing) = (cache.active .= true; cache)
+function apply_active_mask!(cache, ce, active_mask::AbstractVector{<:Bool})
+    T = eltype(cache.covariance)
     newly_inactive = cache.active .& .!active_mask
     if any(newly_inactive)
         cache.covariance[newly_inactive, :] .= zero(T)

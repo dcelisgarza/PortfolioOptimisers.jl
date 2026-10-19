@@ -860,11 +860,18 @@ read.
   - [`regime_bias_factor`](@ref)
 """
 function mahalanobis_transform(grid::NamedTuple, gh::VecNum, e::VecNum, m::Integer)
-    if isnothing(grid.cut)
-        return grid.so,
-               [exp(-(stencil_dot(grid.fout[a], gh, m) - stencil_dot(grid.Qout[a], e)) / 2)
-                for a in eachindex(grid.so)]
-    end
+    return mahalanobis_transform(grid, grid.cut, gh, e, m)
+end
+# The cut of the count selects the grid: the output grid without one, and the grid moved onto
+# the cut with one.
+function mahalanobis_transform(grid::NamedTuple, ::Nothing, gh::VecNum, e::VecNum,
+                               m::Integer)
+    return grid.so,
+           [exp(-(stencil_dot(grid.fout[a], gh, m) - stencil_dot(grid.Qout[a], e)) / 2)
+            for a in eachindex(grid.so)]
+end
+function mahalanobis_transform(grid::NamedTuple, ::NamedTuple, gh::VecNum, e::VecNum,
+                               m::Integer)
     xf = grid.xf
     ls = log(grid.cut.sstar)
     k = clamp(round(Int, (ls - log(first(grid.so))) / grid.ho), 0, length(grid.so) - 1)

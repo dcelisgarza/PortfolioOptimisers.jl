@@ -487,14 +487,16 @@ The row key names the observation of the returns data that each row of the block
 """
 function assert_cs_block_rows(idx::Option{<:VecInt}, ts::Option{<:VecDate},
                               csr::Option{<:CrossSectionalRegression})::Nothing
-    if isnothing(idx) && isnothing(ts)
-        return nothing
-    end
     @argcheck(!isnothing(csr),
               ArgumentError("idx and ts name the observation of each row of the fit, so a block that carries either one must carry csr"))
     Tb = size(csr.f, 1)
     assert_row_key_part(idx, Tb, :idx)
     assert_row_key_part(ts, Tb, :ts)
+    return nothing
+end
+# A block that names no row key has no row to check.
+function assert_cs_block_rows(::Nothing, ::Nothing,
+                              ::Option{<:CrossSectionalRegression})::Nothing
     return nothing
 end
 """

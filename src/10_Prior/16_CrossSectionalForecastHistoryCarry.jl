@@ -196,15 +196,22 @@ Under a threshold `th` above zero, the idiosyncratic correlation reads the rows 
 """
 function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
                                             st::CrossSectionalCarryState, stepped::Bool)
-    if isnothing(st.csr)
-        return st
-    end
-    eps = st.csr.eps
+    return cross_sectional_carry_standardised(pe, st, st.csr, stepped)
+end
+# A state with no fit has no residual to standardise.
+function cross_sectional_carry_standardised(::CrossSectionalFactorPrior,
+                                            st::CrossSectionalCarryState, ::Nothing, ::Bool)
+    return st
+end
+function cross_sectional_carry_standardised(pe::CrossSectionalFactorPrior,
+                                            st::CrossSectionalCarryState, csr,
+                                            stepped::Bool)
+    eps = csr.eps
     k = stepped && !isnothing(st.S) ? size(st.S, 1) : 0
     rn = (k + 1):size(eps, 1)
     # The fitted rows sit after the first `lag` rows of the histories. The rows take the
     # Leverage-One Mask of the batch fit (#1720).
-    h1 = st.csr.h1
+    h1 = csr.h1
     E = leverage_one_residuals(pe.l1mask, isnothing(h1) ? nothing : view(h1, rn, :),
                                view(eps, rn, :))
     V = view(st.vs, rn, :)

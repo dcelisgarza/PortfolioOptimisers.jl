@@ -363,13 +363,16 @@ Return the levels of the Panel Field of a [`CurrencyExposure`](@ref) that take a
   - [`observed_series`](@ref)
 """
 function currency_level_columns(xe::CurrencyExposure, rd::ReturnsResult)::Vector{Int}
-    lv = one_hot_field(rd, xe.field).levels
-    if isnothing(xe.base)
-        return collect(eachindex(lv))
-    end
-    @argcheck(xe.base in lv,
-              ArgumentError("the base currency \"$(xe.base)\" is not a level of the Panel Field \"$(xe.field)\", whose levels are $lv"))
-    return findall(!=(xe.base), lv)
+    return currency_level_columns(xe, xe.base, one_hot_field(rd, xe.field).levels)
+end
+# Without a base currency every level is a column. A base currency drops its own level.
+function currency_level_columns(::CurrencyExposure, ::Nothing, lv::AbstractVector)
+    return collect(eachindex(lv))
+end
+function currency_level_columns(xe::CurrencyExposure, base, lv::AbstractVector)::Vector{Int}
+    @argcheck(base in lv,
+              ArgumentError("the base currency \"$(base)\" is not a level of the Panel Field \"$(xe.field)\", whose levels are $lv"))
+    return findall(!=(base), lv)
 end
 """
     observed_reads_returns(xe::AbstractObservedExposureEstimator) -> Bool

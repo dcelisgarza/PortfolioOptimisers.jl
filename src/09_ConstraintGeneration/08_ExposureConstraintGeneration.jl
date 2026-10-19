@@ -357,12 +357,6 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
 function factor_space_regression(re::Option{<:RegE_Reg},
                                  rr::Option{<:AbstractLoadingsRegressionResult},
                                  rd::Option{<:ReturnsResult})
-    if isa(re, AbstractLoadingsRegressionResult)
-        return re
-    end
-    if isnothing(re)
-        return rr
-    end
     rr = source_loadings(returns_source(re), rr, re)
     if !isnothing(rr)
         return rr
@@ -370,6 +364,16 @@ function factor_space_regression(re::Option{<:RegE_Reg},
     @argcheck(!isnothing(rd),
               IsNothingError("a `FactorSpace` whose `re` is a regression *estimator* ($(nameof(typeof(re)))) must fit the loadings from returns, and this route carries none. `linear_constraints(ece, sets; rr = ...)` is the standalone entry point: it receives the loadings directly and never the data they would be fitted from.\nEither state the basis outright, `FactorSpace(; re = Regression(; M = ...))`, or pass the loadings as `rr` and leave `re === nothing`, or generate the constraint through a `JuMPOptimiser` or a `Pipeline` step, where the returns are in scope and the refit happens per fold."))
     return refit_factor_regression(re, rd)
+end
+# A stated result is the basis, and no stated source reads the loadings of the prior.
+function factor_space_regression(re::AbstractLoadingsRegressionResult,
+                                 ::Option{<:AbstractLoadingsRegressionResult},
+                                 ::Option{<:ReturnsResult})
+    return re
+end
+function factor_space_regression(::Nothing, rr::Option{<:AbstractLoadingsRegressionResult},
+                                 ::Option{<:ReturnsResult})
+    return rr
 end
 """
     constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd)
