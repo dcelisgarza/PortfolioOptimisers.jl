@@ -267,3 +267,44 @@ Against a scratch file `src/26_ScratchProbe.jl` holding two docstrings:
 `--file src/19_RiskMeasures/02_Variance.jl`, whose child map 9 is issue #423 and open, planned the
 file, added no line to `reopen.tsv`, and wrote the was-charted sentence. `--file` on a swept path
 and on a path with no row each threw with the message that names the fix.
+
+## Amendment (2026-10-19)
+
+A title that names no current path is refused, because the safeguard cannot see the issue it heads.
+
+The safeguard finds an open sweep issue by the path its title names. Forty-nine tickets filed
+before the `sweep` label carried no label, and named a file by its bare name or by a path that #1058
+moved. Four labelled tickets named a path that a later move, split or deletion changed. Each hid its
+files: `sweep_check.jl` reported an unfiled file, and `sweep_triage.jl` planned a duplicate. Nine
+tickets were such duplicates, #1717 and #779 among them, and each was closed in favour of the
+older ticket that sweeps its file. #1755 records the gap.
+
+### The fix keeps the title as the one key
+
+Two repairs were possible: retitle the tickets, or teach both jobs to read the body and translate
+old names. The title stays the one key. A body names related files in its prose, so a body match
+skips a file that a ticket only mentions, and a map from old names to new ones grows with every
+move. **The body is still never machine-read.** The tickets were retitled to name the current path
+of every file they sweep, and labelled `sweep`.
+
+GitHub caps a title at 256 characters. Two tickets sweep files whose paths together pass the cap,
+and every one of those files reads `swept = true`. The check reads a sweep issue only for a row that
+reads `swept = false`, so those tickets keep a descriptive title that names no path.
+
+### A stale title is refused, not read past
+
+`CodeHealth.stale_titles` lists every open sweep issue whose title holds a `.jl` token that is not a
+row of the manifest. A move of the tree makes every title that names a moved file stale at once, so
+the guard turns a silent duplicate into a loud refusal:
+
+- `sweep_check.jl --fetch` reports each stale title as a failure in every scope, as it reports a
+  closed child map.
+- `sweep_triage.jl` throws in `reconcile` and plans nothing. A stale title is a fourth way for the
+  manifest and the tracker to disagree, beside the three that throw already.
+
+The repair is a retitle. A session that moves a file under `src/` or `ext/` retitles the open
+sweep issue that names it, and files no second ticket.
+
+A colon now ends a path in `CodeHealth.title_tokens`, which `names_path` reads. A title that reads
+`Sweep src/A.jl: 23 units` named `src/A.jl:`, which matched no path. A path holds no colon, so
+the code-health job of ADR 0078, which reads titles through the same function, is unchanged.

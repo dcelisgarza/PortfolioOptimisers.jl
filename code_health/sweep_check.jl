@@ -288,7 +288,7 @@ end
     Tracker
 
 What the two dumps say, reduced to what this check reads: the child maps by number, whether the
-umbrella is open, and the sweep issues as open-flag and title.
+umbrella is open, and the sweep issues as number, open-flag and title.
 
 `nothing` for the whole struct means the tracker was not read. That is a normal outcome, not a
 failure: the manifest half of the check needs no network and must still run when `gh` is absent or
@@ -297,7 +297,7 @@ unauthenticated.
 struct Tracker
     maps::Dict{Int, Tuple{Int, Bool, String}}
     umbrella_open::Union{Bool, Nothing}
-    issues::Vector{Tuple{Bool, String}}
+    issues::Vector{Tuple{Int, Bool, String}}
 end
 
 function read_tsv(path::AbstractString)
@@ -345,8 +345,7 @@ function read_tracker(maps_path::AbstractString, existing_path::AbstractString)
         end
         maps[parse(Int, m.captures[1])] = (issue, isopen, String(m.captures[2]))
     end
-    issues = [(isopen, title) for (_, isopen, title) in read_tsv(existing_path)]
-    return Tracker(maps, umbrella, issues)
+    return Tracker(maps, umbrella, read_tsv(existing_path))
 end
 
 # --- the findings ----------------------------------------------------------
@@ -612,7 +611,7 @@ function check_tracker(path, row, map_names, tracker, survey)
               Finding(:fail, "child map #$issue is CLOSED, and this file joins it.",
                       ["Reopen #$issue and #$UMBRELLA, then file the sub-issue."]))
     end
-    filed = any(e -> e[1] && CodeHealth.names_path(e[2], path), tracker.issues)
+    filed = any(e -> e[2] && CodeHealth.names_path(e[3], path), tracker.issues)
     if !(filed)
         push!(fs,
               Finding(survey ? :note : :fail, "no open `$LABEL` issue names this path.",
@@ -628,6 +627,30 @@ function check_tracker(path, row, map_names, tracker, survey)
         push!(fs, Finding(:ok, "an open `$LABEL` issue already names it."))
     end
     return fs
+end
+
+"""
+    check_titles(tracker, paths) -> Vector{Finding}
+
+One failure for each open sweep issue whose title names a `.jl` file that `paths` does not hold,
+which `CodeHealth.stale_titles` finds. Such a title hides its file from `check_tracker` and from
+`code_health/sweep_triage.jl`, so every answer about a missing sub-issue is in doubt until it is
+retitled (#1755).
+
+It is a failure in every scope, as a closed child map is. A stale title is a defect of the tracker,
+not the standing backlog of a map.
+"""
+function check_titles(tracker, paths)
+    if tracker === nothing
+        return Finding[]
+    end
+    return [Finding(:fail,
+                    "issue #$n names $(join(("`$t`" for t in bad), ", ")), " *
+                    "which is not a path of the manifest.",
+                    ["Its title: $title",
+                     "Retitle it to name the current path of every file it sweeps. If a file",
+                     "moved, this is its ticket: do not file a second one."])
+            for (n, title, bad) in CodeHealth.stale_titles(tracker.issues, paths)]
 end
 
 # --- the command line ------------------------------------------------------
@@ -756,6 +779,11 @@ function main(args)
     base = opts.all ? nothing : merge_base(resolve_base(opts.base))
     failures = 0
     censused = 0
+    stale = check_titles(tracker, keys(rows))
+    if !(isempty(stale))
+        failures += length(stale)
+        print_findings(stdout, "the open `$LABEL` issues", stale)
+    end
     for f in scope
         fs = check_file(f, rows, map_names, coverage, entry, tracker, exempted, opts.all)
         append!(fs, check_gates(f, baselines, limit))

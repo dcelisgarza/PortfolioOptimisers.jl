@@ -18,6 +18,8 @@ Each session wrote its own driver for one test file, and one of those drivers le
     and names a red that `test/known_red.toml` lists.
   - `code_health/sweep_check.jl` names `code_health/census_preview.jl` when a branch adds a
     declaration that the two package-level censuses read. The test checks which diff lines name one.
+  - `code_health/sweep_check.jl` and `code_health/sweep_triage.jl` refuse an open sweep issue whose
+    title names a `.jl` file that has no row. The test checks the match, the report and the refusal.
   - `docs/doctest_files.jl` runs the doctests of the docstrings that named source files hold. The
     test checks its selection on a fixture module. The doctest run itself needs Documenter, which
     the test environment does not hold.
@@ -600,5 +602,54 @@ end
             @test occursin(open ? "after that map was charted" : "after that map closed",
                            body)
         end
+    end
+    @testset "a sweep title that names no current path is reported and refused" begin
+        #=
+        Both sweep jobs find a sweep issue by the path its title names. Forty-nine tickets named a
+        file by its bare name or by a path that #1058 moved, so the check reported their files as
+        unfiled and the triage filed duplicates (#1755). A colon now ends a path, and a title
+        whose `.jl` token names no row fails the check and stops the triage.
+        =#
+        CH = GateScopeSeam.CodeHealth
+        @test CH.names_path("Sweep src/a.jl: 3 units", "src/a.jl")
+        @test !(CH.names_path("Sweep src/a.jl.orig", "src/a.jl"))
+        paths = Set(["src/a.jl", "src/b/c.jl"])
+        issues = [(1, true, "Sweep `src/a.jl` into child map 9: Risk measures"),
+                  (2, true, "Sweep the pair: `src/old/c.jl` and 02_D.jl, 3 units"),
+                  (3, false, "Sweep `src/gone.jl`"),
+                  (4, true, "Sweep the views of src/13_Prior: 19 new units")]
+        @test CH.stale_titles(issues, paths) ==
+              [(2, issues[2][3], ["src/old/c.jl", "02_D.jl"])]
+
+        SC = SweepCheckSeam
+        tracker = SC.Tracker(Dict{Int, Tuple{Int, Bool, String}}(), true, issues)
+        fs = SC.check_titles(tracker, paths)
+        @test length(fs) == 1
+        @test fs[1].level === :fail
+        @test occursin("issue #2", fs[1].text)
+        @test isempty(SC.check_titles(nothing, paths))
+        @test isempty(SC.check_titles(tracker, union(paths, ["src/old/c.jl", "02_D.jl"])))
+
+        ST = SweepTriageSeam
+        dir = mktempdir()
+        write(joinpath(dir, "existing.tsv"),
+              join(("$n\t$(open ? "OPEN" : "CLOSED")\t$t" for (n, open, t) in issues),
+                   "\n"))
+        existing = ST.read_existing(joinpath(dir, "existing.tsv"))
+        @test existing == issues
+        @test ST.already_filed(existing, "src/a.jl")
+        @test !(ST.already_filed(existing, "src/gone.jl"))
+        rows = Dict("src/a.jl" => Dict{String, Any}("map" => 9, "swept" => false),
+                    "src/b/c.jl" => Dict{String, Any}("map" => 9, "swept" => true))
+        map_names = Dict("9" => "Risk measures")
+        maps = Dict("9" => ST.ChildMap(9, 423, true, "Risk measures"))
+        @test ST.reconcile(rows, map_names, maps, existing[[1, 3, 4]]) === nothing
+        err = try
+            ST.reconcile(rows, map_names, maps, existing)
+        catch e
+            e
+        end
+        @test err isa ErrorException
+        @test occursin("issue #2 names `src/old/c.jl`, `02_D.jl`", err.msg)
     end
 end

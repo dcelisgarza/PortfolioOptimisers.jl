@@ -555,6 +555,20 @@ function declaration_macros(files; root = REPO_ROOT, declaring = DECLARING_FILES
 end
 
 """
+    title_tokens(title) -> Vector{SubString{String}}
+
+The words of an issue title, split at every character that cannot continue a path. `names_path`
+and `stale_titles` read a title through it, so the path one of them finds is the path the other
+checks.
+
+A colon is a separator because a path holds none. A title that reads `Sweep src/A.jl: 23 units`
+names `src/A.jl` (#1755).
+"""
+function title_tokens(title::AbstractString)
+    return split(title, r"[\s`,;:()\[\]]+"; keepempty = false)
+end
+
+"""
     names_path(title, path) -> Bool
 
 Whether an issue title names `path` as a whole word. Both scheduled jobs search the titles they
@@ -565,7 +579,34 @@ The test is a token match rather than a substring: a substring test would let a 
 reuses it for the sweep job, so it is defined once.
 """
 function names_path(title::AbstractString, path::AbstractString)
-    return any(==(path), split(title, r"[\s`,;()\[\]]+"; keepempty = false))
+    return any(==(path), title_tokens(title))
+end
+
+"""
+    stale_titles(issues, paths) -> Vector{Tuple{Int, String, Vector{String}}}
+
+Every open issue of `issues`, given as `(number, isopen, title)`, whose title names a `.jl` file
+that is not in `paths`, with the tokens that name no file.
+
+`names_path` finds a sweep issue by the path its title names, so a title whose path moved, or that
+names a file by its bare name, hides its file from both sweep jobs. The check then reports the file
+as unfiled and the triage files a duplicate (#1755). A move of the tree makes every such title
+stale at once, so the jobs refuse a stale title rather than read past it.
+"""
+function stale_titles(issues, paths)
+    out = Tuple{Int, String, Vector{String}}[]
+    for (number, isopen, title) in issues
+        if !(isopen)
+            continue
+        end
+        bad = String[t
+                     for t in title_tokens(title)
+                     if occursin(r"\.jl\b", t) && !(t in paths)]
+        if !(isempty(bad))
+            push!(out, (number, title, bad))
+        end
+    end
+    return out
 end
 
 # --- git -------------------------------------------------------------------
