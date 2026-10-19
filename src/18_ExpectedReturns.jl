@@ -1789,7 +1789,7 @@ end
 
 Compute the Probabilistic Sharpe Ratio, the probability that the true Sharpe ratio of a return series is greater than a benchmark.
 
-The Probabilistic Sharpe Ratio of [sharpe_stderr](@cite) corrects the sample Sharpe ratio for the length of the series and for the skewness and the kurtosis of its returns. Negative skewness and fat tails make a Sharpe ratio less precise, so they decrease the probability. Every quantity is per period, so `x`, `bsr` and `rf` must have the same frequency, and none is annualised. The matrix method computes one probability for each column.
+The Probabilistic Sharpe Ratio of [sharpe_stderr](@cite) corrects the sample Sharpe ratio for the length of the series and for the skewness and the kurtosis of its returns. Fat tails make a Sharpe ratio that is not zero less precise, and negative skewness makes a positive Sharpe ratio less precise. When the Sharpe ratio is above the benchmark, a less precise Sharpe ratio has a smaller probability. Every quantity is per period, so `x`, `bsr` and `rf` must have the same frequency, and none is annualised. The matrix method computes one probability for each column.
 
 # Mathematical definition
 
@@ -1993,7 +1993,7 @@ Where:
   - $(math_dict[:n_trials]) It can be fractional, and it is at least one.
   - ``e``: Euler's number.
 
-The maximum of ``N \\geq 1`` draws is at least one draw, so its expectation is at least ``\\mu``. The floor at zero keeps that bound. Without it, the approximation falls below ``\\mu`` for ``N < 1.2836``, and it is ``-\\infty`` at ``N = 1``. For one trial, or for trials with no dispersion, the expected maximum is ``\\mu``.
+The maximum of ``N \\geq 1`` draws is at least one draw, so its expectation is at least ``\\mu``. The floor at zero keeps that bound. The source states the approximation for ``N \\gg 1`` and has no floor. Without the floor, the approximation falls below ``\\mu`` for ``N < 1.2836``, and it is ``-\\infty`` at ``N = 1``. For one trial, or for trials with no dispersion, the expected maximum is ``\\mu``.
 
 # Arguments
 
@@ -2158,7 +2158,7 @@ Where:
   - ``\\rho_{ij}``: Correlation between the returns of trials ``i`` and ``j``, entry ``(i, j)`` of ``\\mathbf{C}``.
   - ``\\mathbf{C}``: Correlation matrix of the returns of the trials, ``M \\times M``.
 
-A correlation matrix is positive semidefinite, so ``\\boldsymbol{1}^{\\intercal} \\mathbf{C} \\boldsymbol{1} = M + M (M - 1) \\hat{\\rho} \\geq 0`` and ``\\hat{\\rho} \\geq -1/(M - 1)``. The estimate is ``1`` at ``\\hat{\\rho} = 1`` and ``M`` at ``\\hat{\\rho} = 0``.
+The source takes a correlation matrix that is positive definite, so ``\\boldsymbol{1}^{\\intercal} \\mathbf{C} \\boldsymbol{1} = M + M (M - 1) \\hat{\\rho} > 0`` and ``\\hat{\\rho} > -1/(M - 1)``. A singular correlation matrix can reach the bound, and the function refuses it. The estimate is ``1`` at ``\\hat{\\rho} = 1`` and ``M`` at ``\\hat{\\rho} = 0``.
 
 # Arguments
 

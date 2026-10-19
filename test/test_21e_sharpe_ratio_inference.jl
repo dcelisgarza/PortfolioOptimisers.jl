@@ -284,6 +284,10 @@ end
     @test_throws DomainError implied_independent_trials(0, 0.1)
     @test_throws DomainError implied_independent_trials(10, 1.1)
     @test_throws DomainError implied_independent_trials(10, -0.2)
+    # The source takes a positive definite matrix, so the bound itself is refused, even from
+    # a singular correlation matrix that reaches it.
+    @test_throws DomainError implied_independent_trials(2, -1.0)
+    @test_throws DomainError implied_independent_trials([1.0 -1.0; -1.0 1.0])
     @test_throws DomainError implied_independent_trials(zeros(0, 0))
     @test_throws DimensionMismatch implied_independent_trials(ones(2, 3))
 end
