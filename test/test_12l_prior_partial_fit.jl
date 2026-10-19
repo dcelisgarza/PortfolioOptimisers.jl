@@ -787,6 +787,29 @@ end
         @test isnothing(partial_fit!(online(EmpiricalPrior()), rd(static)).cache.A)
         @test isnothing(partial_fit!(online(EmpiricalPrior()), rd(nothing)).cache.A)
     end
+    @testset "The masks of the assets do not reach a prior of the factors" begin
+        # The refit gives the masks of the buffer as keywords. An augmented Black-Litterman
+        # prior gave them to its factor prior on `F`, which refused an active mask of `N`
+        # columns against `K` (R17 of #1630).
+        # The factors explain the complete columns, so the stepwise regression keeps one.
+        Fm = hcat(X[:, 1] .+ X[:, 3], X[:, 4] .- X[:, 1]) .+
+             randn(StableRNG(1630), T, 2) ./ 1000
+        fv = BlackLittermanViews(; P = [1.0 0.0], Q = [0.01])
+        # A precomputed asset view is refused over a gapped universe, so the asset views of
+        # the augmented prior are written in names.
+        sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => nx, "nf" => ["F1", "F2"]))
+        abl = AugmentedBlackLittermanPrior(; sets = sets,
+                                           a_views = LinearConstraintEstimator(;
+                                                                               val = "A1 == 0.01"),
+                                           f_views = LinearConstraintEstimator(;
+                                                                               val = "F1 == 0.01"))
+        for est in (FactorPrior(), FactorBlackLittermanPrior(; views = fv), abl)
+            o = prior(steps(online(est), rd(masks; nf = ["F1", "F2"], F = Fm)))
+            b = prior(est, rd(masks; nf = ["F1", "F2"], F = Fm))
+            @test isapprox(o.mu, b.mu; rtol = 1e-10, nans = true)
+            @test isapprox(o.sigma, b.sigma; rtol = 1e-10, nans = true)
+        end
+    end
     @testset "The Panel Fields reach only a prior that reads them" begin
         m = message(() -> partial_fit!(online(EmpiricalPrior()), rd(full)))
         @test occursin("the refit of `EmpiricalPrior` reads no Panel Field", m)

@@ -2425,6 +2425,21 @@ end
                F)
     @test no[] == 2
     @test isapprox(LinearAlgebra.dot(ep.w, ep.X[:, 1]), t2; rtol = 1e-6)
+    # The keywords of the asset axis do not reach the factor prior. An active mask of `X`
+    # reached the fit of `f_pe` on `F` and raised a `DimensionMismatch` (R17 of #1630).
+    amsk = trues(size(X))
+    @test prior(abl, X, F; active_mask = amsk).mu == prior(abl, X, F).mu
+    # A factor Black-Litterman prior gives its factor prior the cache too. Before R17 of #1630
+    # it did not, and the refit pooled the opinions again.
+    fbl = FactorBlackLittermanPrior(; pe = fpool, views = lce("F2 == 0.001"), sets = sets2)
+    @test !isnothing(prior(fbl, X, F; cache_reg = true).fpr.pc)
+    @test isnothing(prior(fbl, X, F).fpr.pc)
+    t3 = near(prior(fbl, X, F))
+    no[] = 0
+    ep = prior(EntropyPoolingPrior(; pe = fbl, sets = sets, mu_views = lce("A1 == $t3")), X,
+               F)
+    @test no[] == 2
+    @test isapprox(LinearAlgebra.dot(ep.w, ep.X[:, 1]), t3; rtol = 1e-6)
     # A result states a cache with the rows of its scenarios, and an asset view drops it.
     @test_throws DimensionMismatch LowOrderPrior(; X = X, mu = zeros(4), sigma = cov(X),
                                                  pc = (; X = nothing, w = w[1:10]))

@@ -435,7 +435,7 @@ end
 """
     prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
-          strict::Bool = false, kwargs...)
+          strict::Bool = false, cache_reg::Bool = false, kwargs...)
 
 Compute augmented Black-Litterman prior moments for asset returns.
 
@@ -451,7 +451,8 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
   - $(arg_dict[:pnl_prior]) It reaches `pe.a_pe`, the prior over the assets. `pe.f_pe` is fitted on the factors, whose axis no panel describes, so the panel does not reach it.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
-  - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
+  - $(arg_dict[:cache_reg]) It reaches `pe.a_pe` and `pe.f_pe`.
+  - `kwargs...`: Additional keyword arguments passed to `pe.a_pe`. They describe the asset axis, such as an active mask or implied volatilities, so they do not reach `pe.f_pe`.
 
 # Validation
 
@@ -472,7 +473,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
  3. When `pe.f_views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). Each axis is checked only by the views that resolve names against it, so a pair of precomputed [`BlackLittermanViews`](@ref) needs no `sets` at all.
  4. Fit `pe.a_pe` on `X`, giving `a_prior`.
  5. Derive the Investable Mask and the reduced asset view universe with [`investable_views`](@ref), refuse a precomputed asset view matrix over a gapped universe with [`assert_bl_precomputed_universe`](@ref), and view `a_prior` at the mask with [`investable_prior`](@ref). `N` is the reduced asset count from here on.
- 6. Fit `pe.f_pe` on `F`, giving `f_prior`.
+ 6. Fit `pe.f_pe` on `F` with `strict` and `cache_reg` alone, giving `f_prior`.
  7. Regress the reduced `X` — [`reduce_columns`](@ref) at the mask — on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to the same mask with [`coverage_regression`](@ref), giving `rr` and the reconstructed returns `posterior_X`, both on the reduced asset axis.
  8. Assemble the asset views with [`bl_preroll`](@ref) at the default `:xkey`, over the reduced asset prior covariance, and the factor views at `:tfkey`, over the factor prior covariance. Either half can be emptied, and [`bl_view_block`](@ref) then gives that half no row rather than collapsing the stack — the joint posterior is still conditioned by whatever the other half kept. Only the asset half can be emptied by a *departure*: a factor axis holds no asset name. When **both** halves empty there is nothing left to condition on, and step 12 takes the joint prior.
  9. Build ``\\boldsymbol{\\Sigma}_{aug}``, whose off-diagonal blocks are the model-implied cross-covariance ``\\mathbf{M}\\boldsymbol{\\Sigma}_f`` and its transpose.
@@ -498,7 +499,7 @@ When `pe.tau` is `nothing` the blending parameter is `1/T`, where `T` is the num
 """
 function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
-               kwargs...)
+               cache_reg::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
     # Each axis is checked only by the views that resolve names against it. A
     # `BlackLittermanViews` result carries its own `P` and never touches `sets`, so demanding a
@@ -516,7 +517,8 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
                         "F")
     end
     # Asset prior.
-    a_prior = prior(pe.a_pe, X, nothing, pnl; strict = strict, kwargs...)
+    a_prior = prior(pe.a_pe, X, nothing, pnl; strict = strict, cache_reg = cache_reg,
+                    kwargs...)
     # The reduction, once, at this estimator's entry. The asset views are a dense linear form
     # over the asset axis and `0 * NaN` is `NaN`, so a departed asset poisons `a_omega`, the
     # whole stacked system, and both truncated posteriors — including under views naming only
@@ -528,9 +530,11 @@ function prior(pe::AugmentedBlackLittermanPrior, X::MatNum, F::MatNum,
     vapr = investable_prior(imsk, a_prior)
     a_prior_mu, a_prior_sigma = vapr.mu, vapr.sigma
     # Factor prior.
-    # The keywords reach the factor prior too, so a refit under new scenario weights reads
-    # its cache from `fpr` (#1751).
-    f_prior = prior(pe.f_pe, F; strict = strict, kwargs...)
+    # `cache_reg` reaches the factor prior too, so a refit under new scenario weights reads
+    # its cache from `fpr` (#1751). The other keywords describe the asset axis, so they do
+    # not reach it, as in `FactorPrior`: an active mask of `X` on `F` raised a
+    # `DimensionMismatch` (R17 of #1630).
+    f_prior = prior(pe.f_pe, F; strict = strict, cache_reg = cache_reg)
     f_prior_mu, f_prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors. Only the reconstruction is shared with `FactorPrior`:
     # the asset moments here come out of the augmented system, not out of a lift. It runs on

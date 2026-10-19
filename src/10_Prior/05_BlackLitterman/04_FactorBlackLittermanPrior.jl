@@ -322,7 +322,9 @@ end
 """
     prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
-          strict::Bool = false, kwargs...)
+          strict::Bool = false,
+          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+          cache_reg::Bool = false, kwargs...)
 
 Compute factor Black-Litterman prior moments for asset returns.
 
@@ -379,7 +381,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
  3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves. The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
- 4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one.
+ 4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one. `strict` and `cache_reg` reach it, as in [`FactorPrior`](@ref), so a prior there stores the cache that a refit under new scenario weights reads from `fpr`. No other keyword reaches it, because the other keywords describe the asset axis.
  5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to `imsk` with [`coverage_regression`](@ref), giving the regression result `rr` and the reconstructed returns `posterior_X`.
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(Xi, 1)` observations, giving `blp`. The axis is `:tfkey`, so no view row is ever dropped for a departed asset and no ledger is kept.
  7. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref), over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref); otherwise it is `prior_mu`, which is on that scale already.
@@ -402,6 +404,7 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - $(arg_dict[:cvg_active_mask])
+  - $(arg_dict[:cache_reg])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
 # Validation
@@ -427,7 +430,8 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
-               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+               cache_reg::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
     # The views land on the *factor* distribution, so they resolve against the declared factor
     # axis — not against `xkey`, which names the assets this estimator projects onto. Only the
@@ -453,8 +457,9 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # names neither the asset that left nor the reason it mattered.
     imsk, Xi = coverage_reduction(X, pnl; dims = 1,
                                   active_mask = dims_oriented(dims, active_mask))
-    # Factor prior.
-    f_prior = prior(pe.pe, F; strict = strict)
+    # Factor prior. It stores its cache for a refit under new scenario weights, which reads
+    # it from `fpr`, as in `FactorPrior`.
+    f_prior = prior(pe.pe, F; strict = strict, cache_reg = cache_reg)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
     rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, imsk), Xi, F)
