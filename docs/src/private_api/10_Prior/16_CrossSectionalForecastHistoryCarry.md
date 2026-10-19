@@ -5,7 +5,7 @@ Description = "Cross-Sectional Forecast History Carry, private API of PortfolioO
 # [Cross-Sectional Forecast History Carry: private API](@id private-api-cross-sectional-forecast-history-carry)
 
 The carry fold of a [`CrossSectionalFactorPrior`](@ref) carries the return forecast history when a slot of the prior reads it. The functions below decide when the state carries the history, bring it up to the fitted observations at each step, and give it to the slots. The fifth function brings the standardised idiosyncratic returns, which the call with no data reads, up to the fitted observations by the same rule, and the sixth brings the input of the idiosyncratic correlation up with them.
-The next two give the rows that a covariance estimator reads from the standardised returns with no fill, and the idiosyncratic covariance from the covariance of those rows. The batch fit and the carry fold share both. The next five carry a return forecast that computes its history one observation at a time: its returns data over a set of panel rows, its Descriptor scores, its rows, the rows that a step hands it, and the step under the fit of the orthogonal part of the forecast. The last function brings every output that reads the fit up to the fitted observations.
+The next two give the rows that a covariance estimator reads from the standardised returns with no fill, and the idiosyncratic covariance from the covariance of those rows. The batch fit and the carry fold share both. The next functions carry a return forecast that computes its history one observation at a time: its returns data over a set of panel rows, its Descriptor scores, its rows, and the rows that a step hands it. The step under the fit of the orthogonal part of the forecast is public, and the [public page](@ref api-cross-sectional-forecast-history-carry) documents it. The last two bring every output that reads the fit up to the fitted observations.
 
 ```@docs
 PortfolioOptimisers.cross_sectional_forecast_refits
@@ -21,7 +21,6 @@ PortfolioOptimisers.cross_sectional_carry_scores
 PortfolioOptimisers.cross_sectional_carry_forecast
 PortfolioOptimisers.cross_sectional_forecast_rows
 PortfolioOptimisers.cross_sectional_forecast_lead
-PortfolioOptimisers.orthogonal_forecast_step
 PortfolioOptimisers.cross_sectional_carry_outputs
 PortfolioOptimisers.cross_sectional_carry_forecast_returns
 ```

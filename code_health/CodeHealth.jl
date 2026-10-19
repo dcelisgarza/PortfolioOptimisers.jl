@@ -322,6 +322,31 @@ function own_name(ex)
     return ex
 end
 
+const INTERFACES_LINK_RE = r"\[`([^`]+)`\]\(@ref\)"
+
+"""
+    interfaces_links(section::AbstractVector{<:AbstractString}) -> Vector{Symbol}
+
+The bare names an `# Interfaces` section (as [`interfaces_section`](@ref) returns it) links with
+``[`name`](@ref)`` anywhere in its lines, prose included. [`interfaces_verbs`](@ref) reads only a
+verb heading and a call-shaped bullet, so a section that names its verbs in prose alone gives it no
+verb (#1764); this reader sees those names too. A foreign-qualified name is skipped and a
+self-qualified one counts as the bare name, as in [`interfaces_verbs`](@ref).
+"""
+function interfaces_links(section)
+    out = Symbol[]
+    for l in section, m in eachmatch(INTERFACES_LINK_RE, l)
+        v = try
+            Meta.parse(m.captures[1])
+        catch
+            continue
+        end
+        v = own_name(v)
+        isa(v, Symbol) && push!(out, v)
+    end
+    return unique(out)
+end
+
 # --- every type a module declares --------------------------------------------
 
 """

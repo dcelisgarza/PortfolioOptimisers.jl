@@ -17,7 +17,8 @@ end
     a `# Interfaces` docstring section is the seam signal, not a new marker. An abstract type
     carrying one is a genuine extension point, and documenting the contract already is the
     public promise -- the type, and every verb its section names under a `` ## `verb` ``
-    heading or a call-shaped bullet, must carry a `public` or `export` declaration. The
+    heading or a call-shaped bullet or links in its prose (#1764), must carry a `public` or
+    `export` declaration. The
     converse holds too: a `public`/`export`-declared abstract type's docstring must carry a
     `# Interfaces` section, unless the name is foreign-owned (ADR 0128) and therefore always
     public regardless of what its own docstring says.
@@ -40,7 +41,7 @@ end
     the five contracts and emptied it; the list stays, empty, so the reverse direction has a
     named place to record a future exemption rather than an edit no one remembers to make.
 
-    `interfaces_section`, `interfaces_verbs` and `declared_types` are read from
+    `interfaces_section`, `interfaces_verbs`, `interfaces_links` and `declared_types` are read from
     `code_health/CodeHealth.jl`, shared with `test_61_interfaces_section_census.jl` so the two
     censuses can never disagree about where an `# Interfaces` section starts and ends, or about
     which names the package itself declares.
@@ -155,6 +156,107 @@ end
           ("promotion debt entries with no '# Interfaces' section any more", Symbol[])
     @test ("verb debt entries that are now public/exported", paid_verbs) ==
           ("verb debt entries that are now public/exported", Symbol[])
+
+    #=
+    A section can name its verbs in prose, as `` [`verb`](@ref) ``, and `interfaces_verbs` then
+    reads no verb from it. `AbstractOrthogonalForecastFit` named its four verbs so, and the
+    check above passed while none of the four was declared (#1764). So every function of the
+    package that a section links, in any line, is `public` or exported too. A link to a caller
+    or a helper that is not a verb of the contract leaves the section: the section is the
+    contract, and a reader who extends it cannot reach a private name.
+
+    The debt list holds every such link measured on 2026-10-19 against `3ae1815f03`: 62 links
+    in 34 sections. Each one needs a decision, verb or not, and #1775 holds the work. A commit
+    that decides an entry removes it here; the list never grows.
+    =#
+    link_debt = Set([(:AbstractCarryRule, :assert_carry_rule),
+                     (:AbstractCentralityAlgorithm, :centrality_graph),
+                     (:AbstractConstraintEstimator, :pipe_reads),
+                     (:AbstractConstraintEstimator, :pipe_writes),
+                     (:AbstractConstraintEstimator, :resolve_constraint_target),
+                     (:AbstractConstraintResult, :add_constraint_result),
+                     (:AbstractConstraintSpace, :rebase_linear_constraints),
+                     (:AbstractGapReturnAlgorithm, :apply_gap_return),
+                     (:AbstractGapReturnAlgorithm, :gap_return_value),
+                     (:AbstractGapReturnAlgorithm, :gap_return_writable),
+                     (:AbstractGradientPredictor, :copy_predictor_state),
+                     (:AbstractGradientPredictor, :predictor_state_view),
+                     (:AbstractGradientTransform, :copy_gradient_state),
+                     (:AbstractLeverageOneMask, :cross_sectional_standardised_residuals),
+                     (:AbstractLeverageOneMask, :leverage_one_residuals),
+                     (:AbstractLongRunForm, :quadrature_kernel_features),
+                     (:AbstractMeanTestEstimator, :resolve_rng),
+                     (:AbstractNeutralisationWeights, :neutralisation_base_weights),
+                     (:AbstractObservedExposureEstimator, :exposure_axis_names),
+                     (:AbstractOnlinePortfolioSelectionAlgorithm, :price_relative),
+                     (:AbstractPanelFieldInput, :panel_field_placeholder),
+                     (:AbstractPartialFitState, :assert_mergeable_states),
+                     (:AbstractPartialFitState, :chan_merge),
+                     (:AbstractPreviousWeightsSource, :held_weights_drift),
+                     (:AbstractPriorResult, :check_propagatable_contracts),
+                     (:AbstractPriorResult, :prior_field_values),
+                     (:AbstractPriorResult, :prior_result_property_pool),
+                     (:AbstractProjectionGeometry, :projection_solver),
+                     (:AbstractRedundancyAlgorithm, :bigger_is_better),
+                     (:AbstractReturnsSource, :assert_returns_source),
+                     (:AbstractReturnsSource, :shared_series_view),
+                     (:AbstractRiskMeasureSettings, :set_risk_expression!),
+                     (:AbstractSampleSelector, :price_relative),
+                     (:AbstractSelectionRule, :bigger_is_better),
+                     (:AbstractUncertaintyKAlgorithm, :ucs_dimension),
+                     (:AbstractUnknownEntryRule, :attribution_error_pass),
+                     (:AbstractUnknownEntryRule, :attribution_leverage_nan),
+                     (:BaseOptimisationEstimator, :assert_time_dependent_fold_count),
+                     (:BaseOptimisationEstimator, :is_time_dependent),
+                     (:BaseOptimisationEstimator, :reset_time_dependent_estimator),
+                     (:BaseOptimisationEstimator, :time_dependent_fields),
+                     (:BaseOptimisationEstimator, :update_time_dependent_estimator),
+                     (:CrossValidationSearchScorer, :finite_candidate_index),
+                     (:FrontierBoundEstimator, :rebuild_risk_frontier),
+                     (:GerberIQCovarianceAlgorithm, :clamp_gerber_iq_n),
+                     (:GerberIQCovarianceAlgorithm, :gerber_iq_assert_c_d),
+                     (:GerberIQCovarianceAlgorithm, :gerber_iq_weight),
+                     (:GerberIQEpsEstimator, :gerber_iq_eps),
+                     (:GerberIQGammaEstimator, :gerber_iq_gamma),
+                     (:GerberIQScalerEstimator, :gerber_iq_scaling),
+                     (:HierarchicalRiskMeasure, :bigger_is_better),
+                     (:HierarchicalRiskMeasure, :supports_precomputed_returns),
+                     (:NormError, :norm_error), (:RiskMeasure, :bigger_is_better),
+                     (:RiskMeasure, :range_tails),
+                     (:RiskMeasure, :set_risk_bounds_and_expression!),
+                     (:RiskMeasure, :set_risk_constraints!),
+                     (:RiskMeasure, :set_risk_expression!),
+                     (:RiskMeasure, :set_risk_upper_bound!),
+                     (:RiskMeasure, :supports_precomputed_returns),
+                     (:TimeDependentOptimiserCallable, :assert_time_dependent_optimiser),
+                     (:WeightFinaliser, :finalise_weight_bounds)])
+
+    # A function the package owns: a method it adds to a foreign function (`Base.copy`) is
+    # declared by its owner, and a type is a constructor, not a verb.
+    function own_function(n)
+        isdefined(PO, n) || return false
+        f = getfield(PO, n)
+        return isa(f, Function) && !isa(f, Type) && parentmodule(f) === PO
+    end
+    private_links = Tuple{Symbol, Symbol}[]
+    live_links = Set{Tuple{Symbol, Symbol}}()
+    for (binding, section) in sections
+        for v in CH.interfaces_links(section)
+            own_function(v) || continue
+            status(v) === :neither || continue
+            push!(live_links, (binding, v))
+            (binding, v) in link_debt || push!(private_links, (binding, v))
+        end
+    end
+    sort!(private_links)
+    paid_links = sort!(collect(setdiff(link_debt, live_links)))
+    @test ("'# Interfaces' links to private functions, off the link debt list",
+           private_links) ==
+          ("'# Interfaces' links to private functions, off the link debt list",
+           Tuple{Symbol, Symbol}[])
+    @test ("link debt entries that are now declared, or no longer linked", paid_links) ==
+          ("link debt entries that are now declared, or no longer linked",
+           Tuple{Symbol, Symbol}[])
 
     # ------------------------------------------------------------- direction B: a
     # declaration obliges a section

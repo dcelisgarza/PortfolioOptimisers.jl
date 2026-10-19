@@ -785,13 +785,81 @@ The Orthogonal Forecast Fit is not the Orthogonal Forecast Scale `c`. The fit re
 
 # Interfaces
 
-A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field, and three steps of [`cross_sectional_return_forecast`](@ref) dispatch on it: [`orthogonal_forecast_member`](@ref) gives the member that the prior fits, [`orthogonal_forecast_result`](@ref) fits it, and [`orthogonal_forecast_rescale`](@ref) scales the orthogonal part of the split. The carry fold dispatches on it at a fourth step, [`orthogonal_forecast_step`](@ref), which folds the rows of a step into a member that folds, and a rule that changes [`orthogonal_forecast_result`](@ref) changes this step in the same way, or the carry fold differs from the batch fit. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes.
+In order to implement a new Orthogonal Forecast Fit which will work seamlessly with the library, subtype `AbstractOrthogonalForecastFit`. A rule is a marker for dispatch, and it holds no data. The prior holds it in its `ofit` field. The batch fit dispatches on it at three steps, and the carry fold dispatches on it at a fourth. Each step has a method for this abstract type that leaves the forecast as it stands, so a new rule adds a method only for the step that it changes.
+
+## The member that the prior fits
+
+  - `orthogonal_forecast_member(ofit::MyRule, rfe, csfm::CrossSectionalFactorModel)`: Returns the Return Forecast Estimator that the prior fits under the rule.
+
+### Arguments
+
+  - `ofit`: The rule.
+  - `rfe`: The Return Forecast Estimator of the prior.
+  - `csfm`: The factor-model block, whose names and observed factors state the estimated factors.
+
+### Returns
+
+  - `rfe`: The member that the prior fits.
+
+## The fit of the member
+
+  - `orthogonal_forecast_result(ofit::MyRule, rfe, rd::ReturnsResult, csfm::CrossSectionalFactorModel, cre::AbstractCrossSectionalRegressionEstimator) -> AbstractReturnForecastResult`: Fits the member in the batch fit.
+
+### Arguments
+
+  - `ofit`: The rule.
+  - `rfe`: The member, as `orthogonal_forecast_member` returns it.
+  - `rd`: The returns data. It carries an Asset Panel in `rd.pnl`.
+  - `csfm`: The fitted factor-model block.
+  - `cre`: The Cross-Sectional Regression Estimator of the prior, which splits each row.
+
+### Returns
+
+  - `rf::AbstractReturnForecastResult`: The Result of the member.
+
+## The step of the carry fold
+
+  - `orthogonal_forecast_step(ofit::MyRule, rfe, P::NamedTuple, csfm::CrossSectionalFactorModel, fs, cre::AbstractCrossSectionalRegressionEstimator) -> NamedTuple`: Folds the rows of a step into a member that folds.
+
+A rule that adds a method of `orthogonal_forecast_result` adds the same change to this step, or the carry fold differs from the batch fit.
+
+### Arguments
+
+  - `ofit`: The rule.
+  - `rfe`: The member that the step fits.
+  - `P`: The scores, the weights and the group labels of the rows of the step.
+  - `csfm`: The factor-model block of the rows of the step.
+  - `fs`: The fold state that the state carries, or `nothing`.
+  - `cre`: The Cross-Sectional Regression Estimator of the prior.
+
+### Returns
+
+  - `(; hist, fs)::NamedTuple`: The answer of `return_forecast_step` for the member.
+
+## The scale of the orthogonal part
+
+  - `orthogonal_forecast_rescale(ofit::MyRule, rf::AbstractReturnForecastResult, g::VecNum, ap::VecNum) -> NamedTuple`: Scales the orthogonal part of the split of the Return Forecast.
+
+### Arguments
+
+  - `ofit`: The rule.
+  - `rf`: The Result of the member.
+  - `g`: The spanned coefficients of the split.
+  - `ap`: The unscaled orthogonal part of the split.
+
+### Returns
+
+  - `(; g, ap)::NamedTuple`: The spanned coefficients, and the orthogonal part that the Orthogonal Forecast Scale multiplies.
 
 # Related
 
   - [`ScoreNeutralisation`](@ref)
   - [`OrthogonalPartCalibration`](@ref)
   - [`UnadjustedForecast`](@ref)
+  - [`orthogonal_forecast_member`](@ref)
+  - [`orthogonal_forecast_result`](@ref)
+  - [`orthogonal_forecast_step`](@ref)
+  - [`orthogonal_forecast_rescale`](@ref)
   - [`CrossSectionalFactorPrior`](@ref)
   - [`AbstractAlgorithm`](@ref)
 """
@@ -998,4 +1066,5 @@ end
 
 export return_forecast, IdiosyncraticReturnUnit, IdiosyncraticSharpeUnit,
        ScoreNeutralisation, OrthogonalPartCalibration, UnadjustedForecast
-public AbstractOrthogonalForecastFit
+public AbstractOrthogonalForecastFit, orthogonal_forecast_member,
+       orthogonal_forecast_result, orthogonal_forecast_rescale
