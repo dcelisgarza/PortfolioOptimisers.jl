@@ -295,10 +295,10 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, ROUTING)
     println(io, "## Destination\n")
     if reopens(c)
-        println(io, "This file is swept. It joined child map ", c.map.number,
+        println(io, "This file is not swept yet. It joined child map ", c.map.number,
                 " after that map closed, so the map and #", UMBRELLA, " were reopened.\n")
     else
-        println(io, "This file is swept. It joined child map ", c.map.number,
+        println(io, "This file is not swept yet. It joined child map ", c.map.number,
                 " after that map was charted, and it is filed under it now.\n")
     end
     println(io, "| File | Units | Misses | Lines |")

@@ -42,6 +42,10 @@ module SweepCheckSeam
 include(joinpath(@__DIR__, "..", "code_health", "sweep_check.jl"))
 end
 
+module SweepTriageSeam
+include(joinpath(@__DIR__, "..", "code_health", "sweep_triage.jl"))
+end
+
 using Test
 
 const GATE_STAMP = joinpath(@__DIR__, "..", "code_health", "gate_stamp.sh")
@@ -579,5 +583,22 @@ end
         @test isempty(SC.declarations_in(["+    s::Int", "+structure(x) = x",
                                           "+# struct Foo", "+exported = 1"]))
         @test isempty(SC.declarations_in(String[]))
+    end
+    @testset "the body of a sweep sub-issue says the file is not swept yet" begin
+        #=
+        `code_health/sweep_triage.jl` files a file only when its row reads `swept = false`, and its
+        body said "This file is swept." for every one of them. #1717 and the plans of #1752 carried
+        the false sentence. The body states the state of the row, and only the arm the map takes.
+        =#
+        ST = SweepTriageSeam
+        for open in (true, false)
+            c = ST.Candidate("src/a.jl", ST.ChildMap(9, 423, open, "Risk measures"), 3, 10,
+                             1)
+            body = ST.body_of(c, "abc")
+            @test occursin("This file is not swept yet.", body)
+            @test !occursin("This file is swept.", body)
+            @test occursin(open ? "after that map was charted" : "after that map closed",
+                           body)
+        end
     end
 end
