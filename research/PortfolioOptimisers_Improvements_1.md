@@ -4,17 +4,15 @@
 
 ## 1. Executive Summary
 
-`PortfolioOptimisers.jl` is a high-performance portfolio optimization framework in the Julia ecosystem. It features robust support for advanced risk measures (CVaR, EVaR, CDaR, Tail Gini, etc.), hierarchical and clustering-based asset allocation routines (HAA, HERC, NCO), cross-validation engines, and native Mixed-Integer Programming (MIP) constraint support via `JuMP`.
-
-This report provides an architectural review of the repository (focusing on the `dev` branch), identifies strategic extension points, and delivers **four complete, production-grade Julia modules** ready for integration.
+This report provides an architectural review of the repository (focusing on the `dev` branch), identifies strategic extension points, and delivers **three complete, production-grade Julia modules** ready for integration.
 
 ```text
                            PortfolioOptimisers.jl
                                      │
-      ┌──────────────────────┬───────┴──────────────┬────────────────────────┐
-      ▼                      ▼                      ▼                        ▼
-1. Wasserstein DRO    2. Differentiable AD   3. GPU Acceleration    4. Execution & Rebalancing
- (Uncertainty Balls)   (ImplicitDiff.jl)      (CUDA.jl Kernels)     (Order Sizing Mechanics)
+              ┌──────────────────────┼────────────────────────┐
+              ▼                      ▼                        ▼
+      2. Differentiable AD   3. GPU Acceleration    4. Execution & Rebalancing
+       (ImplicitDiff.jl)      (CUDA.jl Kernels)     (Order Sizing Mechanics)
 ```
 
 ---
@@ -26,95 +24,15 @@ An audit of the current engine highlights the following structural baseline:
 | Feature Area | Current State in `dev` | Strategic Gap / Opportunity |
 | :--- | :--- | :--- |
 | **Covariance & Denoising** | Native support for Marcenko-Pastur, detrending, and targeted shrinkage via composition with `CovarianceEstimation.jl`. | Multi-regime statistical parameter blending and regime-switching dynamics. |
-| **Optimization Constraints** | Rich MIP support for cardinality bounds, buy-in thresholds, semi-continuous variables, and turnover limits via `JuMP`. | **Distributionally Robust Optimization (DRO)** using Wasserstein distance or KL-divergence ambiguity sets. |
 | **Ecosystem Integration** | Seamless connection with `JuMP`-compatible solvers (CLP, HiGHS, Mosek, SCS). | **End-to-End Differentiable Optimization** enabling deep learning models (`Flux.jl`) to backpropagate gradients through portfolio layers. |
 | **High-Performance Computing** | Multi-threaded scenario evaluation and cross-validation across CPU cores. | **GPU Acceleration (`CUDA.jl`)** for ultra-fast scenario-heavy risk calculations and high-dimensional distance matrix generation. |
-| **Portfolio Lifecycle** | Core allocation models (weights $\mathbf{w}^*$) and backtesting infrastructure. | **Execution Mechanics**: Mapping target weights to discrete share orders, lot sizing, transaction cost friction, and cash buffers. |
+| **Portfolio Lifecycle** | Core allocation models (weights $\mathbf{w}^*$) and backtesting infrastructure. | **Execution Mechanics**: A trade list against the current share counts, with a minimum trade value. |
 
 ---
 
 ## 3. Four Pillar Implementation Roadmap
 
-To extend `PortfolioOptimisers.jl` into end-to-end differentiable learning, robust optimization under data drift, GPU computing, and trade execution, the following four modules have been designed and implemented.
-
----
-
-### Pillar I: Distributionally Robust Optimization (DRO)
-
-#### Concept & Mathematical Background
-
-Traditional portfolio optimization assumes historical scenarios perfectly reflect the future distribution. Wasserstein Distributionally Robust Optimization constructs an ambiguity ball $\mathcal{P}$ of radius $\epsilon$ around the empirical distribution $P_0$ using the $L_1$ Wasserstein metric:
-
-$$\min_{\mathbf{w} \in \mathcal{W}} \max_{P \in \mathcal{P}, d(P, P_0) \le \epsilon} \mathbb{E}_P [f(\mathbf{w}, \boldsymbol{\xi})]$$
-
-Using strong duality, this infinite-dimensional inner maximization problem is reformulated into a tractable conic system added directly to the existing `JuMP` model.
-
-#### Implementation
-
-```julia
-module DistributionallyRobust
-
-using JuMP
-
-"""
-    add_wasserstein_dro_mean!(model::JuMP.Model, w::Vector{<:JuMP.AbstractJuMPArray},
-                              scenarios::Matrix{<:Real}, r_var::JuMP.VariableRef,
-                              ϵ::Real)
-
-Adds L1-Wasserstein ball Distributionally Robust constraints for expected return.
-Protects the optimization against out-of-sample data drift within an ϵ-ambiguity ball.
-"""
-function add_wasserstein_dro_mean!(model::JuMP.Model, w::Vector{<:JuMP.AbstractJuMPArray},
-                                  scenarios::Matrix{<:Real}, r_var::JuMP.VariableRef,
-                                  ϵ::Real)
-    T, N = size(scenarios)
-    @assert length(w) == N "Weight vector length must match number of assets $N"
-
-    # Dual variables for Wasserstein duality formulation
-    @variable(model, λ ≥ 0)
-    @variable(model, s[1:T])
-
-    # Portfolio return per scenario path: R_t = ∑ w_i * r_{t,i}
-    @expression(model, R[t=1:T], sum(w[i] * scenarios[t, i] for i in 1:N))
-
-    # Dual constraints bounding worst-case expected return
-    @constraint(model, [t=1:T], R[t] + s[t] ≥ r_var)
-    @constraint(model, [t=1:T], s[t] ≤ λ * ϵ)
-    @constraint(model, (1/T) * sum(s[t] for t in 1:T) + λ * ϵ ≤ r_var)
-
-    return model
-end
-
-"""
-    add_wasserstein_dro_cvar!(model::JuMP.Model, w::Vector{<:JuMP.AbstractJuMPArray},
-                             scenarios::Matrix{<:Real}, γ_var::JuMP.VariableRef,
-                             α::Real, ϵ::Real)
-
-Formulates a Distributionally Robust CVaR constraint under L1 Wasserstein ambiguity.
-"""
-function add_wasserstein_dro_cvar!(model::JuMP.Model, w::Vector{<:JuMP.AbstractJuMPArray},
-                                   scenarios::Matrix{<:Real}, γ_var::JuMP.VariableRef,
-                                   α::Real, ϵ::Real)
-    T, N = size(scenarios)
-
-    @variable(model, VaR)
-    @variable(model, u[1:T] ≥ 0)
-    @variable(model, λ_cvar ≥ 0)
-
-    # Losses per scenario path: L_t = - ∑ w_i * r_{t,i}
-    @expression(model, L[t=1:T], -sum(w[i] * scenarios[t, i] for i in 1:N))
-
-    # CVaR Linearization
-    @constraint(model, [t=1:T], u[t] ≥ L[t] - VaR)
-
-    # Worst-case expected loss bound (Wasserstein duality)
-    @constraint(model, γ_var ≥ VaR + (1 / (α * T)) * sum(u[t] for t in 1:T) + λ_cvar * ϵ)
-
-    return model
-end
-
-end # module
-```
+To extend `PortfolioOptimisers.jl` into end-to-end differentiable learning, GPU computing, and trade execution, the following three modules have been designed and implemented.
 
 ---
 
@@ -262,9 +180,9 @@ end # module
 
 #### Concept & Mathematical Background
 
-Theoretical optimization produces ideal weight vectors $\mathbf{w}^* \in \mathbb{R}^N$. Translating these into real-world trade orders requires discrete integer quantization, accounting for existing share counts $\mathbf{s}$, current prices $\mathbf{p}$, round lot restrictions $L$, minimum order thresholds $M$, cash buffers $c_{\text{buf}}$, and linear/fixed broker frictions:
+Theoretical optimization produces ideal weight vectors $\mathbf{w}^* \in \mathbb{R}^N$. Translating these into real-world trade orders requires a trade list against the existing share counts $\mathbf{s}$ at current prices $\mathbf{p}$, with minimum order thresholds $M$:
 
-$$\text{Trade Shares } \Delta s_i = \text{round}\left( \frac{V_{\text{target}} \cdot w_i^* - s_i p_i}{p_i \cdot L} \right) \times L$$
+$$\text{Trade Shares } \Delta s_i = \text{round}\left( \frac{V_{\text{target}} \cdot w_i^* - s_i p_i}{p_i} \right)$$
 
 #### Implementation
 
@@ -274,10 +192,6 @@ module OrderRebalancing
 using Parameters
 
 @with_kw struct RebalanceConfig
-    cash_buffer::Float64 = 0.02          # 2% cash cushion reserved
-    lot_size::Int = 1                    # Round to nearest lot size
-    fixed_commission::Float64 = 1.0      # Flat broker fee per order
-    variable_commission::Float64 = 0.0005# 5 bps linear transaction cost
     min_trade_value::Float64 = 50.0      # Ignore trades smaller than $50
 end
 
@@ -286,13 +200,10 @@ struct Order
     action::Symbol                       # :BUY, :SELL, or :HOLD
     shares::Int
     estimated_value::Float64
-    estimated_cost::Float64
 end
 
 struct RebalancePlan
     orders::Vector{Order}
-    projected_cash::Float64
-    total_transaction_costs::Float64
     expected_turnover::Float64
 end
 
@@ -310,28 +221,25 @@ function generate_rebalance_plan(
     config::RebalanceConfig = RebalanceConfig()
 )
     N = length(assets)
-    investable_capital = total_portfolio_value * (1.0 - config.cash_buffer)
 
     orders = Order[]
-    total_costs = 0.0
     gross_traded_value = 0.0
     current_portfolio_value = sum(current_shares .* prices)
 
     for i in 1:N
-        target_val = investable_capital * target_weights[i]
+        target_val = total_portfolio_value * target_weights[i]
         current_val = current_shares[i] * prices[i]
         diff_val = target_val - current_val
 
         if abs(diff_val) < config.min_trade_value
-            push!(orders, Order(assets[i], :HOLD, 0, 0.0, 0.0))
+            push!(orders, Order(assets[i], :HOLD, 0, 0.0))
             continue
         end
 
-        raw_shares = diff_val / prices[i]
-        trade_shares = round(Int, raw_shares / config.lot_size) * config.lot_size
+        trade_shares = round(Int, diff_val / prices[i])
 
         if trade_shares == 0
-            push!(orders, Order(assets[i], :HOLD, 0, 0.0, 0.0))
+            push!(orders, Order(assets[i], :HOLD, 0, 0.0))
             continue
         end
 
@@ -339,21 +247,14 @@ function generate_rebalance_plan(
         abs_shares = abs(trade_shares)
         trade_val = abs_shares * prices[i]
 
-        # Calculate execution friction
-        cost = config.fixed_commission + (trade_val * config.variable_commission)
-
-        total_costs += cost
         gross_traded_value += trade_val
 
-        push!(orders, Order(assets[i], action, abs_shares, trade_val, cost))
+        push!(orders, Order(assets[i], action, abs_shares, trade_val))
     end
 
     turnover = gross_traded_value / (2 * current_portfolio_value)
-    projected_cash = total_portfolio_value - sum(
-        o.action == :BUY ? o.estimated_value : -o.estimated_value for o in orders
-    ) - total_costs
 
-    return RebalancePlan(orders, projected_cash, total_costs, turnover)
+    return RebalancePlan(orders, turnover)
 end
 
 end # module
@@ -365,7 +266,6 @@ end # module
 
 | Sprint | Goal | Core Dependencies | Primary Deliverable |
 | :--- | :--- | :--- | :--- |
-| **Sprint 1** | **Wasserstein DRO Constraints** | `JuMP.jl` | Merge `DistributionallyRobust.jl` routines into core `Portfolio` structs. |
 | **Sprint 2** | **Order Rebalancing Engine** | Core `PortfolioOptimisers` | Export `generate_rebalance_plan` for post-optimization trade sizing. |
 | **Sprint 3** | **End-to-End AD Layer** | `ImplicitDifferentiation.jl`, `ChainRulesCore.jl` | Provide gradient support for `Flux.jl` integration. |
 | **Sprint 4** | **GPU Scenario Kernels** | `CUDA.jl` | Enable optional GPU dispatch for distance matrices and risk calculations. |

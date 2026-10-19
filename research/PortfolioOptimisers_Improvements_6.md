@@ -405,24 +405,6 @@ Mean‑variance optimisation relies on historical estimates that may not capture
 
 ### 5.2 Mathematical Formulation
 
-Given a set of $S$ scenarios, each with return vector $\mathbf{r}^{(s)} \in \mathbb{R}^N$ and probability $p_s$, the scenario‑based portfolio optimisation is:
-
-$$\begin{align}
-\underset{\mathbf{w}}{\text{opt}} \quad & \sum_{s=1}^S p_s \cdot \mathbf{w}^\top \mathbf{r}^{(s)} - \frac{\lambda}{2} \sum_{s=1}^S p_s \cdot \left(\mathbf{w}^\top \mathbf{r}^{(s)} - \sum_{s'} p_{s'} \mathbf{w}^\top \mathbf{r}^{(s')}\right)^2 \\
-\text{s.t.} \quad & \mathbf{1}^\top \mathbf{w} = 1, \quad \mathbf{w} \geq 0
-\end{align}$$
-
-Here:
-- $\mathbf{r}^{(s)}$ is the return vector under scenario $s$.
-- $p_s$ is the probability (or weight) of scenario $s$.
-- The first term is the expected return, and the second is the variance of returns across scenarios.
-
-For tail risk measures like Conditional Value‑at‑Risk (CVaR):
-
-$$\text{CVaR}_\alpha(\mathbf{w}) = \mathbb{E}[- \mathbf{w}^\top \mathbf{r} \mid - \mathbf{w}^\top \mathbf{r} \geq \text{VaR}_\alpha]$$
-
-where $\text{VaR}_\alpha$ is the $\alpha$‑quantile of the portfolio loss distribution.
-
 Scenario generation methods include:
 - **Historical bootstrapping**: resample from historical returns.
 - **Parametric**: sample from fitted distributions (normal, t, skewed‑t).
@@ -432,7 +414,6 @@ Scenario generation methods include:
 ### 5.3 Literature
 
 - **TailRiskScenGen.jl**: Julia package for scenario generation with tail risk measures.
-- **Scenario‑based risk**: Implementation in `PortfolioOptimisers.jl` already supports scenario‑based risk expressions.
 - **Stress testing**: Backtesting and stress testing frameworks in Julia.
 
 ### 5.4 Sample Implementation (with detailed comments)
@@ -504,228 +485,21 @@ scenario_cov = cov(hcat(scenarios...))  # covariance across scenarios
 ### 5.5 Integration Points
 
 - **New module**: `ScenarioGeneration` with multiple generator types.
-- **Integration**: Scenario‑based risk measures already exist in the library.
 - **API**: `ScenarioPortfolioOptimiser(optimiser, scenario_generator)`
-
----
-
-## 6. Dedicated Backtesting Framework
-
-### 6.1 Motivation
-
-While `PortfolioOptimisers.jl` provides optimisation capabilities, it lacks a formal backtesting framework for evaluating strategy performance over time. A dedicated backtesting module would enable walk‑forward validation, hyperparameter tuning, and performance attribution.
-
-### 6.2 Mathematical Formulation
-
-For a walk‑forward backtest with rebalancing frequency $\Delta t$ (e.g., monthly), at each rebalancing date $t$ we use the past $L$ observations to compute moments and optimise:
-
-$$\mathbf{w}_{t+\Delta t} = \text{Optimise}\left(\mathcal{D}_{t-L:t}, \Theta\right)$$
-
-where $\mathcal{D}_{t-L:t}$ is the lookback window of length $L$ and $\Theta$ are the optimisation parameters (e.g., risk aversion).
-
-Portfolio value evolution:
-
-$$V_{t+1} = V_t \cdot \left(1 + \mathbf{w}_t^\top \mathbf{r}_{t+1} - \text{TC}(\Delta \mathbf{w}_t)\right)$$
-
-Here:
-- $V_t$ is the portfolio value at time $t$.
-- $\mathbf{r}_{t+1}$ is the vector of asset returns from $t$ to $t+1$.
-- $\text{TC}(\Delta \mathbf{w}_t)$ is the transaction cost incurred when changing weights from $\mathbf{w}_{t-1}$ to $\mathbf{w}_t$.
-
-A common transaction cost function:
-
-$$\text{TC}(\Delta \mathbf{w}) = c_{\text{fixed}} \cdot \mathbf{1}^\top |\Delta \mathbf{w}| + c_{\text{prop}} \cdot \sum_i |\Delta w_i| \cdot |V_t|$$
-
-where:
-- $c_{\text{fixed}}$ is a fixed cost per unit of absolute weight change.
-- $c_{\text{prop}}$ is a proportional cost (e.g., bid‑ask spread).
-
-Performance metrics:
-$$\text{Sharpe} = \frac{\mathbb{E}[R] - R_f}{\sigma(R)}, \quad \text{MaxDD} = \max_{t} \left(1 - \frac{V_t}{\max_{s \leq t} V_s}\right)$$
-
-where $R$ is the portfolio return over the backtest period, $R_f$ is the risk‑free rate, and $\sigma(R)$ is the standard deviation of returns. MaxDD is the maximum drawdown.
-
-### 6.3 Literature
-
-- **Lucky.jl**: Reactive and async trading framework for rapid strategy deployment.
-- **RiskPerf.jl**: High‑performance risk and performance analysis, avoiding temporary allocations.
-- **OnlinePortfolioAnalytics.jl**: Quantitative portfolio analytics via online algorithms.
-
-### 6.4 Sample Implementation (with detailed comments)
-
-```julia
-using DataFrames, Dates, PortfolioOptimisers
-
-# Configuration for a backtest.
-struct BacktestConfig
-    lookback::Int               # number of historical days used for each optimisation
-    rebalance_freq::Int         # days between rebalancing (e.g., 21 for monthly)
-    transaction_cost::Float64   # proportional cost (fixed cost is omitted for simplicity)
-    initial_capital::Float64
-end
-
-# Results container.
-struct BacktestResult
-    weights::Matrix{Float64}          # N × number_of_rebalances
-    portfolio_values::Vector{Float64} # daily values
-    returns::Vector{Float64}          # daily portfolio returns
-    metrics::Dict{Symbol, Float64}    # Sharpe, maxDD, etc.
-end
-
-# Run the backtest.
-function run_backtest(returns::Matrix{Float64},
-                      optimiser_factory::Function,   # function that returns an optimiser
-                      config::BacktestConfig)::BacktestResult
-
-    T, N = size(returns)
-    n_steps = T ÷ config.rebalance_freq   # number of rebalancing points
-
-    weights = zeros(N, n_steps)
-    values = zeros(n_steps + 1)   # we will expand to daily later; simplified here
-    values[1] = config.initial_capital
-
-    for step in 1:n_steps
-        t = (step - 1) * config.rebalance_freq + 1   # start of lookback window
-        lookback_end = min(t + config.lookback - 1, T)
-
-        # Get historical data for the lookback window.
-        hist_returns = returns[t:lookback_end, :]
-
-        # Compute moments.
-        μ = mean(hist_returns, dims=1)[:]
-        Σ = cov(hist_returns)
-        # Create the optimiser and solve.
-        w = optimiser_factory()(μ, Σ)
-        weights[:, step] = w
-
-        # Simulate returns during the holding period.
-        period_end = min(t + config.rebalance_freq - 1, T)
-        period_returns = returns[t+1:period_end, :]
-
-        for day in 1:size(period_returns, 1)
-            # Apply transaction cost only on the first day after rebalancing.
-            if day == 1 && step > 1
-                Δw = w - weights[:, step-1]
-                tc = config.transaction_cost * sum(abs.(Δw))
-            else
-                tc = 0.0
-            end
-            # Update portfolio value.
-            idx = step + day   # index in values array (simplified)
-            values[idx] = values[idx-1] * (1 + dot(w, period_returns[day, :]) - tc)
-        end
-    end
-
-    # Compute performance metrics.
-    port_returns = diff(values) ./ values[1:end-1]
-    metrics = Dict(
-        :sharpe => (mean(port_returns) / std(port_returns)) * sqrt(252),
-        :max_drawdown => maximum(1 .- values ./ cummax(values)),
-        :total_return => values[end] / values[1] - 1,
-        :volatility => std(port_returns) * sqrt(252)
-    )
-
-    return BacktestResult(weights, values, port_returns, metrics)
-end
-
-# Usage:
-config = BacktestConfig(
-    lookback=252,
-    rebalance_freq=21,
-    transaction_cost=0.001,
-    initial_capital=1_000_000
-)
-result = run_backtest(returns, () -> MeanVarianceOptimiser(λ=1.0), config)
-```
-
-### 6.5 Integration Points
-
-- **New module**: `Backtesting` with configurable rebalancing, transaction costs, and metrics.
-- **Integration**: Works with all existing optimiser types.
-- **Extensions**: Parallel backtesting, cross‑validation, parameter grids.
 
 ---
 
 ## 7. Factor Model Integration
 
-### 7.1 Motivation
-
-Factor models like Fama‑French provide a structured approach to understanding asset returns. Deeper integration would enable factor‑based portfolio construction, risk decomposition, and performance attribution.
-
-### 7.2 Mathematical Formulation
-
-The Fama‑French 3‑factor model:
-
-$$\mathbb{E}[r_i] - r_f = \beta_{i,M} \cdot \text{Mkt-RF} + \beta_{i,SMB} \cdot \text{SMB} + \beta_{i,HML} \cdot \text{HML}$$
-
-where:
-- $r_i$ is the return of asset $i$.
-- $r_f$ is the risk‑free rate.
-- $\text{Mkt-RF}$, $\text{SMB}$, $\text{HML}$ are the factor returns.
-- $\beta_{i,M}, \beta_{i,SMB}, \beta_{i,HML}$ are the factor loadings of asset $i$.
-
-The 5‑factor model adds profitability (RMW) and investment (CMA) factors.
-
-For factor‑based portfolio construction, the optimisation can be framed as:
-
-$$\begin{align}
-\underset{\mathbf{w}}{\text{opt}} \quad & \mathbf{w}^\top \boldsymbol{\mu} - \frac{\lambda}{2} \mathbf{w}^\top \boldsymbol{\Sigma} \mathbf{w} \\
-\text{s.t.} \quad & \mathbf{1}^\top \mathbf{w} = 1, \quad \mathbf{w} \geq 0 \\
-& \mathbf{w}^\top \boldsymbol{\beta}_k = \beta_k^{\text{target}} \quad \text{for each factor } k
-\end{align}$$
-
-where $\boldsymbol{\beta}_k \in \mathbb{R}^N$ is the vector of loadings for factor $k$, and $\beta_k^{\text{target}}$ is the desired portfolio exposure to that factor.
-
 ### 7.3 Literature
 
 - **FamaFrenchData.jl**: Julia package for accessing Ken French Data Library.
-- **Factor models**: CAPM, Fama‑French 3 & 5‑Factor, Carhart Momentum.
 - **Market regime**: HMM‑based regime estimation using Fama‑French factors.
 
 ### 7.4 Sample Implementation (with detailed comments)
 
 ```julia
 using FamaFrenchData, PortfolioOptimisers, LinearAlgebra
-
-# Extend the existing FactorPrior with automatic data fetching.
-struct FactorPrior <: AbstractPrior
-    factor_loadings::Matrix{Float64}   # N × K, where K is number of factors
-    factor_returns::Matrix{Float64}    # T × K, historical factor returns
-    factor_premiums::Vector{Float64}   # K, expected factor premiums (e.g., historical averages)
-end
-
-# Given asset returns (or just using the prior), compute expected returns and covariance.
-function (prior::FactorPrior)(::AbstractMatrix)
-    # Expected returns: factor_loadings * factor_premiums.
-    μ = prior.factor_loadings * prior.factor_premiums
-
-    # Covariance: factor covariance + idiosyncratic risk (diagonal).
-    Σ_factor = cov(prior.factor_returns)
-    # Idiosyncratic variance: variance of residuals after factor regression.
-    # Here we approximate: residuals = factor_loadings * factor_returns' - mean(returns)
-    # Actually we need asset returns to compute residuals; for demo we use a placeholder.
-    # In practice, you'd have asset returns to compute residuals.
-    # For illustration, we assume a diagonal matrix of residual variances.
-    residuals = prior.factor_loadings * prior.factor_returns'  # N × T (transposed)
-    # Assume residuals are mean‑zero; compute variance per asset.
-    resid_var = var(residuals, dims=2)[:]   # length N
-    Σ_idio = diagm(resid_var)
-    Σ = prior.factor_loadings * Σ_factor * prior.factor_loadings' + Σ_idio
-
-    return μ, Σ
-end
-
-# Constraint to enforce target factor exposures.
-struct FactorConstraint <: AbstractConstraint
-    factor_loadings::Matrix{Float64}   # N × K
-    target_exposures::Vector{Float64}  # K
-    tolerance::Float64                 # allowed deviation
-end
-
-function (c::FactorConstraint)(w::AbstractVector)
-    exposures = c.factor_loadings' * w
-    return all(abs.(exposures - c.target_exposures) .<= c.tolerance)
-end
 
 # Helper to fetch Fama‑French factors.
 function fetch_ff_factors(which::String="3")
@@ -739,8 +513,6 @@ end
 ### 7.5 Integration Points
 
 - **Enhance existing `FactorPrior`**: Add automatic data fetching from `FamaFrenchData.jl`.
-- **New constraint**: `FactorExposureConstraint`.
-- **New analytics**: Factor attribution and risk decomposition.
 
 ---
 
@@ -770,36 +542,6 @@ Interactive visualisations should support:
 
 ```julia
 using GLMakie, PortfolioOptimisers
-
-# Plot efficient frontier.
-function plot_efficient_frontier(μ::AbstractVector, Σ::AbstractMatrix,
-                                 points::Int=100)
-    fig = Figure()
-    ax = Axis(fig[1, 1], xlabel="Risk (σ)", ylabel="Return (μ)")
-
-    # Generate frontier points by varying target return.
-    returns = range(minimum(μ), maximum(μ), length=points)
-    risks = Float64[]
-
-    for r in returns
-        try
-            w = min_risk_for_return(μ, Σ, r)   # assumes such a function exists
-            push!(risks, sqrt(w' * Σ * w))
-        catch
-            push!(risks, NaN)
-        end
-    end
-
-    lines!(ax, risks, returns, color=:blue, linewidth=2)
-
-    # Mark the maximum Sharpe portfolio.
-    sharpe_w = max_sharpe(μ, Σ)
-    sharpe_risk = sqrt(sharpe_w' * Σ * sharpe_w)
-    sharpe_return = sharpe_w' * μ
-    scatter!(ax, [sharpe_risk], [sharpe_return], color=:red, markersize=15)
-
-    fig
-end
 
 # Interactive dashboard with sliders.
 function interactive_portfolio_dashboard(returns::AbstractMatrix)
@@ -842,7 +584,6 @@ end
 
 | Feature | Priority | Complexity | Dependencies | Estimated Effort |
 |---------|----------|------------|--------------|------------------|
-| **Backtesting Framework** | High | Medium | None | 2‑3 weeks |
 | **ESG Integration** | High | Low | None | 1‑2 weeks |
 | **Factor Model Enhancement** | High | Low | `FamaFrenchData.jl` | 1‑2 weeks |
 | **Interactive Visualisations** | Medium | Medium | `Makie.jl` | 2‑3 weeks |
@@ -850,41 +591,6 @@ end
 | **Deep Learning Priors** | Medium | High | `Flux.jl`/`Lux.jl` | 3‑4 weeks |
 | **RL Optimisers** | Low | High | `ReinforcementLearning.jl` | 4‑6 weeks |
 | **Scenario Generation** | Medium | Medium | `Distributions.jl` | 2‑3 weeks |
-
----
-
-## 10. Architectural Recommendations
-
-### 10.1 Extension System
-
-Consider adopting a plugin/extension system where advanced features (DL, RL, LLM) are optional dependencies:
-
-```julia
-# In Project.toml
-[extras]
-Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
-ReinforcementLearning = "..."
-
-[extensions]
-DeepLearningExt = ["Flux"]
-RLExt = ["ReinforcementLearning"]
-LLMExt = ["HTTP", "JSON"]
-```
-
-### 10.2 API Consistency
-
-All new features should follow the existing API patterns:
-- Priors: `<Name>Prior <: AbstractPrior`
-- Optimisers: `<Name>Optimiser <: AbstractOptimiser`
-- Constraints: `<Name>Constraint <: AbstractConstraint`
-
-### 10.3 Documentation
-
-Each feature should include:
-- Mathematical formulation (LaTeX) with all variables defined.
-- Usage examples.
-- References to literature.
-- Performance considerations.
 
 ---
 

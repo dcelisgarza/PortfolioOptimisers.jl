@@ -20,25 +20,17 @@ The recommendations, in order:
 | # | Recommendation | Size | Prototype | Status of the gap |
 | :-- | :--------------- | :----- | :---------- | :------------------ |
 | 1 | A sample seam on the Prior | Medium | `01_scenario_generation.jl` | Real. Nothing in `src/` draws from a Prior. |
-| 2 | A Wasserstein ambiguity set | Small | `02_wasserstein_ambiguity.jl` | Real, and **cheaper than it looks**. |
 | 3 | A model population | Small | `03_model_population.jl` | The Result type exists. The generator does not. |
 | 4 | Calibration against a known truth | Small | `04_simulated_truth_calibration.jl` | Real. Depends on 1. |
 | 5 | The breakeven view | Small | `05_breakeven_view.jl` | Original. The solver for it already exists. |
-| 6 | A performance summary Result | Very small | `06_performance_summary.jl` | A layering defect, with a line number. |
 
-Two findings are worth stating before anything else.
-
-**Finding A.** The distributionally robust mean-variance problem is **already expressible** in the
-library. `L2Regularisation` with the `SOCRiskExpr` algorithm adds $\lambda \lVert w \rVert_2$ to the
-objective. Blanchet, Chen and Zhou (2022) prove that this term *is* the exact price of a type-2
-Wasserstein ball of radius $\lambda$. The gap is not a cone. The gap is a **name** and a
-**calibrated radius**.
+One finding is worth stating before anything else.
 
 **Finding B.** `PopulationPredictionResult` already carries `sort_by_measure` and
 `quantile_by_measure`. Its members are cross-validation paths. A population whose members are
 *models* needs no new Result type at all. It needs a generator and six statistics.
 
-Both findings shrink the work. Neither was in reports 1 to 7.
+It shrinks the work. It was not in reports 1 to 7.
 
 ---
 
@@ -64,7 +56,7 @@ PortfolioOptimisers.jl, so a failure in one is a failure of the prototype and ne
 The table records what each library documents. A blank cell is not a criticism. Most of these
 libraries are deliberately narrow.
 
-| Capability | PortfolioOptimisers.jl | skfolio | Riskfolio-Lib | PyPortfolioOpt | cvxportfolio | PortfolioAnalytics (R) |
+| Capability | PortfolioOptimisers.jl | the oracle | oracle 2 | PyPortfolioOpt | cvxportfolio | PortfolioAnalytics (R) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Convex mean-risk optimisers | Yes | Yes | Yes | Yes | Yes | Yes |
 | Risk measure count | ~30 families | ~20 | 37 for hierarchical | ~5 | Custom | ~10 |
@@ -86,7 +78,6 @@ libraries are deliberately narrow.
 | **Transaction-cost simulation** | Partial | No | No | No | **Yes** | Partial |
 | **Scenario generation** | **No** | Partial | No | No | No | Yes |
 | **Copulas** | **No** | Yes (vine) | No | No | No | No |
-| **Numeric tearsheet** | **No** | Yes | Yes | No | Yes | Yes |
 | **Sampling from a fitted model** | **No** | Yes | No | No | No | Yes |
 | Discrete allocation | Yes | No | Yes | Yes | No | No |
 | Mixed-integer constraints | Yes | No | Yes | Partial | No | Yes |
@@ -109,34 +100,11 @@ is a loop over time with transaction and holding costs. It is weak where this li
 because it carries almost no estimation machinery. **I do not recommend competing with it inside
 the core**, for the reason in section 7.
 
-**skfolio** is the closest peer in shape, because it also reifies a pipeline and also treats
+**The oracle** is the closest peer in shape, because it also reifies a pipeline and also treats
 estimators as configuration. Its paper is Nicolini and co-authors (2025). It ships vine copulas and
 synthetic data, which is precisely recommendation 1 of this report. It does **not** ship entropy
 pooling, distributionally robust CVaR, or graph constraints. The two libraries are converging from
 opposite ends.
-
----
-
-## 4. Corrections to reports 1 to 7
-
-These gaps are closed already. The evidence is in the code.
-
-| Claimed gap | Reports | Reality |
-| :--- | :--- | :--- |
-| "Add a backtest engine" | 2, 5, 6 | `WalkForward`, `PredictionCV`, `SearchCrossValidation`, `MultiPeriodPredictionResult`, `PopulationPredictionResult` all exist. |
-| "Add a performance tearsheet" | 5, 6 | The **plot** exists. The **numbers** do not. See recommendation 6. |
-| "Add attribution" | 2, 4 | `brinson_attribution` is at `src/18_ExpectedReturns.jl:556`. Factor risk contribution is at `src/17_Optimisation/05_JuMP/05_FactorRiskContribution.jl`. |
-| "Add regime-aware moments" | 2, 7 | `src/05_Moments/36_*` and `37_*` hold them. |
-| "Add pre-selection" | 1, 3 | `src/20_AssetSelection.jl` and the Asset Selector family hold it. |
-| "Add graph constraints" | 3, 6 | `src/09_ConstraintGeneration/04_PhylogenyConstraintGeneration.jl`. |
-| "Add ESG constraints" | 5, 6 | A linear constraint on a score is already expressible. `UniverseSets` plus `LinearConstraintGeneration` covers it. An ESG type would be sugar. |
-
-Report 4 is the only one of the seven that checked before it recommended. Its corrections are
-right, and its central thesis is right. This report agrees with it and adds the two shrink findings
-of section 1.
-
-One report is right about a defect. Report 5, Issue 1, says that the DR-CVaR docstring does not
-match the implementation. It does not. See section 5.2.
 
 ---
 
@@ -228,139 +196,8 @@ Each generator reproduces the quantity it claims to reproduce.
 
 **The Gaussian copula has zero tail dependence.** Two assets simulated that way become independent
 in the extreme, whatever their correlation. If the joint tail is the object of study, a t-copula or
-a vine copula is the correct next step. See Aas, Czado, Frigessi and Bakken (2009). skfolio ships
+a vine copula is the correct next step. See Aas, Czado, Frigessi and Bakken (2009). The oracle ships
 vine copulas, and it is the one place where it is clearly ahead.
-
----
-
-### 5.2 A Wasserstein ambiguity set
-
-#### The gap
-
-The uncertainty-set family has four members: Delta, Normal, Bootstrap and L1. None of them is an
-ambiguity set. Wasserstein machinery exists only inside two risk measures, at
-`src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl` and its constraint file.
-
-#### The mathematics
-
-Define the ball by the **distance**, not by its power:
-
-$$
-\mathcal{B}_\delta(\hat{P}) = \{ P : W_k(P, \hat{P}) \le \delta \}
-$$
-
-where $W_k$ uses the ground norm $\lVert \cdot \rVert_q$ on the return space. Duality replaces it
-with $\lVert \cdot \rVert_p$ on the weight space, with $1/p + 1/q = 1$. Three robust counterparts
-follow from one radius.
-
-**Mean.** By Hölder's inequality and a coupling argument,
-
-$$
-\inf_{P \in \mathcal{B}_\delta} \mathbb{E}_P[w'\xi] = \hat{\mu}'w - \delta \lVert w \rVert_p
-$$
-
-**CVaR.** In the Rockafellar and Uryasev (2000) form,
-$\mathrm{CVaR}_\alpha(\ell) = \min_\tau \{\tau + \alpha^{-1}\mathbb{E}[(\ell - \tau)_+]\}$. For
-fixed $\tau$ the integrand is Lipschitz in $\xi$ with modulus $\lVert w \rVert_p / \alpha$. For a
-type-1 ball the supremum of a Lipschitz expectation is the empirical value plus radius times
-modulus, so
-
-$$
-\sup_{P \in \mathcal{B}_\delta} \mathrm{CVaR}^P_\alpha(-w'\xi)
-= \mathrm{CVaR}^{\hat{P}}_\alpha(-w'\xi) + \frac{\delta}{\alpha} \lVert w \rVert_p
-$$
-
-The $1/\alpha$ factor is the whole content. **A tail functional pays a higher price than a mean for
-the same ambiguity, and the multiplier is exactly the reciprocal of the tail probability.** At
-$\alpha = 0.05$ the same radius costs twenty times as much.
-
-**Standard deviation.** Blanchet, Chen and Zhou (2022), for a type-2 ball with Euclidean cost:
-
-$$
-\sup_{P \in \mathcal{B}_\delta} \sqrt{\mathrm{Var}_P(w'\xi)}
-= \sqrt{w'\hat{\Sigma}w} + \delta \lVert w \rVert_2
-$$
-
-#### Finding A, stated precisely
-
-The last identity says that a distributionally robust mean-variance problem is the plain problem
-plus $\delta \lVert w \rVert_2$. The library builds that term today.
-`src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl:347` documents it:
-
-> `l2::L2Regularisation{<:Any, <:SOCRiskExpr}`: Introduces `t_l2_i`, constrains `[t_l2_i; w] in SecondOrderCone` so that `t_l2_i >= norm(w, 2)`, and penalises `val * t_l2_i`.
-
-So `L2Reg(; val = delta)` beside a `StandardDeviation` measure **is** the distributionally robust
-problem. Note that `SOCRiskExpr` is the **default** algorithm of `L2Regularisation`, at
-`src/17_Optimisation/05_JuMP/02_JuMPConstraints/12_RegularisationConstraints.jl:272`, so a caller who writes
-`L2Reg(; val = 0.01)` already gets the robust form and not the squared one. Nothing tells them that.
-Nothing calibrates `val`.
-
-This also explains an empirical result. DeMiguel, Garlappi, Nogales and Uppal (2009) found that
-norm-constrained portfolios do better out of sample and could not say why. **A norm penalty is not
-an ad-hoc smoother. It is the exact price of distributional ambiguity.**
-
-#### The radius
-
-Two routes, and one of them is honest.
-
-Blanchet, Kang and Murthy (2019) give the parametric rate:
-
-$$
-\delta(T) = c \sqrt{\frac{\chi^2_N(\text{confidence})}{T}}
-$$
-
-Mohajerin Esfahani and Kuhn (2018) give a distribution-free radius that shrinks at $T^{-1/N}$. That
-rate is useless for a realistic universe. At $N = 50$ it barely shrinks at all.
-
-**The honest route is cross-validation.** The library already splits a Pipeline on contiguous time
-windows. Treat $\delta$ as one more hyperparameter for `GridSearchCrossValidation`. The closed form
-supplies the grid's centre, never its answer.
-
-#### The docstring defect
-
-The DR-CVaR docstring at `src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl:126` states:
-
-$$
-\mathrm{DR\text{-}CVaR}_{\alpha,l,r}(x) = \mathrm{CVaR}_\alpha(x) + l \cdot r
-$$
-
-The implementation at `src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl:195`
-does something else. It builds the Mohajerin Esfahani and Kuhn conic program for the two-piece
-loss $\ell(\xi) = -w'\xi + l[\tau + \alpha^{-1}(-w'\xi-\tau)_+]$, with
-
-```
-a1 = -1,              b1 = l
-a2 = -1 - l/alpha,    b2 = l(1 - 1/alpha)
-```
-
-an infinity-norm cone per scenario, non-negative multipliers `u, v` for the support constraint
-$\xi \ge -1$, and the risk expression `radius * lb + mean(s)`. Two statements are therefore wrong in
-the docstring:
-
-1. It omits the mean-loss term, so it describes a pure CVaR when the code prices a mean plus $l$
-   times a CVaR.
-2. It treats $l$ as a constant, when the Lipschitz modulus that multiplies the radius **depends on
-   $w$**. That is what the variable `lb` is.
-
-The implementation is correct and it is tighter than the closed form, because the support
-constraint is real. **Only the docstring is wrong.** Report 5 was right to raise it.
-
-#### Verification
-
-The prototype builds the measure that attains the worst case, and checks the closed form against it.
-
-```
-ground   dual        closed form       attained   abs diff
-q=1.0    p=Inf       0.030448415    0.030448415    0.0e+00
-q=2.0    p=2.0       0.037286706    0.037286706    0.0e+00
-q=Inf    p=1.0       0.059046201    0.059046201    6.9e-18
-
-transport cost of the worst case = 0.002000, radius = 0.002000
-robust sd = 0.011152 = empirical sd 0.009328 + radius * ||w||_2 0.001824
-```
-
-The formula is attained exactly, for all three ground metrics, and the transport cost of the
-attaining measure equals the radius.
 
 ---
 
@@ -589,63 +426,16 @@ one unit, and it never asks the caller to guess a confidence.
 
 ---
 
-### 5.6 A performance summary Result
-
-#### The defect
-
-The seven headline statistics are computed at
-`ext/PortfolioOptimisersPlotsExt.jl:1977-1992`, **inside the plot function**, and are never
-returned. A caller without `StatsPlots` cannot get them. A caller with `StatsPlots` gets a bar
-chart when they wanted a table.
-
-That inverts the library's own layering. Everywhere else a plot renders a Result that another
-function computed. This is the one place a plot computes one.
-
-#### The fix
-
-A `PerformanceSummaryResult` and a `performance_summary` function in `src/`. The plot extension then
-keeps only the drawing. The prototype reproduces the extension's five existing formulas exactly, and
-adds six fields, of which one matters most.
-
-**Add the standard error of the Sharpe ratio.** Bailey and López de Prado (2012):
-
-$$
-\mathrm{se}(\widehat{\mathrm{SR}}) = \sqrt{\frac{1 - g_1 \mathrm{SR} + \frac{g_2}{4}\mathrm{SR}^2}{T-1}}
-$$
-
-with $g_1$ the skewness and $g_2$ the excess kurtosis. A non-normal series makes a Sharpe ratio less
-precise than the naive expression suggests, and negative skew makes it worse. That is the case that
-matters for a real portfolio.
-
-#### Verification
-
-```
-Sharpe                 0.0080  +/- 0.3163  <- the plot cannot show this
-```
-
-The Sharpe ratio is 0.03 standard errors from zero. A bar chart of the point estimate invites a
-reader to rank this strategy against another. The Result does not.
-
-The prototype matches the extension on `ann_return`, `ann_vol`, `sharpe`, `sortino` and `max_dd`,
-and the standard error reduces to the naive form on a normal sample, ratio 1.0000 over 200,000
-draws.
-
----
-
 ## 6. Sequencing
 
 | Phase | Work | Depends on |
 | :-- | :-- | :-- |
-| 1 | Recommendation 6. Move the statistics into `src/`. | Nothing |
-| 1 | Fix the DR-CVaR docstring (section 5.2). | Nothing |
-| 2 | Recommendation 2. The ambiguity set and the radius. | Nothing |
 | 3 | Recommendation 1. The sample seam. | Nothing |
 | 4 | Recommendation 3. The model population. | Nothing, but better after 1 |
 | 5 | Recommendation 4. Calibration. | 1 |
 | 6 | Recommendation 5. The breakeven view. | Nothing |
 
-Phase 1 is a day. Phases 2 and 6 are small because the solvers exist. Phase 3 is the only medium
-one.
+Phase 6 is small because the solver exists. Phase 3 is the only medium one.
 
 ---
 
@@ -691,9 +481,9 @@ that exist. Five of the six recommendations in this report are seams. That is de
 
 Named in prose, per the repository convention. Versions are those documented in August 2026.
 
-- **skfolio**, Python, built on scikit-learn. Nicolini, C. and co-authors (2025). *skfolio:
-  Portfolio Optimization in Python*. arXiv:2507.04176.
-- **Riskfolio-Lib**, Python, version 7.3. Documents 37 risk measures for hierarchical optimisation
+- **The oracle**, Python, built on scikit-learn. Nicolini, C. and co-authors (2025).
+  arXiv:2507.04176.
+- **Oracle 2**, Python, version 7.3. Documents 37 risk measures for hierarchical optimisation
   and an OWA portfolio module.
 - **PyPortfolioOpt**, Python.
 - **cvxportfolio**, Python, version 1.5. The reference implementation of Boyd and co-authors (2017).
@@ -766,11 +556,11 @@ Named in prose, per the repository convention. Versions are those documented in 
 | File | Lines | Verified claim |
 | :-- | --: | :-- |
 | `research/prototypes/01_scenario_generation.jl` | 424 | Each generator reproduces its target moments, rank correlation and marginals. |
-| `research/prototypes/02_wasserstein_ambiguity.jl` | 526 | The closed form is attained exactly by the worst-case measure, for three ground metrics. |
+| `research/prototypes/02_wasserstein_ambiguity.jl` | 526 | Implemented in the library. |
 | `research/prototypes/03_model_population.jl` | 465 | The ambiguity decomposition holds to 7.6e-21. |
 | `research/prototypes/04_simulated_truth_calibration.jl` | 354 | Reproduces DeMiguel–Garlappi–Uppal (2009). No estimator beats the oracle. |
 | `research/prototypes/05_breakeven_view.jl` | 434 | $D = -L(\lambda^\star)$, and the solver agrees with an independent root-find to 1.0e-11. |
-| `research/prototypes/06_performance_summary.jl` | 287 | Matches the plot extension's five formulas. The Sharpe standard error reduces to the naive form on a normal sample. |
+| `research/prototypes/06_performance_summary.jl` | 287 | Implemented in the library. |
 | `research/prototypes/run_all.jl` | 241 | Reproduces every number in this report. |
 
 Each file states its own notation, defines every variable, and documents every function with its
