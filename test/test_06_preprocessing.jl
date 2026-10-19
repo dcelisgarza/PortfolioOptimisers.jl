@@ -6,6 +6,13 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
 # A price-level carrier that implements no `port_opt_view`, used to reach the fallback of
 # the family.
 struct BarePricesResult <: PortfolioOptimisers.AbstractPricesResult end
+# A missing-data rule that keeps the last asset, used to prove that a new rule plugs in
+# through `fit_universe`.
+struct KeepLastAsset <: PortfolioOptimisers.AbstractMissingDataFilterAlgorithm end
+function PortfolioOptimisers.fit_universe(::KeepLastAsset, ::MissingDataFilter,
+                                          pr::PricesResult)
+    return [size(values(pr.X), 2)]
+end
 # A Gap Return algorithm that ignores the invariant entirely and answers the whole column with
 # one sentinel. `apply_gap_return` reads back only the writable cells, so the invariant is the
 # driver's and not the algorithm's, and this is what proves it.
@@ -856,6 +863,109 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # Both thresholds are shares in [0, 1].
         @test_throws DomainError MissingDataFilter(; col_thr = -0.1)
         @test_throws DomainError MissingDataFilter(; row_thr = 1.1)
+    end
+
+    @testset "MissingDataFilter fits its universe to a fixed point (#1758)" begin
+        @test MissingDataFilter().alg isa FixedPointFilter
+        ts10 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 10))
+        # `c` misses 4 of 10 observations, which col_thr = 0.4 admits. The row filter drops
+        # the first three, where `a` and `b` miss, and over the 7 that stay `c` misses 4.
+        M = [NaN NaN 70; NaN NaN 71; NaN NaN 72; 100 50 NaN; 101 51 NaN; 102 52 NaN;
+             103 53 NaN; 104 54 77; 105 55 78; 106 56 79]
+        pr = PricesResult(; X = TimeArray(ts10, M, [:a, :b, :c]))
+        fp = MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3)
+        sp = MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3, alg = SinglePassFilter())
+        rsp = fit_preprocessing(sp, pr)
+        @test rsp.nx == [:a, :b, :c]
+        psp = apply_preprocessing(rsp, pr)
+        @test count(isnan, values(psp.X)[:, 3]) == 4
+        @test size(values(psp.X), 1) == 7
+        # The single pass is not a fixed point: a second fit drops `c`.
+        @test fit_preprocessing(sp, psp).nx == [:a, :b]
+        rfp = fit_preprocessing(fp, pr)
+        @test rfp.nx == [:a, :b]
+        pfp = apply_preprocessing(rfp, pr)
+        @test TimeSeries.timestamp(pfp.X) == ts10[4:10]
+        # At the fixed point a second fit changes nothing, and every kept asset and every
+        # kept observation meets its threshold on the rows that the apply step keeps.
+        @test fit_preprocessing(fp, pfp).nx == rfp.nx
+        gaps = isnan.(values(pfp.X))
+        @test all(vec(count(gaps; dims = 1)) .// size(gaps, 1) .<= 4 // 10)
+        @test all(vec(count(gaps; dims = 2)) .// size(gaps, 2) .<= 1 // 3)
+
+        # The rows come back from the whole window on each pass. Row 7 misses `a` and `c`,
+        # 2 of 4, so the first pass drops it. Over the 6 rows that stay `c` misses 3, more
+        # than 0.4, so `c` drops. Over `a`, `b` and `d` row 7 misses 1 of 3, which
+        # row_thr = 1/3 admits, so the fixed point keeps it.
+        Mr = [NaN NaN 70 80; NaN NaN 71 81; NaN NaN 72 82; 100 50 NaN 83; 101 51 NaN 84;
+              102 52 NaN 85; NaN 53 NaN 86; 104 54 77 87; 105 55 78 88; 106 56 79 89]
+        prr = PricesResult(; X = TimeArray(ts10, Mr, [:a, :b, :c, :d]))
+        rr = fit_preprocessing(MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3), prr)
+        @test rr.nx == [:a, :b, :d]
+        @test TimeSeries.timestamp(apply_preprocessing(rr, prr).X) == ts10[4:10]
+        rs = fit_preprocessing(MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3,
+                                                 alg = SinglePassFilter()), prr)
+        @test rs.nx == [:a, :b, :c, :d]
+        @test TimeSeries.timestamp(apply_preprocessing(rs, prr).X) ==
+              ts10[[4, 5, 6, 8, 9, 10]]
+        t4 = ts10[1:4]
+
+        # At row_thr = 1 the first pass is the fixed point, and the two rules agree.
+        for thr in (0.3, 0.4, 0.5, 1.0)
+            @test fit_preprocessing(MissingDataFilter(; col_thr = thr), pr).nx ==
+                  fit_preprocessing(MissingDataFilter(; col_thr = thr,
+                                                      alg = SinglePassFilter()), pr).nx
+        end
+
+        # The fixed point runs the row filter in the fit, so a row filter that keeps no
+        # observation is refused at the fit. The single pass refuses only at the apply.
+        Mz = [1.0 NaN; NaN 2.0; NaN 3.0; 4.0 NaN]
+        prz = PricesResult(; X = TimeArray(t4, Mz, [:a, :b]))
+        @test_throws PortfolioOptimisers.IsEmptyError fit_preprocessing(MissingDataFilter(;
+                                                                                          col_thr = 0.5,
+                                                                                          row_thr = 0.0),
+                                                                        prz)
+        rz = fit_preprocessing(MissingDataFilter(; col_thr = 0.5, row_thr = 0.0,
+                                                 alg = SinglePassFilter()), prz)
+        @test rz.nx == [:a, :b]
+        @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(rz, prz)
+
+        # An asset with no price stays at col_thr = 1, so a row filter below 1 drops every
+        # observation. The fit refuses, and the message names the asset and the way out.
+        pe = PricesResult(;
+                          X = TimeArray(t4,
+                                        [1.0 2.0 NaN; 1.1 2.1 NaN; 1.2 2.2 NaN;
+                                         1.3 2.3 NaN], [:a, :b, :c]))
+        e = try
+            fit_preprocessing(MissingDataFilter(; row_thr = 0.0), pe)
+        catch err
+            err
+        end
+        @test e isa PortfolioOptimisers.IsEmptyError
+        @test occursin("row_thr = 0.0 drops every observation", e.msg)
+        @test occursin("The assets c have no observation", e.msg)
+        @test occursin("col_thr below 1", e.msg)
+        @test fit_preprocessing(MissingDataFilter(; col_thr = 0.99, row_thr = 0.0), pe).nx ==
+              [:a, :b]
+
+        # A factor with a gap at every observation misses every asset everywhere, and no
+        # filter drops a series, so the message says to fill it or remove it.
+        Ff = TimeArray(t4, [1.0 NaN; 1.1 NaN; 1.2 NaN; 1.3 NaN], [:f1, :f2])
+        pf = PricesResult(;
+                          X = TimeArray(t4, [1.0 2.0; 1.1 2.1; 1.2 2.2; 1.3 2.3], [:a, :b]),
+                          F = Ff)
+        e = try
+            apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.5), pf),
+                                pf)
+        catch err
+            err
+        end
+        @test e isa PortfolioOptimisers.IsEmptyError
+        @test occursin("gap at every observation", e.msg)
+        @test !occursin("have no observation", e.msg)
+
+        # A new rule plugs in through `fit_universe`.
+        @test fit_preprocessing(MissingDataFilter(; alg = KeepLastAsset()), pr).nx == [:c]
     end
 
     @testset "prices_to_returns filters neither axis" begin

@@ -161,6 +161,7 @@
         :AbstractMatrixSquareRootAlgorithm,
         :AbstractMeanTestEstimator,
         :AbstractMeanTestSpan,
+        :AbstractMissingDataFilterAlgorithm,
         :AbstractNeutralisationWeights,
         :AbstractNormCeilingCalibrationAlgorithm,
         :AbstractObservedExposureEstimator,

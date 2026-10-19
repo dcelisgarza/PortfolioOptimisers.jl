@@ -961,7 +961,7 @@ This is the second half of [`shared_series_view`](@ref). A caller that finds the
 function shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
                            rows::Option{<:VecInt})::ReturnsResult
     @argcheck(isnothing(rows) || !isempty(rows),
-              IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under `x_src = ExcessSource()` or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or drop them with MissingDataFilter before the conversion to returns."))
+              IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under `x_src = ExcessSource()` or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or remove the series from the input. A filter that drops the observations with a gap drops every observation here."))
     rd = isnothing(rows) ? rd : port_opt_view(rd, rows, :)
     return benchmark_estimation_mask(rd, x_src)
 end
