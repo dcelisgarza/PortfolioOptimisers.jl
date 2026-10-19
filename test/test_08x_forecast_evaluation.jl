@@ -1387,6 +1387,12 @@ end
         @test isfinite(PO.mean_test(tg, z, 1, PO.mean_test_rng(tg)).t_stat)
         @test PO.mean_test_span_length(FiniteEntrySpan(), 30, 2, 29) == 28
         @test PO.mean_test_span_length(FullGridSpan(), 30, 2, 29) == 30
+        # Finite entries can still have a mean that is not finite (#1753).
+        for t in (mt, OverlapMeanTest())
+            @test PO.mean_test_answers(t, 0.1, 30, 30, 1)
+            @test !PO.mean_test_answers(t, Inf, 30, 30, 1)
+            @test !PO.mean_test_answers(t, NaN, 30, 30, 1)
+        end
     end
 
     @testset "A series whose mean is zero has a finite interval" begin

@@ -131,7 +131,10 @@ function check_exogenous_series(ne::Option{<:VecStr}, E::Option{<:MatNum},
     check_names_and_returns_matrix(ne, E, :ne, :E)
     return check_exogenous_series(E, X, F, ts)
 end
-check_exogenous_series(::Nothing, ::Any, ::Any, ::Any) = nothing
+function check_exogenous_series(::Nothing, X::Option{<:MatNum}, F::Option{<:MatNum},
+                                ts::Option{<:VecDate})
+    return nothing
+end
 function check_exogenous_series(E::MatNum, X::Option{<:MatNum}, F::Option{<:MatNum},
                                 ts::Option{<:VecDate})::Nothing
     for (n, sym) in ((isnothing(X) ? nothing : size(X, 1), :X),

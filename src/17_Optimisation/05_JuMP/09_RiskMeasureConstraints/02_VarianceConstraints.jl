@@ -472,9 +472,10 @@ function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
 end
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::Option{<:AbstractPriorResult},
-                                ratio_alg::SquareRootRatio; prefix::Symbol = Symbol(""))
-    # Outside a positive term of `MaximumRatio` the term reads the lift with the corner
-    # `k`, which is the term of `LinearRatio`.
+                                ratio_alg::RatioFormulation; prefix::Symbol = Symbol(""))
+    # `RatioFormulation` is an extension point whose members implement only the flag, so
+    # this method takes the root. Outside a positive term of `MaximumRatio` the term reads
+    # the lift with the corner `k`, which is the term of `LinearRatio`.
     if !sdp_objective_lift_flag(model, ratio_alg, r.settings)
         return set_sdp_variance_risk!(model, i, r, pr, LinearRatio(); prefix = prefix)
     end

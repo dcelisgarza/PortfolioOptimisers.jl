@@ -1,5 +1,17 @@
 include(joinpath(@__DIR__, "test18_setup.jl"))
 
+# A ratio of a user's own implements only the flag, as the `# Interfaces` section of
+# `RatioFormulation` states. The split of #1752 refused it in the semidefinite variance.
+struct UserLiftRatio <: PortfolioOptimisers.RatioFormulation
+    lift::Bool
+end
+function PortfolioOptimisers.sdp_objective_lift_flag(model::PortfolioOptimisers.JuMP.Model,
+                                                     r::UserLiftRatio,
+                                                     settings::RiskMeasureSettings)
+    return r.lift &&
+           PortfolioOptimisers.sdp_objective_lift_flag(model, SquareRootRatio(), settings)
+end
+
 @testset "Formulations" begin
     opt = JuMPOptimiser(; pe = pr, slv = slv)
     r = factory(Variance(), pr)
@@ -627,6 +639,14 @@ end
         @test !haskey(res1.model, :lift_W)
         @test norm(res1.w - wsoc, Inf) > 0.05
         @test sharpe(res1.w) < sharpe(res.w)
+    end
+    # A ratio of a user's own reaches the semidefinite variance and the lifted set, and its
+    # flag picks the ratio.
+    for (name, mk, kw) in cases[[1, 3]]
+        @test isapprox(ratio(mk(UserLiftRatio(true)); kw...).w,
+                       ratio(mk(SquareRootRatio()); kw...).w; atol = 1e-6)
+        @test isapprox(ratio(mk(UserLiftRatio(false)); kw...).w,
+                       ratio(mk(LinearRatio()); kw...).w; atol = 1e-6)
     end
     # The phylogeny reads the lift of the objective, so it needs no penalty.
     res = ratio(Variance(); ple = SemiDefinitePhylogeny(; A = zeros(N, N), p = 1.0))

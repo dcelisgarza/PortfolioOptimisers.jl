@@ -555,4 +555,13 @@
         fixed, rt_fixed = noc_unconstrained_ret(Fees(; fl = 0.001))
         @test fixed == gross
     end
+    @testset "A QuadExpr risk measure warns, alone or in a vector (#1753)" begin
+        opt = JuMPOptimiser(; pe = pr, slv = slv)
+        @test_logs (:warn, r"QuadExpr") NearOptimalCentering(; r = Variance(), opt = opt)
+        @test_logs (:warn, r"QuadExpr") NearOptimalCentering(;
+                                                             r = [StandardDeviation(),
+                                                                  Variance()], opt = opt)
+        @test_logs NearOptimalCentering(; r = StandardDeviation(), opt = opt)
+        @test_logs NearOptimalCentering(; r = [StandardDeviation()], opt = opt)
+    end
 end

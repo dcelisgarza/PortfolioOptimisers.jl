@@ -318,7 +318,9 @@ An early exit is the usual place where an `if` on a type hides: `isnothing(x) &&
 condition only tests the type of a positional argument, or of a field of one, the definition is
 two cases, and each case is a method. Split it by dispatch on that type:
 
-- a `::Nothing` method beside the method for a value;
+- a `::Nothing` method beside the method for a value. It types every other argument like the
+  method for a value. An `::Any` there takes calls that the method for a value refuses, and an
+  `args...` can make a call ambiguous;
 - one method for each type that the `isa` tests;
 - for a field, a method that forwards the field as an argument, and one method for each type
   of the field:
@@ -326,8 +328,13 @@ two cases, and each case is a method. Split it by dispatch on that type:
   ```julia
   set_sdp_variance_risk!(model, i, r, pr) = set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg)
   function set_sdp_variance_risk!(model, i, r, pr, ::LinearRatio) ... end
-  function set_sdp_variance_risk!(model, i, r, pr, ::SquareRootRatio) ... end
+  function set_sdp_variance_risk!(model, i, r, pr, ratio_alg::RatioFormulation) ... end
   ```
+
+When the type that the condition tests is an extension point, the method for the general case
+takes the abstract type, and the method for the known case takes the concrete type. A user's
+own subtype then reaches the general case, as it did through the branch. Above, a user's own
+`RatioFormulation` implements only `sdp_objective_lift_flag`, which the general method reads.
 
 The split changes the source, not the compiled code. The compiler knows the type of each
 argument of a method, and it removes the dead arm of a branch on that type: under `LinearRatio`
@@ -391,8 +398,8 @@ When two branches do the same thing, write one branch whose condition joins thei
 is a path that the reader must follow and that a test must reach, so a chain of branches with one
 outcome costs more to read and to test than one branch. Merge these four shapes:
 
-- **Two exits in a row with the same body**, which ends in `return`, `continue`, `break`, `throw`
-  or `error`. Join the conditions with `||`. The form `c || return x` exits when `c` is false,
+- **Two exits in a row with the same body**, which ends in `return`, `continue`, `break`, `throw`,
+  `error` or `rethrow`. Join the conditions with `||`. The form `c || return x` exits when `c` is false,
   so its condition is `!c`.
 
   ```julia

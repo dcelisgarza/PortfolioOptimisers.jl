@@ -344,7 +344,7 @@ end
 
 Sets to zero every entry of a projection programme's answer at or below the tolerance of its element type.
 
-A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes comes back slightly above or slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds. It would take `log w` of a negative number, and an exact zero of the raw step keeps the weight at zero. So the clip reads every entry within the tolerance as zero, whatever the sign of the rounding, and a weight that the set forces to zero is zero on every host (#1760). The tolerance is [`weights_bound_tolerance`](@ref): ``\\sqrt{\\epsilon}`` for a floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a `Rational`. The clip does not renormalise, so the sum moves by the clipped mass, which is at most ``N \\tau``.
+A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes comes back slightly above or slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds. It would take `log w` of a negative number, and an exact zero of the raw step keeps the weight at zero. So the clip reads every entry within the tolerance as zero, whatever the sign of the rounding, and a weight that the set forces to zero is zero after the clip. The tolerance is [`weights_bound_tolerance`](@ref): ``\\sqrt{\\epsilon}`` for a floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a `Rational`. The clip does not renormalise, so the sum moves by the clipped mass, which is at most ``N \\tau``.
 
 # Mathematical definition
 
@@ -377,5 +377,5 @@ Where:
 """
 function clip_at_zero(w::AbstractVector)
     tol = weights_bound_tolerance(float_if_integer(eltype(w)))
-    return map(x -> x <= tol ? zero(x) : x, w)
+    return map(x -> ifelse(x <= tol, zero(x), x), w)
 end

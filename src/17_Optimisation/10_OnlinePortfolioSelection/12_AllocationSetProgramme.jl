@@ -1186,7 +1186,7 @@ end
 
 Projects a raw step onto the Allocation Set by the programme of [`projection_programme`](@ref).
 
-These are the programme arms of the Constrained Update. They cover every pair of a geometry and a set except the scalar roots on the bounded set. Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), [`clip_at_zero`](@ref) sets every entry of the answer within the tolerance of its element type to zero. The solver gives a weight that the set forces to zero slightly above or slightly below zero, and the next step must read it as zero on every host. A zero then stays zero at every later step, because the divergence from a zero entry is infinite. When the set later needs that asset, the step is a Held Step.
+These are the programme arms of the Constrained Update. They cover every pair of a geometry and a set except the scalar roots on the bounded set. Under [`EntropicProjection`](@ref), [`TsallisProjection`](@ref) and [`LogBarrierProjection`](@ref), [`clip_at_zero`](@ref) sets every entry of the answer within the tolerance of its element type to zero. The solver gives a weight that the set forces to zero slightly above or slightly below zero, and the next step must read it as zero for either sign. A zero then stays zero at every later step, because the divergence from a zero entry is infinite. When the set later needs that asset, the step is a Held Step.
 
 # Validation
 
