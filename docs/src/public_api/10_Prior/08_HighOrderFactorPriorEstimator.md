@@ -1,5 +1,5 @@
 ```@meta
-Description = "High order factor Prior estimator, public API of PortfolioOptimisers.jl: HighOrderFactorPriorEstimator, prior."
+Description = "High order factor Prior estimator, public API of PortfolioOptimisers.jl: HighOrderFactorPriorEstimator, prior, cokurtosis_processor, …"
 ```
 
 # High order factor Prior estimator
