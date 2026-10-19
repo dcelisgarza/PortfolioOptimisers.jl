@@ -405,7 +405,7 @@ end
 
 Return the observations of `rd` that a head keeps for its group and its prior, or `nothing` when it keeps every observation.
 
-The head drops the observations of a gap that [`shared_series_rows`](@ref) finds under the source of its group `gsrc`, and of a gap of the factor returns when its prior estimator reads them. A prior that is already a result reads no factor return in this solve, so the head reads the record of the result instead. When `rd` is the returns data that the result read, the head also drops the observations that `pe.ss_gaps` marks, see [`shared_series_kept_rows`](@ref). Then the readers of the head pair the rows of `pe.X` with the last rows of the cut data, as they do for a prior that the head fits. So the read-out of an online fold gives the head the whole returns data, and each fallback cuts it by its own rule, see [`batch_from_state`](@ref).
+The head drops the observations of a gap that [`shared_series_rows`](@ref) finds under the source of its group `gsrc`, and of a gap of the factor returns when its prior estimator reads them. A prior that is already a result reads no factor return in this solve, so the head reads the record of the result instead. When `rd` is the returns data that the result read, the head also drops the observations that `pe.ss_gaps` marks, see [`shared_series_kept_rows`](@ref). Then the readers of the head pair the rows of `pe.X` with the last rows of the cut data, as they do for a prior that the head fits. So after an online fold the head reads the whole returns data, and each fallback cuts it by its own rule, see [`batch_from_state`](@ref).
 
 # Algorithm
 

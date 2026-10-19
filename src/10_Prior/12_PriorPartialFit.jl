@@ -966,7 +966,7 @@ end
 
 Applies the Choice Rule of each regression that a prior fits over the rows of its sample buffer, after a fold of the refit route.
 
-The two folds of the refit route call it: the matrix form of [`partial_fit!`](@ref) and [`fold_prior_step`](@ref). It gives [`pin_prior_choice`](@ref) the data that the call with no data, [`buffer_prior`](@ref), gives the batch verb: the rows that a fit keeps, which [`shared_series_buffer`](@ref) answers, the panel of [`sample_buffer_panel`](@ref), and the keywords of [`sample_buffer_fit_kwargs`](@ref). So a prior in the tree that reads a Panel Field, a mask or the Exogenous Series pins the choice of the batch fit over the same rows (#1749).
+The two folds of the refit route call it: the matrix form of [`partial_fit!`](@ref) and [`fold_prior_step`](@ref). It gives [`pin_prior_choice`](@ref) the data that the call with no data, [`buffer_prior`](@ref), gives the batch verb: the rows that a fit keeps, which [`shared_series_buffer`](@ref) answers, the panel of [`sample_buffer_panel`](@ref), and the keywords of [`sample_buffer_fit_kwargs`](@ref). So a prior in the tree that reads a Panel Field, a mask or the Exogenous Series pins the choice of the batch fit over the same rows.
 
 # Algorithm
 
@@ -1027,7 +1027,7 @@ A [`StepwiseRegression`](@ref) or a [`DimensionReductionRegression`](@ref) under
 
 An [`OpinionPoolingPrior`](@ref) does not give each prior the same rows. Its batch fit gives `pe1` the returns of the buffer, gives each prior of `pes` the returns of `pe1`, and refits `pe2` on those returns under the pooled weights. The method gives each prior the rows and the weights that the batch fit gives it, so the choice that it pins is the choice of the batch fit over the same rows. It runs `pe1` and the pool only when a prior of `pes` or `pe2` has a choice to pin, which [`pending_choice`](@ref) answers.
 
-Every method passes `pnl` and `kwargs` to each prior in the tree, as the batch fit passes its panel and its keywords. So a prior that reads a Panel Field, a mask or the Exogenous Series runs the fit of the batch fit (#1749). [`pin_buffer_choice`](@ref) gives the panel and the keywords of the buffer.
+Every method passes `pnl` and `kwargs` to each prior in the tree, as the batch fit passes its panel and its keywords. So a prior that reads a Panel Field, a mask or the Exogenous Series runs the fit of the batch fit. [`pin_buffer_choice`](@ref) gives the panel and the keywords of the buffer.
 
 An [`EntropyPoolingPrior`](@ref) or a [`MeucciEntropyPoolingPrior`](@ref) fits `pe.pe` under its prior probabilities `w0`, builds its views on that fit, and refits `pe.pe` under the posterior weights. Its batch fit applies this function to itself at the `w0` fit, so every refit reads the choice that the views read. The method pins `pe.pe` under the weights of that fit, which [`embedded_pin_weights`](@ref) answers, so the batch fit and the step pin the same choice, and the step runs no view and no solve.
 

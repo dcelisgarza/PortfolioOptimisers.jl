@@ -1082,7 +1082,7 @@ Return [`factory`](@ref) of `pe` under the prior probabilities `w` of the scenar
 
 [`EntropyPoolingPrior`](@ref) and [`MeucciEntropyPoolingPrior`](@ref) state a caller's `w` on the scenarios of the fit of the prior that they embed, and refit that prior under it. A Scenario Cap keeps the last rows of the observations as scenarios, and the moment estimators and the regression read every observation. [`factory`](@ref) gives the same `w` to every field, so these fields received fewer weights than rows. This function gives each such field [`scenario_weights`](@ref) of `w` on its rows, and every other field `w` as [`factory`](@ref) does. A nested entropy pooling prior keeps `w` as its own prior probabilities, on its scenarios.
 
-A prior that reads no Asset Panel reads its data here only for the number of its rows. The methods that take the number of rows `n` in place of the data hold its rules, and every method on the data of such a prior answers through them. A factor prior is fitted on the factor returns alone, so a prior that holds one gives it the number of rows of its factor returns. A [`CrossSectionalFactorPrior`](@ref) reads that number off its exposure stage, so it runs no regression to count the rows (#1751).
+A prior that reads no Asset Panel reads its data here only for the number of its rows. The methods that take the number of rows `n` in place of the data hold its rules, and every method on the data of such a prior answers through them. A factor prior is fitted on the factor returns alone, so a prior that holds one gives it the number of rows of its factor returns. A [`CrossSectionalFactorPrior`](@ref) reads that number off its exposure stage, so it runs no regression to count the rows.
 
 # Algorithm
 
