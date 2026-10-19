@@ -379,6 +379,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - [`OrthogonalPartCalibration`](@ref) in `ofit` needs a member that can fit the slope of the orthogonal part, as [`assert_orthogonal_forecast_fit`](@ref) states.
   - Under [`FoldOnly`](@ref) in `carry`, no part makes the cost of a step of the carry fold grow with the stream, as [`assert_carry_rule`](@ref) states.
   - Under [`NoSystematicRepair`](@ref) in `srep`, `mp` is a [`MatrixProcessing`](@ref), as [`assert_systematic_repair`](@ref) states.
+  - `mp` states the estimator with which the lift repairs the asset covariance, see [`assert_matrix_processing_posdef`](@ref).
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
 
@@ -610,6 +611,7 @@ julia> CrossSectionalFactorPrior(; factors = [\"mkt\" => ConstantExposure()], la
         assert_orthogonal_forecast_fit(ofit, rfe)
         assert_carry_rule(carry, (; factors, pe, ve, rfe, th, ce, choice, families))
         assert_systematic_repair(srep, mp)
+        assert_matrix_processing_posdef(mp)
         # One tuple of the fields gives both the type parameters and the values.
         fs = (factors, neutralise, families, unseen, cre, wa, pe, ve, ce, pdm, f_mp, mp,
               srep, th, bp, mcap, bw, lag, minra, rfe, lambda, c, ofit, l1mask, lx,

@@ -28,6 +28,16 @@ function PortfolioOptimisers.matrix_processing_algorithm!(::AlgProbe, sigma, X; 
     sigma .*= size(X, 1)
     return sigma
 end
+# A matrix processing estimator of a caller's own. Its interface states `matrix_processing!` on
+# the whole sample and no shape method, so the fold refuses it (#1765).
+struct MatrixProcessingProbe <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing!(::MatrixProcessingProbe,
+                                                sigma::PortfolioOptimisers.MatNum,
+                                                X::PortfolioOptimisers.MatNum, args...;
+                                                kwargs...)
+    sigma .*= size(X, 1)
+    return sigma
+end
 # An inner covariance estimator that folds and answers an **immutable** matrix. Nothing the
 # library ships does, because every folded read-out builds a fresh `Matrix`, but the seam is
 # open to a caller's own estimator and the composite's read-out writes its processing in
@@ -356,6 +366,18 @@ end
         w = fold(pe.update_online_estimator(pe.Online(alg)), X)
         @test pe.supports_partial_fit(w)
         @test isapprox(cov(w), cov(alg, X); rtol = 1e-12)
+        # An estimator of a caller's own in `mp` is refused by name as well, where the check
+        # read the field `alg` that its interface does not state (#1765).
+        own = PortfolioOptimisersCovariance(; mp = MatrixProcessingProbe())
+        @test !pe.supports_partial_fit(own)
+        @test !pe.supports_shape_processing(own.mp)
+        msg = "`MatrixProcessingProbe` is a matrix processing estimator of your own"
+        @test_throws msg partial_fit!(own, view(X, 1, :))
+        @test_throws msg partial_fit!(own, X)
+        @test_throws msg matrix_processing!(own.mp, cov(X), size(X)...)
+        w = fold(pe.update_online_estimator(pe.Online(own)), X)
+        @test pe.supports_partial_fit(w)
+        @test isapprox(cov(w), cov(own, X); rtol = 1e-12)
     end
 
     @testset "The carry state's interface" begin

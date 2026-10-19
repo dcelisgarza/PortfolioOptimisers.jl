@@ -28,6 +28,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - When `rsd` is `true`, `mp` states the estimator of its repair, see [`assert_matrix_processing_posdef`](@ref).
 
 ## Propagated parameters
 
@@ -176,6 +177,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :FactorPrior)
         assert_inner_reader(pe, :pe, :FactorPrior)
         assert_inner_reader(re, :re, :FactorPrior)
+        if rsd
+            assert_matrix_processing_posdef(mp)
+        end
         return new{typeof(pe), typeof(mp), typeof(re), typeof(ve), typeof(rsd),
                    typeof(mtx_sqrt), typeof(cache), typeof(x_src)}(pe, mp, re, ve, rsd,
                                                                    mtx_sqrt, cache, x_src)
@@ -335,7 +339,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
  4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
  5. Carry the square root of `f_sigma` under `mtx_sqrt`, from [`matrix_square_root`](@ref), through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
  6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Read the counts of those variances with [`variance_count`](@ref), and restate them with [`residual_variance_counts`](@ref) against the `edof` of `rr`, giving `edof` and `ediv`. Size the residual block as `err_sigma`, the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
- 7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under `mp.pdm`. This is the body's only explicit [`posdef!`](@ref) call. `mp.pdm` also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
+ 7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`. This is the body's only explicit [`posdef!`](@ref) call. For a [`MatrixProcessing`](@ref) that estimator is `mp.pdm`, and it also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
  8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
  9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the four quantities.
 
@@ -385,7 +389,7 @@ function factor_lift(mp::AbstractMatrixProcessingEstimator, ve::AbstractVariance
                                                   size(err, 1))
         err_sigma = LinearAlgebra.diagm(esigma)
         posterior_sigma .+= err_sigma
-        posdef!(mp.pdm, posterior_sigma)
+        posdef!(matrix_processing_posdef(mp), posterior_sigma)
         posterior_csigma = hcat(posterior_csigma, sqrt.(err_sigma))
     end
     return (; mu = posterior_mu, sigma = posterior_sigma,
@@ -448,7 +452,7 @@ end
 
 Declare how a prior estimator adds a residual block to the covariance it lifts.
 
-A consumer that needs to *undo* the residual block — [`HighOrderFactorPriorEstimator`](@ref) subtracts it to recover the systematic covariance its residual cokurtosis correction is defined on — cannot read `ve` and `mp.pdm` off the wrapped estimator's fields. Its `pe` slot is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry those fields; everything else in that bound is a wrapper or a pooling estimator, and a field access reaches past the type bound into a `FieldError`.
+A consumer that needs to *undo* the residual block — [`HighOrderFactorPriorEstimator`](@ref) subtracts it to recover the systematic covariance its residual cokurtosis correction is defined on — cannot read `ve` and the repair of `mp` off the wrapped estimator's fields. Its `pe` slot is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry those fields; everything else in that bound is a wrapper or a pooling estimator, and a field access reaches past the type bound into a `FieldError`.
 
 The declaration states whether a block was added and how to re-condition what remains. The block itself is on the loadings result, `rr.esigma`, measured under the weights of the fit. A prior that embeds this estimator can give the fit other weights than `ve` carries, a caller's `w` on an entropy pooling prior or the pooled weights of an opinion pool, so a consumer reads the block off `rr` and does not measure it again under `ve`.
 
@@ -467,7 +471,7 @@ There is no default. A silent `nothing` fallback cannot separate *this estimator
 # Returns
 
   - `nothing`: The estimator adds no residual block.
-  - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all.
+  - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all. A factor prior gives `pdm` from [`matrix_processing_posdef`](@ref) when `rsd` is `true`, and `nothing` when `rsd` is `false`, because no consumer repairs a covariance that has no residual block.
 
 # Related
 
@@ -482,7 +486,8 @@ function factor_residual_config(pe::AbstractPriorEstimator)
     return throw(ArgumentError("`factor_residual_config` is not defined for `$(nameof(typeof(pe)))`. Every concrete `AbstractPriorEstimator` must declare its residual block beside its own definition by adding a method returning `(; ve, pdm, rsd)`, forwarding the estimator it wraps, or returning `nothing` when it adds no residual block."))
 end
 function factor_residual_config(pe::FactorPrior)
-    return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
+    return (; ve = pe.ve, pdm = pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
+            rsd = pe.rsd)
 end
 """
     assert_factor_residual_config(pe::AbstractPriorEstimator, cfg) -> Nothing

@@ -55,6 +55,7 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - If `tau` is not `nothing`, `tau > 0`.
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - When `rsd` is `true`, `mp` states the estimator of its repair, see [`assert_matrix_processing_posdef`](@ref).
 
 `w` is **not** validated here. Its length is a property of the returns matrix, which the constructor never sees, so a wrong length surfaces at [`prior`](@ref) as a `DimensionMismatch` out of [`equilibrium_mu`](@ref) and only when `l` is set. The constructor also accepts an empty `w`, where the sibling [`AugmentedBlackLittermanPrior`](@ref) refuses one.
 
@@ -264,6 +265,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
         assert_inner_reader(pe, :pe, :FactorBlackLittermanPrior)
         assert_inner_reader(re, :re, :FactorBlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
+        if rsd
+            assert_matrix_processing_posdef(mp)
+        end
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
                    typeof(rsd), typeof(views), typeof(sets), typeof(views_conf), typeof(w),
                    typeof(rf), typeof(l), typeof(tau), typeof(mtx_sqrt), typeof(cache),
@@ -556,7 +560,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
                          kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = fpr)
 end
 function factor_residual_config(pe::FactorBlackLittermanPrior)
-    return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
+    return (; ve = pe.ve, pdm = pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
+            rsd = pe.rsd)
 end
 
 export FactorBlackLittermanPrior

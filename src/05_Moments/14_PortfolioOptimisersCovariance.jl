@@ -440,7 +440,7 @@ The step is `O(N²)`, the inner estimator's own, plus nothing.
 
 # Algorithm
 
- 1. Refuse an `mp` carrying a sample-reading `alg`.
+ 1. Refuse an `mp` that does not run from the shape of the sample, with [`assert_shape_only_matrix_processing`](@ref).
  2. Rebind `ce.ce` to the estimator [`partial_fit!`](@ref) gives, with `Accessors.@reset`.
 
 # Arguments
@@ -453,7 +453,7 @@ The step is `O(N²)`, the inner estimator's own, plus nothing.
 
 # Validation
 
-  - `ce.mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ce.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -502,7 +502,7 @@ The matrix the inner estimator returns is copied when it is immutable, because t
 # Validation
 
   - `ce.ce` carries a partial-fit state. An `ArgumentError` is thrown otherwise.
-  - `ce.mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ce.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -573,7 +573,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`PortfolioOptimisersCovariance`](@ref) method of [`supports_partial_fit`](@ref).
 
-The composite folds by composition, so it folds exactly when both of its halves allow it: the inner estimator must fold, and `mp` must carry no sample-reading `alg`. A composite a wrapper has given a buffer folds whatever those two say, which is the default and is what makes an `mp.alg` reachable online at all.
+The composite folds by composition, so it folds exactly when both of its halves allow it: the inner estimator must fold, and `mp` must run from the shape of the sample, as [`supports_shape_processing`](@ref) states. A [`MatrixProcessing`](@ref) passes when it carries no sample-reading `alg`, and a matrix processing estimator of a caller never passes. A composite a wrapper has given a buffer folds whatever those two say, which is the default and is what makes an `mp.alg` reachable online at all.
 
 # Arguments
 
@@ -591,7 +591,7 @@ The composite folds by composition, so it folds exactly when both of its halves 
 """
 function supports_partial_fit(ce::PortfolioOptimisersCovariance)
     return isa(ce.cache, SampleBufferState) ||
-           (isnothing(ce.mp.alg) && supports_partial_fit(ce.ce))
+           (supports_shape_processing(ce.mp) && supports_partial_fit(ce.ce))
 end
 
 export PortfolioOptimisersCovariance

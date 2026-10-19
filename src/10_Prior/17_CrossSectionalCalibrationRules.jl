@@ -1075,7 +1075,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Repairs the systematic block before the lift of a [`CrossSectionalFactorPrior`](@ref) adds the idiosyncratic block.
 
-The lift runs every step of `mp` on the systematic block in the order of `mp.order`, the `:pdm` step included, as [`factor_lift`](@ref) does. Then it adds the idiosyncratic block and repairs the sum under `mp.pdm`. The systematic block has rank at most ``K``, so the `:pdm` step runs its full repair at each fit, and it moves the block by round-off alone.
+The lift runs every step of `mp` on the systematic block in the order of `mp.order`, the `:pdm` step included, as [`factor_lift`](@ref) does. Then it adds the idiosyncratic block and repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`. The systematic block has rank at most ``K``, so the `:pdm` step runs its full repair at each fit, and it moves the block by round-off alone.
 
 # Mathematical definition
 
@@ -1089,7 +1089,7 @@ Where:
 
   - ``\\mathbf{\\Sigma}``: Asset covariance.
   - ``\\operatorname{mp}``: Every step of `mp`, in the order of `mp.order`.
-  - ``\\operatorname{pdm}``: The repair under `mp.pdm`, from [`posdef!`](@ref).
+  - ``\\operatorname{pdm}``: The repair under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`, from [`posdef!`](@ref).
   - ``\\odot``: The product over the support of each row of loadings, from [`support_product`](@ref).
   - ``\\mathbf{B}_{T,\\,\\mathcal{I}}``: The rows of ``\\mathbf{B}_{T}`` at the assets of ``\\mathcal{I}``.
   - $(math_dict[:B_T_cs])

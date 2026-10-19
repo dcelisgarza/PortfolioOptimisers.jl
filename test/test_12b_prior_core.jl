@@ -192,10 +192,14 @@ processing, and the residual block enters `sigma` and `chol` once each. Sweep ti
     @test isapprox(transpose(lt.chol) * lt.chol, systematic)
     @test !isapprox(transpose(lt.chol) * lt.chol, lt.sigma)
 
-    # Every field of the answer of `factor_residual_config` is the estimator's own.
-    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = false)
+    # Every field of the answer of `factor_residual_config` is the estimator's own. Under
+    # `rsd = false` no consumer repairs a covariance, so `pdm` is `nothing` (#1765).
+    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = true)
     cfg = PO.factor_residual_config(fp)
     @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, fp.mp.pdm, fp.rsd)
+    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = false)
+    cfg = PO.factor_residual_config(fp)
+    @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, nothing, fp.rsd)
     @test isnothing(PO.factor_residual_config(EmpiricalPrior()))
 
     # Issue #776. The lift returns the residual variances it measured, and they are the
@@ -204,6 +208,80 @@ processing, and the residual block enters `sigma` and `chol` once each. Sweep ti
     @test isapprox(l1.sigma - systematic, diagm(l1.esigma))
     # Under `rsd = false` no residual block was added, so there is nothing to report.
     @test isnothing(l0.esigma)
+end
+
+# Issue #1765. A factor prior repairs its covariance under the estimator that
+# `matrix_processing_posdef` gives for `mp`. The interface of `AbstractMatrixProcessingEstimator`
+# states the verb, so a type of a caller states the repair or is refused at construction.
+struct MyMatrixProcessing1765 <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing!(::MyMatrixProcessing1765,
+                                                sigma::PortfolioOptimisers.MatNum,
+                                                X::PortfolioOptimisers.MatNum; kwargs...)
+    return matrix_processing!(MatrixProcessing(), sigma, X; kwargs...)
+end
+struct MyPosdefMatrixProcessing1765 <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing!(::MyPosdefMatrixProcessing1765,
+                                                sigma::PortfolioOptimisers.MatNum,
+                                                X::PortfolioOptimisers.MatNum; kwargs...)
+    return matrix_processing!(MatrixProcessing(), sigma, X; kwargs...)
+end
+function PortfolioOptimisers.matrix_processing_posdef(::MyPosdefMatrixProcessing1765)
+    return Posdef()
+end
+struct MyWrongPosdefMatrixProcessing1765 <:
+       PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing_posdef(::MyWrongPosdefMatrixProcessing1765)
+    return 1
+end
+@testset "A factor prior reads the repair of mp through matrix_processing_posdef (#1765)" begin
+    PO = PortfolioOptimisers
+    no = MyMatrixProcessing1765()
+    yes = MyPosdefMatrixProcessing1765()
+    bad = MyWrongPosdefMatrixProcessing1765()
+    views = LinearConstraintEstimator(; val = ["MTUM == 0.0001", "QUAL - USMV == -0.0003"])
+    fblp(; kwargs...) = FactorBlackLittermanPrior(; sets = xfsets, views = views, kwargs...)
+    kte(mp) = Cokurtosis(; alg = FullMoment(), mp = mp)
+    @testset "The verb, its fallback and its check" begin
+        @test Base.ispublic(PortfolioOptimisers, :matrix_processing_posdef)
+        @test !Base.isexported(PortfolioOptimisers, :matrix_processing_posdef)
+        mp = MatrixProcessing()
+        @test PO.matrix_processing_posdef(mp) === mp.pdm
+        @test isnothing(PO.matrix_processing_posdef(MatrixProcessing(; pdm = nothing)))
+        @test isa(PO.matrix_processing_posdef(yes), Posdef)
+        @test_throws "`matrix_processing_posdef` is not defined for `MyMatrixProcessing1765`" PO.matrix_processing_posdef(no)
+        @test isnothing(PO.assert_matrix_processing_posdef(mp))
+        @test isnothing(PO.assert_matrix_processing_posdef(yes))
+        @test_throws "must return `nothing` or an `AbstractPosdefEstimator`" PO.assert_matrix_processing_posdef(bad)
+    end
+    @testset "A type with no method is refused at construction, not at the fit" begin
+        msg = "`matrix_processing_posdef` is not defined for `MyMatrixProcessing1765`"
+        @test_throws msg FactorPrior(; mp = no)
+        @test_throws msg fblp(; mp = no)
+        @test_throws msg HighOrderFactorPriorEstimator(; kte = kte(no))
+        @test_throws ArgumentError FactorPrior(; mp = bad)
+        @test_throws ArgumentError fblp(; mp = bad)
+        @test_throws ArgumentError HighOrderFactorPriorEstimator(; kte = kte(bad))
+    end
+    @testset "Under rsd = false no repair runs, so the type builds and fits" begin
+        fp = FactorPrior(; mp = no, rsd = false)
+        @test prior(fp, rd).sigma == prior(FactorPrior(; rsd = false), rd).sigma
+        @test isnothing(PO.factor_residual_config(fp).pdm)
+        bl = fblp(; mp = no, rsd = false)
+        @test prior(bl, rd).sigma == prior(fblp(; rsd = false), rd).sigma
+        @test isnothing(PO.factor_residual_config(bl).pdm)
+        ho = HighOrderFactorPriorEstimator(; kte = kte(no), rsd = false)
+        @test ho.kte.mp === no
+    end
+    @testset "A type that states the default repair fits as the default does" begin
+        fp = FactorPrior(; mp = yes)
+        @test prior(fp, rd).sigma == prior(FactorPrior(), rd).sigma
+        @test isa(PO.factor_residual_config(fp).pdm, Posdef)
+        bl = fblp(; mp = yes)
+        @test prior(bl, rd).sigma == prior(fblp(), rd).sigma
+        @test isa(PO.factor_residual_config(bl).pdm, Posdef)
+        ho = HighOrderFactorPriorEstimator(; kte = kte(yes))
+        @test prior(ho, rd).kt == prior(HighOrderFactorPriorEstimator(), rd).kt
+    end
 end
 
 # Issue #776. A prior that lifts the factor moments writes the residual variances onto the

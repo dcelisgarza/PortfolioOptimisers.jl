@@ -207,6 +207,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - When `rsd` is `true` and `kte` is a [`Cokurtosis`](@ref), `kte.mp` states the estimator of its repair, see [`assert_matrix_processing_posdef`](@ref).
 
 ## Propagated parameters
 
@@ -362,6 +363,9 @@ HighOrderFactorPriorEstimator
                                            x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :HighOrderFactorPriorEstimator)
         assert_inner_reader(pe, :pe, :HighOrderFactorPriorEstimator)
+        if rsd && isa(kte, Cokurtosis)
+            assert_matrix_processing_posdef(kte.mp)
+        end
         return new{typeof(pe), typeof(kte), typeof(ske), typeof(ex), typeof(rsd),
                    typeof(cache), typeof(x_src)}(pe, kte, ske, ex, rsd, cache, x_src)
     end
@@ -463,7 +467,7 @@ The factor comoments come from `pe.kte` and `pe.ske` fit on `F`. When the low or
  7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
  8. Still under `pe.rsd`, and when step 3 produced a `posterior_kt`, read the wrapped estimator's residual declaration with [`factor_residual_config`](@ref) and check its shape with [`assert_factor_residual_config`](@ref).
  9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise read the block as `err_sigma`, the residual variances that the wrapped estimator added, with [`idiosyncratic_variances`](@ref) of `rpr.rr`. They were measured under the weights of that fit, which a variance of `err` under `rsd_cfg.ve` does not read. Subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
-10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under `pe.kte.mp.pdm`.
+10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for `pe.kte.mp`.
 11. When step 4 produced a `posterior_sk`, recompute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), so `V` describes the corrected coskewness rather than the projected one.
 12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` back to the full asset universe with [`expand_moment`](@ref), `NaN` outside the investable block. `V` is expanded rather than recomputed, because it is a spectral quantity of the reduced coskewness and the frame carries no reduced returns to rebuild it from. The all-investable sentinel needs no branch of its own: [`expand_moment`](@ref) on a `nothing` mask hands the block straight back, at every one of its arities.
 13. Build the nested factor prior result `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
@@ -601,7 +605,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
             # block the wrapped estimator added has to come back off. Whether an estimator added
             # one, and under which `pdm`, is a declaration rather than a field read: the `pe`
             # slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior` and
-            # `FactorBlackLittermanPrior` carry `rsd` and `mp.pdm` — a wrapper over either
+            # `FactorBlackLittermanPrior` carry `rsd` and `mp` — a wrapper over either
             # forwards the declaration, everything else declares `nothing` (see
             # [`factor_residual_config`](@ref)). The shape is checked before the property
             # access, so a wrong declaration names itself here instead of surfacing as a
@@ -628,7 +632,7 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
             end
             err_kt = cokurtosis_residuals(sigma, err, pe.kte.me, pe.ex)
             posterior_kt .+= err_kt
-            posdef!(pe.kte.mp.pdm, posterior_kt)
+            posdef!(matrix_processing_posdef(pe.kte.mp), posterior_kt)
         end
     end
     if !isnothing(f_sk)

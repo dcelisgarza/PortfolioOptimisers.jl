@@ -11,6 +11,7 @@ In order to implement a new matrix processing estimator which will work seamless
 
   - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: In-place processing of a covariance or correlation matrix.
   - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix. A fallback method copies `sigma` and calls `matrix_processing!`, so it is only needed if the copy can be avoided.
+  - `matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}`: The positive definite matrix estimator with which a factor prior repairs its covariance after the matrix processing. It is necessary when the estimator goes into a factor prior that adds a residual block. The fallback refuses the type by name, and the factor prior calls it at construction. Return `nothing` to skip the repair.
 
 ## Arguments
 
@@ -48,6 +49,11 @@ julia> function PortfolioOptimisers.matrix_processing(est::MyMatrixProcessingEst
            return sigma
        end
 
+julia> function PortfolioOptimisers.matrix_processing_posdef(est::MyMatrixProcessingEstimator)
+           # The estimator with which a factor prior repairs its covariance.
+           return Posdef()
+       end
+
 julia> matrix_processing!(MyMatrixProcessingEstimator(), [1.0 2.0; 2.0 1.0], rand(10, 2))
 Processing matrix in-place...
 2×2 Matrix{Float64}:
@@ -68,6 +74,7 @@ Processing matrix in-place...
   - [`MatrixProcessing`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`matrix_processing_posdef`](@ref)
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
@@ -464,7 +471,8 @@ function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNu
     return matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    assert_shape_only_matrix_processing(mp::MatrixProcessing) -> nothing
+    assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator) -> nothing
 
 Refuses a matrix processing estimator whose steps cannot be run from the shape of the sample alone.
 
@@ -472,13 +480,20 @@ Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pd
 
 The refusal is an `ArgumentError` that names the type of `alg`, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
 
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) passes when `mp.alg` is `nothing`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. Its interface states only [`matrix_processing!`](@ref) on the whole sample, so the shape of the sample cannot stand in for it.
+
 # Arguments
 
   - `mp`: The matrix processing estimator whose steps are checked.
 
 # Validation
 
-  - `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -486,6 +501,7 @@ The refusal is an `ArgumentError` that names the type of `alg`, and it names the
 
 # Related
 
+  - [`supports_shape_processing`](@ref): the same test as a `Bool`.
   - [`matrix_processing!`](@ref)
   - [`MatrixProcessing`](@ref)
   - [`Online`](@ref)
@@ -496,19 +512,146 @@ function assert_shape_only_matrix_processing(mp::MatrixProcessing)
               ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
     return nothing
 end
+function assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator)
+    return throw(ArgumentError("`$(nameof(typeof(mp)))` is a matrix processing estimator of your own, and its `matrix_processing!` is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations, or pass a `MatrixProcessing`."))
+end
+"""
+    supports_shape_processing(mp::MatrixProcessing) -> Bool
+    supports_shape_processing(mp::AbstractMatrixProcessingEstimator) -> Bool
+
+Tells whether an incremental fit can run the steps of a matrix processing estimator from the shape of the sample alone.
+
+This is the test of [`assert_shape_only_matrix_processing`](@ref) as a `Bool`. A composite estimator reads it to tell whether it folds.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) answers `true` when `mp.alg` is `nothing`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) answers `false`.
+
+# Arguments
+
+  - `mp`: The matrix processing estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the steps of `mp` read the shape of the sample and no observation.
+
+# Related
+
+  - [`assert_shape_only_matrix_processing`](@ref)
+  - [`supports_partial_fit`](@ref)
+  - [`MatrixProcessing`](@ref)
+"""
+function supports_shape_processing(mp::MatrixProcessing)
+    return isnothing(mp.alg)
+end
+function supports_shape_processing(::AbstractMatrixProcessingEstimator)
+    return false
+end
+"""
+    matrix_processing_posdef(mp::MatrixProcessing) -> Option{<:AbstractPosdefEstimator}
+    matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}
+
+Gives the positive definite matrix estimator with which a factor prior repairs a covariance after the matrix processing.
+
+A factor prior processes its systematic block with [`matrix_processing!`](@ref). Then it adds the idiosyncratic block, and it repairs the sum with [`posdef!`](@ref) under the estimator that this verb gives. [`HighOrderFactorPriorEstimator`](@ref) repairs its cokurtosis in the same way.
+
+# Interfaces
+
+A subtype of [`AbstractMatrixProcessingEstimator`](@ref) that goes into a factor prior with a residual block adds a method of this verb. The method returns an [`AbstractPosdefEstimator`](@ref), or `nothing` to skip the repair.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) gives `mp.pdm`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. The fallback cannot tell whether the type of a caller repairs a matrix. A `nothing` answer would skip the repair, and the covariance could be indefinite.
+
+# Arguments
+
+  - $(arg_dict[:mp])
+
+# Validation
+
+  - The type of `mp` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `pdm::Option{<:AbstractPosdefEstimator}`: The estimator of the repair, `nothing` to skip it.
+
+# Related
+
+  - [`assert_matrix_processing_posdef`](@ref): the check that each factor prior runs at construction.
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatrixProcessing`](@ref)
+  - [`posdef!`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function matrix_processing_posdef(mp::MatrixProcessing)
+    return mp.pdm
+end
+function matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator)
+    return throw(ArgumentError("`matrix_processing_posdef` is not defined for `$(nameof(typeof(mp)))`. A factor prior repairs its covariance after the matrix processing, under the positive definite matrix estimator of `mp`. Add a method `PortfolioOptimisers.matrix_processing_posdef(mp::$(nameof(typeof(mp))))` that returns an `AbstractPosdefEstimator`, or `nothing` to skip the repair."))
+end
+"""
+    assert_matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> nothing
+
+Checks at construction that a factor prior can read the repair of its matrix processing estimator.
+
+A factor prior calls this check when its fit repairs a covariance under [`matrix_processing_posdef`](@ref). The check moves the refusal of a type with no method from the fit to the constructor.
+
+# Algorithm
+
+ 1. Get `pdm` from [`matrix_processing_posdef`](@ref). Its fallback refuses a type with no method of its own.
+ 2. Check that `pdm` is `nothing` or an [`AbstractPosdefEstimator`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:mp])
+
+# Validation
+
+  - The type of `mp` has a method of [`matrix_processing_posdef`](@ref). An `ArgumentError` is thrown otherwise.
+  - The method returns `nothing` or an [`AbstractPosdefEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`matrix_processing_posdef`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function assert_matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator)
+    pdm = matrix_processing_posdef(mp)
+    @argcheck(isa(pdm, Option{<:AbstractPosdefEstimator}),
+              ArgumentError("`matrix_processing_posdef(::$(nameof(typeof(mp))))` must return `nothing` or an `AbstractPosdefEstimator`. Got\npdm => $(pdm)::$(typeof(pdm))."))
+    return nothing
+end
 """
     matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::Integer;
                        kwargs...) -> MatNum
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, T::Integer,
+                       N::Integer; kwargs...) -> MatNum
 
 Applies matrix processing to `sigma` in-place, from the **shape** of the sample rather than from the sample.
 
 The arm of the pipeline that an incremental fit reaches when the estimate is made from the state: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
 
-`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type before any step runs.
+`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type before any step runs. It also refuses a matrix processing estimator of a caller, whose interface states no shape method.
 
 # Algorithm
 
- 1. Refuse an `mp` carrying a sample-reading `alg`.
+ 1. Refuse an `mp` that is not a [`MatrixProcessing`](@ref), and an `mp` carrying a sample-reading `alg`.
  2. Run each step of `mp.order` in turn, through the shape methods of [`matrix_processing_step!`](@ref).
 
 # Arguments
@@ -521,7 +664,7 @@ The arm of the pipeline that an incremental fit reaches when the estimate is mad
 
 # Validation
 
-  - `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -540,6 +683,11 @@ function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::
     for step in mp.order
         matrix_processing_step!(Val(step), mp, sigma, T, N; kwargs...)
     end
+    return sigma
+end
+function matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
+                            T::Integer, N::Integer; kwargs...)
+    assert_shape_only_matrix_processing(mp)
     return sigma
 end
 """
@@ -821,4 +969,4 @@ end
 
 export MatrixProcessing, matrix_processing, matrix_processing!
 public AbstractMatrixProcessingEstimator, AbstractMatrixProcessingAlgorithm,
-       matrix_processing_algorithm, matrix_processing_algorithm!
+       matrix_processing_algorithm, matrix_processing_algorithm!, matrix_processing_posdef

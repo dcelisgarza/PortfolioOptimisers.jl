@@ -157,6 +157,17 @@ fit_rows(rd, pr) = (size(rd.X, 1) - size(pr.X, 1) + 1):size(rd.X, 1)
 # A matrix processing estimator of a caller, which is not a `MatrixProcessing`. The prior builds it
 # and never fits it.
 struct CsfpCallerMatrixProcessing <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+# A matrix processing estimator of a caller that runs the default steps and states the default
+# repair, so its lift is the lift of the default `MatrixProcessing` (#1765).
+struct CsfpPosdefMatrixProcessing <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing!(::CsfpPosdefMatrixProcessing,
+                                                sigma::PortfolioOptimisers.MatNum,
+                                                X::PortfolioOptimisers.MatNum; kwargs...)
+    return matrix_processing!(MatrixProcessing(), sigma, X; kwargs...)
+end
+function PortfolioOptimisers.matrix_processing_posdef(::CsfpPosdefMatrixProcessing)
+    return Posdef()
+end
 
 @testset "The estimator, its defaults and its refusals" begin
     PO = PortfolioOptimisers
@@ -1977,8 +1988,18 @@ allocated the exposure history in the element type of the returns, so integer re
         @test_throws "srep = NoSystematicRepair() runs the steps of mp one by one" CrossSectionalFactorPrior(;
                                                                                                              factors = csfp_factors(),
                                                                                                              mp = cmp)
-        @test CrossSectionalFactorPrior(; factors = csfp_factors(), mp = cmp,
-                                        srep = SystematicRepair()).mp === cmp
+        # Under `SystematicRepair` the lift still repairs the sum under the estimator that
+        # `matrix_processing_posdef` gives, so the constructor refuses an `mp` that does not
+        # state it, where the fit would fail with a `FieldError` (#1765).
+        @test_throws "`matrix_processing_posdef` is not defined for `CsfpCallerMatrixProcessing`" CrossSectionalFactorPrior(;
+                                                                                                                            factors = csfp_factors(),
+                                                                                                                            mp = cmp,
+                                                                                                                            srep = SystematicRepair())
+        smp = CsfpPosdefMatrixProcessing()
+        @test CrossSectionalFactorPrior(; factors = csfp_factors(), mp = smp,
+                                        srep = SystematicRepair()).mp === smp
+        @test PO.cross_sectional_lift(SystematicRepair(), smp, L, muf, Sf, ev, idx, Xs).sigma ==
+              rep.sigma
         @test isnothing(PO.assert_systematic_repair(NoSystematicRepair(), mp))
     end
     @testset "Integer returns fit, and equal the fit of their float copy" begin
