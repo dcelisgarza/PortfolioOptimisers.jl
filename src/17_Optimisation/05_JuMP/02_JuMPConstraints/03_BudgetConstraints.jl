@@ -599,15 +599,18 @@ Only the statically-decidable contradictions are caught. Ranges may still confli
   - [`gross_budget_bounds_msg`](@ref)
 """
 function assert_gross_budget_admissible(bgt, sbgt, gbgt, wb)::Nothing
-    if isnothing(gbgt) || isa(gbgt, TimeDependent)
-        return nothing
-    end
     @argcheck(!(isa(bgt, Number) && isa(sbgt, Number)),
               ArgumentError("gross budget (gbgt) is over-determined: net budget (bgt = $bgt) and short budget (sbgt = $sbgt) already pin the gross exposure at bgt + 2 * sbgt = $(bgt + 2 * sbgt). Give at most two of bgt, sbgt and gbgt — gbgt exists for the case bgt and sbgt cannot express, a pinned gross exposure with a free net exposure (bgt = nothing)."))
     if isa(wb, WeightBounds)
         @argcheck(w_neg_flag(wb.lb) || w_neg_flag(wb.ub),
                   ArgumentError(gross_budget_bounds_msg(wb.lb, wb.ub)))
     end
+    return nothing
+end
+# No gross budget, or a schedule that `assert_time_dependent_substitution` reaches, has
+# nothing to assert here.
+function assert_gross_budget_admissible(::Any, ::Any, ::Union{Nothing, <:TimeDependent},
+                                        ::Any)::Nothing
     return nothing
 end
 """

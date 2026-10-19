@@ -284,30 +284,7 @@ end
             "src/10_Prior/07_OpinionPoolingPrior.jl: prior_probability_factory: isnothing(pe.pe1)",
             "src/10_Prior/07_OpinionPoolingPrior.jl: prior_probability_factory: isnothing(pe.pe1)",
             "src/10_Prior/15_CrossSectionalPriorFold.jl: cross_sectional_fold_choice: isnothing(pe.families)",
-            "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl: cross_sectional_carry_standardised: isnothing(st.csr)",
-            "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl: assert_prediction_series: isnothing(A)",
-            "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl: assert_gross_budget_admissible: isnothing(gbgt) || gbgt isa TimeDependent",
-            "src/17_Optimisation/05_JuMP/03_JuMPOptimiser_b.jl: assert_universe_axis_order: isnothing(sets)",
-            "src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl: risk_budget_universe_key: !(rba.rkb isa RiskBudgetEstimator)",
-            "src/17_Optimisation/06_Meta/03_Stacking.jl: narrow_optimiser_vector: opti isa VecOptE_Opt_TD",
-            "src/17_Optimisation/09_OnlineOptimisation.jl: batch_from_state: isnothing(opt.cache)",
-            "src/17_Optimisation/09_OnlineOptimisation.jl: batch_from_state: isnothing(opt.cache)",
-            "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl: expert_start_allocation: isnothing(alg.w)",
-            "src/17_Optimisation/10_OnlinePortfolioSelection/02_OnlineSelectionRules.jl: expert_start_weights: isnothing(alg.p0) && isnothing(alg.eset)",
-            "src/17_Optimisation/10_OnlinePortfolioSelection/03_OnlinePortfolioSelection.jl: update_online_estimator: !(opt.fb isa OptimisationEstimator)",
-            "src/17_Optimisation/10_OnlinePortfolioSelection/05_ForecastRules.jl: holds_second_moment: est isa Union{<:AbstractCovarianceEstimator, <:StatsBase.CovarianceEstimator, <:AbstractVarianceEstimator, <:AbstractPriorEstimator}",
-            "src/17_Optimisation/10_OnlinePortfolioSelection/12_AllocationSetProgramme.jl: add_allocation_set_bounds!: isnothing(sbgt) && isnothing(gbgt)",
-            "src/21_Pipeline/02_StepExecution.jl: resolve_constraint_target: isnothing(target)",
-            "src/21_Pipeline/02_StepExecution.jl: run_step: ps.est isa AbstractConstraintEstimator",
-            "src/21_Pipeline/02_StepExecution.jl: run_step: ps.est isa AbstractUncertaintySetEstimator",
-            "src/21_Pipeline/02_StepExecution.jl: run_step: ps.est isa Function",
-            "src/21_Pipeline/03_Pipeline.jl: inject_context: isnothing(ctx.prior) && (isnothing(ctx.phylogeny) && (isnothing(ctx.uncertainty) && isnothing(ctx.constraints)))",
-            "src/21_Pipeline/03_Pipeline.jl: maybe_inject_step: ps.est isa OptimisationEstimator",
-            "src/21_Pipeline/06_OnlinePipeline.jl: copy_step_states: ps.est isa Function",
-            "src/21_Pipeline/06_OnlinePipeline.jl: merge_states: isnothing(b.data)",
-            "src/21_Pipeline/06_OnlinePipeline.jl: online_entry_state: !(isnothing(p.cache))",
-            "src/21_Pipeline/06_OnlinePipeline.jl: update_online_estimator: p.cache isa PipelineBufferState",
-            "src/21_Pipeline/06_OnlinePipeline.jl: update_online_step: ps.est isa Function"]
+            "src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl: cross_sectional_carry_standardised: isnothing(st.csr)"]
 
     found = String[]
     for d in ("src", "ext"), (r, _, fs) in walkdir(joinpath(root, d)), f in fs

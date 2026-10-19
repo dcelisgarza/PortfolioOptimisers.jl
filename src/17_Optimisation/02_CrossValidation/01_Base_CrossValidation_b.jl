@@ -746,9 +746,11 @@ function assert_prediction_series(names::Option{<:VecStr}, A::Option{<:MatNum},
                                   X::Option{<:VecNum_VecVecNum}, ts::Option{<:VecDate},
                                   nsym::Symbol, sym::Symbol)::Nothing
     check_names_and_returns_matrix(names, A, nsym, sym)
-    if isnothing(A)
-        return nothing
-    end
+    return assert_prediction_series(A, X, ts, sym)
+end
+assert_prediction_series(::Nothing, ::Any, ::Any, ::Symbol) = nothing
+function assert_prediction_series(A::MatNum, X::Option{<:VecNum_VecVecNum},
+                                  ts::Option{<:VecDate}, sym::Symbol)::Nothing
     n = size(A, 1)
     if isa(X, VecNum)
         @argcheck(length(X) == n,

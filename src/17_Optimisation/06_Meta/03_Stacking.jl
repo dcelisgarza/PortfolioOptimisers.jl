@@ -212,12 +212,12 @@ The method for a [`TimeDependent`](@ref) returns the schedule unchanged.
   - [`Stacking`](@ref)
 """
 function narrow_optimiser_vector(opti::AbstractVector)
-    if isa(opti, VecOptE_Opt_TD)
-        return opti
-    end
     @argcheck(all(x -> isa(x, OptE_Opt_TD), opti),
               ArgumentError("every element of opti must be an optimisation estimator, a precomputed optimisation result, or a TimeDependent schedule standing in for one"))
     return convert(Vector{Union{unique(typeof.(opti))...}}, opti)
+end
+function narrow_optimiser_vector(opti::VecOptE_Opt_TD)
+    return opti
 end
 function narrow_optimiser_vector(opti::TimeDependent)
     return opti

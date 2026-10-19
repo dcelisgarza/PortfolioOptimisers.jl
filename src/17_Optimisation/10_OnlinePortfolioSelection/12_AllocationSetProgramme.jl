@@ -474,9 +474,15 @@ function add_allocation_set_bounds!(model::JuMP.Model, wb::WeightBounds, sbgt,
         JuMP.@constraint(model, sc * (w ⊖ k * wb.ub) <= 0)
     end
     JuMP.@constraint(model, sc * (sum(w) - k) == 0)
-    if isnothing(sbgt) && isnothing(gbgt)
-        return nothing
-    end
+    return add_allocation_set_bounds!(model, w, sc, sbgt, gbgt)
+end
+# The short and the gross budgets read the long and the short parts of `w`. Without either
+# budget, no row reads them, so the parts are not built.
+function add_allocation_set_bounds!(::JuMP.Model, ::Any, ::Any, ::Nothing,
+                                    ::Nothing)::Nothing
+    return nothing
+end
+function add_allocation_set_bounds!(model::JuMP.Model, w, sc, sbgt, gbgt)::Nothing
     lw, sw = if shared_has(model, :sw)
         shared_get(model, :lw), shared_get(model, :sw)
     else

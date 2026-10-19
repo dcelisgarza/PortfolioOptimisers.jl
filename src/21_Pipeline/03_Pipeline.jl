@@ -853,12 +853,6 @@ This function is the pipeline half of the routing. It turns the slots into a fla
   - [`fit`](@ref)
 """
 function inject_context(opt::OptimisationEstimator, ctx::PipelineContext)
-    if isnothing(ctx.prior) &&
-       isnothing(ctx.phylogeny) &&
-       isnothing(ctx.uncertainty) &&
-       isnothing(ctx.constraints)
-        return opt
-    end
     if !isnothing(ctx.prior)
         opt = pipe_route(opt, Val(:pe), ctx.prior)
     end
@@ -881,10 +875,15 @@ function inject_context(opt::OptimisationEstimator, ctx::PipelineContext)
     end
     return opt
 end
+# A context that holds no prior, phylogeny, uncertainty set or constraint routes nothing.
+function inject_context(opt::OptimisationEstimator,
+                        ::PipelineContext{<:Any, <:Any, Nothing, Nothing, Nothing, Nothing})
+    return opt
+end
 """
     maybe_inject_step(est, ::PipelineContext) = est
     maybe_inject_step(opt::OptimisationEstimator, ctx::PipelineContext)
-    maybe_inject_step(ps::PipelineStep, ctx::PipelineContext)
+    maybe_inject_step(ps::PipelineStep{<:OptimisationEstimator}, ctx::PipelineContext)
 
 Return the step that runs, with the Pipeline Context injected when the step is an optimiser.
 
@@ -940,12 +939,9 @@ function maybe_inject_step(res::NonFiniteAllocationOptimisationResult, ctx::Pipe
               ArgumentError("cannot route constraint results into a $(Base.typename(typeof(res)).wrapper): a precomputed optimisation result is already solved, so computed constraints would be silently dropped"))
     return res
 end
-function maybe_inject_step(ps::PipelineStep, ctx::PipelineContext)
-    if isa(ps.est, OptimisationEstimator)
-        return PipelineStep(; est = inject_context(ps.est, ctx), reads = ps.reads,
-                            writes = ps.writes, target = ps.target)
-    end
-    return ps
+function maybe_inject_step(ps::PipelineStep{<:OptimisationEstimator}, ctx::PipelineContext)
+    return PipelineStep(; est = inject_context(ps.est, ctx), reads = ps.reads,
+                        writes = ps.writes, target = ps.target)
 end
 """
     StatsAPI.fit(pipe::Pipeline, data::Prices_RR) -> PipelineResult

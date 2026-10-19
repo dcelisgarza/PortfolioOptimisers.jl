@@ -1,5 +1,6 @@
 """
-    assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult) -> Nothing
+    assert_universe_axis_order(sets::Nothing, rd::ReturnsResult) -> Nothing
+    assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult) -> Nothing
 
 Assert that every axis [`UniverseSets`](@ref) declares agrees, name for name and in order, with the returns data it is about to be used against.
 
@@ -15,10 +16,10 @@ Both axes are checked, but only where both sides exist: `rd.nx` and `rd.nf` are 
   - [`misaligned_axis_msg`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
 """
-function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult)
-    if isnothing(sets)
-        return nothing
-    end
+function assert_universe_axis_order(::Nothing, ::ReturnsResult)
+    return nothing
+end
+function assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult)
     for (axis, key, names, sym) in
         (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.tfkey, rd.nf, "nf"))
         if isnothing(names) || !haskey(sets.dict, key)

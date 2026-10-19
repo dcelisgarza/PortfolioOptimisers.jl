@@ -1169,11 +1169,13 @@ The start is `p0`, or the uniform weights when `p0` is `nothing`. The projection
 """
 function expert_start_weights(alg::ExpertMixture, K::Integer, datatype::DataType)
     p0 = something(alg.p0, fill(one(datatype) / K, K))
-    if isnothing(alg.p0) && isnothing(alg.eset)
-        return p0
-    end
     return project(projection_geometry(alg.alg),
                    expert_allocation_set(alg.eset, K, datatype), p0, p0)
+end
+# No start and no set: the uniform start needs no projection.
+function expert_start_weights(::ExpertMixture{<:Any, <:Any, Nothing, <:Any, <:Any, Nothing},
+                              K::Integer, datatype::DataType)
+    return fill(one(datatype) / K, K)
 end
 """
     expert_start_allocation(alg::AbstractOnlinePortfolioSelectionAlgorithm, w::AbstractVector)
@@ -1202,10 +1204,10 @@ function expert_start_allocation(::AbstractOnlinePortfolioSelectionAlgorithm,
                                  w::AbstractVector)
     return copy(w)
 end
+function expert_start_allocation(::ConstantRebalancedPortfolio{Nothing}, w::AbstractVector)
+    return fill(one(eltype(w)) / length(w), length(w))
+end
 function expert_start_allocation(alg::ConstantRebalancedPortfolio, w::AbstractVector)
-    if isnothing(alg.w)
-        return fill(one(eltype(w)) / length(w), length(w))
-    end
     # The copy promotes to the numeric type of `w`, the head's, so a target given as
     # integers, as the one-hot experts of a switching portfolio are, holds the projected
     # allocation.

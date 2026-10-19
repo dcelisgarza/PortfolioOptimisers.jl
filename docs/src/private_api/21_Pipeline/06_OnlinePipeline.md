@@ -38,4 +38,5 @@ PortfolioOptimisers.copy_states(p::Pipeline)
 PortfolioOptimisers.copy_step_states
 PortfolioOptimisers.held_timestamps(p::Pipeline)
 PortfolioOptimisers.pipeline_held_timestamps
+PortfolioOptimisers.merge_held_data
 ```

@@ -126,17 +126,24 @@ function run_step(ps::PipelineStep, ctx::PipelineContext)
     for r in ps.reads
         require_slot(ctx, r, ps.est)
     end
-    if isa(ps.est, Function)
-        val = ps.est(ctx)
-        return val, set_slot(ctx, ps.writes, val)
-    end
-    if isa(ps.est, AbstractUncertaintySetEstimator)
-        return run_uncertainty_step(ps.est, ps.target, ctx)
-    end
-    if isa(ps.est, AbstractConstraintEstimator)
-        return run_constraint_step(ps.est, ps.target, ctx)
-    end
-    return run_step(ps.est, ctx)
+    return run_step(ps.est, ps, ctx)
+end
+# The estimator of the step selects the method. A callable writes its value to the slot the
+# step names, a set or a constraint estimator reads the target of the step, and every other
+# estimator runs as a bare step.
+function run_step(f::Function, ps::PipelineStep, ctx::PipelineContext)
+    val = f(ctx)
+    return val, set_slot(ctx, ps.writes, val)
+end
+function run_step(ue::AbstractUncertaintySetEstimator, ps::PipelineStep,
+                  ctx::PipelineContext)
+    return run_uncertainty_step(ue, ps.target, ctx)
+end
+function run_step(ce::AbstractConstraintEstimator, ps::PipelineStep, ctx::PipelineContext)
+    return run_constraint_step(ce, ps.target, ctx)
+end
+function run_step(est, ::PipelineStep, ctx::PipelineContext)
+    return run_step(est, ctx)
 end
 function run_step(ue::AbstractUncertaintySetEstimator, ::PipelineContext)
     return throw(ArgumentError("a $(typeof(ue)) step must declare which parameter it bounds; wrap it in a PipelineStep with target = :mu, target = :sigma, or target = :both"))
@@ -394,11 +401,16 @@ function resolve_constraint_target(ce::AbstractConstraintEstimator,
     name = Base.typename(typeof(ce)).wrapper
     @argcheck(!isempty(ts),
               ArgumentError("a $name computes no value for the constraints slot, so it is not a pipeline step; precompute its result and pass it to the optimiser, or wrap a callable in a PipelineStep that writes :constraints"))
-    if isnothing(target)
-        @argcheck(length(ts) == 1,
-                  ArgumentError("a $name step must declare which routing target it writes, because its result names $(length(ts)) of them; wrap it in a PipelineStep with target = one of $ts"))
-        return ts[1]
-    end
+    return resolve_constraint_target(target, ts, name)
+end
+# An unstated target is the one target the estimator names, and a stated one must be among
+# them.
+function resolve_constraint_target(::Nothing, ts, name)::Symbol
+    @argcheck(length(ts) == 1,
+              ArgumentError("a $name step must declare which routing target it writes, because its result names $(length(ts)) of them; wrap it in a PipelineStep with target = one of $ts"))
+    return ts[1]
+end
+function resolve_constraint_target(target::Symbol, ts, name)::Symbol
     @argcheck(target in ts,
               ArgumentError("the PipelineStep target of a $name step must be one of $ts, got :$target"))
     return target

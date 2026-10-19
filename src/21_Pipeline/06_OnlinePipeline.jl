@@ -115,10 +115,35 @@ end
 function merge_states(a::PipelineBufferState, b::PipelineBufferState)
     @argcheck(isequal(a.max_history, b.max_history),
               ArgumentError("two PipelineBufferStates merge under one cap; got $(a.max_history) and $(b.max_history)"))
-    if isnothing(b.data)
-        return a
-    end
-    return partial_fit!(a, b.data)
+    return merge_held_data(a, b.data)
+end
+"""
+    merge_held_data(a::PipelineBufferState, data::Nothing)
+    merge_held_data(a::PipelineBufferState, data::Prices_RR)
+
+Append the data that a second [`PipelineBufferState`](@ref) holds to the state `a`, for [`merge_states`](@ref).
+
+The type of `data` selects the method. A state that holds no data yet adds no row, so the method returns `a`. Data appends to `a` through [`partial_fit!`](@ref), which keeps the cap of `a`.
+
+# Arguments
+
+  - `a`: The first state.
+  - `data`: The data of the second state, or `nothing`.
+
+# Returns
+
+  - `state::PipelineBufferState`: `a`, or a new state that holds the rows of both.
+
+# Related
+
+  - [`merge_states`](@ref)
+  - [`PipelineBufferState`](@ref)
+"""
+function merge_held_data(a::PipelineBufferState, ::Nothing)
+    return a
+end
+function merge_held_data(a::PipelineBufferState, data::Prices_RR)
+    return partial_fit!(a, data)
 end
 function Base.copy(x::PipelineBufferState)
     return PipelineBufferState(x.data, x.max_history)
@@ -254,10 +279,10 @@ The answer is `"cache"` when the pipeline holds a state of its own. Otherwise th
   - [`online_entry_state`](@ref)
   - [`assert_online_entry(p::Pipeline)`](@ref)
 """
-function online_entry_state(p::Pipeline)
-    if !isnothing(p.cache)
-        return "cache"
-    end
+function online_entry_state(::Pipeline)
+    return "cache"
+end
+function online_entry_state(p::Pipeline{<:Any, <:Any, Nothing})
     for (name, step) in zip(p.names, p.steps)
         path = online_entry_state(step_estimator(step))
         if !isnothing(path)
@@ -540,11 +565,9 @@ function update_online_step(est::Union{<:AbstractEstimator,
     return update_online_estimator(est)
 end
 function update_online_step(ps::PipelineStep)
-    if isa(ps.est, Function)
-        return ps
-    end
     return PipelineStep(update_online_step(ps.est), ps.reads, ps.writes, ps.target)
 end
+update_online_step(ps::PipelineStep{<:Function}) = ps
 """
     update_online_estimator(p::Pipeline)
 
@@ -559,11 +582,9 @@ On the fold route [`update_online_step`](@ref) resolves every step. So an `Onlin
   - [`Online`](@ref)
 """
 function update_online_estimator(p::Pipeline)
-    if isa(p.cache, PipelineBufferState)
-        return p
-    end
     return Pipeline(p.names, map(update_online_step, p.steps), p.cache)
 end
+update_online_estimator(p::Pipeline{<:Any, <:Any, <:PipelineBufferState}) = p
 """
     copy_states(p::Pipeline)
 
@@ -597,11 +618,9 @@ function copy_step_states(est::Union{<:AbstractEstimator, <:StatsBase.Covariance
     return copy_states(est)
 end
 function copy_step_states(ps::PipelineStep)
-    if isa(ps.est, Function)
-        return ps
-    end
     return PipelineStep(copy_step_states(ps.est), ps.reads, ps.writes, ps.target)
 end
+copy_step_states(ps::PipelineStep{<:Function}) = ps
 """
     held_timestamps(p::Pipeline)
 

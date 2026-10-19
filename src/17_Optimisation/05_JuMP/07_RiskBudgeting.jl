@@ -712,10 +712,11 @@ The axis is only read when `rba.rkb` is a [`RiskBudgetEstimator`](@ref) — a [`
 function risk_budget_universe_key(::AssetRiskBudgeting, ::Integer)
     return nothing
 end
-function risk_budget_universe_key(rba::FactorRiskBudgeting, N::Integer)
-    if !isa(rba.rkb, RiskBudgetEstimator)
-        return nothing
-    end
+function risk_budget_universe_key(::FactorRiskBudgeting, ::Integer)
+    return nothing
+end
+function risk_budget_universe_key(rba::FactorRiskBudgeting{<:Any, <:RiskBudgetEstimator},
+                                  N::Integer)
     key = factor_axis_key(rba.sets, rba.re)
     factor_universe(rba.sets, key, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
     return key

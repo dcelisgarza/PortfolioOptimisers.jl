@@ -1092,19 +1092,24 @@ The `cache` of the optimiser selects the branch. An optimiser whose `cache` is `
 function batch_from_state(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                      <:InverseVolatility, <:NestedClustered, <:Stacking,
                                      <:SubsetResampling})
-    if isnothing(opt.cache)
-        return batch_without_state(opt, opt.pe)
-    end
-    rd = returns_result(opt)
-    return rebuild_estimator(opt, (; pe = prior(opt.pe), cache = nothing)), rd
+    return batch_from_state(opt, opt.cache, opt.pe)
 end
 function batch_from_state(opt::Union{<:EqualWeighted, <:RandomWeighted,
                                      <:BestConstantRebalancedPortfolio})
-    if isnothing(opt.cache)
-        return batch_without_state(opt, nothing)
-    end
+    return batch_from_state(opt, opt.cache, nothing)
+end
+# The `cache` selects the branch, and the prior, `nothing` for an optimiser that holds none,
+# is rebuilt beside it.
+function batch_from_state(opt, ::Nothing, pe)
+    return batch_without_state(opt, pe)
+end
+function batch_from_state(opt, ::AbstractPartialFitState, ::Nothing)
     rd = returns_result(opt)
     return rebuild_estimator(opt, (; cache = nothing)), rd
+end
+function batch_from_state(opt, ::AbstractPartialFitState, pe)
+    rd = returns_result(opt)
+    return rebuild_estimator(opt, (; pe = prior(pe), cache = nothing)), rd
 end
 function batch_from_state(opt::JuMPOptimisationEstimator)
     inner, rd = batch_from_state(opt.opt)

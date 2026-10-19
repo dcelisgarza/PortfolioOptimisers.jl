@@ -1055,9 +1055,13 @@ The two heads step their fallback through [`step_fallback`](@ref), so a wrapper 
   - [`online_unreached_path`](@ref)
 """
 function update_online_estimator(opt::Union{<:OnlinePortfolioSelection, <:PreviousWeights})
-    if !isa(opt.fb, OptimisationEstimator)
-        return opt
-    end
+    return opt
+end
+function update_online_estimator(opt::Union{<:OnlinePortfolioSelection{<:Any, <:Any, <:Any,
+                                                                       <:Any,
+                                                                       <:OptimisationEstimator},
+                                            <:PreviousWeights{<:Any, <:Any,
+                                                              <:OptimisationEstimator}})
     return rebuild_estimator(opt, (; fb = update_online_estimator(opt.fb)))
 end
 """
