@@ -308,6 +308,34 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                              l2 = po.L2Regularisation(; val = 0.01)), 5)
         wl2 = po.project(po.DiagonalProjection(h), pl2, cases[2], cases[2])
         @test isapprox(wl2[4], wl2[5]; atol = 1e-5)
+        # A second stage that fails keeps the minimiser of the first (#1778). The factory
+        # gives Clarabel to the first solve and refuses the second. The L2 penalty has one
+        # minimiser, so the first stage finds the limit too. A Held Step would return `q`.
+        calls = Ref(0)
+        refuse2 = () -> if (calls[] += 1) == 1
+            Clarabel.Optimizer()
+        else
+            error("the second stage is refused")
+        end
+        refused(f) = resolve(ProgrammeAllocationSet(;
+                                                    slv = Solver(; name = :refused,
+                                                                 solver = f,
+                                                                 settings = slv.settings,
+                                                                 check_sol = slv.check_sol),
+                                                    wb = box,
+                                                    l2 = po.L2Regularisation(; val = 0.01)),
+                             5)
+        wf = @test_logs (:warn,) match_mode=:any po.project(po.DiagonalProjection(h),
+                                                            refused(refuse2), cases[2],
+                                                            cases[2])
+        @test calls[] == 2
+        @test isapprox(wf, wl2; atol = 1e-5)
+        # A first stage that fails holds the step.
+        refuse1 = () -> error("the first stage is refused")
+        wh = @test_logs (:warn,) match_mode=:any po.project(po.DiagonalProjection(h),
+                                                            refused(refuse1), cases[2],
+                                                            cases[2])
+        @test wh == cases[2]
 
         # The issue's panel: the window of the Risk Loss does not price D, so its gradient is
         # zero there. On two rows the first step reads one row and holds the uniform start.

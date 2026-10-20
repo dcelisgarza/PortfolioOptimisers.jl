@@ -1035,7 +1035,7 @@ Where:
  6. Add the set's constraints with [`set_allocation_set_constraints!`](@ref), with `wr` as the reference.
  7. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
  8. Set the objective with [`set_projection_objective!`](@ref).
- 9. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. When the solve succeeds, return the solution with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+ 9. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. When the solve gives an allocation, return it with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
 
 # JuMP formulation
 
@@ -1091,9 +1091,9 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
     set_allocation_set_constraints!(model, set, wr, X, pr)
     add_custom_objective_term!(model, proj, allocation_set_cobj(set), set, nothing)
     set_projection_objective!(model, proj, q)
-    res = solve_projection_programme!(model, proj, q, projection_solver(proj, set))
-    if res.success
-        return expand_investable_weights(imsk, JuMP.value.(wv))
+    res, wn = solve_projection_programme!(model, proj, q, projection_solver(proj, set))
+    if !isnothing(wn)
+        return expand_investable_weights(imsk, wn)
     end
     record_held_step!("the projection onto the `$(nameof(typeof(set)))` in the `$(nameof(typeof(proj)))` geometry did not solve, and the step trades nothing",
                       res.trials)
@@ -1212,6 +1212,8 @@ Solves a projection programme, and picks one minimiser when the divergence of th
 
 [`projection_programme`](@ref) calls it after it writes the objective. Every geometry except [`DiagonalProjection`](@ref) has one minimiser, and the function solves the model once with [`optimise_JuMP_model!`](@ref). A diagonal with a zero entry is a seminorm, so its minimisers share their weights at the positive entries of the diagonal and differ at the zero entries. After a first solve that succeeds, the diagonal arm then solves a second stage on the same model. Its answer is the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``: the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm.
 
+When the second stage fails, the arm returns the weights of the first stage, and the result is a success that holds the trials of the second stage. Those weights are a minimiser of the projection, so the regret bound of [`AdaptiveSubgradient`](@ref) holds on them. The second stage can fail when its face is one point: under a strictly convex Objective Penalty, or when the budget pins the free weights at their bounds. That point is then the limit. On a face of more than one point, the weights of the first stage are a minimiser that need not be the limit.
+
 # JuMP formulation
 
 The second stage of the diagonal arm, when ``Z`` is not empty.
@@ -1251,7 +1253,7 @@ Where:
 
 # Returns
 
-  - `res::JuMPResult`: The result of the last solve. A first solve that fails is the last one.
+  - `(res, w)::Tuple`: `res::JuMPResult` is the result of the last solve, and a first solve that fails is the last one. `w::Option{<:AbstractVector}` is the solved allocation, or `nothing` when no solve gives one.
 
 # Related
 
@@ -1262,7 +1264,8 @@ Where:
 """
 function solve_projection_programme!(model::JuMP.Model, ::AbstractProjectionGeometry,
                                      ::AbstractVector, slv::Slv_VecSlv)
-    return optimise_JuMP_model!(model, slv)
+    res = optimise_JuMP_model!(model, slv)
+    return res, res.success ? JuMP.value.(get_w(model)) : nothing
 end
 """
     projection_scale(set::ProgrammeAllocationSet, f::Symbol)

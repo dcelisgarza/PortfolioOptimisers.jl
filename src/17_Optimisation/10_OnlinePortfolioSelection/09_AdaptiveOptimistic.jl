@@ -5,7 +5,7 @@ Projects the raw step onto the Allocation Set in the norm of a non-negative diag
 
 This is the geometry of the diagonal adaptive subgradient method of [duchi2011](@citet). [`AdaptiveSubgradient`](@ref) builds one at every step from the gradient mass it has accrued, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). The rule projects the Start Allocation before it sees a gradient, so [`projection_geometry`](@ref) returns [`EuclideanProjection`](@ref) for that projection. The geometry admits a negative lower bound, as the Euclidean geometry does.
 
-A zero entry of ``\\boldsymbol{h}`` makes the norm a seminorm. The projection then has many minimisers, and all of them have the same weights at the positive entries of ``\\boldsymbol{h}``. The geometry returns the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``, which is the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm. So the projection is continuous in ``\\boldsymbol{h}`` at a zero entry. A diagonal of equal entries, zero included, is a multiple of the identity, and on a [`BoundedAllocationSet`](@ref) its projection is the Euclidean one.
+A zero entry of ``\\boldsymbol{h}`` makes the norm a seminorm. The projection then has many minimisers, and all of them have the same weights at the positive entries of ``\\boldsymbol{h}``. The geometry returns the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``, which is the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm. So the projection is continuous in ``\\boldsymbol{h}`` at a zero entry. On a [`ProgrammeAllocationSet`](@ref) a failed solve of the limit keeps a minimiser that need not be the limit, as [`solve_projection_programme!`](@ref) states. A diagonal of equal entries, zero included, is a multiple of the identity, and on a [`BoundedAllocationSet`](@ref) its projection is the Euclidean one.
 
 # Mathematical definition
 
@@ -91,7 +91,7 @@ On a [`BoundedAllocationSet`](@ref):
 
 On a [`ProgrammeAllocationSet`](@ref):
 
- 1. Solve the programme of [`projection_programme`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation. When `proj.h` has a zero entry, [`solve_projection_programme!`](@ref) solves a second stage that picks the limit of [`DiagonalProjection`](@ref).
+ 1. Solve the programme of [`projection_programme`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation. When `proj.h` has a zero entry, [`solve_projection_programme!`](@ref) solves a second stage that picks the limit of [`DiagonalProjection`](@ref). When the second stage fails, it keeps the minimiser of the first.
 
 # Related
 
@@ -128,20 +128,24 @@ end
 function solve_projection_programme!(model::JuMP.Model, proj::DiagonalProjection,
                                      q::AbstractVector, slv::Slv_VecSlv)
     res = optimise_JuMP_model!(model, slv)
+    if !res.success
+        return res, nothing
+    end
+    w = get_w(model)
+    # JuMP reads a solution only before the model changes.
+    w1 = JuMP.value.(w)
     zer = findall(iszero, proj.h)
-    if !res.success || isempty(zer)
-        return res
+    if isempty(zer)
+        return res, w1
     end
     # The first stage fixes the weights where `h` is positive. The second keeps them, keeps
     # the Objective Penalty at its minimum, and takes the rest nearest `q`: the limit of the
     # projection in `h + δ` as `δ → 0⁺`.
     pos = findall(x -> x > zero(x), proj.h)
-    w = get_w(model)
     sc = get_constraint_scale(model)
     so = get_objective_scale(model)
-    # JuMP reads a solution only before the model changes.
     v = JuMP.objective_value(model)
-    wp = JuMP.value.(w[pos])
+    wp = w1[pos]
     if shared_has(model, :op)
         JuMP.@constraint(model, proj_face, JuMP.objective_function(model) <= v)
     end
@@ -150,7 +154,13 @@ function solve_projection_programme!(model::JuMP.Model, proj::DiagonalProjection
     JuMP.@constraint(model, proj_sel,
                      [sc * t_sel; sc * (w[zer] - q[zer])] in JuMP.SecondOrderCone())
     JuMP.@objective(model, Min, so * t_sel)
-    return optimise_JuMP_model!(model, slv)
+    res = optimise_JuMP_model!(model, slv)
+    if res.success
+        return res, JuMP.value.(w)
+    end
+    # The point of the first stage is a minimiser of the projection, so the step keeps it
+    # (#1778). The known failures come on a face of one point, where it is the limit too.
+    return JuMPResult(; trials = res.trials, success = true), w1
 end
 """
 $(DocStringExtensions.TYPEDEF)
