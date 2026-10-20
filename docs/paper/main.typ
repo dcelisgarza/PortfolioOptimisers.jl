@@ -92,7 +92,19 @@
 
 #let date = datetime.today().display("[month repr:long] [day], [year]")
 #let repo = "https://github.com/dcelisgarza/PortfolioOptimisers.jl/"
+#let docs = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/"
+#let catalogue_link = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue/"
+#let examples_link = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples/"
+#let user_guide_link = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/00_User_Guide/"
+#let api_link = "https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/00_API/"
+#let codecov = "https://app.codecov.io/gh/dcelisgarza/PortfolioOptimisers.jl"
 #let po = link(repo)[PortfolioOptimisers.jl]
+#let podocs = link(docs)[documentation]
+#let catalogue = link(catalogue_link)[capability catalogue]
+#let examples = link(examples_link)[examples]
+#let user_guide = link(user_guide_link)[user guide]
+#let api = link(api_link)[API]
+#let coverage = link(codecov)[coverage]
 #let jump = link("https://github.com/jump-dev/JuMP.jl")[JuMP.jl]
 #let statsbase = link("https://juliastats.org/StatsBase.jl/stable/cov/#StatsBase.CovarianceEstimator")[StatsBase.jl]
 
@@ -113,9 +125,7 @@
   date: date,
   heading-color: rgb("#0000ff"),
   link-color: rgb("#008002"),
-  // Insert your abstract after the colon, wrapped in brackets.
-  // Example: `abstract: [This is my abstract...]`
-  abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. PortfolioOptimisers.jl is an attempt at providing as many of these as possible under a single banner and making it accessible to all: 57 risk measures, 22 covariance estimators, 13 prior estimators, 20 optimisers and 22 online portfolio selection rules, which compose with each other rather than sit in separate silos, and which a single cross-validation framework can tune as one object. The library reads a point-in-time universe, in which assets list, delist and are suspended, and its estimators can be updated one observation at a time rather than refitted. We make extensive use of Julia's type system, module extensions, and multiple dispatch to simplify development and maintenance, while keeping robustness, testability, and usability high.],
+  abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing algorithms, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. #po is an attempt at providing as many of these as possible under a single banner and making it accessible to all. The library is highly composable, so the many different components can be mixed and matched in arbitrary ways as long as they are compatible, providing users with the ability to create complex portfolio optimisation workflows in accordance to their needs and creativity. We make extensive use of Julia's type system, module extensions, and multiple dispatch to achieve excellent performance, robustness, correctness and testability, without sacrificing maintainability or usability.],
   keywords: ("Portfolio Optimisation", "Quantitative Investment", "Conic Optimisation", "Parameter Estimation"),
 )
 #show heading: set block(above: 1em, below: 1em)
@@ -133,16 +143,16 @@ Unfortunately, most implementations live in disparate, unconnected, often propri
 
 There also exist myriad optimisation methods, pre-filtering, distribution and moment estimators, machine learning techniques, validation, and parameter tuning methods that can all be used together to improve the out-of sample performance of a portfolio. To this day, only skfolio @skfolio has succeeded in providing a unified framework for this. #po provides an alternative that is not tied to the scikit-learn @scikit-learn or cvxpy @cvxpy1 @cvxpy2 APIs and ecosystems, as well as providing different functionality and a different architectural philosophy.
 
-@tab1 gives a sense of the scale. What follows is a tour rather than a manual: the documentation carries the detail, and the point of this paper is to show that the detail is there.
+@tab1 gives a sense of the scale at the time of writing. The library is actively maintained so its capabilities are constantly expanded and improved. Some have reached maturity, but new features in line with new research, user feedback, my own ideas, and AI assisted reviews are added regularly.
 
 #show table: set par(first-line-indent: 0em, spacing: 0.6em, leading: 0.6em)
 #show table: set text(size: 9pt)
 
 #figure(
-  placement: auto,
+  // placement: auto,
   caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 20 optimisers are 6 naïve, 5 #jump based, 4 clustering, 2 ensemble, 2 finite allocators, and 1 hindsight comparator. One of the naïve optimisers holds any of the 22 online portfolio selection rules, and 24 named constructors fix a rule to its published form. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
   table(
-    columns: (auto, auto, 1fr),
+    columns: (0.5fr, 0.2fr, 2.3fr),
     align: (left + top, center + top, left + top),
     stroke: none,
     table.hline(),
@@ -150,7 +160,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     table.hline(stroke: 0.5pt),
     [Risk measures], [57],
     [Variance, CVaR, EVaR, RLVaR, their range and drawdown twins, ordered weights, high order moments],
-    [Covariance and correlation], [22],
+    [Covariance, correlation], [22],
     [Gerber, Smyth-Broby, Kendall, Spearman, mutual information, distance covariance, lower tail dependence, geodesic shrinkage, regime adjusted exponential weighting],
     [Expected returns], [12],
     [Equilibrium, excess, median, windowed, exponentially weighted, price level forecasts, and shrunk towards three targets],
@@ -159,12 +169,12 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     [Cross-sectional factor model], [27],
     [Descriptor estimators behind 37 named descriptors, such as book to price or momentum, factor exposures including observed and currency factors, and return forecasts],
     [Phylogeny algorithms], [14],
-    [Three minimum spanning trees, DBHT, hierarchical clustering, k-means, eight centrality measures],
+    [Distances and distances of distances, minimum spanning trees, Direct Bubble Hierarchical Trees, hierarchical clustering, k-means, eight centrality measures],
     [Uncertainty sets], [5],
-    [Normal, ARCH bootstrapped, delta, characteristic, and orthogonal to a factor model, in box, ellipsoidal, norm ball or compact form],
+    [Normal distribution, ARCH bootstrapped, delta, characteristic, and orthogonal to a factor model, in box, ellipsoidal, norm ball or compact form],
     [Calibration rules], [14],
-    [Rules that compute a significance level, a deformation parameter, an ambiguity radius, a norm ceiling, or a factor mean blend from the data in place of a number],
-    [Constraints, costs, and penalties], [18],
+    [Data-driven heuristics for significance levels, deformation parameters, ambiguity radii, norm ceilings, factor mean blends],
+    [Constraints, costs, penalties], [18],
     [Weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, two allocation sets of an online rule, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
     [Optimisers], [20],
     [Equal weighted, inverse volatility, online portfolio selection, best constant rebalanced portfolio, mean risk, near optimal centering, risk budgeting, HRP, HERC, Schur, nested clustering, stacking, discrete allocation],
@@ -180,9 +190,11 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
 
 = Design and implementation
 
+#po is built with modularity and extensibility in mind, whilst guaranteeing performance, robustness, and correctness. With Julia, and careful software architecture design, we need not make compromises in any of these.
+
 == Basic example
 
-#po is built with modularity and extensibility in mind. We can demonstrate a simple improvement over the Markowitz model by adding an L2 regularisation term to the optimisation problem, which shrinks the weights towards the equal weighted portfolio and is known to improve out of sample performance @demiguel2009norm.
+We can demonstrate a simple improvement over the Markowitz model by adding an L2 regularisation term to the optimisation problem, which shrinks the weights towards the equal weighted portfolio and is known to improve out of sample performance @demiguel2009norm.
 
 $
   & min_bold(w) quad && bold(w)^top bold(Sigma) bold(w) + lambda ||bold(w)||_2^2 \
@@ -209,6 +221,7 @@ Pkg.activate(joinpath(@__DIR__, ".."))
   show figure: set block(breakable: true)
   set figure(gap: 1.5em)
   figure(
+    // placement: auto,
     caption: [End-to-end example of a regularised Markowitz model. The listing is not a transcript: it is executed by the build, so it cannot drift away from the library.],
     jl(code: true, result: false, stdout: false, logs: false, recompute: false, ```julia
     # Import packages.
@@ -289,11 +302,12 @@ The same panel holds the features of the assets, such as a market capitalisation
 
 == Moments
 
-#po comes with a large number of moment estimation and prior statistics methods. It leverages #statsbase's covariance estimator definitions and API to allow interoperability with the Julia ecosystem, for example by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They can be combined in many ways: it is possible to compute the expected returns using a specific covariance method and vice-versa.
+#po comes with a large number of moment estimation and prior statistics methods. It leverages #statsbase's covariance estimator definitions and API to allow interoperability with the Julia ecosystem, for example shrinkage is supported by composing with #link("https://github.com/mateuszbaran/CovarianceEstimation.jl")[CovarianceEstimation.jl]. They are highly composable with each other, as well as with different priors, and uncertainty sets.
 
 - Full or downside co-moments.
 - Weighted, unweighted.
-- Shrinkage @ledoit2004, and geodesic shrinkage, which moves along the affine-invariant geodesic between the sample estimate and a target, and so stays positive definite at every intensity @musolas2021.
+- Shrunk, excess, equilibrium returns.
+- Geodesic shrinkage @musolas2021.
 - Exponentially weighted, and regime adjusted with an exact correction of the bias of the regime statistic.
 - Probability-theoretic, including the Gerber statistic and its descendants @gerber @smyth2022enhanced @gerber2025squeezing.
 - Denoising and detoning against the Marchenko-Pastur spectrum @mpdist @lopezdepradobook.
@@ -301,7 +315,7 @@ The same panel holds the features of the assets, such as a market capitalisation
 - Regression-based.
 - Rank based.
 - Coskewness and cokurtosis.
-- Expected returns forecast from the price levels, such as moving averages, spatial medians, and trend switches, as the online portfolio selection literature uses them @lihoi2014.
+- Expected returns forecast from the price levels, such as moving averages, spatial medians, and trend switches, as the online portfolio selection features use them @lihoi2014.
 
 == Distance and phylogeny statistics
 
@@ -320,20 +334,11 @@ These bundle clustering and network analysis pipelines to explore the relational
 
 A prior is the returns distribution the optimisation actually sees, and it is the one component every optimiser requires. They fall under three categories:
 
-- Frequentist: empirical, timeseries factor, and cross-sectional factor models, for low and high moments.
+- Frequentist: empirical, timeseries factor models for low and high moments, and cross-sectional (fundamental analysis) factor models.
 - Bayesian: Black-Litterman @blacklitterman1992, in vanilla, factor, Bayesian and augmented forms.
-- Information-theoretic: entropy pooling @meucci2008, including views on CVaR and EVaR @EPTail, and linear or logarithmic opinion pooling @genest1986.
+- Information-theoretic: entropy pooling @meucci2008, including views on Conditional Value at Risk, Entropic Value at Risk @EPTail and Relativistic Value at Risk @EPRLVaR, and linear or logarithmic opinion pooling @genest1986.
 
-== Cross-sectional factor models
-
-The cross-sectional factor prior is the fundamental counterpart of the timeseries factor model @grinoldkahn1999. It reads no series of factor returns. Instead, it builds the exposure of every asset to every factor from the asset panel, and at each observation it regresses the returns of the assets on their lagged exposures, so the factor returns are estimated rather than given. The model is assembled from parts that can be used on their own:
-
-- Descriptors: values per asset and observation, computed from the panel fields, such as a book to price ratio, a momentum, or a downside beta. 37 are named, and each is a configuration of one of 17 general estimators.
-- Exposures: composites of standardised descriptors, one-hot memberships such as sectors, and observed factors whose returns are read rather than estimated, such as a currency. Each family of one-hot factors is collinear with a global factor, so the fit drops one member per family and expands the factor returns back afterwards.
-- Return forecasts: predictions of the idiosyncratic return of each asset, fitted on the descriptor scores, whose spanned part is blended with the factor mean by precision.
-- Diagnostics: the correlation, stability, dispersion and coverage of the exposures, the fit of each regression, and the standardised idiosyncratic returns. The first two groups are gathered into a single summary table, one row per factor.
-
-The prior steps online. Each new observation is folded into the carried state of every part that has an exact update, and every other part is refitted over its rows, so a step reproduces the batch fit to round-off.
+Again these can be composed with each other to form more sophisticated priors.
 
 == Risk measures
 
@@ -356,11 +361,11 @@ Uncertainty sets are used for robust optimisation, where the parameters are only
 
 - Box: the simplest set, defined by a lower and upper bound for each parameter @tutuncu2004.
 - Ellipsoidal: defined by a radius and a covariance matrix, forming an ellipsoid in the parameter space @goldfarb2003.
-- Characteristic: applies an L1 uncertainty set to the expected returns, which recovers the quintile portfolio as a special case @quintile. This will eventually be generalised to any characteristic vector.
+- Characteristic: applies a specially callibrated L1 uncertainty set to the expected returns, which recovers the quintile portfolio as a special case @quintile. This supports any characteristics vector, as long as there exists an overload for `Statistics.mean` for that vector.
 - Norm ball: the image of a norm ball under a map of any rank, so a set that is flat in the directions a factor model does not span needs no full rank shape matrix.
 - Compact: holds the worst-case variance of a covariance set as a quadratic penalty on the weights, so the problem stays a second order cone programme with no semidefinite constraint.
 
-The bounds themselves come from a normal approximation, from a delta method, or from an ARCH bootstrap of the estimator. A further estimator reads no returns at all: it takes the factor model of the optimisation's prior, and limits both sets to the directions that the factors do not span.
+The bounds themselves come from a normal distribution approximation, from a delta method, or from an ARCH bootstrap of the estimator. A further estimator reads no returns at all: it takes the factor model of the optimisation's prior, and limits both sets to the directions that the factors do not span.
 
 == Optimisers
 
@@ -397,7 +402,9 @@ There is a huge variety of constraints. Every optimiser supports weight bounds, 
 
 == Incremental estimation
 
-Some statistics have an exact update, in which the new value follows from a running state and one new observation. The sample mean, the variance, the full covariance, the coskewness and the cokurtosis are among them, and their estimators fold each new observation into that state rather than read the sample again. Every other estimator keeps the observations it has seen, optionally capped to a rolling window, and runs its batch computation over them. Both forms answer the same call, and every optimiser updates through its prior, so a whole strategy can step forward one observation at a time.
+Some statistics have an exact update, in which the new value follows from a running state and one new observation. The sample mean, the variance, the full covariance, the coskewness and the cokurtosis are among them, and their estimators fold each new observation into that state rather than read the entire sample again. Every other estimator keeps the observations it has seen, optionally capped to a rolling window, and runs its batch computation over them.
+
+When used, incremental estimators allow the strategy to update its statistics with new data as it arrives, without recomputing on the entire history, falling back to batch computation for estimators that do not support exact incremental updates. Users only need to declare an estimator as incremental, the library uses multiple dispatch to select the appropriate update or recomputation method automatically.
 
 == Cross-validation, hyperparameter tuning, and pipelines
 
@@ -415,6 +422,7 @@ The postprocessing stage scores what the processing stage produced. The forecast
 - Attribution: the predicted or realised volatility and mean return of a portfolio, split into systematic, idiosyncratic and unexplained parts, by factor, by factor family and by asset, as well as Brinson attribution.
 - Forecast evaluation: the information coefficient, coverage, quantile spread, decay and calibration of a return forecast out of sample, with a test of the mean information coefficient that pairs a fixed-bandwidth long-run variance with a wild bootstrap, so the overlap of the forward windows does not inflate its significance. Covariance forecasts are scored against the returns realised after them, step by step through a walk-forward.
 - Regret: the log-wealth regret of a strategy against any comparator, with a Newey-West test of equal expected log growth @neweywest1987. A comparator fitted in hindsight on each row gives the dynamic regret, and the best sequence of allocations under a budget on its path length gives the regret against the budgeted comparator of @zinkevich2003.
+- These include textual printouts as well as plots and charts.
 
 == Design philosophy
 
@@ -433,15 +441,31 @@ With the exception of covariance estimators, which are defined in #statsbase, ev
 
 The strict adherence to a well-defined type hierarchy lets developers and users alike extend and modify the library's behaviour without modifying the source code. A new risk measure, estimator, or optimiser can live in a user's own package and still compose with everything described here.
 
+== Future developments
+
+There are several planned features that have not yet been implemented these include:
+
++ Vine copula based synthetic data prior. This would allow the generation of realistic synthetic datasets that preserve complex dependency structures observed in historical data whilst letting users perform robust stress testing and scenario analysis without relying solely on historical samples.
++ Fixed income and derivative risk models. This would enable the library to handle a broader range of financial instruments, allowing for more comprehensive portfolio optimisation and risk management strategies.
++ Characteristics based portfolio construction. This would allow the library to build portfolios directly from cross-sectional factors rather than returns data.
+
+= High standards of quality in the age of AI
+
+The library has an extensive and growing test suite that as of now has 98% #coverage. It has a fully documented public and private #api, very comprehensive #examples and #user_guide, and an entire toolchain dedicated to automatically finding and reporting regressions, type instabilities, missing documentation, code smells, and other potential issues that unequivocally improve code quality and maintainability as the library evolves. These tools are run both when code is committed---serving as a measure of immediate quality control---but also as part of weekly continuous integration checks which serve to improve the overall code quality and maintainability of the existing codebase. These tools are deterministic in their reporting, so they do not require an AI to interpret, analyse or fix their findings, however we have found frontier models to be particularly good at fixing these measurable, interpretable results.
+
+Even before AI tools became as prevalent and---for frontier models---unambiguously beneficial as they are today, the library defined high standards of quality. These have been greatly expanded and reinforced with automated checks and continuous integration, ensuring that both human and AI contributions maintain the library's high standards. There are also entire workflows that use AI tools to assist in code review; improve testing and documentation; add new features; find and fix bugs; improve the user experience by simplifying interfaces, improving logging and error messages; and overall doing the menial and boring maintenance refactors that unlock new possibilities and fix latent issues before they manifest.
+
+By being so thorough with our standards and automatic checks, we have found great success at integrating AI tools into our development workflow, allowing the library to integrate previously out of scope features, and improving the quality of existing ones. These workflows are continuously refined and expanded to maximize the benefits of AI assistance without losing our unwavering commitment to the highest standards of quality. A cursory glance at the issue tracker will reveal the lengths to which we go to ensure additions meet our quality standards, but also how much effort is put into maintaining and improving the existing codebase over time.
+
 = Availability
 
-#po is registered in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed, and it is available under an MIT license. It follows common software development best practices:
+#po is registered under an MIT license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, etc. contributions are very much appreciated and welcome.
 
-+ An extensive and high #link("https://app.codecov.io/gh/dcelisgarza/PortfolioOptimisers.jl")[coverage] test suite.
-+ Automated documentation builds with a programmatically generated #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/capability_catalogue")[capability catalogue], an introductory #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/user_guide/00_User_Guide")[user guide], #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/examples/00_Examples")[deep examples], and fully documented public and private #link("https://dcelisgarza.github.io/PortfolioOptimisers.jl/stable/00_API")[APIs].
-+ Miscellaneous code quality checks.
+We hope readers will find in #po an interesting, valuable, and trustworthy tool for their needs.
 
-All as part of a GitHub continuous integration pipeline. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the roadmap is public, and contributions are welcome. We hope readers will find it a good place to run their own experiments.
+= AI use disclosure
+
+AI was used in the validation of the counts provided in @tab1, in ensuring the paper covers a comprehensive and accurate representation of the library's features, capabilities, and development practices, as well as checking for gaps in the literature. It was not used to write any part of this article.
 
 #show bibliography: set par(first-line-indent: 0em, spacing: 0.75em, leading: 0.6em)
 #show bibliography: set text(size: 9pt)

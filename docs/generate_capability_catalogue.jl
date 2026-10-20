@@ -274,7 +274,7 @@ type or function does. Each entry links to its docstring, on a public API page, 
 on a private API page for a name outside the public API.
 
 The documentation build writes this page with
-[docs/generate_capability_catalogue.jl](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_capability_catalogue.jl).
+[`docs/generate_capability_catalogue.jl`](https://github.com/dcelisgarza/PortfolioOptimisers.jl/tree/main/docs/generate_capability_catalogue.jl).
 The grouping comes from `docs/capability_catalogue.jl`. The description of an entry
 is the first sentence of its docstring, unless the catalogue gives the entry its own
 label. The build fails when a type that you can choose, such as an estimator or an
