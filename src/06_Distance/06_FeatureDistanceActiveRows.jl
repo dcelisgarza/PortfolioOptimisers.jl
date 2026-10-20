@@ -317,13 +317,13 @@ Rescale the distance `d` of a pair, measured on the coordinates `idx` of a stack
 
 [`StackObservations`](@ref) measures a pair on the rows at which both assets are active. A metric that sums over the coordinates then sums over fewer of them, and gives a smaller distance than the whole window would. The rescale is the one that makes the sum an estimate of the sum over the whole window.
 
-| Metric                                                                                                                                         | Rescale                                            |
-|:---------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------- |
-| `Distances.Cityblock`, `Distances.TotalVariation`, `Distances.SqEuclidean`, `Distances.ChiSqDist`                                              | ``d \\cdot L / n``                                 |
-| `Distances.Euclidean`                                                                                                                          | ``d \\cdot \\sqrt{L / n}``                         |
-| `Distances.Minkowski`                                                                                                                          | ``d \\cdot (L / n)^{1/p}``                         |
-| A weighted form                                                                                                                                | the ratio of the weight sums in place of ``L / n`` |
-| [`AngularDist`](@ref), `Distances.CosineDist`, `Distances.CorrDist`, `Distances.Jaccard`, `Distances.BrayCurtis`, and the four mean deviations | none                                               |
+| Metric                                                                                                                                          | Rescale                                            |
+|:----------------------------------------------------------------------------------------------------------------------------------------------- |:-------------------------------------------------- |
+| `Distances.Cityblock`, `Distances.TotalVariation`, `Distances.SqEuclidean`, `Distances.ChiSqDist`                                               | ``d \\cdot L / n``                                 |
+| `Distances.Euclidean`                                                                                                                           | ``d \\cdot \\sqrt{L / n}``                         |
+| `Distances.Minkowski`                                                                                                                           | ``d \\cdot (L / n)^{1/p}``                         |
+| A weighted form                                                                                                                                 | the ratio of the weight sums in place of ``L / n`` |
+| [`AngularDist`](@ref), `Distances.CosineDist`, `Distances.CorrDist`, `Distances.Jaccard`, `Distances.BrayCurtis`, and the three mean deviations | none                                               |
 
 Where ``L`` is `len` and ``n`` is the length of `idx`. Every coordinate of a row carries the features of one observation, so ``L / n`` is ``T / n`` in rows. Another metric has no method, and it refuses. The message names the method to add.
 
@@ -349,8 +349,8 @@ end
 function stack_rescale(::Union{<:AngularDist, <:Distances.CosineDist, <:Distances.CorrDist,
                                <:Distances.Jaccard, <:Distances.BrayCurtis,
                                <:Distances.MeanAbsDeviation, <:Distances.MeanSqDeviation,
-                               <:Distances.RMSDeviation, <:Distances.NormRMSDeviation},
-                       d::Number, ::AbstractVector, ::Integer)
+                               <:Distances.RMSDeviation}, d::Number, ::AbstractVector,
+                       ::Integer)
     return d
 end
 function stack_rescale(::Union{<:Distances.Cityblock, <:Distances.TotalVariation,

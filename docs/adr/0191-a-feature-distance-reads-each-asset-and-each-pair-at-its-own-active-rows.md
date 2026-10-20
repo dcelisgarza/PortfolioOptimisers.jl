@@ -55,7 +55,7 @@ R's `stats::dist` for a missing coordinate:
 | `Euclidean` | `d · sqrt(T / n)` |
 | `Minkowski(p)` | `d · (T / n)^(1 / p)` |
 | `WeightedEuclidean`, `WeightedSqEuclidean`, `WeightedCityblock`, `WeightedMinkowski` | the ratio of the weight sums in place of `T / n` |
-| `AngularDist`, `CosineDist`, `CorrDist`, `Jaccard`, `BrayCurtis`, the four mean deviations | none |
+| `AngularDist`, `CosineDist`, `CorrDist`, `Jaccard`, `BrayCurtis`, the three mean deviations that are semi-metrics (`MeanAbsDeviation`, `MeanSqDeviation`, `RMSDeviation`) | none |
 
 Any other metric refuses a pair with `n < T`, and the message names the method to add. #1450
 simulated the stack against complete latent data (200 draws, AR(1) features, the gaps of the

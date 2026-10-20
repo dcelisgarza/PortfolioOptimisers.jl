@@ -735,6 +735,12 @@ struct PeelEveryEnd <: PortfolioOptimisers.AbstractPeel end
 function PortfolioOptimisers.peel_assets(::PeelEveryEnd, U::AbstractMatrix{Bool})
     return findall(vec(any(U; dims = 2)))
 end
+# A rule that peels the first end of the first edge alone, so it can leave an edge.
+struct PeelFirstEdge <: PortfolioOptimisers.AbstractPeel end
+function PortfolioOptimisers.peel_assets(::PeelFirstEdge, U::AbstractMatrix{Bool})
+    i = findfirst(vec(any(U; dims = 2)))
+    return isnothing(i) ? Int[] : [i]
+end
 @testset "Peel family" begin
     @testset "Graph rules" begin
         # The star X-(A1, A2, A3) whose leaves each carry one more edge Ai-Li. Greedy removes X
@@ -785,6 +791,14 @@ end
         end
         # The sample must reach the lexicographic arm, or the last test above checks nothing.
         @test larger > 0
+        # The complete graph is the worst case of the cover: every rule keeps one asset, the
+        # last (#1771). R7 of #1630 measured 0.13 ms for 32 assets.
+        for n in (3, 8, 32)
+            K = trues(n, n)
+            K[LinearAlgebra.diagind(K)] .= false
+            @test PortfolioOptimisers.peel_assets(MinimalPeel(), K) == 1:(n - 1)
+            @test PortfolioOptimisers.peel_assets(GreedyPeel(), K) == 1:(n - 1)
+        end
     end
     @testset "Policy and interface" begin
         @test CoveragePolicy().peel === MinimalPeel()
@@ -799,6 +813,19 @@ end
         s = @test_logs (:warn, r"indices \[3, 4\]") cov(peel_covariance(PeelEveryEnd()),
                                                         peel_disjoint_returns())
         @test all(isnan, s[3, :]) && all(isnan, s[4, :]) && all(isfinite, s[1:2, 1:2])
+        # A rule whose set leaves an edge leaves a `NaN` inside the block, and the matrix
+        # repair and the prior refuse it, as the interface states (#1771). The undetermined
+        # pairs make the cycle 3-4-5-6, and the rule peels asset 3 alone.
+        Y = hcat(peel_disjoint_returns(), peel_disjoint_returns()[:, 3:4])
+        s = @test_logs (:warn, r"indices \[3\]") cov(peel_covariance(PeelFirstEdge()), Y)
+        @test all(isnan, s[3, :]) && isnan(s[4, 5]) && isnan(s[5, 6])
+        @test all(isfinite, LinearAlgebra.diag(s)[[1, 2, 4, 5, 6]])
+        @test_throws PortfolioOptimisers.IsNonFiniteError PortfolioOptimisers.matrix_processing_block!(MatrixProcessing(),
+                                                                                                       copy(s),
+                                                                                                       Y)
+        pe = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = CoveragePolicy()),
+                            ce = peel_covariance(PeelFirstEdge()))
+        @test_throws PortfolioOptimisers.IsNonFiniteError prior(pe, Y)
     end
     @testset "Covariance peels at admission" begin
         X = peel_disjoint_returns()
@@ -831,6 +858,23 @@ end
         ce = partial_fit!(peel_covariance(MinimalPeel()), X)
         sf = @test_logs (:warn,) cov(ce)
         @test isequal(sf, s1)
+        # The fold peels each time it answers, so the peeled set can change between steps
+        # (#1771). After rows 1 to 20, assets 3 and 4 share no row, and asset 5 has none. After
+        # rows 21 to 40, 3 and 4 share rows, and 1 and 5 share none.
+        Z = [(sin(0.9 * t + 2.1 * j) + cos(0.2 * t * j) / 3) / 100 for t in 1:40, j in 1:5]
+        Z[21:end, 1] .= NaN
+        Z[11:20, 3] .= NaN
+        Z[1:10, 4] .= NaN
+        Z[1:20, 5] .= NaN
+        pc = peel_covariance(MinimalPeel())
+        f1 = partial_fit!(pc, Z[1:20, :])
+        z1 = @test_logs (:warn, r"indices \[3\]") cov(f1)
+        f2 = partial_fit!(f1, Z[21:40, :])
+        z2 = @test_logs (:warn, r"indices \[1\]") cov(f2)
+        @test findall(isnan, LinearAlgebra.diag(z1)) == [3, 5]
+        @test findall(isnan, LinearAlgebra.diag(z2)) == [1]
+        @test isequal(z1, @test_logs (:warn,) cov(pc, Z[1:20, :]))
+        @test isapprox(z2, (@test_logs (:warn,) cov(pc, Z)); rtol = 1e-12, nans = true)
         @test_throws ArgumentError cov(ce; strict = true)
         @test_throws ArgumentError cor(ce; strict = true)
         # An estimator wrapped in `Online` reads its Sample Buffer through the batch verb, and

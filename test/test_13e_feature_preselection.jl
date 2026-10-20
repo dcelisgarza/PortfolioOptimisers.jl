@@ -296,7 +296,9 @@ using PortfolioOptimisers, Test, StableRNGs, StatsBase, LinearAlgebra, Clarabel
 using PortfolioOptimisers.Distances: Euclidean, Cityblock, SqEuclidean, Minkowski,
                                      ChiSqDist, WeightedEuclidean, WeightedCityblock,
                                      CosineDist, Chebyshev, WeightedSqEuclidean,
-                                     WeightedMinkowski, TotalVariation, BrayCurtis, Jaccard
+                                     WeightedMinkowski, TotalVariation, BrayCurtis, Jaccard,
+                                     CorrDist, MeanAbsDeviation, MeanSqDeviation,
+                                     RMSDeviation
 
 const PO = PortfolioOptimisers
 
@@ -343,6 +345,9 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # LastActiveRow reads `a` at row 4 (4), `b` at row 2 (4), and `c` at row 4 (7).
         D = hand_distance(fdist(LastObservation(; alg = LastActiveRow())), rd)
         @test D == [0.0 0.0 3.0; 0.0 0.0 3.0; 3.0 3.0 0.0]
+        # A direct `cor_and_dist` or `clusterise` call refuses `b` by name too (#1771).
+        @test_throws msg cor_and_dist(fdist(LastObservation()), nothing, rd.X; rd = rd)
+        @test_throws msg clusterise(ClustersEstimator(; de = fdist(LastObservation())), rd)
         # The stack holds the rows from the earliest last active row, row 2, to the last.
         @test PO.collapse_rows(LastObservation(; alg = LastActiveRow()), rd.pnl) == 2:4
         @test PO.collapse_rows(LastObservation(), rd.pnl) == 4:4
@@ -369,9 +374,14 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         # and 4: |3 - 5| and |4 - 7| average to 2.5. (b, c) shares no row.
         msg = "FeatureDistance reads each pair of assets at the rows at which both are active, and the assets (\"b\", \"c\") share no active row."
         @test_throws msg hand_distance(fdist(AggregateDistances()), rd)
+        # A direct `cor_and_dist` or `clusterise` call refuses the pair too (#1771).
+        @test_throws msg cor_and_dist(fdist(AggregateDistances()), nothing, rd.X; rd = rd)
+        @test_throws msg clusterise(ClustersEstimator(; de = fdist(AggregateDistances())),
+                                    rd)
         msg = "DropFewerRows drops an asset at the entry of a fit"
         de = fdist(AggregateDistances(; pair = DropFewerRows()))
         @test_throws msg hand_distance(de, rd)
+        @test_throws msg clusterise(ClustersEstimator(; de = de), rd)
         # The fallback measures (b, c) by their means over their own rows, 3 against 6.
         D = hand_distance(fdist(AggregateDistances(; pair = FeatureFallback())), rd)
         @test D ≈ [0 1.5 2.5; 1.5 0 3; 2.5 3 0] rtol = 1e-15
@@ -381,6 +391,18 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test D[1, 2] ≈ 5 / 3 rtol = 1e-15
         @test D[1, 3] ≈ 18 / 7 rtol = 1e-15
         @test D[2, 3] ≈ 3 rtol = 1e-15
+        # The fallback takes its own collapse and weights (#1771). `b` is active on rows 1 to
+        # 3, at 2, 4 and 9, and `c` on row 4 alone, at 7. The median of `b` is 4 and its mean
+        # 5. Under weights 1:4 it is (2 + 8 + 27) / 6, and a stack of four equal rows of the
+        # pair is twice the gap under the Euclidean metric.
+        rd3 = hand_rd(; A = Bool[1 1 0; 1 1 0; 1 1 0; 1 0 1])
+        w4 = StatsBase.Weights(1.0:4.0)
+        fbd(fb) = hand_distance(fdist(AggregateDistances(; pair = fb)), rd3)[2, 3]
+        @test fbd(FeatureFallback()) ≈ 2 rtol = 1e-15
+        @test fbd(FeatureFallback(; alg = MedianCollapse())) ≈ 3 rtol = 1e-15
+        @test fbd(FeatureFallback(; w = w4)) ≈ 7 - 37 / 6 rtol = 1e-14
+        D = hand_distance(fdist(StackObservations(; pair = FeatureFallback(; w = w4))), rd3)
+        @test D[2, 3] ≈ 2 * (7 - 37 / 6) rtol = 1e-14
         # An asset whose active rows carry a zero weight has no distance to read. The total of
         # `c` was `0 / 0` on the diagonal, which no pair rule reaches, and the refusal named
         # the pair (a, c) as one that shares no active row (R7 of #1630).
@@ -430,6 +452,35 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         @test D[1, 3] == AngularDist()([3.0, 4], [5.0, 7])
         D = hand_distance(fdist(StackObservations(; pair = fb); metric = CosineDist()), rd)
         @test D[1, 2] ≈ CosineDist()([1.0, 2], [2.0, 4]) atol = 1e-15
+        # So do the other ratio metrics and the mean deviations (#1771). On this panel (a, c)
+        # shares rows 1, 3 and 4, at (1, 3, 4) and (9, 5, 7), and (a, b) rows 1 and 2. A
+        # rescale of either pair would move it by a factor of 4 / 3 or 2.
+        rd2 = hand_rd(; A = Bool[1 1 1; 1 1 0; 1 0 1; 1 0 1])
+        for m in
+            (CorrDist(), BrayCurtis(), Jaccard(), MeanAbsDeviation(), MeanSqDeviation(),
+             RMSDeviation())
+            D = hand_distance(fdist(StackObservations(; pair = fb); metric = m), rd2)
+            @test D[1, 3] ≈ m([1.0, 3, 4], [9.0, 5, 7]) rtol = 1e-14
+            @test D[1, 2] ≈ m([1.0, 2], [2.0, 4]) atol = 1e-15
+        end
+        # A stack of two features rescales over the coordinates of both, and the fallback
+        # fills each feature with its own mean. `g` holds (0.5, 1, 2, 2), (1, 3, 8, 8) and
+        # (3, 3, 1, 4) for `a`, `b` and `c`.
+        G = [0.5 1 3; 1 3 3; 2 8 1; 2 8 4]
+        pnl2 = AssetPanel(;
+                          pf = [NumericPanelField(; name = "f", vals = rd.pnl.pf[1].vals),
+                                NumericPanelField(; name = "g", vals = G)],
+                          amsk = rd.pnl.amsk, emsk = rd.pnl.emsk)
+        rdg = ReturnsResult(; nx = rd.nx, X = rd.X, pnl = pnl2)
+        de2 = FeatureDistance(; metric = Euclidean(), alg = StackObservations(; pair = fb),
+                              sel = ["f", "g"])
+        D = hand_distance(de2, rdg)
+        # (a, b): (1, 2, 0.5, 1) against (2, 4, 1, 3) on four of eight coordinates.
+        @test D[1, 2] ≈ sqrt(1 + 4 + 0.25 + 4) * sqrt(2) rtol = 1e-15
+        # (a, c): (3, 4, 2, 2) against (5, 7, 1, 4).
+        @test D[1, 3] ≈ sqrt(4 + 9 + 1 + 4) * sqrt(2) rtol = 1e-15
+        # (b, c): the means (3, 2) against (6, 2.5), on four rows.
+        @test D[2, 3] ≈ 2 * sqrt(9 + 0.25) rtol = 1e-15
         # A metric with no rescale method refuses a partial pair, and names the method to add.
         msg = "Add a method `PortfolioOptimisers.stack_rescale(metric::Chebyshev, d, idx, len)`"
         de = fdist(StackObservations(; pair = fb); metric = Chebyshev())
@@ -538,6 +589,13 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         A = Bool[1 1 0; 1 0 0; 1 0 1; 1 0 1]
         @test PO.feature_readable_mask(de, nothing, hand_rd(; A = A)) ==
               BitVector([1, 0, 1])
+        # The rule repeats until no pair is empty (#1771). (a, b) is the first empty pair,
+        # and `b` has fewer rows; then (a, c) is empty, and `c` has fewer rows. One pass
+        # would keep `c`.
+        A = Bool[1 0 0 1; 1 0 0 1; 1 0 0 1; 0 1 1 1]
+        rd4 = hand_rd(; V = [1.0 2 9 3; 2 4 9 4; 3 9 5 5; 4 9 7 6], A = A,
+                      nx = ["a", "b", "c", "d"])
+        @test PO.feature_readable_mask(de, nothing, rd4) == BitVector([1, 0, 0, 1])
         # Every holder forwards, and a producer or a precomputed estimator reads no panel.
         cle = ClustersEstimator(; de = fdist(LastObservation()))
         @test PO.feature_readable_mask(cle, nothing, rd) == BitVector([1, 0, 1])
@@ -635,6 +693,15 @@ end
                             HierarchicalEqualRiskContribution(; opt = ho),
                         "SchurComplementHierarchicalRiskParity" =>
                             SchurComplementHierarchicalRiskParity(; opt = ho),
+                        # The vector arms enter at sites of their own (#1771).
+                        "HierarchicalRiskParity, a vector of measures" =>
+                            HierarchicalRiskParity(; r = [Variance(), ConditionalValueatRisk()], opt = ho),
+                        "SchurComplementHierarchicalRiskParity, a vector of params" =>
+                            SchurComplementHierarchicalRiskParity(;
+                                                                  params = [SchurComplementParams(),
+                                                                            SchurComplementParams(;
+                                                                                                  gamma = 0.5)],
+                                                                  opt = ho),
                         "NestedClustered" =>
                             NestedClustered(; pe = pe, cle = cle, opti = InverseVolatility(; pe = pe),
                                             opto = InverseVolatility(; pe = pe)),
