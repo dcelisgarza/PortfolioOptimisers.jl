@@ -210,6 +210,47 @@ end
             @test size(st.fsc.S, 1) - size(st.Ms, 1) == a
             @test size(st.win.X, 1) == po.cross_sectional_carry_rows(pe)
         end
+        # The rows that train, read off a score the test controls (#1770). The block starts at
+        # row `b0`. Under a rule that does not neutralise, a blank on every row before the
+        # last `lag + horizon - 1` rows before the block moves nothing, and a blank on one row
+        # more removes the pairs of that row (49 of 60 assets, measured). Under the default
+        # rule the scores before the block are `NaN`, so no row before the block trains, and a
+        # blank on all of them moves nothing.
+        Ts, Ns = size(syn.X)
+        sv = randn(StableRNG(1770), Ts, Ns)
+        function blanked(k)
+            pm = falses(Ts, Ns)
+            pm[1:k, :] .= true
+            pnl = AssetPanel(;
+                             pf = [syn.pnl.pf...,
+                                   NumericPanelField(; name = "s",
+                                                     vals = ifelse.(pm, 0.0, sv),
+                                                     omsk = .!pm, pmsk = pm)],
+                             amsk = syn.pnl.amsk, emsk = syn.pnl.emsk)
+            return ReturnsResult(; nx = syn.nx, X = syn.X, ts = syn.ts, pnl = pnl)
+        end
+        pscore = DescriptorScores(; descriptors = [Passthrough(; field = "s")])
+        function fit_rf(ofit, k; kw...)
+            pe = CrossSectionalFactorPrior(; lambda = 1, factors = momentum,
+                                           families = ["industry" => nothing], minra = 5,
+                                           ofit = ofit,
+                                           rfe = TargetReturnForecast(; scores = pscore,
+                                                                      half_life = 10.0,
+                                                                      kw...))
+            return prior(pe, blanked(k)).rr
+        end
+        for (h, l) in ((5, 1), (2, 4), (3, 2))
+            gap = l + h - 1
+            rr = fit_rf(un, 0; horizon = h, lag = l)
+            b0 = Ts - size(rr.csr.eps, 1) + 1
+            keep = fit_rf(un, b0 - gap - 1; horizon = h, lag = l).rf
+            cut = fit_rf(un, b0 - gap; horizon = h, lag = l).rf
+            @test isequal(keep.mu, rr.rf.mu) && keep.model.n == rr.rf.model.n
+            @test rr.rf.model.n - cut.model.n == 49
+            neutral = fit_rf(ScoreNeutralisation(), 0; horizon = h, lag = l).rf
+            blank = fit_rf(ScoreNeutralisation(), b0 - 1; horizon = h, lag = l).rf
+            @test isequal(blank.mu, neutral.mu) && blank.model.n == neutral.model.n
+        end
         # The strict carry rule accepts the member, because it folds.
         @test po.folds_forecast_rows(CrossSectionalFactorPrior(; factors = momentum,
                                                                carry = FoldOnly(),

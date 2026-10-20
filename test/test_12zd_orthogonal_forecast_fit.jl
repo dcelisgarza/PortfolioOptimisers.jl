@@ -326,4 +326,55 @@ PortfolioOptimisers.return_forecast_step(::OfitStepProbe, P, csfm, fs, cre) = :w
             end
         end
     end
+
+    @testset "A rule in c measures about one on the history of a neutralised member (#1770)" begin
+        # The panel of #1485 as a full prior: loadings [1 ℓ], a score `s1 = ℓ + u`, and an
+        # idiosyncratic return orthogonal to the loadings that `u` of the row before
+        # predicts, at equal caps. The orthogonal part of a member as it stands is under-scaled
+        # by `var(s⊥) / var(s) = 1 / 2`, so its calibration slope is about two, and the
+        # neutralised member's is about one. Measured on 200 assets × 600 observations, at
+        # three seeds: 0.89, 0.84 and 0.85 (standard error 0.08) neutralised, and 1.79, 1.62
+        # and 1.72 (0.16) as it stands, a ratio of 2.01, 1.92 and 2.02. The target member
+        # measures the same to 0.04. Each neutralised slope is below one, within two standard
+        # errors: the noise of the fitted coefficient attenuates the slope out of sample.
+        rng = StableRNG(1770)
+        N, T = 200, 600
+        ell = randn(rng, N)
+        L = [ones(N) ell]
+        Pp = I - L * ((L' * L) \ L')
+        U = Matrix{Float64}(undef, T, N)
+        u = randn(rng, N)
+        for t in 1:T
+            if t > 1
+                u = 0.99 .* u .+ sqrt(1 - 0.99^2) .* randn(rng, N)
+            end
+            U[t, :] = u
+        end
+        E = Matrix{Float64}(undef, T, N)
+        E[1, :] = Pp * (0.02 .* randn(rng, N))
+        for t in 2:T
+            E[t, :] = Pp * (0.5 / sqrt(252) .* 0.02 .* U[t - 1, :] .+ 0.02 .* randn(rng, N))
+        end
+        X = 0.01 .* randn(rng, T, 2) * L' .+ E
+        inp = [NumericPanelInput(; name = "market_cap", vals = ones(T, N)),
+               NumericPanelInput(; name = "ell", vals = repeat(ell', T, 1)),
+               NumericPanelInput(; name = "s1", vals = ell' .+ U)]
+        rd = ReturnsResult(; nx = ["A$i" for i in 1:N], X = X,
+                           pnl = asset_panel(inp; amsk = trues(T, N), emsk = trues(T, N)))
+        factors = ["market" => ConstantExposure(),
+                   "ell" =>
+                       CompositeExposure(; descriptors = [Passthrough(; field = "ell")],
+                                         family = "style")]
+        # The default warm-up holds the target for 252 rows of history; a short one reads
+        # the slope, clipped at zero.
+        slope = ForecastCalibrationSlope(; wu = ThresholdWarmUp(; min_obs = 20))
+        c(ofit) = prior(CrossSectionalFactorPrior(; factors = factors,
+                                                  rfe = ExpWeightedReturnForecast(;
+                                                                                  scores = scores()),
+                                                  ofit = ofit, c = slope), rd).rr.c
+        cn = c(ScoreNeutralisation())
+        cu = c(UnadjustedForecast())
+        @test abs(cn - 1) <= 2 * 0.082
+        @test abs(cu / cn - 2) <= 0.1
+    end
 end

@@ -105,12 +105,18 @@ The standalone member tests do not change.
 
 ## Consequences
 
-- A neutralised score is `NaN` before the block. Under `whole_history = true` a
-  `TargetReturnForecast` then trains only on the last `lag + horizon - 1` rows before the block,
-  the rows whose forward window reaches into the block.
-- A rule in `c` that fits the slope on the history of a neutralised member measures about one. Under
-  `OrthogonalPartCalibration()` the history is the history of the member as it stands, which `κ⊥`
-  does not scale, so such a rule repairs the under-scale a second time.
+- A neutralised score is `NaN` before the block, so under the default rule a
+  `TargetReturnForecast` with `whole_history = true` trains on no row before the block. Under a
+  rule that does not neutralise it trains on the last `lag + horizon - 1` rows before the block,
+  the rows whose forward window reaches into the block. `test_12zb` (#1770) pins both.
+- A rule in `c` that fits the slope on the history of a neutralised member measures about one where
+  the member has a signal. On the panel of #1485 at 200 assets × 600 observations,
+  `ForecastCalibrationSlope` measured 0.84 to 0.89 (standard error 0.08) on the neutralised
+  member, and twice that on the member as it stands, at three seeds. The slope is below one
+  because the noise of the fitted coefficient attenuates it out of sample. On the parity panel,
+  which plants no signal, the slope is noise around zero. `test_12zd` (#1770) holds the measure.
+  Under `OrthogonalPartCalibration()` the history is the history of the member as it stands,
+  which `κ⊥` does not scale, so such a rule repairs the under-scale a second time.
 - The constructors of `DescriptorScores`, `TargetReturnForecastResult` and
   `CrossSectionalFactorPrior` each take one more positional argument. A method that binds a type
   parameter of the prior by its position counts the new one.

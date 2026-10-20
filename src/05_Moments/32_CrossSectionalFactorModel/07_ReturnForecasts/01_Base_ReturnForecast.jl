@@ -871,7 +871,7 @@ Neutralise the scores of a fitted member against every estimated factor of the b
 
 This is the default Orthogonal Forecast Fit of a [`CrossSectionalFactorPrior`](@ref). When the member answers `true` to [`fits_idiosyncratic_target`](@ref), the prior adds the name of every estimated factor of the block to the Neutralisation names of its [`DescriptorScores`](@ref), and sets the weights of the Neutralisation to [`BlockRegressionWeights`](@ref). The score of each observation is then orthogonal to the exposures under the inner product of the cross-sectional fit, which is the one that the split reads. By the Frisch–Waugh theorem the member then fits the slope on the orthogonal part of its score, so `α⊥` carries the scale of the fit and `g` is about zero. The observed factors are not neutralised: the regression does not estimate them, so the idiosyncratic return is not orthogonal to their exposures, and the split leaves them out.
 
-A member that answers `false` keeps its forecast. A neutralised score is `NaN` before the block, so under `whole_history = true` a [`TargetReturnForecast`](@ref) trains only on the last `lag + horizon - 1` rows before the block, which are the rows whose forward window reaches into the block.
+A member that answers `false` keeps its forecast. A neutralised score is `NaN` before the block, so under `whole_history = true` a [`TargetReturnForecast`](@ref) trains on no row before the block. Under a rule that does not neutralise it trains on the last `lag + horizon - 1` rows before the block, which are the rows whose forward window reaches into the block.
 
 # Related
 
