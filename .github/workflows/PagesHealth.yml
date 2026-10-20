@@ -1,0 +1,50 @@
+name: Pages health
+
+# GitHub Pages refuses a site above 10 GiB, and a refused deployment fails without a word to anyone.
+# It happened once: the previews of closed pull requests and the expanded version links pushed
+# `gh-pages` past the limit, and every `pages-build-deployment` run failed for two days before
+# anyone saw it. This job makes the failure visible, and it warns before the limit is reached.
+#
+# It fails when the latest completed `pages-build-deployment` run failed, or when the expanded size
+# of `gh-pages` passes 8 GiB. Pages expands a symbolic link to a directory into a full copy of that
+# directory, and Documenter writes one link per version alias, so the check counts every link as a
+# copy of its target. It reads the tree through the GitHub API, which reports the size of every
+# blob, so it downloads none of the site. `.github/pages_health.py` holds the logic, and a person
+# can run it locally with `gh` logged in.
+#
+# The check caps nothing. `DocPreviewCleanup.yml` does: each week it keeps the versions of the
+# newest minor series and the previews that a pull request asks for with a label, and it deletes
+# the rest (#1722). This check is the backstop when that job stops or the cap is too high.
+#
+# A schedule fires only from the default branch, so this file runs once it reaches `main`.
+
+on:
+  schedule:
+    # Every day, 05:00 UTC.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+# The job reads the tree of `gh-pages` and the runs of the Pages deployment. It writes nothing.
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  pages-health:
+    name: Check the size and the deployment of the Pages site
+    # A fork has no Pages site of this repository to check.
+    if: github.repository == 'dcelisgarza/PortfolioOptimisers.jl'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+      - name: Check the Pages site
+        run: python3 .github/pages_health.py "${GITHUB_REPOSITORY}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_LIMIT_GIB: "8"

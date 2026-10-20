@@ -17,7 +17,7 @@ file.
   page, the migration guide, the API index, the bibliography page, and 638 mirror pages under
   `public_api/` and `private_api/` that host the docstrings.
 - **`README.md`**, the repository front page, and the one user-facing Markdown file at the root.
-  `CLAUDE.md`, `AGENTS.md`, `CONTEXT.md`, `STANDARDS.md`, `CODE_OF_CONDUCT.md`, `.github/` and
+  `CLAUDE.md`, `AGENTS.md`, `GLOSSARY.md`, `CODING_STANDARDS.md`, `CODE_OF_CONDUCT.md`, `.github/` and
   `research/` are written for a contributor, as `docs/src/contribute/` is.
 - **`docs/capability_catalogue.jl`**, a Julia data file from which the docs build renders the
   Capability Catalogue. It holds 114 `Prose` paragraphs, 45 `Note` texts, 94 `Cap` labels and 76
@@ -46,7 +46,7 @@ say "we", "you" and "your" 14.0 times and the new pages 1.8. 48 of the 73 pages 
 
 **The contributor glossary leaks into the pages.** The prose holds `carrier` 37 times over 10
 pages, `read-out` 21 times, `seam` 12, `to the bit` 9, `refused by name` 14, the section sign `§`
-58 times over 12 pages, and the capitalised concept names of `CONTEXT.md` 80 times over 16 pages.
+58 times over 12 pages, and the capitalised concept names of `GLOSSARY.md` 80 times over 16 pages.
 The docs site has no glossary page, so a capitalised term points nowhere for a reader.
 
 **Three of the skill's word lists fire on this library's own vocabulary.** Rule 26's list gives 148
@@ -130,7 +130,7 @@ full.
 **6. A page names a type by its identifier and a concept in plain words.** A type is its identifier
 in a code span with an `@ref`. A concept is a plain phrase in lower case, and the page defines it
 in the sentence where it first appears. A word for the mechanism of the code never appears. The
-census holds at zero the multi-word bold terms of `CONTEXT.md` in their capitalised form, and the
+census holds at zero the multi-word bold terms of `GLOSSARY.md` in their capitalised form, and the
 exact strings `seam`, `carrier`, `read-out`, `to the bit`, `refused by name` and `§`.
 
 **7. A page shows a check as a number, never as a verdict.** A page can run a comparison and print

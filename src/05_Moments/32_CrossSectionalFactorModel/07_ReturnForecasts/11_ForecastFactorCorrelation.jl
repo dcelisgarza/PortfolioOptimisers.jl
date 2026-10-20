@@ -45,7 +45,7 @@ end
                                 dates::AbstractVector{<:Integer} = axes(fe.alpha, 1),
                                 rank::Bool = false,
                                 weighting::AbstractOrthogonalityMetric = IdentityMetric(),
-                                min_count::Integer = fe.min_count) -> Matrix{<:Real}
+                                min_count::Integer = fe.min_count) -> FactorDiagnosticResult
 
 Return the contemporaneous correlation of a Return Forecast against every factor exposure, one row per observation.
 
@@ -103,7 +103,8 @@ Where:
 
 # Returns
 
-  - `c::Matrix{<:Real}`: `length(dates) × factors`, which is `observations × factors` by default. Entry `(j, k)` scores the observation `dates[j]` against factor `k`. An asset enters entry `(j, k)` when its forecast and its exposure to factor `k` are finite and, in the weighted form, its weight is finite and positive. The entry is `NaN` when fewer than `min_count` assets enter, and, in the weighted form, when the forecast or the exposure is constant over the assets that enter.
+  - `c::Matrix{<:Real}`: `length(dates) × factors`, which is `observations × factors` by default, on the method over histories. Entry `(j, k)` scores the observation `dates[j]` against factor `k`. An asset enters entry `(j, k)` when its forecast and its exposure to factor `k` are finite and, in the weighted form, its weight is finite and positive. The entry is `NaN` when fewer than `min_count` assets enter, and, in the weighted form, when the forecast or the exposure is constant over the assets that enter.
+  - `r::FactorDiagnosticResult`: On the block method, the same matrix in `X`, with the names and the family labels of the raw factor axis. [`exposure_ic_summary`](@ref) summarises it and keeps the labels. The block method returned the bare matrix in earlier releases, so a caller that indexed it now reads `r.X`.
 
 # Examples
 
@@ -181,9 +182,10 @@ function forecast_factor_correlation(fe::ForecastEvaluationResult,
                                      rank::Bool = false,
                                      weighting::AbstractOrthogonalityMetric = IdentityMetric(),
                                      min_count::Integer = fe.min_count)
-    return forecast_factor_correlation(fe, cs_diagnostic_exposures(csfm),
-                                       cs_diagnostic_weights(weighting, csfm);
-                                       dates = dates, rank = rank, min_count = min_count)
+    c = forecast_factor_correlation(fe, cs_diagnostic_exposures(csfm),
+                                    cs_diagnostic_weights(weighting, csfm); dates = dates,
+                                    rank = rank, min_count = min_count)
+    return FactorDiagnosticResult(c, csfm.nf, csfm.fam, (2,))
 end
 
 export forecast_factor_correlation

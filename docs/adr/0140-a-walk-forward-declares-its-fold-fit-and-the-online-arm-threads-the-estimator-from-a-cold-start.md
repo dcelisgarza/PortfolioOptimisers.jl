@@ -49,10 +49,10 @@ Five facts shaped the decision.
    bound is the bundle type, so a schedule there is refused at construction, and `pe` and the root
    are the only stateful slots a schedule reaches. (The build, #969, measured this; the decision
    comment named the head's `opt` as a third.)
-5. **The reference's online loop is a function, not a scheme.** It takes the walk-forward's own
+5. **The oracle's online loop is a function, not a scheme.** It takes the walk-forward's own
    keywords, builds an expanding walk-forward inside, clones the estimator so every run starts cold,
    folds the delta rows between folds, threads the previous weights, and returns the same result as
-   batch. A caller of the reference cannot hand the online loop to the batch grid search as a
+   batch. A caller of the oracle cannot hand the online loop to the batch grid search as a
    scheme, cannot run it through a date-based walk-forward as the same object, and cannot resume.
 
 ## Decision
@@ -149,13 +149,13 @@ refused as today.
    the library that wraps a scheme, and it forwards `split`, `n_splits`, `fold_evaluation`,
    `folds_are_time_ordered` and `show` today and one more method for every switch the walk-forwards
    ever gain. Inference is identical to option 1, measured.
-3. **`OnlineWalkForward(warmup_size, test_size; …)`, a sibling scheme in the reference's
+3. **`OnlineWalkForward(warmup_size, test_size; …)`, a sibling scheme in the oracle's
    vocabulary** — the cleanest call and no dead knob. Rejected because the date form needs an
-   `OnlineDateWalkForward` twin duplicating thirteen fields, or is lost — a capability the reference
+   `OnlineDateWalkForward` twin duplicating thirteen fields, or is lost — a capability the oracle
    has through `freq`.
-4. **`online_predict(opt, rd; warmup_size, …)`, the reference's function** — rejected: it cannot
+4. **`online_predict(opt, rd; warmup_size, …)`, the oracle's function** — rejected: it cannot
    be the `cv` field of a search or of a `Pipeline`'s `cross_val_predict`, so the search would need
-   an `OnlineGridSearch` of its own as the reference has, and a second loop would sit beside
+   an `OnlineGridSearch` of its own as the oracle has, and a second loop would sit beside
    `fold_loop`, undoing ADR 0067.
 5. **Reusing `Online(cv)`** — rejected: the word would carry a second meaning, "run the loop by
    stepping" beside "seed a refit buffer", which is what the glossary's *Avoid* lines exist to
@@ -164,7 +164,7 @@ refused as today.
    steps with no wrapper, so a caller could not ask for the online path without one, and the
    scheme's window would go unchecked.
 
-On the entry state, **reset** (the reference's clone) was costed and not chosen: after `Online`
+On the entry state, **reset** (the oracle's clone) was costed and not chosen: after `Online`
 resolves, the cap lives only in the state, so a reset must empty a state and keep its cap — one
 verb per state type, fourteen today. **Use** — fold the warm-up on top of what the estimator holds
 — was rejected on a worked case: an estimator hand-stepped over rows `1 : 100` and then handed a
@@ -206,7 +206,7 @@ on the map, and neither is built.
   `fold_loop`'s batch arms and from the twelve `optimise(opt, rd)` doors of the hosts that hold a
   prior. The walk is type-decided and folds to `nothing` on a wrapper-free tree, so a batch fit
   pays nothing it can measure.
-- `CONTEXT.md` gains **Fold Fit**.
+- `GLOSSARY.md` gains **Fold Fit**.
 
 ## Amendment (2026-09-21)
 

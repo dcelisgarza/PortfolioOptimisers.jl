@@ -17,7 +17,8 @@ $(DocStringExtensions.FIELDS)
         horizon::Option{<:Number} = nothing,
         fill_limit::Option{<:Real} = nothing,
         max_scenarios::Option{<:Integer} = nothing,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> EmpiricalPrior
 
 Keywords correspond to the struct's fields.
@@ -27,6 +28,7 @@ Keywords correspond to the struct's fields.
   - If `horizon` is not `nothing`, `horizon > 0`.
   - If `fill_limit` is not `nothing`, `0 < fill_limit <= 1`. Zero is not a value, because `nothing` already means that no fill passes in silence. The fit refuses a value looser than `1 - min_coverage` over the arms that state a coverage floor, because such a value could never fire.
   - If `max_scenarios` is not `nothing`, `max_scenarios > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
 
 ## The incremental fit
 
@@ -82,7 +84,8 @@ EmpiricalPrior
           me ┼ SimpleExpectedReturns
              │   w ┴ nothing
      horizon ┼ nothing
-  fill_limit ┴ nothing
+  fill_limit ┼ nothing
+       x_src ┴ nothing
 ```
 
 # Related
@@ -129,10 +132,16 @@ EmpiricalPrior
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function EmpiricalPrior(ce::StatsBase.CovarianceEstimator,
                             me::AbstractExpectedReturnsEstimator, horizon::Option{<:Number},
                             fill_limit::Option{<:Real}, max_scenarios::Option{<:Integer},
-                            cache::Option{<:AbstractPartialFitState})
+                            cache::Option{<:AbstractPartialFitState},
+                            x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :EmpiricalPrior)
         if !isnothing(horizon)
             @argcheck(horizon > 0, DomainError(horizon, "horizon must be > 0"))
         end
@@ -147,8 +156,10 @@ EmpiricalPrior
                                   "max_scenarios is the number of observations the result carries as scenarios, so it must be positive. Pass `nothing`, the default, to carry every observation the fit read."))
         end
         return new{typeof(ce), typeof(me), typeof(horizon), typeof(fill_limit),
-                   typeof(max_scenarios), typeof(cache)}(ce, me, horizon, fill_limit,
-                                                         max_scenarios, cache)
+                   typeof(max_scenarios), typeof(cache), typeof(x_src)}(ce, me, horizon,
+                                                                        fill_limit,
+                                                                        max_scenarios,
+                                                                        cache, x_src)
     end
 end
 function EmpiricalPrior(;
@@ -157,15 +168,16 @@ function EmpiricalPrior(;
                         horizon::Option{<:Number} = nothing,
                         fill_limit::Option{<:Real} = nothing,
                         max_scenarios::Option{<:Integer} = nothing,
-                        cache::Option{<:AbstractPartialFitState} = nothing)::EmpiricalPrior
-    return EmpiricalPrior(ce, me, horizon, fill_limit, max_scenarios, cache)
+                        cache::Option{<:AbstractPartialFitState} = nothing,
+                        x_src::Option{<:AbstractReturnsSource} = nothing)::EmpiricalPrior
+    return EmpiricalPrior(ce, me, horizon, fill_limit, max_scenarios, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of an [`EmpiricalPrior`](@ref) except `cache`, and `max_scenarios` only where it is set.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every host that carries a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. `max_scenarios` is a cap most callers never set, and a `nothing` row for it would move every rendering of every estimator that holds a prior; it appears exactly where a caller chose one. Set `set_show_nothing_fields!(:EmpiricalPrior, true)` to render both.
 
 # Arguments
 
@@ -173,7 +185,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:ce, :me, :horizon, :fill_limit)` with no scenario cap and `(:ce, :me, :horizon, :fill_limit, :max_scenarios)` with one.
+  - `fields::Tuple`: The field names to render, which is `(:ce, :me, :horizon, :fill_limit, :x_src)` with no scenario cap and `(:ce, :me, :horizon, :fill_limit, :max_scenarios, :x_src)` with one.
 
 # Related
 
@@ -183,9 +195,9 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 """
 function show_fields(pe::EmpiricalPrior)
     return if isnothing(pe.max_scenarios)
-        (:ce, :me, :horizon, :fill_limit)
+        (:ce, :me, :horizon, :fill_limit, :x_src)
     else
-        (:ce, :me, :horizon, :fill_limit, :max_scenarios)
+        (:ce, :me, :horizon, :fill_limit, :max_scenarios, :x_src)
     end
 end
 """
@@ -218,7 +230,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Scales a pair of log-return moments to an investment horizon and converts them to arithmetic returns, in place.
 
-The horizon algebra of [`EmpiricalPrior`](@ref), written once. The batch method reaches it after fitting `pe.me` and `pe.ce` on `log1p.(X)`, and the read-out of a folded prior reaches it after reading the same two moments off their states, so the two answer identically by construction rather than by a test over two copies of the arithmetic.
+The horizon algebra of [`EmpiricalPrior`](@ref), written once. The batch method reaches it after fitting `pe.me` and `pe.ce` on `log1p.(X)`, and `prior(pe)` with no data reaches it after reading the same two moments off their states, so the two answer identically by construction rather than by a test over two copies of the arithmetic.
 
 # Mathematical definition
 
@@ -316,7 +328,7 @@ Under a **mask-aware** `pe.me` and `pe.ce` — the exponentially weighted family
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
@@ -348,7 +360,8 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any}, X::MatNum,
     # [`resolve_fill_limit`](@ref)).
     fill_limit = resolve_fill_limit(pe.fill_limit, coverage_floor(pe))
     mu = vec(Statistics.mean(pe.me, X, pnl; dims = 1, kwargs...))
-    sigma = Statistics.cov(library_covariance_estimator(pe.ce), X, pnl; dims = 1, kwargs...)
+    sigma = Statistics.cov(library_covariance_estimator(pe.ce), X, pnl; dims = 1,
+                           strict = strict, kwargs...)
     # The Scenario Cap cuts the rows the result carries and leaves the moments above it
     # alone, so the fill runs over the matrix a consumer actually reads and its share is
     # measured against that window (see [`scenario_window`](@ref)).
@@ -424,7 +437,7 @@ Step 8 takes the same fill the no-horizon method takes, on the **arithmetic** `X
   - `F`: Factor returns matrix (ignored).
   - $(arg_dict[:pnl_moment])
   - $(arg_dict[:dims])
-  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`.
+  - `strict`: Whether a zero-filled scenario raises rather than warns. Any fill raises under `strict`; otherwise a column filled above the limit [`resolve_fill_limit`](@ref) derives warns, and every fill warns while that limit is `nothing`. It also reaches the covariance, where a peel of a [`CoveragePolicy`](@ref) refuses under `strict` and warns otherwise.
   - `kwargs...`: Additional keyword arguments passed to mean and covariance estimators.
 
 # Validation
@@ -454,7 +467,7 @@ function prior(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any}, X::MatNum,
     X_log = log1p.(X)
     mu = vec(Statistics.mean(pe.me, X_log, pnl; dims = 1, kwargs...))
     sigma = Statistics.cov(library_covariance_estimator(pe.ce), X_log, pnl; dims = 1,
-                           kwargs...)
+                           strict = strict, kwargs...)
     horizon_moments!(mu, sigma, pe.horizon)
     Xs = scenario_window(pe.max_scenarios, X)
     # The fill is on the arithmetic `X` the caller handed in, and it is taken after step 7,

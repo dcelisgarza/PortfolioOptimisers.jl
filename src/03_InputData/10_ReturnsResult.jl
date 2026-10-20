@@ -5,7 +5,7 @@ Abstract supertype for all returns result types.
 
 Every concrete type that holds the result of a returns calculation subtypes `AbstractReturnsResult`. [`ReturnsResult`](@ref) is the member the library builds.
 
-[`select_assets`](@ref), [`fit_preprocessing`](@ref) and the fold generation of cross-validation dispatch on this supertype. [`ClusterGroups`](@ref) reads the Feature Matrix from the [`AssetPanel`](@ref) of the carrier, because preselection runs before any prior exists and the carrier is the only source it can read. The `Pr_RR` alias names the concrete [`ReturnsResult`](@ref), and many methods dispatch on that alias, so these readers take this supertype instead. No check enforces the interface below.
+[`select_assets`](@ref), [`fit_preprocessing`](@ref) and the fold generation of cross-validation dispatch on this supertype. [`ClusterGroups`](@ref) reads the Feature Matrix from the [`AssetPanel`](@ref) of the returns data, because preselection runs before any prior exists and the returns data is the only source it can read. The `Pr_RR` alias names the concrete [`ReturnsResult`](@ref), and many methods dispatch on that alias, so these readers take this supertype instead. No check enforces the interface below.
 
 [`PredictionReturnsResult`](@ref) subtypes this supertype, but its `X` is a vector of portfolio returns with no asset axis. It does not meet the interface, and every entry point that needs an asset axis throws an error for it.
 
@@ -51,7 +51,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Check that a list of column names and the returns matrix it names are both given or both `nothing`, and that they agree in size.
 
-[`ReturnsResult`](@ref) calls it for the asset, factor and benchmark pairs.
+[`ReturnsResult`](@ref) calls it for the asset, factor, benchmark and Exogenous Series pairs.
 
 # Arguments
 
@@ -97,11 +97,62 @@ function check_names_and_returns_matrix(names::Option{<:VecStr}, mat::Option{<:M
     return nothing
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Check the Exogenous Series of a [`ReturnsResult`](@ref) against its names and against the other series of the observation axis.
+
+The Exogenous Series shares the observation axis with the asset, factor and benchmark returns, so it has their row count and one row per timestamp. It has no asset axis, so nothing else constrains it.
+
+# Arguments
+
+  - `ne`: The names of the Exogenous Series, or `nothing`.
+  - `E`: The Exogenous Series, `observations × series`, or `nothing`.
+  - `X`: The asset returns, or `nothing`.
+  - `F`: The factor returns, or `nothing`.
+  - `ts`: The timestamps, or `nothing`.
+
+# Validation
+
+  - The rules of [`check_names_and_returns_matrix`](@ref) for `ne` and `E`.
+  - When `E` is given, `size(E, 1)` equals the row count of each of `X` and `F` that is given, and `length(ts)` when `ts` is given. Raises a `DimensionMismatch`.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`ReturnsResult`](@ref)
+  - [`check_names_and_returns_matrix`](@ref)
+"""
+function check_exogenous_series(ne::Option{<:VecStr}, E::Option{<:MatNum},
+                                X::Option{<:MatNum}, F::Option{<:MatNum},
+                                ts::Option{<:VecDate})::Nothing
+    check_names_and_returns_matrix(ne, E, :ne, :E)
+    return check_exogenous_series(E, X, F, ts)
+end
+function check_exogenous_series(::Nothing, X::Option{<:MatNum}, F::Option{<:MatNum},
+                                ts::Option{<:VecDate})
+    return nothing
+end
+function check_exogenous_series(E::MatNum, X::Option{<:MatNum}, F::Option{<:MatNum},
+                                ts::Option{<:VecDate})::Nothing
+    for (n, sym) in ((isnothing(X) ? nothing : size(X, 1), :X),
+                     (isnothing(F) ? nothing : size(F, 1), :F),
+                     (isnothing(ts) ? nothing : length(ts), :ts))
+        @argcheck(isnothing(n) || size(E, 1) == n,
+                  DimensionMismatch("the Exogenous Series (E) shares the observation axis of $sym, so it must have one row per observation, got size(E, 1) = $(size(E, 1)) and $n for $sym"))
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
-Returns data of a universe: the asset returns, and optionally the factor returns, the benchmark returns, the timestamps, the implied volatilities and an Asset Panel.
+Returns data of a universe: the asset returns, and optionally the factor returns, the benchmark returns, the Exogenous Series, the timestamps, the implied volatilities and an Asset Panel.
 
 [`prices_to_returns`](@ref) builds it, and the priors, the optimisers and the cross-validation folds read it. All of its matrices share the observation axis, which is the rows. `X`, `iv` and a matrix `B` also share the asset axis, which is the columns.
+
+The Exogenous Series `E` holds named series over the observation axis that belong to no asset, for example the Currency Excess Returns that the Currency Factors of a [`CrossSectionalFactorPrior`](@ref) read. A consumer reads a column of `E` only by its name, so no model takes the block whole as its factors, as a time-series factor model takes `F`. `E` can hold `NaN`: the consumer that names a series refuses a non-finite value only on the rows that it fits.
 
 The optional [`AssetPanel`](@ref) `pnl` holds the two universe masks of the ingestion layer, and the Panel Fields that [`FeatureDistance`](@ref) turns into a distance. The panel is data, so this type holds it and no estimator does. The clustering code does not know which subset of assets it receives. A Feature Matrix on an estimator would reach a nested clustered subproblem or a cross-validation fold with every asset of the full universe, and its rows would no longer match the assets of the subproblem. `ReturnsResult` implements [`port_opt_view`](@ref), so a view subselects the panel together with `X`.
 
@@ -118,6 +169,8 @@ $(DocStringExtensions.FIELDS)
         F::Option{<:MatNum} = nothing,
         nb::Option{<:VecStr} = nothing,
         B::Option{<:VecNum_MatNum} = nothing,
+        ne::Option{<:VecStr} = nothing,
+        E::Option{<:MatNum} = nothing,
         ts::Option{<:VecDate} = nothing,
         iv::Option{<:MatNum} = nothing,
         ivpa::Option{<:Num_VecNum} = nothing,
@@ -135,7 +188,8 @@ Keywords correspond to the struct's fields.
   - If `B` is a vector and `nb` is given, `length(nb) == 1`. A vector `B` needs no name.
   - If `B` is `nothing`, `nb` is `nothing`.
   - If `X` and a vector `B` are given, `size(X, 1) == size(B, 1)`. If `X` and a matrix `B` are given, `size(X) == size(B)`.
-  - If `ts` is not `nothing`, `!isempty(ts)`, `X` or `F` is given, and `allunique(ts)`. `length(ts)` equals the row count of each of `X`, `F` and `B` that is given. `ts` must be unique because it keys the observation axis. [`feature_row_indices`](@ref) finds the rows of a subset by matching its timestamps back into this clock, and a repeated timestamp resolves to its first occurrence, which pairs an asset with the features of another period.
+  - If `ne` or `E` is not `nothing`, [`check_exogenous_series`](@ref) holds: the checks of `nx` and `X` hold for `ne` and `E`, and `E` has the row count of each of `X`, `F` and `ts` that is given. `E` can hold `NaN`.
+  - If `ts` is not `nothing`, `!isempty(ts)`, `X` or `F` is given, and `allunique(ts)`. `length(ts)` equals the row count of each of `X`, `F` and `B` that is given, and of `E`, which [`check_exogenous_series`](@ref) checks. `ts` must be unique because it keys the observation axis. [`feature_row_indices`](@ref) finds the rows of a subset by matching its timestamps back into this clock, and a repeated timestamp resolves to its first occurrence, which pairs an asset with the features of another period.
   - If `iv` is not `nothing`, `X` is given, `!isempty(iv)`, `size(iv) == size(X)`, and every present value is finite and non-negative. `NaN` marks an absent value. See [`assert_nonneg_where_present`](@ref).
   - `ivpa` is checked only when `iv` is given, because with no implied volatility it adjusts nothing. Then `all(x -> x > 0, ivpa)` and `all(isfinite, ivpa)`, and a vector `ivpa` has `length(ivpa) == size(iv, 2)`. The bound is strict, so a zero adjustment is refused.
   - The asset axis of `pnl` is `length(nx)`. The observation axis of a time-varying `pnl` is `size(X, 1)`. See [`check_asset_panel`](@ref).
@@ -153,6 +207,8 @@ ReturnsResult
      F ┼ nothing
     nb ┼ nothing
      B ┼ nothing
+    ne ┼ nothing
+     E ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -198,6 +254,14 @@ ReturnsResult
     """
     B
     """
+    Names of the Exogenous Series (series × 1). A consumer selects a column of `E` by one of these names.
+    """
+    ne
+    """
+    Exogenous Series (observations × series): named series over the observation axis that belong to no asset. `NaN` marks an absent value.
+    """
+    E
+    """
     Optional timestamps for each observation (observations × 1).
     """
     ts
@@ -215,9 +279,9 @@ ReturnsResult
     pnl
     function ReturnsResult(nx::Option{<:VecStr}, X::Option{<:MatNum}, nf::Option{<:VecStr},
                            F::Option{<:MatNum}, nb::Option{<:VecStr},
-                           B::Option{<:VecNum_MatNum}, ts::Option{<:VecDate},
-                           iv::Option{<:MatNum}, ivpa::Option{<:Num_VecNum},
-                           pnl::Option{<:AssetPanel})
+                           B::Option{<:VecNum_MatNum}, ne::Option{<:VecStr},
+                           E::Option{<:MatNum}, ts::Option{<:VecDate}, iv::Option{<:MatNum},
+                           ivpa::Option{<:Num_VecNum}, pnl::Option{<:AssetPanel})
         check_names_and_returns_matrix(nx, X, :nx, :X)
         check_names_and_returns_matrix(nf, F, :nf, :F)
         if isa(B, VecNum) && !isnothing(nb)
@@ -228,6 +292,7 @@ ReturnsResult
             # benchmark returns throws as `nx` without `X` does.
             check_names_and_returns_matrix(nb, B, :nb, :B)
         end
+        check_exogenous_series(ne, E, X, F, ts)
         if !isnothing(X) && !isnothing(F)
             @argcheck(size(X, 1) == size(F, 1),
                       DimensionMismatch("asset returns (X) and factor returns (F) must share the same number of observations (rows), got size(X, 1) = $(size(X, 1)) and size(F, 1) = $(size(F, 1))"))
@@ -280,17 +345,18 @@ ReturnsResult
         check_asset_panel(pnl, isnothing(nx) ? nothing : length(nx),
                           isnothing(X) ? nothing : size(X, 1), "length(nx)")
         return new{typeof(nx), typeof(X), typeof(nf), typeof(F), typeof(nb), typeof(B),
-                   typeof(ts), typeof(iv), typeof(ivpa), typeof(pnl)}(nx, X, nf, F, nb, B,
-                                                                      ts, iv, ivpa, pnl)
+                   typeof(ne), typeof(E), typeof(ts), typeof(iv), typeof(ivpa),
+                   typeof(pnl)}(nx, X, nf, F, nb, B, ne, E, ts, iv, ivpa, pnl)
     end
 end
 function ReturnsResult(; nx::Option{<:VecStr} = nothing, X::Option{<:MatNum} = nothing,
                        nf::Option{<:VecStr} = nothing, F::Option{<:MatNum} = nothing,
                        nb::Option{<:VecStr} = nothing, B::Option{<:VecNum_MatNum} = nothing,
+                       ne::Option{<:VecStr} = nothing, E::Option{<:MatNum} = nothing,
                        ts::Option{<:VecDate} = nothing, iv::Option{<:MatNum} = nothing,
                        ivpa::Option{<:Num_VecNum} = nothing,
                        pnl::Option{<:AssetPanel} = nothing)::ReturnsResult
-    return ReturnsResult(nx, X, nf, F, nb, B, ts, iv, ivpa, pnl)
+    return ReturnsResult(nx, X, nf, F, nb, B, ne, E, ts, iv, ivpa, pnl)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -305,19 +371,25 @@ This is the [`port_opt_view`](@ref) method for [`ReturnsResult`](@ref). It restr
 
 # Algorithm
 
- 1. View the asset names `nx` at `i` with [`nothing_scalar_array_view`](@ref).
- 2. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
- 3. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
- 4. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
- 5. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
- 6. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F` and the timestamps `ts` pass through unchanged, because none of the three has an asset axis.
+ 1. Resolve the asset names of `i` to positions in `nx` with [`label_positions`](@ref). Positions, a range and a `Colon` pass through.
+ 2. View the asset names `nx` at `i` with [`nothing_scalar_array_view`](@ref).
+ 3. View the asset returns as `view(rd.X, :, i)`. Axis 2 is the assets, and every observation is kept.
+ 4. When `B` is a matrix, it holds one column per asset, so view `nb` at `i` and view `B` as `view(rd.B, :, i)`. When `B` is a vector or `nothing`, `nb` and `B` pass through unchanged.
+ 5. View the implied volatilities as `view(rd.iv, :, i)`, and the adjustment `ivpa` at `i`.
+ 6. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at `i` on the asset axis, and give it the asset names `rd.nx`. The observation index is a `Colon`, so a time-varying panel keeps every observation. The view slices the values of every Panel Field and both universe masks on the asset axis. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). The label axis of every other field holds features, and an asset view does not change it.
+ 7. Rebuild the [`ReturnsResult`](@ref). The factor names `nf`, the factor returns `F`, the Exogenous Series `ne` and `E`, and the timestamps `ts` pass through unchanged, because none of them has an asset axis.
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: Indices of the assets to view.
+  - `i`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
+
+# Validation
+
+  - Every asset name of `i` is in `nx`, and `nx` is not `nothing`. Raises an `ArgumentError`. See [`label_positions`](@ref).
+  - `i` is not a vector of timestamps, because this method selects assets. Raises an `ArgumentError`.
 
 # Returns
 
@@ -334,6 +406,8 @@ ReturnsResult
      F ┼ nothing
     nb ┼ nothing
      B ┼ nothing
+    ne ┼ nothing
+     E ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -347,10 +421,19 @@ ReturnsResult
      F ┼ nothing
     nb ┼ nothing
      B ┼ nothing
+    ne ┼ nothing
+     E ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
    pnl ┴ nothing
+
+julia> PortfolioOptimisers.port_opt_view(rd, [\"B\"]).X == [0.2; 0.4;;]
+true
+
+julia> PortfolioOptimisers.port_opt_view(rd, [\"C\"])
+ERROR: ArgumentError: the view selects the assets by name, and 1 name(s) are not among the 2 asset names of the input data: C. A view refuses a name that it cannot find, because a dropped name gives a smaller universe with no error.
+[...]
 ```
 
 # Related
@@ -379,22 +462,29 @@ Return a view of the `ReturnsResult` object for assets at indices `j`, observati
 
 # Algorithm
 
- 1. View the asset names `nx` at `j` with [`nothing_scalar_array_view`](@ref).
- 2. View the asset returns as `view(rd.X, i, j)`. Axis 1 is the observations, and axis 2 is the assets.
- 3. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
- 4. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
- 5. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
- 6. View the [`AssetPanel`](@ref) `pnl` with [`panel_carrier_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
- 7. Rebuild the [`ReturnsResult`](@ref).
+ 1. Resolve the timestamps of `i` to positions in `ts` with [`timestamp_positions`](@ref), and the names of `j` and `k` to positions in `nx` and `nf` with [`label_positions`](@ref). Positions, a range and a `Colon` pass through.
+ 2. View the asset names `nx` at `j` with [`nothing_scalar_array_view`](@ref).
+ 3. View the asset returns as `view(rd.X, i, j)`. Axis 1 is the observations, and axis 2 is the assets.
+ 4. View the factor names `nf` at `k`. When `k` is a `Colon`, `nf` passes through. View the factor returns as `view(rd.F, i, k)`.
+ 5. When `B` is a matrix, it holds one column per asset, so view `nb` at `j` and view `B` as `view(rd.B, i, j)`. When `B` is a vector, every asset shares it, so view it as `view(rd.B, i)` and pass `nb` through.
+ 6. View the Exogenous Series as `view(rd.E, i, :)`, and pass its names `ne` through. View the timestamps `ts` at `i`, the implied volatilities as `view(rd.iv, i, j)`, and the adjustment `ivpa` at `j`.
+ 7. View the [`AssetPanel`](@ref) `pnl` with [`asset_panel_view`](@ref) at the observations `i` and the assets `j`, and give it the asset names `rd.nx`. The view slices both axes of every Panel Field and of both universe masks. It also slices the label axis of a tensor Panel Field whose labels are the asset names, see [`features_are_assets`](@ref). A static panel has no observation axis and ignores `i`, as a scalar `ivpa` ignores `j`.
+ 8. Rebuild the [`ReturnsResult`](@ref).
 
 Each field that is `nothing` stays `nothing`. No step copies data.
 
 # Arguments
 
   - `rd`: A `ReturnsResult` object containing asset and/or factor returns.
-  - `i`: Index or indices of the observation(s) to view.
-  - `j`: Index or indices of the assets to view.
-  - `k`: Index or indices of the factors to view.
+  - `i`: The observations to view: integer positions, a range, a `Colon`, or a vector of timestamps. A timestamp that `ts` does not hold selects no row, and the rows keep their clock order, as in the timestamp view of a [`PricesResult`](@ref).
+  - `j`: The assets to view: integer positions, a range, a `Colon`, or a vector of asset names.
+  - `k`: The factors to view: integer positions, a range, a `Colon`, or a vector of factor names.
+
+# Validation
+
+  - `ts` is not `nothing` when `i` holds timestamps, and `i` holds no names. Raises an `ArgumentError`. See [`timestamp_positions`](@ref).
+  - Every name of `j` is in `nx`, and every name of `k` is in `nf`. Raises an `ArgumentError`. See [`label_positions`](@ref).
+  - A window that keeps no observation or no asset raises the `IsEmptyError` of the [`ReturnsResult`](@ref) constructor.
 
 # Returns
 
@@ -412,6 +502,8 @@ ReturnsResult
      F ┼ 3×1 Matrix{Float64}
     nb ┼ nothing
      B ┼ nothing
+    ne ┼ nothing
+     E ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
@@ -425,10 +517,31 @@ ReturnsResult
      F ┼ 2×1 SubArray{Float64, 2, Matrix{Float64}, Tuple{UnitRange{Int64}, Base.Slice{Base.OneTo{Int64}}}, false}
     nb ┼ nothing
      B ┼ nothing
+    ne ┼ nothing
+     E ┼ nothing
     ts ┼ nothing
     iv ┼ nothing
   ivpa ┼ nothing
    pnl ┴ nothing
+```
+
+The observations can be selected by timestamp, and the assets and the factors by name. A calendar range keeps the observations that the returns hold.
+
+```jldoctest
+julia> using Dates
+
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6],
+                          ts = [Date(2024, 1, 2), Date(2024, 1, 3), Date(2024, 1, 5)]);
+
+julia> sub = PortfolioOptimisers.port_opt_view(rd, Date(2024, 1, 3):Day(1):Date(2024, 1, 6), [\"B\"]);
+
+julia> sub.ts
+2-element view(::Vector{Date}, [2, 3]) with eltype Date:
+ 2024-01-03
+ 2024-01-05
+
+julia> sub.X == [0.4; 0.6;;]
+true
 ```
 
 # Related
@@ -448,7 +561,7 @@ Fallback that throws for an [`AbstractReturnsResult`](@ref) subtype that does no
 
 Without it, the call reaches the generic fallback `port_opt_view(x, i, args...)`, which throws a `MethodError` for [`nothing_scalar_array_view`](@ref), a function that the author of the subtype never called. This method names the missing method instead. Returns data always has an asset axis, so no subtype can pass through a view unchanged.
 
-A subtype that carries an [`AssetPanel`](@ref) subselects it as it subselects `X`. It subselects the asset axis in every method, and the observation axis in the methods that take one. When the labels of a tensor Panel Field are the assets, see [`features_are_assets`](@ref), it subselects the label axis of that field too. A panel that a fold does not subselect gives a finite distance over the wrong universe, and no check catches it. The [`ReturnsResult`](@ref) methods are the reference implementation.
+A subtype that carries an [`AssetPanel`](@ref) subselects it as it subselects `X`. It subselects the asset axis in every method, and the observation axis in the methods that take one. When the labels of a tensor Panel Field are the assets, see [`features_are_assets`](@ref), it subselects the label axis of that field too. A panel that a fold does not subselect gives a finite distance over the wrong universe, and no check catches it. The [`ReturnsResult`](@ref) methods are the model to follow.
 
 # Algorithm
 
@@ -478,17 +591,21 @@ Fallback that throws for a [`ReturnsResult`](@ref) call whose shape matches no s
   - [`ReturnsResult`](@ref)
 """
 function port_opt_view(rd::ReturnsResult, i)
+    i = label_positions(rd.nx, i, "asset")
     nx = nothing_scalar_array_view(rd.nx, i)
     X = isnothing(rd.X) ? nothing : view(rd.X, :, i)
     nb = !isa(rd.B, MatNum) ? rd.nb : nothing_scalar_array_view(rd.nb, i)
     B = !isa(rd.B, MatNum) ? rd.B : view(rd.B, :, i)
     iv = isnothing(rd.iv) ? nothing : view(rd.iv, :, i)
     ivpa = nothing_scalar_array_view(rd.ivpa, i)
-    pnl = panel_carrier_view(rd.pnl, :, i, rd.nx)
-    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ts = rd.ts,
-                         iv = iv, ivpa = ivpa, pnl = pnl)
+    pnl = asset_panel_view(rd.pnl, :, i, rd.nx)
+    return ReturnsResult(; nx = nx, X = X, nf = rd.nf, F = rd.F, nb = nb, B = B, ne = rd.ne,
+                         E = rd.E, ts = rd.ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, i, j, k = :)
+    i = timestamp_positions(rd.ts, i)
+    j = label_positions(rd.nx, j, "asset")
+    k = label_positions(rd.nf, k, "factor")
     nx = nothing_scalar_array_view(rd.nx, j)
     X = isnothing(rd.X) ? rd.X : view(rd.X, i, j)
     nf = isnothing(rd.nf) || isa(k, Colon) ? rd.nf : view(rd.nf, k)
@@ -501,12 +618,13 @@ function port_opt_view(rd::ReturnsResult, i, j, k = :)
     else
         view(rd.B, i, j)
     end
+    E = isnothing(rd.E) ? rd.E : view(rd.E, i, :)
     ts = isnothing(rd.ts) ? rd.ts : view(rd.ts, i)
     iv = isnothing(rd.iv) ? rd.iv : view(rd.iv, i, j)
     ivpa = nothing_scalar_array_view(rd.ivpa, j)
-    pnl = panel_carrier_view(rd.pnl, i, j, rd.nx)
-    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ts = ts, iv = iv,
-                         ivpa = ivpa, pnl = pnl)
+    pnl = asset_panel_view(rd.pnl, i, j, rd.nx)
+    return ReturnsResult(; nx = nx, X = X, nf = nf, F = F, nb = nb, B = B, ne = rd.ne,
+                         E = E, ts = ts, iv = iv, ivpa = ivpa, pnl = pnl)
 end
 function port_opt_view(rd::ReturnsResult, args...; kwargs...)
     kws = keys(kwargs)
@@ -533,105 +651,452 @@ Fold generation needs only an observation count, from [`cv_nobs`](@ref), and a t
 """
 const Prices_RR = Union{<:AbstractReturnsResult, <:AbstractPricesResult}
 """
-    returns_result_picker(rd::ReturnsResult, brt::Bool) -> ReturnsResult
+    benchmark_relative_returns(rd::ReturnsResult, x_src::Option{<:DataSource}) -> Option{<:MatNum}
+    benchmark_relative_returns(rd::ReturnsResult, x_src::ExcessSource) -> Option{<:MatNum}
+    benchmark_relative_returns(rd::ReturnsResult, x_src::PriorSource)
 
-Return a `ReturnsResult` appropriate for benchmark-tracking optimisations.
+Return the asset returns of `rd` that a reader with the source `x_src` fits on.
 
-The function reads the benchmark field `B` of `rd` and the flag `brt`, which asks for benchmark tracking. When `brt` is `true` and `rd` carries a benchmark, it returns a new `ReturnsResult` whose asset returns are the excess returns over the benchmark. Otherwise it returns `rd`.
+Every reader of the returns calls this function at the point of use with its own `x_src`: the prior, the factor regression of an exposure constraint or of a factor risk contribution, a clustering, phylogeny or centrality estimator that reads the data, and the step of [`OnlinePortfolioSelection`](@ref). The function returns a matrix and never builds a [`ReturnsResult`](@ref), so `rd` keeps its raw `X` and its `B`, and every other reader sees the returns data as the caller gave it.
+
+[`ExcessSource`](@ref) on returns that carry no benchmark is a refusal and not a pass-through, because no excess return exists without a benchmark. [`PriorSource`](@ref) reads the Prior Result, which `rd` does not hold, so a reader at `PriorSource()` picks its matrix before it reaches this function.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\tilde{x}_{t,\\,i} &= \\begin{cases}
+x_{t,\\,i} - b_{t} & \\text{a vector benchmark}\\,,\\\\
+x_{t,\\,i} - b_{t,\\,i} & \\text{a matrix benchmark}\\,.
+\\end{cases}
+\\end{align}
+```
+
+Where:
+
+  - ``\\tilde{x}_{t,\\,i}``: Excess return of asset ``i`` at observation ``t``.
+  - ``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``, `rd.X`.
+  - ``b_{t}``, ``b_{t,\\,i}``: Benchmark return at observation ``t``, `rd.B`. A vector benchmark has one value for each observation, and a matrix benchmark has one value for each observation and asset.
+
+A gap in the benchmark gives a `NaN` excess return.
 
 # Algorithm
 
-The method that Julia selects on the type of the field `B` is the first step, so a carrier with no benchmark runs no branch.
+The method that Julia selects is the algorithm.
 
- 1. `rd` carries no benchmark, because its `B` field is `Nothing`. Return `rd`.
- 2. `brt` is `false`. Return `rd`.
- 3. `brt` is `true`. Subtract the benchmark from the asset returns, which gives `X`. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`, which takes the benchmark value of each observation from every asset column. A matrix benchmark subtracts elementwise, `rd.X - rd.B`.
- 4. Rebuild the [`ReturnsResult`](@ref) from `X`, with `nb` and `B` set to `nothing`. The subtraction uses up the benchmark, so a second call returns its argument unchanged. The fields `nx`, `nf`, `F`, `ts`, `iv`, `ivpa` and `pnl` pass through. The function does not modify `rd`.
+ 1. `x_src` is `nothing` or [`DataSource`](@ref). Return `rd.X`.
+ 2. `x_src` is [`ExcessSource`](@ref) and `rd` holds no returns, because its `X` field is `nothing`. Return `nothing`, because there is nothing to subtract from.
+ 3. `x_src` is [`ExcessSource`](@ref) and `rd` carries no benchmark, because its `B` field is `nothing`. Throw an `ArgumentError`.
+ 4. `x_src` is [`ExcessSource`](@ref). Subtract the benchmark from the asset returns. A vector benchmark subtracts by broadcast, `rd.X .- rd.B`. A matrix benchmark subtracts elementwise, `rd.X - rd.B`. The function does not modify `rd`.
+ 5. `x_src` is [`PriorSource`](@ref). Throw an `ArgumentError`.
 
 # Arguments
 
-  - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the factor and benchmark returns. When it carries a benchmark, it also holds `X`.
-  - `brt`: `true` to subtract the benchmark `B` from the asset returns, `false` to keep them. A carrier with no benchmark accepts any value.
+  - `rd`: A `ReturnsResult` that holds the asset returns, and optionally the benchmark returns. When it carries a benchmark, it also holds `X`.
+  - $(arg_dict[:x_src_read])
 
 # Validation
 
-  - When `rd` carries a benchmark, `rd.X` is a matrix and `brt` is a `Bool`. Otherwise no method matches, and the call raises a `MethodError`.
+  - `x_src` is not [`ExcessSource`](@ref), or `rd` carries a benchmark, or `rd` holds no returns. An `ArgumentError` is thrown otherwise.
+  - `x_src` is not [`PriorSource`](@ref). An `ArgumentError` is thrown otherwise.
+  - When `rd` carries a benchmark, `rd.X` is a matrix. Otherwise no method matches, and the call raises a `MethodError`. A value of `x_src` that is not `nothing` and not an [`AbstractReturnsSource`](@ref) raises a `MethodError`.
 
 # Returns
 
-  - `rd::ReturnsResult`:
-
-      + If `brt` is `true` and `rd` carries a benchmark, a new `ReturnsResult` that holds the excess returns in `X`. Its `nb` and `B` are `nothing`, so a second call returns it unchanged.
-      + Otherwise, `rd` itself.
+  - `X::Option{<:MatNum}`: The excess returns when `x_src` is [`ExcessSource`](@ref), a new matrix. Otherwise `rd.X` itself, which is `nothing` when `rd` holds no returns.
 
 # Examples
 
 ```jldoctest
 julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.10 0.20; 0.30 0.40], nb = [\"BM\"],
-                          B = [0.01; 0.02])
-ReturnsResult
-    nx ┼ Vector{String}: ["A", "B"]
-     X ┼ 2×2 Matrix{Float64}
-    nf ┼ nothing
-     F ┼ nothing
-    nb ┼ Vector{String}: ["BM"]
-     B ┼ Vector{Float64}: [0.01, 0.02]
-    ts ┼ nothing
-    iv ┼ nothing
-  ivpa ┼ nothing
-   pnl ┴ nothing
+                          B = [0.01; 0.02]);
 
-julia> rd2 = returns_result_picker(rd, false)  # no change when brt is false
-ReturnsResult
-    nx ┼ Vector{String}: ["A", "B"]
-     X ┼ 2×2 Matrix{Float64}
-    nf ┼ nothing
-     F ┼ nothing
-    nb ┼ Vector{String}: ["BM"]
-     B ┼ Vector{Float64}: [0.01, 0.02]
-    ts ┼ nothing
-    iv ┼ nothing
-  ivpa ┼ nothing
-   pnl ┴ nothing
-
-julia> rd === rd2
+julia> benchmark_relative_returns(rd, DataSource()) === rd.X  # no change for the raw returns
 true
 
-julia> rd3 = returns_result_picker(rd, true)
-ReturnsResult
-    nx ┼ Vector{String}: ["A", "B"]
-     X ┼ 2×2 Matrix{Float64}
-    nf ┼ nothing
-     F ┼ nothing
-    nb ┼ nothing
-     B ┼ nothing
-    ts ┼ nothing
-    iv ┼ nothing
-  ivpa ┼ nothing
-   pnl ┴ nothing
-
-julia> rd.X .- rd.B == rd3.X
+julia> benchmark_relative_returns(rd, ExcessSource()) == rd.X .- rd.B
 true
+
+julia> rd.B  # rd keeps its benchmark
+2-element Vector{Float64}:
+ 0.01
+ 0.02
 ```
 
 # Related
 
   - [`ReturnsResult`](@ref)
+  - [`AbstractReturnsSource`](@ref)
+  - [`prior`](@ref)
+  - [`returns_matrix_picker`](@ref)
+"""
+function benchmark_relative_returns(rd::ReturnsResult, ::Option{<:DataSource})
+    return rd.X
+end
+function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
+                                                      Nothing}, ::ExcessSource)
+    @argcheck(isnothing(rd.X),
+              ArgumentError("`x_src = ExcessSource()` asks for the returns in excess of a benchmark, and this ReturnsResult carries no benchmark: its `B` is `nothing`, so no excess return exists. Pass returns data that carries `nb` and `B`, or set `x_src = DataSource()` to read the asset returns as they are."))
+    return rd.X
+end
+function benchmark_relative_returns(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
+                                                      <:VecNum_MatNum}, ::ExcessSource)
+    return isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
+end
+function benchmark_relative_returns(::ReturnsResult, ::PriorSource)
+    return throw(ArgumentError("`x_src = PriorSource()` reads the Prior Result, and returns data holds no Prior Result. A reader at `PriorSource()` reads the `X` of its Prior Result, so it does not read the returns of `rd`."))
+end
+"""
+    shared_series_rows(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
+        -> Option{Vector{Int}}
+
+Find the observations of `rd` that a fit keeps when a Shared Series has a gap.
+
+A Shared Series is a series that every asset reads at the same observation: a vector benchmark under [`ExcessSource`](@ref), and each column of the factor returns of a fit that reads them. A gap in the series of one asset puts that asset outside the Coverage Universe, as [`coverage_mask`](@ref) states. A gap in a Shared Series at observation `t` leaves no asset a value at `t`: an excess return or a factor regression needs the shared value. So the fit drops observation `t` and keeps every asset. The drop removes no value that an asset still had.
+
+The function reads a vector benchmark only under [`ExcessSource`](@ref), and the factor returns only under `rf`, because a fit that does not read a series meets none of its gaps. An optimiser passes the source of its group, see [`group_source`](@ref), so a raw reader of a group that reads the Excess Frame loses the same observations. A matrix benchmark is a series of one asset at each column, so its gaps go through [`benchmark_estimation_mask`](@ref) and the Coverage Universe, never through this function.
+
+# Algorithm
+
+ 1. Take the vector benchmark when `x_src` is [`ExcessSource`](@ref) and `rd.B` is a vector, see [`shared_benchmark`](@ref), and the factor returns when `rf` is `true`.
+ 2. Return `nothing` when each of them is absent or finite at every observation.
+ 3. Otherwise keep each observation at which the benchmark is finite and every factor is finite.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Returns
+
+  - `rows::Option{Vector{Int}}`: The positions of the kept observations, empty when every observation has a gap, or `nothing` when the fit keeps every observation.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`benchmark_relative_returns`](@ref)
+  - [`coverage_mask`](@ref)
+"""
+function shared_series_rows(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                            rf::Bool)::Option{Vector{Int}}
+    b = shared_benchmark(rd.B, x_src)
+    F = rf ? rd.F : nothing
+    if shared_series_complete(b) && shared_series_complete(F)
+        return nothing
+    end
+    return filter(t -> shared_row_finite(b, t) && shared_row_finite(F, t),
+                  1:shared_series_length(b, F))
+end
+"""
+    shared_benchmark(B::VecNum, x_src::ExcessSource) -> VecNum
+    shared_benchmark(B, x_src::Option{<:AbstractReturnsSource}) -> Nothing
+
+Return the benchmark of `rd` that is a Shared Series of the fit: a vector benchmark under [`ExcessSource`](@ref), and `nothing` otherwise.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A vector benchmark under [`ExcessSource`](@ref): return `B`.
+ 2. Any other benchmark, or any other source: return `nothing`. A matrix benchmark is a series of one asset at each column, and a fit at another source does not read the benchmark.
+
+# Arguments
+
+  - `B`: The benchmark of `rd`.
+  - $(arg_dict[:x_src_read])
+
+# Returns
+
+  - `b::Option{<:VecNum}`: The vector benchmark, or `nothing`.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_benchmark(B::VecNum, ::ExcessSource)
+    return B
+end
+function shared_benchmark(::Any, ::Option{<:AbstractReturnsSource})
+    return nothing
+end
+"""
+    shared_series_complete(A::Nothing) -> Bool
+    shared_series_complete(A::VecNum_MatNum) -> Bool
+
+Answer `true` when a Shared Series is absent, or finite at every observation.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_series_complete(::Nothing)
+    return true
+end
+function shared_series_complete(A::VecNum_MatNum)
+    return all(isfinite, A)
+end
+"""
+    shared_row_finite(A::Nothing, t::Integer) -> Bool
+    shared_row_finite(A::VecNum, t::Integer) -> Bool
+    shared_row_finite(A::MatNum, t::Integer) -> Bool
+
+Answer `true` when a Shared Series is absent, or finite at observation `t`. A matrix is finite at `t` when each of its columns is.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_row_finite(::Nothing, ::Integer)
+    return true
+end
+function shared_row_finite(A::VecNum, t::Integer)
+    return isfinite(A[t])
+end
+function shared_row_finite(A::MatNum, t::Integer)
+    return all(isfinite, view(A, t, :))
+end
+"""
+    shared_series_length(b::VecNum, F::Option{<:MatNum}) -> Int
+    shared_series_length(b::Nothing, F::MatNum) -> Int
+
+Return the number of observations of the Shared Series that [`shared_series_rows`](@ref) scans.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+"""
+function shared_series_length(b::VecNum, ::Option{<:MatNum})
+    return length(b)
+end
+function shared_series_length(::Nothing, F::MatNum)
+    return size(F, 1)
+end
+"""
+    shared_series_view(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
+        -> ReturnsResult
+
+Return the returns data that a fit reads, with the observations of a Shared Series gap dropped.
+
+This is the entry of each fit that reads a Shared Series. [`shared_series_rows`](@ref) finds the observations to keep, and [`port_opt_view`](@ref) cuts every field of `rd` at them: the asset returns, the factor returns, the benchmark, the Exogenous Series, the timestamps, the implied volatilities and the [`AssetPanel`](@ref). So every reader after the entry sees the same observations. A reader that pairs the observations of a prior with the last observations of the returns data stays correct, because the prior and the reader read the same view.
+
+Under [`ExcessSource`](@ref), [`benchmark_estimation_mask`](@ref) then marks a gap of a matrix benchmark in the estimation mask, because the excess return of that cell does not exist.
+
+An optimiser calls the function one time, before the solve, with the source of its group, see [`group_source`](@ref). A prior, a regression and an uncertainty set that receive the returns data call it with their own source, and the view of the optimiser has no gap left for them.
+
+The function is idempotent. A view with no gap left returns itself, so a meta-optimiser and the optimiser it nests can each call it.
+
+The positions of the row key of a factor model block count the observations of the view, and its timestamps name them exactly.
+
+# Algorithm
+
+ 1. Find the kept observations with [`shared_series_rows`](@ref).
+ 2. View `rd` at them, and refresh the estimation mask, with [`shared_series_cut`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Validation
+
+  - At least one observation is kept. An [`IsEmptyError`](@ref) is thrown otherwise.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself when the fit meets no gap, and otherwise its view.
+
+# Examples
+
+```jldoctest
+julia> rd = ReturnsResult(; nx = [\"A\", \"B\"], X = [0.1 0.2; 0.3 0.4; 0.5 0.6], nb = [\"BM\"],
+                          B = [0.01, NaN, 0.03]);
+
+julia> PortfolioOptimisers.shared_series_view(rd, DataSource(), false) === rd  # no benchmark read
+true
+
+julia> PortfolioOptimisers.shared_series_view(rd, ExcessSource(), false).X
+2×2 view(::Matrix{Float64}, [1, 3], :) with eltype Float64:
+ 0.1  0.2
+ 0.5  0.6
+```
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+  - [`benchmark_estimation_mask`](@ref)
+  - [`benchmark_relative_returns`](@ref)
   - [`port_opt_view`](@ref)
 """
-function returns_result_picker(rd::ReturnsResult{<:Any, <:Any, <:Any, <:Any, <:Any,
-                                                 Nothing}, ::Any)
+function shared_series_view(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                            rf::Bool)::ReturnsResult
+    return shared_series_cut(rd, x_src, shared_series_rows(rd, x_src, rf))
+end
+"""
+    shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                      rows::Option{<:VecInt}) -> ReturnsResult
+
+Return the returns data at the observations `rows` that a fit keeps, with the estimation mask of a matrix benchmark refreshed.
+
+This is the second half of [`shared_series_view`](@ref). A caller that finds the kept observations by another rule, and needs them after the cut, passes them here. An optimiser does so, because it also drops the observations that the record of its prior result marks, and it maps the prior that it fits back through the same rows, see [`shared_series_solve`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rows`: The positions of the kept observations, or `nothing` when the fit keeps every observation.
+
+# Validation
+
+  - At least one observation is kept. An [`IsEmptyError`](@ref) is thrown otherwise.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself when `rows` is `nothing` and no estimation mask changes, and otherwise its view.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`shared_series_rows`](@ref)
+  - [`benchmark_estimation_mask`](@ref)
+"""
+function shared_series_cut(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                           rows::Option{<:VecInt})::ReturnsResult
+    @argcheck(isnothing(rows) || !isempty(rows),
+              IsEmptyError("every observation has a gap in a Shared Series, the vector benchmark under `x_src = ExcessSource()` or the factor returns, so the fit keeps no observation. Fill the gaps of the series, or remove the series from the input. A filter that drops the observations with a gap drops every observation here."))
+    rd = isnothing(rows) ? rd : port_opt_view(rd, rows, :)
+    return benchmark_estimation_mask(rd, x_src)
+end
+"""
+    shared_series_gaps(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource}, rf::Bool)
+        -> Option{BitVector}
+
+Mark the observations of `rd` that have a gap in a Shared Series that the fit reads, for an online step.
+
+A batch fit drops such an observation with [`shared_series_view`](@ref). An online step cannot drop the row. An optimiser appends each observation to the buffer of its prior and to its Fold Context together, and `optimise(opt)` with no data rebuilds the returns data from both, row by row. So the step keeps the row in both, and the prior marks it in its buffer, see [`SampleBufferState`](@ref). Every fit through the buffer then drops it with [`shared_series_buffer`](@ref), and a carry fold leaves it out of its running moments. The marks are the complement of the rows of [`shared_series_rows`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `rf`: `true` when the fit reads the factor returns of `rd`.
+
+# Returns
+
+  - `gaps::Option{BitVector}`: One mark for each observation of `rd`, `true` at an observation with a gap, or `nothing` when no observation has one.
+
+# Related
+
+  - [`shared_series_rows`](@ref)
+  - [`shared_series_view`](@ref)
+  - [`shared_series_buffer`](@ref)
+"""
+function shared_series_gaps(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource},
+                            rf::Bool)::Option{BitVector}
+    rows = shared_series_rows(rd, x_src, rf)
+    if isnothing(rows)
+        return nothing
+    end
+    gaps = trues(size(rd.X, 1))
+    gaps[rows] .= false
+    return gaps
+end
+"""
+    shared_series_step(rd::ReturnsResult, gaps::Nothing) -> ReturnsResult
+    shared_series_step(rd::ReturnsResult, gaps::AbstractVector{Bool}) -> Option{ReturnsResult}
+
+Return the observations of an online step that a carry fold folds, with the observations that `gaps` marks dropped.
+
+A carry fold computes running moments or histories from each observation. A batch fit drops an observation with a Shared Series gap at its entry, so the carry must not see it, while the buffer beside it keeps the row, see [`shared_series_gaps`](@ref). [`port_opt_view`](@ref) cuts every field of `rd` at the same observations, as [`shared_series_view`](@ref) does.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No marks: return `rd`.
+ 2. Marks: return `nothing` when every observation is marked, and the view of `rd` at the unmarked observations otherwise.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - `gaps`: One mark for each observation of `rd`, `true` at an observation with a Shared Series gap, or `nothing`.
+
+# Returns
+
+  - `rd::Option{ReturnsResult}`: The observations with no mark, or `nothing` when the step has none.
+
+# Related
+
+  - [`shared_series_gaps`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function shared_series_step(rd::ReturnsResult, ::Nothing)
     return rd
 end
-function returns_result_picker(rd::ReturnsResult{<:Any, <:MatNum, <:Any, <:Any, <:Any,
-                                                 <:VecNum_MatNum}, brt::Bool)
-    return if !brt
-        rd
-    else
-        X = isa(rd.B, VecNum) ? rd.X .- rd.B : rd.X - rd.B
-        ReturnsResult(; nx = rd.nx, X = X, nf = rd.nf, F = rd.F, ts = rd.ts, iv = rd.iv,
-                      ivpa = rd.ivpa, pnl = rd.pnl)
+function shared_series_step(rd::ReturnsResult, gaps::AbstractVector{Bool})
+    rows = findall(!, gaps)
+    return isempty(rows) ? nothing : port_opt_view(rd, rows, :)
+end
+"""
+    benchmark_estimation_mask(rd::ReturnsResult, x_src::ExcessSource) -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, x_src::Option{<:AbstractReturnsSource})
+        -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, B::Option{<:VecNum_MatNum},
+                              pnl::Option{<:AssetPanel}) -> ReturnsResult
+    benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
+                              pnl::AssetPanel{<:Any, <:AbstractMatrix{Bool},
+                                              <:AbstractMatrix{Bool}}) -> ReturnsResult
+
+Mark each gap of a matrix benchmark in the estimation mask of `rd`, for a fit that reads the excess returns.
+
+Under [`ExcessSource`](@ref) the fit reads `X - B`. A matrix benchmark holds one series for each asset, so a gap in `B[t, i]` is a gap in the excess return of asset `i` at observation `t`, as a gap in `X[t, i]` is. The `NaN` of the excess return already puts the asset outside the Coverage Universe of a plain estimator. A reader of the estimation mask, a cross-sectional estimate, reads the mask and not the returns, so the function writes the gap into the mask. The ingestion layer derives the mask from `X` alone, because a fit at another source does not read `B`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `x_src` is not [`ExcessSource`](@ref), the benchmark is not a matrix, or the panel carries no mask: return `rd`.
+ 2. Return `rd` when the benchmark is finite at every cell.
+ 3. Otherwise set the estimation mask to `emsk .& isfinite.(B)`, and rebuild `rd` with that panel.
+
+# Arguments
+
+  - $(arg_dict[:rd])
+  - $(arg_dict[:x_src_read])
+  - `B`: The benchmark of `rd`.
+  - `pnl`: The Asset Panel of `rd`.
+
+# Returns
+
+  - `rd::ReturnsResult`: `rd` itself, or `rd` with the refreshed estimation mask.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`AssetPanel`](@ref)
+"""
+function benchmark_estimation_mask(rd::ReturnsResult, ::ExcessSource)::ReturnsResult
+    return benchmark_estimation_mask(rd, rd.B, rd.pnl)
+end
+function benchmark_estimation_mask(rd::ReturnsResult,
+                                   ::Option{<:AbstractReturnsSource})::ReturnsResult
+    return rd
+end
+function benchmark_estimation_mask(rd::ReturnsResult, ::Option{<:VecNum_MatNum},
+                                   ::Option{<:AssetPanel})
+    return rd
+end
+function benchmark_estimation_mask(rd::ReturnsResult, B::MatNum,
+                                   pnl::AssetPanel{<:Any, <:AbstractMatrix{Bool},
+                                                   <:AbstractMatrix{Bool}})
+    if all(isfinite, B)
+        return rd
     end
+    pnl = AssetPanel(; pf = pnl.pf, amsk = pnl.amsk, emsk = pnl.emsk .& isfinite.(B))
+    return ReturnsResult(; nx = rd.nx, X = rd.X, nf = rd.nf, F = rd.F, nb = rd.nb, B = B,
+                         ne = rd.ne, E = rd.E, ts = rd.ts, iv = rd.iv, ivpa = rd.ivpa,
+                         pnl = pnl)
 end
 """
     asset_panel(ape::Nothing, pr, rd::ReturnsResult, X) -> AssetPanel
@@ -640,7 +1105,7 @@ end
 
 Resolve the [`AssetPanel`](@ref) a [`FeatureDistance`](@ref) with no producer measures.
 
-`nothing` in the `ape` slot tells the kernel to read the panel that the data carrier holds. The carriers reach the kernel as the two keywords `pr` and `rd`, and this function selects the source by dispatch. A [`ReturnsResult`](@ref) in either slot gives its `pnl`. When both slots hold one, `rd` wins, because `rd` is the data carrier. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass it there. So the second method serves the shortest public call.
+`nothing` in the `ape` slot tells the kernel to read the panel that the [`ReturnsResult`](@ref) holds. The data reaches the kernel as the two keywords `pr` and `rd`, and this function selects the source by dispatch. A [`ReturnsResult`](@ref) in either slot gives its `pnl`. When both slots hold one, `rd` wins, because `rd` is the returns data. `Pr_RR` admits a [`ReturnsResult`](@ref) in the `pr` slot, and `clusterise(cle, rd)` and every [`Pipeline`](@ref) step pass it there. So the second method serves the shortest public call.
 
 A prior result alone carries no panel, so the call raises an [`IsNothingError`](@ref) that names the two ways to supply one.
 
@@ -650,24 +1115,24 @@ The method that Julia selects is the algorithm.
 
  1. `rd` is a [`ReturnsResult`](@ref): answer `rd.pnl`.
  2. `pr` is a [`ReturnsResult`](@ref) and there is no `rd`: answer `pr.pnl`.
- 3. Neither slot holds a data carrier: raise.
+ 3. Neither slot holds a `ReturnsResult`: raise.
 
-Each of the first two checks that the carrier it read holds a panel, with [`assert_asset_panel_supplied`](@ref).
+Each of the first two checks that the `ReturnsResult` it read holds a panel, with [`assert_asset_panel_supplied`](@ref).
 
 # Arguments
 
-  - `ape`: `nothing`, which reads the carrier's panel.
+  - `ape`: `nothing`, which reads the panel of the `ReturnsResult`.
   - $(arg_dict[:pr_rr])
   - $(arg_dict[:rd])
   - `X`: Returns matrix of the subproblem. Unread here; a producer reads it.
 
 # Validation
 
-  - A data carrier is present, and it holds an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
+  - A `ReturnsResult` is present, and it holds an [`AssetPanel`](@ref). Raises an [`IsNothingError`](@ref).
 
 # Returns
 
-  - `pnl::AssetPanel`: The Asset Panel the data carrier holds.
+  - `pnl::AssetPanel`: The Asset Panel that the `ReturnsResult` holds.
 
 # Related
 
@@ -686,15 +1151,15 @@ function asset_panel(::Nothing, pr::ReturnsResult, ::Nothing, ::Any)
     return assert_asset_panel_supplied(pr.pnl)
 end
 function asset_panel(::Nothing, ::Any, ::Nothing, ::Any)
-    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the data carrier, and this call supplied none: only a prior result reached it, and a prior result carries no panel. Two ways forward:\n  1. Pass the `ReturnsResult` that holds the panel, which every forwarder takes as `rd`.\n  2. Set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds a panel from the prior it is handed."))
+    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the ReturnsResult, and this call supplied none: only a prior result reached it, and a prior result carries no panel. Two ways forward:\n  1. Pass the `ReturnsResult` that holds the panel, which every forwarder takes as `rd`.\n  2. Set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`, which builds a panel from the prior it is handed."))
 end
 """
     assert_asset_panel_supplied(pnl::AssetPanel) -> AssetPanel
     assert_asset_panel_supplied(pnl::Nothing) -> Union{}
 
-Assert that the data carrier a [`FeatureDistance`](@ref) read holds an [`AssetPanel`](@ref), and return it.
+Assert that the [`ReturnsResult`](@ref) that a [`FeatureDistance`](@ref) read holds an [`AssetPanel`](@ref), and return it.
 
-The `pnl` of a carrier is optional, so a carrier built without one gives `nothing`. This function turns that `nothing` into an error message. It returns the panel, so the caller makes one call for the check and the access.
+The `pnl` of a `ReturnsResult` is optional, so a `ReturnsResult` built without one gives `nothing`. This function turns that `nothing` into an error message. It returns the panel, so the caller makes one call for the check and the access.
 
 # Algorithm
 
@@ -702,7 +1167,7 @@ The method that Julia selects is the algorithm. A panel returns itself, and `not
 
 # Arguments
 
-  - `pnl`: The carrier's Asset Panel, or `nothing`.
+  - `pnl`: The Asset Panel of the `ReturnsResult`, or `nothing`.
 
 # Validation
 
@@ -724,8 +1189,8 @@ function assert_asset_panel_supplied(pnl::AssetPanel)
     return pnl
 end
 function assert_asset_panel_supplied(::Nothing)
-    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the data carrier, and the carrier holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
+    return throw(IsNothingError("`FeatureDistance` with no producer reads the Asset Panel off the ReturnsResult, and the ReturnsResult holds none. Build one with `asset_panel(inputs)` and pass it as `ReturnsResult(; …, pnl = pnl)`, or set a producer on the estimator, `FeatureDistance(; ape = RegressionPanel())`."))
 end
 
-export ReturnsResult, returns_result_picker
+export ReturnsResult, benchmark_relative_returns
 public AbstractReturnsResult

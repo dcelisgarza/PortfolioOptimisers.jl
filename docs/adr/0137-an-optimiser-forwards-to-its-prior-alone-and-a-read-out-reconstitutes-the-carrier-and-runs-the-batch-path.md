@@ -28,7 +28,7 @@ resolves **by asset name**, which lives in `rd.nx`; a `LowOrderPrior` carries `X
 read-out that handed the batch path a bare matrix would hand its inner optimisers an empty panel
 and its constraint estimators no names.
 
-### What the reference does
+### What the oracle does
 
 Its optimiser's `partial_fit` folds *and* solves in one call — its own docstring says the problem
 is solved fresh on each call — so a warm-up of `T` observations costs it `T` solves, and a failed
@@ -79,14 +79,14 @@ read-out `prior(pe)` — a Prior Result, which the batch path does not refit, so
 prior's exact fold and the step stays quadratic in the assets — drops the state, and calls
 `optimise(opt′, rd′)`. The clustering estimator, the constraint estimators, all `N + M` uncertainty
 sets and a meta-optimiser's inner optimisers are therefore identical to batch **by construction**,
-from one carrier and with no state of their own. No uncertainty set gains a method; the reference
+from one carrier and with no state of their own. No uncertainty set gains a method; the oracle
 reaches the same place by recomputing its one online set from the prior result on every call.
 
 The read-out is **pure**. The state moves at `partial_fit!` and nothing else writes it, so
 `optimise(opt)` is callable any number of times for the same answer, and a failed solve leaves the
 state where the last fold put it. The ordinary fallback chain therefore walks unchanged: each
 fallback is handed the reconstituted carrier and fits from it as it would from the caller's, and
-`factory(res, fb)` records the chain. The reference's refusal of an estimator chain rests on a
+`factory(res, fb)` records the chain. The oracle's refusal of an estimator chain rests on a
 premise — a state advanced past the last answer it can give — that splitting the verbs removed.
 
 The fold-less entry `optimise(opt)` is now one method on the root, chosen by dispatch on the
@@ -154,7 +154,7 @@ Six refusals, each an `ArgumentError` naming the field or the type.
 so far, which is meaningful; what has no meaning is turnover *across* those frontiers, and that is
 [#1004](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1004)'s, in batch and online
 alike. **No previous-weights threading.** The loop threads them and the step does not, which is the
-reference line for line and correct today for every non-frontier optimiser.
+oracle line for line and correct today for every non-frontier optimiser.
 
 ## Considered options
 
@@ -166,8 +166,8 @@ reference line for line and correct today for every non-frontier optimiser.
    would have to move.
 2. **Hand the batch path a bare matrix at read-out.** Rejected by the two facts in the context:
    the meta-optimisers view the caller's carrier and the constraints resolve by name.
-3. **Fold and solve in one verb, as the reference does.** Rejected: a warm-up of `T` observations
-   is `T` solves, and a failed solve strands the state, which forces the reference's refusal of
+3. **Fold and solve in one verb, as the oracle does.** Rejected: a warm-up of `T` observations
+   is `T` solves, and a failed solve strands the state, which forces the oracle's refusal of
    an estimator chain.
 4. **The context on the head rather than on the bundle** — `MeanRisk.cache` rather than
    `JuMPOptimiser.cache`. Rejected: fourteen hosts instead of eight, and the bundle is what holds
@@ -223,6 +223,87 @@ An optimiser's read-out is therefore one of two kinds, and which one is the fami
 The rule that an optimiser forwards the observation to its prior and to nothing else is unchanged
 where a prior is held: a recursive head that reads a forecast off a prior forwards the observation
 to that prior *and* folds its own recursion, and everything else it holds still takes its
-ordinary batch treatment at read-out. The sentence in `CONTEXT.md`'s *Fold Context* entry that
+ordinary batch treatment at read-out. The sentence in `GLOSSARY.md`'s *Fold Context* entry that
 nothing above the prior takes a step of its own now names the recursion as the one thing that
 does.
+
+## Amendment (2026-10-12)
+
+**A fallback under a reconstitution fits its own prior from the rebuilt carrier, and steps not
+at all.** [#1633](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1633) asked whether
+a fallback estimator at a read-out should take the carried prior of the optimiser it replaces, or
+fit its own prior over the folded rows. The decision above already hands each fallback the
+reconstituted carrier, and #1633 keeps that rule after it weighed two other options.
+
+- **Step the fallback beside the optimiser.** Rejected. A carry fold is exact (ADR 0136), so a
+  batch fit over the held window gives the prior that a stepped fallback would carry. The step
+  would cost a fold at every row for a fallback that runs only when a solve fails, where the batch
+  fit costs one fit on the failed read-out alone.
+- **Hand the fallback the carried prior of the optimiser.** Rejected. The prior of a fallback is
+  its own configuration, and a different estimator from the prior of the optimiser in general, so
+  the substitution would change what the fallback computes and say nothing.
+
+A fallback therefore sees the window the optimiser holds: every folded row under an uncapped
+carry, and the last `max_history` rows under `Online(pe; max_history)`. An `Online` in a fallback
+stays refused at the entry of the online arm, because nothing steps it.
+`test/test_24c_online_fold_loop.jl` locks the rule: an estimator fallback answers a failed step
+as it answers the batch fold.
+
+An Online Portfolio Selection head has no carrier to rebuild, so its fallback cannot take this
+route. [ADR 0155](0155-an-online-portfolio-selection-head-is-a-naive-optimiser-whose-batch-verb-is-a-causal-pass-and-whose-read-out-is-its-own-recursion.md)
+carries the amendment that steps it.
+
+## Amendment (2026-10-12, #1632)
+
+**An implied-volatility surface travels the step, in the buffer that holds the returns**
+([#1632](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1632)). The refusal of `iv`
+above is withdrawn for every optimiser. `iv` holds one value for each observation and asset, as the
+returns and the masks do, so `SampleBufferState` records it beside them, under the same offset, count
+and cap. `ivpa` has no observation axis, so the first append pins it, as `vcat` of two returns
+carriers already pins it, and a later step with another `ivpa` is refused by name.
+
+- **No statistic of the regression folds.** The regression of `ImpliedVolatility` reads windows
+  that end at the last observation, so a new row moves every window. The oracle has no online fit of
+  its implied covariance either: its online step raises `TypeError` for it. So the read-out refits the
+  regression over the rows of the buffer, and the online answer equals the batch answer over the same
+  rows.
+- **One place holds it.** The buffer that holds the returns holds the surface: the prior's buffer on
+  the refit, the carried buffer of `EmpiricalPrior` on its carry, and the Fold Context's own `X` for a
+  head with no prior. No predicate and no ownership flag are needed, because the surface goes where
+  the returns go. The call with no data of a refit gives `iv` and `ivpa` to the batch verb. The carry
+  of `EmpiricalPrior` gives them to a member that it refits, and a member that folds never reads them.
+  `returns_result` gives them back, so the clustering and every other member above the prior read the
+  surface as they read it in batch.
+- **The carry of `CrossSectionalFactorPrior` carries it twice.** Its Descriptors read the carried
+  panel rows, as the batch Descriptors read the returns data, so the carried rows hold `iv` beside
+  the returns and the first step pins `ivpa`
+  ([#1647](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1647)). Its buffer records
+  them too, so `returns_result` gives them to every member above the prior.
+- **Two folds still refuse it, by name.** The exact folds that keep numbers alone, the step of a
+  covariance estimator in `covariance_forecast_evaluation` and the step of an online portfolio
+  selection, refuse it in `step_active_mask`.
+- **A gap in the surface.** The panel method of `ImpliedVolatility` excludes an asset whose surface
+  has a gap from the Coverage Universe, and the refit calls that method, so it gives the batch answer
+  for a gapped surface too. The carry of `EmpiricalPrior` refits a member through its plain method,
+  which reads no panel. That plain method now refuses a gap in `iv` as it refuses a gap in `X`, so the
+  carry fails by name where it would have answered for an asset that the batch fit does not price.
+  That the carry refits through the plain method at all is
+  [#1639](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1639).
+
+## Amendment (2026-10-12, #1645, #1646 and #1651)
+
+- **The prior folds `X - B` under `brt`, and the context keeps the raw rows.** The batch prior
+  reads `X - B` under `brt = true`, and the step folded the raw `rd`. So the prior folded `X`, and
+  online weights differed from batch weights with no error
+  ([#1645](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1645)). `fold_returns` now
+  gives the prior `prior_step_returns(rd, brt)`, which holds `X - B` in `X`, and the Fold Context
+  keeps the raw rows beside the buffer of the prior
+  ([#1651](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1651)). So `returns_result`
+  rebuilds the raw `rd`, and the identity "the rebuilt `ReturnsResult` equals `rd[1:t]` field by
+  field" holds under every value of `brt`. Each reader above the prior subtracts the benchmark
+  itself under `brt`, as in batch (ADR 0204).
+- **The head of an online portfolio selection carries `iv`.** Its rows buffer is now a
+  `ReturnsBufferState` that owns the returns, so it records the surface beside the rows, and
+  `step_active_mask` no longer refuses `iv`. The step of a covariance estimator in
+  `covariance_forecast_evaluation` refuses it itself, because its exact fold keeps numbers alone
+  ([#1646](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1646), ADR 0204).

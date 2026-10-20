@@ -160,3 +160,19 @@ count rose under 1.13.1's inference: `01_PosdefMatrix.jl` and `06_CalibrationRul
 `plots_ext` run. The same tree is JET-green under 1.13.0 with the old Manifest, so the rises are
 the analyser's, not the code's. The coverage baseline's provenance line was moved by hand, for the
 reason the first amendment gives.
+
+## Amendment (2026-10-15)
+
+The pin is **Julia 1.13.2**. The juliaup `release` channel moved from 1.13.1 to 1.13.2 and deleted
+the 1.13.1 binary, so every local gate refused to check against provenance that named 1.13.1.
+`code_health/Manifest.toml` was re-resolved under 1.13.2 with `Pkg.resolve`, which kept every
+package version: only `julia_version` and six stdlib jlls moved (`LibCURL_jll`, `LibGit2_jll`,
+`OpenSSL_jll`, `Zlib_jll`, `nghttp2_jll`, `p7zip_jll`). JET stays at 0.12.1, and CodeComplexity and
+JuliaSyntax stay at their recorded versions.
+
+The size, complexity, expansion, performance, prose and JET baselines were refreshed under 1.13.2
+in the commit that moved the Manifest, and no binding number rose, so no row needed
+`--accept-rise`. JET fell in seven rows of the `main` run, among them
+`16_PanelDataFrame.jl` from 4 to 0 and `02_ConditionalXatRisk.jl` from 8 to 4. The other rows moved because sessions record only their own rows, so `dev`
+carried drift under the thresholds, and a refresh imports it. The coverage baseline's provenance
+line was moved by hand, for the reason the first amendment gives.

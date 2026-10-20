@@ -1,5 +1,5 @@
 ```@meta
-Description = "Assertions, private API of PortfolioOptimisers.jl: assert_resource_cap, assert_ep_grid_size, resolve_rng, assert_nonempty, assert_finite, assert_nonneg, …"
+Description = "Assertions, private API of PortfolioOptimisers.jl: assert_resource_cap, assert_ep_grid_size, assert_nonempty, assert_finite, assert_nonneg, assert_gt0, …"
 ```
 
 # [Assertions: private API](@id private-api-assertions)
@@ -9,7 +9,6 @@ The library checks each input where a constructor or a function receives it, a p
 ```@docs
 assert_resource_cap
 assert_ep_grid_size
-resolve_rng
 assert_nonempty
 assert_finite
 assert_nonneg
@@ -21,5 +20,4 @@ assert_matrix_issquare
 assert_unit_interval
 assert_closed_unit_interval
 assert_all_finite
-assert_source_selector
 ```

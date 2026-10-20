@@ -9,7 +9,7 @@ Selects the appropriate clustering routine based on `alg`, determines the optima
 
  1. Cluster `P`, through the branch that `alg` selects, giving `res`.
 
-      + [`HClustAlgorithm`](@ref): `Clustering.hclust` under `alg.linkage` and `branchorder`.
+      + [`HClustAlgorithm`](@ref): [`branch_ordered_hclust`](@ref) under `alg.linkage` on `Val(branchorder)`.
       + [`DBHT`](@ref): [`DBHTs`](@ref) over `P` and `S`, whose last returned value is the clustering.
       + [`AbstractNonHierarchicalClusteringAlgorithm`](@ref): [`optimal_number_clusters`](@ref), which answers with the clustering and the count together.
 
@@ -50,7 +50,7 @@ Selects the appropriate clustering routine based on `alg`, determines the optima
 """
 function _clusterise(alg::HClustAlgorithm, onc::AbstractOptimalNumberClustersEstimator,
                      S::MatNum, D::MatNum, P::MatNum; branchorder::Symbol = :optimal)
-    res = Clustering.hclust(P; linkage = alg.linkage, branchorder = branchorder)
+    res = branch_ordered_hclust(P, alg.linkage, Val(branchorder))
     k = optimal_number_clusters(onc, res, P)
     return Clusters(; res = res, S = S, D = D, P = P, k = k)
 end

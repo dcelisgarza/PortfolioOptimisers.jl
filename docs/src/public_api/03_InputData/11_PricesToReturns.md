@@ -1,5 +1,5 @@
 ```@meta
-Description = "Prices to returns, public API of PortfolioOptimisers.jl: AbstractGapReturnAlgorithm, CatchUpGapReturn, PricesToReturns, prices_to_returns, gap_return."
+Description = "Prices to returns, public API of PortfolioOptimisers.jl: AbstractGapReturnAlgorithm, CatchUpGapReturn, PricesToReturns, prices_to_returns, gap_return, …"
 ```
 
 # Prices to returns
@@ -17,4 +17,6 @@ PricesToReturns
 ```@docs
 prices_to_returns
 gap_return
+currency_excess_index
+PortfolioOptimisers.gap_return_value
 ```

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Linear Constraints (a), private API of PortfolioOptimisers.jl: VecLc, Lc_VecLc, VecPR, PR_VecPR, AbstractParsingResult, allowed_functions, …"
+Description = "Linear constraint generation (a), private API of PortfolioOptimisers.jl: VecLc, Lc_VecLc, VecPR, PR_VecPR, AbstractParsingResult, allowed_functions, …"
 ```
 
-# Linear Constraints (a): private API
+# Linear constraint generation (a): private API
 
 ```@docs
 VecLc

@@ -126,7 +126,7 @@ what keeps the JuMP families cheap.
                 est, out = po.partial_fit_transform(est, rows(data, b))
                 push!(parts, out)
             end
-            return est, reduce(po.vcat_carrier_rows, parts)
+            return est, reduce(po.vcat_observations, parts)
         end
         for ptr in
             (PricesToReturns(), PricesToReturns(; gap_return_alg = CatchUpGapReturn()),
@@ -229,7 +229,7 @@ what keeps the JuMP families cheap.
                 est, out = po.partial_fit_transform(est, rows(prfb, b))
                 push!(parts, out)
             end
-            online = reduce(po.vcat_carrier_rows, parts)
+            online = reduce(po.vcat_observations, parts)
             batch = apply_preprocessing(ptr, prfb)
             @test same_carrier(online, batch)
             @test isequal(Matrix(online.F), Matrix(batch.F))
@@ -247,13 +247,13 @@ what keeps the JuMP families cheap.
         b = po.partial_fit!(PricesToReturns(), rows(pr, 71:160)).cache
         @test isnothing(po.merge_states(a, b).anchor)
         static = AssetPanel(; pf = [NumericPanelField(; name = "size", vals = ones(N))])
-        @test po.vcat_panel_rows(static, static) === static
-        @test_throws ArgumentError po.vcat_panel_rows(static, nothing)
-        @test isnothing(po.vcat_panel_rows(nothing, nothing))
+        @test vcat(static, static) === static
+        @test_throws ArgumentError po.vcat_optional(static, nothing, :pnl)
+        @test isnothing(po.vcat_optional(nothing, nothing, :pnl))
         rds = ReturnsResult(; nx = nx, X = rd.X[1:10, :], pnl = static)
-        @test po.vcat_carrier_rows(rds, rds).pnl === static
-        @test_throws ArgumentError po.vcat_carrier_rows(rds, rows(rd, 1:10))
-        @test_throws ArgumentError po.vcat_carrier_rows(rd,
+        @test po.vcat_observations(rds, rds).pnl === static
+        @test_throws ArgumentError po.vcat_observations(rds, rows(rd, 1:10))
+        @test_throws ArgumentError po.vcat_observations(rd,
                                                         ReturnsResult(; nx = nx,
                                                                       X = rd.X[1:10, :]))
     end
@@ -387,8 +387,156 @@ what keeps the JuMP families cheap.
         end
     end
 
-    @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the host route" begin
-        # A statistic fill is window-valued, which the host route refuses and the refit
+    @testset "A benchmark-relative prior step folds the excess returns (#1659, #1702)" begin
+        # The prior step of the online pipeline folds from the source of its own prior, as
+        # the prior of an optimiser folds from its own source, and the Fold Context of the
+        # Pipeline keeps the raw rows. So the read-out equals the batch fit
+        # field by field, and online equals batch fold for fold.
+        Xb = randn(StableRNG(1659), T, N) ./ 100
+        Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(16590), T) ./ 1000
+        rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
+        pex = EmpiricalPrior(; x_src = ExcessSource())
+        pstep = PipelineStep(; est = pex, writes = :prior)
+        mrb = MeanRisk(; opt = JuMPOptimiser(; pe = pex, slv = slv))
+        hrpb = HierarchicalRiskParity(;
+                                      opt = HierarchicalOptimiser(; pe = pex,
+                                                                  cle = ClustersEstimator(;
+                                                                                          x_src = ExcessSource())))
+        for opt in (mrb, hrpb)
+            pipe = Pipeline(; steps = (pstep, opt))
+            on = fit(stepped(pipe, rdb, blocks))
+            ba = fit(pipe, rows(rdb, 1:80))
+            @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+            @test on.ctx.prior.sigma ≈ ba.ctx.prior.sigma
+            @test on.ctx.prior.mu ≈ prior(pex, rows(rdb, 1:80)).mu
+            # The rebuilt returns data is raw, as the caller gave it.
+            @test isequal(Matrix(on.ctx.returns.X), Matrix(ba.ctx.returns.X))
+            @test isequal(collect(on.ctx.returns.B), collect(ba.ctx.returns.B))
+            @test isapprox(on.w, ba.w; atol = weight_tol(pipe))
+            b = cross_val_predict(pipe, rdb, batch_cv)
+            o = cross_val_predict(pipe, rdb, online_cv)
+            @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-5)
+                      for (pb, po_) in zip(b.pred, o.pred))
+        end
+    end
+
+    @testset "The group of the optimiser decides the gap drop of every step it receives (#1774)" begin
+        # A raw reader in a group with an excess reader loses the observations of a gap of
+        # the vector benchmark, in a head and in a Pipeline alike. The rule picks the
+        # observations, never the frame: each reader keeps its own `x_src`.
+        Xb = randn(StableRNG(1774), T, N) ./ 100
+        Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(17740), T) ./ 1000
+        Bb[[50, 90]] .= NaN
+        rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
+        keep = setdiff(1:80, [50])
+        pd = EmpiricalPrior(; x_src = DataSource())
+        pstep = PipelineStep(; est = pd, writes = :prior)
+        cex = ClustersEstimator(; x_src = ExcessSource())
+        hrpg = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pd, cle = cex))
+        # A prior owner. The step drops the gap, as the head drops it for its own prior.
+        pipe = Pipeline(; steps = (pstep, hrpg))
+        @test po.pipeline_gap_sources(pipe.steps) == [ExcessSource(), ExcessSource()]
+        ba = fit(pipe, rows(rdb, 1:80))
+        @test size(ba.ctx.prior.X, 1) == length(keep)
+        @test ba.ctx.prior.mu ≈ prior(pd, rows(rdb, keep)).mu
+        @test ba.w ≈ optimise(hrpg, rows(rdb, 1:80)).w
+        # The context keeps the returns data that the caller gave.
+        @test size(ba.ctx.returns.X, 1) == 80
+        on = fit(stepped(pipe, rdb, blocks))
+        @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+        @test isapprox(on.w, ba.w; atol = 1e-10)
+        # An optimiser owner. A clustering step in the Excess Frame joins the group of a raw
+        # head, so the head drops the gap in batch and marks it online.
+        hrpd = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pd))
+        cstep = PipelineStep(; est = cex, writes = :phylogeny)
+        pipe = Pipeline(; steps = (cstep, hrpd))
+        ba = fit(pipe, rows(rdb, 1:80))
+        @test ba.w ≈ optimise(hrpd, rows(rdb, keep)).w
+        @test isapprox(fit(stepped(pipe, rdb, blocks)).w, ba.w; atol = 1e-10)
+        b = cross_val_predict(pipe, rdb, batch_cv)
+        o = cross_val_predict(pipe, rdb, online_cv)
+        @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
+                  for (pb, po_) in zip(b.pred, o.pred))
+        # An uncertainty step over a raw prior, in a group with an excess constraint.
+        ue = DeltaUncertaintySet(; pe = pd)
+        ustep = PipelineStep(; est = ue, reads = (:returns,), writes = :uncertainty,
+                             target = :sigma)
+        jo = JuMPOptimiser(; pe = pd, cte = CentralityConstraint(; x_src = ExcessSource()),
+                           slv = slv)
+        mru = MeanRisk(; r = UncertaintySetVariance(; ucs = ue), opt = jo)
+        pipe = Pipeline(; steps = (pstep, ustep, mru))
+        ba = fit(pipe, rows(rdb, 1:80))
+        @test ba.ctx.uncertainty.sigma.ub ≈ sigma_ucs(ue, rows(rdb, keep)).ub
+        @test isapprox(ba.w, optimise(mru, rows(rdb, 1:80)).w; atol = 1e-5)
+        @test isapprox(fit(stepped(pipe, rdb, blocks)).w, ba.w; atol = 1e-5)
+        # A step that no optimiser receives drops by its own reader alone, in batch and
+        # online.
+        pex = PipelineStep(; est = EmpiricalPrior(; x_src = ExcessSource()),
+                           writes = :prior)
+        @test po.pipeline_gap_sources((pex,)) == [nothing]
+        ba = fit(Pipeline(; steps = (pex,)), rows(rdb, 1:80))
+        @test size(ba.ctx.prior.X, 1) == length(keep)
+        on = fit(stepped(Pipeline(; steps = (pex,)), rdb, blocks))
+        @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+        # A Pipeline of one optimiser step is a head alone, so it drops by the group of the
+        # head online as in batch. With `nothing` the fold kept the `NaN` rows of `X - B`.
+        mrx = MeanRisk(;
+                       opt = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                                           slv = slv))
+        @test po.pipeline_gap_sources((mrx,)) == [ExcessSource()]
+        ba = fit(Pipeline(; steps = (mrx,)), rows(rdb, 1:80))
+        @test isapprox(ba.w, optimise(mrx, rows(rdb, 1:80)).w; atol = 1e-10)
+        @test isapprox(fit(stepped(Pipeline(; steps = (mrx,)), rdb, blocks)).w, ba.w;
+                       atol = 1e-10)
+        # A raw prior step in an excess group keeps its frame, so a data benchmark subtracts
+        # the benchmark once and builds. A prior step in the Excess Frame is still refused.
+        dbt = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        jt = JuMPOptimiser(; pe = pd, cte = CentralityConstraint(; x_src = ExcessSource()),
+                           slv = slv)
+        res = fit(Pipeline(; steps = (pstep, MeanRisk(; r = dbt, opt = jt))),
+                  rows(rdb, 1:80))
+        @test all(isfinite, res.w)
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PipelineStep(;
+                                                                  est = EmpiricalPrior(;
+                                                                                       x_src = ExcessSource()),
+                                                                  writes = :prior),
+                                                     MeanRisk(; r = dbt, opt = jt)))
+    end
+
+    @testset "A benchmark-relative uncertainty or constraint step reads the excess returns (#1670, #1702)" begin
+        # The steps before the owner run over the Fold Context of the Pipeline, which keeps
+        # the raw rows and the benchmark, so each reads the returns from the source of its
+        # own reader, as in batch.
+        Xb = randn(StableRNG(1670), T, N) ./ 100
+        Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(16700), T) ./ 1000
+        rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
+        pex = EmpiricalPrior(; x_src = ExcessSource())
+        pstep = PipelineStep(; est = pex, writes = :prior)
+        ue = DeltaUncertaintySet(; pe = pex)
+        ustep = PipelineStep(; est = ue, reads = (:returns,), writes = :uncertainty,
+                             target = :sigma)
+        cstep = PipelineStep(; est = CentralityConstraint(; x_src = ExcessSource()),
+                             writes = :constraints)
+        jo = JuMPOptimiser(; pe = pex, slv = slv)
+        for pipe in (Pipeline(;
+                              steps = (pstep, ustep,
+                                       MeanRisk(; r = UncertaintySetVariance(), opt = jo))),
+                     Pipeline(; steps = (pstep, cstep, MeanRisk(; opt = jo))))
+            on = fit(stepped(pipe, rdb, blocks))
+            ba = fit(pipe, rows(rdb, 1:80))
+            @test isapprox(on.w, ba.w; atol = weight_tol(pipe))
+            b = cross_val_predict(pipe, rdb, batch_cv)
+            o = cross_val_predict(pipe, rdb, online_cv)
+            @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-5)
+                      for (pb, po_) in zip(b.pred, o.pred))
+        end
+        on = fit(stepped(Pipeline(; steps = (pstep, ustep)), rdb, blocks))
+        @test on.ctx.uncertainty.sigma.ub ≈ sigma_ucs(ue, rows(rdb, 1:80)).ub
+    end
+
+    @testset "Online(pipe; max_history = w) is the rolling batch walk-forward; Online(pipe) is the fold route" begin
+        # A statistic fill is window-valued, which the fold route refuses and the refit
         # route admits: every fold is a batch fit over the buffer.
         pipe = Pipeline(;
                         steps = (PriceGapFill(; fill = MeanValue()), PricesToReturns(),
@@ -403,7 +551,7 @@ what keeps the JuMP families cheap.
         o = cross_val_predict(po.Online(pipe), pr, online_cv)
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
-        # The refit route equals the host route where both run.
+        # The refit route equals the fold route where both run.
         hpipe = Pipeline(;
                          steps = (PriceGapFill(), PricesToReturns(), EmpiricalPrior(), hrp))
         h = cross_val_predict(hpipe, pr, online_cv)
@@ -417,7 +565,7 @@ what keeps the JuMP families cheap.
         @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
                   for (pb, po_) in zip(b.pred, o.pred))
         # A capped owner on returns input, behind a universe-only step alone, stays on the
-        # host route and equals the rolling batch walk-forward: the read-out refits the
+        # fold route and equals the rolling batch walk-forward: the read-out refits the
         # selector over the owner's capped rows (#1076).
         sel = ScoreSelector(; score = MeanReturn(), rule = RankRule(; best = 4))
         b = cross_val_predict(Pipeline(; steps = (sel, EmpiricalPrior(), hrp)), rd, rolling)
@@ -430,7 +578,7 @@ what keeps the JuMP families cheap.
                   for (pb, po_) in zip(b.pred, o.pred))
         # #1076's fixture: asset 2 gapped over rows 5:40, so fold 2's window starts inside
         # the gap. The rolling batch fit seeds no price the window did not see and the column
-        # filter drops asset 2; the refit route drops it too. A capped owner on the host route
+        # filter drops asset 2; the refit route drops it too. A capped owner on the fold route
         # would have kept it, filled from row 4 at fold 1, and is refused below.
         P2 = copy(P)
         P2[5:40, 2] .= NaN
@@ -456,7 +604,7 @@ what keeps the JuMP families cheap.
         @test isa(opipe.cache, po.PipelineBufferState)
         @test_throws ArgumentError fit(opipe)
         opipe = po.partial_fit!(po.partial_fit!(opipe, rows(pr, 1:20)), rows(pr, 21:50))
-        @test po.carrier_rows(opipe.cache.data) == 30
+        @test po.data_row_count(opipe.cache.data) == 30
         @test isapprox(fit(opipe).w, fit(pipe, rows(pr, 21:50)).w; atol = 1e-10)
         half = po.partial_fit!(po.PipelineBufferState(), rows(pr, 1:20))
         @test isequal(values(po.merge_states(half,
@@ -545,7 +693,7 @@ what keeps the JuMP families cheap.
         @test occursin("opt.opt.pe", msg)
         # A capped owner behind a row-local step (#1076): each of the three steps by name, on
         # a prior owner and on an optimisation owner's prior; the cap is read through
-        # `step_online_cap`, and an uncapped owner stays on the host route.
+        # `step_online_cap`, and an uncapped owner stays on the fold route.
         cpe = po.Online(EmpiricalPrior(); max_history = w)
         for (steps, name) in ((PricesToReturns(),) => "PricesToReturns",
                               (PriceGapFill(), PricesToReturns()) => "PriceGapFill",
@@ -695,7 +843,7 @@ what keeps the JuMP families cheap.
         # assets and for the factors, and a factor column that one block lacks by presence.
         other = price_ingestion(PriceIngestion(),
                                 TimeArray(ts[11:20], P[11:20, :], ["B$i" for i in 1:N]))
-        msg = message(() -> po.vcat_carrier_rows(rows(pr, 1:10), other))
+        msg = message(() -> po.vcat_observations(rows(pr, 1:10), other))
         @test occursin("the columns of `X`", msg) && occursin("\"B1\"", msg)
         @test occursin("the columns of `X`",
                        message(() -> po.partial_fit_transform(po.partial_fit!(PricesToReturns(),
@@ -707,10 +855,10 @@ what keeps the JuMP families cheap.
         prf1 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F1)
         prf2 = price_ingestion(PriceIngestion(), TimeArray(ts, P, nx); F = F2)
         @test occursin("the columns of `F`",
-                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10),
+                       message(() -> po.vcat_observations(rows(prf1, 1:10),
                                                           rows(prf2, 11:20))))
         @test occursin("the `F` column",
-                       message(() -> po.vcat_carrier_rows(rows(prf1, 1:10), rows(pr, 11:20))))
+                       message(() -> po.vcat_observations(rows(prf1, 1:10), rows(pr, 11:20))))
 
         # A first block of one price row has no return without padding, and the batch
         # conversion of that row refuses it as empty rather than out of bounds. With
@@ -724,7 +872,7 @@ what keeps the JuMP families cheap.
                     PricesToReturns(; padding = true, gap_return_alg = CatchUpGapReturn()))
             e1, o1 = po.partial_fit_transform(ptr, rows(pr, 1:1))
             e2, o2 = po.partial_fit_transform(e1, rows(pr, 2:160))
-            @test same_carrier(po.vcat_carrier_rows(o1, o2), apply_preprocessing(ptr, pr))
+            @test same_carrier(po.vcat_observations(o1, o2), apply_preprocessing(ptr, pr))
         end
 
         # A caller's Gap Return rule that reads the next price. The batch writes a zero at
@@ -747,7 +895,7 @@ what keeps the JuMP families cheap.
         msg = message(() -> po.partial_fit!(nptr, rows(pr, 1:97)))
         @test occursin("NextPriceGapReturn", msg) && occursin("no online form", msg)
 
-        # A caller's own row-local step joins the host route with three methods and no
+        # A caller's own row-local step joins the fold route with three methods and no
         # `partial_fit!`: the stepped pipeline reads out as the batch fit.
         struct PriceDoubler{C} <: po.AbstractPricesPreprocessingEstimator
             cache::C

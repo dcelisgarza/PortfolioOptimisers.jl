@@ -112,10 +112,14 @@ Sub-group MIP constraints: indicators gate the sub-group weights `smtx * w` and 
   - [`AssetMIPSpace`](@ref)
   - [`mip_key`](@ref)
 """
-struct SubsetMIPSpace{T1 <: MatNum, T2 <: Integer} <: AbstractMIPSpace
-    smtx::T1
+@concrete struct SubsetMIPSpace <: AbstractMIPSpace
+    smtx
     pfx::Symbol
-    i::T2
+    i
+    function SubsetMIPSpace(smtx::T1, pfx::Symbol,
+                            i::T2) where {T1 <: MatNum, T2 <: Integer}
+        return new{T1, T2}(smtx, pfx, i)
+    end
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -230,9 +234,9 @@ Long-only indicators: one *held* bit per asset, and no sign.
 
   - [`AbstractMIPIndicators`](@ref)
 """
-struct HeldIndicators{T1, T2} <: AbstractMIPIndicators
-    ib::T1
-    i_mip::T2
+@concrete struct HeldIndicators <: AbstractMIPIndicators
+    ib
+    i_mip
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -252,12 +256,12 @@ budgets at once.
 
   - [`AbstractMIPIndicators`](@ref)
 """
-struct LongShortIndicators{T1, T2, T3, T4, T5} <: AbstractMIPIndicators
-    ilb::T1
-    isb::T2
-    il::T3
-    is::T4
-    i_mip::T5
+@concrete struct LongShortIndicators <: AbstractMIPIndicators
+    ilb
+    isb
+    il
+    is
+    i_mip
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -278,8 +282,8 @@ decomposition use `N` binaries rather than `2N`.
 
   - [`AbstractMIPIndicators`](@ref)
 """
-struct SignIndicators{T1} <: AbstractMIPIndicators
-    xb::T1
+@concrete struct SignIndicators <: AbstractMIPIndicators
+    xb
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -289,7 +293,7 @@ portfolio. This is what cardinality counts and what integer phylogeny gates on.
 
 [`SignIndicators`](@ref) deliberately has no method: it carries no held bit, and the
 declaration step only chooses it when nothing in the model consumes one. A caller that would
-need a held indicator therefore fails at the seam with a `MethodError`, rather than reading a
+need a held indicator therefore fails at the call of `held` with a `MethodError`, rather than reading a
 sign bit and silently miscounting.
 
 # Related
@@ -315,7 +319,7 @@ the budget is free and the gate relaxes — the same reason [`long_bin`](@ref) e
 [`long_gate`](@ref).
 
 [`SignIndicators`](@ref) deliberately has no method, for the same reason [`held`](@ref) does
-not: it carries no held bit, so a caller that would count one fails at the seam with a
+not: it carries no held bit, so a caller that would count one fails at the call of `held_bin` with a
 `MethodError` rather than miscounting a sign bit.
 
 # Related
@@ -343,7 +347,7 @@ value. With the bundle in Model State, the per-builder raw keys (`:ib`, `:ilb`/`
 private to the bundle: nothing outside a builder reaches an indicator by key.
 
 Only the asset space registers a bundle. Sub-group builders consume theirs immediately, in the
-same call, and never cross the late seam.
+same call, and never pass them to a late emitter.
 
 # Related
 

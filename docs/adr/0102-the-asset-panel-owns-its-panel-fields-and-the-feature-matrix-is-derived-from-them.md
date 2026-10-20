@@ -36,7 +36,7 @@ Three facts decided the reworked shape.
     bound against the feature axis; a walk from a column back to its owner; and two naming
     conventions, `"<field>=<level>"` and `"<field>::observed"`, which the first shape rejected as
     the index and then kept to name the columns.
- 2. **The reference implementation stores per-field values.** Its panel is a dictionary of fields,
+ 2. **The oracle stores per-field values.** Its panel is a dictionary of fields,
     each with its own array and element type, a categorical as integer codes over labels, and two
     boolean masks. It has no verb that stacks fields into one matrix, and no distance or
     clustering consumer, so it never needed one.
@@ -177,7 +177,7 @@ bridge serves it.
 
 `pnl` follows the library's abbreviated-type-word pattern (`alg`, `opt`, `sim`, `sel`). The strict
 initialism `ap` was considered; `pnl` reads as *panel* and is what map #643's readers already say
-at about 54 sites. `CONTEXT.md` rules out the profit-and-loss reading.
+at about 54 sites. `GLOSSARY.md` rules out the profit-and-loss reading.
 
 ### A blank never reaches a carrier
 
@@ -260,18 +260,18 @@ a function, and it never enters a carrier at all.
 
 The leak is stated in `BackwardPanelFill`'s own docstring rather than refused. Map #643's
 governing rule is that a decision may add capability or simplify the design and may never remove
-a mode, and the reference implementation offers a backward fill. A panel built outside any fold
+a mode, and the oracle offers a backward fill. A panel built outside any fold
 looks forward into nothing, so the mode is real.
 
 ### The subset invariant is checked, not coerced
 
 The estimation mask is a subset of the active mask: an asset that is not listed at an observation
-cannot enter that observation's estimate. The reference implementation coerces silently. A
+cannot enter that observation's estimate. The oracle coerces silently. A
 coercion allocates a new mask, and `port_opt_view` must return views, so the rule is **checked**
 and the caller writes `emsk .& amsk` when they want the coercion. A slice of two masks that
 satisfy the rule satisfies it again, so a view never has to re-establish it and never throws.
 
-**The per-observation non-empty checks are deliberately not ported.** The reference refuses a
+**The per-observation non-empty checks are deliberately not ported.** The oracle refuses a
 panel in which some observation has no active asset. An asset view can produce exactly that, and
 a view must not throw. The rule would also be a refusal rather than a capability, so dropping it
 removes no mode.
@@ -382,3 +382,139 @@ the cross-validated path is time-varying and the static-shape coupling above hol
   collapse gives way to a collapse over the panel's fields. `panel_feature_matrix` stays, as the
   verb that stacks the panel whole.
 - **Panel persistence is not built.** It is in scope for map #643 and does not gate its close.
+
+## Amendment (2026-09-29)
+
+A directional fill runs **within each stretch of constant activity** of the asset's active mask
+([#1413](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1413), found by the parity
+audit of map #1375). `ForwardPanelFill` and `BackwardPanelFill` walked the whole observation axis
+with one carried value and one run counter. So an asset that delisted and listed again took, at a
+blank first cell of its second listing, the last value of its first listing, and `lim` counted the
+inactive cells as part of the run of blanks.
+
+An inactive stretch separates two listings, and the library already treats it as a reset: a
+folding statistic resets an asset that the active mask turns off (ADR 0172), and a relisting asset
+re-enters at the recursion's own weight (ADR 0157). The builder was the one place that crossed
+it. Now no value crosses an inactive stretch, and the run that `lim` counts restarts in each
+stretch. The old rule is not kept behind a keyword: it carries a value of one listing into the
+other, and no caller needs that.
+
+The seam is two optional methods, so an extension written before this amendment keeps working:
+
+- `asset_panel` calls `panel_resolve(inp, amsk)`. An input type that defines only
+  `panel_resolve(inp)` reaches it through a fallback that drops the mask.
+- `panel_fill_array` calls `panel_fill(alg, v, act, name)` with the asset's column of the mask. A
+  policy that defines only the three-argument method reaches it through a fallback that drops
+  `act`. `NoPanelFill` and `ConstantPanelFill` are cell-wise and read no mask, so the position in
+  the `NoPanelFill` error stays the position in the whole column.
+
+A blank inactive cell now gets the policy's `val` in place of a value carried into it. No active
+cell of the test fixtures changes: the change reaches an active cell only at a blank first cell of
+a relisting (forward) or a blank last cell before a delisting (backward).
+
+## Amendment (2026-10-06)
+
+([#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416), the last verdict of
+the parity audit of map #1375). Three rules of this ADR differ from the oracle. The maintainer
+kept each one, and this amendment states the mathematics behind it.
+
+**A read keeps the stored value of an inactive cell by default.** `panel_field_values` defaults to
+`inactive = nothing`, and the oracle stores `NaN` there. A cell holds two separate facts: the value
+of the field, and whether the asset is in the universe. The default read already shows a blank as
+`NaN` (`unobserved = NaN`), so an inactive cell that reads a finite value holds a value that the
+data held, for example the capitalisation of a firm before it enters the universe. A `NaN` there
+would state "missing" for a value that exists, and one `NaN` would then mean two things.
+`inactive = NaN` gives the oracle's view.
+
+**An estimation mask outside the active mask is refused.** The oracle intersects the two masks in
+silence. A cell that is estimable and outside the universe is a contradiction: the two masks come
+from different sources, or one is shifted by a row. A silent intersection would change the
+estimation sample with no message, so the refusal follows the rule that corrupt input refuses
+(ADR 0108, amendment of 2026-09-29). The oracle's result is `emsk .& amsk`.
+
+**An observation with no active asset is allowed.** The oracle refuses such a panel. The rows
+before the first listing, a holiday on which every asset is inactive, and a view on a
+sub-universe at a time when none of its assets is listed are valid input, so a refusal would
+refuse valid input. Every consumer keeps such a row unscored. The oracle's check is
+`all(any(pnl.amsk; dims = 2))`.
+
+An unfilled blank keeps the policy's `val` with `omsk = false`. #1416 found that two readers used
+that `val` as data: `feature_matrix` (and through it `FeatureDistance`) and the panel collapse of a
+meta-optimiser. A child task of map #1375 makes them skip that `val`, and adds a census that
+poisons it in the active cells, as `test_06j` poisons the inactive ones. The next amendment states
+the rule.
+
+## Amendment (2026-10-06, #1508)
+
+([#1508](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1508), a build task
+of #1416, and [#1631](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1631), which
+corrected it.) **A reader reads the active cells that hold data, and a placeholder is a value that
+no reader reads.** A placeholder is the `val` that a fill policy writes into a blank only because
+it has nothing to carry there. It is a storage convention, not an observation. A reader that uses
+it adds a fabricated value to its sample, and its answer then changes with `val`. A correct reader
+gives the same answer for every placeholder.
+
+**A filled cell holds data.** The observed mask cannot tell a placeholder from a filled cell: both
+are `false`. The first build of #1508 read `omsk = false` as a placeholder, so the readers skipped
+every value that a fill policy wrote. That broke the purpose of `ConstantPanelFill`, whose value is
+what the absence means, and of a carried value. #1631 found it: a static panel filled under
+`ConstantPanelFill` made `FeatureDistance` refuse every asset with a filled cell, and a fit dropped
+such an asset in silence. So each Panel Field carries a second mask beside `omsk`.
+
+- **`pmsk` is the placeholder mask**: `true` where a cell holds a placeholder, of the size of the
+  values, or `nothing` when no cell holds one. An observed cell is never a placeholder, and a field
+  with no observed mask holds none: the constructor refuses both. `omsk` keeps its meaning,
+  observed by the raw input. So a cell is observed, filled (`omsk` and `pmsk` both `false`) or a
+  placeholder. A second `Bool` mask was chosen over one array of three states, an enumeration or
+  a `UInt8`: every reader of `omsk`, the lazy `AllTrueMask` and the `nothing` form keep working,
+  and a reader that skips placeholders reads one mask.
+- **The fill policy states its placeholders** through the optional verb `panel_placeholder`,
+  which `panel_fill` has beside it. `ForwardPanelFill` and `BackwardPanelFill` mark a blank that
+  no carried value reaches: before the first observed cell of a stretch, or past the run of `lim`.
+  `ConstantPanelFill` marks none. A policy that defines no method marks none, so its values are
+  data, as they were before #1508. An input type states them through the optional verb
+  `panel_input_placeholder`, whose fallback marks none.
+- **`RegressionPanel`** marks its zero rows outside the Investable Mask as placeholders, because
+  no loading exists there.
+- **A lift keeps both masks.** The lift above drops the observed mask of a static input, because
+  every cell of a static input was observed. That is not so for a static input whose blanks
+  `ConstantPanelFill` filled, and a collapsed static panel that a meta-optimiser lifts can hold a
+  placeholder. So the lift wraps `omsk` and `pmsk` in a `RepeatedLeading`, as it wraps the values.
+  A view, a concatenation, a fold stack and the round trip of the panel keep `pmsk` too; the
+  manifest records it in a `placeholder` column, and the table in `"<column>::placeholder"`
+  columns.
+
+The readers:
+
+- `feature_matrix` holds `placeholder` at a placeholder of a value column, `NaN` by default.
+  `placeholder = nothing` keeps the stored value. A filled cell keeps its value. An observed-mask
+  column is data in every cell, so it is unchanged. The keyword is `placeholder`, not
+  `unobserved`, because `panel_field_values` reads `unobserved` at every unobserved cell, filled or
+  not, and one name must not mean two cell sets.
+- `FeatureDistance` reads an asset at a cell only where it is active and no value column of its
+  selector holds a placeholder. The rules of #1454 for an inactive cell apply to a placeholder:
+  each asset and each pair at its own readable rows, `LastActiveRow` at the last readable row, and
+  the entry of a fit drops an asset with no readable row. A static panel has one row, so an asset
+  with a selected placeholder is unreadable there.
+- The panel collapse of a meta-optimiser reads, for each Panel Field, the members that are active
+  and hold data, and the rule of #1456 divides by their weight. A tensor field reads the mask of
+  each label. A square field reads a pair of members with the weight `W[i, k] W[j, l]` and divides
+  by the weight of the read pairs, so a symmetric field stays symmetric. A collapsed cell holds a
+  placeholder where no active member with weight holds data, and it is observed where an active
+  member with weight was observed. Where no active cell holds a placeholder, the collapse is the
+  one that reads the active members, bit for bit.
+- `panel_field_values`, the descriptors, the exposures and `describe` read `omsk` as before: a
+  filled cell is not an observation there.
+
+`test_06m` gates the rule. It marks about one active cell in twenty of every Panel Field as a
+placeholder, poisons the value there, and needs every consumer of an Asset Panel to give the same
+answer on the clean and on the poisoned copy. Its last test set checks that a filled cell is read.
+
+## Amendment (2026-10-07)
+
+**Panel persistence is built.** The Consequences above say that it is not.
+[#1399](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1399) built the round trip in
+`src/03_InputData/22_PanelRoundTrip.jl`. `panel_manifest(pnl)` writes a manifest that names the
+axes, the selected assets and every Panel Field with its labels or levels. `asset_panel(df, mf)`
+reads an Asset Panel back from a table that `panel_dataframe` wrote, in the long or the wide
+layout, with its active and estimation masks. The `AssetPanel` constructor checks the result.

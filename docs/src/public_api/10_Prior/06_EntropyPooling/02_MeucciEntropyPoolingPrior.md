@@ -1,8 +1,8 @@
 ```@meta
-Description = "Meucci Entropy Pooling, public API of PortfolioOptimisers.jl: MeucciEntropyPoolingPrior, prior."
+Description = "Meucci entropy pooling Prior, public API of PortfolioOptimisers.jl: MeucciEntropyPoolingPrior, prior."
 ```
 
-# Meucci Entropy Pooling
+# Meucci entropy pooling Prior
 
 ```@docs
 MeucciEntropyPoolingPrior

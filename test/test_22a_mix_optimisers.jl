@@ -183,9 +183,10 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                                                   MeanRisk(; obj = MaximumRatio(),
                                                            opt = jopto)]),
                      opto = MeanRisk(; opt = jopto)),
-            NestedClustered(; brt = true, opti = MeanRisk(; opt = jopti),
-                            opto = MeanRisk(; opt = jopto)),
-            Stacking(; brt = true,
+            NestedClustered(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                            cle = ClustersEstimator(; x_src = ExcessSource()),
+                            opti = MeanRisk(; opt = jopti), opto = MeanRisk(; opt = jopto)),
+            Stacking(; pe = EmpiricalPrior(; x_src = ExcessSource()),
                      opti = concrete_typed_array([resi,
                                                   HierarchicalRiskParity(; opt = hopto),
                                                   MeanRisk(; obj = MaximumRatio(),
@@ -205,7 +206,9 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
                      opto = SubsetResampling(; rng = StableRNG(100), seed = 42,
                                              opt = MeanRisk(; opt = jopto)))]
     df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
-    for (i, opt) in enumerate(opts)
+    # The loop is split by index over two files, so that each file of the suite runs in
+    # about the same time. This file checks one half of `opts`.
+    for (i, opt) in collect(enumerate(opts))[1:(length(opts) ÷ 2)]
         res = try
             optimise(opt, rd)
         catch err
@@ -238,7 +241,7 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
         end
         rtol = if i in (2, 15)
             5e-5
-        elseif i == 19
+        elseif i in (4, 19)
             5e-6
         elseif i == 10
             1.1
@@ -256,16 +259,16 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
     end
 end
 
-@testset "No meta-optimiser fold captures a boxed carrier" begin
+@testset "No meta-optimiser fold captures a boxed returns result" begin
     #=
-    `NestedClustered` and `Stacking` assign `rd` twice before their `@floop` — the
-    benchmark-relative picker, then the investable reduction — and a variable that is
-    reassigned and then captured by the fold's closure is boxed. FLoops reports a boxed
-    capture as a correctness and performance problem, once per process, so a test file whose
-    earlier NCO call already fired it never sees it again, and example 16 does on every fresh
-    run. The reduced carrier therefore takes a name of its own, and this gate asks FLoops to
-    throw rather than warn on the two fold loops. `assistant` is process-wide, so the default
-    `:warn` is restored whatever happens.
+    `NestedClustered`, `Stacking` and `SubsetResampling` once assigned `rd` twice before their
+    `@floop` — the benchmark-relative picker, then the investable reduction — and a variable
+    that is reassigned and then captured by the fold's closure is boxed. FLoops reports a
+    boxed capture as a correctness and performance problem, once per process, so a test file
+    whose earlier NCO call already fired it never sees it again, and example 16 does on every
+    fresh run. The reduced returns result therefore takes a name of its own, and this gate
+    asks FLoops to throw rather than warn on the three fold loops. `assistant` is
+    process-wide, so the default `:warn` is restored whatever happens.
     =#
     PortfolioOptimisers.FLoops.assistant(:error)
     try
@@ -280,6 +283,9 @@ end
                               MeanRisk(; opt = jopti)],
                       opto = HierarchicalRiskParity(; opt = hopto))
         @test isa(optimise(st, rd).retcode, OptimisationSuccess)
+        sr = SubsetResampling(; opt = HierarchicalRiskParity(; opt = hopti),
+                              subset_size = 3, n_subsets = 4, seed = 1)
+        @test isa(optimise(sr, rd).retcode, OptimisationSuccess)
     finally
         PortfolioOptimisers.FLoops.assistant(:warn)
     end

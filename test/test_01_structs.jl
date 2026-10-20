@@ -1,3 +1,36 @@
+# Stand-in readers of the returns for the testset "Returns Source". They implement the
+# contract of the frame walk as a reader and a head do. A method is defined at the top
+# level, so that the testset can call it.
+module ReturnsSourceStandIn
+import PortfolioOptimisers as PO
+struct Reader
+    x_src::Any
+end
+struct RegressionReader
+    x_src::Any
+end
+struct Holder
+    pe::Any
+    r::Any
+    re::Any
+end
+function PO.returns_source(x::Reader)
+    return x.x_src
+end
+function PO.reader_frames(x::Reader, path::AbstractString, ::Bool)
+    return PO.source_frames(x.x_src, path, true)
+end
+function PO.reader_frames(x::RegressionReader, path::AbstractString, refit::Bool)
+    return PO.source_frames(x.x_src, path, refit)
+end
+function PO.group_frames(h::Holder)
+    refit = PO.refits_regression(h.pe)
+    return PO.merge_frames(PO.reader_frames(h.pe, "pe", refit),
+                           PO.reader_frames(h.r, "r", refit),
+                           PO.reader_frames(h.re, "re", refit))
+end
+end
+
 @testset "Struct tests" begin
     using Test, PortfolioOptimisers, AverageShiftedHistograms, Dates, Clarabel, CSV,
           TimeSeries
@@ -204,21 +237,80 @@
         @test_throws ArgumentError PO.port_opt_view(PredictionReturnsResult(; nx = nx,
                                                                             X = Bv), 1)
 
-        # returns_result_picker subtracts the benchmark once, and keeps every other field.
-        r1 = returns_result_picker(rdv, true)
-        @test r1.X == X .- Bv
-        @test isnothing(r1.nb) && isnothing(r1.B)
-        @test r1.iv === iv && r1.ivpa == 2.0
-        @test returns_result_picker(r1, true) === r1
-        r2 = returns_result_picker(rd, true)
-        @test r2.X == X - Bm
-        @test r2.ts === ts && r2.F === F && r2.nx === nx
-        @test returns_result_picker(rd, false) === rd
+        # benchmark_relative_returns gives the matrix a reader fits on and builds no
+        # ReturnsResult (ADR 0204): `rd` keeps its raw `X` and its `B`. One method per
+        # value of the source picks the matrix (ADR 0212).
+        x1 = benchmark_relative_returns(rdv, ExcessSource())
+        @test x1 == X .- Bv
+        @test rdv.X === X && rdv.B === Bv
+        x2 = benchmark_relative_returns(rd, ExcessSource())
+        @test x2 == X - Bm
+        @test rd.X === X && rd.B === Bm
+        for x_src in (nothing, DataSource())
+            @test benchmark_relative_returns(rd, x_src) === rd.X
+            @test benchmark_relative_returns(rdv, x_src) === rdv.X
+        end
+        # A gap of the benchmark gives a gap of the excess return, and only there.
+        Bg = copy(Bv)
+        Bg[2] = NaN
+        xg = benchmark_relative_returns(ReturnsResult(; nx = nx, X = X, nb = ["BM"],
+                                                      B = Bg), ExcessSource())
+        @test all(isnan, xg[2, :]) && xg[[1; 3:end], :] == (X .- Bv)[[1; 3:end], :]
+        # ExcessSource() on returns with no benchmark is a refusal, not a pass-through.
         rn = ReturnsResult(; nx = nx, X = X)
-        @test returns_result_picker(rn, :any) === rn
-        @test_throws MethodError returns_result_picker(rd, 1)
-        @test_throws MethodError returns_result_picker(ReturnsResult(; nb = ["BM"], B = Bv),
-                                                       true)
+        @test benchmark_relative_returns(rn, DataSource()) === rn.X
+        err = try
+            benchmark_relative_returns(rn, ExcessSource())
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("x_src = ExcessSource()", err.msg)
+        # Returns data holds no Prior Result, so PriorSource() reads nothing here.
+        err = try
+            benchmark_relative_returns(rd, PriorSource())
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) && occursin("x_src = PriorSource()", err.msg)
+        # Returns data with no returns holds nothing to subtract from.
+        re = ReturnsResult()
+        @test isnothing(benchmark_relative_returns(re, ExcessSource()))
+        @test_throws MethodError benchmark_relative_returns(rd, true)
+        @test_throws MethodError benchmark_relative_returns(rn, :data)
+        @test_throws MethodError benchmark_relative_returns(ReturnsResult(; nb = ["BM"],
+                                                                          B = Bv),
+                                                            ExcessSource())
+        # The Shared Series of a fit: a vector benchmark only under ExcessSource().
+        Bh = copy(Bv)
+        Bh[3] = NaN
+        rh = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = Bh)
+        @test PO.shared_benchmark(Bh, ExcessSource()) === Bh
+        @test isnothing(PO.shared_benchmark(Bm, ExcessSource()))
+        for x_src in (nothing, DataSource(), PriorSource())
+            @test isnothing(PO.shared_benchmark(Bh, x_src))
+            @test isnothing(PO.shared_series_rows(rh, x_src, false))
+            @test isnothing(PO.shared_series_gaps(rh, x_src, false))
+            @test PO.shared_series_view(rh, x_src, false) === rh
+        end
+        @test PO.shared_series_rows(rh, ExcessSource(), false) == [1, 2, 4]
+        @test PO.shared_series_gaps(rh, ExcessSource(), false) ==
+              [false, false, true, false]
+        @test PO.shared_series_view(rh, ExcessSource(), false).X == X[[1, 2, 4], :]
+        @test_throws PO.IsEmptyError PO.shared_series_view(ReturnsResult(; nx = nx, X = X,
+                                                                         nb = ["BM"],
+                                                                         B = fill(NaN, 4)),
+                                                           ExcessSource(), false)
+        # A gap of a matrix benchmark goes into the estimation mask under ExcessSource().
+        Bmg = copy(Bm)
+        Bmg[2, 3] = NaN
+        amsk = trues(4, 3)
+        rmb = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bmg,
+                            pnl = AssetPanel(; amsk = amsk, emsk = copy(amsk)))
+        @test PO.benchmark_estimation_mask(rmb, DataSource()) === rmb
+        @test PO.benchmark_estimation_mask(rmb, nothing) === rmb
+        rmx = PO.benchmark_estimation_mask(rmb, ExcessSource())
+        @test !rmx.pnl.emsk[2, 3] && count(!, rmx.pnl.emsk) == 1
+        @test PO.shared_series_view(rmb, ExcessSource(), false).pnl.emsk == rmx.pnl.emsk
 
         # asset_panel reads rd first, then a ReturnsResult in the pr slot, else it throws.
         pv = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0; 1.0 2.0 3.0]
@@ -233,6 +325,85 @@
         @test PO.panel_field(PO.port_opt_view(rp, [3, 1]).pnl, "a").vals == pv[:, [3, 1]]
         @test PO.panel_field(PO.port_opt_view(rp, 2:3, [3, 1]).pnl, "a").vals ==
               pv[2:3, [3, 1]]
+    end
+    @testset "Returns Source" begin
+        # The values, the shared assertion, the refusal of an inner reader and the frame
+        # walk (ADR 0211, ADR 0212, ADR 0214, ADR 0215). No reader holds `x_src` yet in
+        # this file, so a stand-in reader exercises the contract that the readers use.
+        PO = PortfolioOptimisers
+        @test DataSource() isa PO.AbstractReturnsSource
+        @test ExcessSource() isa PO.AbstractReturnsSource
+        @test PriorSource() isa PO.AbstractReturnsSource
+        @test PO.source_label(nothing) == "nothing"
+        @test PO.source_label(ExcessSource()) == "ExcessSource()"
+        # Each family admits its own set, and the refusal names the field, the reader, the
+        # value and the admitted values.
+        for x_src in PO.DATA_RETURNS_SOURCES
+            @test isnothing(PO.assert_returns_source(x_src, PO.DATA_RETURNS_SOURCES, :Pe))
+        end
+        @test isnothing(PO.assert_returns_source(PriorSource(), PO.ALL_RETURNS_SOURCES,
+                                                 :Graph))
+        err = try
+            PO.assert_returns_source(PriorSource(), PO.DATA_RETURNS_SOURCES, :Pe)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test err.msg ==
+              "`x_src = PriorSource()` is not a source that `Pe` reads. Its `x_src` admits nothing, DataSource() or ExcessSource()."
+        @test_throws MethodError PO.assert_returns_source(:data, PO.ALL_RETURNS_SOURCES,
+                                                          :Pe)
+        # A value that is not a reader states no source, so it passes as an inner reader.
+        @test isnothing(PO.returns_source(1.0))
+        @test isnothing(PO.assert_inner_reader(1.0, :pe, :Holder))
+        # A stand-in reader. Its walk method is the one a reader of the returns writes.
+        sr = ReturnsSourceStandIn
+        @test isnothing(PO.assert_inner_reader(sr.Reader(nothing), :pe, :FactorPrior))
+        err = try
+            PO.assert_inner_reader(sr.Reader(ExcessSource()), :pe, :FactorPrior)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("the `pe` of `FactorPrior`", err.msg)
+        @test occursin("It is `ExcessSource()`. State the source on `FactorPrior`", err.msg)
+        # The walk: one answer per source, and a vector at the paths of its positions.
+        @test PO.join_path("", :pe) == "pe" && PO.join_path("opt", "pe") == "opt.pe"
+        @test PO.source_frames(ExcessSource(), "pe", true).excess
+        @test PO.source_frames(nothing, "pe", true).raw == ["pe"]
+        @test isempty(PO.source_frames(nothing, "re", false).raw)
+        for x_src in (DataSource(), PriorSource())
+            f = PO.source_frames(x_src, "pe", true)
+            @test !f.excess && isempty(f.raw)
+        end
+        f = PO.reader_frames(1.0, "x", true)
+        @test !f.excess && isempty(f.raw)
+        f = PO.reader_frames([sr.Reader(nothing), 1.0, sr.Reader(ExcessSource())], "r",
+                             false)
+        @test f.excess && f.raw == ["r[1]"]
+        @test PO.merge_frames().raw == String[] && !PO.merge_frames().excess
+        @test !PO.refits_regression(nothing)
+        # The group of a head: the gap rule and the warning read the same walk.
+        @test !PO.group_frames(1.0).excess && isnothing(PO.group_source(1.0))
+        quiet = sr.Holder(sr.Reader(DataSource()), [sr.Reader(ExcessSource())],
+                          sr.RegressionReader(nothing))
+        @test PO.group_source(quiet) === ExcessSource()
+        @test isempty(PO.group_frames(quiet).raw)
+        @test_logs PO.warn_raw_readers(quiet)
+        loud = sr.Holder(sr.Reader(nothing), [sr.Reader(DataSource()), sr.Reader(nothing)],
+                         sr.RegressionReader(ExcessSource()))
+        @test PO.group_frames(loud).raw == ["pe", "r[2]"]
+        @test_logs (:warn,
+                    "`Holder` holds a reader that states `x_src = ExcessSource()`, and these readers state no source and read the raw returns data: `pe`, `r[2]`. State `x_src = DataSource()` on each one to keep the raw returns, or `x_src = ExcessSource()` to read the returns in excess of the benchmark.") PO.warn_raw_readers(loud)
+        # A head with no reader of the Excess Frame is silent, and reads no benchmark.
+        raw = sr.Holder(sr.Reader(nothing), sr.Reader(nothing),
+                        sr.RegressionReader(nothing))
+        @test isnothing(PO.group_source(raw))
+        @test_logs PO.warn_raw_readers(raw)
+        # A Pipeline passes the frames of its steps joined to those of its optimiser.
+        @test_logs (:warn, r"`Float64` holds a reader") PO.warn_raw_readers(1.0,
+                                                                            PO.ReturnsFrames(true,
+                                                                                             ["pe"]))
     end
     @testset "Denoise" begin
         @test_throws DomainError ShrunkDenoise(; alpha = -eps())
@@ -441,11 +612,12 @@
         @test_throws IsEmptyError FeesEstimator(; l = Dict{String, Number}())
         @test_throws IsEmptyError FeesEstimator(; l = Pair{String, Number}[])
 
-        @test_throws DomainError FeesEstimator(; s = "a" => -1)
+        # A negative short rate is a credit, which `Fees` checks against `l` (#1518).
+        @test FeesEstimator(; s = "a" => -1) isa FeesEstimator
         @test_throws DomainError FeesEstimator(; s = "a" => Inf)
-        @test_throws DomainError FeesEstimator(; s = ["a" => -1])
+        @test FeesEstimator(; s = ["a" => -1]) isa FeesEstimator
         @test_throws DomainError FeesEstimator(; s = ["a" => Inf])
-        @test_throws DomainError FeesEstimator(; s = Dict("a" => -1))
+        @test FeesEstimator(; s = Dict("a" => -1)) isa FeesEstimator
         @test_throws DomainError FeesEstimator(; s = Dict("a" => Inf))
         @test_throws IsEmptyError FeesEstimator(; s = Dict{String, Number}())
         @test_throws IsEmptyError FeesEstimator(; s = Pair{String, Number}[])
@@ -2684,13 +2856,55 @@ end
         @test PO.tracking_benchmark(trn, Xt) == calc_net_returns(wb, Xt, nothing)
     end
 
-    @testset "a ReturnsTracking benchmark reads no return matrix" begin
+    @testset "a ReturnsTracking benchmark reads only the row count" begin
         rt = ReturnsTracking(; w = [0.01, 0.02, 0.03])
         @test PO.tracking_benchmark(rt) === rt.w
-        # a matrix of the wrong number of rows still succeeds: the length mismatch is the
-        # model's to raise, not this function's
-        @test PO.tracking_benchmark(rt, zeros(7, 2)) === rt.w
-        @test PO.tracking_benchmark(rt, zeros(7, 2), :nonsense, 42) === rt.w
+        @test PO.tracking_benchmark(rt, zeros(3, 2)) === rt.w
+        @test PO.tracking_benchmark(rt, zeros(3)) === rt.w
+        # A series of the wrong length is refused with both lengths, not subtracted from
+        # the rows deep inside a reader.
+        err = try
+            PO.tracking_benchmark(rt, zeros(7, 2))
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("3 entries", err.msg) && occursin("7 rows", err.msg)
+        @test_throws ArgumentError PO.tracking_benchmark(rt, zeros(2))
+        @test_throws MethodError PO.tracking_benchmark(rt, zeros(3, 2), :nonsense)
+        # The walk names the field that holds a series, and passes a weights benchmark.
+        @test PO.returns_tracking_path(rt) == ""
+        @test PO.returns_tracking_path(TrackingError(; tr = rt, err = 0.1)) == "tr"
+        @test PO.returns_tracking_path([Variance(), TrackingRiskMeasure(; tr = rt)]) ==
+              "[2].tr"
+        @test PO.returns_tracking_path(:a => TrackingRiskMeasure(; tr = rt)) == "tr"
+        @test isnothing(PO.returns_tracking_path(TrackingError(;
+                                                               tr = WeightsTracking(;
+                                                                                    w = [0.5,
+                                                                                         0.5]),
+                                                               err = 0.1)))
+        @test isnothing(PO.returns_tracking_path([1.0, 2.0]))
+        @test isnothing(PO.returns_tracking_path(nothing))
+        # A schedule answers through its default only, because entry i is fold i's alone.
+        @test isnothing(PO.returns_tracking_path(TimeDependent([TrackingRiskMeasure(;
+                                                                                    tr = rt),
+                                                                Variance()])))
+        @test PO.returns_tracking_path(TimeDependent([Variance()];
+                                                     default = TrackingRiskMeasure(;
+                                                                                   tr = rt))) ==
+              "default.tr"
+        # A batch fold loop refuses a series over more than one fold, and names the field.
+        @test isnothing(PO.assert_folds_track_no_series(TrackingRiskMeasure(; tr = rt), 1))
+        err = try
+            PO.assert_folds_track_no_series(TrackingRiskMeasure(; tr = rt), 2)
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError)
+        @test occursin("at `tr`", err.msg) && occursin("DataBenchmarkTracking", err.msg)
+        @test isnothing(PO.assert_folds_track_no_series(TrackingRiskMeasure(;
+                                                                            tr = DataBenchmarkTracking()),
+                                                        2))
     end
 
     @testset "factory obeys fixed the way Turnover's does" begin

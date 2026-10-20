@@ -1,7 +1,7 @@
 ```@meta
-Description = "Distances of Distances has no private API in PortfolioOptimisers.jl; its names are in the public API."
+Description = "Distance distance has no private API in PortfolioOptimisers.jl; its names are in the public API."
 ```
 
-# Distances of Distances: private API
+# Distance distance: private API
 
-Every name of this topic is public. The [public page](@ref api-distances-of-distances) documents them.
+Every name of this topic is public. The [public page](@ref api-distance-distance) documents them.

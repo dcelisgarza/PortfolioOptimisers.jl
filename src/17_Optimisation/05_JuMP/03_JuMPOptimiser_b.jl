@@ -1,5 +1,6 @@
 """
-    assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult) -> Nothing
+    assert_universe_axis_order(sets::Nothing, rd::ReturnsResult) -> Nothing
+    assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult) -> Nothing
 
 Assert that every axis [`UniverseSets`](@ref) declares agrees, name for name and in order, with the returns data it is about to be used against.
 
@@ -15,10 +16,10 @@ Both axes are checked, but only where both sides exist: `rd.nx` and `rd.nf` are 
   - [`misaligned_axis_msg`](@ref)
   - [`processed_jump_optimiser_attributes`](@ref)
 """
-function assert_universe_axis_order(sets::Option{<:UniverseSets}, rd::ReturnsResult)
-    if isnothing(sets)
-        return nothing
-    end
+function assert_universe_axis_order(::Nothing, ::ReturnsResult)
+    return nothing
+end
+function assert_universe_axis_order(sets::UniverseSets, rd::ReturnsResult)
     for (axis, key, names, sym) in
         (("asset", sets.xkey, rd.nx, "nx"), ("factor", sets.tfkey, rd.nf, "nf"))
         if isnothing(names) || !haskey(sets.dict, key)
@@ -67,15 +68,20 @@ processing happens exactly once per `optimise` call.
 """
 function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResult;
                                              kwargs...)
-    rd = returns_result_picker(rd, opt.brt)
+    # `rd` keeps its raw `X` and `B`. Each reader below that reads the returns states its
+    # own source, and subtracts the benchmark itself, at the point of use.
     assert_universe_axis_order(opt.sets, rd)
     pr = prior(opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`.
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`.
     # A name stated over that universe must not be refused because the data delisted the
-    # asset, and a carrier keyed by name cannot resolve at all once its `w` sits on the
-    # complement while `sets` sits on the mask. `investable_fees_view` then places the
+    # asset. A liquidation charge keyed by name cannot resolve at all once its `w` sits on
+    # the complement while `sets` sits on the mask. `investable_fees_view` then places the
     # resolved fee on the axes the mask leaves.
-    imsk = investable_mask(pr)
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
+    imsk = feature_readable_mask((opt.ple, opt.cte), investable_mask(pr), rd)
+    imsk = graph_reader_mask((opt.ple, opt.cte), imsk, pr, rd, opt.strict)
     fees = investable_fees_view(fees_constraints(opt.fees, opt.sets;
                                                  datatype = eltype(pr.X),
                                                  strict = opt.strict), imsk, pr.X)
@@ -94,12 +100,12 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
     lcsr = linear_constraints(opt.lcse, opt.sets; datatype = datatype, strict = opt.strict,
                               rr = pr.rr, rd = rd)
     ctr = centrality_constraints(opt.cte, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                 x_src = opt.x_src, strict = opt.strict, kwargs...)
+                                 strict = opt.strict, kwargs...)
     gcardr = linear_constraints(opt.gcarde, opt.sets; datatype = Int, strict = opt.strict)
     sgcardr = linear_constraints(opt.sgcarde, opt.sets; datatype = Int, strict = opt.strict)
-    # A name-keyed estimator follows the door: a name that left resolves on the
-    # Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to its
-    # columns by position. Say so here rather than let the model meet two numbers.
+    # A name-keyed estimator follows `investable_reduction`: a name that left resolves on
+    # the Non-Investable Axis. A precomputed constraint cannot, because its `A` is bound to
+    # its columns by position. Say so here rather than let the model meet two numbers.
     # `sgcardr` is not checked: its columns are the rows of `sgmtx`, one for each sub-group,
     # and a departed asset removes a column of `sgmtx`, never a sub-group.
     if !isnothing(imsk)
@@ -132,8 +138,7 @@ function processed_jump_optimiser_attributes(opt::JuMPOptimiser, rd::ReturnsResu
                                      strict = opt.strict)
     end
     tn = turnover_constraints(opt.tn, opt.sets; datatype = datatype, strict = opt.strict)
-    plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd,
-                                x_src = opt.x_src, kwargs...)
+    plr = phylogeny_constraints(opt.ple, pr; iv = rd.iv, ivpa = rd.ivpa, rd = rd, kwargs...)
     ret = factory(opt.ret, pr)
     return ProcessedJuMPOptimiserAttributes(; pr = pr, wb = wb, lt = lt, st = st,
                                             lcsr = lcsr, ctr = ctr, gcardr = gcardr,
@@ -379,7 +384,7 @@ Run the invariant model-assembly sequence shared by all single-JuMP-model optimi
 Executes the constraint-builder pipeline — from `set_linear_weight_constraints!` through
 `add_custom_constraint!` — that sits between the per-optimiser *head* (weight variables)
 and *tail* (objective + solve). The head must have populated Model State (`w`/`k` variables)
-before calling this function. See `Model Assembly` in `CONTEXT.md` and
+before calling this function. See `Model Assembly` in `GLOSSARY.md` and
 `0008-jump-model-assembly.md`.
 
 The tail of the sequence is [`assert_frontier_sweep_cap`](@ref): both frontier registries are
@@ -508,3 +513,91 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
                          Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
+"""
+    reader_frames(opt::JuMPOptimiser, path::AbstractString, refit::Bool) -> ReturnsFrames
+    group_frames(opt::JuMPOptimiser) -> ReturnsFrames
+    group_frames(est::JuMPOptimisationEstimator) -> ReturnsFrames
+
+Walk the readers of a JuMP head, for the warning of a forgotten raw reader and the gap rule of the head.
+
+The group of a JuMP head is the head, the configuration that it holds in `opt`, and every reader in their slots: the prior `opt.pe`, the graph readers `opt.cte` and `opt.ple`, the regressions of `opt.lcse`, and the readers inside the risk measures, the tracking errors and the return terms. [`field_frames`](@ref) walks every field. The walk stops at a fallback, because it is a head with its own group. A configuration that takes an online step with no head answers for its own slots. A regression reader at `x_src = nothing` counts as raw only when the prior `opt.pe` gives no loadings, see [`refits_regression`](@ref).
+
+# Arguments
+
+  - `opt`: The configuration of a JuMP head.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+  - `est`: The JuMP head.
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the slots of `opt`, at `path` or from the configuration itself, or of the group of `est`.
+
+# Related
+
+  - [`field_frames`](@ref)
+  - [`warn_raw_readers`](@ref)
+  - [`group_source`](@ref)
+"""
+function reader_frames(opt::JuMPOptimiser, path::AbstractString, refit::Bool)
+    return field_frames(opt, path, refit)
+end
+function group_frames(opt::JuMPOptimiser)
+    return field_frames(opt, "", refits_regression(opt.pe))
+end
+function group_frames(est::JuMPOptimisationEstimator)
+    return field_frames(est, "", refits_regression(est.opt.pe))
+end
+"""
+    bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
+    bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
+    bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
+
+Bind every [`DataBenchmarkTracking`](@ref) of a JuMP optimiser to the benchmark of the rows it fits on.
+
+Each head calls this function after [`investable_view`](@ref), so the benchmark has the rows and the investable columns of the model. Every builder, every corner solve and every risk of a frontier then reads the bound benchmark. The constructor of each holder already refused a data benchmark beside a prior that states `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+
+  - A [`JuMPOptimiser`](@ref) binds its tracking errors `tr`.
+  - A head binds its `opt`. A head with risk measures, a [`RiskJuMPOptimisationEstimator`](@ref), also binds its `r`.
+
+Each rebuilds through its keyword constructor only when a field changes, so a head with no data benchmark comes back as itself.
+
+# Algorithm
+
+ 1. A [`JuMPOptimiser`](@ref) binds `opt.tr` to `rd` with [`bind_data_benchmark`](@ref), giving `tr`.
+ 2. A head binds its `est.opt` with step 1, giving `opt`. A [`RiskJuMPOptimisationEstimator`](@ref) also binds `est.r`, giving `r`.
+ 3. Return the object itself when every bound field is the field it replaces, by `===`.
+ 4. Otherwise rebuild the object with the bound fields through its keyword constructor, with [`rebuild_estimator`](@ref).
+
+# Arguments
+
+  - `opt`, `est`: The optimiser or the head.
+  - $(arg_dict[:rd])
+
+# Returns
+
+  - The optimiser or the head with its data benchmarks bound, or itself when it holds none.
+
+# Related
+
+  - [`bind_data_benchmark`](@ref)
+  - [`DataBenchmarkTracking`](@ref)
+  - [`investable_view`](@ref)
+"""
+function bind_data_benchmark(opt::JuMPOptimiser, rd::ReturnsResult)
+    tr = bind_data_benchmark(opt.tr, rd)
+    return tr === opt.tr ? opt : rebuild_estimator(opt, (; tr = tr))
+end
+function bind_data_benchmark(est::JuMPOptimisationEstimator, rd::ReturnsResult)
+    opt = bind_data_benchmark(est.opt, rd)
+    return opt === est.opt ? est : rebuild_estimator(est, (; opt = opt))
+end
+function bind_data_benchmark(est::RiskJuMPOptimisationEstimator, rd::ReturnsResult)
+    opt = bind_data_benchmark(est.opt, rd)
+    r = bind_data_benchmark(est.r, rd)
+    return if opt === est.opt && r === est.r
+        est
+    else
+        rebuild_estimator(est, (; opt = opt, r = r))
+    end
+end

@@ -77,7 +77,7 @@ include(joinpath(@__DIR__, "moment_family_setup.jl"))
     rescaled = filter(S -> takes_correlation_rescale(S), families.ce)
     @test !isempty(rescaled)
     for S in rescaled
-        @test hasfield(typeof(S()), :ve)
+        @test hasfield(typeof(default_instance(S)), :ve)
         @test owns_verb(Statistics.cor, S)
     end
 end
@@ -97,7 +97,7 @@ that take the identity, so that a leaf added with a per-asset field reds the bui
 either declares the axis or states here why it has none. Closed polarity, as ADR 0037's rules
 and the censuses of ADR 0058 have it.
 
-The probe asks about `typeof(S())` rather than `S`, for the reason `dispatched_method` gives: a
+The probe asks about `typeof(default_instance(S))` rather than `S`, for the reason `dispatched_method` gives: a
 parametric leaf arrives as a `UnionAll`, and `which` on one reads the fallback whatever the leaf
 declares.
 =#
@@ -126,7 +126,7 @@ end
 # `CustomValueExpectedReturns` is on the list below and its three shapes are pinned one by one.
 function takes_view_identity(S::Type)
     me = try
-        S()
+        default_instance(S)
     catch
         return false
     end
@@ -138,9 +138,8 @@ Every leaf that takes the identity, and why it carries no asset-axis field.
 
 Measured under #667, by building each estimator and taking a `port_opt_view` of it.
 
-  - `MedianExpectedReturns` and `DistanceCovariance` carry `w::Option{<:ObsWeights}` alone. Those
-    are OBSERVATION weights, tagged `@wprop`, and `obs_weights_view` is their verb; the asset axis
-    holds nothing.
+  - `MedianExpectedReturns` carries `w::Option{<:ObsWeights}` alone. Those are OBSERVATION
+    weights, tagged `@wprop`, and `obs_weights_view` is their verb; the asset axis holds nothing.
   - `CustomValueExpectedReturns` defaults to `val = 0.0`, so the shape its default constructor
     gives is the scalar one, and a scalar is universe-independent. Its per-asset shape,
     `CustomValueExpectedReturns{<:VecNum}`, declares its axis with a `port_opt_view` method, and
@@ -151,19 +150,15 @@ Measured under #667, by building each estimator and taking a `port_opt_view` of 
     would still change no answer: no consumer reads the cache, which is the exemption ADR 0106
     grants and the reason ADR 0105 hides the field. `mean`, `var` and `cov` rebuild from the
     sample they are handed, measured equal to the same verb on an estimator carrying no cache.
-  - `RankOneCovariance` carries `shift::Real` alone, the number added to every entry of the rows
-    before the decomposition. A scalar is universe-independent, so a view of the estimator is
-    the estimator.
 
 A name added here must carry its own reason, and a leaf with a genuine per-asset field belongs in
 a `port_opt_view` method instead -- `CustomValueExpectedReturns{<:VecNum}` is the worked example.
 =#
-const VIEW_IDENTITY_ALLOWED = Set([:MedianExpectedReturns, :DistanceCovariance,
-                                   :CustomValueExpectedReturns, :ExpWeightedExpectedReturns,
-                                   :ExpWeightedVariance, :ExpWeightedCovariance,
+const VIEW_IDENTITY_ALLOWED = Set([:MedianExpectedReturns, :CustomValueExpectedReturns,
+                                   :ExpWeightedExpectedReturns, :ExpWeightedVariance,
+                                   :ExpWeightedCovariance,
                                    :RegimeAdjustedExpWeightedVariance,
-                                   :RegimeAdjustedExpWeightedCovariance,
-                                   :RankOneCovariance])
+                                   :RegimeAdjustedExpWeightedCovariance])
 
 @testset "The asset-axis tripwire: a per-asset field is declared, never inferred" begin
     families = moment_families()

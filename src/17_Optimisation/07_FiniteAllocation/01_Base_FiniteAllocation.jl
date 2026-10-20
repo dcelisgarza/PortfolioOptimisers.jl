@@ -634,7 +634,7 @@ end
 
 Charge the forced exit of every asset that left the universe, as one constant.
 
-A [`Fees`](@ref) has two liquidation carriers. `lq` is a rate and `flq` is an amount of money, and the `w` of each holds the previous weights of the positions that the optimisation had to sell. The allocator solves no share count for these assets, so the charge needs no variable and is a constant of the sub-problem. [`set_liquidation_fees!`](@ref) and [`set_fixed_liquidation_fees!`](@ref) add the same charge to the JuMP model as a constant.
+A [`Fees`](@ref) has two liquidation charges, `lq` and `flq`. `lq` is a rate and `flq` is an amount of money, and the `w` of each holds the previous weights of the positions that the optimisation had to sell. The allocator solves no share count for these assets, so the charge needs no variable and is a constant of the sub-problem. [`set_liquidation_fees!`](@ref) and [`set_fixed_liquidation_fees!`](@ref) add the same charge to the JuMP model as a constant.
 
 The long sub-problem pays the whole charge. Every asset that left has a zero target weight, and [`setup_alloc_optim`](@ref) puts a zero weight on the long side. The total fee does not depend on the side that pays, but that side has less cash for shares, and a long-only book has no other side.
 
@@ -666,7 +666,7 @@ Where:
 
 # Arguments
 
-  - `fees`: Fee with the two liquidation carriers, or `nothing`.
+  - `fees`: Fee with the two liquidation charges, `lq` and `flq`, or `nothing`.
   - `T::Number`: Horizon, in periods.
   - `prev_cash::Number`: Cash that the portfolio held before the trade.
 

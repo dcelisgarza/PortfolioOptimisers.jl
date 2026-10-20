@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Regression Diagnostics, public API of PortfolioOptimisers.jl: cs_gram, exposure_vif, exposure_condition_number, cs_regression_t_stats, …"
+Description = "Cross-Sectional Regression Diagnostics, public API of PortfolioOptimisers.jl: cs_gram, cs_regression_t_stats, cs_regression_t_stat_exceedance_rate, …"
 ```
 
 # [Cross-Sectional Regression Diagnostics](@id api-cross-sectional-regression-diagnostics)
@@ -8,8 +8,6 @@ Description = "Cross-Sectional Regression Diagnostics, public API of PortfolioOp
 
 ```@docs
 cs_gram
-exposure_vif
-exposure_condition_number
 cs_regression_t_stats
 cs_regression_t_stat_exceedance_rate
 cs_regression_r2

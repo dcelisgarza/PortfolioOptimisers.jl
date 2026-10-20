@@ -51,16 +51,16 @@ Every distinct idea in reports 1 to 8, and where it went.
 | Idea | Raised in | Prototype |
 | :--- | :--- | :--- |
 | Sampling from a fitted prior | 4, 8 | `01_scenario_generation.jl` |
-| Wasserstein ambiguity set | 1, 3, 4, 5, 8 | `02_wasserstein_ambiguity.jl` |
+| Wasserstein ambiguity set | 1, 3, 4, 5, 8 | `02_wasserstein_ambiguity.jl`, implemented in the library |
 | Model disagreement, consensus, ensembles | 4, 8 | `03_model_population.jl` |
 | Calibration against a known truth | 8 | `04_simulated_truth_calibration.jl` |
 | The breakeven view | 8 | `05_breakeven_view.jl` |
-| Numeric performance summary | 5, 6, 8 | `06_performance_summary.jl` |
+| Numeric performance summary | 5, 6, 8 | `06_performance_summary.jl`, implemented in the library |
 | Differentiable layer, sensitivity analysis | 1, 3, 7 | `07_optimiser_sensitivity.jl` |
 | Critical line algorithm | 2 | `08_critical_line.jl` |
-| Online portfolio selection | 2, 5 | `09_online_portfolio_selection.jl` |
+| Online portfolio selection | 2, 5 | `09_online_portfolio_selection.jl`, implemented in the library |
 | Conditional stress, scenario transforms, t-copula | 2, 3, 4, 6 | `10_conditional_stress.jl` |
-| Gelbrich and divergence ambiguity sets | 3, 4 | `11_moment_and_divergence_ambiguity.jl` |
+| Gelbrich and divergence ambiguity sets | 3, 4 | `11_moment_and_divergence_ambiguity.jl`, implemented in the library |
 | Bootstrap weight intervals, conformal prediction | 3, 4 | `12_weight_uncertainty.jl` |
 | Robustness analysis and the robustness frontier | 4 | `13_robustness_frontier.jl` |
 | Constraint attribution, Shapley, rebalance decomposition | 2, 4, 7 | `14_attribution.jl` |
@@ -68,24 +68,10 @@ Every distinct idea in reports 1 to 8, and where it went.
 | Rebalancing policy layer | 3, 5 | `16_rebalancing_policies.jl` |
 | Market impact and optimal execution | 1, 2, 3, 4, 7 | `17_market_impact.jl` |
 | Tax lots, wash sales, after-tax rebalancing | 2, 3 | `18_tax_aware.jl` |
-| Online and incremental estimators, `partial_fit` | 3, 4 | `19_online_moments.jl` |
+| Online and incremental estimators, `partial_fit` | 3, 4 | `19_online_moments.jl`, implemented in the library |
 | Laplacian regularisation, neighbourhood constraints | 3 | `20_graph_structure.jl` |
 | Regime models, worst-case regime | 2, 4, 7 | `21_regime_models.jl` |
 | Provenance, capability and compatibility checking | 4 | `22_provenance_and_capability.jl` |
-
-### Already implemented, so not built
-
-Report 8, section 4 lists these with file and line evidence: the backtest engine, walk-forward and
-combinatorial cross-validation, search cross-validation, pre-selection, higher moments, Brinson and
-factor attribution, graph and phylogeny constraints, custom objectives and constraints, turnover,
-fees, tracking, regime-adjusted moments, discrete allocation, and mixed-integer constraints.
-
-Two more, found while consolidating:
-
-- **ESG constraints** (reports 2, 5, 6). A linear constraint on a per-asset score is already
-  expressible through `UniverseSets` and `LinearConstraintGeneration`. A dedicated type would be
-  sugar over existing machinery, not a capability.
-- **Batteries-included pipelines** (report 3). The `Pipeline` estimator is exactly this.
 
 ### Deliberately not built
 
@@ -220,48 +206,6 @@ does asset seven enter?" — a question no repeated solve can answer.
 
 ---
 
-### 3.3 Online portfolio selection — `09_online_portfolio_selection.jl`
-
-Report 5 notes that no Julia package implements these. They need no prior, no covariance and no
-solver, and they carry worst-case guarantees that hold for **every** price sequence.
-
-#### Mathematics
-
-With price relatives $x_t$ and wealth $S_T = \prod_t \langle w_t, x_t\rangle$:
-
-- **Universal portfolio** (Cover 1991): $w_{t+1} = \int b\,S_t(b)\,d\mu(b) \big/ \int S_t(b)\,d\mu(b)$.
-- **Exponentiated gradient**: $w_{t+1,i} \propto w_{t,i}\exp\!\big(\eta x_{t,i}/\langle w_t,x_t\rangle\big)$.
-- **Online Newton step**: $w_{t+1} = \Pi_\Delta\big(\delta A_t^{-1}b_t\big)$, with logarithmic regret.
-- **PAMR**: $\min_w \tfrac12\|w-w_t\|^2$ subject to $\langle w,x_t\rangle \le \varepsilon$.
-- **OLMAR / RMR**: revert to a moving average, or to the $L_1$ (spatial) median found by Weiszfeld's
-  iteration.
-
-All use the simplex projection of Duchi and co-authors (2008): $w_i = \max(v_i - \theta, 0)$ with
-one scalar $\theta$ set by the budget.
-
-#### Verified
-
-| strategy | reverting market | trending market |
-| :--- | ---: | ---: |
-| uniform constant rebalanced | 1.82 | 4.81 |
-| universal portfolio | 1.70 | 5.89 |
-| exponentiated gradient | 1.77 | 5.31 |
-| online Newton step | 1.82 | 4.82 |
-| PAMR | 46.6 | 0.00 |
-| OLMAR | 195.3 | 0.00 |
-| **RMR** | **212.2** | **0.00** |
-| best constant portfolio, in hindsight | 1.83 | 144.7 |
-
-#### The finding
-
-The reversion family is **not a strategy, it is a bet on a market property**, and the bet is total.
-On a reverting market RMR turns 1.83 into 212. On a trending one it goes to zero. Running a momentum
-rule and a reversion rule side by side is a cheap, assumption-free test of which regime a market is
-in, and it costs no estimation at all. Negative regret against the best constant portfolio is
-expected and is not a bug: the bound only says a strategy cannot fall far behind.
-
----
-
 ### 3.4 Conditional stress — `10_conditional_stress.jl`
 
 A stress test that shocks equities and leaves credit at its unconditional mean is not a stress test.
@@ -304,52 +248,6 @@ Read the last column. A **near-Gaussian** copula, whose true tail dependence is 
 measures `0.307` at a five per cent tail. A practitioner estimating tail dependence from a five per
 cent tail will conclude that a Gaussian model has strong tail dependence, which is the exact
 opposite of the truth, and it is the error that makes Gaussian stress tests look adequate.
-
----
-
-### 3.5 Moment and divergence ambiguity — `11_moment_and_divergence_ambiguity.jl`
-
-Three ambiguity families answer three different questions: what if the **data** moves (Wasserstein,
-prototype 2), what if the **moments** are wrong (Gelbrich), what if the **probabilities** are wrong
-(divergence). A caller should be able to say which they mean.
-
-#### Mathematics
-
-Gelbrich distance, with the Bures-Wasserstein metric on covariances:
-
-$$
-G^2 = \|\mu_1-\mu_2\|_2^2 + \operatorname{tr}\!\Big(\Sigma_1+\Sigma_2-2(\Sigma_1^{1/2}\Sigma_2\Sigma_1^{1/2})^{1/2}\Big)
-$$
-
-Kullback-Leibler ball, by Donsker-Varadhan duality:
-
-$$
-\sup_{D(q\|p)\le\eta}\mathbb{E}_q[L] \;=\; \min_{\theta>0}\Big\{\theta\log\mathbb{E}_p\big[e^{L/\theta}\big] + \theta\eta\Big\},
-\qquad q^\star_t \propto p_t e^{L_t/\theta^\star}
-$$
-
-**The whole problem collapses to a scalar minimisation, whatever `T` is** — the same collapse
-prototype 5 exploits, for the same reason.
-
-#### Verified
-
-| `η` | dual value | `E_q*[L]` | `D(q*‖p)` | `θ*` |
-| ---: | ---: | ---: | ---: | ---: |
-| 0.000 | 0.00799 | 0.00799 | 0.00000 | ∞ |
-| 0.010 | 0.01263 | 0.01263 | 0.01000 | 0.246 |
-| 0.200 | 0.03287 | 0.03287 | 0.20000 | 0.075 |
-| 1.000 | 0.07596 | 0.07596 | 1.00000 | 0.044 |
-
-The dual value equals the tilt's expectation exactly, and the divergence binds at exactly `η`. A
-brute-force search over two million random measures agreed with the dual to `1.8e-4`. Bures-Wasserstein
-reduces to `‖√D₁ − √D₂‖_F` in the commuting case to `8.9e-16`.
-
-#### The finding
-
-**A divergence ball can only reweight scenarios that exist.** If every scenario is mild, no `η`
-produces a severe worst case — the KL value is bounded above by the worst observed loss
-(`0.172 ≤ 0.174` at `η = 5`). A Wasserstein ball can move a scenario to a value never observed.
-That is the structural difference, and it decides which set to use.
 
 ---
 
@@ -482,12 +380,6 @@ Report 4's strongest practical point: optimisation is not a stateless function o
 
 #### Mathematics
 
-$$
-w^{\text{drift}}_i = \frac{w_i(1+r_i)}{\sum_j w_j(1+r_j)}\sum_j w_j,
-\qquad
-\tau = \tfrac12\big\|w^{\text{target}} - w^{\text{drift}}\big\|_1
-$$
-
 Frozen positions reduce the budget rather than the universe: solve the tradable block to sum to
 `budget - held_fixed`, and the reassembled portfolio satisfies the original budget with **no
 post-hoc renormalisation**, which would silently rescale the frozen positions.
@@ -495,16 +387,8 @@ post-hoc renormalisation**, which would silently rescale the frozen positions.
 #### Verified
 
 ```
-drift preserves the budget to 0.0e+00
 frozen holds 0.1870, sub-budget 0.8130, restored budget 1.000000, frozen preserved exactly true
 ```
-
-#### The finding
-
-**Turnover measured against the last target instead of the drifted holdings understated the trade by
-54.2 per cent** — 0.0667 against 0.1455. That is real money, invisible to any calculation that never
-sees the holdings. The library's `src/12_Turnover.jl` is *capable* of the correct calculation; what
-is absent is the state object that makes the drifted vector the natural argument.
 
 ---
 
@@ -540,12 +424,10 @@ calendar ceiling, which is why it wins on the net figure.
 
 ### 3.11 Market impact — `17_market_impact.jl`
 
-A fee is proportional to size. Impact is not, and the difference changes the answer rather than
-just the bill.
+The library has the convex power-law impact cost. The execution schedule is missing.
 
 #### Mathematics
 
-Square-root law: price move $\propto \sigma\sqrt{Q/V}$, so **total** cost $\propto Q^{3/2}$.
 Almgren-Chriss optimal liquidation, with $\tilde\eta = \eta - \gamma\tau/2$ and
 $\tilde\kappa^2 = \lambda\sigma^2/\tilde\eta$:
 
@@ -560,8 +442,6 @@ $$
 #### Verified
 
 ```
-doubling the order multiplies cost by 2.8284, theory 2^1.5 = 2.8284
-marginal cost divided by average cost = 1.5000, theory 1.5
 lambda = 0 is exactly uniform (TWAP): max deviation 8.7e-11
 the closed-form path is optimal: 400 of 400 perturbations were no better
 ```
@@ -573,21 +453,11 @@ the closed-form path is optimal: 400 of 400 perturbations were no better
 | 1e-6 | 3.57 | 356,786 | 433,728 |
 | 1e-5 | 1.14 | 823,664 | 195,203 |
 
-#### The findings
+#### The finding
 
-Two, both counter-intuitive and both worth documenting in any adaptation.
-
-1. **The marginal cost of the last share is 1.5 times the average cost per share.** A trader who
-   prices a block at the average square-root cost under-charges the marginal decision by fifty per
-   cent.
-2. **Permanent impact drops out of the optimal path entirely.** Gatheral (2010) shows permanent
-   impact must be linear to exclude dynamic arbitrage, and a linear permanent cost depends only on
-   the total traded, not on the schedule. It changes the bill and not the plan.
-
-And a tractability note: a `Q^(3/2)` cost is two rotated second-order cones, and a general exponent
-`1+δ` is one `MOI.PowerCone`. The library already uses that cone in
-`src/17_Optimisation/05_JuMP/02_JuMPConstraints/13_WeightNormConstraints.jl`. **A convex impact model costs
-nothing in tractability.**
+**Permanent impact drops out of the optimal path entirely.** Gatheral (2010) shows permanent
+impact must be linear to exclude dynamic arbitrage, and a linear permanent cost depends only on
+the total traded, not on the schedule. It changes the bill and not the plan.
 
 ---
 
@@ -628,43 +498,6 @@ The wash-sale check is symmetric, and the "before" half is the one people forget
 
 **This models mechanics, not advice.** The rules encoded are a simplified reading of the United
 States federal regime. Several jurisdictions mandate an averaged basis and have no lot choice at all.
-
----
-
-### 3.13 Online moments — `19_online_moments.jl`
-
-#### Mathematics
-
-Welford's update, whose asymmetry is the whole point:
-
-$$
-n \leftarrow n+1, \quad
-d = x - \mu_{\text{old}}, \quad
-\mu \leftarrow \mu_{\text{old}} + d/n, \quad
-M \leftarrow M + d\,(x-\mu_{\text{new}})'
-$$
-
-Chan's merge, which makes it parallel and associative:
-
-$$
-\mu = \mu_A + \delta\frac{n_B}{n}, \qquad
-M = M_A + M_B + \delta\delta'\frac{n_A n_B}{n}
-$$
-
-#### The finding
-
-On data with mean 1000 and unit-scale spread — the case that occurs whenever prices are used instead
-of returns:
-
-```
-Welford covariance error  7.37e-14
-textbook covariance error 6.38e-10, which is 8653 times worse
-parallel merge equals the sequential answer to 1.15e-13
-```
-
-**The first factor uses the old mean and the second uses the new one.** Using the same mean in both
-gives the textbook formula, which Chan and co-authors (1983) show can return a negative variance on
-real data. Welford's cannot. The speed gain is the advertised benefit; the accuracy is the real one.
 
 ---
 
@@ -777,7 +610,7 @@ with a high-order prior: true
 
 **The value is the message, not the boolean.** The cost is one `provides` or `requires` method per
 concrete type, declared by its author. It must be a **per-type declaration and never a walk over the
-fields**, for exactly the reason `CONTEXT.md` gives for `deferred_slots`: the presence of a field does
+fields**, for exactly the reason `GLOSSARY.md` gives for `deferred_slots`: the presence of a field does
 not imply the semantics.
 
 The check is **necessary and not sufficient**. It catches a missing quantity. It cannot catch one of
@@ -792,17 +625,14 @@ identified by what it did, not by when.**
 
 ## 4. Recommended sequence
 
-Ordered by value divided by effort, using the report 8 items as phase 0.
+Ordered by value divided by effort.
 
 | Phase | Work | Prototype | Size |
 | :--- | :--- | :--- | :--- |
-| 0 | Performance summary into `src/`; fix the DR-CVaR docstring | 06 | hours |
 | 1 | Capability and compatibility layer | 22 | small |
-| 1 | Welford and EWMA `partial_fit` | 19 | small |
-| 1 | Wasserstein and Gelbrich ambiguity sets, calibrated | 02, 11 | small |
-| 2 | Portfolio state, drift-aware turnover, frozen positions | 15 | medium |
+| 2 | Frozen positions | 15 | medium |
 | 2 | Rebalancing policies | 16 | small |
-| 2 | Market impact as a convex cost term | 17 | medium |
+| 2 | Almgren-Chriss execution schedule | 17 | medium |
 | 3 | Prior sampling seam | 01 | medium |
 | 3 | Conditional stress and scenario transforms | 10 | small |
 | 3 | Regime models | 21 | medium |
@@ -811,7 +641,6 @@ Ordered by value divided by effort, using the report 8 items as phase 0.
 | 4 | Model population and robustness frontier | 03, 13 | small |
 | 4 | Bootstrap and conformal intervals | 12 | small |
 | 5 | Critical line algorithm | 08 | medium |
-| 5 | Online portfolio selection | 09 | small |
 | 5 | Laplacian regularisation | 20 | small |
 | 5 | The breakeven view | 05 | small |
 | 6 | Tax-aware lots | 18 | large |
@@ -999,16 +828,16 @@ These are the additional ones for prototypes 7 to 22.
 | File | Lines | Central verified claim |
 | :--- | --: | :--- |
 | `01_scenario_generation.jl` | 424 | Each generator reproduces its target moments, rank correlation and marginals. |
-| `02_wasserstein_ambiguity.jl` | 526 | The closed form is attained exactly by the worst-case measure, for three ground metrics. |
+| `02_wasserstein_ambiguity.jl` | 526 | Implemented in the library. |
 | `03_model_population.jl` | 465 | The ambiguity decomposition holds to `7.6e-21`. |
 | `04_simulated_truth_calibration.jl` | 354 | Reproduces DeMiguel–Garlappi–Uppal (2009). No estimator beats the oracle. |
 | `05_breakeven_view.jl` | 434 | `D = -L(λ*)`; agrees with an independent root-find to `1.0e-11`. |
-| `06_performance_summary.jl` | 287 | Matches the plot extension's five formulas; the Sharpe standard error reduces correctly. |
+| `06_performance_summary.jl` | 287 | Implemented in the library. |
 | `07_optimiser_sensitivity.jl` | 391 | Three analytic Jacobians match finite differences; the constraint price is exact. |
 | `08_critical_line.jl` | 471 | KKT residual `1.4e-15`; never worse than a high-accuracy solver. |
-| `09_online_portfolio_selection.jl` | 745 | The best constant portfolio dominates the best single asset; every strategy stays on the simplex with no look-ahead. |
+| `09_online_portfolio_selection.jl` | 745 | Implemented in the library. `test/test_67_online_portfolio_selection.jl` reads it as the parity reference. |
 | `10_conditional_stress.jl` | 593 | Conditional moments match 200k Monte Carlo; t-copula tail dependence converges to theory. |
-| `11_moment_and_divergence_ambiguity.jl` | 482 | The Kullback-Leibler dual binds at exactly `η`; brute force agrees to `1.8e-4`. |
+| `11_moment_and_divergence_ambiguity.jl` | 482 | Implemented in the library. |
 | `12_weight_uncertainty.jl` | 390 | Conformal coverage lands inside `[1-α, 1-α+1/(n+1)]` for every `α`. |
 | `13_robustness_frontier.jl` | 355 | `R(1/N) = 1` exactly, and `R` rises monotonically with shrinkage. |
 | `14_attribution.jl` | 385 | Shapley efficiency to `1.4e-20`; Euler identity to `8.7e-19`. |
@@ -1016,7 +845,7 @@ These are the additional ones for prototypes 7 to 22.
 | `16_rebalancing_policies.jl` | 436 | `threshold = 0` reproduces `always`; the hybrid rule wins on the net figure. |
 | `17_market_impact.jl` | 396 | `2^1.5` exactly; the Almgren-Chriss path beat 400 of 400 perturbations. |
 | `18_tax_aware.jl` | 466 | Shares conserved, input never mutated, wash sales caught in both directions. |
-| `19_online_moments.jl` | 344 | Welford matches batch to `7.4e-14`; the merge is exact and associative. |
+| `19_online_moments.jl` | 344 | Implemented in the library. |
 | `20_graph_structure.jl` | 334 | The Laplacian identity is exact at `0.0e+00`. |
 | `21_regime_models.jl` | 496 | The log likelihood never decreases; 97.3 per cent state accuracy on simulated truth. |
 | `22_provenance_and_capability.jl` | 350 | Fingerprints stable, sensitive and transpose-aware; the check yields an actionable sentence. |

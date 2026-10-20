@@ -156,9 +156,7 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
                 3 * e2[j] * sigma[j, i]
             elseif i == j && k == l
                 e2[k] * sigma[i, i] + e2[i] * sigma[k, k] + e2[i] * e2[k]
-            elseif i == k && j == l
-                e2[j] * sigma[i, i] + e2[i] * sigma[j, j] + e2[i] * e2[j]
-            elseif i == l && j == k
+            elseif (i == k && j == l) || (i == l && j == k)
                 e2[j] * sigma[i, i] + e2[i] * sigma[j, j] + e2[i] * e2[j]
             elseif i == j
                 e2[i] * sigma[k, l]
@@ -181,6 +179,248 @@ function cokurtosis_residuals(sigma::MatNum, X::MatNum,
     return kt_res
 end
 """
+    cokurtosis_processor(kte::CokurtosisEstimator) -> Option{<:AbstractMatrixProcessingEstimator}
+    cokurtosis_processor(kte::Cokurtosis) -> AbstractMatrixProcessingEstimator
+    cokurtosis_processor(kte::WindowedCokurtosis) -> Option{<:AbstractMatrixProcessingEstimator}
+
+Gives the matrix processing estimator with which [`HighOrderFactorPriorEstimator`](@ref) processes the cokurtosis that it lifts onto the asset axis.
+
+The prior processes the lifted cokurtosis under this estimator. Under `rsd = true` it adds the residual cokurtosis, and it repairs the sum under the estimator that [`matrix_processing_posdef`](@ref) gives for this one.
+
+# Interfaces
+
+A subtype of [`CokurtosisEstimator`](@ref) that goes into a [`HighOrderFactorPriorEstimator`](@ref) adds a method of this verb. The method returns `nothing` when the subtype wants no processing, and the prior then does not process the lifted cokurtosis or repair the sum. The constructor of the prior calls `assert_cokurtosis_processor` on `kte`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`Cokurtosis`](@ref) gives `kte.mp`.
+ 2. A [`WindowedCokurtosis`](@ref) gives the processor of the estimator that it wraps.
+ 3. Every other subtype is refused. A `nothing` answer would skip the repair of the sum under `rsd = true` with no message, and the cokurtosis could be indefinite.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator.
+
+# Validation
+
+  - The type of `kte` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `mp::Option{<:AbstractMatrixProcessingEstimator}`: The matrix processing estimator, `nothing` when the method of `kte` names none.
+
+# Related
+
+  - [`CokurtosisEstimator`](@ref)
+  - [`coskewness_processor`](@ref)
+  - [`matrix_processing_posdef`](@ref)
+  - [`assert_cokurtosis_processor`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function cokurtosis_processor(kte::CokurtosisEstimator)
+    return throw(ArgumentError("`cokurtosis_processor` is not defined for `$(nameof(typeof(kte)))`. A HighOrderFactorPriorEstimator processes the cokurtosis that it lifts under the matrix processing estimator of `kte`, and under rsd = true it repairs the sum with the residual cokurtosis. Add a method `PortfolioOptimisers.cokurtosis_processor(kte::$(nameof(typeof(kte))))` that returns an `AbstractMatrixProcessingEstimator`, or `nothing` to skip the processing and the repair."))
+end
+function cokurtosis_processor(kte::Cokurtosis)
+    return kte.mp
+end
+function cokurtosis_processor(kte::WindowedCokurtosis)
+    return cokurtosis_processor(kte.kte)
+end
+"""
+    cokurtosis_expected_returns(kte::CokurtosisEstimator) -> AbstractExpectedReturnsEstimator
+    cokurtosis_expected_returns(kte::Cokurtosis) -> AbstractExpectedReturnsEstimator
+    cokurtosis_expected_returns(kte::WindowedCokurtosis) -> AbstractExpectedReturnsEstimator
+
+Gives the expected returns estimator with which [`HighOrderFactorPriorEstimator`](@ref) averages the residual moments of its cokurtosis correction.
+
+[`cokurtosis_residuals`](@ref) averages the squared and the fourth-power residuals under this estimator. The prior reads it only under `rsd = true`.
+
+# Interfaces
+
+A subtype of [`CokurtosisEstimator`](@ref) that goes into a [`HighOrderFactorPriorEstimator`](@ref) with `rsd = true` adds a method of this verb.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`Cokurtosis`](@ref) gives `kte.me`.
+ 2. A [`WindowedCokurtosis`](@ref) gives the estimator of the estimator that it wraps.
+ 3. Every other subtype is refused. An average has no `nothing` value, and a default rule chosen for the caller would hide a missing method.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator.
+
+# Validation
+
+  - The type of `kte` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `me::AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments.
+
+# Related
+
+  - [`coskewness_expected_returns`](@ref)
+  - [`cokurtosis_residuals`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function cokurtosis_expected_returns(kte::CokurtosisEstimator)
+    return throw(ArgumentError("`cokurtosis_expected_returns` is not defined for `$(nameof(typeof(kte)))`. A HighOrderFactorPriorEstimator with rsd = true averages the residual moments of its cokurtosis under the expected returns estimator of `kte`. Add a method `PortfolioOptimisers.cokurtosis_expected_returns(kte::$(nameof(typeof(kte))))` that returns an `AbstractExpectedReturnsEstimator`, or set rsd = false."))
+end
+function cokurtosis_expected_returns(kte::Cokurtosis)
+    return kte.me
+end
+function cokurtosis_expected_returns(kte::WindowedCokurtosis)
+    return cokurtosis_expected_returns(kte.kte)
+end
+"""
+    coskewness_expected_returns(ske::CoskewnessEstimator) -> AbstractExpectedReturnsEstimator
+    coskewness_expected_returns(ske::Coskewness) -> AbstractExpectedReturnsEstimator
+    coskewness_expected_returns(ske::WindowedCoskewness) -> AbstractExpectedReturnsEstimator
+
+Gives the expected returns estimator with which [`HighOrderFactorPriorEstimator`](@ref) averages the residual moments of its coskewness correction.
+
+[`coskewness_residuals`](@ref) averages the cubed residuals under this estimator. The prior reads it only under `rsd = true`.
+
+# Interfaces
+
+A subtype of [`CoskewnessEstimator`](@ref) that goes into a [`HighOrderFactorPriorEstimator`](@ref) with `rsd = true` adds a method of this verb.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`Coskewness`](@ref) gives `ske.me`.
+ 2. A [`WindowedCoskewness`](@ref) gives the estimator of the estimator that it wraps.
+ 3. Every other subtype is refused, for the reason that [`cokurtosis_expected_returns`](@ref) states.
+
+# Arguments
+
+  - `ske`: Coskewness estimator.
+
+# Validation
+
+  - The type of `ske` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `me::AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments.
+
+# Related
+
+  - [`cokurtosis_expected_returns`](@ref)
+  - [`coskewness_residuals`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function coskewness_expected_returns(ske::CoskewnessEstimator)
+    return throw(ArgumentError("`coskewness_expected_returns` is not defined for `$(nameof(typeof(ske)))`. A HighOrderFactorPriorEstimator with rsd = true averages the residual moments of its coskewness under the expected returns estimator of `ske`. Add a method `PortfolioOptimisers.coskewness_expected_returns(ske::$(nameof(typeof(ske))))` that returns an `AbstractExpectedReturnsEstimator`, or set rsd = false."))
+end
+function coskewness_expected_returns(ske::Coskewness)
+    return ske.me
+end
+function coskewness_expected_returns(ske::WindowedCoskewness)
+    return coskewness_expected_returns(ske.ske)
+end
+"""
+    assert_cokurtosis_processor(kte::Nothing) -> nothing
+    assert_cokurtosis_processor(kte::CokurtosisEstimator) -> nothing
+
+Checks at construction that a [`HighOrderFactorPriorEstimator`](@ref) can read the processor of its cokurtosis estimator `kte`.
+
+The prior processes the lifted cokurtosis under every `rsd`, so the check runs under every `rsd`. It moves the refusal of a type with no method of [`cokurtosis_processor`](@ref) from the fit to the constructor.
+
+# Algorithm
+
+ 1. `nothing` gives `nothing`. The prior lifts no cokurtosis.
+ 2. A [`CokurtosisEstimator`](@ref) gets its processor from [`cokurtosis_processor`](@ref). Its fallback refuses a type with no method of its own.
+ 3. Check that the processor is `nothing` or an [`AbstractMatrixProcessingEstimator`](@ref).
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator, or `nothing`.
+
+# Validation
+
+  - The type of `kte` has a method of [`cokurtosis_processor`](@ref). An `ArgumentError` is thrown otherwise.
+  - The method returns `nothing` or an [`AbstractMatrixProcessingEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cokurtosis_processor`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+  - [`assert_matrix_processing_posdef`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function assert_cokurtosis_processor(::Nothing)
+    return nothing
+end
+function assert_cokurtosis_processor(kte::CokurtosisEstimator)
+    mp = cokurtosis_processor(kte)
+    @argcheck(isa(mp, Option{<:AbstractMatrixProcessingEstimator}),
+              ArgumentError("`cokurtosis_processor(::$(nameof(typeof(kte))))` must return `nothing` or an `AbstractMatrixProcessingEstimator`. Got\nmp => $(mp)::$(typeof(mp))."))
+    return nothing
+end
+"""
+    assert_factor_comoment_residuals(kte::Option{<:CokurtosisEstimator},
+                                     ske::Option{<:CoskewnessEstimator}) -> nothing
+
+Checks at construction that a [`HighOrderFactorPriorEstimator`](@ref) with `rsd = true` can read what its residual corrections need from `kte` and `ske`.
+
+The check moves the refusal of a co-moment estimator with no method from the fit to the constructor.
+
+# Algorithm
+
+ 1. When `kte` is not `nothing`, get its expected returns estimator from [`cokurtosis_expected_returns`](@ref), and check its type. Check the repair of its processor from [`cokurtosis_processor`](@ref) with [`assert_matrix_processing_posdef`](@ref).
+ 2. When `ske` is not `nothing`, get its expected returns estimator from [`coskewness_expected_returns`](@ref), and check its type.
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator, or `nothing`.
+  - `ske`: Coskewness estimator, or `nothing`.
+
+# Validation
+
+  - The fallbacks of [`cokurtosis_expected_returns`](@ref) and [`coskewness_expected_returns`](@ref) refuse a type with no method. An `ArgumentError` is thrown.
+  - Each method returns an `AbstractExpectedReturnsEstimator`. An `ArgumentError` is thrown otherwise.
+  - The processor of `kte` passes [`assert_matrix_processing_posdef`](@ref).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cokurtosis_expected_returns`](@ref)
+  - [`coskewness_expected_returns`](@ref)
+  - [`cokurtosis_processor`](@ref)
+  - [`assert_matrix_processing_posdef`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function assert_factor_comoment_residuals(kte::Option{<:CokurtosisEstimator},
+                                          ske::Option{<:CoskewnessEstimator})
+    if !isnothing(kte)
+        me = cokurtosis_expected_returns(kte)
+        @argcheck(isa(me, AbstractExpectedReturnsEstimator),
+                  ArgumentError("`cokurtosis_expected_returns(::$(nameof(typeof(kte))))` must return an `AbstractExpectedReturnsEstimator`. Got\nme => $(me)::$(typeof(me))."))
+        assert_matrix_processing_posdef(cokurtosis_processor(kte))
+    end
+    if !isnothing(ske)
+        me = coskewness_expected_returns(ske)
+        @argcheck(isa(me, AbstractExpectedReturnsEstimator),
+                  ArgumentError("`coskewness_expected_returns(::$(nameof(typeof(ske))))` must return an `AbstractExpectedReturnsEstimator`. Got\nme => $(me)::$(typeof(me))."))
+    end
+    return nothing
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Projects factor coskewness and cokurtosis onto the asset axis through the regression loadings.
@@ -199,10 +439,18 @@ $(DocStringExtensions.FIELDS)
         ske::Option{<:CoskewnessEstimator} = Coskewness(; alg = FullMoment()),
         ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
         rsd::Bool = true,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> HighOrderFactorPriorEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - `kte` states its processor, see [`assert_cokurtosis_processor`](@ref).
+  - When `rsd` is `true`, `kte` and `ske` state what the residual corrections read, see [`assert_factor_comoment_residuals`](@ref).
 
 ## Propagated parameters
 
@@ -223,79 +471,86 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 ```jldoctest
 julia> HighOrderFactorPriorEstimator()
 HighOrderFactorPriorEstimator
-   pe ┼ FactorPrior
-      │    pe ┼ EmpiricalPrior
-      │       │           ce ┼ PortfolioOptimisersCovariance
-      │       │              │   ce ┼ Covariance
-      │       │              │      │    me ┼ SimpleExpectedReturns
-      │       │              │      │       │   w ┴ nothing
-      │       │              │      │    ce ┼ GeneralCovariance
-      │       │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │              │      │       │    w ┴ nothing
-      │       │              │      │   alg ┼ FullMoment()
-      │       │              │      │     w ┴ nothing
-      │       │              │   mp ┼ MatrixProcessing
-      │       │              │      │     pdm ┼ Posdef
-      │       │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │       │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │       │              │      │      dn ┼ nothing
-      │       │              │      │      dt ┼ nothing
-      │       │              │      │     alg ┼ nothing
-      │       │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │       │           me ┼ SimpleExpectedReturns
-      │       │              │   w ┴ nothing
-      │       │      horizon ┼ nothing
-      │       │   fill_limit ┴ nothing
-      │    mp ┼ MatrixProcessing
-      │       │     pdm ┼ Posdef
-      │       │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │       │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │       │      dn ┼ nothing
-      │       │      dt ┼ nothing
-      │       │     alg ┼ nothing
-      │       │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │    re ┼ StepwiseRegression
-      │       │   crit ┼ PValue
-      │       │        │   t ┴ Float64: 0.05
-      │       │    alg ┼ ForwardSelection()
-      │       │    tgt ┼ LinearModel
-      │       │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │    ve ┼ SimpleVariance
-      │       │          me ┼ SimpleExpectedReturns
-      │       │             │   w ┴ nothing
-      │       │           w ┼ nothing
-      │       │   corrected ┴ Bool: true
-      │   rsd ┴ Bool: true
-  kte ┼ Cokurtosis
-      │      me ┼ SimpleExpectedReturns
-      │         │   w ┴ nothing
-      │      mp ┼ MatrixProcessing
-      │         │     pdm ┼ Posdef
-      │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      dn ┼ nothing
-      │         │      dt ┼ nothing
-      │         │     alg ┼ nothing
-      │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │     alg ┼ FullMoment()
-      │       w ┼ nothing
-      │   cache ┴ nothing
-  ske ┼ Coskewness
-      │      me ┼ SimpleExpectedReturns
-      │         │   w ┴ nothing
-      │      mp ┼ MatrixProcessing
-      │         │     pdm ┼ Posdef
-      │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │         │      dn ┼ nothing
-      │         │      dt ┼ nothing
-      │         │     alg ┼ nothing
-      │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │     alg ┼ FullMoment()
-      │       w ┼ nothing
-      │   cache ┴ nothing
-   ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
-  rsd ┴ Bool: true
+     pe ┼ FactorPrior
+        │         pe ┼ EmpiricalPrior
+        │            │           ce ┼ PortfolioOptimisersCovariance
+        │            │              │   ce ┼ Covariance
+        │            │              │      │    me ┼ SimpleExpectedReturns
+        │            │              │      │       │   w ┴ nothing
+        │            │              │      │    ce ┼ GeneralCovariance
+        │            │              │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │            │              │      │       │    w ┴ nothing
+        │            │              │      │   alg ┼ FullMoment()
+        │            │              │      │     w ┴ nothing
+        │            │              │   mp ┼ MatrixProcessing
+        │            │              │      │     pdm ┼ Posdef
+        │            │              │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │            │              │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │            │              │      │      dn ┼ nothing
+        │            │              │      │      dt ┼ nothing
+        │            │              │      │     alg ┼ nothing
+        │            │              │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │            │           me ┼ SimpleExpectedReturns
+        │            │              │   w ┴ nothing
+        │            │      horizon ┼ nothing
+        │            │   fill_limit ┼ nothing
+        │            │        x_src ┴ nothing
+        │         mp ┼ MatrixProcessing
+        │            │     pdm ┼ Posdef
+        │            │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │            │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │            │      dn ┼ nothing
+        │            │      dt ┼ nothing
+        │            │     alg ┼ nothing
+        │            │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │         re ┼ StepwiseRegression
+        │            │       crit ┼ PValue
+        │            │            │   t ┴ Float64: 0.05
+        │            │        alg ┼ ForwardSelection()
+        │            │        tgt ┼ LinearModel
+        │            │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │            │     choice ┼ BatchChoice()
+        │            │   included ┼ nothing
+        │            │      x_src ┴ nothing
+        │         ve ┼ SimpleVariance
+        │            │          me ┼ SimpleExpectedReturns
+        │            │             │   w ┴ nothing
+        │            │           w ┼ nothing
+        │            │   corrected ┴ Bool: true
+        │        rsd ┼ Bool: true
+        │   mtx_sqrt ┼ EigenFallbackSquareRoot()
+        │      x_src ┴ nothing
+    kte ┼ Cokurtosis
+        │      me ┼ SimpleExpectedReturns
+        │         │   w ┴ nothing
+        │      mp ┼ MatrixProcessing
+        │         │     pdm ┼ Posdef
+        │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      dn ┼ nothing
+        │         │      dt ┼ nothing
+        │         │     alg ┼ nothing
+        │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │     alg ┼ FullMoment()
+        │       w ┼ nothing
+        │   cache ┴ nothing
+    ske ┼ Coskewness
+        │      me ┼ SimpleExpectedReturns
+        │         │   w ┴ nothing
+        │      mp ┼ MatrixProcessing
+        │         │     pdm ┼ Posdef
+        │         │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      dn ┼ nothing
+        │         │      dt ┼ nothing
+        │         │     alg ┼ nothing
+        │         │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │     alg ┼ FullMoment()
+        │       w ┼ nothing
+        │   cache ┴ nothing
+     ex ┼ Transducers.ThreadedEx{@NamedTuple{}}: Transducers.ThreadedEx()
+    rsd ┼ Bool: true
+  x_src ┴ nothing
 ```
 
 # Related
@@ -339,13 +594,24 @@ HighOrderFactorPriorEstimator
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function HighOrderFactorPriorEstimator(pe::AbstractLowOrderPriorEstimator_F_AF,
                                            kte::Option{<:CokurtosisEstimator},
                                            ske::Option{<:CoskewnessEstimator},
                                            ex::FLoops.Transducers.Executor, rsd::Bool,
-                                           cache::Option{<:AbstractPartialFitState})
+                                           cache::Option{<:AbstractPartialFitState},
+                                           x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :HighOrderFactorPriorEstimator)
+        assert_inner_reader(pe, :pe, :HighOrderFactorPriorEstimator)
+        assert_cokurtosis_processor(kte)
+        if rsd
+            assert_factor_comoment_residuals(kte, ske)
+        end
         return new{typeof(pe), typeof(kte), typeof(ske), typeof(ex), typeof(rsd),
-                   typeof(cache)}(pe, kte, ske, ex, rsd, cache)
+                   typeof(cache), typeof(x_src)}(pe, kte, ske, ex, rsd, cache, x_src)
     end
 end
 function HighOrderFactorPriorEstimator(;
@@ -356,8 +622,9 @@ function HighOrderFactorPriorEstimator(;
                                                                                        alg = FullMoment()),
                                        ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
                                        rsd::Bool = true,
-                                       cache::Option{<:AbstractPartialFitState} = nothing)::HighOrderFactorPriorEstimator
-    return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd, cache)
+                                       cache::Option{<:AbstractPartialFitState} = nothing,
+                                       x_src::Option{<:AbstractReturnsSource} = nothing)::HighOrderFactorPriorEstimator
+    return HighOrderFactorPriorEstimator(pe, kte, ske, ex, rsd, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -380,7 +647,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`show_fields`](@ref)
   - [`set_show_nothing_fields!`](@ref)
 """
-show_fields(::HighOrderFactorPriorEstimator) = (:pe, :kte, :ske, :ex, :rsd)
+show_fields(::HighOrderFactorPriorEstimator) = (:pe, :kte, :ske, :ex, :rsd, :x_src)
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
 @forward_properties HighOrderFactorPriorEstimator begin
@@ -405,7 +672,9 @@ Compute high order factor prior moments for asset returns using a factor model.
 
     The co-moments are computed from `F` as supplied, so they always describe the **pre-view** factor distribution, whichever Black-Litterman member is underneath. Where that member reports a *posterior* factor block — [`FactorBlackLittermanPrior`](@ref) and [`BayesianBlackLittermanPrior`](@ref) — the nested `fpr` therefore mixes orders: `fpr.mu` and `fpr.sigma` carry the views, `fpr.kt`, `fpr.sk` and `fpr.V` do not. The `fpr.pr === pr.fpr` invariant still holds, because both routes reach the same posterior low order block; what differs is the order at which the views stop.
 
-    This is a consequence of Black-Litterman having no higher-moment update to apply, not of a value being discarded, and it is the same under [`BlackLittermanPrior`](@ref) — where the low order factor block is pre-view too, so the carrier happens to be uniform.
+    This is a consequence of Black-Litterman having no higher-moment update to apply, not of a value being discarded, and it is the same under [`BlackLittermanPrior`](@ref) — where the low order factor block is pre-view too, so the prior result happens to be uniform.
+
+    An entropy pooling prior and an opinion pooling prior differ. They state their views and opinions as the probabilities `w` of the scenarios, and the factor co-moments read `w`, so the views reach every order.
 
 # Mathematical definition
 
@@ -429,24 +698,24 @@ Where:
   - ``\\hat{\\mathbf{M}}_{3,\\varepsilon}``: Residual coskewness correction from [`coskewness_residuals`](@ref), present only when `rsd` is `true`.
   - ``\\otimes``: Kronecker product.
 
-The factor comoments come from `pe.kte` and `pe.ske` fit on `F`, so a non-default `alg` on either replaces its display above. Either estimator set to `nothing` drops its moment from both the asset result and the nested factor block.
+The factor comoments come from `pe.kte` and `pe.ske` fit on `F`. When the low order block answers the probabilities `w` of its scenarios, `w` replaces the observation weights of both estimators, and the fit reads the last `length(w)` rows of `F`, which `w` weighs. The residual corrections read no `w`, because the residuals belong to the model, and the views move the probabilities of the scenarios, not the model. A non-default `alg` on either replaces its display above. Either estimator set to `nothing` drops its moment from both the asset result and the nested factor block.
 
 # Algorithm
 
  1. Orient `X` and `F` to `observations × variables` with [`dims_oriented`](@ref).
- 2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole carrier to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the carrier, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on the carrier itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
- 3. Compute the factor square cokurtosis `f_kt` with `pe.kte` on `F`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it with `pe.kte.mp`.
- 4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `pe.ske` on `F`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
+ 2. Compute the low order block `pr` with `pe.pe`, and check that it carries a regression result. Derive the Investable Mask from it with [`investable_mask`](@ref), and reduce the whole prior result to the investable universe with [`port_opt_view`](@ref), giving `rpr`; `X` is an argument rather than a block of the prior result, so it is cut alongside as `Xr`. Take the reconstructed returns `posterior_X = rpr.X` and the loadings `M = rpr.rr.M`. The `nothing` sentinel of an all-investable universe reduces nothing, and every step below then runs on `pr` itself. The reduction happens **before** the lift because the lift squares the reach of a non-investable asset: one `NaN` loading row makes a whole `NaN` band of `kron(M, M)`, and the projection carries it across most of the cokurtosis, where [`posdef!`](@ref) refuses it in the name of LAPACK rather than of the asset.
+ 3. Read the probabilities `w = pr.w` of the scenarios, and cut `F` to the rows `Fw` that they weigh with [`scenario_rows`](@ref). Compute the factor square cokurtosis `f_kt` with `factory(pe.kte, w)` on `Fw`. When it exists, build `kM = kron(M, M)`, project `posterior_kt = kM * f_kt * transpose(kM)`, and process it under [`cokurtosis_processor`](@ref)`(pe.kte)`.
+ 4. Compute the factor coskewness `f_sk` and its negative spectral form `f_V` with `factory(pe.ske, w)` on `Fw`. When `f_sk` exists, build `kM` if step 3 did not, and project `posterior_sk = M * f_sk * transpose(kM)`.
  5. Build the structure matrices with [`dup_elim_sum_matrices`](@ref), twice: at the **full** asset count for `D2`, `L2` and `S2`, and at the factor count for `f_D2`, `f_L2` and `f_S2`. The asset count is the full one because step 12 expands the co-moments, and the constructor validates the triple against `length(pr.mu)`. The all-or-none rule is the one `prior(::HighOrderPriorEstimator, …)` applies, at both dimensions.
- 6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`.
- 7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, pe.ske.me)` to the `posterior_sk` of step 4, when there is one.
+ 6. When `pe.rsd` is `true`, take the reconstruction error `err = Xr - posterior_X`. Under a Scenario Cap `posterior_X` holds the last rows alone, so the error reads `F * transpose(M) .+ transpose(b)` over every row instead, as the residual block of `sigma` does.
+ 7. Still under `pe.rsd`, add [`coskewness_residuals`](@ref)`(err, me)` to the `posterior_sk`, with `me` from [`coskewness_expected_returns`](@ref)`(pe.ske)`, of step 4, when there is one.
  8. Still under `pe.rsd`, and when step 3 produced a `posterior_kt`, read the wrapped estimator's residual declaration with [`factor_residual_config`](@ref) and check its shape with [`assert_factor_residual_config`](@ref).
- 9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise size the block as `err_sigma`, the column variances of `err` under `rsd_cfg.ve`, subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
-10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, pe.kte.me, pe.ex)` to `posterior_kt`, and re-condition the sum with [`posdef!`](@ref) under `pe.kte.mp.pdm`.
+ 9. Recover the systematic covariance `sigma` from `rpr.sigma`. A `nothing` declaration, and one whose `rsd` is `false`, both mean that no residual block was added, so `sigma` is `rpr.sigma` unchanged. Otherwise read the block as `err_sigma`, the residual variances that the wrapped estimator added, with [`idiosyncratic_variances`](@ref) of `rpr.rr`. They were measured under the weights of that fit, which a variance of `err` under `rsd_cfg.ve` does not read. Subtract its diagonal matrix from `rpr.sigma`, and re-condition the difference with [`posdef!`](@ref) under `rsd_cfg.pdm`. When any entry of `err_sigma` exceeds the matching diagonal entry of `rpr.sigma` the subtraction would leave a negative variance, so the step warns and keeps `rpr.sigma` whole. That happens when the wrapped estimator reports a covariance the block was never added to — a posterior that shrank it, rather than the lift's own sum.
+10. Still under `pe.rsd`, add [`cokurtosis_residuals`](@ref)`(sigma, err, me, pe.ex)` to `posterior_kt`, with `me` from [`cokurtosis_expected_returns`](@ref)`(pe.kte)`. Re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for the processor of step 3.
 11. When step 4 produced a `posterior_sk`, recompute `posterior_V` from it with [`negative_spectral_coskewness`](@ref), so `V` describes the corrected coskewness rather than the projected one.
 12. Expand `posterior_kt`, `posterior_sk` and `posterior_V` back to the full asset universe with [`expand_moment`](@ref), `NaN` outside the investable block. `V` is expanded rather than recomputed, because it is a spectral quantity of the reduced coskewness and the frame carries no reduced returns to rebuild it from. The all-investable sentinel needs no branch of its own: [`expand_moment`](@ref) on a `nothing` mask hands the block straight back, at every one of its arities.
-13. Build the nested factor carrier `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
-14. Assemble the asset [`HighOrderPrior`](@ref) through its keyword constructor, over the **full** `pr` rather than the reduced `rpr`, so the carrier lives on the full asset universe as the contract requires.
+13. Build the nested factor prior result `fpr` over `pr.fpr`, from the factor moments of steps 3 to 5. It is `nothing` when neither `f_kt` nor `f_sk` exists. The factor block is untouched by steps 2 and 12: `i` indexes assets, and these co-moments live on the factor axis.
+14. Assemble the asset [`HighOrderPrior`](@ref) through its keyword constructor, over the **full** `pr` rather than the reduced `rpr`, so the prior result lives on the full asset universe as the contract requires.
 
 Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is defined on the systematic covariance, so step 9 has to undo the residual block that the wrapped estimator's own lift added before step 10 adds the residual cokurtosis.
 
@@ -467,7 +736,7 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
 
 # Returns
 
-  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments, on the **full** asset universe. An asset the wrapped prior could not estimate carries `NaN` in `mu`, on the diagonal of `sigma`, and at every fourth-moment index that names it in `kt`, `sk` and `V` — the carrier [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel, which [`port_opt_view`](@ref) slices clean. Its `fpr` is a nested [`HighOrderPrior`](@ref) built over the wrapped prior's own factor block, so `fpr.pr === pr.fpr`: the factor co-moments and the low order factor moments describe one distribution, reachable by either route.
+  - `pr::HighOrderPrior`: Result object containing asset returns, mean, covariance, coskewness tensor, cokurtosis tensor, and factor moments, on the **full** asset universe. An asset the wrapped prior could not estimate carries `NaN` in `mu`, on the diagonal of `sigma`, and at every fourth-moment index that names it in `kt`, `sk` and `V` — the prior result that [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel, which [`port_opt_view`](@ref) slices clean. Its `fpr` is a nested [`HighOrderPrior`](@ref) built over the wrapped prior's own factor block, so `fpr.pr === pr.fpr`: the factor co-moments and the low order factor moments describe one distribution, reachable by either route.
 
 # Related
 
@@ -484,6 +753,7 @@ Steps 9 and 10 are ordered, not independent. [`cokurtosis_residuals`](@ref) is d
   - [`assert_factor_residual_config`](@ref): the shape check that runs on that declaration.
   - [`coskewness_residuals`](@ref)
   - [`cokurtosis_residuals`](@ref)
+  - [`scenario_rows`](@ref): the cut of step 3, to the rows of `F` that the probabilities of the scenarios weigh.
 """
 function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
@@ -510,8 +780,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     # sentinel, and it takes the path this estimator always took.
     #
     # `port_opt_view` cuts every block the lift reads — `X`, `mu`, `sigma`, and `rr` on its
-    # asset axis — but the caller's `X` is an argument rather than a block of the carrier, so
-    # it is cut here alongside, on the same index.
+    # asset axis — but the caller's `X` is an argument rather than a block of the prior
+    # result, so it is cut here alongside, on the same index.
     #
     # A branch, where the expansion below is dispatch. The mask is a *value*, and
     # `investable_mask` is inferred `Union{Nothing, BitVector}`, so a `(::Nothing, …)`/
@@ -528,13 +798,20 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
     end
     posterior_X = rpr.X
     M = rpr.rr.M
-    f_kt = cokurtosis(pe.kte, F; kwargs...)
+    # A prior result that answers `w` weighs its scenarios with it, and the rows of `F` pair
+    # with the scenarios, so the factor co-moments read the same distribution as the factor
+    # moments that `mu` and `sigma` lift (#1650). The residual co-moments below stay with
+    # the model, as the residual block of `sigma` does (ADR 0205).
+    w = pr.w
+    Fw = scenario_rows(w, F, nothing)[1]
+    f_kt = cokurtosis(factory(pe.kte, w), Fw; kwargs...)
     if !isnothing(f_kt)
         kM = kron(M, M)
         posterior_kt = kM * f_kt * transpose(kM)
-        matrix_processing!(pe.kte.mp, posterior_kt, posterior_X; kwargs...)
+        matrix_processing!(cokurtosis_processor(pe.kte), posterior_kt, posterior_X;
+                           kwargs...)
     end
-    f_sk, f_V = coskewness(pe.ske, F; kwargs...)
+    f_sk, f_V = coskewness(factory(pe.ske, w), Fw; kwargs...)
     if !isnothing(f_sk)
         if isnothing(kM)
             kM = kron(M, M)
@@ -542,10 +819,12 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         posterior_sk = M * f_sk * transpose(kM)
     end
     # The same all-or-none branching the asset block gets, at the factor dimension: the
-    # nested carrier validates its own `kt`/`L2`/`S2` triple against `length(pr.fpr.mu)`.
+    # nested prior result validates its own `kt`/`L2`/`S2` triple against
+    # `length(pr.fpr.mu)`.
     # The structure matrices are sized from the *full* asset count, not from the reduced
-    # `posterior_X`: the co-moments are expanded before the carrier is assembled, so the
-    # triple the constructor validates against `length(pr.mu)` has to describe that width.
+    # `posterior_X`: the co-moments are expanded before the prior result is assembled, so
+    # the triple the constructor validates against `length(pr.mu)` has to describe that
+    # width.
     if !isnothing(f_kt) && !isnothing(f_sk)
         D2, L2, S2 = dup_elim_sum_matrices(length(pr.mu))
         f_D2, f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))
@@ -554,16 +833,24 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         f_L2, f_S2 = dup_elim_sum_matrices(size(F, 2))[2:3]
     end
     if pe.rsd
-        err = Xr - posterior_X
+        # The residual co-moments stay with the model, as the residual block of `sigma` does,
+        # so they read every row of the regression. Under a Scenario Cap `posterior_X` holds
+        # the last rows alone, and the model rebuilds the rest (ADR 0206).
+        Xm = if size(posterior_X, 1) == size(Xr, 1)
+            posterior_X
+        else
+            F * transpose(M) .+ transpose(rpr.rr.b)
+        end
+        err = Xr - Xm
         if !isnothing(f_sk)
-            posterior_sk .+= coskewness_residuals(err, pe.ske.me)
+            posterior_sk .+= coskewness_residuals(err, coskewness_expected_returns(pe.ske))
         end
         if !isnothing(f_kt)
             # `cokurtosis_residuals` is defined on the *systematic* covariance, so a residual
-            # block the wrapped estimator added has to come back off. Which estimator added one,
-            # and with what variance estimator, is a declaration rather than a field read: the
-            # `pe` slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior`
-            # and `FactorBlackLittermanPrior` carry `ve` and `mp.pdm` — a wrapper over either
+            # block the wrapped estimator added has to come back off. Whether an estimator added
+            # one, and under which `pdm`, is a declaration rather than a field read: the `pe`
+            # slot is bounded `AbstractLowOrderPriorEstimator_F_AF`, and only `FactorPrior` and
+            # `FactorBlackLittermanPrior` carry `rsd` and `mp` — a wrapper over either
             # forwards the declaration, everything else declares `nothing` (see
             # [`factor_residual_config`](@ref)). The shape is checked before the property
             # access, so a wrong declaration names itself here instead of surfacing as a
@@ -573,7 +860,11 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
             sigma = if isnothing(rsd_cfg) || !rsd_cfg.rsd
                 rpr.sigma
             else
-                err_sigma = vec(Statistics.var(rsd_cfg.ve, err; dims = 1))
+                # The block comes off as the prior added it, from the loadings result. A
+                # variance of `err` under `rsd_cfg.ve` read the weights of the configuration,
+                # not the weights of the fit: a caller's `w` on an entropy pooling prior, or
+                # the pooled weights of an opinion pool, moved it 7.5 % and 1.3 %.
+                err_sigma = idiosyncratic_variances(rpr.rr)
                 sigma = if any(map((x, y) -> x > y, err_sigma,
                                    LinearAlgebra.diag(rpr.sigma)))
                     @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
@@ -584,17 +875,19 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
                 posdef!(rsd_cfg.pdm, sigma)
                 sigma
             end
-            err_kt = cokurtosis_residuals(sigma, err, pe.kte.me, pe.ex)
+            err_kt = cokurtosis_residuals(sigma, err, cokurtosis_expected_returns(pe.kte),
+                                          pe.ex)
             posterior_kt .+= err_kt
-            posdef!(pe.kte.mp.pdm, posterior_kt)
+            posdef!(matrix_processing_posdef(cokurtosis_processor(pe.kte)), posterior_kt)
         end
     end
     if !isnothing(f_sk)
-        posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X, pe.ske.mp)
+        posterior_V = negative_spectral_coskewness(posterior_sk, posterior_X,
+                                                   coskewness_processor(pe.ske))
     end
     # The expansion, the second half of the contract. Every asset-side co-moment goes back
     # into a `NaN` frame of the full width through the same [`expand_moment`](@ref) the
-    # moment estimators use, so this estimator's carrier is the one
+    # moment estimators use, so this estimator's prior result is the one
     # [`HighOrderPriorEstimator`](@ref) makes on the same gapped panel — the fourth-moment
     # index of a non-investable asset is `NaN` and nothing else is — and `port_opt_view`
     # slices it clean again. `V` is expanded rather than recomputed: it is a spectral
@@ -614,11 +907,13 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
         nothing
     else
         HighOrderPrior(; pr = pr.fpr, kt = f_kt, D2 = f_D2, L2 = f_L2, S2 = f_S2, sk = f_sk,
-                       V = f_V, skmp = isnothing(f_sk) ? nothing : pe.ske.mp)
+                       V = f_V,
+                       skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske))
     end
     hop = HighOrderPrior(; pr = pr, kt = posterior_kt, D2 = D2, L2 = L2, S2 = S2,
                          sk = posterior_sk, V = posterior_V,
-                         skmp = isnothing(f_sk) ? nothing : pe.ske.mp, fpr = fpr)
+                         skmp = isnothing(f_sk) ? nothing : coskewness_processor(pe.ske),
+                         fpr = fpr)
     # The posterior co-moments run through this estimator's own `ske` and `kte`, so a policy
     # set on the low order alone narrows the Investable Mask here exactly as it does for a
     # plain high order prior. The fit is the one place that says so.
@@ -634,3 +929,4 @@ function factor_residual_config(pe::HighOrderFactorPriorEstimator)
 end
 
 export HighOrderFactorPriorEstimator
+public cokurtosis_processor, cokurtosis_expected_returns, coskewness_expected_returns

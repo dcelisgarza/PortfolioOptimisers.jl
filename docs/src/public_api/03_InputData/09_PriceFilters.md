@@ -1,5 +1,5 @@
 ```@meta
-Description = "Price filters, public API of PortfolioOptimisers.jl: MissingDataFilter, MissingDataFilterResult."
+Description = "Price filters, public API of PortfolioOptimisers.jl: MissingDataFilter, MissingDataFilterResult, AbstractMissingDataFilterAlgorithm, FixedPointFilter, …"
 ```
 
 # Price filters
@@ -7,4 +7,8 @@ Description = "Price filters, public API of PortfolioOptimisers.jl: MissingDataF
 ```@docs
 MissingDataFilter
 MissingDataFilterResult
+AbstractMissingDataFilterAlgorithm
+FixedPointFilter
+SinglePassFilter
+fit_universe
 ```

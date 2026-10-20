@@ -95,14 +95,14 @@ function read_maps(path::AbstractString)
 end
 
 """
-    read_existing(path) -> Vector{Tuple{Bool, String}}
+    read_existing(path) -> Vector{Tuple{Int, Bool, String}}
 
 The `sweep` issues the workflow dumped, one per line as `number<TAB>state<TAB>title`, reduced to
-what the safeguard reads: whether each is open, and its title. `CodeHealth.read_tracker_dump` does
+what the safeguard and `reconcile` read: the number, whether each is open, and its title. `CodeHealth.read_tracker_dump` does
 the reading, so this job and `code_health/triage.jl` parse a dump the same way.
 """
 function read_existing(path::AbstractString)
-    return [(uppercase(r[2]) == "OPEN", r[3])
+    return [(parse(Int, r[1]), uppercase(r[2]) == "OPEN", r[3])
             for r in CodeHealth.read_tracker_dump(path, 3)]
 end
 
@@ -117,15 +117,15 @@ The match is `CodeHealth.names_path`, so the path stands as a whole word and a t
 `src/A.jl.orig` can never suppress `src/A.jl`.
 """
 function already_filed(existing, path::AbstractString)
-    return any(e -> e[1] && CodeHealth.names_path(e[2], path), existing)
+    return any(e -> e[2] && CodeHealth.names_path(e[3], path), existing)
 end
 
 # --- reconciliation --------------------------------------------------------
 
 """
-    reconcile(rows, map_names, maps) -> nothing
+    reconcile(rows, map_names, maps, existing) -> nothing
 
-The manifest and the tracker must agree before a single issue is planned. Three ways they can
+The manifest and the tracker must agree before a single issue is planned. Four ways they can
 disagree, and each one throws:
 
  1. A child map the manifest names has no issue in the dump. The job cannot reopen what it cannot
@@ -134,11 +134,14 @@ disagree, and each one throws:
     no way to tell which.
  3. A row names a map that `[map]` does not list. `test/test_45_sweep_census.jl` already reds the
     build on this, so reaching it here means the census was bypassed.
+ 4. An open sweep issue names a `.jl` file that has no row, which `CodeHealth.stale_titles` finds.
+    The file moved, or the title names it by its bare name. `already_filed` cannot see that issue,
+    so the job would file a duplicate of it (#1755).
 
-A loud refusal is the right outcome for all three. This job writes to a tracker, and a wrong parent
+A loud refusal is the right outcome for all four. This job writes to a tracker, and a wrong parent
 or a wrong title is work a person must undo by hand.
 """
-function reconcile(rows, map_names, maps)
+function reconcile(rows, map_names, maps, existing)
     bad = String[]
     for (key, name) in sort(collect(map_names); by = first)
         m = get(maps, key, nothing)
@@ -154,6 +157,11 @@ function reconcile(rows, map_names, maps)
         if !(haskey(map_names, string(row["map"])))
             push!(bad, "`$path` names map $(row["map"]), which `[map]` does not list")
         end
+    end
+    for (n, title, tokens) in CodeHealth.stale_titles(existing, keys(rows))
+        push!(bad,
+              "issue #$n names $(join(("`$t`" for t in tokens), ", ")), which has no row. " *
+              "Retitle it to name the current path of every file it sweeps: $(repr(title))")
     end
     if !(isempty(bad))
         error("The sweep manifest and the tracker disagree, so nothing is planned:\n  " *
@@ -248,7 +256,7 @@ tickets that were filed before it existed.
 It names the map, the Authority of each rule the sweeper touches, and the glossary **directly**.
 Before it existed the only route was one long hop: this body pointed at #404, and #404 named the
 four files inside five thousand words. Three of the six open sweep tickets measured on 2026-08-24
-named an Authority, and none named `STANDARDS.md`.
+named an Authority, and none named `CODING_STANDARDS.md`.
 
 The block is constant text, so it costs the job no judgement, and it is never machine-read. #404
 keeps the rules of this effort alone; every rule of the tree itself lives at one of these four
@@ -259,13 +267,13 @@ const ROUTING = """
 
 Read before you start:
 
-- `STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
+- `CODING_STANDARDS.md` — which file owns the rule you are about to apply, and which check holds it.
 - `.github/instructions/julia-docstrings.instructions.md` — the Authority for a docstring rule.
 - `.github/instructions/julia-source-code.instructions.md` — the Authority for a rule about code
   under `src/` and `ext/`.
-- `CONTEXT.md` — the domain vocabulary. Use its words, and add a word you introduce.
+- `GLOSSARY.md` — the domain vocabulary. Use its words, and add a word you introduce.
 
-`STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
+`CODING_STANDARDS.md` is the map. Open it first when you do not know which file governs the change.
 """
 
 function title_of(c::Candidate)
@@ -279,7 +287,8 @@ number_or_dash(x) = x === nothing ? "—" : string(x)
 
 The sub-issue of ADR 0084. It mirrors the child map that owns it, one file wide: the fixed
 `ROUTING` block, a Destination naming the file and its measured row, the five conditions of #404
-restated compactly, the sentence that the committed files are the authority, and Notes that point
+restated compactly (condition 2 names the original source of a formulation and the standard note
+of `.github/instructions/julia-docstrings.instructions.md` § *The original source*), the sentence that the committed files are the authority, and Notes that point
 at #404 without copying a rule.
 
 **Every field is generated**, so the job needs no judgement: the path, `map` and `units` from
@@ -294,10 +303,10 @@ function body_of(c::Candidate, commit::AbstractString)
     println(io, ROUTING)
     println(io, "## Destination\n")
     if reopens(c)
-        println(io, "This file is swept. It joined child map ", c.map.number,
+        println(io, "This file is not swept yet. It joined child map ", c.map.number,
                 " after that map closed, so the map and #", UMBRELLA, " were reopened.\n")
     else
-        println(io, "This file is swept. It joined child map ", c.map.number,
+        println(io, "This file is not swept yet. It joined child map ", c.map.number,
                 " after that map was charted, and it is filed under it now.\n")
     end
     println(io, "| File | Units | Misses | Lines |")
@@ -306,7 +315,9 @@ function body_of(c::Candidate, commit::AbstractString)
             number_or_dash(c.lines), " |\n")
     println(io, "Five conditions, from #", UMBRELLA, ":\n")
     println(io, "1. Its documentation states the mathematics.")
-    println(io, "2. Its code agrees with that statement, checked with real numbers.")
+    println(io, "2. Its code agrees with that statement, checked with real numbers. Each ",
+            "formulation is checked against its original source, the work that first states ",
+            "it, and a formulation whose original was not found carries the standard note.")
     println(io, "3. Its lines are covered, or exempted with a reason.")
     println(io, "4. Its prose passes `/unslop`.")
     println(io, "5. Its code carries no performance trap: `code_health/perf.jl scan ",
@@ -507,7 +518,7 @@ function main(args)
     maps, umbrella_open = read_maps(opts.maps)
     existing = read_existing(opts.existing)
 
-    reconcile(rows, map_names, maps)
+    reconcile(rows, map_names, maps, existing)
     chosen, skipped = candidates(rows, maps, coverage, existing, Set(opts.files))
     write_plan(opts.out, chosen, umbrella_open, CodeHealth.git_short_commit())
 

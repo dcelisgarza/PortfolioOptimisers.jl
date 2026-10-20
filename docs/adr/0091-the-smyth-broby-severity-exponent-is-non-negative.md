@@ -82,12 +82,12 @@ are well-defined admission rules, and neither answers a matrix that is not a cor
   the behaviour change. No matrix moves, because a caller who passed a negative `n` was not
   answered a correlation matrix.
 - **`n = 0` and `n = Inf` are unchanged.** Both already gave a unit diagonal and a finite matrix,
-  and `test_08h_smythbroby.jl` pinned that before this ADR.
+  and `test_08b_robust_moments.jl` pinned that before this ADR.
 - **No shipped number moves.** The default is `n = 2`, and the guard does not touch the kernel.
 - **`val_dict[:sbn]` states the range once.** It reads ``0 <= n``, and the
   [`SmythBrobyCovariance`](../../src/05_Moments/05_Gerber/02_SmythBrobyCovariance.jl) docstring interpolates
   it beside the three thresholds.
-- **`test_08h_smythbroby.jl` holds the contract.** The testset
+- **`test_08b_robust_moments.jl` holds the contract.** The testset
   `the constructor guards, and the severity exponent (#496, ADR 0091)` pins that `-2`, `-1e-9` and
   `NaN` raise, that `0`, `0.5`, `2` and `Inf` construct, that each of those four answers a unit
   diagonal, and that the kernel's inversion at a negative `n` is still visible one level down.

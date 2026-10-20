@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online portfolio selection: the family, the geometry, the set and the state, private API of PortfolioOptimisers.jl: simplex_bounds, assert_feasible_bounds, …"
+Description = "Base Online Portfolio Selection, private API of PortfolioOptimisers.jl: simplex_bounds, assert_feasible_bounds, assert_finite_raw_step, budget_or_held_step, …"
 ```
 
-# Online portfolio selection: the family, the geometry, the set and the state: private API
+# Base Online Portfolio Selection: private API
 
 ```@docs
 PortfolioOptimisers.simplex_bounds
@@ -10,6 +10,7 @@ PortfolioOptimisers.assert_feasible_bounds
 PortfolioOptimisers.assert_finite_raw_step
 PortfolioOptimisers.budget_or_held_step
 PortfolioOptimisers.bounded_quadratic_projection
+PortfolioOptimisers.budget_root_projection
 PortfolioOptimisers.breakpoint_root
 PortfolioOptimisers.breakpoint_segment
 PortfolioOptimisers.bounded_root
@@ -21,10 +22,10 @@ PortfolioOptimisers.HeldStep
 PortfolioOptimisers.ProjectionStep
 PortfolioOptimisers.PROJECTION_STEP
 PortfolioOptimisers.with_projection_step
-PortfolioOptimisers.price_relative
 PortfolioOptimisers.record_held_step!
 PortfolioOptimisers.projection_step_rows
 PortfolioOptimisers.projection_step_strict
+PortfolioOptimisers.head_frame_returns
 PortfolioOptimisers.assert_rule_admits_set
 PortfolioOptimisers.rows_needed_max
 PortfolioOptimisers.rule_state_view

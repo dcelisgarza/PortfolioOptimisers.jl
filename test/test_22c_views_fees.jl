@@ -85,7 +85,9 @@ end
         filter!(!isnothing, idx)
         if !isempty(idx)
             for w in res.resi[i].w[idx]
-                if abs(w) > sqrt(20) * sqrt(eps(w))
+                # A MIP solver leaves a zero weight near 1e-13, so the cut reads the unit
+                # scale: `eps(w)` of such a weight would count it as invested.
+                if abs(w) > sqrt(20) * sqrt(eps(one(w)))
                     @test w > 0.48 - sqrt(eps(w))
                 end
             end

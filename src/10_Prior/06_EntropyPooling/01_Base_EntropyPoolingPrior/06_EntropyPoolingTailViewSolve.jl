@@ -66,11 +66,11 @@ Where:
  1. Raise when `opt` is an [`OptimEntropyPooling`](@ref) and `tvs` names a tail view, and forward to the three-argument form otherwise.
  2. Return `w` when `epc` holds no row and `tvs` names no tail view. An empty view set states nothing, so the posterior is the prior, and it is answered exactly rather than solved for.
  3. Solve once with [`ep_jump_entropy_pooling`](@ref), giving `w1`.
- 4. Read `iters`, the largest number of re-solves a carrier of `tvs` asks for, with [`ep_refine_iters`](@ref). It is zero where no carrier is sequential, and the steps below then do not run.
- 5. Re-read every carrier at `w1` with [`ep_refine_tail_view`](@ref), which returns the carrier and whether its surrogate row is tight there. Stop where every carrier is tight.
- 6. Solve again with the re-read carriers, giving a new `w1`, and return to step 5. Take at most `iters` re-solves, so the last posterior can hold a slack row when the sequence has not settled.
- 7. Check every carrier at `w1` with [`ep_check_tail_window`](@ref), which warns where the window of an integer carrier can bind.
- 8. Return `w1` as `StatsBase.pweights`.
+ 4. Read `iters`, the largest number of re-solves a tail view constraint of `tvs` asks for, with [`ep_refine_iters`](@ref). It is zero where no tail view constraint is sequential, and the steps below then do not run.
+ 5. Re-read every tail view constraint at `w1` with [`ep_refine_tail_view`](@ref), which returns the tail view constraint and whether its surrogate row is tight there. Stop where every tail view constraint is tight.
+ 6. Solve again with the re-read tail view constraints, giving a new `w1`, and return to step 5. Take at most `iters` re-solves, so the last posterior can hold a slack row when the sequence has not settled.
+ 7. Check every tail view constraint at `w1` with [`ep_check_tail_window`](@ref), which warns where the window of an integer tail view constraint can bind.
+ 8. Return `w1`, which [`ep_jump_entropy_pooling`](@ref) answers in the kind of `w`.
 
 The re-solves are the sequential convex formulations' half of the work. Each re-read row is tight at the posterior it was read at and still holds there, so that posterior stays feasible and the divergence of the next one is at most its own.
 
@@ -95,7 +95,7 @@ A stop on tight rows means that the sequence reached a fixed point, not that the
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -123,7 +123,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
     #! See the twin note in the `OptimEntropyPooling` methods: an empty view set states
     #! nothing, so the posterior is the prior. Issue #852.
     if isempty(epc) && isempty(tvs)
-        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+        return scenario_probabilities(w)
     end
     w1 = ep_jump_entropy_pooling(w, epc, tvs, opt)
     iters = ep_refine_iters(tvs)
@@ -146,9 +146,9 @@ end
     ep_refine_iters(tv::AbstractEntropyPoolingTailView)
     ep_refine_iters(tvs::VecEPTV)
 
-Read the number of re-solves a tail view carrier asks [`entropy_pooling`](@ref) for.
+Read the number of re-solves a tail view constraint asks [`entropy_pooling`](@ref) for.
 
-A carrier whose rows are fixed at construction asks for none. A sequential carrier asks for the `iters` its formulation holds, and a vector of carriers asks for the largest number among its entries, so one loop serves every sequential view of the model.
+A tail view constraint whose rows are fixed at construction asks for none. A sequential tail view constraint asks for the `iters` its formulation holds, and a vector of tail view constraints asks for the largest number among its entries, so one loop serves every sequential view of the model.
 
 # Arguments
 
@@ -157,7 +157,7 @@ A carrier whose rows are fixed at construction asks for none. A sequential carri
 
 # Returns
 
-  - `iters::Integer`: Number of re-solves, zero for a carrier with fixed rows.
+  - `iters::Integer`: Number of re-solves, zero for a tail view constraint with fixed rows.
 
 # Related
 
@@ -174,9 +174,9 @@ end
 """
     ep_refine_tail_view(tv::AbstractEntropyPoolingTailView, w::VecNum)
 
-Re-read a tail view carrier at a posterior, and say whether its rows were already tight there.
+Re-read a tail view constraint at a posterior, and say whether its rows were already tight there.
 
-A carrier whose rows are fixed at construction is returned unchanged, and is always tight. A sequential carrier re-reads the multipliers of its primal side at `w`, which is what tightens its surrogate row between two solves of [`entropy_pooling`](@ref); its method lives beside it in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl`.
+A tail view constraint whose rows are fixed at construction is returned unchanged, and is always tight. A sequential tail view constraint re-reads the multipliers of its primal side at `w`, which is what tightens its surrogate row between two solves of [`entropy_pooling`](@ref); its method lives beside it in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl`.
 
 # Arguments
 
@@ -185,8 +185,8 @@ A carrier whose rows are fixed at construction is returned unchanged, and is alw
 
 # Returns
 
-  - `tv::AbstractEntropyPoolingTailView`: The carrier to solve with next.
-  - `tight::Bool`: Whether the rows `tv` held before the call were tight at `w`, within the tolerance the carrier holds. A tight row marks a fixed point of the sequence, which can be a local minimiser of the divergence and not the global one.
+  - `tv::AbstractEntropyPoolingTailView`: The tail view constraint to solve with next.
+  - `tight::Bool`: Whether the rows `tv` held before the call were tight at `w`, within the tolerance the tail view constraint holds. A tight row marks a fixed point of the sequence, which can be a local minimiser of the divergence and not the global one.
 
 # Related
 
@@ -200,9 +200,9 @@ end
 """
     ep_check_tail_window(tv::AbstractEntropyPoolingTailView, w::VecNum)
 
-Warn where the window of a tail view carrier can restrict the posterior.
+Warn where the window of a tail view constraint can restrict the posterior.
 
-Only [`IntegerConditionalValueatRiskViewConstraint`](@ref) reads a window: its model admits the posteriors that put at least `alpha` of their mass on the `sbar` largest losses of each asset. Where that restriction binds, the window holds exactly `alpha`, and the view can have a posterior of smaller divergence outside it, so the method warns. Every other carrier reads the whole sample and does nothing. The integer method lives in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
+Only [`IntegerConditionalValueatRiskViewConstraint`](@ref) reads a window: its model admits the posteriors that put at least `alpha` of their mass on the `sbar` largest losses of each asset. Where that restriction binds, the window holds exactly `alpha`, and the view can have a posterior of smaller divergence outside it, so the method warns. Every other tail view constraint reads the whole sample and does nothing. The integer method lives in `src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl`.
 
 # Arguments
 
@@ -226,9 +226,9 @@ end
     ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                             opt::JuMPEntropyPooling)
 
-Build and solve the entropy pooling model of one set of tail view carriers, once.
+Build and solve the entropy pooling model of one set of tail view constraints, once.
 
-`ep_jump_entropy_pooling` is the body of the [`JuMPEntropyPooling`](@ref) route of [`entropy_pooling`](@ref), which calls it once per set of carriers and re-calls it after re-reading the sequential ones. The two methods differ only in how they represent the divergence, and agree on every view.
+`ep_jump_entropy_pooling` is the body of the [`JuMPEntropyPooling`](@ref) route of [`entropy_pooling`](@ref), which calls it once per set of tail view constraints and re-calls it after re-reading the sequential ones. The two methods differ only in how they represent the divergence, and agree on every view.
 
 # Algorithm
 
@@ -240,7 +240,7 @@ Build and solve the entropy pooling model of one set of tail view carriers, once
  6. Add every view with [`ep_jump_views!`](@ref), which mutates `obj_expr` when a fixed equality is relaxed.
  7. Set the objective to `obj_expr` under [`ExpEntropyPooling`](@ref), and to `obj_expr` less `so` times the inner product of `x` with the prior log-probabilities under [`LogEntropyPooling`](@ref).
  8. Solve with `slv`, and raise when no solver configuration succeeds.
- 9. Clamp the value of `x` at zero, because the solver meets the non-negativity of step 4 to its feasibility tolerance only, and a mixed-integer solve can return an entry slightly below zero. Divide by its sum, and return it as `StatsBase.pweights`.
+ 9. Clamp the value of `x` at zero, because the solver meets the non-negativity of step 4 to its feasibility tolerance only, and a mixed-integer solve can return an entry slightly below zero. Divide by its sum, and return it through [`scenario_probabilities`](@ref), in the kind of `w`.
 
 # JuMP formulation
 
@@ -299,7 +299,7 @@ Where:
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -335,7 +335,7 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
     # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
-    return StatsBase.pweights(LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
+    return scenario_probabilities(w, LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
 end
 function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                                  opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -361,7 +361,7 @@ function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     # The solver meets `x >= 0` to its feasibility tolerance, so an entry can come back a
     # hair below zero, and every weighted estimator of the refit refuses it. Issue #1260.
-    return StatsBase.pweights(LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
+    return scenario_probabilities(w, LinearAlgebra.normalize(max.(JuMP.value.(x), 0), 1))
 end
 """
     ep_jump_views!(model::JuMP.Model, x, obj_expr, epc::AbstractDict, tvs::VecEPTV,

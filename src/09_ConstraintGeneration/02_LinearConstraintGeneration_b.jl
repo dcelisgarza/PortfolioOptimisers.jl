@@ -329,7 +329,7 @@ The two lines are different operations. The first repeats the coefficient on eve
   - `bl_flag`: Selects which of the two expansions above runs. `false` takes the first, which constrains the sum over the group. `true` takes the second, the Black-Litterman-style expansion, which constrains the mean.
   - `ep_flag`: If `true`, the function expands `prior(...)` expressions, for entropy pooling.
   - `rho_flag`: If `true`, the function expands correlation views `(A, B)`, for entropy pooling.
-  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A shed group is recorded into it through [`record_group_shed!`](@ref).
+  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting. A shed group is recorded into it through [`record_group_shed!`](@ref).
 
 # Validation
 
@@ -395,7 +395,7 @@ function replace_group_by_assets(res::ParsingResult, sets::UniverseSets,
     # Investable Mask *before* the coefficient is spread: the mean then divides by the
     # surviving count, and the row still computes what its right-hand side asserts. A name
     # written out in the equation is the caller pointing at one asset, and that one takes
-    # its row with it, one door later. See ADR 0125.
+    # its row with it later, in `get_linear_constraints`. See ADR 0125.
     other = counterpart_axis_names(sets, sets.xkey)
     variables, coeffs = res.vars, res.coef
     variables_new, coeffs_new = copy(variables), copy(coeffs)
@@ -638,7 +638,7 @@ The function resolves the variable names of one or more [`ParsingResult`](@ref)s
 
 A row takes one of two shapes. Without `rr`, it runs over the universe that the names resolve against. With `rr`, it runs over the assets, because the loadings re-base each term during the assembly and the result is an ordinary asset-space row.
 
-The function drops whole rows and never single terms. A row is one statement over several names with one right-hand side, so a name that the function cannot resolve drops the whole row. `a + c == 0.05` without `c` fits `a == 0.05`, which is a different and stronger statement than the caller wrote. The cause of the failure decides only whether the function reports the drop. The function drops a row that names the counterpart axis in silence, whatever `strict` is. [`counterpart_axis_names`](@ref) reads that axis, which in practice is the Non-Investable Axis that a door wrote. The name was correct over the universe that the caller had, and the data moved it, so the door reports the departure once. A name on neither axis is a typo, and the function reports it.
+The function drops whole rows and never single terms. A row is one statement over several names with one right-hand side, so a name that the function cannot resolve drops the whole row. `a + c == 0.05` without `c` fits `a == 0.05`, which is a different and stronger statement than the caller wrote. The cause of the failure decides only whether the function reports the drop. The function drops a row that names the counterpart axis in silence, whatever `strict` is. [`counterpart_axis_names`](@ref) reads that axis, which in practice is the Non-Investable Axis that the entry of a fit wrote. The name was correct over the universe that the caller had, and the data moved it, so the entry of the fit reports the departure once. A name on neither axis is a typo, and the function reports it.
 
 # Algorithm
 
@@ -662,7 +662,7 @@ The function drops whole rows and never single terms. A row is one statement ove
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, a variable name that the universe does not hold throws. If `false`, it warns.
   - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. Callers do not pass it directly, and [`ExposureConstraintEstimator`](@ref) passes it.
-  - `ledger`: The door's ledger of departure casualties, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
+  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
@@ -991,11 +991,11 @@ end
 
 Refuse a precomputed [`LinearConstraint`](@ref) whose rows are wider than the investable universe, with a message that states why.
 
-A name-keyed estimator stays valid after a reduction to the Investable Mask. It resolves against the [`UniverseSets`](@ref) that the door gives it, and a name that left resolves on the Non-Investable Axis and is not refused. A precomputed constraint cannot do this. Its `A` is a matrix, and the position is the only link between a column and an asset, so there is no name to resolve again and no correct way to narrow the matrix. A dropped column changes what `Ax ≤ B` means, and for that reason [`port_opt_view`](@ref)`(::LinearConstraint, i)` is the identity.
+A name-keyed estimator stays valid after a reduction to the Investable Mask. It resolves against the [`UniverseSets`](@ref) that the entry of the fit gives it, and a name that left resolves on the Non-Investable Axis and is not refused. A precomputed constraint cannot do this. Its `A` is a matrix, and the position is the only link between a column and an asset, so there is no name to resolve again and no correct way to narrow the matrix. A dropped column changes what `Ax ≤ B` means, and for that reason [`port_opt_view`](@ref)`(::LinearConstraint, i)` is the identity.
 
-The row therefore passes the door at its original width and meets a shorter weight vector. Without this check, the model raises a bare `DimensionMismatch` between two numbers, and nothing links either number to the asset that delisted. This function raises once, before the model, and its message states what the caller did and what the caller can do instead.
+The row therefore passes the entry of the fit at its original width and meets a shorter weight vector. Without this check, the model raises a bare `DimensionMismatch` between two numbers, and nothing links either number to the asset that delisted. This function raises once, before the model, and its message states what the caller did and what the caller can do instead.
 
-The repair is always the same. State the constraint as a [`LinearConstraintEstimator`](@ref), which resolves its names again over the universe that the door leaves.
+The repair is always the same. State the constraint as a [`LinearConstraintEstimator`](@ref), which resolves its names again over the universe that the entry of the fit leaves.
 
 # Algorithm
 
@@ -1033,7 +1033,7 @@ function assert_investable_constraint_width(lc::LinearConstraint, N::Integer,
             continue
         end
         @argcheck(size(half.A, 2) == N,
-                  DimensionMismatch("the precomputed linear constraint in `$slot` is written over $(size(half.A, 2)) assets, but this optimisation runs over $N. An asset left the investable universe, and a precomputed constraint cannot follow it: its `A` is bound to its columns by position, so no column can be dropped without changing what the constraint means. State it as a LinearConstraintEstimator, which is resolved by name against whatever universe the door leaves."))
+                  DimensionMismatch("the precomputed linear constraint in `$slot` is written over $(size(half.A, 2)) assets, but this optimisation runs over $N. An asset left the investable universe, and a precomputed constraint cannot follow it: its `A` is bound to its columns by position, so no column can be dropped without changing what the constraint means. State it as a LinearConstraintEstimator, which is resolved by name against whatever universe the entry of the optimisation leaves."))
     end
     return nothing
 end

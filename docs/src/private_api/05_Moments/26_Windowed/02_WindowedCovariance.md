@@ -1,7 +1,12 @@
 ```@meta
-Description = "Windowed covariance has no private API in PortfolioOptimisers.jl; its names are in the public API."
+Description = "Windowed covariance, private API of PortfolioOptimisers.jl: variance_series."
 ```
 
 # Windowed covariance: private API
 
-Every name of this topic is public. The [public page](@ref api-windowed-covariance) documents them.
+## Functions
+
+```@docs
+variance_series(ce::WindowedCovariance, X::MatNum; dims::Int = 1, kwargs...)
+variance_series(ce::WindowedCovariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
+```

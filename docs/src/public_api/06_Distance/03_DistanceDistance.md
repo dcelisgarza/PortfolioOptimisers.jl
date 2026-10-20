@@ -1,8 +1,8 @@
 ```@meta
-Description = "Distances of Distances, public API of PortfolioOptimisers.jl: DistanceDistance, distance, cor_and_dist."
+Description = "Distance distance, public API of PortfolioOptimisers.jl: DistanceDistance, distance, cor_and_dist."
 ```
 
-# [Distances of Distances](@id api-distances-of-distances)
+# [Distance distance](@id api-distance-distance)
 
 ```@docs
 DistanceDistance

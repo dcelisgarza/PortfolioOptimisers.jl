@@ -13,9 +13,9 @@ In order to implement a new prior estimator which will work seamlessly with the 
 
 The family fixes the signature. A member of the `_A` family declares `F` as `args...` and never reads it, a member of the `_F` family declares it `F::MatNum` and requires it, and a member of the `_AF` family declares it `F::Option{<:MatNum} = nothing` and reads it when it is there.
 
-`pnl` is the Asset Panel the carrier held, and the [`ReturnsResult`](@ref) method forwards it to every estimator. Take it and ignore it unless the estimator is fitted on a panel, as [`CrossSectionalFactorPrior`](@ref) is. An estimator that wraps another over the assets forwards it unchanged, so that the wrapped estimator composes; one that wraps a prior over the factors does not, because no panel describes a factor axis. An estimator that declares `args...` takes it there and needs no further declaration.
+`pnl` is the Asset Panel of the [`ReturnsResult`](@ref), and the `ReturnsResult` method forwards it to every estimator. Take it and ignore it unless the estimator is fitted on a panel, as [`CrossSectionalFactorPrior`](@ref) is. An estimator that wraps another over the assets forwards it unchanged, so that the wrapped estimator composes; one that wraps a prior over the factors does not, because no panel describes a factor axis. An estimator that declares `args...` takes it there and needs no further declaration.
 
-The method returns the carrier of its own order: a low order estimator returns a [`LowOrderPrior`](@ref), and a high order estimator returns a [`HighOrderPrior`](@ref). An estimator that wraps another rebuilds the wrapped result with [`forward_prior`](@ref) rather than by a hand-written constructor call, so that every field it does not name survives the hop.
+The method returns the prior result of its own order: a low order estimator returns a [`LowOrderPrior`](@ref), and a high order estimator returns a [`HighOrderPrior`](@ref). An estimator that wraps another rebuilds the wrapped result with [`forward_prior`](@ref) rather than by a hand-written constructor call, so that every field it does not name survives the hop.
 
 The [`ReturnsResult`](@ref) method of [`prior`](@ref) is supplied by this file and needs no implementation.
 
@@ -31,6 +31,24 @@ The [`ReturnsResult`](@ref) method of [`prior`](@ref) is supplied by this file a
 ## Returns
 
   - `pr::AbstractPriorResult`: Result object containing the estimated prior.
+
+## `carry_folds` (optional)
+
+  - `carry_folds(pe::MyPriorEstimator) -> Bool`: Returns `true` when the carry fold of a [`CrossSectionalFactorPrior`](@ref) folds the prior as its factor prior, one row at a time.
+
+A prior that returns `true` also implements `partial_fit!(pe, f::MatNum) -> pe`, which folds factor returns into a state that the prior holds, and `prior(pe; strict::Bool = false) -> LowOrderPrior`, which reads that state. The fallback returns `false`, which is exact for every prior. Its cost is on the carry fold. [`FoldOrRefit`](@ref) fits the factor prior again over every carried factor return at each step, and [`FoldOnly`](@ref) refuses the prior.
+
+## `returns_source` (optional)
+
+  - `returns_source(pe::MyPriorEstimator) -> Option{<:AbstractReturnsSource}`: Returns the source of the returns that the prior fits on, usually a field `x_src::Option{<:AbstractReturnsSource}` that the keyword constructor checks with `PortfolioOptimisers.assert_returns_source(x_src, PortfolioOptimisers.DATA_RETURNS_SOURCES, :MyPriorEstimator)`.
+
+The [`ReturnsResult`](@ref) method of [`prior`](@ref) reads the source through this method, and so does the frame walk of an optimiser. The fallback returns `nothing`, so a prior that implements no method reads the raw returns `rd.X`. A prior that holds another reader in a field refuses a source on it in its keyword constructor with `PortfolioOptimisers.assert_inner_reader`, because the outer prior picks the returns.
+
+## `keeps_observations` (optional)
+
+  - `keeps_observations(pe::MyPriorEstimator) -> Bool`: Returns `true` when the result carries one scenario for each observation that the prior receives, for every configuration and all data.
+
+A prior that reweights observations, such as [`EntropyPoolingPrior`](@ref), reads this method on the prior that it wraps. Under a caller's prior probabilities, it reads the count of the scenarios of the wrapped prior before it fits that prior under them. A wrapped prior that returns `true` states the count with no fit. The count of a wrapped prior that makes no promise runs only the steps that drop rows, and the wrapped prior is fitted once more to read the count only when no method of `PortfolioOptimisers.scenario_count` states it. The fallback returns `false`, which is correct for every prior and costs at most that fit. A prior that drops rows, such as one that holds a Scenario Cap, keeps the fallback. A prior that wraps another returns the answer of the prior that it wraps.
 
 # Examples
 
@@ -48,17 +66,20 @@ julia> function PortfolioOptimisers.prior(pe::MyPriorEstimator, X::PortfolioOpti
 
 julia> prior(MyPriorEstimator(), [0.01 0.02; 0.03 0.04])
 LowOrderPrior
-      X ┼ 2×2 Matrix{Float64}
-    o_X ┼ nothing
-     mu ┼ Vector{Float64}: [0.02, 0.03]
-  sigma ┼ 2×2 Matrix{Float64}
-   chol ┼ nothing
-      w ┼ nothing
-    ens ┼ nothing
-    kld ┼ nothing
-     ow ┼ nothing
-     rr ┼ nothing
-    fpr ┴ nothing
+        X ┼ 2×2 Matrix{Float64}
+      o_X ┼ nothing
+       mu ┼ Vector{Float64}: [0.02, 0.03]
+    sigma ┼ 2×2 Matrix{Float64}
+     chol ┼ nothing
+        w ┼ nothing
+      ens ┼ nothing
+      kld ┼ nothing
+       ow ┼ nothing
+       rr ┼ nothing
+      fpr ┼ nothing
+    x_src ┼ nothing
+  ss_gaps ┼ nothing
+       pc ┴ nothing
 ```
 
 # Related
@@ -68,6 +89,7 @@ LowOrderPrior
   - [`AbstractPriorResult`](@ref)
   - [`prior`](@ref)
   - [`forward_prior`](@ref)
+  - [`carry_folds`](@ref)
 """
 abstract type AbstractPriorEstimator <: AbstractEstimator end
 """
@@ -75,7 +97,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for low order prior estimators.
 
-`AbstractLowOrderPriorEstimator` is the base type for estimators that compute low order moments (mean and covariance) from asset and/or factor returns. All concrete low order prior estimators should subtype this type for consistent moment estimation and integration. A member of this family returns a [`LowOrderPrior`](@ref), never a bare tuple of moments, so every consumer reads one carrier. It does not subtype this type directly: it subtypes the one of [`AbstractLowOrderPriorEstimator_A`](@ref), [`AbstractLowOrderPriorEstimator_F`](@ref) and [`AbstractLowOrderPriorEstimator_AF`](@ref) that names the returns it reads.
+`AbstractLowOrderPriorEstimator` is the base type for estimators that compute low order moments (mean and covariance) from asset and/or factor returns. All concrete low order prior estimators should subtype this type for consistent moment estimation and integration. A member of this family returns a [`LowOrderPrior`](@ref), never a bare tuple of moments, so every consumer reads one result type. It does not subtype this type directly: it subtypes the one of [`AbstractLowOrderPriorEstimator_A`](@ref), [`AbstractLowOrderPriorEstimator_F`](@ref) and [`AbstractLowOrderPriorEstimator_AF`](@ref) that names the returns it reads.
 
 # Related
 
@@ -259,7 +281,7 @@ abstract type AbstractHighOrderPriorEstimator_F <: AbstractHighOrderPriorEstimat
 
 Groups the two families that **require** factor returns, one per order.
 
-`AbstractHiLoOrderPriorEstimator_F` is the type-level half of the test for *this estimator cannot run without factor returns*, taken across both orders at once: a member answers `true` to [`needs_factor_returns`](@ref). The doors that check for a missing factor matrix ask the predicate rather than this union, because a factor leaf may sit under a host whose own factor argument is optional, and the predicate walks the tree where an `isa` test reads the host alone.
+`AbstractHiLoOrderPriorEstimator_F` is the type-level half of the test for *this estimator cannot run without factor returns*, taken across both orders at once: a member answers `true` to [`needs_factor_returns`](@ref). The checks at entry that look for a missing factor matrix ask the predicate rather than this union. A factor leaf may sit under an outer estimator whose own factor argument is optional, and the predicate walks the tree where an `isa` test reads the outer estimator alone.
 
 # Related
 
@@ -278,16 +300,16 @@ Abstract supertype for all prior result types.
 
 `AbstractPriorResult` is the base type for all result objects produced by prior estimators, containing computed prior information such as moments, asset returns, and factor returns. All concrete prior result types should subtype this to ensure a consistent interface for integration with portfolio optimisation workflows.
 
-The library ships two carriers: [`LowOrderPrior`](@ref) holds the returns, the mean and the covariance, and [`HighOrderPrior`](@ref) holds the co-moments over a [`LowOrderPrior`](@ref) it wraps.
+The library ships two prior result types: [`LowOrderPrior`](@ref) holds the returns, the mean and the covariance, and [`HighOrderPrior`](@ref) holds the co-moments over a [`LowOrderPrior`](@ref) it wraps.
 
 # Interfaces
 
-In order to implement a new prior result carrier which will work seamlessly with the library, subtype `AbstractPriorResult` with all necessary fields as part of the struct, and implement the following methods:
+In order to implement a new prior result type which will work seamlessly with the library, subtype `AbstractPriorResult` with all necessary fields as part of the struct, and implement the following methods:
 
-  - `reconstruct_prior(pr::AbstractPriorResult, patch::NamedTuple) -> AbstractPriorResult`: Rebuild the carrier through its own constructor with `patch` applied. This is what makes [`forward_prior`](@ref) work on the carrier, and it is written per carrier because the constructor is named rather than recovered by reflection.
-  - `port_opt_view(pr::AbstractPriorResult, i, args...) -> AbstractPriorResult`: Restrict the carrier to the assets at index `i`, for hierarchical and subset optimisation.
+  - `reconstruct_prior(pr::AbstractPriorResult, patch::NamedTuple) -> AbstractPriorResult`: Rebuild `pr` through its own constructor with `patch` applied. This is what makes [`forward_prior`](@ref) work on `pr`, and it is written per result type because the constructor is named rather than recovered by reflection.
+  - `port_opt_view(pr::AbstractPriorResult, i, args...) -> AbstractPriorResult`: Restrict `pr` to the assets at index `i`, for hierarchical and subset optimisation.
 
-The field list is derived by [`prior_field_values`](@ref), so a carrier that gains a field needs no further method. An `@pprop` field may only name a property of the two carriers [`prior_result_property_pool`](@ref) hard-codes today — [`LowOrderPrior`](@ref) and [`HighOrderPrior`](@ref); a third-party carrier's own property is refused by [`check_propagatable_contracts`](@ref) rather than recognised.
+The field list is derived by `prior_field_values`, so a result type that gains a field needs no further method. An `@pprop` field may only name a property of the two result types that `prior_result_property_pool` hard-codes today — [`LowOrderPrior`](@ref) and [`HighOrderPrior`](@ref); the own property of a third-party result type is refused by `check_propagatable_contracts` rather than recognised.
 
 ## Arguments
 
@@ -298,11 +320,11 @@ The field list is derived by [`prior_field_values`](@ref), so a carrier that gai
 
 ## Returns
 
-  - `pr::AbstractPriorResult`: A carrier of the same type as the input.
+  - `pr::AbstractPriorResult`: A prior result of the same type as the input.
 
 # Examples
 
-We can create a dummy prior result carrier as follows:
+We can create a dummy prior result type as follows:
 
 ```jldoctest
 julia> struct MyPriorResult <: PortfolioOptimisers.AbstractPriorResult
@@ -359,9 +381,9 @@ const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 """
     const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 
-Groups the two carriers that hold an asset returns matrix `X` and a feature matrix `Z`.
+Groups the two result types that hold an asset returns matrix `X` and a feature matrix `Z`.
 
-`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` off its carrier and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. A carrier holds its observations along the rows, so each forwarder passes `dims = 1` after `kwargs`, and a `dims` in `kwargs` has no effect. Where both carriers are present, [`returns_matrix_picker`](@ref) picks between them; both travel on to the estimator tree as `pr` and `rd`, so a [`FeatureDistance`](@ref) resolves its Asset Panel from them.
+`Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` off the result it receives and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Each result type holds its observations along the rows, so each forwarder passes `dims = 1` after `kwargs`, and a `dims` in `kwargs` has no effect. Where both results are present, [`returns_matrix_picker`](@ref) picks between them; both travel on to the estimator tree as `pr` and `rd`, so a [`FeatureDistance`](@ref) resolves its Asset Panel from them.
 
 # Related
 
@@ -371,7 +393,8 @@ Groups the two carriers that hold an asset returns matrix `X` and a feature matr
 """
 const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 """
-    prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+    prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
+          dims::Int = 1, cache_reg::Bool = false)
 
 Compute prior information from asset and/or factor returns using a prior estimator.
 
@@ -382,21 +405,29 @@ This method is the entry point every caller uses, and it is written once here. W
 # Algorithm
 
  1. Check that `rd` carries asset returns, so that the estimator is not handed a `nothing` for `X`.
- 2. When `pe` requires factor returns — when [`needs_factor_returns`](@ref) answers `true`, which walks the tree to a factor leaf under an optional-argument host — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the leaf's own signature one call later.
- 3. Call the estimator's returns-matrix method with `rd.X`, `rd.F` and `rd.pnl`, forwarding `rd.iv` and `rd.ivpa` as keyword arguments alongside `kwargs`, and return the prior result it produces. The call passes `dims = 1` last, because a `ReturnsResult` holds its observations along the rows. So a `dims` in `kwargs` has no effect.
+ 2. When `pe` requires factor returns — when [`needs_factor_returns`](@ref) answers `true`, which walks the tree to a factor leaf under an outer estimator whose factor argument is optional — check that `rd` carries them. The check is made here so that the caller reads a named error against `rd.F` rather than a `MethodError` against the leaf's own signature one call later.
+ 3. Read the source that `pe` states with [`returns_source`](@ref), giving `x_src`.
+ 4. Drop the observations of a Shared Series gap with [`shared_series_view`](@ref): a gap of a vector benchmark under `x_src = ExcessSource()`, and a gap of the factor returns when [`needs_factor_returns`](@ref) answers `true`. Every field of `rd` loses the same observations.
+ 5. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 6. Call the estimator's returns-matrix method with `X`, `rd.F` and `rd.pnl`, forwarding `rd.iv`, `rd.ivpa`, `rd.ne`, `rd.E`, `strict` and `cache_reg` as keyword arguments, and record `x_src` in the prior result it produces with [`stamp_returns_source`](@ref). A wrapping prior forwards its keyword arguments to the estimator it nests, so the Exogenous Series reaches a [`CrossSectionalFactorPrior`](@ref) whose observed factors read it, and every other estimator ignores it. The call passes `dims = 1`, because a `ReturnsResult` holds its observations along the rows. So the keyword `dims` has no effect.
+ 7. Record the observations that step 4 dropped with [`shared_series_record`](@ref), so a reader that holds `rd` pairs the rows of `X` with the right observations.
 
-The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no carrier, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
+The Asset Panel travels as the third positional argument for the same reason `rd.F` travels as the second: a wrapping prior holds no `ReturnsResult`, so it can compose an estimator that is fitted on a panel only if the panel reaches its own returns-matrix method. Every returns-matrix method takes the argument, every wrapping prior forwards it unchanged to the estimator it nests over the assets, and an estimator that reads no panel ignores it.
 
 # Arguments
 
   - $(arg_dict[:pe])
   - `rd`: Asset and/or factor returns result.
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
+  - $(arg_dict[:strict_prior_rd])
+  - $(arg_dict[:dims_rd])
+  - $(arg_dict[:cache_reg])
 
 # Validation
 
   - `!isnothing(rd.X)`.
+  - The rules of [`benchmark_relative_returns`](@ref).
   - `!isnothing(rd.F)`, when `needs_factor_returns(pe) === true`.
+  - The rules of [`shared_series_rows`](@ref).
 
 # Returns
 
@@ -411,10 +442,46 @@ The Asset Panel travels as the third positional argument for the same reason `rd
   - [`LowOrderPrior`](@ref)
   - [`HighOrderPrior`](@ref)
 """
-function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; kwargs...)
+function prior(pe::AbstractPriorEstimator, rd::ReturnsResult; strict::Bool = false,
+               dims::Int = 1, cache_reg::Bool = false)
     @argcheck(!isnothing(rd.X), IsNothingError)
     assert_factor_returns(pe, rd.F)
-    return prior(pe, rd.X, rd.F, rd.pnl; iv = rd.iv, ivpa = rd.ivpa, kwargs..., dims = 1)
+    x_src = returns_source(pe)
+    rf = needs_factor_returns(pe) === true
+    T = size(rd.X, 1)
+    rows = shared_series_rows(rd, x_src, rf)
+    rd = shared_series_view(rd, x_src, rf)
+    pr = prior(pe, benchmark_relative_returns(rd, x_src), rd.F, rd.pnl; iv = rd.iv,
+               ivpa = rd.ivpa, ne = rd.ne, E = rd.E, strict = strict, dims = 1,
+               cache_reg = cache_reg)
+    return stamp_returns_source(shared_series_record(pr, rows, T), pe)
+end
+"""
+    reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online}) -> Bool
+    reads_factor_returns(pe::Union{Nothing, <:AbstractPriorResult, <:AbstractEstimator}) -> Bool
+
+Answer whether a fit through `pe` reads the factor returns, so that a gap in them drops the observation, see [`shared_series_view`](@ref).
+
+A tree reads them when [`needs_factor_returns`](@ref) answers `true`. A tree whose factor argument is optional all the way down answers `nothing`, and it reads no factor return of its own. No prior, and a prior result that a caller computed before, read no factor return in this fit. Any other estimator in the place of a prior is a schedule that the nearest fold loop resolves, and the prior that it resolves to drops its own gaps at its entry, so the answer is `false`.
+
+# Arguments
+
+  - `pe`: The prior estimator, a prior result, or `nothing`.
+
+# Returns
+
+  - `flag::Bool`: `true` when the fit reads the factor returns.
+
+# Related
+
+  - [`needs_factor_returns`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function reads_factor_returns(pe::Union{<:AbstractPriorEstimator, <:Online})
+    return needs_factor_returns(pe) === true
+end
+function reads_factor_returns(::Union{Nothing, <:AbstractPriorResult, <:AbstractEstimator})
+    return false
 end
 """
     prior_regression_remedy
@@ -491,7 +558,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a prior result's own **fields** as a named tuple, keyed in declaration order.
 
-Reads through `getfield`, so it sees only what the carrier stores — never a name a [`@forward_properties`](@ref) block exposes on top. That is the distinction [`forward_prior`](@ref) needs: `HighOrderPrior` forwards the whole of its `pr`, so `mu` and `sigma` are *properties* of it without being fields, and only a field can be patched. The field list is derived rather than written out, so adding a field to a carrier does not need an edit here.
+Reads through `getfield`, so it sees only what `pr` stores — never a name a [`@forward_properties`](@ref) block exposes on top. That is the distinction [`forward_prior`](@ref) needs: `HighOrderPrior` forwards the whole of its `pr`, so `mu` and `sigma` are *properties* of it without being fields, and only a field can be patched. The field list is derived rather than written out, so adding a field to a prior result type does not need an edit here.
 
 # Algorithm
 
@@ -504,7 +571,7 @@ Reads through `getfield`, so it sees only what the carrier stores — never a na
 
 # Returns
 
-  - `vals::NamedTuple`: The carrier's own fields, keyed by name in declaration order.
+  - `vals::NamedTuple`: The fields of `pr`, keyed by name in declaration order.
 
 # Related
 
@@ -527,7 +594,7 @@ This is the mechanical half of the composition rule:
 
 Forwarding is the default and costs nothing to write, so a wrapper cannot accidentally return a narrower result than the one it wraps. Every deviation is spelled at the call site — a new value as `field = value`, a drop as `field = nothing` — which makes the set of drops greppable and reviewable instead of implicit in a hand-written constructor call listing all thirteen fields.
 
-Reconstruction goes through the carrier's ordinary keyword constructor (see [`reconstruct_prior`](@ref)), so **every `@argcheck` runs**: a forward that leaves the carrier internally inconsistent throws exactly as a hand-written constructor call would. Only the carrier's own **fields** may be named — a forwarded or computed property is a view of a nested value, so setting it could only ever mean setting the field that value came from.
+Reconstruction goes through the ordinary keyword constructor of `pr` (see [`reconstruct_prior`](@ref)), so **every `@argcheck` runs**: a forward that leaves the result internally inconsistent throws exactly as a hand-written constructor call would. Only the **fields** of `pr` may be named — a forwarded or computed property is a view of a nested value, so setting it could only ever mean setting the field that value came from.
 
 ## The three enforced bindings
 
@@ -535,24 +602,24 @@ Three fields are *bound* to another field's value rather than being independent,
 
   - **`sigma` binds `chol`.** `chol` *takes precedence over* `sigma` at every consumer, so a stale `chol` makes the optimisation silently ignore the posterior covariance.
   - **`w` binds `ens`, `kld` and `ow`.** Those are diagnostics *of* `w`; weights carrying another weighting's provenance cannot be interrogated.
-  - **`rr` binds `o_X`.** `o_X` says `X` is a reconstruction, and `rr` is what records the projection that produced it, so the carrier refuses one without the other. Dropping the factor block therefore drops the original with it.
+  - **`rr` binds `o_X`.** `o_X` says `X` is a reconstruction, and `rr` is what records the projection that produced it, so the constructor refuses one without the other. Dropping the factor block therefore drops the original with it.
 
-A binding is inert when the bound field is already `nothing` (there is nothing stale to carry) or absent from the carrier.
+A binding is inert when the bound field is already `nothing` (there is nothing stale to carry) or absent from `pr`.
 
 Everything else the constructor already covers: `rr` and `fpr` must be supplied together or not at all, and `w`, `chol` and `Z` are re-checked against the shape of `X` and `mu`.
 
 ## What does not fit
 
-The estimators that *lift* a factor-axis prior into an asset-axis result ([`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref)) and the one that *merges two priors* ([`AugmentedBlackLittermanPrior`](@ref)) are not forwarding a single wrapped result along its own axis, so they construct their carrier directly and should not be forced through this helper. `forward_prior` still applies to the *factor block* they build, which is an ordinary forward of the factor prior.
+The estimators that *lift* a factor-axis prior into an asset-axis result ([`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref)) and the one that *merges two priors* ([`AugmentedBlackLittermanPrior`](@ref)) are not forwarding a single wrapped result along its own axis, so they construct their prior result directly and should not be forced through this helper. `forward_prior` still applies to the *factor block* they build, which is an ordinary forward of the factor prior.
 
 # Algorithm
 
  1. Collect the keyword overrides into the named tuple `patch`. When `patch` is empty, return `pr` itself: a forward that changes nothing rebuilds nothing.
- 2. Compare the names of `patch` against the fields of `typeof(pr)`, giving `extra`, the names that are not fields. A non-empty `extra` raises an `ArgumentError` naming the carrier's fields.
+ 2. Compare the names of `patch` against the fields of `typeof(pr)`, giving `extra`, the names that are not fields. A non-empty `extra` raises an `ArgumentError` naming the fields of `pr`.
  3. Enforce the binding of `chol` to `sigma`. When `patch` names `sigma`, does not name `chol`, and [`bound_field_is_stale`](@ref) says `pr` holds a `chol`, raise a [`ConflictingArgumentError`](@ref).
  4. Enforce the binding of `o_X` to `rr`, on the same three tests, giving the second [`ConflictingArgumentError`](@ref).
  5. Enforce the binding of `ens`, `kld` and `ow` to `w`. When `patch` names `w`, collect into `stale` each of the three that `patch` does not name and that `pr` holds, and raise when `stale` is non-empty.
- 6. Rebuild the carrier through [`reconstruct_prior`](@ref), which merges `patch` over [`prior_field_values`](@ref) and calls the ordinary keyword constructor, so every `@argcheck` of the carrier runs on the result.
+ 6. Rebuild `pr` through [`reconstruct_prior`](@ref), which merges `patch` over [`prior_field_values`](@ref) and calls the ordinary keyword constructor, so every `@argcheck` of `typeof(pr)` runs on the result.
 
 # Arguments
 
@@ -627,11 +694,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` when field `sym` of `pr` holds a value that would go stale if the field it is bound to changed without it.
 
-A field that the carrier does not have, or holds as `nothing`, has nothing to go stale. Reads through `getfield` so a forwarded property of the same name cannot answer for a field the carrier does not own.
+A field that `pr` does not have, or holds as `nothing`, has nothing to go stale. Reads through `getfield` so a forwarded property of the same name cannot answer for a field that `pr` does not own.
 
 # Algorithm
 
- 1. Check whether `typeof(pr)` declares a field named `sym`. When it does not, the binding is inert on this carrier, so answer `false` without reading anything.
+ 1. Check whether `typeof(pr)` declares a field named `sym`. When it does not, the binding is inert on `pr`, so answer `false` without reading anything.
  2. Read that field with `getfield`, and answer `true` when the value it holds is not `nothing`.
 
 # Arguments
@@ -641,7 +708,7 @@ A field that the carrier does not have, or holds as `nothing`, has nothing to go
 
 # Returns
 
-  - `stale::Bool`: `true` when the carrier holds a value under `sym` that a change to the field it is bound to would make stale.
+  - `stale::Bool`: `true` when `pr` holds a value under `sym` that a change to the field it is bound to would make stale.
 
 # Related
 
@@ -688,7 +755,7 @@ Pass a prior estimator, or a vector of priors, through a view unchanged.
 
 Both methods are the not-sliceable branch of [`port_opt_view`](@ref). An estimator carries a recipe rather than data on an asset axis, so there is nothing in it to cut down: the subproblem refits it on its own universe instead. A vector arrives already resolved per subproblem — one entry per cluster or per subset — so the entry has been chosen by the time the view is taken, and slicing the vector by an asset index would cut the wrong axis.
 
-The carriers that *do* hold data on the asset axis take their own methods: see [`port_opt_view`](@ref) on [`LowOrderPrior`](@ref) and on [`HighOrderPrior`](@ref).
+The prior result types that *do* hold data on the asset axis take their own methods: see [`port_opt_view`](@ref) on [`LowOrderPrior`](@ref) and on [`HighOrderPrior`](@ref).
 
 # Arguments
 
@@ -719,400 +786,6 @@ function port_opt_view(pr::AbstractVector{<:Union{<:AbstractPriorResult,
     return pr
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Pick the returns matrix the clustering, phylogeny and centrality estimators read.
-
-Two carriers can supply asset returns: the prior result and the raw returns result. `x_src` names which one wins — `:prior` takes `pr.X`, `:data` takes `rd.X`. When no returns result is available there is nothing to select between, so `pr.X` is used and `x_src` is inert.
-
-# Algorithm
-
- 1. Check that `x_src` names one of the two carriers, with [`assert_source_selector`](@ref).
- 2. Return `pr.X` when there is no returns result, or when `x_src` is `:prior`. Return `rd.X` otherwise.
-
-# Arguments
-
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Consulted only when `x_src` is `:data`.
-  - $(arg_dict[:x_src])
-
-# Validation
-
-  - `x_src in (:prior, :data)`.
-
-# Returns
-
-  - `X::MatNum`: Asset returns matrix from the selected carrier.
-
-# Related
-
-  - [`assert_source_selector`](@ref)
-  - [`clusterise`](@ref)
-  - [`phylogeny_matrix`](@ref)
-  - [`centrality_vector`](@ref)
-"""
-function returns_matrix_picker(pr::Pr_RR, rd::Option{<:ReturnsResult}, x_src::Symbol)
-    assert_source_selector(x_src, :x_src)
-    return isnothing(rd) || x_src == :prior ? pr.X : rd.X
-end
-"""
-    clusterise(cle::AbstractClustersEstimator, pr::AbstractPriorResult; kwargs...)
-
-Clusterise asset or factor returns from a prior result using a clustering estimator.
-
-`clusterise` applies the specified clustering estimator to the asset returns matrix contained in the prior result object, producing a clustering result for use in phylogeny analysis, constraint generation, or portfolio construction.
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`clusterise`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the clustering result it produces.
-
-# Arguments
-
-  - `cle`: Clustering estimator.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments passed to the clustering estimator.
-
-# Returns
-
-  - `clr::AbstractClusteringResult`: Result object containing clustering information.
-
-# Related
-
-  - [`ClustersEstimator`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`clusterise`](@ref)
-"""
-function clusterise(cle::AbstractClustersEstimator, pr::Pr_RR;
-                    rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                    kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return clusterise(cle, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-    phylogeny_matrix(pl::NwE_ClE_Cl, pr::AbstractPriorResult;
-                     kwargs...)
-
-Compute the phylogeny matrix from asset returns in a prior result using a network or clustering estimator.
-
-`phylogeny_matrix` applies the specified network or clustering estimator to the asset returns matrix contained in the prior result object, producing a phylogeny matrix for use in constraint generation, centrality analysis, or portfolio construction.
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`phylogeny_matrix`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the phylogeny result it produces.
-
-# Arguments
-
-  - `pl`: Network estimator, clusters estimator, or clustering result.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
-
-# Returns
-
-  - `plr::PhylogenyResult`: Result object containing the phylogeny matrix.
-
-# Related
-
-  - [`NetworkEstimator`](@ref)
-  - [`ClustersEstimator`](@ref)
-  - [`PhylogenyResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`phylogeny_matrix`](@ref)
-"""
-function phylogeny_matrix(pl::NwE_ClE_Cl, pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                          x_src::Symbol = :prior, kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return phylogeny_matrix(pl, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Compute phylogeny constraints from asset returns in a prior result using a phylogeny constraint estimator.
-
-`phylogeny_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `x_src` is `:data`).
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`phylogeny_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the constraint result it produces.
-
-# Arguments
-
-  - `plc`: Phylogeny constraint estimator.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments passed to the estimator.
-
-# Returns
-
-  - Phylogeny constraint result.
-
-# Related
-
-  - [`AbstractPhylogenyConstraintEstimator`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`phylogeny_constraints`](@ref)
-"""
-function phylogeny_constraints(plc::AbstractPhylogenyConstraintEstimator, pr::Pr_RR;
-                               rd::Option{<:ReturnsResult} = nothing,
-                               x_src::Symbol = :prior, kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return phylogeny_constraints(plc, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-    centrality_vector(cte::CentralityEstimator, pr::AbstractPriorResult; kwargs...)
-
-Compute the centrality vector for a centrality estimator and prior result.
-
-`centrality_vector` applies the centrality algorithm in the estimator to the network constructed from the asset returns in the prior result, returning centrality scores for each asset.
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the centrality result it produces.
-
-# Arguments
-
-  - $(arg_dict[:cte])
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - `plr::PhylogenyResult`: Result object containing the centrality vector.
-
-# Related
-
-  - [`CentralityEstimator`](@ref)
-  - [`PhylogenyResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`centrality_vector`](@ref)
-"""
-function centrality_vector(cte::CentralityEstimator, pr::Pr_RR;
-                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_vector(cte, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-    centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm,
-                      pr::AbstractPriorResult; kwargs...)
-
-Compute the centrality vector for a network or clustering estimator and centrality algorithm.
-
-`centrality_vector` constructs the phylogeny matrix from the asset returns in the prior result, builds a graph, and computes node centrality scores using the specified centrality algorithm.
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`centrality_vector`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the centrality result it produces.
-
-# Arguments
-
-  - `pl`: Network estimator, clusters estimator, or clustering result.
-  - $(arg_dict[:cta])
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - `plr::PhylogenyResult`: Result object containing the centrality vector.
-
-# Related
-
-  - [`NetworkEstimator`](@ref)
-  - [`CentralityEstimator`](@ref)
-  - [`PhylogenyResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`centrality_vector`](@ref)
-"""
-function centrality_vector(pl::NwE_ClE_Cl, ct::AbstractCentralityAlgorithm, pr::Pr_RR;
-                           rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                           kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_vector(pl, ct, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-    average_centrality(pl::NwE_Pl_ClE_Cl,
-                       ct::AbstractCentralityAlgorithm, w::VecNum,
-                       pr::AbstractPriorResult; kwargs...)
-
-Compute the weighted average centrality for a network or phylogeny result.
-
-`average_centrality` computes the centrality vector using the specified network or phylogeny estimator and centrality algorithm, then returns the weighted average using the provided portfolio weights.
-
-# Algorithm
-
- 1. Compute the centrality result with the [`Pr_RR`](@ref) method of [`centrality_vector`](@ref), forwarding `rd` and `x_src` unchanged. The source selection is therefore made once, there, and this method never reads a carrier itself.
- 2. Return the dot product of that result's `X`, the centrality vector, with the weights `w`.
-
-# Arguments
-
-  - `pl`: Network estimator or phylogeny result.
-  - $(arg_dict[:cta])
-  - `w`: Portfolio weights vector.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - `ac::Number`: Weighted average centrality.
-
-# Related
-
-  - [`NetworkEstimator`](@ref)
-  - [`CentralityEstimator`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`centrality_vector`](@ref)
-  - [`average_centrality`](@ref)
-"""
-function average_centrality(pl::NwE_Pl_ClE_Cl, ct::AbstractCentralityAlgorithm, w::VecNum,
-                            pr::Pr_RR; rd::Option{<:ReturnsResult} = nothing,
-                            x_src::Symbol = :prior, kwargs...)
-    return LinearAlgebra.dot(centrality_vector(pl, ct, pr; rd = rd, x_src = x_src,
-                                               kwargs...).X, w)
-end
-"""
-    average_centrality(cte::CentralityEstimator, w::VecNum, pr::AbstractPriorResult;
-                       kwargs...)
-
-Compute the weighted average centrality for a centrality estimator.
-
-`average_centrality` applies the centrality algorithm in the estimator to the network constructed from the asset returns in the prior result, then returns the weighted average using the provided portfolio weights.
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`average_centrality`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the weighted average it produces.
-
-The estimator method picks the carriers itself, where the network-and-algorithm method above delegates that to [`centrality_vector`](@ref). The two reach the same selection: `cte` carries `pl` and `ct` in its own fields, so the asset-returns method it calls is the one the other method's step 1 would have reached.
-
-# Arguments
-
-  - $(arg_dict[:cte])
-  - `w`: Portfolio weights vector.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments.
-
-# Returns
-
-  - `ac::Number`: Weighted average centrality.
-
-# Related
-
-  - [`CentralityEstimator`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`centrality_vector`](@ref)
-  - [`average_centrality`](@ref)
-"""
-function average_centrality(cte::CentralityEstimator, w::VecNum, pr::Pr_RR;
-                            rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                            kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return average_centrality(cte, w, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-    asset_phylogeny(pl::NwE_ClE_Cl,
-                    w::VecNum, pr::AbstractPriorResult; kwargs...)
-
-Compute the asset phylogeny score for a portfolio allocation using a phylogeny estimator or clustering result and a prior result.
-
-This function computes the phylogeny matrix from the asset returns in the prior result using the specified phylogeny estimator or clustering result, then evaluates the asset phylogeny score for the given portfolio weights. The asset phylogeny score quantifies the degree of phylogenetic (network or cluster-based) structure present in the portfolio allocation.
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`asset_phylogeny`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the score it produces.
-
-# Arguments
-
-  - `pl`: Phylogeny estimator or clustering result used to compute the phylogeny matrix.
-  - `w`: Portfolio weights vector.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments passed to the phylogeny matrix computation.
-
-# Returns
-
-  - `score::Number`: Asset phylogeny score.
-
-# Related
-
-  - [`phylogeny_matrix`](@ref)
-  - [`AbstractPhylogenyEstimator`](@ref)
-  - [`AbstractClusteringResult`](@ref)
-  - [`AbstractPriorResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`asset_phylogeny`](@ref): The asset-returns methods this one delegates to. They build the phylogeny matrix, add up the gross weight of the related pairs, and divide by the gross weight of every pair. That is where the score's closed form and its numbered steps are stated.
-"""
-function asset_phylogeny(pl::NwE_ClE_Cl, w::VecNum, pr::Pr_RR;
-                         rd::Option{<:ReturnsResult} = nothing, x_src::Symbol = :prior,
-                         kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return asset_phylogeny(pl, w, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Compute centrality constraints from asset returns in a prior result using a centrality constraint estimator.
-
-`centrality_constraints` delegates to the asset-returns variant by extracting `X` from `pr` (or `rd` if provided and `x_src` is `:data`).
-
-# Algorithm
-
- 1. Pick the asset returns matrix `X` from the carrier that `x_src` names, with [`returns_matrix_picker`](@ref).
- 2. Call the asset-returns method of [`centrality_constraints`](@ref) with `X`, passing both carriers on as `pr` and `rd` and `dims = 1` last, and return the constraint result it produces.
-
-# Arguments
-
-  - `ccs`: Centrality constraint estimator or vector thereof.
-  - $(arg_dict[:pr_rr])
-  - $(arg_dict[:rd]) Read for `X` only when `x_src` is `:data`, and passed on to the estimator tree.
-  - $(arg_dict[:x_src])
-  - `kwargs...`: Additional keyword arguments passed to the estimator. `strict` is read by the asset-returns variant, which reports a dropped zero centrality vector through it.
-
-# Returns
-
-  - Centrality constraint result.
-
-# Related
-
-  - [`AbstractPriorResult`](@ref)
-  - [`Pr_RR`](@ref)
-  - [`returns_matrix_picker`](@ref)
-  - [`centrality_constraints`](@ref)
-"""
-function centrality_constraints(ccs::CC_VecCC, pr::Pr_RR;
-                                rd::Option{<:ReturnsResult} = nothing,
-                                x_src::Symbol = :prior, kwargs...)
-    X = returns_matrix_picker(pr, rd, x_src)
-    return centrality_constraints(ccs, X; pr = pr, rd = rd, kwargs..., dims = 1)
-end
-"""
 $(DocStringExtensions.TYPEDEF)
 
 Carries the returns, mean and covariance a low order prior estimator produced.
@@ -1136,20 +809,23 @@ $(DocStringExtensions.FIELDS)
         kld::Option{<:Num_VecNum} = nothing,
         ow::Option{<:VecNum} = nothing,
         rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-        fpr::Option{<:LowOrderPrior} = nothing
+        fpr::Option{<:LowOrderPrior} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing,
+        ss_gaps::Option{<:AbstractVector{Bool}} = nothing,
+        pc::Option{<:NamedTuple} = nothing
     ) -> LowOrderPrior
 
 Keywords correspond to the struct's fields.
 
 ## The factor block
 
-A prior fit through a factor model carries two distributions: one over the assets, in the carrier's own fields, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the carrier has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`.
+A prior fit through a factor model carries two distributions: one over the assets, in the fields of the `LowOrderPrior` itself, and one over the factors. The factor one is a **nested `LowOrderPrior`** in `fpr` rather than a set of `f_`-prefixed flat fields, so it gains every field the `LowOrderPrior` has — `w`, `ens`, `kld` and `ow` as well as `mu` and `sigma` — and gains any field added in future without a second edit. Its `X` is the factor returns matrix, over the same observations as the asset `X`.
 
 `fpr` travels with `rr`: the two are the factor block, and the constructor requires them together or not at all. `rr` is what projects the block onto the assets (`mu ≈ rr.M * fpr.mu + rr.b`), so a factor distribution with no loadings could not be read against this asset axis.
 
 `rr` is bound to [`AbstractLoadingsRegressionResult`](@ref), the root that states a member carries the loadings matrix `M`, so a [`Regression`](@ref) and a [`CrossSectionalFactorModel`](@ref) both sit in the slot. The bound is the loadings criterion and not a fitting geometry: every invariant the constructor checks here reads `rr.M` alone, `fpr` sits on the axis `M`'s columns name, and every consumer of the slot reads `M`, or reads `L` and gets `M` back when `L` is unset.
 
-One property of the block does not follow from the slot, and a consumer that needs it must ask. A member fitted in a re-based Factor Family states so through [`has_family_rebasis`](@ref), and its `fpr.sigma` is then singular by construction, because the raw factor axis is a linear image of the re-based one. Projecting through `M` is unaffected — that is what [`HighOrderFactorPriorEstimator`](@ref) does — but inverting or factorising `fpr.sigma` has no answer. The inversion does not say so: it raises nothing and returns a result whose scale looks ordinary, so [`BayesianBlackLittermanPrior`](@ref) refuses such a carrier rather than reporting one.
+One property of the block does not follow from the slot, and a consumer that needs it must ask. A member fitted in a re-based Factor Family states so through [`has_family_rebasis`](@ref), and its `fpr.sigma` is then singular by construction, because the raw factor axis is a linear image of the re-based one. Projecting through `M` is unaffected — that is what [`HighOrderFactorPriorEstimator`](@ref) does — but inverting or factorising `fpr.sigma` has no answer. The inversion does not say so: it raises nothing and returns a result whose scale looks ordinary, so [`BayesianBlackLittermanPrior`](@ref) refuses such a prior result rather than reporting one.
 
 The flat names are **virtual reads** of the nested block, so code written against the old shape is unaffected: `pr.f_mu`, `pr.f_sigma` and `pr.f_w` return `fpr.mu`, `fpr.sigma` and `fpr.w`, or `nothing` when there is no factor block, and `pr.f_ens`, `pr.f_kld` and `pr.f_ow` come with them. They are properties, not fields — [`forward_prior`](@ref) and [`prior_field_values`](@ref) see only `fpr`.
 
@@ -1157,13 +833,13 @@ The flat names are **virtual reads** of the nested block, so code written agains
 
 **`pr.fpr.mu` is the public read**; the flat `f_`-prefixed names are a **compatibility surface**, kept so that code written against the pre-nesting shape keeps working, and useful where a value-or-`nothing` read without branching is wanted.
 
-The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over eleven fields, so `fpr.X` — the factor returns matrix — and `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
+The reason is not taste. The flat surface is **partial and frozen**: there are six flat names over eleven fields, so `fpr.X` — the factor returns matrix — and `fpr.chol` and `fpr.rr` have no flat spelling at all and never will. A surface that cannot express the whole block cannot be the way to read it. The set is fixed at the six here and the seven on [`HighOrderPrior`](@ref); a field added to a `LowOrderPrior` in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart, so nothing has to be added in two places to stay complete.
 
 The two reads also differ where the block is absent, which is the one case worth checking before choosing: `pr.f_mu` returns `nothing`, while `pr.fpr.mu` throws, because `fpr` is `nothing`. Guard with [`assert_prior_regression`](@ref) — `rr` and `fpr` are supplied together or not at all, so checking `rr` establishes the whole block — and then read through `fpr`.
 
 ## Composition: what a wrapping estimator forwards
 
-Most prior estimators wrap another and return a carrier built from the one they were handed. Which fields survive that hop is governed by a single rule, enforced by [`forward_prior`](@ref):
+Most prior estimators wrap another and return a prior result built from the one they were handed. Which fields survive that hop is governed by a single rule, enforced by [`forward_prior`](@ref):
 
 > **Forward when forwarding is correct; drop only where forwarding would state something false; document every drop in the estimator's docstring.**
 
@@ -1171,26 +847,37 @@ Consistency of the returned result is the criterion, and destroying a value the 
 
 ## The original returns matrix
 
-Those same three estimators are the reason `o_X` exists. They overwrite `X`, so on their carriers `X` is a **posterior** matrix — the asset distribution this prior asserts — and not the returns the caller supplied. `o_X` holds the returns the caller supplied. It is `nothing` everywhere else, where `X` already is them.
+Those same three estimators are the reason `o_X` exists. They overwrite `X`, so on their results `X` is a **posterior** matrix — the asset distribution this prior asserts — and not the returns the caller supplied. `o_X` holds the returns the caller supplied. It is `nothing` everywhere else, where `X` already is them.
 
 The two matrices are not interchangeable. The reconstruction spans only the factors: it has rank `size(F, 2)`, and the residual is absent. A consumer that refits a moment on the sample must therefore read the original, or it gets a singular matrix whenever there are more assets than factors.
 
-**Read it as `original_X`, never as `o_X`.** The property is always a matrix — the field where there is one, `X` where there is not — so a consumer needs no fallback and cannot forget one. The field is storage, and it answers a different question: `isnothing(pr.o_X)` is how to ask whether this carrier reconstructed `X`. The field carries the state rather than the property carrying it, because [`forward_prior`](@ref) rebuilds through the keyword constructor with every field named, and a `nothing` is inert there where an always-populated matrix would go stale past a change to `X`.
+**Read it as `original_X`, never as `o_X`.** The property is always a matrix — the field where there is one, `X` where there is not — so a consumer needs no fallback and cannot forget one. The field is storage, and it answers a different question: `isnothing(pr.o_X)` is how to ask whether this prior result reconstructed `X`. The field carries the state rather than the property carrying it, because [`forward_prior`](@ref) rebuilds through the keyword constructor with every field named, and a `nothing` is inert there where an always-populated matrix would go stale past a change to `X`.
 
-`o_X` requires `rr`. Every estimator that overwrites `X` today does so by projecting a factor prior through regression loadings, so a carrier claiming a reconstruction it cannot explain is a bug. This is a present-tense constraint rather than a law of the domain, and a future estimator that transforms `X` without a regression must relax it deliberately.
+`o_X` requires `rr`. Every estimator that overwrites `X` today does so by projecting a factor prior through regression loadings, so a prior result claiming a reconstruction it cannot explain is a bug. This is a present-tense constraint rather than a law of the domain, and a future estimator that transforms `X` without a regression must relax it deliberately.
+
+## The source of the returns
+
+`x_src` records the frame of `X`. [`prior`](@ref) fills it with the source that the prior estimator states, through [`stamp_returns_source`](@ref), when it fits on a [`ReturnsResult`](@ref) and when it reads out the state of an online fold. A returns-matrix method of `prior` cannot know the frame of the matrix that it receives, so it leaves `nothing`. The field lets a consumer that receives the Result in place of the estimator read the frame: the outer problem of a meta-optimiser adds the benchmark back to `X` when the field is [`ExcessSource`](@ref), see [`outer_returns_source`](@ref). A [`HighOrderPrior`](@ref) holds no field of its own, and answers `x_src` from the `LowOrderPrior` that it wraps.
+
+## The observations of the rows
+
+`ss_gaps` records the observations of the returns data that the fit dropped for a Shared Series gap. A fit drops leading rows too: a Scenario Cap keeps the last rows, and a [`CrossSectionalFactorPrior`](@ref) drops the rows of its warm-up and of its exposure lag. So the rows of `X` are the last `size(X, 1)` observations that `ss_gaps` keeps, and the last `size(X, 1)` observations of the returns data when it is `nothing`. A reader that holds the returns data that the prior read uses the marks to pair its rows with the rows of `X`, see [`shared_series_kept_rows`](@ref). A reader that holds the returns data after the same cut has fewer observations than the marks, so it pairs the last rows, as it did before the record existed. [`prior`](@ref) writes the marks after it fits on the returns data, and after it reads out an online fold. A returns-matrix method of `prior` drops no observation, so it leaves `nothing`. A [`HighOrderPrior`](@ref) answers `ss_gaps` from the `LowOrderPrior` that it wraps.
 
 ## Validation
 
   - `X`, `mu`, and `sigma` must be non-empty.
   - `size(sigma, 1) == size(sigma, 2)`.
   - `size(X, 2) == length(mu) == size(sigma, 1)`.
+  - Every entry of `sigma` between two investable assets is finite, an investable asset being one with a finite `mu` and a finite variance. Raises an `IsNonFiniteError`.
   - If `w` is not `nothing`, `!isempty(w)` and `length(w) == size(X, 1)`.
   - If `kld` is an `AbstractVector`, `!isempty(kld)`.
   - If `ow` is not `nothing`, `!isempty(ow)`.
   - `rr` and `fpr` must be provided together or not at all.
   - If the factor block is present, `size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1)`, `size(rr.M, 1) == length(mu)`, and `size(fpr.X, 1) == size(X, 1)` — the two blocks describe the same observations. Everything internal to the factor block, including its own `w` against its own `X`, is validated by its own constructor.
-  - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the carrier that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
+  - If `o_X` is not `nothing`, `o_X !== X`, `size(o_X) == size(X)`, and `rr` is not `nothing`. `o_X !== X` is an **identity** test and not an equality test, so `o_X = copy(X)` is admitted where `o_X = X` raises. The two calls read identically at a call site, and only the first carries a matrix a later change to `X` cannot follow. What the guard rejects is the prior result that has no original distinct from the one it asserts, not a matrix whose values happen to agree.
   - If `chol` is not `nothing`, `!isempty(chol)` and `length(mu) == size(chol, 2)`.
+  - The rules of [`assert_shared_series_gaps`](@ref) on `ss_gaps`.
+  - If `pc` is not `nothing`, `length(pc.w) == size(X, 1)`, and `size(pc.X, 1) == size(X, 1)` when `pc.X` is a matrix, through [`assert_pool_cache`](@ref).
 
 ## View parameters
 
@@ -1200,7 +887,9 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
   - `rr` recurses through [`port_opt_view`](@ref) with `i`, which cuts the loadings down on their asset axis.
   - `X`, `o_X`, `mu`, `sigma` and `chol` are sliced to `i` on the asset axis. `o_X` takes the same cut as `X`, so a subproblem's original returns stay the caller's returns for that subproblem's assets.
   - `w`, `ens`, `kld` and `ow` pass through unchanged. They live on the observation axis, and `i` indexes assets.
-  - `fpr` passes through unchanged, because it is a distribution over factors rather than over assets. It is why the view keeps `rr` and `fpr` together, and so keeps the carrier's own factor-block rule satisfied.
+  - `fpr` passes through unchanged, because it is a distribution over factors rather than over assets. It is why the view keeps `rr` and `fpr` together, and so keeps the factor-block rule of `LowOrderPrior` satisfied.
+  - `ss_gaps` passes through unchanged. It lives on the observation axis.
+  - `pc` is dropped. Its rows hold every asset, and a refit of the sub-universe has no cache of its own.
 
 # Examples
 
@@ -1208,17 +897,20 @@ The two matrices are not interchangeable. The reconstruction spans only the fact
 julia> LowOrderPrior(; X = [0.01 0.02; 0.03 0.04], mu = [0.02, 0.03],
                      sigma = [0.0001 0.0002; 0.0002 0.0003])
 LowOrderPrior
-      X ┼ 2×2 Matrix{Float64}
-    o_X ┼ nothing
-     mu ┼ Vector{Float64}: [0.02, 0.03]
-  sigma ┼ 2×2 Matrix{Float64}
-   chol ┼ nothing
-      w ┼ nothing
-    ens ┼ nothing
-    kld ┼ nothing
-     ow ┼ nothing
-     rr ┼ nothing
-    fpr ┴ nothing
+        X ┼ 2×2 Matrix{Float64}
+      o_X ┼ nothing
+       mu ┼ Vector{Float64}: [0.02, 0.03]
+    sigma ┼ 2×2 Matrix{Float64}
+     chol ┼ nothing
+        w ┼ nothing
+      ens ┼ nothing
+      kld ┼ nothing
+       ow ┼ nothing
+       rr ┼ nothing
+      fpr ┼ nothing
+    x_src ┼ nothing
+  ss_gaps ┼ nothing
+       pc ┴ nothing
 ```
 
 # Related
@@ -1276,18 +968,36 @@ LowOrderPrior
     $(field_dict[:fpr])
     """
     fpr
+    """
+    $(field_dict[:x_src_pr])
+    """
+    x_src
+    """
+    $(field_dict[:ss_gaps])
+    """
+    ss_gaps
+    """
+    $(field_dict[:pc])
+    """
+    pc
     function LowOrderPrior(X::MatNum, o_X::Option{<:MatNum}, mu::VecNum, sigma::MatNum,
                            chol::Option{<:MatNum}, w::Option{<:ObsWeights},
                            ens::Option{<:Number}, kld::Option{<:Num_VecNum},
                            ow::Option{<:VecNum},
                            rr::Option{<:AbstractLoadingsRegressionResult},
-                           fpr::Option{<:LowOrderPrior})
+                           fpr::Option{<:LowOrderPrior},
+                           x_src::Option{<:AbstractReturnsSource},
+                           ss_gaps::Option{<:AbstractVector{Bool}},
+                           pc::Option{<:NamedTuple})
         @argcheck(!isempty(X), IsEmptyError("X cannot be empty"))
         @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         @argcheck(!isempty(sigma), IsEmptyError("sigma cannot be empty"))
         assert_matrix_issquare(sigma, :sigma)
         @argcheck(size(X, 2) == length(mu) == size(sigma, 1),
                   DimensionMismatch("size(X, 2) ($(size(X, 2))), length(mu) ($(length(mu))), and size(sigma, 1) ($(size(sigma, 1))) must all match"))
+        imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
+        @argcheck(all(isfinite, view(sigma, imsk, imsk)),
+                  IsNonFiniteError("sigma of investable assets must only contain finite values"))
         assert_nonempty_nonneg_finite_val(w, :w)
         if isa(w, StatsBase.AbstractWeights)
             @argcheck(length(w) == size(X, 1),
@@ -1302,11 +1012,9 @@ LowOrderPrior
         # `rr` and `fpr` are the factor block. The block is validated as a whole here and
         # only against this asset axis: everything internal to it — its own `mu`/`sigma`
         # shapes, and its own `w` against its own `X` — is its own constructor's job.
-        rr_is_nothing = isnothing(rr)
-        fpr_is_nothing = isnothing(fpr)
-        @argcheck(rr_is_nothing == fpr_is_nothing,
-                  ArgumentError("rr and fpr are the factor block and must be provided together or not at all, isnothing(rr) = $(rr_is_nothing), isnothing(fpr) = $(fpr_is_nothing)"))
-        if !rr_is_nothing
+        @argcheck(isnothing(rr) == isnothing(fpr),
+                  ArgumentError("rr and fpr are the factor block and must be provided together or not at all, isnothing(rr) = $(isnothing(rr)), isnothing(fpr) = $(isnothing(fpr))"))
+        if !isnothing(rr)
             @argcheck(size(rr.M, 2) == length(fpr.mu) == size(fpr.sigma, 1),
                       DimensionMismatch("size(rr.M, 2) = $(size(rr.M, 2)), length(fpr.mu) = $(length(fpr.mu)), and size(fpr.sigma, 1) = $(size(fpr.sigma, 1)) must all match"))
             @argcheck(size(rr.M, 1) == length(mu),
@@ -1319,35 +1027,77 @@ LowOrderPrior
         #
         # The `rr` requirement is a *present-tense* constraint, not a law of the domain.
         # Every estimator that overwrites `X` today does so by projecting a factor prior
-        # through regression loadings, so the loadings are always in hand and a carrier
+        # through regression loadings, so the loadings are always in hand and a prior result
         # claiming a reconstruction it cannot explain is a bug. A future estimator that
         # transforms `X` without a regression — a bootstrap or a simulation prior — is the
         # case that relaxes this, and it must relax it deliberately. See ADR 0046.
         if !isnothing(o_X)
             @argcheck(o_X !== X,
-                      ArgumentError("o_X is X itself, so this carrier has no original distinct from the one it asserts. Pass o_X = nothing, which is what every consumer reads as \"X is the original\""))
+                      ArgumentError("o_X is X itself, so this prior result has no original distinct from the one it asserts. Pass o_X = nothing, which is what every consumer reads as \"X is the original\""))
             @argcheck(size(o_X) == size(X),
-                      DimensionMismatch("size(o_X) ($(size(o_X))) must match size(X) ($(size(X))): the original and the matrix this carrier asserts describe the same observations and the same assets"))
-            @argcheck(!rr_is_nothing,
-                      IsNothingError("o_X says X is not the caller's matrix, but rr === nothing, so this carrier does not record what produced X. Every estimator that overwrites X projects a factor prior through regression loadings and carries them in rr"))
+                      DimensionMismatch("size(o_X) ($(size(o_X))) must match size(X) ($(size(X))): the original and the matrix this prior result asserts describe the same observations and the same assets"))
+            @argcheck(!isnothing(rr),
+                      IsNothingError("o_X says X is not the caller's matrix, but rr === nothing, so this prior result does not record what produced X. Every estimator that overwrites X projects a factor prior through regression loadings and carries them in rr"))
         end
         if !isnothing(chol)
             @argcheck(!isempty(chol), IsEmptyError("chol cannot be empty"))
             @argcheck(length(mu) == size(chol, 2),
                       DimensionMismatch("length(mu) ($(length(mu))) must match size(chol, 2) ($(size(chol, 2)))"))
         end
-        return new{typeof(X), typeof(o_X), typeof(mu), typeof(sigma), typeof(chol),
-                   typeof(w), typeof(ens), typeof(kld), typeof(ow), typeof(rr),
-                   typeof(fpr)}(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr)
+        assert_shared_series_gaps(ss_gaps, size(X, 1))
+        assert_pool_cache(pc, size(X, 1))
+        fs = (X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps, pc)
+        return new{map(typeof, fs)...}(fs...)
     end
+end
+"""
+    assert_pool_cache(pc::Nothing, T::Integer)
+    assert_pool_cache(pc::NamedTuple, T::Integer)
+
+Check the cache of an opinion pool against the scenarios of the [`LowOrderPrior`](@ref) that carries it.
+
+The cache weighs the scenarios of the pool, so its pooled weights and its rows have the rows of the result.
+
+# Arguments
+
+  - `pc`: The cache of the pool, `(; X, w, pe2)` with the cache of `pe2` in `pe2`, or `nothing`.
+  - `T`: The number of scenarios of the result.
+
+# Validation
+
+  - `length(pc.w) == T`. A `DimensionMismatch` is thrown otherwise.
+  - `size(pc.X, 1) == T` when `pc.X` is a matrix. A `DimensionMismatch` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`opinion_pooling_cache`](@ref)
+"""
+function assert_pool_cache(::Nothing, ::Integer)::Nothing
+    return nothing
+end
+function assert_pool_cache(pc::NamedTuple, T::Integer)::Nothing
+    @argcheck(length(pc.w) == T,
+              DimensionMismatch("length(pc.w) ($(length(pc.w))) must match size(X, 1) ($T): the pooled weights weigh the scenarios of the result"))
+    @argcheck(isnothing(pc.X) || size(pc.X, 1) == T,
+              DimensionMismatch("pc.X ($(size(pc.X, 1)) rows) must have the rows of X ($T)"))
+    return nothing
 end
 function LowOrderPrior(; X::MatNum, o_X::Option{<:MatNum} = nothing, mu::VecNum,
                        sigma::MatNum, chol::Option{<:MatNum} = nothing,
                        w::Option{<:ObsWeights} = nothing, ens::Option{<:Number} = nothing,
                        kld::Option{<:Num_VecNum} = nothing, ow::Option{<:VecNum} = nothing,
                        rr::Option{<:AbstractLoadingsRegressionResult} = nothing,
-                       fpr::Option{<:LowOrderPrior} = nothing)::LowOrderPrior
-    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr)
+                       fpr::Option{<:LowOrderPrior} = nothing,
+                       x_src::Option{<:AbstractReturnsSource} = nothing,
+                       ss_gaps::Option{<:AbstractVector{Bool}} = nothing,
+                       pc::Option{<:NamedTuple} = nothing)::LowOrderPrior
+    return LowOrderPrior(X, o_X, mu, sigma, chol, w, ens, kld, ow, rr, fpr, x_src, ss_gaps,
+                         pc)
 end
 # The flat `f_`-prefixed names are virtual reads of the nested factor block, so code written
 # against the pre-nesting shape is unaffected, and `f_ens`/`f_kld`/`f_ow` come for free.
@@ -1382,9 +1132,9 @@ The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a d
 
 # Algorithm
 
- 1. Cut the Cholesky factor to `i` on its column axis, giving `chol`. A carrier that holds none keeps `nothing`.
- 2. Cut the original returns matrix to `i` on its asset axis, giving `o_X`. A carrier that holds none keeps `nothing`. It takes the same cut `X` takes in the next step, because the two are assets-major over the same observations.
- 3. Rebuild the carrier through its ordinary keyword constructor, naming every field: `X` and `mu` cut to `i`, `sigma` cut to `i` on both axes, `chol` and `o_X` from the two steps above, `rr` recursed through [`port_opt_view`](@ref) with `i`, and `w`, `ens`, `kld`, `ow` and `fpr` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
+ 1. Cut the Cholesky factor to `i` on its column axis, giving `chol`. A prior result that holds none keeps `nothing`.
+ 2. Cut the original returns matrix to `i` on its asset axis, giving `o_X`. A prior result that holds none keeps `nothing`. It takes the same cut `X` takes in the next step, because the two are assets-major over the same observations.
+ 3. Rebuild the prior result through its ordinary keyword constructor, naming every field: `X` and `mu` cut to `i`, `sigma` cut to `i` on both axes, `chol` and `o_X` from the two steps above, `rr` recursed through [`port_opt_view`](@ref) with `i`, and `w`, `ens`, `kld`, `ow`, `fpr` and `x_src` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
 
 # Arguments
 
@@ -1394,7 +1144,7 @@ The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a d
 
 # Returns
 
-  - `pr::LowOrderPrior`: The carrier restricted to the assets at `i`, holding views rather than copies.
+  - `pr::LowOrderPrior`: The prior result restricted to the assets at `i`, holding views rather than copies.
 
 # Related
 
@@ -1409,7 +1159,7 @@ function port_opt_view(pr::LowOrderPrior, i, args...)::LowOrderPrior
     return LowOrderPrior(; X = view(pr.X, :, i), o_X = o_X, mu = view(pr.mu, i),
                          sigma = view(pr.sigma, i, i), chol = chol, w = pr.w, ens = pr.ens,
                          kld = pr.kld, ow = pr.ow, rr = port_opt_view(pr.rr, i),
-                         fpr = pr.fpr)
+                         fpr = pr.fpr, x_src = pr.x_src, ss_gaps = pr.ss_gaps)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1469,11 +1219,11 @@ end
 
 Derive the Investable Mask of a fitted prior, and give a view builder the universe it may write rows over.
 
-A view is a **dense linear form over the asset axis**, and a departed asset carries `NaN` in `mu` and on the diagonal of `sigma`. `A[i] == 0` does not protect a row from it, because `0 * NaN` is `NaN`, so a view naming only *live* assets is poisoned exactly as thoroughly as one naming the asset that left: the row reaches the solver all `NaN`, and the fit fails naming something that is not the cause. Building the row on the investable columns is the whole fix, and it is the same reduction every optimiser takes at its entry — [`port_opt_view`](@ref) of the carrier at `findall(imsk)`, which is bit-exact against the hand-reduced oracle.
+A view is a **dense linear form over the asset axis**, and a departed asset carries `NaN` in `mu` and on the diagonal of `sigma`. `A[i] == 0` does not protect a row from it, because `0 * NaN` is `NaN`, so a view naming only *live* assets is poisoned exactly as thoroughly as one naming the asset that left: the row reaches the solver all `NaN`, and the fit fails naming something that is not the cause. Building the row on the investable columns is the whole fix, and it is the same reduction every optimiser takes at its entry — [`port_opt_view`](@ref) of the prior result at `findall(imsk)`, which is bit-exact against the hand-reduced oracle.
 
-**Both view-taking prior families reduce here, and what they owe afterwards is theirs, not this door's.** An entropy pooling row runs over *observations*, so its solved probabilities carry no asset axis and nothing is expanded back — the moments come from the refit wrapped prior, which already holds the full-universe `NaN` frame. A Black–Litterman posterior is a *moment pair over the reduced assets*, so it has to be written back into a `NaN` frame of the full width with [`expand_moment`](@ref) before it leaves the estimator. That is the whole of the difference, and it is why this verb hands back the index rather than swallowing it.
+**Both view-taking prior families reduce here, and what they owe afterwards is theirs, not this function's.** An entropy pooling row runs over *observations*, so its solved probabilities carry no asset axis and nothing is expanded back — the moments come from the refit wrapped prior, which already holds the full-universe `NaN` frame. A Black–Litterman posterior is a *moment pair over the reduced assets*, so it has to be written back into a `NaN` frame of the full width with [`expand_moment`](@ref) before it leaves the estimator. That is the whole of the difference, and it is why this verb hands back the index rather than swallowing it.
 
-The door also **mints the Non-Investable Axis** on the sets it hands the builders, with [`non_investable_sets`](@ref) after [`port_opt_view`](@ref) — after, because the view drops the axis so that a sub-problem cannot inherit its parent's departures. That is what lets a builder tell a departed name from a typo: the row is dropped whole and in silence for the first, and today's `strict_diagnostic` applies for the second.
+This function also **mints the Non-Investable Axis** on the sets it hands the builders, with [`non_investable_sets`](@ref) after [`port_opt_view`](@ref) — after, because the view drops the axis so that a sub-problem cannot inherit its parent's departures. That is what lets a builder tell a departed name from a typo: the row is dropped whole and in silence for the first, and today's `strict_diagnostic` applies for the second.
 
 **`sets` splits by dispatch and the mask by a condition**, and the asymmetry is the whole of the reason. `sets` is a field of a `@concrete` estimator, so whether it is `nothing` is a **type** fact, fixed per instantiation: the pair is static dispatch, it costs nothing, and it is what keeps the returned sets concretely a [`UniverseSets`](@ref). A single method over `Option{<:UniverseSets}` would answer a value-level `Union`, and the view builders declare `sets::UniverseSets` — so JET finds no method for the `Nothing` half at every builder call site, none of them reachable. [`investable_mask`](@ref), by contrast, answers a `Union{Nothing, BitVector}` that depends on the **data**: Julia union-splits a two-member `Union` and compiles a method pair back into this very branch, so dispatching on it would buy nothing and cost a unit in a swept file. Dispatch where the fact is a type; branch where it is a value.
 
@@ -1567,7 +1317,7 @@ end
 
 Name the departed assets for an estimator that reduces its **asset** axis while its views live on another one.
 
-[`investable_views`](@ref) is the door for an estimator whose views resolve against `xkey`: it reduces the sets, mints the Non-Investable Axis on them, and the names fall out on the way. [`BayesianBlackLittermanPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) write their views on the **factor** axis, so they reduce their asset side and touch no view axis at all — there is nothing for them to mint, and going through that door would make them demand an asset universe they have no other use for. They still have a departure to report, and this is the least they need to report it.
+[`investable_views`](@ref) is the function that every estimator whose views resolve against `xkey` calls: it reduces the sets, mints the Non-Investable Axis on them, and the names fall out on the way. [`BayesianBlackLittermanPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) write their views on the **factor** axis, so they reduce their asset side and touch no view axis at all — there is nothing for them to mint, and a call of `investable_views` would make them demand an asset universe they have no other use for. They still have a departure to report, and this is the least they need to report it.
 
 Sets that are not stated at all answer an empty list rather than throwing, and an empty list is what [`announce_non_investable`](@ref) says nothing about. That is the honest outcome, and it is a real configuration: both members admit `sets` of `nothing` entirely, because a precomputed [`BlackLittermanViews`](@ref) resolves no name and needs no universe. A stated universe that does not describe this fit answers the same silence, because neither member reads an asset name for any other purpose and so nothing else has checked its length.
 
@@ -1602,349 +1352,6 @@ function investable_universe_names(sets::UniverseSets, imsk::BitVector)::VecStr
     # a message and refusing a message is not its job.
     nx = sets.dict[sets.xkey]
     return length(nx) == length(imsk) ? non_investable_names(nx, imsk) : String[]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Find the entries a mask-aware prior fills: the non-finite returns of an **investable** asset.
-
-A non-investable asset keeps its whole `NaN` column, because the Investable Mask is derived from that gap and filling it would erase the mask. Only a column whose moments came back finite is filled.
-
-# Arguments
-
-  - `X`: Asset returns, `observations × assets`.
-  - `imsk`: The Investable Mask, `true` at every asset whose prior moments were finite.
-
-# Returns
-
-  - `filled::Vector{Tuple{Int, Int}}`: The `(observation, asset)` pairs to fill, asset-major.
-
-# Related
-
-  - [`scenario_fill`](@ref)
-  - [`scenario_fill_msg`](@ref)
-  - [`investable_mask`](@ref)
-"""
-function scenario_fill_pairs(X::MatNum, imsk::BitVector)
-    return [(t, i) for i in axes(X, 2) if imsk[i] for t in axes(X, 1) if !isfinite(X[t, i])]
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Write the message a scenario fill raises.
-
-The message names the assets, the count of filled pairs and the first observation, so a caller can find the listing that made them. It then names the **worst investable column**, the share of its own observations the fill invented, and the limit that share was measured against — that share is the one the fill tests, because a matrix-wide denominator scales with the universe and hides the column the notice exists to catch. The matrix-wide share is reported beside it as context, and it trips nothing.
-
-It states the consequence at each of the four consumers that a census of the readers of `pr.X` found, because a caller told only about the tail will not look for the other three, and it states the tail's cost as the identity rather than the adjective: the invented zeros do not enter the tail, they inflate the denominator, so a measure at level `alpha` over an admitted column of coverage `c` reads that column's observed `alpha / c` level.
-
-The limit it names is the estimator's own, after [`resolve_fill_limit`](@ref). A `fill_limit` of `nothing` demands every observation of every investable asset, so the message says so rather than printing a share no caller chose.
-
-# Arguments
-
-  - `filled`: The `(observation, asset)` pairs [`scenario_fill_pairs`](@ref) found.
-  - `wi`: The index of the worst investable column, the one with the most filled entries.
-  - `worst`: The share of its own observations that column's fill invented.
-  - `frac`: The share of the entries of the returns matrix every filled pair is, as context.
-  - `fill_limit`: The share of a column the fit allowed in silence, or `nothing` when it allowed none.
-
-# Returns
-
-  - `msg::String`: The message.
-
-# Related
-
-  - [`scenario_fill`](@ref)
-  - [`scenario_fill_pairs`](@ref)
-  - [`resolve_fill_limit`](@ref)
-  - [`EmpiricalPrior`](@ref)
-  - [`strict_diagnostic`](@ref)
-"""
-function scenario_fill_msg(filled::AbstractVector{<:Tuple{Integer, Integer}}, wi::Integer,
-                           worst::Real, frac::Real, fill_limit::Option{<:Real})
-    assets = unique(last.(filled))
-    against = if isnothing(fill_limit)
-        "against `fill_limit = nothing`, which asks that every investable asset cover every observation"
-    else
-        "against a limit of $(fill_limit)"
-    end
-    return "a mask-aware prior estimated an asset from the observations it had, and the returns matrix still carries the gap. Assets $(assets) carry a non-finite return at $(length(filled)) (observation, asset) pair(s) of an investable column, the first at observation $(first(filled)[1]). The worst column is asset $(wi), $(worst) of whose own observations are invented, measured $(against); the whole matrix is $(frac) invented, which is context and trips nothing. Those entries are filled with zero, and four consumers read them. A scenario-based measure (CVaR, EVaR, CDaR and their kin) understates its risk over the filled rows, and the cost is exact: the zeros do not enter the tail, they inflate the denominator, so a measure at level `alpha` over an admitted column of coverage `c` reads that column's observed `alpha / c` level, and at `c = 0.3` a 5% CVaR is a 16.7% CVaR. A hierarchical optimiser may branch the asset alone and then overweight it, because `clusterise` recomputes its correlation from the returns matrix rather than from `sigma`, an invented column reads as idiosyncratic, and an inverse-variance allocation over that branch buys more of it. An entropy pooling view on the asset is calibrated on the filled column, because the view resolvers read the matrix column by column. And a meta-optimiser carries the fill into the outer problem, whose returns matrix is built from the inner Sub-Portfolios' net returns over this one. `mu` and `sigma` are untouched, because the estimator computed them from the rows it saw. Accept a share of an investable column in silence with the estimator's own field, `EmpiricalPrior(; fill_limit = ...)`, state the share as a `CoveragePolicy`'s `min_coverage` so that admission and the notice are the one number, pass `strict = true` to refuse any fill, or fit over a window every asset covers."
-end
-"""
-    resolve_fill_limit(fill_limit::Nothing, floor::Nothing)
-    resolve_fill_limit(fill_limit::Nothing, floor::Real)
-    resolve_fill_limit(fill_limit::Real, floor::Nothing)
-    resolve_fill_limit(fill_limit::Real, floor::Real)
-
-Resolve the share of an investable column a [`scenario_fill`](@ref) may invent in silence, at the fit.
-
-`fill_limit` and a [`CoveragePolicy`](@ref)'s `min_coverage` are two spellings of one number. [`admits`](@ref) reads an asset's coverage share as its own observation count over the number of observations folded, and the fill counts that column's non-finite entries over the same denominator, so `filled_share == 1 - coverage_share` identically and the admission test **is** the fill test. A limit that did not know this would fire on nearly every fold of an available-case walk-forward, naming the caller for doing precisely what they configured.
-
-So `nothing` **derives**. Where any arm of the fitting estimator states a floor, `nothing` means `1 - floor`, and it never fires: every admitted column satisfies it by construction. Where no arm states one — the exponentially weighted family is mask-aware without a policy, gating on `min_obs`, a *count* that says nothing about the share of a long window — `nothing` keeps its original meaning and names every fill, because a caller who set no floor has weighed no trade.
-
-An explicit `fill_limit` overrides the derivation and must be **tighter** than admission. A value above `1 - floor` is refused, because it is dead by construction: nothing that reaches the fill could trip it, and a knob that cannot fire is worse than no knob. What an explicit value buys is the one configuration the derivation cannot express — admit broadly and be told anyway, `min_coverage = 0.3` with `fill_limit = 0.5`.
-
-The four methods are dispatch rather than a branch, so a call site holding two `Option`s finds a method for every arm of its union split.
-
-# Arguments
-
-  - `fill_limit`: The estimator's own `fill_limit` field, or `nothing` to derive one.
-  - `floor`: The binding coverage floor of the estimator's arms, or `nothing` when no arm states one.
-
-# Validation
-
-  - `fill_limit <= 1 - floor` where both are stated, else a `DomainError` naming both is thrown.
-
-# Returns
-
-  - `fill_limit::Option{<:Real}`: The share of an investable column the fill may invent in silence, or `nothing` when it may invent none.
-
-# Related
-
-  - [`scenario_fill`](@ref)
-  - [`coverage_floor`](@ref)
-  - [`CoveragePolicy`](@ref)
-  - [`EmpiricalPrior`](@ref)
-"""
-function resolve_fill_limit(::Nothing, ::Nothing)
-    return nothing
-end
-function resolve_fill_limit(::Nothing, floor::Real)
-    return one(floor) - floor
-end
-function resolve_fill_limit(fill_limit::Real, ::Nothing)
-    return fill_limit
-end
-function resolve_fill_limit(fill_limit::Real, floor::Real)
-    @argcheck(fill_limit <= one(floor) - floor,
-              DomainError(fill_limit,
-                          "fill_limit must be tighter than the coverage floor it is measured against, so it must be at most 1 - min_coverage = $(one(floor) - floor). A looser limit is dead by construction: an asset the fit admits covers at least $(floor) of the observations folded, so its column is at most $(one(floor) - floor) invented, and nothing that reaches the fill could trip $(fill_limit). Pass `nothing`, the default, to derive $(one(floor) - floor) and be told only when a coverage algorithm admits a column thinner than the floor it was given."))
-    return fill_limit
-end
-"""
-    scenario_window(::Nothing, X::MatNum)
-    scenario_window(max_scenarios::Integer, X::MatNum)
-
-Cut the returns matrix a Prior Result carries down to the last `max_scenarios` observations.
-
-The Scenario Cap, applied. A prior that carries `X` carries it for the scenario risk measures, and a caller who wants a long window of moments and a short window of scenarios says so with one field rather than with two fits. The cap therefore touches `X` alone: `mu` and `sigma` are already computed when this runs, over every observation the fit read, and nothing here can or does move them.
-
-It is deliberately the **same** verb in batch and online. A cap is a property of the result, not of the fold, so `prior(pe, X)` and the read-out of a folded `pe` cut the same rows off the same tail.
-
-A window at or above the number of observations is the matrix itself, and no copy is taken: the cut is a `view`, so a cap that does nothing costs nothing.
-
-# Arguments
-
-  - `max_scenarios`: The number of observations to carry, or `nothing` to carry every one.
-  - `X`: Asset returns, `observations × assets`.
-
-# Returns
-
-  - `X::MatNum`: The last `max_scenarios` rows of `X`, or `X` itself.
-
-# Related
-
-  - [`scenario_fill`](@ref)
-  - [`EmpiricalPrior`](@ref)
-  - [`LowOrderPrior`](@ref)
-"""
-function scenario_window(::Nothing, X::MatNum)
-    return X
-end
-function scenario_window(max_scenarios::Integer, X::MatNum)
-    t = size(X, 1)
-    return max_scenarios >= t ? X : view(X, (t - max_scenarios + 1):t, :)
-end
-"""
-    scenario_ens(::Nothing, X::MatNum)
-    scenario_ens(max_scenarios::Integer, X::MatNum)
-
-State the number of observations the moments of a capped Prior Result were fitted over, or `nothing` when the cap cuts nothing.
-
-The count a Scenario Cap owes its readers. [`scenario_window`](@ref) cuts the rows the result carries and leaves `mu` and `sigma` fitted over every observation, so a consumer that prices a sample size off `size(pr.X, 1)` — an uncertainty set's `T`, a calibration rule's count — would read `w` rows for moments fitted over `t`, and mis-price every count by `t / w`. The result therefore states `t` in `ens` exactly when the cap cuts, and every count reader takes `ens` before the shape. When the cap does not cut, or there is no cap, the rows carried *are* the observations fitted over, and `ens` stays `nothing`, so a fit without a cap is bit-identical to what it was.
-
-It is the same verb in batch and at the folded read-out, as [`scenario_window`](@ref) is, and the two agree by construction: both read the same `t` off the same matrix.
-
-# Arguments
-
-  - `max_scenarios`: The number of observations carried, or `nothing`.
-  - `X`: Asset returns the moments were fitted over, `observations × assets`, **before** the cut.
-
-# Returns
-
-  - `ens::Option{<:Integer}`: `size(X, 1)` when `max_scenarios` cuts it, `nothing` otherwise.
-
-# Related
-
-  - [`scenario_window`](@ref)
-  - [`EmpiricalPrior`](@ref)
-  - [`LowOrderPrior`](@ref)
-  - [`effective_sample_size`](@ref)
-"""
-function scenario_ens(::Nothing, ::MatNum)
-    return nothing
-end
-function scenario_ens(max_scenarios::Integer, X::MatNum)
-    t = size(X, 1)
-    return max_scenarios >= t ? nothing : t
-end
-"""
-    scenario_fill_report(filled, ::Nothing)
-    scenario_fill_report(filled, named::AbstractSet{<:Integer})
-
-Narrow the filled pairs a [`scenario_fill`](@ref) reports to the assets it has not named before.
-
-A batch fit calls [`scenario_fill`](@ref) once, so it reports everything it finds and keeps no memory: that is the `nothing` method. A walk-forward reading out at every step calls it once per step over a growing window, and every step would otherwise name the same assets again, so a caller who read the first notice learns to ignore the channel and misses the asset that lists at step 500.
-
-So a carry state holds the set of assets it has already named, and this verb narrows the report to the pairs of assets outside it. The set is the state's memory, and [`scenario_fill_remember!`](@ref) is what writes to it — only for a notice that actually fired, so an asset whose share was under the limit at one step is still named at the step where it goes over.
-
-# Arguments
-
-  - `filled`: The `(observation, asset)` pairs [`scenario_fill_pairs`](@ref) found.
-  - `named`: The assets already named, or `nothing` when nothing remembers.
-
-# Returns
-
-  - `report::AbstractVector{<:Tuple{Integer, Integer}}`: The pairs to name, which is `filled` itself when nothing remembers.
-
-# Related
-
-  - [`scenario_fill`](@ref)
-  - [`scenario_fill_remember!`](@ref)
-  - [`PriorCarryState`](@ref)
-"""
-function scenario_fill_report(filled::AbstractVector{<:Tuple{Integer, Integer}}, ::Nothing)
-    return filled
-end
-function scenario_fill_report(filled::AbstractVector{<:Tuple{Integer, Integer}},
-                              named::AbstractSet{<:Integer})
-    return filter(p -> last(p) ∉ named, filled)
-end
-"""
-    scenario_fill_remember!(::Nothing, report)
-    scenario_fill_remember!(named::AbstractSet{<:Integer}, report)
-
-Record the assets a [`scenario_fill`](@ref) has just named, so a later read-out does not name them again.
-
-The write side of [`scenario_fill_report`](@ref). It runs after the notice, not before it, so an asset is remembered exactly when a caller was told about it: under `strict` the notice throws and nothing is remembered, and under a limit the notice did not trip nothing is remembered either.
-
-The set is a field of a [`PriorCarryState`](@ref) and is written **in place**, because a read-out returns a Prior Result rather than the estimator, so there is no other channel by which the memory could survive the call.
-
-# Arguments
-
-  - `named`: The assets already named, or `nothing` when nothing remembers.
-  - `report`: The `(observation, asset)` pairs just named.
-
-# Returns
-
-  - `nothing`.
-
-# Related
-
-  - [`scenario_fill`](@ref)
-  - [`scenario_fill_report`](@ref)
-  - [`PriorCarryState`](@ref)
-"""
-function scenario_fill_remember!(::Nothing, ::AbstractVector{<:Tuple{Integer, Integer}})
-    return nothing
-end
-function scenario_fill_remember!(named::AbstractSet{<:Integer},
-                                 report::AbstractVector{<:Tuple{Integer, Integer}})
-    for p in report
-        push!(named, last(p))
-    end
-    return nothing
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return the returns matrix with the missing rows of every investable asset filled with zero, and say so above the fitting estimator's resolved `fill_limit`.
-
-A mask-aware moment estimator answers a young asset from the observations it has, so the asset is investable and its returns column still carries a `NaN` at every row before it listed. Every consumer of a Prior Result reads that column — the JuMP model, the meta-optimisers and the value-level door among them — so the fill is paid **once**, here, on the estimator's own pass, rather than at each of them.
-
-A non-investable asset keeps its `NaN` column, so [`investable_mask`](@ref) is unchanged. `mu`, `sigma` and every other block are untouched, because the estimator computed them from the rows it saw.
-
-**The share the fill tests is per asset**: the worst investable column's own count of filled entries over the number of observations. A matrix-wide denominator scales with the universe, so the column the notice exists to catch disappears inside it — one asset of a hundred whose column is seven-tenths invented is seven thousandths of the matrix, under any limit a caller would set. The matrix-wide share is reported in the message as context and trips nothing.
-
-How much of the trade passes in silence is the fitting estimator's own answer, carried in its `fill_limit` field and resolved at the fit by [`resolve_fill_limit`](@ref) against the coverage floor of its arms — the share is a property of one fit, not of the session, so two priors in one program may answer differently. Under `strict = false` the trade is silent while the worst column's share stays at or below the resolved limit, and is named through [`strict_diagnostic`](@ref) above it. Under `strict = true` **any** fill refuses, whatever the limit holds.
-
-Two mask-aware families reach this verb. The exponentially weighted family carries no [`CoveragePolicy`](@ref), so a `fill_limit` of `nothing` names every fill there. The plain family is mask-aware exactly where a policy is set, and a policy derives a limit that never fires, so an available-case fit names nothing while it does what it was configured to do. A plain estimator with no policy never reaches this verb at all: under the whole-window rule, an asset it could not cover leaves the Coverage Universe and is not investable.
-
-# Algorithm
-
- 1. Return `X` itself when every entry of `X` is finite, which is every fit over a complete window.
- 2. Derive the Investable Mask from `mu` and the diagonal of `sigma`, as [`investable_mask`](@ref) does, and find the pairs to fill with [`scenario_fill_pairs`](@ref). Return `X` itself when there are none, which is a gap that belongs to a non-investable asset alone.
- 3. Narrow the pairs to report with [`scenario_fill_report`](@ref), which drops the assets a carry state has already named and is the identity when nothing remembers. Under `strict` the narrowing is skipped, because `strict` refuses any fill and must not depend on how often the estimator has been read out.
- 4. Count the reported pairs per asset, take the worst column's share of its own observations, and report through [`strict_diagnostic`](@ref) when `strict` holds, when `fill_limit` is `nothing`, or when that share exceeds `fill_limit`. Record the assets just named with [`scenario_fill_remember!`](@ref).
- 5. Return a copy of `X` with zero written at each of the filled pairs — every one of them, not just the reported ones — and the `NaN` of every non-investable asset left where it is.
-
-# The notice fires once per asset, not once per step
-
-`named` is what separates the batch call from the online one. A batch fit passes `nothing`, reports every fill it finds, and remembers nothing. A read-out of a folded prior passes the set its [`PriorCarryState`](@ref) carries, so a walk-forward names an asset at the step it lists and stays quiet afterwards instead of emitting the same notice at every one of two thousand steps. The **fill itself is unchanged**: every filled pair is written at every call, whatever the set holds. Under `strict = true` the first fill still throws.
-
-# Arguments
-
-  - `X`: Asset returns, `observations × assets`.
-  - `mu`: The expected returns the estimator answered, `NaN` at a non-investable asset.
-  - `sigma`: The covariance the estimator answered, `NaN` on the diagonal at a non-investable asset.
-  - `strict`: If `true`, any fill raises an `ArgumentError`; if `false`, a fill above the share warns.
-  - `fill_limit`: The share of an investable column the fitting estimator accepts in silence, after [`resolve_fill_limit`](@ref), or `nothing` when it accepts none.
-  - `named`: The assets already named, written in place when a notice fires, or `nothing` when nothing remembers.
-
-# Validation
-
-  - The worst investable column's filled share is at or below `fill_limit`, else a warning naming the assets is emitted, or an `ArgumentError` naming them is raised under `strict`, which any fill raises. A `fill_limit` of `nothing` is at or below no share, so any fill is named.
-
-# Returns
-
-  - `X::MatNum`: The returns matrix whose investable columns are finite.
-
-# Related
-
-  - [`scenario_fill_pairs`](@ref)
-  - [`scenario_fill_msg`](@ref)
-  - [`scenario_fill_report`](@ref)
-  - [`scenario_fill_remember!`](@ref)
-  - [`scenario_window`](@ref)
-  - [`resolve_fill_limit`](@ref)
-  - [`EmpiricalPrior`](@ref)
-  - [`investable_mask`](@ref)
-  - [`strict_diagnostic`](@ref)
-  - [`filter_held_gaps`](@ref)
-"""
-function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
-                       fill_limit::Option{<:Real},
-                       named::Option{<:AbstractSet{<:Integer}} = nothing)
-    if all(isfinite, X)
-        return X
-    end
-    imsk = isfinite.(mu) .& isfinite.(LinearAlgebra.diag(sigma))
-    filled = scenario_fill_pairs(X, imsk)
-    if isempty(filled)
-        return X
-    end
-    # `strict` refuses **any** fill, so it never reads the memory: an asset a previous
-    # read-out named is still a fill, and silencing it here would make `strict` depend on
-    # how many times the estimator had been read out.
-    report = strict ? filled : scenario_fill_report(filled, named)
-    if !isempty(report)
-        counts = zeros(Int, size(X, 2))
-        for (_, i) in report
-            counts[i] += 1
-        end
-        wi = argmax(counts)
-        worst = counts[wi] / size(X, 1)
-        frac = length(filled) / length(X)
-        if strict || isnothing(fill_limit) || worst > fill_limit
-            strict_diagnostic(scenario_fill_msg(report, wi, worst, frac, fill_limit),
-                              strict)
-            scenario_fill_remember!(named, report)
-        end
-    end
-    Xf = copy(X)
-    for (t, i) in filled
-        Xf[t, i] = zero(eltype(Xf))
-    end
-    return Xf
 end
 """
     held_non_investable(imsk::BitVector, w::VecNum)
@@ -2054,15 +1461,15 @@ Keywords correspond to the struct's fields.
 
 ## The factor block
 
-A high order prior fit through a factor model carries factor co-moments alongside the asset ones. They are a **nested `HighOrderPrior`** in `fpr` rather than the `f_`-prefixed flat fields `f_kt`, `f_sk` and `f_V`, so the factor block gains every field the carrier has — `D2`, `L2`, `S2` and `skmp` as well as `kt`, `sk` and `V` — and gains any field added in future without a second edit. The flat names remain readable as **virtual reads** of it: `pr.f_kt`, `pr.f_sk` and `pr.f_V` return `fpr.kt`, `fpr.sk` and `fpr.V`, or `nothing` when there is no factor block, and `pr.f_D2`, `pr.f_L2`, `pr.f_S2` and `pr.f_skmp` come with them.
+A high order prior fit through a factor model carries factor co-moments alongside the asset ones. They are a **nested `HighOrderPrior`** in `fpr` rather than the `f_`-prefixed flat fields `f_kt`, `f_sk` and `f_V`, so the factor block gains every field the `HighOrderPrior` has — `D2`, `L2`, `S2` and `skmp` as well as `kt`, `sk` and `V` — and gains any field added in future without a second edit. The flat names remain readable as **virtual reads** of it: `pr.f_kt`, `pr.f_sk` and `pr.f_V` return `fpr.kt`, `fpr.sk` and `fpr.V`, or `nothing` when there is no factor block, and `pr.f_D2`, `pr.f_L2`, `pr.f_S2` and `pr.f_skmp` come with them.
 
-`fpr.pr` is the factor block one order down: the [`LowOrderPrior`](@ref) over the factors. The same distribution is also reachable as `pr.pr.fpr`, the low order carrier's own factor block, and the constructor **enforces that the two are the same object** — see the validation below.
+`fpr.pr` is the factor block one order down: the [`LowOrderPrior`](@ref) over the factors. The same distribution is also reachable as `pr.pr.fpr`, the factor block of the low order result, and the constructor **enforces that the two are the same object** — see the validation below.
 
-`fpr` is this carrier's own field, so it resolves ahead of the `forward(pr)` block and names the **high** order factor block, where before nesting it resolved through to the low order one. Reads through it are unaffected by that shift: the nested carrier forwards to its own `pr`, which the invariant pins to `pr.fpr`, so `hop.fpr.mu` is the factor mean either way and `hop.fpr` is simply "the factor prior at this order".
+`fpr` is a field of the `HighOrderPrior` itself, so it resolves ahead of the `forward(pr)` block and names the **high** order factor block, where before nesting it resolved through to the low order one. Reads through it are unaffected by that shift: the nested `HighOrderPrior` forwards to its own `pr`, which the invariant pins to `pr.fpr`, so `hop.fpr.mu` is the factor mean either way and `hop.fpr` is simply "the factor prior at this order".
 
 ### Which read is idiomatic
 
-**`pr.fpr.kt` is the public read**, on the same terms as on [`LowOrderPrior`](@ref) — see the fuller reasoning there. The seven flat names here are a **frozen compatibility surface**: `f_kt`, `f_sk`, `f_V`, `f_D2`, `f_L2`, `f_S2` and `f_skmp`, and no more will be added. A field added to this carrier in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart.
+**`pr.fpr.kt` is the public read**, on the same terms as on [`LowOrderPrior`](@ref) — see the fuller reasoning there. The seven flat names here are a **frozen compatibility surface**: `f_kt`, `f_sk`, `f_V`, `f_D2`, `f_L2`, `f_S2` and `f_skmp`, and no more will be added. A field added to `HighOrderPrior` in future is reachable as `pr.fpr.<name>` and gains no `f_` counterpart.
 
 As there, the two reads differ where the block is absent — `pr.f_kt` returns `nothing`, `pr.fpr.kt` throws — so guard first and then read through `fpr`.
 
@@ -2072,8 +1479,8 @@ Defining `N = length(pr.mu)`.
 
   - If any of `kt`, `L2`, or `S2` are provided, all must be provided, non-empty, and `size(kt) == (N^2, N^2)`, `size(L2) == size(S2) == (div(N * (N + 1), 2), N^2)`.
   - If `sk` or `V` are provided, both must be provided, non-empty, and `size(sk) == (N, N^2)`, `size(V) == (N, N)`.
-  - If that first triple is provided and `sk` is too, `D2` must be provided, non-empty, and `size(D2) == size(transpose(L2))`. `D2` carries no other rule: it is the one moment field the constructor accepts on its own, and a carrier holding it alone is legal.
-  - If `fpr` is provided, `pr.fpr` must be provided and `fpr.pr === pr.fpr` — the factor distribution the factor co-moments were computed against is the low order carrier's own factor block, not a second copy of it. The converse does not hold: a low order factor block with no factor co-moments is ordinary, so `fpr === nothing` is always allowed. Everything internal to the factor block, including its own shapes against its own `N`, is validated by its own constructor.
+  - If that first triple is provided and `sk` is too, `D2` must be provided, non-empty, and `size(D2) == size(transpose(L2))`. `D2` carries no other rule: it is the one moment field the constructor accepts on its own, and a `HighOrderPrior` holding it alone is legal.
+  - If `fpr` is provided, `pr.fpr` must be provided and `fpr.pr === pr.fpr` — the factor distribution the factor co-moments were computed against is the factor block of the low order result, not a second copy of it. The converse does not hold: a low order factor block with no factor co-moments is ordinary, so `fpr === nothing` is always allowed. Everything internal to the factor block, including its own shapes against its own `N`, is validated by its own constructor.
 
 ## View parameters
 
@@ -2100,17 +1507,20 @@ julia> HighOrderPrior(;
                       V = rand(2, 2))
 HighOrderPrior
     pr ┼ LowOrderPrior
-       │       X ┼ 2×2 Matrix{Float64}
-       │     o_X ┼ nothing
-       │      mu ┼ Vector{Float64}: [0.02, 0.03]
-       │   sigma ┼ 2×2 Matrix{Float64}
-       │    chol ┼ nothing
-       │       w ┼ nothing
-       │     ens ┼ nothing
-       │     kld ┼ nothing
-       │      ow ┼ nothing
-       │      rr ┼ nothing
-       │     fpr ┴ nothing
+       │         X ┼ 2×2 Matrix{Float64}
+       │       o_X ┼ nothing
+       │        mu ┼ Vector{Float64}: [0.02, 0.03]
+       │     sigma ┼ 2×2 Matrix{Float64}
+       │      chol ┼ nothing
+       │         w ┼ nothing
+       │       ens ┼ nothing
+       │       kld ┼ nothing
+       │        ow ┼ nothing
+       │        rr ┼ nothing
+       │       fpr ┼ nothing
+       │     x_src ┼ nothing
+       │   ss_gaps ┼ nothing
+       │        pc ┴ nothing
     kt ┼ 4×4 Matrix{Float64}
     D2 ┼ 4×3 SparseArrays.SparseMatrixCSC{Int64, Int64}
     L2 ┼ 3×4 SparseArrays.SparseMatrixCSC{Int64, Int64}
@@ -2254,11 +1664,11 @@ The factor block is forwarded **unsliced**, as it is on [`LowOrderPrior`](@ref):
 
 # Algorithm
 
- 1. Make `idx`, the fourth-moment index that addresses the co-moment tensors of the assets at `i`, with [`fourth_moment_index_generator`](@ref) against the carrier's full asset count.
- 2. Cut the coskewness matrix to `i` on its asset axis and to `idx` on its pair axis, with [`nothing_scalar_array_view_odd_order`](@ref), giving `sk`. A carrier that holds none keeps `nothing`.
- 3. Recompute `V` from the `sk` of step 2 and the cut returns matrix, with [`negative_spectral_coskewness`](@ref) and the carrier's `skmp`. `V` is a spectral quantity of the coskewness matrix, so it is rebuilt rather than cut. When step 2 gave `nothing`, `V` is `nothing`.
- 4. Rebuild `D2`, `L2` and `S2` at the subproblem's asset count with [`dup_elim_sum_view`](@ref), rather than cutting them. Take all three when the carrier holds `D2`, take `L2` and `S2` alone and leave `D2` as `nothing` when it holds `S2` but no `D2`, and take none when it holds neither.
- 5. Rebuild the carrier through its ordinary keyword constructor: `pr` recursed through [`port_opt_view`](@ref) with `i`, `kt` indexed by `idx`, the values of steps 2 to 4, and `skmp` and `fpr` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
+ 1. Make `idx`, the fourth-moment index that addresses the co-moment tensors of the assets at `i`, with [`fourth_moment_index_generator`](@ref) against the full asset count of `pr`.
+ 2. Cut the coskewness matrix to `i` on its asset axis and to `idx` on its pair axis, with [`nothing_scalar_array_view_odd_order`](@ref), giving `sk`. A prior result that holds none keeps `nothing`.
+ 3. Recompute `V` from the `sk` of step 2 and the cut returns matrix, with [`negative_spectral_coskewness`](@ref) and the `skmp` of `pr`. `V` is a spectral quantity of the coskewness matrix, so it is rebuilt rather than cut. When step 2 gave `nothing`, `V` is `nothing`.
+ 4. Rebuild `D2`, `L2` and `S2` at the subproblem's asset count with [`dup_elim_sum_view`](@ref), rather than cutting them. Take all three when `pr` holds `D2`, take `L2` and `S2` alone and leave `D2` as `nothing` when it holds `S2` but no `D2`, and take none when it holds neither.
+ 5. Rebuild the prior result through its ordinary keyword constructor: `pr` recursed through [`port_opt_view`](@ref) with `i`, `kt` indexed by `idx`, the values of steps 2 to 4, and `skmp` and `fpr` forwarded unchanged. Every `@argcheck` of the constructor therefore runs on the view.
 
 # Arguments
 
@@ -2268,7 +1678,7 @@ The factor block is forwarded **unsliced**, as it is on [`LowOrderPrior`](@ref):
 
 # Returns
 
-  - `pr::HighOrderPrior`: The carrier restricted to the assets at `i`.
+  - `pr::HighOrderPrior`: The prior result restricted to the assets at `i`.
 
 # Related
 
@@ -2310,10 +1720,10 @@ end
 # block. They are declared before `forward(pr)` only for reading order: the embedded
 # `LowOrderPrior` has no `f_kt`/`f_sk`/`f_V` of its own to shadow.
 #
-# `fpr` is the carrier's own field, so it resolves before `forward(pr)` and names the *high*
-# order factor block rather than the low order one. Reads through it are unaffected by the
-# shift: the nested carrier forwards to its own `pr`, which the constructor pins to
-# `pr.fpr`, so `hop.fpr.mu` is the factor mean either way.
+# `fpr` is a field of the `HighOrderPrior` itself, so it resolves before `forward(pr)` and
+# names the *high* order factor block rather than the low order one. Reads through it are
+# unaffected by the shift: the nested `HighOrderPrior` forwards to its own `pr`, which the
+# constructor pins to `pr.fpr`, so `hop.fpr.mu` is the factor mean either way.
 #
 # ForwardSelection of the remaining unknown property names to the embedded `pr` prior gives
 # transparent access to the low-order moment fields (see [`@forward_properties`](@ref)).
@@ -2332,19 +1742,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Rebuild a prior result through its ordinary keyword constructor, patching the fields named in `patch`.
 
-One method per carrier, because the carrier's constructor is *named* here rather than recovered by reflection. Recovering it generically would mean either `Base.typename(T).wrapper` or a dependency on `ConstructionBase`, and neither buys anything: the field *list* is already derived, via [`prior_field_values`](@ref), so a carrier that gains a field needs no edit here. Only a new carrier type needs a method — and until it has one it gets a `MethodError` naming this function, rather than being reconstructed by machinery that has never seen it.
+One method per prior result type, because the constructor of the type is *named* here rather than recovered by reflection. Recovering it generically would mean either `Base.typename(T).wrapper` or a dependency on `ConstructionBase`, and neither buys anything: the field *list* is already derived, via [`prior_field_values`](@ref), so a result type that gains a field needs no edit here. Only a new prior result type needs a method — and until it has one it gets a `MethodError` naming this function, rather than being reconstructed by machinery that has never seen it.
 
-Reconstruction runs the carrier's full validation, which is the point of routing through the constructor at all: a patch that leaves the carrier internally inconsistent throws exactly as a hand-written constructor call would. Keyword arguments are order-independent, so `patch` may name fields in any order.
+Reconstruction runs the full validation of the type, which is the point of routing through the constructor at all: a patch that leaves the result internally inconsistent throws exactly as a hand-written constructor call would. Keyword arguments are order-independent, so `patch` may name fields in any order.
 
-These methods are defined here, after both carriers, because they dispatch on the concrete types.
+These methods are defined here, after both prior result types, because they dispatch on the concrete types.
 
 # Algorithm
 
 Both methods run the same three steps, and differ only in the constructor step 3 names.
 
- 1. Read the carrier's own fields into a named tuple with [`prior_field_values`](@ref), keyed in declaration order.
- 2. Merge `patch` over that tuple. A field `patch` names takes the patch's value, and every field it does not name keeps the carrier's.
- 3. Splat the merged tuple into the carrier's keyword constructor — `LowOrderPrior` in the first method, `HighOrderPrior` in the second — and return the carrier it builds. Every `@argcheck` of that constructor runs on the merged values.
+ 1. Read the fields of `pr` into a named tuple with [`prior_field_values`](@ref), keyed in declaration order.
+ 2. Merge `patch` over that tuple. A field `patch` names takes the patch's value, and every field it does not name keeps the value of `pr`.
+ 3. Splat the merged tuple into the keyword constructor of the type — `LowOrderPrior` in the first method, `HighOrderPrior` in the second — and return the prior result it builds. Every `@argcheck` of that constructor runs on the merged values.
 
 # Arguments
 
@@ -2353,7 +1763,7 @@ Both methods run the same three steps, and differ only in the constructor step 3
 
 # Returns
 
-  - `pr::AbstractPriorResult`: Reconstructed result of the same carrier type.
+  - `pr::AbstractPriorResult`: Reconstructed result of the same type.
 
 # Related
 
@@ -2371,23 +1781,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return every property name a prior result can answer, unioned over the carriers.
+Return every property name a prior result can answer, unioned over the prior result types.
 
 This is the candidate pool [`propagatable_contract_violations`](@ref) checks an `@pprop` field
 name against: the generated `factory(x, pr::AbstractPriorResult, args...)` reads
-`getproperty(pr, :field)`, and the carrier that arrives is not known at the declaration.
+`getproperty(pr, :field)`, and the prior result type that arrives is not known at the declaration.
 
-The names of the two carriers are written out, as in [`reconstruct_prior`](@ref); their fields
-are derived, so a carrier that gains a field needs no edit here. `HighOrderPrior` forwards the
+The names of the two prior result types are written out, as in [`reconstruct_prior`](@ref); their fields
+are derived, so a result type that gains a field needs no edit here. `HighOrderPrior` forwards the
 whole of the `pr` it wraps, so the low-order names are properties of it too without being
-fields — that forwarding is the reason a plain `fieldnames` of one carrier is not the pool.
+fields — that forwarding is the reason a plain `fieldnames` of one result type is not the pool.
 
-These methods are defined here, after both carriers, because they name the concrete types.
+These methods are defined here, after both prior result types, because they name the concrete types.
 
 # Algorithm
 
  1. Concatenate the field names of [`LowOrderPrior`](@ref) and of [`HighOrderPrior`](@ref) into one vector of `Symbol`.
- 2. Remove the duplicates in place, and return the vector. `fpr` is a field of both carriers, so the concatenation is not already unique.
+ 2. Remove the duplicates in place, and return the vector. `fpr` is a field of both types, so the concatenation is not already unique.
 
 # Returns
 
@@ -2405,6 +1815,233 @@ function prior_result_property_pool()
     return unique!(Symbol[fieldnames(LowOrderPrior)..., fieldnames(HighOrderPrior)...])
 end
 
+"""
+    shared_series_record(pr::AbstractPriorResult, rows::Nothing, T::Integer)
+    shared_series_record(pr::LowOrderPrior, rows::VecInt, T::Integer)
+    shared_series_record(pr::HighOrderPrior, rows::VecInt, T::Integer)
+    shared_series_record(pr::AbstractPriorResult, state::SampleBufferState)
+
+Record on a prior the observations of the returns data that its fit kept after a Shared Series cut.
+
+A fit drops each observation with a Shared Series gap before it starts, see [`shared_series_view`](@ref) and [`shared_series_buffer`](@ref). After the cut, no part of the prior states which observation of the data each of its rows is. The function writes two records:
+
+  - `ss_gaps`, the marks of the dropped observations, one for each of the `T` observations of the data. A reader that holds the data pairs the rows of `X` with its own rows through the marks, see [`shared_series_kept_rows`](@ref).
+  - The row key of the factor model block. The batch verb counts the position of each row among the observations it kept, and kept row `k` is observation `rows[k]` of the data. The function replaces each position with its observation, so a realised [`factor_attribution`](@ref) of a cross-validation over the same data matches the right rows. A key that kept the positions of the kept rows matched each row after a gap to the row after it, with no error. The timestamps are read off the kept rows, so they need no change.
+
+[`prior`](@ref) calls it after it fits on the returns data and after it reads out a sample buffer, and an optimiser calls it on the prior that it fits after its own cut, see [`shared_series_solve`](@ref).
+
+# Algorithm
+
+The method that Julia selects is the algorithm. Under `rows`:
+
+ 1. Mark every one of the `T` observations as dropped, giving `ss_gaps`.
+ 2. Unmark the observations that the fit kept. When `pr` already holds marks of the `length(rows)` kept observations, as a prior that an optimiser fits on its cut data can, unmark only `rows` at the positions that those marks keep, so the two cuts compose.
+ 3. Map the row key of the factor model block through `rows` with [`map_row_positions`](@ref), and forward the key and `ss_gaps` onto `pr` with [`forward_prior`](@ref). A [`HighOrderPrior`](@ref) forwards the record of the `LowOrderPrior` that it wraps.
+
+# Arguments
+
+  - `pr`: The prior that the fit returned.
+  - `rows`: The observations that the fit kept, from [`shared_series_rows`](@ref), or `nothing` when it kept every observation.
+  - `T`: The number of observations of the data that the fit was given.
+  - `state`: The sample buffer that a refit read. Its kept rows are those of [`buffer_kept_rows`](@ref), and its observations are its `n` rows.
+
+# Validation
+
+  - The rules of [`assert_shared_series_gaps`](@ref) on the marks.
+
+# Returns
+
+  - `pr::AbstractPriorResult`: `pr` itself when the fit kept every observation, and otherwise `pr` with the marks and with the positions of its block mapped through `rows`.
+
+# Related
+
+  - [`shared_series_kept_rows`](@ref)
+  - [`map_row_positions`](@ref)
+  - [`buffer_row_key`](@ref)
+  - [`attribution_row_key`](@ref)
+"""
+function shared_series_record(pr::AbstractPriorResult, ::Nothing, ::Integer)
+    return pr
+end
+function shared_series_record(pr::LowOrderPrior, rows::VecInt, T::Integer)
+    ss_gaps = trues(T)
+    kept = shared_series_kept_rows(pr, length(rows))
+    ss_gaps[isnothing(kept) ? rows : view(rows, kept)] .= false
+    # The positions are not part of the projection that `o_X` records, so `o_X` stays.
+    return forward_prior(pr; rr = map_row_positions(pr.rr, rows), o_X = pr.o_X,
+                         ss_gaps = ss_gaps)
+end
+function shared_series_record(pr::HighOrderPrior, rows::VecInt, T::Integer)
+    return forward_prior(pr; pr = shared_series_record(pr.pr, rows, T))
+end
+function shared_series_record(pr::AbstractPriorResult, state::SampleBufferState)
+    return shared_series_record(pr, buffer_kept_rows(state), state.n)
+end
+"""
+    assert_shared_series_gaps(ss_gaps::Nothing, n::Integer)
+    assert_shared_series_gaps(ss_gaps::AbstractVector{Bool}, n::Integer)
+
+Check the Shared Series marks `ss_gaps` of a [`LowOrderPrior`](@ref) against the number of rows `n` of its `X`.
+
+# Validation
+
+  - At least one mark is `true`, else an `ArgumentError` is raised. A prior that dropped no observation records `nothing`. So the returns data after the cut always holds fewer observations than the marks, and [`shared_series_kept_rows`](@ref) tells the two apart by their length.
+  - The marks keep at least `n` observations, else a `DimensionMismatch` is raised, because the rows of `X` are the last observations that the marks keep.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`LowOrderPrior`](@ref)
+  - [`shared_series_record`](@ref)
+"""
+function assert_shared_series_gaps(::Nothing, ::Integer)
+    return nothing
+end
+function assert_shared_series_gaps(ss_gaps::AbstractVector{Bool}, n::Integer)
+    @argcheck(any(ss_gaps),
+              ArgumentError("ss_gaps marks no observation. A prior that dropped no observation for a Shared Series gap records `nothing`, so that a reader can tell the returns data that the prior read from the returns data after the same cut"))
+    k = count(!, ss_gaps)
+    @argcheck(k >= n,
+              DimensionMismatch("ss_gaps keeps $k observation(s), and X holds $n row(s). The rows of X are the last observations that ss_gaps keeps, so the marks must keep at least size(X, 1) observations"))
+    return nothing
+end
+"""
+    shared_series_kept_rows(pr, T::Integer) -> Option{Vector{Int}}
+
+Return the observations that a prior kept after a Shared Series cut, when the returns data of a reader is the data that the prior read.
+
+A reader holds `T` observations of the returns data. When `T` equals the number of marks in `pr.ss_gaps`, the reader holds the data that the prior read, and the rows of `pr.X` are the last of the observations that the marks keep. Otherwise the reader holds the data after the same cut, or data with no record, and the rows of `pr.X` are its last observations, which is the rule of every reader before the record existed. The marks are `nothing` when the prior dropped no observation, so the cut data never has as many observations as the marks.
+
+# Arguments
+
+  - `pr`: The prior result, the returns data, a prior estimator, or `nothing`. Only a prior result holds marks: a [`LowOrderPrior`](@ref) in its field `ss_gaps`, and a [`HighOrderPrior`](@ref) in the low order prior that it wraps.
+  - `T`: The number of observations of the returns data that the reader holds.
+
+# Returns
+
+  - `rows::Option{Vector{Int}}`: The positions of the kept observations in the data of the reader, or `nothing` when the reader pairs the last rows.
+
+# Related
+
+  - [`shared_series_record`](@ref)
+  - [`implied_volatility_picker`](@ref)
+  - [`optimiser_shared_series_rows`](@ref)
+"""
+function shared_series_kept_rows(pr::LowOrderPrior, T::Integer)
+    return shared_series_kept_rows(getfield(pr, :ss_gaps), T)
+end
+function shared_series_kept_rows(pr::HighOrderPrior, T::Integer)
+    return shared_series_kept_rows(getfield(pr, :pr), T)
+end
+function shared_series_kept_rows(ss_gaps::AbstractVector{Bool}, T::Integer)
+    return length(ss_gaps) == T ? findall(!, ss_gaps) : nothing
+end
+function shared_series_kept_rows(::Any, ::Integer)
+    return nothing
+end
+"""
+    prior_data_rows(pr, T::Integer, n::Integer) -> AbstractVector{Int}
+
+Return the observations of the returns data of a reader that pair the last `n` rows of the `X` of a prior.
+
+A fit drops leading rows, a Scenario Cap and the warm-up of a [`CrossSectionalFactorPrior`](@ref), and the observations of a Shared Series gap. When the reader holds the data that the prior read, the rows of `X` are the last of the observations that the marks `pr.ss_gaps` keep, see [`shared_series_kept_rows`](@ref). Otherwise they are the last `n` observations of the data of the reader.
+
+# Arguments
+
+  - `pr`: The prior result, or the returns data that a reader reads in its place.
+  - `T`: The number of observations of the returns data that the reader holds.
+  - `n`: The number of rows to pair, at most the number of rows of `pr.X`.
+
+# Returns
+
+  - `rows::AbstractVector{Int}`: The positions of the paired observations in the data of the reader, in order.
+
+# Related
+
+  - [`shared_series_kept_rows`](@ref)
+  - [`implied_volatility_picker`](@ref)
+  - [`outer_prior_rows`](@ref)
+"""
+function prior_data_rows(pr, T::Integer, n::Integer)
+    rows = shared_series_kept_rows(pr, T)
+    return if isnothing(rows)
+        ((T - n + 1):T)
+    else
+        view(rows, (length(rows) - n + 1):length(rows))
+    end
+end
+"""
+    map_row_positions(rr::Option{<:AbstractLoadingsRegressionResult}, rows::VecInt)
+    map_row_positions(rr::Regression, rows::VecInt)
+    map_row_positions(rr::CrossSectionalFactorModel, rows::VecInt)
+
+Return a factor model block whose positions are mapped through `rows`, and every other field unchanged.
+
+Position `k` becomes `rows[k]`, with [`kept_row_positions`](@ref). A block that records no row key, or no block at all, is returned as it is.
+
+# Arguments
+
+  - `rr`: The factor model block, or `nothing`.
+  - `rows`: The observation of each position.
+
+# Returns
+
+  - `rr`: The block with its positions mapped, or `rr` itself.
+
+# Related
+
+  - [`shared_series_record`](@ref)
+  - [`forget_row_positions`](@ref)
+  - [`set_row_key`](@ref)
+"""
+function map_row_positions(rr::Option{<:AbstractLoadingsRegressionResult}, ::VecInt)
+    return rr
+end
+function map_row_positions(rr::Regression, rows::VecInt)
+    return set_row_key(rr, kept_row_positions(rows, rr.idx), rr.ts)
+end
+function map_row_positions(rr::CrossSectionalFactorModel, rows::VecInt)
+    # Every field is read with `getfield`, for the reason `forget_row_positions` states.
+    names = fieldnames(typeof(rr))
+    fields = NamedTuple{names}(map(k -> getfield(rr, k), names))
+    return CrossSectionalFactorModel(; fields...,
+                                     idx = kept_row_positions(rows, getfield(rr, :idx)))
+end
+"""
+    kept_row_positions(rows::Nothing, pos::Option{<:VecInt})
+    kept_row_positions(rows::VecInt, pos::Nothing)
+    kept_row_positions(rows::VecInt, pos::VecInt)
+
+Return the observation of each position among the kept rows.
+
+Kept row `k` is observation `rows[k]`. With no `rows`, every observation was kept, so the positions are the observations. With no positions, there is nothing to map.
+
+# Arguments
+
+  - `rows`: The kept observations, or `nothing` when every observation was kept.
+  - `pos`: The positions among the kept rows, or `nothing`.
+
+# Returns
+
+  - `idx::Option{<:VecInt}`: `rows[pos]`, `pos` itself when `rows` is `nothing`, or `nothing` when `pos` is `nothing`.
+
+# Related
+
+  - [`map_row_positions`](@ref)
+  - [`buffer_kept_rows`](@ref)
+"""
+function kept_row_positions(::Nothing, pos::Option{<:VecInt})
+    return pos
+end
+function kept_row_positions(::VecInt, ::Nothing)
+    return nothing
+end
+function kept_row_positions(rows::VecInt, pos::VecInt)
+    return rows[pos]
+end
 export prior, LowOrderPrior, HighOrderPrior
 public forward_prior, AbstractPriorEstimator, AbstractPriorResult, reconstruct_prior
 # The `# Interfaces`-marked types of #1146 (ADR 0154): the four families

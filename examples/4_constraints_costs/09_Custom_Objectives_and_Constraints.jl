@@ -389,13 +389,14 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   cobj::Option{<:CustomJuMPObjective}). Fixed in src (uncommitted, this branch): added
 #src   VecJuMPConstr/VecJuMPObj iteration methods + widened the 5 objective-gate signatures to
 #src   Option{<:JuMPObj_VecJuMPObj}. Now band [0.5,0.8] binds at 0.500 (was 0.204); two 1e-4
-#src   tilts == one 2e-4 tilt (1.3695). test_03b assembly suite still green.
+#src   tilts == one 2e-4 tilt (1.3695). test_03_optimisation.jl assembly suite still
+#src   green.
 #src - BOTH follow-ups now CLOSED (uncommitted on dev):
 #src   1. NearOptimalCentering called add_custom_objective_term! with a DIFFERENT arg order
 #src      than the main path, so a custom objective missed dispatch there. Fixed by inserting
 #src      MinimumRisk() as `obj` (NOC minimises: @objective(…, Min) + penalty factor 1).
 #src      test_20 NOC suite 39/39 green after.
-#src   2. New test/test_03c_custom_jump_hooks.jl covers both hooks: single + vector cobj/ccnt,
+#src   2. New test/test_03_optimisation.jl covers both hooks: single + vector cobj/ccnt,
 #src      the k idiom under MaximumRatio, the fallback, and a spy pinning the calling
 #src      convention on BOTH the main and NOC paths. Mutation-checked.
 #src      Gotcha: `!isempty(spy_log)` is NOT a valid NOC regression detector — NOC solves
@@ -408,8 +409,8 @@ plot_stacked_bar_composition(results, rd; xticks = (1:length(labels), labels))
 #src   other caller, so the detector keys on `isa(e.optimiser, NearOptimalCentering)` — naming
 #src   the estimator under test instead of detecting a type confusion. If you ever reintroduce
 #src   a JuMPOptimiser in that slot, this test will NOT catch it; the typed fallback will.
-#src - Also new in test_03c: a quadratic term (SpreadPenalty) against MaximumReturn's AFFINE
-#src   objective — impossible before ADR 0036 (add_to_expression!(::AffExpr, ::QuadExpr) is a
+#src - Also new in test_03_optimisation.jl: a quadratic term (SpreadPenalty) against
+#src   MaximumReturn's AFFINE objective — impossible before ADR 0036 (add_to_expression!(::AffExpr, ::QuadExpr) is a
 #src   MethodError), so custom-term validity used to depend on the risk measure and objective.
 #src   And an Inert* pair asserting the fallback now RAISES rather than silently no-op'ing.
 #src   Also: constrained NOC does NOT solve on this SP500 slice (NaN) with Variance OR

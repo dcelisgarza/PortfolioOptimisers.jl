@@ -4,11 +4,13 @@ Description = "Matrix processing, private API of PortfolioOptimisers.jl: matrix_
 
 # Matrix processing: private API
 
-These are the helpers of [`matrix_processing!`](@ref). `matrix_processing_block!` runs the steps on the part of the matrix that holds no `NaN`, so the entries of an asset that the fit left out stay `NaN`. `matrix_processing_step!` applies one named step, such as the positive definite projection or the denoising.
+These are the helpers of [`matrix_processing!`](@ref). `matrix_processing_block!` runs the steps on the part of the matrix that holds no `NaN` and no zero variance, so the entries of an asset that the fit left out stay `NaN`, and the row and column of a constant asset stay zero. `matrix_processing_step!` applies one named step, such as the positive definite projection or the denoising.
 
 ```@docs
 matrix_processing_block!
 PortfolioOptimisers.assert_finite_block
 matrix_processing_step!
 PortfolioOptimisers.assert_shape_only_matrix_processing
+PortfolioOptimisers.supports_shape_processing
+PortfolioOptimisers.assert_matrix_processing_posdef
 ```

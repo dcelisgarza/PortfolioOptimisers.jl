@@ -134,7 +134,7 @@ to skip a step, and the job does not cover the open-map case anyway.
 - ADR 0073 and ADR 0078 are neither amended nor superseded. ADR 0078's title names a rise and its
   refile clause reads git history; this job does neither, so folding it in would make one ADR
   describe two mechanisms.
-- `STANDARDS.md` routes the subject of a late addition to `Sweep.yml` beside the census.
+- `CODING_STANDARDS.md` routes the subject of a late addition to `Sweep.yml` beside the census.
 
 ## Verification
 
@@ -160,12 +160,12 @@ no row it printed the one map for `src/11_Phylogeny/07_NewThing.jl` and the five
 
 ## Amendment (2026-08-24)
 
-The body carries a fixed `## Routing` block above its Destination. It names `STANDARDS.md`, the two
-Authorities a sweeper reads, and `CONTEXT.md`, each one directly.
+The body carries a fixed `## Routing` block above its Destination. It names `CODING_STANDARDS.md`, the two
+Authorities a sweeper reads, and `GLOSSARY.md`, each one directly.
 
 The original body routed through #404 alone: *"Every rule for this effort lives on #404. Read it
 first."* #404 does name those files, inside five thousand words. Measured over the six open sweep
-tickets on 2026-08-24, three named an Authority and none named `STANDARDS.md`. A standard that the
+tickets on 2026-08-24, three named an Authority and none named `CODING_STANDARDS.md`. A standard that the
 sweeper is never routed to does not hold, however well it is written.
 
 The block is constant text, so the sentence *"Every field of its body is generated, so the job
@@ -267,3 +267,62 @@ Against a scratch file `src/26_ScratchProbe.jl` holding two docstrings:
 `--file src/19_RiskMeasures/02_Variance.jl`, whose child map 9 is issue #423 and open, planned the
 file, added no line to `reopen.tsv`, and wrote the was-charted sentence. `--file` on a swept path
 and on a path with no row each threw with the message that names the fix.
+
+## Amendment (2026-10-19)
+
+A title that names no current path is refused, because the safeguard cannot see the issue it heads.
+
+The safeguard finds an open sweep issue by the path its title names. Forty-nine tickets filed
+before the `sweep` label carried no label, and named a file by its bare name or by a path that #1058
+moved. Four labelled tickets named a path that a later move, split or deletion changed. Each hid its
+files: `sweep_check.jl` reported an unfiled file, and `sweep_triage.jl` planned a duplicate. Nine
+tickets were such duplicates, #1717 and #779 among them, and each was closed in favour of the
+older ticket that sweeps its file. #1755 records the gap.
+
+### The fix keeps the title as the one key
+
+Two repairs were possible: retitle the tickets, or teach both jobs to read the body and translate
+old names. The title stays the one key. A body names related files in its prose, so a body match
+skips a file that a ticket only mentions, and a map from old names to new ones grows with every
+move. **The body is still never machine-read.** The tickets were retitled to name the current path
+of every file they sweep, and labelled `sweep`.
+
+GitHub caps a title at 256 characters. Two tickets sweep files whose paths together pass the cap,
+and every one of those files reads `swept = true`. The check reads a sweep issue only for a row that
+reads `swept = false`, so those tickets keep a descriptive title that names no path.
+
+### A stale title is refused, not read past
+
+`CodeHealth.stale_titles` lists every open sweep issue whose title holds a `.jl` token that is not a
+row of the manifest. A move of the tree makes every title that names a moved file stale at once, so
+the guard turns a silent duplicate into a loud refusal:
+
+- `sweep_check.jl --fetch` reports each stale title as a failure in every scope, as it reports a
+  closed child map.
+- `sweep_triage.jl` throws in `reconcile` and plans nothing. A stale title is a fourth way for the
+  manifest and the tracker to disagree, beside the three that throw already.
+
+The repair is a retitle. A session that moves a file under `src/` or `ext/` retitles the open
+sweep issue that names it, and files no second ticket.
+
+A colon now ends a path in `CodeHealth.title_tokens`, which `names_path` reads. A title that reads
+`Sweep src/A.jl: 23 units` named `src/A.jl:`, which matched no path. A path holds no colon, so
+the code-health job of ADR 0078, which reads titles through the same function, is unchanged.
+
+## Amendment (2026-10-19) — from [#1713](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1713)
+
+`apply` retries the attach of a sub-issue, and an attach that still fails does not stop the plan.
+
+`apply` opened #1712 and stopped on `gh: Not Found (HTTP 404)` before it attached the issue to its
+child map. The sub-issues endpoint takes the database id of the child, which `apply` reads back by
+number, and that REST read of an issue opened a moment before can answer 404 for a short time.
+`set -e` then stopped the loop, so #1712 had no parent and the rest of the plan was not opened.
+
+Two calls now go through `retry`, five attempts two seconds apart: the read of the id, and the post
+to the sub-issues endpoint. A failed `gh api` prints its error body to stdout, so `retry` prints the
+output of the attempt that succeeded alone, and `apply` attaches only an id that is a number. If a
+call still fails after five attempts, `apply` names the issue and
+its map, opens the rest of the plan, and then prints one command per orphan that attaches it by hand
+and exits with status 1. **An orphan does not stop the plan**, because the plan cannot open it again.
+The next dump reports the orphan as an existing sweep issue, so a re-run skips its path, and the
+orphan is attached only by the printed command. A red step in `Sweep.yml` shows the orphan.

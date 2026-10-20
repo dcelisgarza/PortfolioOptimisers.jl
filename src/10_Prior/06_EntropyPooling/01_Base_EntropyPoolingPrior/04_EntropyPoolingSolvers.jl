@@ -61,7 +61,7 @@ Where:
 
 !!! note "The view is met to one observation"
 
-    The constraint fixes the posterior mass of ``\\mathcal{T}_{i}(\\bar{v})``, and the posterior value at risk of that mass is a sample order statistic: [`ValueatRisk`](@ref) reads the first observation whose cumulative weight reaches ``\\alpha``. An entropy pooling solve meets its constraints to its own tolerance, and a mass short of ``\\alpha`` by as little as `1e-8` reads one observation further down the tail. The posterior value at risk then sits under ``\\bar{v}``, by the gap between two neighbouring losses. No tolerance on the solve removes this, because the reading is a step function of the mass. The view is met to the resolution the sample has, which is one observation. Read a posterior value at risk against the two observations that bracket the target, and read the tail mass where an exact statement is needed.
+    The constraint fixes the posterior mass of ``\\mathcal{T}_{i}(\\bar{v})``, and the posterior value at risk of that mass is a sample order statistic: [`ValueatRisk`](@ref) reads the first observation whose cumulative weight exceeds ``\\alpha``. A mass of exactly ``\\alpha`` does not exceed it, so the reading passes every observation of ``\\mathcal{T}_{i}(\\bar{v})`` and takes the largest loss under ``\\bar{v}``. A mass above ``\\alpha`` by more than the slack of [`ValueatRisk`](@ref) reads the smallest loss in ``\\mathcal{T}_{i}(\\bar{v})``, which is at or above ``\\bar{v}``. An entropy pooling solve meets its constraints to its own tolerance, about `1e-8`, so the sign of its residual selects one of the two. No tolerance on the solve removes this, because the reading is a step function of the mass. The view is met to the resolution the sample has, which is one observation. Read a posterior value at risk against the two observations that bracket the target, and read the tail mass where an exact statement is needed.
 
 # Algorithm
 
@@ -206,38 +206,40 @@ function ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
     return nothing
 end
 """
-    ep_prior_probabilities(w::Option{<:StatsBase.ProbabilityWeights},
-                           pr::AbstractPriorResult, Ti::Int)
+    ep_prior_probabilities(w::Nothing, pr::AbstractPriorResult, Ti::Int)
+    ep_prior_probabilities(w::ScenarioProbabilities, T::Integer, Ti::Integer)
 
 Return the prior probabilities an entropy pooling fit starts from.
 
-A prior that reweights observations works on the observation axis its nested prior **answered**, not on the axis it was handed. A nested prior may drop rows: a [`CrossSectionalFactorPrior`](@ref) drops the observations its Descriptors warm up over and the observations its exposure lag consumes, so its scenarios are the window the fit is defined on. So `pr` is fitted first, and the prior probabilities are read on its rows.
+A prior that reweights observations works on the observation axis its nested prior **answered**, not on the axis it was handed. A nested prior may drop rows: a [`CrossSectionalFactorPrior`](@ref) drops the observations its Descriptors warm up over and the observations its exposure lag consumes, so its scenarios are the window the fit is defined on. So the prior probabilities are read on the rows of the nested result, and [`ep_wrapped_prior`](@ref) finds the count `T` of those rows.
 
-The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior. Uniform over the rows of `pr.X` is the last.
+The three sources are read in order. A caller's `pe.w` wins, because it is the one tilt no fit can state. The nested result's own `w` comes next, because a nested pooling prior already tilted the scenarios it answered, and uniform is then not the prior. Uniform over the rows of `pr.X` is the last. The method for a caller's `pe.w` runs before the refit under it, so it reads the count `T` and not a result. When that refit answers its own `pr.w`, the nested prior solved its views from `pe.w`, and [`ep_wrapped_prior`](@ref) reads its posterior `pr.w` instead.
 
 # Algorithm
 
- 1. Take `T` as `size(pr.X, 1)`, the observations the nested prior answered.
- 2. When `w` is not `nothing`, check its length against `T` and return it.
- 3. When `w` is `nothing` and `pr.w` is not, return `pr.w` as `StatsBase.pweights`.
- 4. Otherwise return the uniform `1/T` as `StatsBase.pweights`.
+The method that Julia selects is the algorithm.
+
+ 1. A `nothing` `w`: when `pr.w` is not `nothing`, return it through [`scenario_probabilities`](@ref), which keeps the kind of a [`ScenarioProbabilities`](@ref) and makes any other vector `StatsBase.AnalyticWeights`. Otherwise return the uniform `1/T` over the `T = size(pr.X, 1)` rows of `pr.X` as `StatsBase.AnalyticWeights`. Their bias correction is the one of reliability weights, see [`ScenarioProbabilities`](@ref).
+ 2. A caller's `w`: check its length against `T`, and return it.
 
 # Arguments
 
   - `w`: A caller's prior probabilities, the `w` field of the pooling estimator, or `nothing`.
-  - `pr`: Prior result of the nested estimator, fitted before this call.
+  - `pr`: Prior result of the nested estimator.
+  - `T`: Observations the nested prior answers.
   - `Ti`: Observations the pooling estimator was handed. It is read only by the refusal message.
 
 # Validation
 
-  - `length(w) == size(pr.X, 1)`. A length that does not match raises a `DimensionMismatch` naming both counts and the count the estimator was handed.
+  - `length(w) == T`. A length that does not match raises a `DimensionMismatch` naming both counts and the count the estimator was handed.
 
 # Returns
 
-  - `w0::StatsBase.ProbabilityWeights`: Prior probabilities, on the rows of `pr.X`.
+  - `w0::ScenarioProbabilities`: Prior probabilities, on the rows that the nested prior answers.
 
 # Related
 
+  - [`ep_wrapped_prior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`entropy_pooling`](@ref)
@@ -247,14 +249,12 @@ function ep_prior_probabilities(::Nothing, pr::AbstractPriorResult, ::Int)
     return if isnothing(pr.w)
         T = size(pr.X, 1)
         iT = inv(T)
-        StatsBase.pweights(range(iT, iT; length = T))
+        StatsBase.aweights(range(iT, iT; length = T))
     else
-        StatsBase.pweights(pr.w)
+        scenario_probabilities(pr.w)
     end
 end
-function ep_prior_probabilities(w::StatsBase.ProbabilityWeights, pr::AbstractPriorResult,
-                                Ti::Int)
-    T = size(pr.X, 1)
+function ep_prior_probabilities(w::ScenarioProbabilities, T::Integer, Ti::Integer)
     @argcheck(length(w) == T,
               DimensionMismatch("length(pe.w) ($(length(w))) must match the $T observations the nested prior answered. The estimator was handed $Ti. A prior that reweights observations states its prior probabilities on the scenarios its nested prior produced, so a nested prior that drops rows moves this axis."))
     return w
@@ -309,11 +309,11 @@ Where:
 
  1. Return `w` when `epc` holds no row. An empty view set states nothing, so the posterior is the prior, and it is answered exactly rather than solved for.
  2. Open `A` and `B` with the row that pins the posterior to sum to one, both sides divided by ``\\sqrt{T}``.
- 3. Stack the block of every key of `epc` onto `A` and `B`, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
+ 3. Stack the block of every key of `epc` onto `A` and `B`, in the sorted order of the keys, and set the box `wb` of that block's dual variables from the key: free for `:eq` and `:cvar_eq`, non-negative for `:ineq`, and ``[-s_{c2},\\, s_{c2}]`` for `:feq`. Raise on any other key. A `:feq` block is left out when ``s_{c2}`` is zero, because that box pins its dual variables to zero and the fixed rows then carry no weight.
  4. Start every dual variable at ``1/\\sqrt{T}``, clamped into its own box. A `:feq` box is ``[-s_{c2},\\, s_{c2}]``, so an `s_{c2}` below ``1/\\sqrt{T}`` would otherwise place the start outside it.
  5. Minimise the dual objective over that box with `Optim.optimize`, through the branch `alg` selects. Both the objective and its gradient are multiplied by ``s_{c1}``.
  6. Raise when `Optim.converged` reports that the solve failed.
- 7. Recover the posterior probabilities from the minimiser, and return them as `StatsBase.pweights`.
+ 7. Recover the posterior probabilities from the minimiser, and return them through [`scenario_probabilities`](@ref), in the kind of `w`.
 
 # Arguments
 
@@ -334,7 +334,7 @@ Where:
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 
@@ -357,13 +357,17 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     #! over the normalisation row alone: that answers `w` to solver tolerance where this
     #! answers it exactly, and `kld` is zero rather than a rounding of it. See issue #852.
     if isempty(epc)
-        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+        return scenario_probabilities(w)
     end
     T = length(w)
     factor = inv(sqrt(T))
     blocks = Any[(fill(factor, 1, T), [factor])]
     wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
-    for (key, val) in epc
+    #! The keys of `epc` are `Symbol`s, which hash by their address, so the order of the
+    #! `Dict` moves between two processes. The blocks stack in the sorted order of their keys,
+    #! so one view set gives one problem in every process.
+    for key in sort!(collect(keys(epc)))
+        val = epc[key]
         s = length(val[2])
         #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
         #! fix carries no weight. That is what a primal penalty of weight `sc2` means, and
@@ -433,7 +437,7 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return StatsBase.pweights(w .* exp.(-transpose(A) * x .- one(eltype(w))))
+    return scenario_probabilities(w, w .* exp.(-transpose(A) * x .- one(eltype(w))))
 end
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -443,13 +447,17 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     #! over the normalisation row alone: that answers `w` to solver tolerance where this
     #! answers it exactly, and `kld` is zero rather than a rounding of it. See issue #852.
     if isempty(epc)
-        return isa(w, StatsBase.ProbabilityWeights) ? w : StatsBase.pweights(w)
+        return scenario_probabilities(w)
     end
     T = length(w)
     factor = inv(sqrt(T))
     blocks = Any[(fill(factor, 1, T), [factor])]
     wbs = AbstractMatrix[[typemin(eltype(w)) typemax(eltype(w))]]
-    for (key, val) in epc
+    #! The keys of `epc` are `Symbol`s, which hash by their address, so the order of the
+    #! `Dict` moves between two processes. The blocks stack in the sorted order of their keys,
+    #! so one view set gives one problem in every process.
+    for key in sort!(collect(keys(epc)))
+        val = epc[key]
         s = length(val[2])
         #! A `:feq` dual variable is boxed by `sc2`, so `sc2 == 0` pins it to zero and the
         #! fix carries no weight. That is what a primal penalty of weight `sc2` means, and
@@ -522,7 +530,8 @@ function entropy_pooling(w::VecNum, epc::AbstractDict,
     @argcheck(Optim.converged(result),
               ErrorException("Entropy pooling optimisation failed. Relax the views, use different solver parameters, or use a different prior."))
     x = Optim.minimizer(result)
-    return StatsBase.pweights(exp.(log_p .- (one(eltype(log_p)) .+ transpose(A) * x)))
+    return scenario_probabilities(w,
+                                  exp.(log_p .- (one(eltype(log_p)) .+ transpose(A) * x)))
 end
 """
     entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
@@ -550,7 +559,7 @@ This method registers no model entry of its own. It is the three-argument shape 
 
 # Returns
 
-  - `pw::StatsBase.ProbabilityWeights`: Posterior probability weights satisfying the constraints.
+  - `pw::ScenarioProbabilities`: Posterior probability weights satisfying the constraints, in the kind of `w`.
 
 # Related
 

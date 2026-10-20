@@ -25,7 +25,7 @@ tests; in-place modification reaches the solver only for HiGHS, while Clarabel a
 JuMP's cache on every solve; and a scenario row cannot be appended to a vector constraint, so a new
 observation is a new variable, a new constraint and `T + 1` coefficient rewrites.
 
-### What the reference does
+### What the oracle does
 
 Its optimiser's `partial_fit` "is solved fresh on each call". Its expression cache lives inside one
 fit and is cleared after every solve, and nothing keeps a problem across steps or sets a start. So

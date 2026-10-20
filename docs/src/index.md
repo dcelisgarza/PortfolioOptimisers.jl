@@ -5,8 +5,8 @@ layout: home
 
 hero:
   name: "PortfolioOptimisers.jl"
-  text: Portfolio optimisation library in Julia
-  tagline: Swap a prior, a risk measure or a constraint by passing a different estimator
+  text: Quantitative portfolio construction
+  tagline: Democratising, demystifying, and derisking investing
   image:
     # Root-relative: DocumenterLandingPage remaps a bare filename under `/` into the site's
     # `assets/` directory.
@@ -24,27 +24,33 @@ hero:
       link: 00_API
 
 features:
-  - title: Priors and views
+  - icon: 🔮
+    title: Priors and views
     details: Empirical, factor, and high-order priors. Impose views with the Black-Litterman family, entropy pooling, or opinion pooling. Swapping the prior leaves the optimiser untouched.
     link: user_guide/01_Data_and_Priors
     linkText: Data and priors
-  - title: Robust moment estimation
+  - icon: 🧮
+    title: Robust moment estimation
     details: Gerber, Gerber-IQ, and Smyth-Broby covariances, mutual information and distance covariance, denoising, detoning, regime adjustment, coskewness, and cokurtosis.
     link: examples/2_moments_priors/02_Covariance_Estimation
     linkText: Covariance estimation
-  - title: Over 50 risk measures
+  - icon: 📉
+    title: Over 50 risk measures
     details: Variance, semi-moments, mean absolute deviation, VaR, CVaR, EVaR, RLVaR, drawdowns, ordered weights arrays, and tail ranges. Combine several in one objective, or use one as a limit.
     link: user_guide/03_Risk_Measures
     linkText: Risk measures
-  - title: Optimisers and meta-optimisers
+  - icon: ⚖️
+    title: Optimisers and meta-optimisers
     details: Mean-risk, risk budgeting, near-optimal centering, hierarchical risk parity, HERC, Schur complement, naïve, and the meta-optimisers that nest, stack, and resample them.
     link: user_guide/02_Optimisers
     linkText: Optimisers
-  - title: Constraints and costs
+  - icon: 🔗
+    title: Constraints and costs
     details: Budget, group, factor exposure, cardinality, turnover, tracking, phylogeny, and centrality constraints, plus fees and market impact. Add your own JuMP expressions.
     link: user_guide/04_Constraints_and_Costs
     linkText: Constraints and costs
-  - title: Validation and tuning
+  - icon: 🔁
+    title: Validation and tuning
     details: Walk-forward and combinatorial cross-validation, grid and randomised hyperparameter search, pipelines, and time-dependent constraints.
     link: user_guide/05_Validation_and_Tuning
     linkText: Validation and tuning

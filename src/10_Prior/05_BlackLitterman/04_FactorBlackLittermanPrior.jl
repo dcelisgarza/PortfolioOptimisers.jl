@@ -17,6 +17,7 @@ $(DocStringExtensions.FIELDS)
         mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
         re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
         ve::AbstractVarianceEstimator = SimpleVariance(),
+        rsd::Bool = true,
         views::Lc_BLV,
         sets::Option{<:UniverseSets} = nothing,
         views_conf::Option{<:Num_VecNum} = nothing,
@@ -24,18 +25,19 @@ $(DocStringExtensions.FIELDS)
         rf::Number = 0.0,
         l::Option{<:Number} = nothing,
         tau::Option{<:Number} = nothing,
-        rsd::Bool = true,
-        cache::Option{<:AbstractPartialFitState} = nothing
+        mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+        cache::Option{<:AbstractPartialFitState} = nothing,
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> FactorBlackLittermanPrior
 
 Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its carrier directly rather than forwarding one along its own axis; each field still follows the pattern of a posterior field replacing its prior counterpart while a structural field forwards whole. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
+This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its prior result directly rather than forwarding one along its own axis; each field still follows the pattern of a posterior field replacing its prior counterpart while a structural field forwards whole. It is the member of the Black-Litterman family whose factor block is *modified* rather than passed through — the views land on the factor distribution, and the assets are its projection.
 
   - The factor block `fpr` is the **posterior** factor distribution, processed by `f_mp`, with `chol` dropped because the posterior covariance supersedes the one it factorises. Its `w` and that weighting's diagnostics forward untouched.
-  - `mu` and `sigma` are that block projected through the loadings, so the returned carrier is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction, whatever `rf` is, because the rate is inside `fpr.mu` where it is present at all. `sigma` optionally gains a residual correction when `rsd` is `true`.
+  - `mu` and `sigma` are that block projected through the loadings, so the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction, whatever `rf` is, because the rate is inside `fpr.mu` where it is present at all. `sigma` optionally gains a residual correction when `rsd` is `true`.
   - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence.
 
 Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the identity exactly, while [`BlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) do not — see their warnings.
@@ -51,6 +53,9 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - If `views` is a [`LinearConstraintEstimator`](@ref), `!isnothing(sets)`.
   - If `views_conf` is not `nothing`, `views_conf` is validated with [`assert_bl_views_conf`](@ref).
   - If `tau` is not `nothing`, `tau > 0`.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
+  - The `x_src` of `pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - When `rsd` is `true`, `mp` states the estimator of its repair, see [`assert_matrix_processing_posdef`](@ref).
 
 `w` is **not** validated here. Its length is a property of the returns matrix, which the constructor never sees, so a wrong length surfaces at [`prior`](@ref) as a `DimensionMismatch` out of [`equilibrium_mu`](@ref) and only when `l` is set. The constructor also accepts an empty `w`, where the sibling [`AugmentedBlackLittermanPrior`](@ref) refuses one.
 
@@ -103,7 +108,8 @@ FactorBlackLittermanPrior
              │           me ┼ SimpleExpectedReturns
              │              │   w ┴ nothing
              │      horizon ┼ nothing
-             │   fill_limit ┴ nothing
+             │   fill_limit ┼ nothing
+             │        x_src ┴ nothing
         f_mp ┼ MatrixProcessing
              │     pdm ┼ Posdef
              │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -121,16 +127,20 @@ FactorBlackLittermanPrior
              │     alg ┼ nothing
              │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
           re ┼ StepwiseRegression
-             │   crit ┼ PValue
-             │        │   t ┴ Float64: 0.05
-             │    alg ┼ ForwardSelection()
-             │    tgt ┼ LinearModel
-             │        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │       crit ┼ PValue
+             │            │   t ┴ Float64: 0.05
+             │        alg ┼ ForwardSelection()
+             │        tgt ┼ LinearModel
+             │            │   kwargs ┴ @NamedTuple{}: NamedTuple()
+             │     choice ┼ BatchChoice()
+             │   included ┼ nothing
+             │      x_src ┴ nothing
           ve ┼ SimpleVariance
              │          me ┼ SimpleExpectedReturns
              │             │   w ┴ nothing
              │           w ┼ nothing
              │   corrected ┴ Bool: true
+         rsd ┼ Bool: true
        views ┼ LinearConstraintEstimator
              │   val ┼ Vector{String}: ["F1 == 0.03", "F2 == 0.04"]
              │   key ┴ nothing
@@ -148,7 +158,8 @@ FactorBlackLittermanPrior
           rf ┼ Float64: 0.0
            l ┼ nothing
          tau ┼ nothing
-         rsd ┴ Bool: true
+    mtx_sqrt ┼ EigenFallbackSquareRoot()
+       x_src ┴ nothing
 ```
 
 ## The incremental fit
@@ -195,6 +206,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
     """
     @fprop @vprop ve
     """
+    $(field_dict[:rsd])
+    """
+    rsd
+    """
     $(field_dict[:views])
     """
     views
@@ -223,30 +238,41 @@ This prior has no exact incremental recursion, so it takes the online step by **
     """
     tau
     """
-    $(field_dict[:rsd])
+    $(field_dict[:mtx_sqrt])
     """
-    rsd
+    mtx_sqrt
     """
     $(field_dict[:pfcache])
     """
     @fprop @vprop cache
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function FactorBlackLittermanPrior(pe::AbstractLowOrderPriorEstimator_A_AF,
                                        f_mp::AbstractMatrixProcessingEstimator,
                                        mp::AbstractMatrixProcessingEstimator,
                                        re::AbstractTimeSeriesRegressionEstimator,
-                                       ve::AbstractVarianceEstimator, views::Lc_BLV,
-                                       sets::Option{<:UniverseSets},
+                                       ve::AbstractVarianceEstimator, rsd::Bool,
+                                       views::Lc_BLV, sets::Option{<:UniverseSets},
                                        views_conf::Option{<:Num_VecNum},
                                        w::Option{<:VecNum}, rf::Number, l::Option{<:Number},
-                                       tau::Option{<:Number}, rsd::Bool,
-                                       cache::Option{<:AbstractPartialFitState})
+                                       tau::Option{<:Number},
+                                       mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm},
+                                       cache::Option{<:AbstractPartialFitState},
+                                       x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :FactorBlackLittermanPrior)
+        assert_inner_reader(pe, :pe, :FactorBlackLittermanPrior)
+        assert_inner_reader(re, :re, :FactorBlackLittermanPrior)
         assert_bl(views, sets, views_conf, tau)
+        if rsd
+            assert_matrix_processing_posdef(mp)
+        end
         return new{typeof(pe), typeof(f_mp), typeof(mp), typeof(re), typeof(ve),
-                   typeof(views), typeof(sets), typeof(views_conf), typeof(w), typeof(rf),
-                   typeof(l), typeof(tau), typeof(rsd), typeof(cache)}(pe, f_mp, mp, re, ve,
-                                                                       views, sets,
-                                                                       views_conf, w, rf, l,
-                                                                       tau, rsd, cache)
+                   typeof(rsd), typeof(views), typeof(sets), typeof(views_conf), typeof(w),
+                   typeof(rf), typeof(l), typeof(tau), typeof(mtx_sqrt), typeof(cache),
+                   typeof(x_src)}(pe, f_mp, mp, re, ve, rsd, views, sets, views_conf, w, rf,
+                                  l, tau, mtx_sqrt, cache, x_src)
     end
 end
 function FactorBlackLittermanPrior(;
@@ -255,14 +281,17 @@ function FactorBlackLittermanPrior(;
                                    mp::AbstractMatrixProcessingEstimator = MatrixProcessing(),
                                    re::AbstractTimeSeriesRegressionEstimator = StepwiseRegression(),
                                    ve::AbstractVarianceEstimator = SimpleVariance(),
-                                   views::Lc_BLV, sets::Option{<:UniverseSets} = nothing,
+                                   rsd::Bool = true, views::Lc_BLV,
+                                   sets::Option{<:UniverseSets} = nothing,
                                    views_conf::Option{<:Num_VecNum} = nothing,
                                    w::Option{<:VecNum} = nothing, rf::Number = 0.0,
                                    l::Option{<:Number} = nothing,
-                                   tau::Option{<:Number} = nothing, rsd::Bool = true,
-                                   cache::Option{<:AbstractPartialFitState} = nothing)::FactorBlackLittermanPrior
-    return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, views, sets, views_conf, w, rf,
-                                     l, tau, rsd, cache)
+                                   tau::Option{<:Number} = nothing,
+                                   mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot(),
+                                   cache::Option{<:AbstractPartialFitState} = nothing,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing)::FactorBlackLittermanPrior
+    return FactorBlackLittermanPrior(pe, f_mp, mp, re, ve, rsd, views, sets, views_conf, w,
+                                     rf, l, tau, mtx_sqrt, cache, x_src)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -277,7 +306,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :f_mp, :mp, :re, :ve, :rsd, :views, :sets, :views_conf, :w, :rf, :l, :tau, :mtx_sqrt, :x_src)`.
 
 # Related
 
@@ -286,7 +315,8 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
   - [`set_show_nothing_fields!`](@ref)
 """
 function show_fields(::FactorBlackLittermanPrior)
-    return (:pe, :f_mp, :mp, :re, :ve, :views, :sets, :views_conf, :w, :rf, :l, :tau, :rsd)
+    return (:pe, :f_mp, :mp, :re, :ve, :rsd, :views, :sets, :views_conf, :w, :rf, :l, :tau,
+            :mtx_sqrt, :x_src)
 end
 # Expose `:me` and `:ce` from the embedded prior estimator `pe` for transparent access
 # (see [`@forward_properties`](@ref)).
@@ -296,7 +326,9 @@ end
 """
     prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
           pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
-          strict::Bool = false, kwargs...)
+          strict::Bool = false,
+          active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+          cache_reg::Bool = false, kwargs...)
 
 Compute factor Black-Litterman prior moments for asset returns.
 
@@ -352,19 +384,20 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
  2. When `pe.views` resolves names, check the declared factor axis against the width of `F` with [`factor_universe`](@ref). A precomputed [`BlackLittermanViews`](@ref) resolves no name, so step 6 checks its width instead.
- 3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves.
- 4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one.
- 5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re`, giving the regression result `rr` and the reconstructed returns `posterior_X`.
+ 3. Reduce `X` to the assets it can be fitted over with [`coverage_reduction`](@ref), under `pnl`, giving the mask and `Xi`. This member wraps a *factor* prior, so there is no asset-side prior result to read an Investable Mask off and the gap is read out of the returns themselves. The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
+ 4. Fit the wrapped prior `pe.pe` on `F` alone, giving `f_prior`, and read `prior_mu` and `prior_sigma` off it. The wrapped estimator is bounded over the asset axis, but the matrix it is handed here is the factor one. `strict` and `cache_reg` reach it, as in [`FactorPrior`](@ref), so a prior there stores the cache that a refit under new scenario weights reads from `fpr`. No other keyword reaches it, because the other keywords describe the asset axis.
+ 5. Regress `Xi` on `F` with [`factor_reconstruction`](@ref) under `pe.re` viewed to `imsk` with [`coverage_regression`](@ref), giving the regression result `rr` and the reconstructed returns `posterior_X`.
  6. Assemble the views and their uncertainty with [`bl_preroll`](@ref), over `prior_sigma` and `size(Xi, 1)` observations, giving `blp`. The axis is `:tfkey`, so no view row is ever dropped for a departed asset and no ledger is kept.
  7. Put the prior mean on the total-return scale the views are written on, giving `prior_total_mu`. When `pe.l` is set this is the equilibrium mean of [`equilibrium_mu`](@ref), a risk premium, plus `pe.rf` by [`apply_rf`](@ref), over `pe.w` sliced to the reduced axis by [`investable_weights_view`](@ref); otherwise it is `prior_mu`, which is on that scale already.
  8. Run the master equations with [`bl_posteriors`](@ref), giving the posterior factor pair. When no view row survived it hands back `prior_total_mu` and the factor prior covariance instead, and step 10 lifts those exactly as it lifts a posterior pair.
  9. Process the posterior factor covariance in place with [`matrix_processing!`](@ref), under `pe.f_mp` and `F`.
-10. Lift the posterior factor pair onto the reduced assets with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, and processes `sigma` under `pe.mp`.
+10. Lift the posterior factor pair onto the reduced assets with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`. This is the lift [`FactorPrior`](@ref) applies; only the factor moments handed to it differ. It adds the residual block when `pe.rsd` is `true`, takes the square root of the posterior factor covariance that `chol` holds under `pe.mtx_sqrt`, and processes `sigma` under `pe.mp`.
 11. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
 12. Forward the factor block with [`forward_prior`](@ref), replacing `mu` and `sigma` by the posterior factor pair and dropping `chol`. It is not expanded: the reduction never touched the factor axis.
 13. Announce the departures once with [`announce_bl_departures`](@ref), naming them with [`investable_universe_names`](@ref).
 14. Write every asset-axis block back onto the full universe: the moment pair with [`expand_moment`](@ref), the reconstruction with [`expand_columns`](@ref) and the regression with [`expand_regression`](@ref). `chol` is dropped instead of expanded, because a `NaN` frame has no factorisation.
-15. Build the carrier directly, taking `w` and its diagnostics from `f_prior` and carrying no `Z`.
+15. Cut the reconstruction and the oriented `X` to the rows that `f_prior.X` carries, with [`scenario_window`](@ref). A Scenario Cap of `pe.pe` keeps the last rows of `F` alone, and the asset side keeps the same rows, as in [`FactorPrior`](@ref). With no cap, the cut keeps every row. The moments are fitted over every observation, so the cut changes no moment.
+16. Build the prior result directly, taking `w` and its diagnostics from `f_prior`, the reconstruction under `X`, the oriented `X` under `o_X`, and carrying no `Z`. Under a cap, `f_prior.ens` states the count of the observations that the moments read.
 
 # Arguments
 
@@ -374,6 +407,8 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
   - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
+  - $(arg_dict[:cvg_active_mask])
+  - $(arg_dict[:cache_reg])
   - `kwargs...`: Additional keyword arguments passed to underlying estimators and matrix processing.
 
 # Validation
@@ -399,7 +434,8 @@ The shift is linear in ``r_f`` and depends on the views through ``\\mathbf{G}``.
 """
 function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
                pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, strict::Bool = false,
-               kwargs...)
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+               cache_reg::Bool = false, kwargs...)
     X, F = dims_oriented(dims, X, F)
     # The views land on the *factor* distribution, so they resolve against the declared factor
     # axis — not against `xkey`, which names the assets this estimator projects onto. Only the
@@ -423,12 +459,14 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # Unreduced, `X`'s `NaN` column reaches the regression, where `StepwiseRegression`
     # selects *zero* factors and raises `BoundsError … at index [1:T, [0]]` — an error that
     # names neither the asset that left nor the reason it mattered.
-    imsk, Xi = coverage_reduction(X, pnl; dims = 1)
-    # Factor prior.
-    f_prior = prior(pe.pe, F; strict = strict)
+    imsk, Xi = coverage_reduction(X, pnl; dims = 1,
+                                  active_mask = dims_oriented(dims, active_mask))
+    # Factor prior. It stores its cache for a refit under new scenario weights, which reads
+    # it from `fpr`, as in `FactorPrior`.
+    f_prior = prior(pe.pe, F; strict = strict, cache_reg = cache_reg)
     prior_mu, prior_sigma = f_prior.mu, f_prior.sigma
     # Black litterman on the factors.
-    rr, posterior_X = factor_reconstruction(pe.re, Xi, F)
+    rr, posterior_X = factor_reconstruction(coverage_regression(pe.re, imsk), Xi, F)
     M = rr.M
     # `pe.sets` goes through unreduced and unminted, and with no ledger, for the reason
     # [`BayesianBlackLittermanPrior`](@ref) gives: the views resolve against `tfkey`, so
@@ -469,7 +507,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # is the same one `FactorPrior` applies; only the factor moments handed to it differ.
     (; mu, sigma, chol, esigma, edof, ediv) = factor_lift(pe.mp, pe.ve, pe.rsd, rr,
                                                           f_posterior_mu, f_posterior_sigma,
-                                                          Xi, posterior_X; kwargs...)
+                                                          Xi, posterior_X;
+                                                          mtx_sqrt = pe.mtx_sqrt, kwargs...)
     # The lift already measured the residual variances, so the block carries them instead of
     # making every consumer recompute them from the reconstruction error. Under `rsd = false`
     # the lift added no residual block and `esigma` is `nothing`, which is what the field then
@@ -494,7 +533,8 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     # asset axis and every one of them goes back: the moment pair through
     # [`expand_moment`](@ref), the reconstruction through [`expand_columns`](@ref), and the
     # regression — its loadings, its intercept and its idiosyncratic block — through
-    # [`expand_regression`](@ref). `o_X` is the caller's own `X` and was never reduced.
+    # [`expand_regression`](@ref). `o_X` is the caller's own `X`, cut to the rows that the
+    # factor prior carries and never reduced.
     #
     # `chol` is the one thing that cannot be expanded and is dropped instead. It factorises
     # `sigma`, and a `NaN` frame has no factorisation, so writing one into a frame would
@@ -504,18 +544,24 @@ function prior(pe::FactorBlackLittermanPrior, X::MatNum, F::MatNum,
     sigma = expand_moment(sigma, imsk)
     chol = isnothing(imsk) ? chol : nothing
     rr = expand_regression(rr, imsk)
-    posterior_X = expand_columns(posterior_X, imsk)
+    # A Scenario Cap of the factor prior keeps the last rows of `F` alone, so the asset side
+    # keeps the same rows, as in `FactorPrior`: the two blocks describe the same
+    # observations. The moments above were fitted over every observation, and the factor
+    # prior's `ens` states that count.
+    n = size(f_prior.X, 1)
+    posterior_X = expand_columns(scenario_window(n, posterior_X), imsk)
     #
     # The asset-side `w` is the factor prior's: this estimator wraps only a factor prior, and
     # `posterior_X = F*M' + b'` has exactly `F`'s rows, so it is the only weighting in
     # existence and it is over the right observation axis. Its `ens`/`kld`/`ow` travel with it
     # — a weighting with no provenance cannot be interrogated (ADR 0046).
-    return LowOrderPrior(; X = posterior_X, o_X = X, mu = mu, sigma = sigma, chol = chol,
-                         w = f_prior.w, ens = f_prior.ens, kld = f_prior.kld,
-                         ow = f_prior.ow, rr = rr, fpr = fpr)
+    return LowOrderPrior(; X = posterior_X, o_X = scenario_window(n, X), mu = mu,
+                         sigma = sigma, chol = chol, w = f_prior.w, ens = f_prior.ens,
+                         kld = f_prior.kld, ow = f_prior.ow, rr = rr, fpr = fpr)
 end
 function factor_residual_config(pe::FactorBlackLittermanPrior)
-    return (; ve = pe.ve, pdm = pe.mp.pdm, rsd = pe.rsd)
+    return (; ve = pe.ve, pdm = pe.rsd ? matrix_processing_posdef(pe.mp) : nothing,
+            rsd = pe.rsd)
 end
 
 export FactorBlackLittermanPrior

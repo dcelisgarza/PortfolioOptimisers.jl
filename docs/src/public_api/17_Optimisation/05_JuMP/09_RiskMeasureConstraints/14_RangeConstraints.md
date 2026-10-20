@@ -1,7 +1,9 @@
 ```@meta
-Description = "Range Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Range Constraints, public API of PortfolioOptimisers.jl: set_risk_constraints!."
 ```
 
-# Range Constraints
+# [Range Constraints](@id api-range-constraints)
 
-Every name of this topic is private. The [private page](@ref private-api-range-constraints) documents them.
+```@docs
+set_risk_constraints!(model::JuMP.Model, ::Any, r::Range, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+```

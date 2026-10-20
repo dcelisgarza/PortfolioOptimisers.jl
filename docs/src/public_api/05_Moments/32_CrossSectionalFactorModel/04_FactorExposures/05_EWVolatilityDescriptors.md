@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exponentially Weighted Volatility Descriptors, public API of PortfolioOptimisers.jl: EWVolatility, EWResidualVolatility, descriptor, EWDownsideVolatility, …"
+Description = "EW volatility descriptors, public API of PortfolioOptimisers.jl: EWVolatility, EWResidualVolatility, descriptor, partial_fit!, merge_states, …"
 ```
 
-# [Exponentially Weighted Volatility Descriptors](@id api-ew-volatility-descriptors)
+# [EW volatility descriptors](@id api-ew-volatility-descriptors)
 
 ## Types
 
@@ -16,6 +16,8 @@ EWResidualVolatility
 ```@docs
 descriptor(de::EWVolatility, rd::ReturnsResult)
 descriptor(de::EWResidualVolatility, rd::ReturnsResult)
+PortfolioOptimisers.partial_fit!(de::Union{EWVolatility{<:RegimeAdjustedExpWeightedVariance}, EWResidualVolatility{<:Any, <:RegimeAdjustedExpWeightedVariance}}, rd::ReturnsResult)
+merge_states(::PortfolioOptimisers.EWVolatilityState, ::PortfolioOptimisers.EWVolatilityState)
 EWDownsideVolatility
 EWResidualDownsideVolatility
 ```

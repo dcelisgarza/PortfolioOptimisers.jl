@@ -1,8 +1,8 @@
 ```@meta
-Description = "Linear Constraints (a), public API of PortfolioOptimisers.jl: PartialLinearConstraint, LinearConstraint, ParsingResult, estimator_to_val, port_opt_view."
+Description = "Linear constraint generation (a), public API of PortfolioOptimisers.jl: PartialLinearConstraint, LinearConstraint, ParsingResult, estimator_to_val, …"
 ```
 
-# Linear Constraints (a)
+# Linear constraint generation (a)
 
 ```@docs
 PartialLinearConstraint

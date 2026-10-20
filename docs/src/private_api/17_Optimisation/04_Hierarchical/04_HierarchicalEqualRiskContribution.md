@@ -10,4 +10,5 @@ herc_unitary_risks
 herc_intra_cluster_weights
 herc_cluster_risk
 herc_risk
+PortfolioOptimisers.bind_data_benchmark(::HierarchicalEqualRiskContribution, ::ReturnsResult)
 ```

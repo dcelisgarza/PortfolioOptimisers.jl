@@ -1,8 +1,8 @@
 ```@meta
-Description = "Dimensional Reduction Regression, public API of PortfolioOptimisers.jl: PCA, PPCA, DimensionReductionRegression, fit, regression, factory."
+Description = "Dimension reduction regression, public API of PortfolioOptimisers.jl: PCA, PPCA, DimensionReductionRegression, fit, regression, factory, returns_source."
 ```
 
-# Dimensional Reduction Regression
+# Dimension reduction regression
 
 ```@docs
 PCA
@@ -12,6 +12,7 @@ fit(drtgt::PCA, X::MatNum)
 fit(drtgt::PPCA, X::MatNum)
 regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
 factory(drtgt::DimensionReductionTarget, args...; kwargs...)
+returns_source(re::Union{<:StepwiseRegression, <:DimensionReductionRegression})
 ```
 
 ## References

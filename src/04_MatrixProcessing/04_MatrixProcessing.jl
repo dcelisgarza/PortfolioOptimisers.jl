@@ -11,6 +11,7 @@ In order to implement a new matrix processing estimator which will work seamless
 
   - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: In-place processing of a covariance or correlation matrix.
   - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix. A fallback method copies `sigma` and calls `matrix_processing!`, so it is only needed if the copy can be avoided.
+  - `matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}`: The positive definite matrix estimator with which a factor prior repairs its covariance after the matrix processing. It is necessary when the estimator goes into a factor prior that adds a residual block. The fallback refuses the type by name, and the factor prior calls it at construction. Return `nothing` to skip the repair.
 
 ## Arguments
 
@@ -48,6 +49,11 @@ julia> function PortfolioOptimisers.matrix_processing(est::MyMatrixProcessingEst
            return sigma
        end
 
+julia> function PortfolioOptimisers.matrix_processing_posdef(est::MyMatrixProcessingEstimator)
+           # The estimator with which a factor prior repairs its covariance.
+           return Posdef()
+       end
+
 julia> matrix_processing!(MyMatrixProcessingEstimator(), [1.0 2.0; 2.0 1.0], rand(10, 2))
 Processing matrix in-place...
 2×2 Matrix{Float64}:
@@ -68,6 +74,7 @@ Processing matrix in-place...
   - [`MatrixProcessing`](@ref)
   - [`matrix_processing!`](@ref)
   - [`matrix_processing`](@ref)
+  - [`matrix_processing_posdef`](@ref)
 """
 abstract type AbstractMatrixProcessingEstimator <: AbstractEstimator end
 """
@@ -257,11 +264,6 @@ MatrixProcessing
   - [`Denoise`](@ref)
   - [`Detone`](@ref)
   - [`AbstractMatrixProcessingAlgorithm`](@ref)
-
-# References
-
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
 """
 @concrete struct MatrixProcessing <: AbstractMatrixProcessingEstimator
     """
@@ -395,11 +397,6 @@ julia> matrix_processing!(MatrixProcessing(; dt = Detone()), sigma, X)
   - [`detone!`](@ref)
   - [`matrix_processing_algorithm!`](@ref)
   - [`MatNum`](@ref)
-
-# References
-
-  - $(ref_dict[:mlp1]) Chapter 2.
-  - $(ref_dict[:mpdist])
 """
 function matrix_processing!(::Nothing, sigma::MatNum, args...; kwargs...)::MatNum
     return sigma
@@ -425,7 +422,7 @@ The method that Julia selects is the algorithm. Each step is one method, and eac
  1. `Val{:pdm}`: apply [`posdef!`](@ref) to `sigma`, under `mp.pdm`. `X` is not read.
  2. `Val{:dn}`: read `T, N = size(X)`, then apply [`denoise!`](@ref) to `sigma`, under `mp.dn` and the effective sample ratio `T / N`. This is the one step that reads `X`, and it reads only its shape.
  3. `Val{:dt}`: apply [`detone!`](@ref) to `sigma`, under `mp.dt`. `X` is not read.
- 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, forwarding `X` and `kwargs`. This is the seam a caller extends.
+ 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, forwarding `X` and `kwargs`. This is the step that a caller extends.
 
 No method is defined for any other symbol, so an unrecognised step raises a `MethodError`. The constructor of [`MatrixProcessing`](@ref) rejects such a symbol first, so the `MethodError` is reachable only through a hand-built `Val`.
 
@@ -474,13 +471,21 @@ function matrix_processing_step!(::Val{:alg}, mp::MatrixProcessing, sigma::MatNu
     return matrix_processing_algorithm!(mp.alg, sigma, X; kwargs...)
 end
 """
-$(DocStringExtensions.TYPEDSIGNATURES)
+    assert_shape_only_matrix_processing(mp::MatrixProcessing) -> nothing
+    assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator) -> nothing
 
 Refuses a matrix processing estimator whose steps cannot be run from the shape of the sample alone.
 
-Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pdm` and `dt` read `sigma` alone, and `dn` reads `size(X)` and nothing else. The fourth, `alg`, is a seam a caller extends, and it is handed `X` whole, so nothing here can say what it reads. An incremental fit keeps a moment and a count rather than the observations, so it can answer the first three and cannot answer the fourth.
+Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pdm` and `dt` read `sigma` alone, and `dn` reads `size(X)` and nothing else. The fourth, `alg`, is a step that a caller extends, and it is handed `X` whole, so nothing here can say what it reads. An incremental fit keeps a moment and a count rather than the observations, so it can answer the first three and cannot answer the fourth.
 
-The refusal is by name, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
+The refusal is an `ArgumentError` that names the type of `alg`, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) passes when `mp.alg` is `nothing`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. Its interface states only [`matrix_processing!`](@ref) on the whole sample, so the shape of the sample cannot stand in for it.
 
 # Arguments
 
@@ -488,7 +493,7 @@ The refusal is by name, and it names the two routes that do carry the observatio
 
 # Validation
 
-  - `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -496,6 +501,7 @@ The refusal is by name, and it names the two routes that do carry the observatio
 
 # Related
 
+  - [`supports_shape_processing`](@ref): the same test as a `Bool`.
   - [`matrix_processing!`](@ref)
   - [`MatrixProcessing`](@ref)
   - [`Online`](@ref)
@@ -503,22 +509,155 @@ The refusal is by name, and it names the two routes that do carry the observatio
 """
 function assert_shape_only_matrix_processing(mp::MatrixProcessing)
     @argcheck(isnothing(mp.alg),
-              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or host it in a prior that carries them."))
+              ArgumentError("`$(typeof(mp.alg))` is a matrix processing algorithm of your own, and it is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations the algorithm reads, or put it in a prior that carries them."))
+    return nothing
+end
+function assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator)
+    return throw(ArgumentError("`$(nameof(typeof(mp)))` is a matrix processing estimator of your own, and its `matrix_processing!` is handed the whole sample, so an incremental fit that keeps a moment and a count cannot run it. Wrap the estimator in `Online`, which buffers the observations, or pass a `MatrixProcessing`."))
+end
+"""
+    supports_shape_processing(mp::MatrixProcessing) -> Bool
+    supports_shape_processing(mp::AbstractMatrixProcessingEstimator) -> Bool
+
+Tells whether an incremental fit can run the steps of a matrix processing estimator from the shape of the sample alone.
+
+This is the test of [`assert_shape_only_matrix_processing`](@ref) as a `Bool`. A composite estimator reads it to tell whether it folds.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) answers `true` when `mp.alg` is `nothing`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) answers `false`.
+
+# Arguments
+
+  - `mp`: The matrix processing estimator.
+
+# Returns
+
+  - `flag::Bool`: `true` when the steps of `mp` read the shape of the sample and no observation.
+
+# Related
+
+  - [`assert_shape_only_matrix_processing`](@ref)
+  - [`supports_partial_fit`](@ref)
+  - [`MatrixProcessing`](@ref)
+"""
+function supports_shape_processing(mp::MatrixProcessing)
+    return isnothing(mp.alg)
+end
+function supports_shape_processing(::AbstractMatrixProcessingEstimator)
+    return false
+end
+"""
+    matrix_processing_posdef(mp::MatrixProcessing) -> Option{<:AbstractPosdefEstimator}
+    matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}
+    matrix_processing_posdef(mp::Nothing) -> Nothing
+
+Gives the positive definite matrix estimator with which a factor prior repairs a covariance after the matrix processing.
+
+A factor prior processes its systematic block with [`matrix_processing!`](@ref). Then it adds the idiosyncratic block, and it repairs the sum with [`posdef!`](@ref) under the estimator that this verb gives. [`HighOrderFactorPriorEstimator`](@ref) repairs its cokurtosis in the same way.
+
+# Interfaces
+
+A subtype of [`AbstractMatrixProcessingEstimator`](@ref) that goes into a factor prior with a residual block adds a method of this verb. The method returns an [`AbstractPosdefEstimator`](@ref), or `nothing` to skip the repair.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A [`MatrixProcessing`](@ref) gives `mp.pdm`.
+ 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. The fallback cannot tell whether the type of a caller repairs a matrix. A `nothing` answer would skip the repair, and the covariance could be indefinite.
+ 3. `nothing` gives `nothing`. No matrix processing estimator names no repair, as [`matrix_processing!`](@ref) of `nothing` is a no-op. A cokurtosis estimator whose method of [`cokurtosis_processor`](@ref) gives `nothing` names no processor.
+
+# Arguments
+
+  - $(arg_dict[:omp])
+
+# Validation
+
+  - The type of `mp` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
+# Returns
+
+  - `pdm::Option{<:AbstractPosdefEstimator}`: The estimator of the repair, `nothing` to skip it.
+
+# Related
+
+  - [`assert_matrix_processing_posdef`](@ref): the check that each factor prior runs at construction.
+  - [`AbstractMatrixProcessingEstimator`](@ref)
+  - [`MatrixProcessing`](@ref)
+  - [`posdef!`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+"""
+function matrix_processing_posdef(mp::MatrixProcessing)
+    return mp.pdm
+end
+function matrix_processing_posdef(::Nothing)
+    return nothing
+end
+function matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator)
+    return throw(ArgumentError("`matrix_processing_posdef` is not defined for `$(nameof(typeof(mp)))`. A factor prior repairs its covariance after the matrix processing, under the positive definite matrix estimator of `mp`. Add a method `PortfolioOptimisers.matrix_processing_posdef(mp::$(nameof(typeof(mp))))` that returns an `AbstractPosdefEstimator`, or `nothing` to skip the repair."))
+end
+"""
+    assert_matrix_processing_posdef(mp::Option{<:AbstractMatrixProcessingEstimator}) -> nothing
+
+Checks at construction that a factor prior can read the repair of its matrix processing estimator.
+
+A factor prior calls this check when its fit repairs a covariance under [`matrix_processing_posdef`](@ref). The check moves the refusal of a type with no method from the fit to the constructor.
+
+# Algorithm
+
+ 1. Get `pdm` from [`matrix_processing_posdef`](@ref). Its fallback refuses a type with no method of its own.
+ 2. Check that `pdm` is `nothing` or an [`AbstractPosdefEstimator`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:omp])
+
+# Validation
+
+  - The type of `mp` has a method of [`matrix_processing_posdef`](@ref). An `ArgumentError` is thrown otherwise.
+  - The method returns `nothing` or an [`AbstractPosdefEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`matrix_processing_posdef`](@ref)
+  - [`FactorPrior`](@ref)
+  - [`FactorBlackLittermanPrior`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+  - [`CrossSectionalFactorPrior`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+"""
+function assert_matrix_processing_posdef(mp::Option{<:AbstractMatrixProcessingEstimator})
+    pdm = matrix_processing_posdef(mp)
+    @argcheck(isa(pdm, Option{<:AbstractPosdefEstimator}),
+              ArgumentError("`matrix_processing_posdef(::$(nameof(typeof(mp))))` must return `nothing` or an `AbstractPosdefEstimator`. Got\npdm => $(pdm)::$(typeof(pdm))."))
     return nothing
 end
 """
     matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::Integer;
                        kwargs...) -> MatNum
+    matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, T::Integer,
+                       N::Integer; kwargs...) -> MatNum
 
 Applies matrix processing to `sigma` in-place, from the **shape** of the sample rather than from the sample.
 
-The read-out arm of the pipeline, and the arm an incremental fit reaches: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
+The arm of the pipeline that an incremental fit reaches when the estimate is made from the state: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
 
-`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it by name before any step runs.
+`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type before any step runs. It also refuses a matrix processing estimator of a caller, whose interface states no shape method.
 
 # Algorithm
 
- 1. Refuse an `mp` carrying a sample-reading `alg`.
+ 1. Refuse an `mp` that is not a [`MatrixProcessing`](@ref), and an `mp` carrying a sample-reading `alg`.
  2. Run each step of `mp.order` in turn, through the shape methods of [`matrix_processing_step!`](@ref).
 
 # Arguments
@@ -531,7 +670,7 @@ The read-out arm of the pipeline, and the arm an incremental fit reaches: a fold
 
 # Validation
 
-  - `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -550,6 +689,11 @@ function matrix_processing!(mp::MatrixProcessing, sigma::MatNum, T::Integer, N::
     for step in mp.order
         matrix_processing_step!(Val(step), mp, sigma, T, N; kwargs...)
     end
+    return sigma
+end
+function matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum,
+                            T::Integer, N::Integer; kwargs...)
+    assert_shape_only_matrix_processing(mp)
     return sigma
 end
 """
@@ -600,15 +744,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Applies matrix processing to the finite block of `sigma`, from the shape of the sample rather than from the sample.
 
-The shape twin of [`matrix_processing_block!`](@ref), and the arm a read-out of an incremental fit takes. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
+The shape twin of [`matrix_processing_block!`](@ref), and the arm an incremental fit takes when the estimate is made from the state. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
 
-A read-out reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it, so nothing is paid where nothing is missing.
+An estimate made from the state reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it after the refusal, which names a non-finite off-diagonal entry that LAPACK would refuse without a name.
 
 # Algorithm
 
- 1. Read the block mask off the diagonal of `sigma`.
- 2. Run the plain arm where no asset is finite, and where every asset is.
- 3. Otherwise refuse a block carrying a non-finite entry, process the block with the block's own asset count, and write it back.
+ 1. Read the finite rows off the diagonal of `sigma`, and run the plain arm where no asset is finite.
+ 2. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`, as the matrix method does.
+ 3. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block as the finite rows whose variance is not zero. A zero variance has no correlation, so no step reads it.
+ 4. Run the plain arm where every asset is in the block, and return where no asset is.
+ 5. Otherwise process the block with the block's own asset count, and write it back.
 
 # Arguments
 
@@ -627,15 +773,24 @@ A read-out reaches this arm rather than the plain one for the reason the [`Asset
   - [`matrix_processing_block!`](@ref)
   - [`matrix_processing!`](@ref)
   - [`assert_finite_block`](@ref)
+  - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
                                   sigma::MatNum, T::Integer, N::Integer; kwargs...)
-    blk = isfinite.(LinearAlgebra.diag(sigma))
-    if !any(blk) || all(blk)
+    fin = isfinite.(LinearAlgebra.diag(sigma))
+    if !any(fin)
         matrix_processing!(mp, sigma, T, N; kwargs...)
         return sigma
     end
-    assert_finite_block(view(sigma, blk, blk))
+    assert_finite_block(view(sigma, fin, fin))
+    blk = zero_variance_rows!(sigma, fin)
+    if all(blk)
+        matrix_processing!(mp, sigma, T, N; kwargs...)
+        return sigma
+    end
+    if !any(blk)
+        return sigma
+    end
     block = sigma[blk, blk]
     matrix_processing!(mp, block, T, count(blk); kwargs...)
     sigma[blk, blk] = block
@@ -717,7 +872,7 @@ Repair the finite block of a covariance-like frame in place, and leave the frame
 
 A composite estimator that forwards an Asset Panel to the estimator it wraps can get a **frame** back: a matrix whose rows and columns outside the Coverage Universe are `NaN`. The repair has no answer for a `NaN`, so it runs on the finite block alone, and the frame around the block is written back unchanged.
 
-The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it. An off-diagonal `NaN` **inside** the block is refused with an `IsNonFiniteError`, and is not peeled away. A [`CoveragePolicy`](@ref) makes one whenever a pair shares no observation while both of its assets have observations of their own, so the refusal is the one the caller of an available-case fit meets. A peel here would hide it rather than repair a matrix.
+The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it, and it holds the variances that are finite and not zero. A zero variance belongs to a constant variable: it has no correlation, and a positive semidefinite matrix gives it a zero row and column. So its row and column are set to zero and kept out of the block, and no step, the denoising and the detoning included, reads them. The result is then positive semidefinite and not positive definite. An off-diagonal `NaN` **inside** the finite block is refused with an `IsNonFiniteError`, and is not peeled away here. A [`CoveragePolicy`](@ref) peels the assets of such a pair at admission, with the rule in its `peel` field, so its covariance reaches this step with no such cell. Under [`NoPeel`](@ref) the cell stays, and this refusal is the one the caller meets. A peel here would remove an asset from the covariance and leave it in the Coverage Universe, so two consumers would read two universes.
 
 The block is the whole matrix when every diagonal entry is finite, and **the refusal covers that case too**: a complete diagonal is what an available-case pair with an empty intersection has, so a short-circuit past the refusal would send exactly the case the message was written for to LAPACK. A matrix with no finite diagonal is the one case that still goes straight to the plain repair, because it has no block to refuse anything inside.
 
@@ -725,11 +880,13 @@ The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a 
 
 # Algorithm
 
- 1. Take the block `blk` as `isfinite.(diag(sigma))`.
- 2. Run the ordinary repair and return where `blk` holds no `true`. A matrix with no finite diagonal has no block to repair, so it belongs to the plain repair and meets its refusal.
- 3. Refuse a non-finite entry inside the block with an `IsNonFiniteError`.
- 4. Run the ordinary repair on `sigma` itself and return where `blk` holds no `false`. A complete matrix has no frame to leave alone.
- 5. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. `X` is cut only where the axis of `sigma` is the asset axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X` and the whole returns matrix is handed over, which is what the plain path does at that order.
+ 1. Take the finite rows `fin` as `isfinite.(diag(sigma))`.
+ 2. Run the ordinary repair and return where `fin` holds no `true`. A matrix with no finite diagonal has no block to repair, so it belongs to the plain repair and meets its refusal.
+ 3. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`.
+ 4. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block `blk` as the rows of `fin` whose variance is not zero.
+ 5. Run the ordinary repair on `sigma` itself and return where `blk` holds no `false`. A complete matrix has no frame to leave alone.
+ 6. Return `sigma` where `blk` holds no `true`. Every finite variance is zero, so nothing is left to repair.
+ 7. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. `X` is cut only where the axis of `sigma` is the asset axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X` and the whole returns matrix is handed over, which is what the plain path does at that order.
 
 # Arguments
 
@@ -752,21 +909,27 @@ The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a 
   - [`matrix_processing!`](@ref)
   - [`investable_mask`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`zero_variance_rows!`](@ref)
 """
 function matrix_processing_block!(mp::Option{<:AbstractMatrixProcessingEstimator},
                                   sigma::MatNum, X::MatNum, args...; kwargs...)
-    blk = isfinite.(LinearAlgebra.diag(sigma))
+    fin = isfinite.(LinearAlgebra.diag(sigma))
     # A matrix with no finite diagonal has no block to repair, so it is the plain repair's and
     # its refusal is the one its caller already met.
-    if !any(blk)
+    if !any(fin)
         matrix_processing!(mp, sigma, X, args...; kwargs...)
         return sigma
     end
-    assert_finite_block(view(sigma, blk, blk))
+    assert_finite_block(view(sigma, fin, fin))
+    # A zero variance has a zero row and column and no correlation, so it leaves the block.
+    blk = zero_variance_rows!(sigma, fin)
     # A complete matrix has no frame to leave alone, so the repair runs on it whole. The
     # refusal above has already covered its block, which is the matrix itself.
     if all(blk)
         matrix_processing!(mp, sigma, X, args...; kwargs...)
+        return sigma
+    end
+    if !any(blk)
         return sigma
     end
     block = sigma[blk, blk]
@@ -806,10 +969,10 @@ The one refusal of the block rule, shared by [`matrix_processing_block!`](@ref) 
 """
 function assert_finite_block(block::AbstractArray)::Nothing
     @argcheck(all(isfinite, block),
-              IsNonFiniteError("the finite block of the answer carries $(count(!isfinite, block)) non-finite entries, the first at $(findfirst(!isfinite, block)) of a block of size $(size(block)), indexed over the block's own assets and not the full universe. Every asset of the block was estimated on its own, so this cell names assets that share no observation. An axis of length `n` is the asset axis and an axis of length `n^2` is the pair axis, on which the position `c` is the asset pair `(fld(c - 1, n) + 1, mod1(c, n))`. Lower `min_coverage`, fit over a window the cells of the block share, or clear `cvg` to fall back on the Coverage Universe."))
+              IsNonFiniteError("the finite block of the answer carries $(count(!isfinite, block)) non-finite entries, the first at $(findfirst(!isfinite, block)) of a block of size $(size(block)), indexed over the block's own assets and not the full universe. Every asset of the block was estimated on its own, so this cell names assets that share no observation. An axis of length `n` is the asset axis and an axis of length `n^2` is the pair axis, on which the position `c` is the asset pair `(fld(c - 1, n) + 1, mod1(c, n))`. On a covariance, set the `peel` of the `CoveragePolicy` to a rule that removes the assets of such a pair, for example the default `MinimalPeel()`. Otherwise raise `min_coverage` so that admission refuses an asset of the cell, fit over a window the cells of the block share, or clear `cvg` to fall back on the Coverage Universe."))
     return nothing
 end
 
 export MatrixProcessing, matrix_processing, matrix_processing!
 public AbstractMatrixProcessingEstimator, AbstractMatrixProcessingAlgorithm,
-       matrix_processing_algorithm, matrix_processing_algorithm!
+       matrix_processing_algorithm, matrix_processing_algorithm!, matrix_processing_posdef

@@ -50,7 +50,7 @@ Scope stopped at `src/`.
 ## Decision
 
 The Authority for all four rules is
-`.github/instructions/julia-docstrings.instructions.md`. `STANDARDS.md` routes to it.
+`.github/instructions/julia-docstrings.instructions.md`. `CODING_STANDARDS.md` routes to it.
 
 **1. `# JuMP formulation`.** Any code that adds rows to a `JuMP.Model` carries this section. It
 sits after `# Mathematical definition` and after `# Algorithm`, and before `# Fields` or
@@ -91,7 +91,7 @@ sections on day one would red the build across every selector tag in the library
 **The gate follows the standard, not the reverse.** `test/test_26_docs.jl` reads `src/` only, so
 the widened Scope is unenforced in `ext/` until
 [#409](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/409) teaches it about `ext/`.
-This is a known unenforced state, in the sense of `STANDARDS.md`, and not a hidden one.
+This is a known unenforced state, in the sense of `CODING_STANDARDS.md`, and not a hidden one.
 
 **The prose exception keeps 368 sentences out of the dictionary**, and pays for it with a rule that
 holds only while a second user is noticed. The migration it does demand is the reverse one: a prose
@@ -143,7 +143,7 @@ the objective. `set_model_scales!` is one of them, and so are
 the trigger should widen is a change to this decision, so it is raised as
 [#443](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/443) rather than settled by a
 gate that demands more than its Authority states. This is a known unenforced state, in the sense of
-`STANDARDS.md`, and not a hidden one.
+`CODING_STANDARDS.md`, and not a hidden one.
 
 ## Amendment (2026-08-24)
 
@@ -254,6 +254,6 @@ and no exemption list.
 docstring names with the keys the body registers, and nothing reads `## Relaxation` at all — an
 inexact encoding is a fact about the mathematics and not a token. The key census stands in the
 map's *Not yet specified*, as the Consequences above already record. `## Relaxation` holds by
-review, in the sense of `STANDARDS.md`. This is a known unenforced state and not a hidden one.
+review, in the sense of `CODING_STANDARDS.md`. This is a known unenforced state and not a hidden one.
 
 `math_dict` gains `:so_scale`, the objective scale, beside the `:sc_scale` this decision added.

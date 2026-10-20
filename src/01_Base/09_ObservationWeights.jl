@@ -12,6 +12,79 @@ Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from
 """
 const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 """
+    const ScenarioProbabilities = Union{<:StatsBase.AnalyticWeights,
+                                        <:StatsBase.ProbabilityWeights}
+
+Union type for the probabilities of the scenarios of a prior that reweights its scenarios.
+
+The type of the weights fixes the bias correction of a weighted variance, and `corrected = true` is the default of the library. Probabilities of scenarios sum to one. Under that sum, `StatsBase.AnalyticWeights` divides by ``1 - \\sum_t p_t^2``, the reliability correction ``n_{eff} / (n_{eff} - 1)`` of the Kish count ``n_{eff} = 1 / \\sum_t p_t^2``. `StatsBase.ProbabilityWeights` gives ``T / (T - 1)`` whatever the weights are. The other kinds give no usable correction: `StatsBase.FrequencyWeights` divides by ``\\sum_t p_t - 1 = 0``, and `StatsBase.Weights` refuses `corrected = true`.
+
+# Related
+
+  - [`scenario_probabilities`](@ref)
+  - [`EntropyPoolingPrior`](@ref)
+  - [`MeucciEntropyPoolingPrior`](@ref)
+  - [`OpinionPoolingPrior`](@ref)
+"""
+const ScenarioProbabilities = Union{<:StatsBase.AnalyticWeights,
+                                    <:StatsBase.ProbabilityWeights}
+"""
+    scenario_probabilities(w::VecNum)
+    scenario_probabilities(w, x::VecNum)
+
+Wrap the probabilities `x` of the scenarios in the kind of the weights `w`. The one-argument method reads `w` as the probabilities, and returns it unchanged when it already has a kind of [`ScenarioProbabilities`](@ref).
+
+A prior that reweights its scenarios answers posterior probabilities of the same kind as its prior probabilities, so a caller who gives `StatsBase.ProbabilityWeights` keeps their correction. Without such weights, the probabilities are `StatsBase.AnalyticWeights`, whose correction is the one of reliability weights. [`ScenarioProbabilities`](@ref) states the two corrections.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `w` is a [`ScenarioProbabilities`](@ref): return weights of the kind of `w` over `x`. With no `x`, return `w`.
+ 2. `w` is anything else, `nothing` and a plain vector included: return `StatsBase.aweights(x)`. With no `x`, return `StatsBase.aweights(w)`.
+
+# Arguments
+
+  - `w`: The weights whose kind the result takes, or `nothing`.
+  - `x`: The probabilities of the scenarios. It is `w` when it is not given.
+
+# Returns
+
+  - `p::ScenarioProbabilities`: The weights over `x`.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.scenario_probabilities(nothing, [0.25, 0.75])
+2-element AnalyticWeights{Float64, Float64, Vector{Float64}}:
+ 0.25
+ 0.75
+
+julia> PortfolioOptimisers.scenario_probabilities(pweights([0.5, 0.5]), [0.25, 0.75])
+2-element ProbabilityWeights{Float64, Float64, Vector{Float64}}:
+ 0.25
+ 0.75
+```
+
+# Related
+
+  - [`ScenarioProbabilities`](@ref)
+  - [`ep_prior_probabilities`](@ref)
+  - [`entropy_pooling`](@ref)
+"""
+function scenario_probabilities(w::ScenarioProbabilities)
+    return w
+end
+function scenario_probabilities(w::VecNum)
+    return StatsBase.aweights(w)
+end
+function scenario_probabilities(w::ScenarioProbabilities, x::VecNum)
+    return Base.typename(typeof(w)).wrapper(x)
+end
+function scenario_probabilities(::Any, x::VecNum)
+    return StatsBase.aweights(x)
+end
+"""
     get_observation_weights(
         w::Option{<:ObsWeights},
         args...;

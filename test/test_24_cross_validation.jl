@@ -580,15 +580,6 @@
         @test_throws DomainError IndexWalkForward(10, 5; purged_size = 10)
         @test_throws DomainError IndexWalkForward(10, 5; purged_size = 11)
         @test IndexWalkForward(10, 5; purged_size = 9) isa IndexWalkForward
-
-        # `special_div(a, b)` counts the steps of size `b` that fit in the span `1:a`, so it
-        # is `div(a - 1, b)` and never a guarded division.
-        for a in 1:40, b in 1:7
-            @test PortfolioOptimisers.special_div(a, b) == div(a - 1, b)
-            @test PortfolioOptimisers.special_div(a, b) ==
-                  length(1:b:a) - 1 ==
-                  count(k -> 1 + k * b <= a, 0:a) - 1
-        end
     end
     @testset "n_splits and split agree on short data" begin
         # `n_splits` had no guard, so a `train_size` of `T` or more returned a count of zero
@@ -661,6 +652,82 @@
             end
         end
     end
+    @testset "A date walk-forward drops empty test windows and refuses empty training" begin
+        # Business days, so a daily `period` maps the two days of every weekend to the
+        # Monday. Two dates of the range then share a row, and a test window between them
+        # held no observation. Such a fold was returned, and `n_splits` counted it.
+        bd = [d for d in Date(2024, 1, 1):Day(1):Date(2024, 3, 31) if dayofweek(d) <= 5]
+        rdb = ReturnsResult(; nx = ["a", "b"], X = zeros(length(bd), 2), ts = bd)
+        cv = DateWalkForward(5, 1; period = Day(1))
+        (; train_idx, test_idx) = split(cv, rdb)
+        @test length(test_idx) == n_splits(cv, rdb) == 59
+        # Three dates always hold a weekday, so each training window keeps a row.
+        for train_size in (3, 5, Day(4), Day(10)), test_size in (1, 3),
+            previous in (false, true), reduce_test in (false, true),
+            expand_train in (false, true), period_offset in (nothing, Day(1), Day(-1))
+
+            cv = DateWalkForward(train_size, test_size; period = Day(1),
+                                 previous = previous, reduce_test = reduce_test,
+                                 expand_train = expand_train, period_offset = period_offset)
+            (; train_idx, test_idx) = split(cv, rdb)
+            @test n_splits(cv, rdb) == length(test_idx)
+            @test !any(isempty, test_idx)
+            @test !any(isempty, train_idx)
+            # The dropped folds leave no hole: each test window starts after the last one.
+            @test all(first(test_idx[k + 1]) == last(test_idx[k]) + 1
+                      for k in 1:(length(test_idx) - 1))
+        end
+
+        # A positive `period_offset` moves the last dates of the range past the data. Under
+        # `previous = true`, such a date mapped to the last row, so a fold that the data
+        # cannot fill counted as full and the last row left its test window.
+        tsd = collect(Date(2024, 1, 1):Day(1):Date(2024, 1, 20))
+        rdd = ReturnsResult(; nx = ["a", "b"], X = zeros(20, 2), ts = tsd)
+        dr = PortfolioOptimisers.walk_forward_date_range(tsd, Day(3), Day(2), identity)
+        @test last(dr) > last(tsd)
+        @test PortfolioOptimisers.date_index_positions(tsd, dr, true) ==
+              [1, 4, 7, 10, 13, 16, 19]
+        cv = DateWalkForward(2, 1; period = Day(3), period_offset = Day(2), previous = true)
+        @test split(cv, rdd).test_idx == [7:9, 10:12, 13:15, 16:18]
+        @test n_splits(cv, rdd) == 4
+
+        # A purge as wide as the training window empties it. The width of a window in rows
+        # depends on the data, so `split` and `n_splits` refuse it, not the constructor.
+        for expand_train in (false, true)
+            cv = DateWalkForward(1, 1; period = Day(1), purged_size = 1,
+                                 expand_train = expand_train)
+            @test_throws IsEmptyError split(cv, rdb)
+            @test_throws IsEmptyError n_splits(cv, rdb)
+        end
+        cv = DateWalkForward(Day(1), 1; period = Day(1), purged_size = 1)
+        @test_throws IsEmptyError split(cv, rdb)
+        @test_throws IsEmptyError n_splits(cv, rdb)
+        # Two dates can be a weekend: the test that starts on a Monday trains on no row.
+        cv = DateWalkForward(2, 1; period = Day(1))
+        @test_throws IsEmptyError split(cv, rdb)
+        @test_throws IsEmptyError n_splits(cv, rdb)
+        # A training window longer than the data leaves no fold to count.
+        for train_size in (1000, Day(1000))
+            cv = DateWalkForward(train_size, 1; period = Day(1))
+            @test n_splits(cv, rdb) == 0
+            @test_throws IsEmptyError split(cv, rdb)
+        end
+        # An integer `train_size` of zero dates is empty on any data.
+        @test_throws DomainError DateWalkForward(0, 1)
+        @test DateWalkForward(1, 1) isa DateWalkForward
+    end
+    @testset "A scheme with a shuffle property set to true is refused" begin
+        # No scheme of the library shuffles, but a scheme a user defines can carry a
+        # `shuffle` property, and the fold loop refuses it.
+        @test_throws ArgumentError PortfolioOptimisers.assert_unshuffled_folds((;
+                                                                                shuffle = true),
+                                                                               [1:3])
+        @test isnothing(PortfolioOptimisers.assert_unshuffled_folds((; shuffle = false),
+                                                                    [1:3]))
+        @test isnothing(PortfolioOptimisers.assert_unshuffled_folds(KFold(), [1:3]))
+        @test_throws ArgumentError PortfolioOptimisers.assert_unshuffled_folds(KFold(),
+                                                                               [[3, 1, 2]])
+    end
     @testset "A zero test_size is refused" begin
         # A `test_size` of zero advances the walk-forward window by nothing, so each of the
         # three `while true` split loops runs forever and allocates forever. `n_splits`
@@ -673,6 +740,21 @@
         # The smallest legal value is still accepted.
         @test IndexWalkForward(100, 1) isa IndexWalkForward
         @test DateWalkForward(12, 1; period = Month(1)) isa DateWalkForward
+    end
+    @testset "A split keeps a training fold, and a gap is not negative" begin
+        # With every fold held out, the one split had an empty training set and no error.
+        @test_throws DomainError CombinatorialCrossValidation(; n_folds = 3,
+                                                              n_test_folds = 3)
+        @test_throws DomainError CombinatorialCrossValidation(; n_folds = 2,
+                                                              n_test_folds = 2)
+        @test CombinatorialCrossValidation(; n_folds = 3, n_test_folds = 2) isa
+              CombinatorialCrossValidation
+        # A negative purge or embargo was accepted by both constructors.
+        @test_throws DomainError CombinatorialCrossValidation(; purged_size = -1)
+        @test_throws DomainError CombinatorialCrossValidation(; embargo_size = -1)
+        @test_throws DomainError KFold(; purged_size = -1)
+        @test_throws DomainError KFold(; embargo_size = -1)
+        @test KFold(; purged_size = 0, embargo_size = 0) isa KFold
     end
     @testset "MultipleRandomised" begin
         cv = IndexWalkForward(127, 171)
@@ -798,6 +880,26 @@
                                      window_size = ws)
             @test n_splits(cvn, rd) == length(split(cvn, rd).path_ids)
         end
+
+        # A window of `w` rows fits at `T - w + 1` starts. The draw must reach the last one,
+        # which ends on row `T`, and a window of all `T` rows has the one start `1`.
+        Xw = randn(StableRNG(393), 10, 4) ./ 100
+        rdw = ReturnsResult(; nx = string.('A':'D'), X = Xw)
+        resf = split(MultipleRandomised(IndexWalkForward(8, 2); rng = StableRNG(1),
+                                        n_subsets = 3, subset_size = 2, window_size = 10),
+                     rdw)
+        @test resf.train_idx == fill(1:8, 3)
+        @test resf.test_idx == fill(9:10, 3)
+        starts = Set{Int}()
+        for s in 1:100
+            resw = split(MultipleRandomised(IndexWalkForward(2, 2); rng = StableRNG(s),
+                                            n_subsets = 2, subset_size = 2,
+                                            window_size = 4), rdw)
+            for p in 1:2
+                push!(starts, minimum(first.(resw.train_idx[resw.path_ids .== p])))
+            end
+        end
+        @test starts == Set(1:7)
     end
     #=
     Issue #860, ADR 0120: a random asset subset is drawn from the Coverage Universe of its
@@ -1694,6 +1796,36 @@
             end
         end
     end
+    @testset "Combinatorial puts every trailing row in the last fold" begin
+        # When `mod(T, n_folds) >= div(T, n_folds)`, the fold index of a trailing row
+        # used to pass `n_folds`. Only the value `n_folds` itself was clipped, so the rows
+        # past it joined no fold: every split trained on them and none tested them.
+        for (T, nf, ntf, sizes) in ((10, 5, 2, fill(2, 5)), (11, 5, 2, [2, 2, 2, 2, 3]),
+                                    (12, 5, 2, [2, 2, 2, 2, 4]), (13, 5, 2, [2, 2, 2, 2, 5]),
+                                    (89, 10, 2, [fill(8, 9); 17]), (17, 4, 3, [4, 4, 4, 5]),
+                                    (14, 5, 2, [2, 2, 2, 2, 6]), (19, 10, 2, [fill(1, 9); 10]),
+                                    (19, 5, 2, [3, 3, 3, 3, 7]))
+            rdT = ReturnsResult(; nx = rd.nx, X = rd.X[1:T, :])
+            cv = CombinatorialCrossValidation(; n_folds = nf, n_test_folds = ntf)
+            res = split(cv, rdT)
+            blocks = unique(reduce(vcat, res.test_idx))
+            sort!(blocks; by = first)
+            @test length.(blocks) == sizes
+            @test reduce(vcat, blocks) == 1:T
+            for j in eachindex(res.train_idx)
+                @test sort!([res.train_idx[j]; reduce(vcat, res.test_idx[j])]) == 1:T
+            end
+        end
+        # Purging takes rows out of the training sets only, so the folds keep every row. The
+        # old index dropped row 19 here.
+        rdT = ReturnsResult(; nx = rd.nx, X = rd.X[1:19, :])
+        cv = CombinatorialCrossValidation(; n_folds = 5, n_test_folds = 2, purged_size = 1,
+                                          embargo_size = 1)
+        blocks = unique(reduce(vcat, split(cv, rdT).test_idx))
+        sort!(blocks; by = first)
+        @test length.(blocks) == [3, 3, 3, 3, 7]
+        @test reduce(vcat, blocks) == 1:19
+    end
     @testset "Purging and embargoing leave the documented gap" begin
         T = size(rd.X, 1)
         # A training row must never sit within `purged_size` rows before a test block,
@@ -2009,10 +2141,16 @@
             w0 = fill(inv(size(rd.X, 2)), size(rd.X, 2))
             optn = JuMPOptimiser(; slv = slv, tn = Turnover(; w = w0, val = 0.02))
             mrt = MeanRisk(; opt = optn)
-            a = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            a = cross_val_predict(mrt, rd,
+                                  IndexWalkForward(500, 250; wd = sfd,
+                                                   pws = TargetWeights()))
             b = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd, pws = dw))
             @test a.pred[1].res.w == b.pred[1].res.w
             @test a.pred[2].res.w != b.pred[2].res.w
+            # An unset source follows the drift (#1518), so `wd` alone threads the held
+            # weights, as the explicit source does.
+            c = cross_val_predict(mrt, rd, IndexWalkForward(500, 250; wd = sfd))
+            @test c.pred[2].res.w == b.pred[2].res.w
         end
         @testset "The drift reaches the pipeline entry point" begin
             pipe = Pipeline(; steps = (EmpiricalPrior(), ivol))
@@ -2130,7 +2268,7 @@
             catch e
                 sprint(showerror, e)
             end
-            @test occursin("neither `wd` nor `pws`", msg)
+            @test occursin("neither `wd` nor a `DriftedWeights` source", msg)
 
             # The fold-taking form hands the fold's bare asset returns to the free
             # function, so a moment measure whose slot is unfilled is refused by name there
@@ -2216,11 +2354,11 @@
         end
     end
     @testset "A failed fold holds (#1021)" begin
-        # The reference's online loop leaves its previous weights where they were on a failed
+        # The oracle's online loop leaves its previous weights where they were on a failed
         # step, so the next step reads the last successful ones; its batch loop threads the
         # failed step's `NaN`. Here both arms thread the last threadable fold, a failed fold
         # under a drift holds the weights it was handed, and `PreviousWeights` is the
-        # reference's `fallback = "previous_weights"`.
+        # oracle's `fallback = "previous_weights"`.
         PO = PortfolioOptimisers
         N = size(rd.X, 2)
         ok = WeightBounds(; lb = zeros(N), ub = ones(N))
@@ -2232,7 +2370,8 @@
         dw = DriftedWeights()
         cv = IndexWalkForward(250, 250)
         cvd = IndexWalkForward(250, 250; wd = sfd, pws = dw)
-        cvw = IndexWalkForward(250, 250; wd = sfd, store_weight_path = true)
+        cvw = IndexWalkForward(250, 250; wd = sfd, pws = TargetWeights(),
+                               store_weight_path = true)
         n = n_splits(cv, rd)
         @test n >= 3
         sched(k) = TimeDependent([i in k ? bad : ok for i in 1:n])
@@ -2291,19 +2430,19 @@
             @test !PO.threads_weights(dw, res1.pred[1])
             @test threaded(res1.pred[2]) == tn.w
         end
-        @testset "under a drift alone, a failed fold holds the last target" begin
+        @testset "under a drift and the target source, a failed fold holds the last target" begin
             res = cross_val_predict(mk(2), rd, cvw)
             p1, p2, p3 = res.pred[1], res.pred[2], res.pred[3]
             @test isa(p2.res.retcode, OptimisationFailure)
             @test p2.hw.w0 == p1.res.w
             @test all(isfinite, p2.hw.U)
             @test p2.hw.w == PO.held_weights(sfd, p1.res.w, p2.hw.X)
-            # No source, so the target read skips the failed fold and reads fold 1, and the
-            # solve is the one the undrifted run made: a drift moves no target.
+            # The target source, so the target read skips the failed fold and reads fold 1,
+            # and the solve is the one the undrifted run made: a drift moves no target.
             @test threaded(p3) == p1.res.w
             @test p3.res.w == cross_val_predict(mk(2), rd, cv).pred[3].res.w
         end
-        @testset "PreviousWeights is the reference's previous-weights fallback" begin
+        @testset "PreviousWeights is the oracle's previous-weights fallback" begin
             @test PO.needs_previous_weights(PreviousWeights())
             @test PO.needs_previous_weights(mk(()))
             @test PO.needs_previous_weights(MeanRisk(; opt = JuMPOptimiser(; slv = slv),
@@ -2320,7 +2459,8 @@
             pw = PO.factory(PreviousWeights(; fb = PreviousWeights()), [0.25, 0.75])
             @test pw.w == [0.25, 0.75]
             @test pw.fb.w == [0.25, 0.75]
-            # Its online step is the identity.
+            # Its online step steps its fallback alone, so over a fallback that holds no
+            # state it is the identity (#1745).
             @test PO.partial_fit!(pw, rd) === pw
             # As a fallback in a walk-forward, the failed fold holds the threaded weights and
             # becomes a success, so the fold after it reads it.

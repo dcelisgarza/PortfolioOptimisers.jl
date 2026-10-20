@@ -90,7 +90,7 @@ without committing to its stability.
 
 This decision fixes the rule; it does not run it. None of the 94 still-private `# Interfaces`-
 marked abstract types, nor their named verbs, gain a `public` declaration in this ticket. Applying
-the rule is a shared infrastructure ticket — the census below, plus the STANDARDS.md row — followed
+the rule is a shared infrastructure ticket — the census below, plus the CODING_STANDARDS.md row — followed
 by one promotion ticket per top-level `src/`/`ext/` directory, mirroring the shape the mirror-tree
 migration itself used ([#1101](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1101)
 → #1102–#1118): each directory ticket promotes every `# Interfaces`-marked type it holds and moves
@@ -109,9 +109,9 @@ decision only fixes that the gate must exist.
 
 ## Consequences
 
-- `STANDARDS.md` gains a row: subject = a private name's promotion to `public`, authority = this
+- `CODING_STANDARDS.md` gains a row: subject = a private name's promotion to `public`, authority = this
   ADR, gate = the new census file, not yet created.
-- The infrastructure ticket owes the census and the STANDARDS.md row it gates. Each directory
+- The infrastructure ticket owes the census and the CODING_STANDARDS.md row it gates. Each directory
   ticket it unblocks owes, per abstract type it promotes: the `public` declaration on the type and
   every verb its `# Interfaces` section names, and the mirror-tree page updates the promotion moves
   entries on.
@@ -121,3 +121,53 @@ decision only fixes that the gate must exist.
 - This decision leaves ADR 0128's foreign-owned class untouched: `Base.copy`, `Base.vcat`, and
   every other foreign-owned method that ADR already classifies stay governed by it. Widening that
   class is still a separate, one-at-a-time maintainer call.
+
+## Amendment (2026-10-05)
+
+[Issue #1489](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1489) asked whether a
+`public` declaration needs the maintainer's approval, as an export did. Two sessions read the old
+rule of `CLAUDE.md` two ways: one waited for an answer, and one left `test_66` red on purpose.
+
+The maintainer decided that a declaration of an unambiguously user-facing name needs no approval:
+
+- A name that users are meant to extend is `public`: an abstract type they subtype, and a verb that
+  a subtype implements.
+- A name that users are meant to use directly is exported.
+- The maintainer decides only a case where it is ambiguous whether users extend or use the name.
+
+This changes two statements of the decision above. A `# Interfaces` section is still a sufficient
+signal of an extension point, but it is no longer the only one: a verb that a rule implements is
+`public` when its section names it in prose, as `drop_empty_pairs!` is. And a directory ticket no
+longer confirms each promoted type with the maintainer, because a family whose concrete members are
+exported is unambiguously an extension point. The rule lives in `CLAUDE.md` § *Design rules*.
+
+The first application declared seven families `public`, with their verbs, that `test_66` listed on
+[#1475](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1475):
+`AbstractLastObservationAlgorithm`, `AbstractEmptyPairAlgorithm`,
+`AbstractPanelCollapseAlgorithm`, `AbstractWindowRule`, `AbstractChoiceRule`,
+`AbstractNeutralisationWeights` and `AbstractOrthogonalForecastFit`.
+
+## Amendment (2026-10-19)
+
+[Issue #1764](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1764) found that a
+section can name its verbs in prose, as `` [`verb`](@ref) ``, and that `test_66` then read no verb
+from it. `test_66` now also checks every function of the package that a section links: each one is
+`public` or exported. The first measurement found 62 such links to private functions, in 38
+sections, and [issue #1775](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1775)
+decided each one.
+
+A link in a section names one of three kinds of function, and the maintainer decided the third:
+
+- **A verb of the contract**, which a new subtype implements, is `public`, and the section writes it
+  as a call-shaped bullet. This was the rule already.
+- **A caller or a check that the library runs** is not part of the contract. The section names it
+  in plain code, with no link.
+- **A helper that the section tells an implementer to call** inside its own method is `public`, as
+  `get_k` and `get_constraint_scale` already were. `chan_merge` and `assert_mergeable_states`, which
+  a new Partial Fit State calls in its `merge_states` under
+  [ADR 0106](0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md), were pinned private
+  by `test_48` until then.
+
+A method entry of a `public` function belongs on the public page of its file, so the
+`set_risk_constraints!` method of each risk measure moved there, and eight private pages of the
+risk constraint files became empty mirrors.

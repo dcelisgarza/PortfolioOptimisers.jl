@@ -34,7 +34,7 @@ for it, at both doors, and each door dropped it deliberately:
 - The finite allocation took a result's reduced `Fees` beside the result's full-length weights
   and prices, and raised `DimensionMismatch`.
 
-The reference implementation added the same charge, after map
+The oracle added the same charge, after map
 [#746](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/746) closed, as a fix in its
 own backtest path: an exit is full turnover at the previous weight, the cost rides at the previous
 weight times the asset's rate, and the turnover bound does not bound it. It keeps the caller's
@@ -52,7 +52,7 @@ because they forward it as a property the verb cannot dispatch on.
 
 A position in an asset that leaves the Investable Mask is charged as a trade to zero. The charge
 enters the model's fee expression, multiplied by the homogenising variable as the turnover term is,
-so under a ratio objective it moves the argmin as it does in the reference. It enters the fold's
+so under a ratio objective it moves the argmin as it does in the oracle. It enters the fold's
 realised series through `calc_fees`. The turnover bound does not bound it, because the trade is
 forced rather than chosen, and a bound that refused it would make the programme infeasible for a
 reason the caller cannot act on. The docstrings of `Turnover` and `Fees` state this.
@@ -242,7 +242,7 @@ are zero for the exit, so nothing else is owed.
   methods, `HierarchicalEqualRiskContribution`, `NestedClustered`, `Stacking` and
   `SubsetResampling` — hoist their `fees_constraints` call above the door and gain one
   `investable_fees_view` binding. The finite allocation input learns the mask.
-- Reporting a per-fold turnover that includes the liquidation, as the reference does, is not
+- Reporting a per-fold turnover that includes the liquidation, as the oracle does, is not
   decided here: the library reports no per-fold turnover today, so there is no reader to be wrong.
 
 ## Amendment (2026-09-23)

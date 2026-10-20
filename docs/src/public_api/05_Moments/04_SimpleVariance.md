@@ -1,8 +1,8 @@
 ```@meta
-Description = "Simple variance and standard deviation, public API of PortfolioOptimisers.jl: SimpleVariance, std, var, partial_fit!, port_opt_view, merge_states, …"
+Description = "Simple variance, public API of PortfolioOptimisers.jl: SimpleVariance, std, var, partial_fit!, port_opt_view, merge_states, fold_inactive!."
 ```
 
-# Simple variance and standard deviation
+# Simple variance
 
 The library uses the variance of each asset in several places: in some expected returns estimators, in covariance estimation, in performance analysis and in constraint generation. The estimators below compute the variance, and the standard deviation, which is its square root.
 
@@ -18,13 +18,14 @@ var(ve::SimpleVariance, X::VecNum; mean = nothing)
 
 ## Incremental fit
 
-Like the sample mean, the sample variance updates with each new block of observations. [`partial_fit!`](@ref) stores the running state in the `cache` field of the estimator it returns, and `var(ve)` computes the estimate from that state, with no data.
+Like the sample mean, the sample variance updates with each new block of observations. [`partial_fit!`](@ref) stores the running state in the `cache` field of the estimator it returns, and `var(ve)` and `std(ve)` compute the estimate from that state, with no data.
 
 ```@docs
 partial_fit!(state::SimpleVarianceState, x::VecNum)
 partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1)
 partial_fit!(ve::SimpleVariance, x::VecNum)
 var(ve::SimpleVariance, state::SimpleVarianceState)
+std(ve::SimpleVariance, state::SimpleVarianceState)
 port_opt_view(x::SimpleVarianceState, i, args...)
 merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
 ```

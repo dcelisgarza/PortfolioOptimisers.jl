@@ -19,7 +19,7 @@ sibling maps of the same release did, so that the code is checked against a docu
 against a thread. It was written by the PR 625 review of the map (piece Q10, 2026-09-14) and
 adds no decision the tickets did not take.
 
-The reference implementation ships the same reading as one entry point of fifteen parameters that
+The oracle ships the same reading as one entry point of fifteen parameters that
 fits the estimator, computes every statistic eagerly, and answers two Result classes — an
 evaluation and a comparison — over about twenty-five private helpers, with a free-form parameter
 bag and a name on each. The library already held three of its pieces before the map opened:
@@ -56,7 +56,7 @@ fitted.
 
 The universe is carried for the same reason the pairing is. `forecast_coverage` divides the
 assets that carry a finite pair at a date by the estimation universe of that date, which is the
-reference's denominator (`n_valid / eligible_count`), and the coverage is read at the Result
+oracle's denominator (`n_valid / eligible_count`), and the coverage is read at the Result
 layer, where no carrier is in hand. So the pairing cuts the Asset Panel's estimation mask to the
 block's rows once, into `umsk`, and every consumer — the coverage, the summary's four coverage
 columns, the window tables' `mean_coverage` — reads that one universe; the bare method takes it as
@@ -75,7 +75,7 @@ An observation is scorable when some asset carries a finite forecast and a finit
 The first and the last such observation bound the evaluation, the dates run between them in
 strides of `step`, and a stride of the horizon (the default) gives forward windows that do not
 overlap. An unscorable observation inside the bounds is **kept**, with `NaN` statistics, so that
-`step` means the same thing everywhere in the sample. The reference drops such a date, and no
+`step` means the same thing everywhere in the sample. The oracle drops such a date, and no
 statistic reads the difference: every summary of a per-date series — the coefficients through
 `exposure_ic_factor_summary`, the books and spreads through `forecast_hit_rate` — reads a `NaN`
 date as one at which nothing was measured, so the kept date is in no denominator, and how often a
@@ -83,7 +83,7 @@ date was silenced is the coverage's question.
 
 ### The forecast is written onto the universe at the pairing
 
-The reference masks the forecast by the panel's estimation mask before every statistic. A member
+The oracle masks the forecast by the panel's estimation mask before every statistic. A member
 of this family standardises its Descriptors over the estimation universe but writes a score for
 every asset whose fields are finite, so an active asset the estimate never reads carried a finite
 forecast and entered every statistic here and none there; on the planted fixture of `test_08x`
@@ -127,12 +127,12 @@ because every member answers in return units.
 the forecast alone — centred and rescaled to 200 % gross by `forecast_centred_weights!`, so every
 date is dollar neutral whatever the spread of the forecast — and its return series *is* a
 portfolio, so it earns the whole of `performance_summary` (a Sharpe ratio and its standard error,
-Sortino, Calmar, the maximum drawdown and the CVaR), which the reference does not report. The gaps
+Sortino, Calmar, the maximum drawdown and the CVaR), which the oracle does not report. The gaps
 below `min_count` are dropped before that call, as its Precomputed-returns contract prescribes, so
 **`max_drawdown` and `calmar` are of the compressed path**; the docstring carries the caveat and no
 guard is applied. A quantile spread is a difference of two means and not a book, so it gets the
 three annualisation figures and a hit rate through `forecast_series_summary`. The turnover of the
-book is `calc_turnover`, which landed in `src/17_NetReturnsDrawdowns.jl` beside `calc_net_returns`
+book is `calc_turnover`, which landed in `src/14_NetReturnsDrawdowns.jl` beside `calc_net_returns`
 because a caller who holds a weight path wants its turnover whether a forecast produced it or not;
 its first observation is `NaN`, because a path cannot say whether it opened from cash.
 
@@ -152,8 +152,8 @@ cross-section of each exposure **at the same observation**. Nothing in it looks 
 no window to mature and nothing to keep disjoint: every observation at which the forecast and an
 exposure are both written is a sample of it, and the evaluation grid — which exists to keep the
 coefficient's forward windows from overlapping — has no meaning for it. The verb therefore reads
-the whole observation axis of `fe.alpha` by default, which is what the reference reads, and it is
-bit-exact with the reference's kernel and summary on that axis (`test_08x` pins it). A caller who
+the whole observation axis of `fe.alpha` by default, which is what the oracle reads, and it is
+bit-exact with the oracle's kernel and summary on that axis (`test_08x` pins it). A caller who
 wants the correlations beside the coefficients of the same dates passes `dates = fe.dates`, and
 any other row set is read on the same terms; the row set is a value, not a flag, so the grid is
 one spelling of it rather than a second shape. The rows are not filtered: a member that is refit
@@ -173,17 +173,17 @@ window matures later, so the dates are intersected across the **whole grid** bef
 is taken: a fall down a column is the forecast decaying, not the sample changing under it. The
 consequence is that a table read at one depth `n` is internally comparable and is **not**
 comparable to a table read at another, and that shortening `n` does not leave the rows that remain.
-The table's book columns are annualised at `fe.ppy`, where the reference reports them per period.
+The table's book columns are annualised at `fe.ppy`, where the oracle reports them per period.
 
 ### One columnar summary is also the comparison
 
 `forecast_evaluation_summary` answers `ForecastSummaryResult`, thirty columns whose axis is the
 forecast — the ten coefficient figures, the five annualised figures of each book, the six
 calibration figures and the four coverage figures, plus the quantile block on request — so a single
-evaluation is its length-1 case and the length-2 case *is* the comparison. The reference's
+evaluation is its length-1 case and the length-2 case *is* the comparison. The oracle's
 comparison class is not carried. The vector method refuses evaluations that are not comparable (a
 different target, horizon, lag, step, threshold, annualisation, date set or asset axis), which the
-reference does not check. The column names are those of the forward-window tables, so a row of a
+oracle does not check. The column names are those of the forward-window tables, so a row of a
 table and a row of a summary read on the same terms. Three parts of an evaluation are deliberately
 **not** columns, each because its axis is not the forecast: the drawdown family (of the compressed
 path), the forward-window tables (axis: the window) and the factor correlations (axis: the factor).
@@ -195,7 +195,7 @@ scored, and the two were kept apart and named apart because `exposure_ic_factor_
 thought to be released surface of map #643. It is not on `main`, and the reading was the odd one
 out: it disagreed with the mean, the ratio and the t-statistic printed beside it (over the finite
 dates), with `forecast_hit_rate`, with every pairwise kernel of the library, which reads a `NaN`
-as unobserved, and with the reference's evaluation `_hit_rate`, which drops it (its exposure
+as unobserved, and with the oracle's evaluation `_hit_rate`, which drops it (its exposure
 summary counts the `NaN` as a miss, through a `nanmean` of `ic > 0` whose comparison has already
 turned the `NaN` into a `false`, and map #643's oracle in `test_08s` records that as a deliberate
 divergence now); and once the coverage
@@ -212,7 +212,7 @@ because the pairing may have cost a refit and every figure must read the same on
 figure draws ten of the thirty columns, leaving out the counts that would dwarf a ratio on one
 axis, and draws the quantile block only when it was asked for.
 
-### Two parameters of the reference have a documented absence
+### Two parameters of the oracle have a documented absence
 
 Its free-form parameter bag has no home: every parameter is a typed field and a `@concrete` Result
 prints them. Its per-evaluation `name` is not a parameter of the evaluation: the names axis lives
@@ -230,15 +230,15 @@ fifteen parameters has a home, tabulated in #932's resolution.
 - **Reconciling the two hit-rate denominators.** It would move map #643's released surface.
 - **A stored oracle for the books.** They are pinned by their invariants (dollar neutral, 200 %
   gross, a perfect forecast earns a positive mean and its negation the exact opposite), and the
-  coefficients, calibration, tables and summary are pinned bit for bit against the reference's own
+  coefficients, calibration, tables and summary are pinned bit for bit against the oracle's own
   methods on two small matrices.
 
 ## Consequences
 
-Seventeen names are exported from `src/08_Moments/45_ReturnForecasts/07`–`14`: the three targets,
+Seventeen names are exported from `src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/07`–`14`: the three targets,
 the two Results, `forecast_evaluation`, `forecast_history`, and the ten level-2 verbs and
 summaries; eleven `plot_forecast_*` figures from the extension. `AbstractForecastTarget` is not
-exported. `CONTEXT.md` defines **Forecast Evaluation**, **Forward Target** and **Forecast
+exported. `GLOSSARY.md` defines **Forecast Evaluation**, **Forward Target** and **Forecast
 Calibration**. Example `7_putting_it_together/07_Forecast_Evaluation.jl` is the page that walks the
 reading order.
 
@@ -253,16 +253,16 @@ The grid is anchored at the later start, which is what the blank did, and it als
 earlier finish, which the blank did not.
 
 The review that wrote this ADR found three places where the code at the head read less than the
-reference and the tickets did not say so, and all three are paid. `forecast_coverage` divided by
+oracle and the tickets did not say so, and all three are paid. `forecast_coverage` divided by
 every asset on the panel rather than by the estimation mask's count at the date
 ([#1070](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1070)), and the Result now
 carries the universe, as the decision above states. `forecast_factor_correlation` read the
 evaluation dates only, where a contemporaneous statistic can read every observation
 ([#1071](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1071)), and it now reads
-them all, as the decision above states; its parity run against the reference measured a fourth
+them all, as the decision above states; its parity run against the oracle measured a fourth
 place, the forecast entering every statistic off the estimation mask
 ([#1074](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1074)), and the pairing now
-writes the forecast onto the universe. The reference's two comparison overlays — several
+writes the forecast onto the universe. The oracle's two comparison overlays — several
 forecasts' cumulative coefficient and cumulative book return on one axis — had no vector method
 ([#1072](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1072)), and its own commit
 paid it.
@@ -284,7 +284,7 @@ base evaluation defaults to the horizon, so the base summary was right by defaul
 any smaller `step`; `forecast_holding_period` lengthens the window at every row and keeps the
 stride, so its row ``p`` was wrong by about ``\sqrt{p}`` at the default, which is where a caller
 reads the table to choose a rebalancing frequency; and `exposure_ic_summary` on a block scores
-every observation, so it was wrong at any `horizon` above one. The reference implementation
+every observation, so it was wrong at any `horizon` above one. The oracle
 carries the same defect, and its maintainers were shown a synthetic no-skill forecast reaching
 "significance" at half its holding periods.
 
@@ -310,7 +310,7 @@ yields a `NaN` statistic, not a clamped one, as a zero standard deviation alread
 lag derivation, the two tables' per-row lags, and the null: a persistent forecast against an
 independent target, over many seeds, whose corrected statistic is dispersed like a unit normal at
 every depth of the holding-period table while the plain one widens with the depth. The
-reference-parity literals of the holding-period table at a stride of one are kept as the plain
+oracle-parity literals of the holding-period table at a stride of one are kept as the plain
 statistic and asserted as a deliberate divergence, beside the corrected one.
 
 ## Amendment (2026-09-25)
@@ -322,10 +322,10 @@ forecast scored a Spearman coefficient of `1` or `-1`, set by that order alone, 
 coefficient is `NaN`, and two equal forecasts took two different weights in the `:rank` book.
 Issue [#1332](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1332) records it.
 
-The reference implementation ranks the same way through an unstable sort, so on a tied
+The oracle ranks the same way through an unstable sort, so on a tied
 cross-section its answer comes from its sort algorithm and not from a rule. A tie block of five
 or twelve values kept the asset order, and one of seventeen or more did not, when measured with
-one version of the numerical library it runs on. There is therefore no reference behaviour on
+one version of the numerical library it runs on. There is therefore no behaviour of the oracle on
 tied data that the port can reproduce in general, and on data with no tie the two rules give the
 same ranks, so parity there is unchanged bit for bit.
 
@@ -337,5 +337,209 @@ reads one `min_count`. The summary refuses two evaluations whose rules differ, a
 thresholds. The cross-sectional diagnostics, `exposure_ic`, `exposure_ic_summary`, `idio_vol_ic`,
 `idio_vol_residual_dependence` and `plot_cumulative_exposure_ic`, take it as a keyword with the
 same default. The rule is a named symbol and not a flag, as ADR 0044 decides for a named choice.
-`:ordinal` stays so that a caller can reproduce the reference's numbers where its sort keeps the
+`:ordinal` stays so that a caller can reproduce the oracle's numbers where its sort keeps the
 asset order, which the parity fixtures of `test_08s` and `test_08t` do.
+
+## Amendment (2026-09-29)
+
+**The book carries its weights over a date with no scorable asset.** The decision that keeps such
+a date says that no statistic reads the difference from the oracle, which drops the date. The
+parity measure of [#1389](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1389)
+found one that did. `forecast_portfolio_weights` left the row of the kept date at zero, so the
+turnover of the next date read a trade out of an empty book, the whole gross of the new book, and
+`mean_turnover` moved with it. The forecast states nothing at such a date, so the date is no
+rebalance: the row now copies the book of the date before it. The return and the turnover of the
+kept date stay `NaN`, and the turnover of the next date reads the trade between the two books
+around the gap, which is the oracle's number. A date with one asset or a flat signal still holds
+no book, because the forecast states no spread there, and the oracle agrees.
+
+The coverage is still the one statistic that reads the kept date, by design: it counts the date as
+silenced, so the least coverage of a summary can be `0` where the oracle's, over the dates it
+kept, cannot.
+
+`test_08x_forecast_evaluation.jl` pins every per-date series, the forward-window tables,
+the calibration curve and the summary against the oracle on nine cases, and the two differences
+this ADR rules (the t-statistic of an overlap and the kept date) by identity.
+
+## Amendment (2026-10-07)
+
+[#1416](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1416) kept three rules of
+this ADR and asked for the oracle's rule beside each one.
+[#1512](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1512) built them.
+
+**A silenced date has coverage zero, and the summary also reports the coverage over the scored
+dates.** The stride defines a fixed schedule of dates, and coverage is the share of the universe
+scored at each scheduled date. So a scheduled date whose universe is not empty and at which
+nothing is scored has coverage zero, and the mean coverage counts it. The oracle drops the date
+and averages over the dates it kept, which conditions on success and overstates the coverage. The
+summary now also reports `n_silenced`, the count of such dates, and `mean_coverage_scored` and
+`min_coverage_scored`, the coverage over the dates that scored an asset. With `J` dates of finite
+coverage, `mean_coverage_scored = mean_coverage * J / (J - n_silenced)` exactly, and the two
+scored figures are the oracle's coverage.
+
+**The forward-window tables take `ppy`.** Annualisation is a linear rescale: the mean times `p`
+and the ratio times `sqrt(p)`. The tables build each window with the `ppy` of the evaluation, so
+a table and the summary of one evaluation share their units, and that stays the default. The
+oracle's tables are per period whatever its factor is. `forecast_holding_period` and
+`forecast_decay` now take `ppy`, so `ppy = 1` gives the oracle's per-period tables from the same
+evaluation as an annualised summary.
+
+**A comparison is paired, and a listing is a separate product.** A comparison of skill needs one
+estimand (the target, the horizon and the lag), one sample (the dates and the universe) and one
+unit (`ppy`). The tests of forecast comparison are defined on a common sample. So the refusal of
+evaluations that are not comparable stays the guard of the summary. `paired = false` gives a
+listing: it stacks the summary of each evaluation on its own and runs no check, which is the
+oracle's table of evaluations. Its `ppy` holds one entry per forecast. A difference between two
+rows of a listing is not a difference in skill, and the docstring says so. `align = true`
+re-dates the evaluations onto one grid, so it does not give the oracle's rows, and the two
+keywords conflict by name.
+
+**The descriptor Neutralisation fits an intercept by default.** The Consequences above state that
+both Neutralisation sites fit with no intercept. The site of `DescriptorScores` no longer does:
+[#1521](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1521) set its default to
+`cre = CrossSectionalLinearRegression(; intercept = true)`, which reverses #950. The residual is
+then orthogonal to the constant and to each target, so the score is uncorrelated with each target
+under every design. `cre = CrossSectionalLinearRegression(; intercept = false)` gives the oracle's
+rule. The Neutralisation of a Factor Exposure reads the `cre` of the prior, and it does not change.
+
+## Amendment (2026-10-12)
+
+**The test of a mean coefficient is a Mean Test, and the default is a fixed-bandwidth wild
+bootstrap.** The amendment of 2026-09-19 set the order of the long-run variance to the overlap of
+the forward windows. That order reads no dependence past the overlap. A coefficient series that is
+persistent past it, such as a factor-like forecast whose coefficient follows a slow regime, was
+still overstated, and the normal law is a poor reference for a long-run variance in a short series.
+Measured on a no-skill series of 60 dates at the 5% level: an AR(1) series of coefficient 0.5 at a
+stride of the horizon, where the order is zero, was rejected 27.9% of the time, and an MA(4)
+series at its exact overlap order 10.6% of the time, 20.1% at 24 dates. The untapered sum can also
+be negative, and the statistic is then `NaN`.
+
+The decision follows the source `demetrescu2026robust`: a long-run variance at a fixed bandwidth
+`B = b * T`, where `T` is the span of the series, with the p-value read off a Gaussian wild
+bootstrap of the studentised mean. On the same cases with the Bartlett kernel at `b = 0.4` the
+rejection rates are 6.9% and 9.1%, and 5.7% for the AR(1) case at 250 dates, where the overlap rule
+still gives 25.4%. The remaining distortion of the MA(4) case is the one the source reports for
+strong serial correlation in a short series. A block multiplier of the overlap length moved it from
+9.0% to 8.7% and was not adopted.
+
+Every value of the test is a field, and none is fixed in the code:
+`WildBootstrapMeanTest(; kernel = BartlettKernel(), b = 0.4, span = FiniteEntrySpan(), n_sim = 1_999,
+q = 0.05, min_obs = nothing, min_periods = nothing, rng = Random.default_rng(), seed = nothing)`.
+
+- **The defaults of the kernel, `b` and `n_sim` are those of the source.** Its simulations
+  recommend a mid bandwidth and find the Bartlett kernel more powerful than the quadratic spectral
+  one, and its application draws 1,999 times. The level `q = 0.05` is the one of the library: the
+  source uses 0.1 in its simulations and 0.01 in its application. The source also states the
+  residuals of an AR(1) fit as an option for the multipliers, and the test does not take it. A smaller `b` gives more power and a larger distortion: at `b = 0.1` the AR(1) case was
+  rejected 10.1% of the time and the power against a shift of 0.6 standard deviations rose from
+  0.47 to 0.64.
+- **The kernel** is an extension point, `AbstractLongRunKernel` with `long_run_kernel_weight`. The
+  library ships `BartlettKernel` and `QuadraticSpectralKernel`, the kernel of equation 2.7 of
+  `andrews1991`. The weight of the quadratic spectral kernel reads its Taylor series for
+  `|z| < 1`, because the closed form cancels there: at a lag of `1e-4` bandwidths it lost nine
+  digits.
+- **The draws** are an extension point, the field `alg`, an `AbstractBootstrapDraws`. Every
+  algorithm draws the same law, and they differ in cost. `ObservationDraws` draws one multiplier per
+  finite entry. Under Bartlett it reads sums of windows, linear in the length of the series, and
+  under any other kernel one matrix product per block of draws, quadratic in it. Every kernel reads
+  its multipliers in one order, so two kernels compare on the same draws. The statistic of a draw
+  reads the multipliers only through the sum of the product and its sums against a factor of the
+  matrix of the weights. These sums are jointly Gaussian, so `QuadratureSumDraws` and
+  `EigenSumDraws` draw them directly. `QuadratureSumDraws` takes the factor from a Gauss-Legendre
+  rule on the band of the quadratic spectral kernel. Its node count depends on `b` alone, is the
+  least whose Bernstein-ellipse bound holds at `tol` (`trefethen2019`, Theorem 19.3), and a caller
+  can give a count. A fixed count is wrong at a small `b`: 32 nodes err by 0.57 at `b = 0.02`.
+  `EigenSumDraws` takes an exact eigen factor, so it reads every kernel. `QuadratureSumDraws` is the
+  default of the quadratic spectral kernel: at 5,000 dates and 9,999 draws a test took 22 s under
+  `ObservationDraws` and 11 ms under it. `ObservationDraws` is the default of every other kernel.
+- **The observed sum** under `QuadratureSumDraws` is its field `form`, an `AbstractLongRunForm`.
+  The quadratic spectral kernel weights every lag, so the exact sum, `ExactLongRunForm`, costs
+  `O(n^2)`: 1.2 s at 50,000 dates, where the draws cost 0.1 s. The default `FeatureLongRunForm` reads
+  the sum through the features of the draws, `‖Φ'd‖²`, at `O(n K)`: 0.8 ms at 50,000 dates and
+  `1.3e-14` from the exact sum. The observed statistic then reads the kernel of the draws. A test
+  takes 6.8 ms at 1,000 dates, 25 ms at 20,000 and 66 ms at 50,000, linear in the length; the
+  oracle takes 14, 57 and 118 ms.
+- **The span** that the bandwidth and the history rule read is `FiniteEntrySpan`, the entries from
+  the first finite one to the last, or `FullGridSpan`, every position of the grid. A missing entry
+  inside the span keeps its position under both.
+- **The interval** of the mean is the symmetric percentile-t interval of the bootstrap at the level
+  `1 - q`. Its order statistic is read off the same division that gives the p-value, so it excludes
+  zero exactly when the p-value is at most `q`. A product `q * (M + 1)` can round below an integer,
+  as `0.29 * 100` does, so the order is not read off it.
+- **The minimum-data rules** `min_obs` and `min_periods` answer `NaN` for a series with fewer finite
+  entries, or with a span that holds fewer windows. The test receives the window of the grid,
+  `horizon // step` from `forecast_ic_window`, as an exact ratio, so `T / window` is the count of
+  holding periods the history covers, `T * step / horizon`. A test that received only `lags` would
+  count windows of `cld(horizon, step)` dates, which is fewer periods whenever the stride does not
+  divide the horizon. The summaries keep `lags` and take `window = lags + 1` beside it, and refuse
+  two that state different overlaps.
+- **The scale of the statistic is the source's by default.** Every autocovariance divides by
+  `n - ddof`, with `ddof = 0` the divisor `n` of the source. The divisor scales the observed
+  statistic and every bootstrap statistic by one factor, so it moves the t-statistic alone and no
+  p-value and no interval. `ddof = 1` gives the divisor `n - 1` of the summary's variance. The sample
+  size is the count of finite entries: a missing date keeps its position and is no observation.
+- **The generator** follows the convention of the library, resolved once per summary by
+  `resolve_rng`, so a seeded test is reproducible and the series of one summary take different
+  draws.
+
+The oracle has the same test since v1.8.6: the quadratic spectral kernel at a bandwidth of `0.1` of
+the span from the first finite date to the last, the divisor `n`, 9,999 draws at a fixed seed of
+the same Gaussian sums as `QuadratureSumDraws`, and `NaN` under 20 dates, under 10 holding periods
+or for a series of constant value. `WildBootstrapMeanTest(; kernel = QuadraticSpectralKernel(),
+b = 0.1, n_sim = 9_999, seed = 0, min_obs = 20, min_periods = 10)` states each of these. On 181
+series of six processes and three lengths, its t-statistic equals the oracle's to `2.4e-13`, and
+the p-values and the intervals agree within the Monte Carlo error of two generators. Over 250 to
+1,000 no-skill series a cell, the sizes of the two agree within that error in every cell. Three
+differences are kept, because each is the
+correct rule. The oracle fixes 32 nodes, which holds at its fixed `b = 0.1` alone. Its interval
+excludes zero when `p < 0.05`, a test of level `499 / 10,000`, where `p <= q` gives the level `q`.
+It calls a series constant when its spread is under `1e-12` of its size, a fixed tolerance. The
+library calls a series constant when its largest centred deviation is at most `n * eps(T)` times its
+largest absolute entry, with `T` the type of the mean and zero for a `Rational`: the round-off
+bound of the sum that the mean reads. A series whose entries are one ulp apart, such as `0.3` and
+`0.1 + 0.2`, then answers `NaN`, and not a statistic of the order of `1e16`. The oracle needs one
+entry more than the library at a stride above one: it counts the history as the base periods from
+the first date to the last, `(T - 1) * step + 1`, where the library counts `T * step`, each entry
+as its own stride. The library's count is the number of independent windows with the variance of
+the mean of the overlapping ones, and counts `T` windows that do not overlap as `T`. The
+default of the library holds its size better under strong dependence: an AR(1) series of
+coefficient 0.8 at 60 dates is rejected 11.1% of the time against 16.4% for the oracle's rule, at
+a cost of power under weak dependence, 0.61 to 0.66 against 0.71 to 0.74 for independent series.
+
+The rule of 2026-09-19 stays available as `OverlapMeanTest`, with two corrections. The sum `Q` of
+the centred products reads deviations from the sample mean, so its expectation is not `n` times the
+long-run variance. Under the null hypothesis each entry is a sum of `window` independent periods, so
+two entries `j` apart have the correlation `max(1 - j / w, 0)`, and `E[Q] = tr(M W M Σ₀)` with `M`
+the centring matrix and `W` the band of width `2L + 1`. The divisor `n - 1` of 2026-09-19 is
+unbiased at `L = 0` only. The field `law` sets the divisor and the degrees of freedom of the
+Student law. The default `NullMomentLaw` divides by `n tr(M W M Σ₀) / 1'Σ₀1`, which makes the
+variance of the mean unbiased at every length and with every gap, and takes the degrees of freedom
+of Satterthwaite (1946), `tr(M W M Σ₀)² / tr((M W M Σ₀)²)`, which match the variance of `Q`. Both
+read every entry of the band once through two prefix sums of the mask, so a test costs 2 to 15
+times a test under `BandCountLaw`: 1.8 ms against 0.12 ms at 5,000 dates and a window of 20, where
+the bootstrap default takes 97 ms. `BandCountLaw` keeps `n - 2L - 1` for both. That divisor is almost unbiased for the variance
+of the mean, 51 against an exact 51.17 at `L = 4` and 60 dates, because two edge terms of order `L`
+cancel. Its degrees of freedom are not: the untapered sum varies as a chi-squared law with 8.1
+degrees of freedom there, not 51. Measured on a no-skill series of overlapping windows at the 5%
+level, the released rule `n - 1` with the normal law rejected 19.9% at `L = 4` and 24 dates and
+10.6% at 60, over 20,000 seeds. Over 100,000 seeds, `BandCountLaw` rejected 11.2% and 7.8%, 5.7% at 250 dates,
+and 12.4% at `L = 19` and 120 dates. `NullMomentLaw` rejected 4.1%, 4.9%, 5.0% and 4.5%, and 4.9%
+and 4.7% with four and five gaps. At `L = 0` both laws are the classical t-test, and the statistic
+is bit for bit the one it was, so the parity of the plain statistic at a stride of the horizon
+holds. A series whose span is at most `L + 1` entries has no statistic. No law reads persistence
+past the overlap, so the bootstrap test stays the default.
+
+Every summary of an information coefficient takes the test as the keyword `mt`:
+`exposure_ic_factor_summary`, `exposure_ic_summary`, `forecast_ic_summary`,
+`forecast_holding_period`, `forecast_decay` and `forecast_evaluation_summary`. Each summary gains a
+two-sided p-value and the two bounds of the interval beside its t-statistic: `p_value`,
+`mean_ci_lower` and `mean_ci_upper` in `ExposureICSummaryResult` and in the `NamedTuple` summaries,
+and the same three names behind `spearman_` and `pearson_` in `ForecastSummaryResult` and in the two
+forward-window tables. Under the default the t-statistic is not on the scale of the normal law, so
+the p-value or the interval is the figure to read. `lags` keeps its meaning, and `window` joins it. The mean, the standard
+deviation, the ratio and the hit rate do not change.
+
+The oracle states the plain statistic. The parity fixtures of `test_08x` and `test_08r` that pin a
+t-statistic pass `mt = OverlapMeanTest()`, and new testsets pin the default against a hand
+computation, the bootstrap against a computation draw by draw on both paths, the interval against
+the p-value, and the size against a no-skill series that is persistent past the overlap.

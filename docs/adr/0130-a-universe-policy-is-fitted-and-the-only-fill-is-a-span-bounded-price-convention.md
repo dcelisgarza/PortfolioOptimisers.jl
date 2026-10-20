@@ -31,14 +31,14 @@ A coverage floor, a sparsity threshold and a survivorship filter are none of the
 instruments. Each is a number applied to a quantity computed from the data. Whether the license
 extends to them is the question every remaining item on this ticket hangs on.
 
-### What the reference does
+### What the oracle does
 
 [Issue #957](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/957) measured five knobs
-in the reference implementation, and all five run panel-wide, before any split: a missing-share row
+in the oracle, and all five run panel-wide, before any split: a missing-share row
 filter, an unlimited forward fill of prices (on by default), an inception cut that drops every row
 holding a gap (on by default), an endpoint survivorship filter that keeps a column iff its first and
 last rows are finite (no threshold, on by default), and a per-estimator warm-up. Under the span
-rule, "last row finite" is exactly "not delisted by the end of the panel", so the reference's default
+rule, "last row finite" is exactly "not delisted by the end of the panel", so the oracle's default
 decides today's universe from the end of the sample. Separately, its *panel* fill takes a limit and
 stops at the active boundary, which its *ingestion* fill does not.
 
@@ -60,7 +60,7 @@ Three mechanisms bear directly on the question, and all three were measured on `
 Two facts constrain what a policy may promise. `fit_preprocessing(sel::AbstractAssetSelector, rd)`
 calls `coverage_reduction(rd)` **before** `select_assets`, so a selector is handed a window whose
 every column is 100% complete by construction. And `coverage_mask` reads finiteness and the active
-mask and **never** the estimation mask, which `CONTEXT.md` states outright.
+mask and **never** the estimation mask, which `GLOSSARY.md` states outright.
 
 ## Decision
 
@@ -126,7 +126,7 @@ price is the one a caller reaching for a fill normally wants.
 
 The fill is **bounded by the Listing Span**. It fills only where `first[i] <= t <= last[i]`, so it
 touches Held Gaps alone and can never fabricate a price where the asset was not yet listed or has
-been delisted. This is the guarantee the reference's ingestion fill lacks and its panel fill has.
+been delisted. This is the guarantee the oracle's ingestion fill lacks and its panel fill has.
 The span is asked of the carrier, and a carrier that states none **is not filled**: under
 [ADR 0133](0133-the-conversion-computes-a-return-and-ingestion-is-the-only-door.md) every carrier
 the layer builds states one, so a carrier without a span was built by hand and the step has no
@@ -259,14 +259,14 @@ no `bound` field is added to `PriceGapFill` to hold the alternative.
 
 ## Consequences
 
-`CONTEXT.md` mints **Universe Policy** and **Held Price**, and the *Avoid* line on Held Price
+`GLOSSARY.md` mints **Universe Policy** and **Held Price**, and the *Avoid* line on Held Price
 separates it from `gap_fill_value`.
 
 ADR 0129 is rewritten in place rather than amended: its decision has not reached `main`, so no
 reader outside the branch has seen the sentence being replaced. The sentence in its *Consequences*
 placing the whole policy surface at the returns level is replaced by the split rule above.
 
-The five knobs #957 measured in the reference map onto this library as follows. The row filter and
+The five knobs #957 measured in the oracle map onto this library as follows. The row filter and
 the inception cut have no counterpart, because a gap is carried rather than deleted. The unlimited
 forward fill becomes an opt-in `PriceGapFill` under `CarriedPrice`, bounded by the span. The
 endpoint survivorship filter has no panel-wide counterpart and never will; its per-window reading is
@@ -292,7 +292,7 @@ asset stays non-finite and the Asset Panel keeps it out of the weights, which is
 text could not make while the imputer was filling it. That page's prose about the conversion
 silently dropping assets is stale under ADR 0133 and is rewritten in the same change.
 
-**`CONTEXT.md` needs nothing.** It never named `Imputer`, and its **Held Price** entry already
+**`GLOSSARY.md` needs nothing.** It never named `Imputer`, and its **Held Price** entry already
 speaks of *the* fill in the singular and states the Listing Span bound as that fill's property. The
 removal makes the entry true rather than aspirational.
 

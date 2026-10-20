@@ -1,10 +1,19 @@
 ```@meta
-Description = "Ordered Weights Array (b), public API of PortfolioOptimisers.jl: OrderedWeightsArrayRange, factory."
+Description = "OWA risk measures (b), public API of PortfolioOptimisers.jl: SortingNetworkOrderedWeightsArray, AbstractSortingNetworkMerge, OddEvenMerge, BitonicMerge, …"
 ```
 
-# Ordered Weights Array (b)
+# OWA risk measures (b)
 
 ```@docs
+SortingNetworkOrderedWeightsArray
+PortfolioOptimisers.AbstractSortingNetworkMerge
+OddEvenMerge
+BitonicMerge
+PortfolioOptimisers.sorting_network
+PortfolioOptimisers.AbstractSortingNetworkOrdering
+ComparatorOrdering
+WireOrdering
+PortfolioOptimisers.sorting_network_columns
 OrderedWeightsArrayRange
 factory(x::OrderedWeightsArrayRange, pr::AbstractPriorResult, args...; kwargs...)
 ```

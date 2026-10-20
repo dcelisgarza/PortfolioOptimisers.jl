@@ -1,7 +1,7 @@
 ```@meta
-Description = "Field descriptions has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Field dict has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Field descriptions
+# Field dict
 
-This file defines no name. The [private page](@ref private-api-field-descriptions) says which table it fills.
+This file defines no name. The [private page](@ref private-api-field-dict) says which table it fills.

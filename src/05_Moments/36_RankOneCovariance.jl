@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates the covariance of a short window as a rank-one matrix along the principal direction of its price relatives.
 
-Lai, Tan, Wu and Fang (2020) built the estimate for short-term portfolio optimisation, where the window holds a few observations of many assets. The matrix is positive semidefinite and singular, so it has no Cholesky factor. A consumer reads it as a quadratic form, as [`Variance`](@ref) does under [`QuadRiskExpr`](@ref).
+[lai2020spolc](@citet) define the estimate for short-term portfolio optimisation, where the window holds a few observations of many assets. The matrix is positive semidefinite and singular, so it has no Cholesky factor. A consumer reads it as a quadratic form, as [`Variance`](@ref) does under [`QuadRiskExpr`](@ref).
 
 # Mathematical definition
 
@@ -28,9 +28,9 @@ Where:
   - ``\\zeta_1^\\star``: Energy of the estimate along ``\\boldsymbol{u}_1``.
   - $(math_dict[:Sigma_hat_RO])
 
-This is Algorithm 1 of the paper. Its equations 42 and 49 write the trace of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` in the basis of the singular vectors of ``\\mathbf{X}``, as ``\\operatorname{tr}(D)``, which is the same number. The quotient ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) / (N (w - 1))`` is the mean of the ``N`` sample variances of the window. So ``\\zeta_1^\\star`` is ``\\theta_1`` over the root of the mean variance. That value minimises the trade-off of equation 48 between the magnitude of ``\\theta_1 \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal`` and the magnitude of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}``.
+This is Algorithm 1 of [lai2020spolc](@cite). Equations 42 and 49 of [lai2020spolc](@cite) write the trace of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` in the basis of the singular vectors of ``\\mathbf{X}``, as ``\\operatorname{tr}(D)``, which is the same number. The quotient ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) / (N (w - 1))`` is the mean of the ``N`` sample variances of the window. So ``\\zeta_1^\\star`` is ``\\theta_1`` over the root of the mean variance. That value minimises the trade-off of equation 48 between the magnitude of ``\\theta_1 \\boldsymbol{u}_1 \\boldsymbol{u}_1^\\intercal`` and the magnitude of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}``.
 
-Equation 47 divides the trace of a matrix by its rank, and equation 49 puts the rank of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` at ``w - 1``. That is the rank of a short window, ``w \\leq N + 1``, which is the case the paper studies. On a longer window the rank is at most ``N``, but the definition keeps ``w - 1``, as Algorithm 1 and the authors' code do. When every row of the window is the same, ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) = 0`` and ``\\zeta_1^\\star`` is not defined.
+Equation 47 divides the trace of a matrix by its rank, and equation 49 puts the rank of ``\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}`` at ``w - 1``. That is the rank of a short window, ``w \\leq N + 1``, which is the case that [lai2020spolc](@cite) studies. On a longer window the rank is at most ``N``, but the definition keeps ``w - 1``, as Algorithm 1 and the code that accompanies [lai2020spolc](@cite) do. When every row of the window is the same, ``\\operatorname{tr}(\\hat{\\mathbf{\\Sigma}}_{\\mathrm{MP}}) = 0`` and ``\\zeta_1^\\star`` is not defined.
 
 # Fields
 
@@ -38,13 +38,28 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    RankOneCovariance(; shift::Real = 1) -> RankOneCovariance
+    RankOneCovariance(;
+        shift::Real = 1,
+        cache::Option{<:AbstractPartialFitState} = nothing
+    ) -> RankOneCovariance
 
 Keywords correspond to the struct's fields.
 
 ## Validation
 
   - `isfinite(shift)`. A `DomainError` is thrown otherwise.
+
+## Propagated parameters
+
+When [`factory`](@ref) is called on this type, the following `@fprop`-tagged field is automatically propagated:
+
+  - `cache`: Carried unchanged via [`factory`](@ref).
+
+## View parameters
+
+When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged field is automatically subset to the selected indices:
+
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -65,19 +80,46 @@ RankOneCovariance
 
   - $(ref_dict[:lai2020spolc]) Algorithm 1 and equations 42 to 49.
 """
-struct RankOneCovariance{T1 <: Real} <: AbstractCovarianceEstimator
+@propagatable @concrete struct RankOneCovariance <: AbstractCovarianceEstimator
     """
-    Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into the price relatives that the paper reads, and `0` decomposes the rows as given.
+    Number added to every entry of the returns to form the price relatives ``\\mathbf{X}``. The default `1` turns returns into price relatives, which the estimate reads, and `0` decomposes the rows as given.
     """
-    shift::T1
-    function RankOneCovariance(shift::Real)
+    shift
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
+    function RankOneCovariance(shift::Real, cache::Option{<:AbstractPartialFitState})
         @argcheck(isfinite(shift), DomainError(shift, "shift must be finite"))
-        return new{typeof(shift)}(shift)
+        return new{typeof(shift), typeof(cache)}(shift, cache)
     end
 end
-function RankOneCovariance(; shift::Real = 1)::RankOneCovariance
-    return RankOneCovariance(shift)
+function RankOneCovariance(; shift::Real = 1,
+                           cache::Option{<:AbstractPartialFitState} = nothing)::RankOneCovariance
+    return RankOneCovariance(shift, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`RankOneCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:RankOneCovariance, true)` to render it.
+
+# Arguments
+
+  - `::RankOneCovariance`: Rank-one covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:shift,)`.
+
+# Related
+
+  - [`RankOneCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::RankOneCovariance) = (:shift,)
 """
     Statistics.cov(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
@@ -92,7 +134,7 @@ Computes the rank-one covariance of a window of returns, `assets × assets`.
  3. Subtract the column means from `Xs`, and sum the squares of the result. The sum `trD` is the trace of the scatter matrix.
  4. Compute the singular value decomposition of `Xs`. Take `theta`, the square of the largest singular value, and `u`, its right singular vector.
  5. Compute `zeta = theta * sqrt(N * (w - 1) / trD)`. When every row of `Xs` is the same, or when `trD` is zero, `zeta` is zero. The method compares the rows, because the column means of equal rows carry round-off, and `trD` of a constant window is often a tiny positive number.
- 6. Return `zeta .* (u .* transpose(u))`. The method forms the outer product entry by entry, so the matrix is symmetric to the bit.
+ 6. Return `zeta .* (u .* transpose(u))`. The method forms the outer product entry by entry, so the matrix is exactly symmetric.
 
 # Arguments
 
@@ -134,7 +176,7 @@ function Statistics.cov(ce::RankOneCovariance, X::MatNum; dims::Int = 1, kwargs.
     else
         theta * sqrt(N * (w - 1) / trD)
     end
-    # Entry by entry, so the product is symmetric to the bit and a consumer's Hermitian check
+    # Entry by entry, so the product is exactly symmetric and a consumer's Hermitian check
     # holds; a matrix product need not be.
     return zeta .* (u .* transpose(u))
 end

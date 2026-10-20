@@ -1,8 +1,8 @@
 ```@meta
-Description = "Multiple Randomised Cross Validation, private API of PortfolioOptimisers.jl: SubsetSizeEstimator, NumberSubsetsEstimator, WindowSizeEstimator, SubsetSizeEC, …"
+Description = "Multiple randomised, private API of PortfolioOptimisers.jl: SubsetSizeEstimator, NumberSubsetsEstimator, WindowSizeEstimator, SubsetSizeEC, NumberSubsetsEC, …"
 ```
 
-# Multiple Randomised Cross Validation: private API
+# Multiple randomised: private API
 
 ```@docs
 SubsetSizeEstimator

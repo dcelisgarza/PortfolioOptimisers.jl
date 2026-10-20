@@ -5,7 +5,7 @@ Folds observations into an estimator's partial-fit state, and returns the estima
 
 An incremental fit reads each observation once and keeps what it needs in an [`AbstractPartialFitState`](@ref), so a later call continues where the last one stopped instead of reading the sample again. The state lives in the estimator's `cache` field, which holds `nothing` until the first call. That field is the one Result an estimator holds.
 
-Reading the sample once is the advertised benefit; **numerical accuracy is the real one**. Every state accumulates by Welford's recursion at the observation and by the merge of [chan1983](@cite) at the block, and both centre each increment on the running mean rather than differencing two large sums. On a sample whose mean dwarfs its spread — prices rather than returns — a textbook accumulator of squares loses most of its significant digits to cancellation, while these recursions hold machine precision. `test/test_08r_partial_fit.jl` pins that on a sample of mean 1000 and unit spread, so a later simplification to the textbook formula fails loudly instead of quietly returning a worse answer.
+Reading the sample once is the advertised benefit; **numerical accuracy is the real one**. Every state accumulates by Welford's recursion at the observation and by the merge of [chan1983](@cite) at the block, and both centre each increment on the running mean rather than differencing two large sums. On a sample whose mean dwarfs its spread — prices rather than returns — a textbook accumulator of squares loses most of its significant digits to cancellation, while these recursions hold machine precision. `test/test_08p_regime_partial_fit.jl` pins that on a sample of mean 1000 and unit spread, so a later simplification to the textbook formula fails loudly instead of quietly returning a worse answer.
 
 This is the method each family writes, and it is the family's cheapest exact fold. It writes into the array fields of the state where it can, and it rebinds the scalar fields with `Accessors.@reset`. So it returns a **new** estimator, and the caller must rebind it.
 
@@ -23,6 +23,12 @@ A family that answers this verb implements two methods:
 
   - `partial_fit!(est, X::MatNum; dims::Int = 1, kwargs...) -> est`: Folds every observation of `X`, in order.
   - `partial_fit!(est, x::VecNum; kwargs...) -> est`: Folds one observation, whose entries are the assets.
+
+A family that folds also states it through [`supports_partial_fit`](@ref):
+
+  - `supports_partial_fit(est::MyEstimator) -> Bool`: Returns `true`.
+
+The fallback answers `true` only for an estimator whose `cache` holds a [`SampleBufferState`](@ref). An outer estimator that asks, such as the carry fold of a [`CrossSectionalFactorPrior`](@ref), fits a member that answers `false` again at each step, over every row. Under [`FoldOnly`](@ref) the prior refuses such a `ve`.
 
 # Arguments
 
@@ -51,7 +57,7 @@ Folds observations into a copy of an estimator's partial-fit state, and returns 
 
 This is the value form of [`partial_fit!`](@ref), and it is the pair [`matrix_processing`](@ref) makes with [`matrix_processing!`](@ref). The estimator handed over is untouched, and so is the state it carries, so two folds that start from one warm estimator cannot contaminate each other.
 
-One generic method serves the whole seam, so a family writes no method for it. A family whose fold builds a fresh state in either verb overrides it, to skip a copy that nothing reads.
+One generic method serves every family of the `partial_fit!` interface, so a family writes no method for it. A family whose fold builds a fresh state in either verb overrides it, to skip a copy that nothing reads.
 
 # Interfaces
 
@@ -82,7 +88,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Generic method of [`partial_fit`](@ref). Copies every state the estimator tree carries, and folds the observations into the copies.
 
-Every family of the seam reaches this method, because the copy and the fold are the same two steps whatever the state holds. The copy is [`copy_states`](@ref), the walk [`Resume`](@ref) takes at entry: it copies the estimator's own `cache` when it holds a state, descends into every estimator-valued field, and rebuilds each host whose fields moved. So a host that holds no `cache` field of its own and folds through the states of its **members** — a [`HighOrderPriorEstimator`](@ref) folds its `pe`, `ske` and `kte`, a hierarchical optimiser folds its `opt.pe` — is served by the same method as a leaf, and the kept host's states are as untouched as a leaf's. The cost is one copy per state the tree carries, which is the order of the update itself for every second-order family.
+Every family of the `partial_fit!` interface reaches this method, because the copy and the fold are the same two steps whatever the state holds. The copy is [`copy_states`](@ref), the walk [`Resume`](@ref) takes at entry: it copies the estimator's own `cache` when it holds a state, descends into every estimator-valued field, and rebuilds each outer estimator whose fields moved. So an outer estimator that holds no `cache` field of its own and folds through the states of its **members** — a [`HighOrderPriorEstimator`](@ref) folds its `pe`, `ske` and `kte`, a hierarchical optimiser folds its `opt.pe` — is served by the same method as a leaf, and the kept outer estimator's states are as untouched as a leaf's. The cost is one copy per state the tree carries, which is the order of the update itself for every second-order family.
 
 An estimator with no incremental fit of its own carries no state, so the walk returns it as it is, and [`partial_fit!`](@ref) gives the refusal that names the wrapper.
 
@@ -117,7 +123,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Drops a partial-fit state when its estimator is viewed on the observation axis.
 
-[`obs_weights_view`](@ref) selects observations, and a state describes the observations it was fitted on. No slice of a state exists on that axis: removing an observation from a running accumulator has no numerically stable inverse, which is the reason the seam refuses a windowed estimator in the first place. So the channel drops the state rather than carrying one that answers over observations the view excluded, and the viewed estimator's read-out refuses instead of answering wrongly.
+[`obs_weights_view`](@ref) selects observations, and a state describes the observations it was fitted on. No slice of a state exists on that axis: removing an observation from a running accumulator has no numerically stable inverse, which is the reason `partial_fit!` refuses a windowed estimator in the first place. So the channel drops the state rather than carrying one that answers over observations the view excluded, and the viewed estimator refuses the call with no data instead of answering wrongly.
 
 The asset axis is the other case, and it slices. [`port_opt_view`](@ref) restricts the estimator to a subset of assets, and a family whose state has an exact sub-state over that subset returns it by index copy.
 
@@ -360,7 +366,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the partial-fit state an estimator carries, and refuses an estimator that carries none.
 
-A read-out verb called on the estimator alone reads the state out of the `cache` field, and that field holds `nothing` until the first fold. The refusal names the verb that fills it, so a caller who reached the one-argument form too early is told what to call rather than meeting a `MethodError`.
+A batch verb called on the estimator alone, with no data, reads the state out of the `cache` field, and that field holds `nothing` until the first fold. The refusal names the verb that fills it, so a caller who reached the one-argument form too early is told what to call rather than meeting a `MethodError`.
 
 # Arguments
 
@@ -381,7 +387,8 @@ A read-out verb called on the estimator alone reads the state out of the `cache`
 """
 function partial_fit_cache(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
     # An estimator with no `cache` field at all reads as one carrying nothing, so a family
-    # that never took the seam meets the same named refusal rather than a `FieldError`.
+    # that implements no `partial_fit!` meets the same named refusal rather than a
+    # `FieldError`.
     cache = hasfield(typeof(est), :cache) ? getfield(est, :cache) : nothing
     @argcheck(!isnothing(cache),
               ArgumentError("`$(typeof(est))` carries no partial-fit state, so there is nothing to read. Call `partial_fit!` on it first, or pass a state as the second argument."))
@@ -393,7 +400,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Returns the number of observations an estimator has folded into its partial-fit state.
 
-Every state of the seam records the count of observations it has seen in its `n` field, whatever else it accumulates, because the count is what turns a running sum into a moment. This verb reads it, so a read-out that needs the sample size — and not the sample — asks the state rather than the matrix that is no longer there. [`Statistics.cov`](@ref) of a [`PortfolioOptimisersCovariance`](@ref) is the case that motivated it: its denoising step reads `size(X, 1)` alone, and the folded count is exactly that number, `NaN` rows included.
+Every partial-fit state records the count of observations it has seen in its `n` field, whatever else it accumulates, because the count is what turns a running sum into a moment. This verb reads it, so a call with no data that needs the sample size — and not the sample — asks the state rather than the matrix that is no longer there. [`Statistics.cov`](@ref) of a [`PortfolioOptimisersCovariance`](@ref) is the case that motivated it: its denoising step reads `size(X, 1)` alone, and the folded count is exactly that number, `NaN` rows included.
 
 # Arguments
 
@@ -416,5 +423,52 @@ Every state of the seam records the count of observations it has seen in its `n`
 function observation_count(est::Union{<:AbstractEstimator, <:StatsBase.CovarianceEstimator})
     return partial_fit_cache(est).n
 end
+"""
+    shared_series_member_rows(X::MatNum, gaps::Nothing; kwargs...)
+    shared_series_member_rows(X::MatNum, gaps::AbstractVector{Bool}; active_mask = nothing,
+                              kwargs...)
+
+Return the observations of a carry step that its members fold, and the keyword arguments of their fold.
+
+A carry fold adds each observation to running moments. A batch fit drops an observation with a Shared Series gap, see [`shared_series_view`](@ref), so the running moments must not see it. The carried rows keep it, because the Fold Context of an optimiser holds one row for each observation. So the members fold the unmarked rows of `X` with the rows of the active mask that belong to them, and the carried rows take every row with its mark.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. No marks: return `X` and the keyword arguments.
+ 2. Marks: view `X` and the active mask at the unmarked rows.
+
+# Arguments
+
+  - `X`: The observations of the step, `observations × assets`.
+  - `gaps`: One mark for each observation, `true` at an observation with a Shared Series gap, or `nothing`.
+  - $(arg_dict[:pf_active_mask])
+  - `kwargs...`: The other keyword arguments of the fold of a member, unchanged.
+
+# Returns
+
+  - `(X, kwargs)::Tuple`: The observations that the members fold, and the keyword arguments of their fold.
+
+# Related
+
+  - [`fold_member`](@ref)
+  - [`shared_series_gaps`](@ref)
+  - [`fold_prior_step`](@ref)
+"""
+function shared_series_member_rows(X::MatNum, ::Nothing; kwargs...)
+    return X, (; kwargs...)
+end
+function shared_series_member_rows(X::MatNum, gaps::AbstractVector{Bool};
+                                   active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
+                                   kwargs...)
+    rows = findall(!, gaps)
+    kw = if isnothing(active_mask)
+        (; kwargs...)
+    else
+        (; active_mask = view(active_mask, rows, :), kwargs...)
+    end
+    return view(X, rows, :), kw
+end
 export partial_fit!, partial_fit
-public merge_states
+public merge_states, assert_mergeable_states, chan_merge

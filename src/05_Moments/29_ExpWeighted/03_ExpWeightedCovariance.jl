@@ -1,13 +1,15 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Estimates a covariance matrix by an exponentially weighted recursion that holds a correlation on a holiday and resets on an inactive period.
+Estimates a covariance matrix by an exponentially weighted recursion in which each pair of assets ages on its own common observations, and which resets on an inactive period.
 
-Each asset ages its observations on its own clock, which counts only the observations where that asset is valid. An entry for a pair of assets weights an observation by the geometric mean of the two weights. A gap in one asset thus leaves its variance unchanged, and each of its covariances decays by the square root of the decay at an observation where the other asset is valid. The state starts at zero. The estimate divides out the weight that the zero start lacks, and it divides the rows and the columns by the same factor, so every correlation stays unchanged.
+An entry for a pair of assets steps only at an observation where both assets are valid. A holiday of one asset thus holds its variance and each of its covariances, because it carries no information about them. The state starts at zero, and a second state holds the weight that each pair has gained. The estimate divides each entry by that weight, so each entry is the exponentially weighted mean of the product over the common observations of its pair.
 
-The estimate is positive semidefinite, with or without a holiday. A holiday gives no information about the co-movement of its asset, so the step holds the correlation of each pair that contains it and moves the variance of the other asset. Of the rules that keep the estimate positive semidefinite, this is the one that moves no correlation without data. It is where the port departs from the reference, which freezes the covariance and can return an indefinite matrix. Without a holiday the two rules agree.
+A matrix whose entries each read their own observations need not be positive semidefinite. Where the assets do not share one history, for example after a holiday or a late listing, and the matrix is not positive semidefinite, the estimate clips the negative eigenvalues of its correlation to zero and keeps its variances. The congruence that held the correlation on a holiday is positive semidefinite by construction, but it shrinks every correlation of a pair with different histories towards zero, and a simulation measured the cost. Where every asset has the same valid observations, the two rules agree.
 
 A young asset that stays investable has a cost for the prior. A prior fitted with this estimator fills the rows that the asset lacks with zeros through [`scenario_fill`](@ref), because every consumer of a Prior Result reads its returns matrix. A scenario-based measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. The covariance stays the estimate that this recursion made from the rows it saw. The fill is silent at or below the `fill_limit` field of the fitting prior, which is a share of the observations of that asset. Above the limit it warns, and under `strict` it refuses every fill. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so the prior names every fill.
+
+The estimator has no window of its own. [`WindowedCovariance`](@ref) is its window: the wrapper keeps the last `window` observations of the returns and of the active mask, and the recursion starts cold at the first of them. The example below fits the covariance of an [`EmpiricalPrior`](@ref) on the last 500 observations.
 
 # Fields
 
@@ -18,7 +20,7 @@ $(DocStringExtensions.FIELDS)
     ExpWeightedCovariance(;
         decay::Number = exp2(-inv(40.0)),
         min_obs::Integer = round(Int, max(1, decay_half_life(decay))),
-        centred::Bool = false,
+        centring::AbstractCentring = EstimatedCentring(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ExpWeightedCovariance
 
@@ -33,10 +35,11 @@ Keywords correspond to the struct's fields. The default `min_obs` is the half-li
 
 ```math
 \\begin{align}
-m_{t,\\,i} &= (1 - \\lambda) \\sum_{u \\in \\mathcal{V}_i,\\, u < t} \\lambda^{c_i(u,\\, t)} x_{u,\\,i}\\,, \\\\
+m_{t,\\,i} &= \\frac{\\sum_{u \\in \\mathcal{V}_i,\\, u < t} \\lambda^{c_i(u,\\, t)} x_{u,\\,i}}{\\sum_{u \\in \\mathcal{V}_i,\\, u < t} \\lambda^{c_i(u,\\, t)}}\\,, \\\\
 e_{t,\\,i} &= x_{t,\\,i} - m_{t,\\,i}\\,, \\\\
-S_{ij} &= (1 - \\lambda) \\sum_{t \\in \\mathcal{V}_i \\cap \\mathcal{V}_j} \\lambda^{(c_i(t) + c_j(t)) / 2} e_{t,\\,i} e_{t,\\,j}\\,, \\\\
-\\hat{\\Sigma}_{ij} &= \\frac{S_{ij}}{\\sqrt{(1 - \\lambda^{n_i})(1 - \\lambda^{n_j})}}\\,.
+S_{ij} &= (1 - \\lambda) \\sum_{t \\in \\mathcal{D}_i \\cap \\mathcal{D}_j} \\lambda^{c_{ij}(t)} \\frac{e_{t,\\,i} e_{t,\\,j}}{1 + q_{t,\\,ij}}\\,, \\\\
+W_{ij} &= (1 - \\lambda) \\sum_{t \\in \\mathcal{D}_i \\cap \\mathcal{D}_j} \\lambda^{c_{ij}(t)} = 1 - \\lambda^{n_{ij}}\\,, \\\\
+\\hat{\\Sigma}_{ij} &= \\frac{S_{ij}}{W_{ij}}\\,.
 \\end{align}
 ```
 
@@ -45,21 +48,23 @@ Where:
   - $(math_dict[:lambda_ew])
   - $(math_dict[:x_ti_ret])
   - ``\\mathcal{V}_i``: Valid observations of asset ``i``. They are the observations after the last one at which the active mask excludes the asset, where the return of the asset is finite.
+  - ``\\mathcal{D}_i``: The observations of ``\\mathcal{V}_i`` that give a deviation. Under [`EstimatedCentring`](@ref), the default, they are every one but the first, because the first has no location before it. Under [`PreCentred`](@ref) they are every one.
   - $(math_dict[:n_i_ew])
   - ``c_i(u,\\, t)``: Count of the observations of ``\\mathcal{V}_i`` that lie strictly between ``u`` and ``t``.
-  - ``c_i(t)``: Count of the observations of ``\\mathcal{V}_i`` that lie after ``t``.
-  - ``m_{t,\\,i}``: Running location of asset ``i`` before the observation ``t``. It is zero where `centred` is `true`.
+  - ``c_{ij}(t)``: Count of the observations of ``\\mathcal{D}_i \\cap \\mathcal{D}_j`` that lie after ``t``.
+  - ``n_{ij}``: Count of the observations of ``\\mathcal{D}_i \\cap \\mathcal{D}_j``.
+  - ``m_{t,\\,i}``: Location of asset ``i`` before the observation ``t``, the normalised exponentially weighted mean of its valid returns. It is zero under `PreCentred`.
   - ``e_{t,\\,i}``: Deviation of asset ``i`` at the observation ``t``.
+  - ``q_{t,\\,ij}``: The overlap of the two locations, the sum over their common returns of the products of their normalised weights, so ``1 + q_{t,\\,ij}`` is the factor of [`centring_pair_factor`](@ref). It is zero under `PreCentred`.
   - ``S_{ij}``: Entry of the internal state.
-  - ``\\hat{\\Sigma}_{ij}``: Entry of the estimate. It is `NaN` where asset ``i`` or asset ``j`` has fewer than `min_obs` valid observations, or where the active mask excludes it at the last observation.
+  - ``W_{ij}``: Weight that the pair holds in ``S_{ij}``, the entry of the second state.
+  - ``\\hat{\\Sigma}_{ij}``: Entry of the estimate, before the repair below. It is `NaN` where asset ``i`` or asset ``j`` has fewer than `min_obs` valid observations, or no deviation, or where the active mask excludes it at the last observation.
 
-The weights of ``S_{ii}`` sum to ``1 - \\lambda^{n_i}``, so ``\\hat{\\Sigma}_{ii}`` is a weighted mean of squared deviations whose weights sum to one. In matrix form ``\\hat{\\Sigma} = D S D`` with ``D = \\operatorname{diag}(1 / \\sqrt{1 - \\lambda^{n_i}})``. This congruence transform cancels in a correlation, and ``\\hat{\\Sigma}`` is positive semidefinite exactly when ``S`` is. ``S`` is positive semidefinite for every pattern of holidays. With ``w_{t,\\,i} = \\lambda^{c_i(t) / 2}`` on ``\\mathcal{V}_i`` and zero elsewhere, ``S = (1 - \\lambda) \\sum_t (w_t \\circ e_t)(w_t \\circ e_t)^\\intercal`` is a sum of positive semidefinite outer products. At each observation the recursion is the congruence ``S \\leftarrow D_t S D_t`` plus one such product, where ``D_t`` holds ``\\sqrt{\\lambda}`` for a valid asset and one for any other asset. Without a holiday ``D_t = \\sqrt{\\lambda} I``, and the recursion is ``S \\leftarrow \\lambda S`` plus the product. The correction is the square root of ``1 - \\lambda^{n_i}``, where a first-moment estimator divides by the first power.
+For returns that are independent in time, ``\\mathbb{E}[e_{t,\\,i} e_{t,\\,j}] = \\sigma_{ij} (1 + q_{t,\\,ij})``, so each term of ``S_{ij}`` has the mean ``\\sigma_{ij}``, and the estimate is unbiased from the second return of each asset, whatever the mean. Under `PreCentred` it is too large by the product of the two means. [`ZeroStartCentring`](@ref) keeps the uncorrected rule: ``\\mathcal{D}_i = \\mathcal{V}_i``, ``q_{t,\\,ij} = 0``, and the location is the recursion ``m \\leftarrow \\lambda m + (1 - \\lambda) x`` from zero, not divided by its weight.
 
-A holiday of asset ``j`` scales ``S_{ij}`` by ``\\sqrt{\\lambda}`` and ``S_{ii}`` by ``\\lambda`` before the new product, and it leaves ``S_{jj}`` unchanged, so the correlation of the pair holds. A recursion that updates only the pairs whose two assets are valid scales ``S_{ii}`` by ``\\lambda`` and leaves ``S_{ij}`` unchanged. After ``k`` such steps with a zero deviation of asset ``i``, the implied correlation grows by ``\\lambda^{-k/2}``, without bound, in exact arithmetic.
+The weights of ``S_{ij}`` sum to ``W_{ij}``, so ``\\hat{\\Sigma}_{ij}`` is a weighted mean of products whose weights sum to one, over the common observations of the pair. At each observation the recursion is ``S_{\\mathcal{V}\\mathcal{V}} \\leftarrow \\lambda S_{\\mathcal{V}\\mathcal{V}} + (1 - \\lambda) e_{\\mathcal{V}} e_{\\mathcal{V}}^\\intercal`` on the block of the valid assets, and ``W`` takes the same step with every product one. Every other entry holds.
 
-By the Cauchy-Schwarz inequality, the weights of ``S_{ij}`` sum to at most the denominator, with equality when the two assets have the same valid observations. An entry for two assets with different histories is therefore smaller in magnitude than the weighted mean over their common observations.
-
-The location starts at zero and takes no correction. The first deviation of an asset is thus its return, and the next deviations read a location that the zero start damps.
+Where every asset has the same valid observations, ``W_{ij} = \\sqrt{W_{ii} W_{jj}}``, so the estimate is the congruence ``D S D`` with ``D = \\operatorname{diag}(1 / \\sqrt{1 - \\lambda^{n_i}})``. ``S`` is then a sum of positive semidefinite outer products, and so is the estimate. Where the histories differ, ``n_{ij} \\le \\min(n_i, n_j)``, so ``W_{ij} \\le \\sqrt{W_{ii} W_{jj}}``, and the congruence would divide ``S_{ij}`` by more than its weight and shrink the correlation of the pair towards zero. The division by ``W_{ij}`` does not, but its matrix can fail to be positive semidefinite: a variance that falls while the covariances of its asset hold can imply a correlation above one. Where the smallest eigenvalue of the correlation is below ``-n\\,\\varepsilon`` times its largest, the estimate clips the negative eigenvalues to zero, restores the unit diagonal, and keeps the variances.
 
 # Examples
 
@@ -71,10 +76,16 @@ true
 
 julia> ce.min_obs
 40
+
+julia> pe = EmpiricalPrior(; ce = WindowedCovariance(; ce = ce, window = 500));
+
+julia> pe.ce.window
+500
 ```
 
 # Related
 
+  - [`WindowedCovariance`](@ref)
   - [`AbstractCovarianceEstimator`](@ref)
   - [`ExpWeightedCovarianceState`](@ref)
   - [`ExpWeightedExpectedReturns`](@ref)
@@ -94,36 +105,37 @@ julia> ce.min_obs
     """
     min_obs
     """
-    $(field_dict[:centred])
+    $(field_dict[:centring])
     """
-    centred
+    centring
     """
     $(field_dict[:ew_cache])
     """
     cache
-    function ExpWeightedCovariance(decay::Number, min_obs::Integer, centred::Bool,
+    function ExpWeightedCovariance(decay::Number, min_obs::Integer,
+                                   centring::AbstractCentring,
                                    cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
-        return new{typeof(decay), typeof(min_obs), typeof(centred), typeof(cache)}(decay,
-                                                                                   min_obs,
-                                                                                   centred,
-                                                                                   cache)
+        return new{typeof(decay), typeof(min_obs), typeof(centring), typeof(cache)}(decay,
+                                                                                    min_obs,
+                                                                                    centring,
+                                                                                    cache)
     end
 end
 function ExpWeightedCovariance(; decay::Number = exp2(-inv(40.0)),
                                min_obs::Integer = round(Int,
                                                         max(1, decay_half_life(decay))),
-                               centred::Bool = false,
+                               centring::AbstractCentring = EstimatedCentring(),
                                cache::Option{<:AbstractPartialFitState} = nothing)::ExpWeightedCovariance
-    return ExpWeightedCovariance(decay, min_obs, centred, cache)
+    return ExpWeightedCovariance(decay, min_obs, centring, cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Holds the running state of an incremental exponentially weighted covariance fit.
 
-The struct is immutable, and each of its four fields is an array that the recursion writes in place. [`partial_fit!`](@ref) stores the state in the `cache` field of [`ExpWeightedCovariance`](@ref), and `cov(ce, state)` reads the estimate out of it.
+The struct is immutable, and each of its fields is an array that the recursion writes in place, or `nothing`. [`partial_fit!`](@ref) stores the state in the `cache` field of [`ExpWeightedCovariance`](@ref), and `cov(ce, state)` reads the estimate out of it.
 
 # Fields
 
@@ -139,9 +151,17 @@ $(DocStringExtensions.FIELDS)
     """
     covariance
     """
+    $(field_dict[:ew_weight])
+    """
+    weight
+    """
     $(field_dict[:ra_location])
     """
     location
+    """
+    $(field_dict[:ew_overlap])
+    """
+    overlap
     """
     $(field_dict[:obs_count])
     """
@@ -156,17 +176,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Folds one observation into the state of an exponentially weighted covariance fit.
 
-An asset is valid when its return is finite and the active mask admits it. An active asset with a non-finite return is on a holiday. Its variance keeps its value, and its covariance with each valid asset decays by the square root of the decay, so their correlation holds. An asset that leaves the active mask returns to the zero state, so its correction starts again if it lists again.
+An asset is valid when its return is finite and the active mask admits it. An active asset with a non-finite return is on a holiday. Its variance and each of its covariances keep their values, and so do their weights. An asset that leaves the active mask returns to the zero state, so its weights start again if it lists again.
 
 # Algorithm
 
  1. Mark as `valid` each asset whose return in `X` is finite and that `active_mask` admits.
- 2. When `active_mask` is not `nothing`, take `newly_inactive` as the assets that the mask excludes and that `cache.active` admits. Set their rows and columns of `cache.covariance` and their counts in `cache.obs_count` to zero. Where `ce.centred` is `false`, set their entries of `cache.location` to `NaN`.
+ 2. When `active_mask` is not `nothing`, take `newly_inactive` as the assets that the mask excludes and that `cache.active` admits. Set their rows and columns of `cache.covariance`, `cache.weight` and `cache.overlap`, and their counts in `cache.obs_count`, to zero, and their entries of `cache.location` to `NaN`.
  3. Copy the mask into `cache.active`, or set every entry to `true` when the mask is `nothing`.
  4. Return `cache` when no asset is valid.
- 5. Where `ce.centred` is `true`, take `Xi` as `X`. Otherwise read `cache.location` with `NaN` as zero into `loc`, move the valid entries of `cache.location` to `ce.decay * loc + (1 - ce.decay) * X`, and take `Xi` as `X - loc`.
- 6. Take `d` as `sqrt(ce.decay)` for each valid asset and as one for each other asset, and scale `cache.covariance` to `d .* cache.covariance .* d'`. Take `e` as the entries of `Xi` of the valid assets, and add `(1 - ce.decay) * e * e'` to their block.
- 7. Add one to the count of each valid asset in `cache.obs_count`.
+ 5. Take the factor of each pair from the overlap and the counts before the observation with [`centring_pair_factor`](@ref). Take the deviations and the mask `dvalid` of the assets that give a deviation with [`centring_location!`](@ref), which also moves the location of each valid asset.
+ 6. Take `e` as the deviations of the assets of `dvalid`. On their block, move `cache.covariance` to `ce.decay * block + (1 - ce.decay) * (e * e') ./ F`, with `F` the block of the factors, and `cache.weight` to `ce.decay * block + (1 - ce.decay)`. Every other entry holds.
+ 7. Fold the valid assets into the overlap with [`centring_overlap!`](@ref), and add one to the count of each valid asset in `cache.obs_count`.
 
 # Arguments
 
@@ -194,10 +214,11 @@ function process_observation!(cache::ExpWeightedCovarianceState, ce::ExpWeighted
         if any(newly_inactive)
             cache.covariance[newly_inactive, :] .= zero(eltype(cache.covariance))
             cache.covariance[:, newly_inactive] .= zero(eltype(cache.covariance))
+            cache.weight[newly_inactive, :] .= zero(eltype(cache.weight))
+            cache.weight[:, newly_inactive] .= zero(eltype(cache.weight))
             cache.obs_count[newly_inactive] .= 0
-            if !ce.centred
-                cache.location[newly_inactive] .= NaN
-            end
+            cache.location[newly_inactive] .= NaN
+            centring_reset!(cache.overlap, newly_inactive)
         end
         cache.active .= active_mask
     else
@@ -208,23 +229,21 @@ function process_observation!(cache::ExpWeightedCovarianceState, ce::ExpWeighted
         return cache
     end
 
-    Xi = if ce.centred
-        X
-    else
-        loc = replace(cache.location, NaN => zero(eltype(cache.location)))
-        cache.location[valid] = ce.decay * view(loc, valid) +
-                                (one(ce.decay) - ce.decay) * view(X, valid)
-        X - loc
-    end
-
-    sqrt_decay = sqrt(ce.decay)
-    d = ifelse.(valid, sqrt_decay, one(sqrt_decay))
-    cache.covariance .*= d .* transpose(d)
-    idx = findall(valid)
-    e = view(Xi, idx)
+    dvalid = centring_deviation_mask(ce.centring, valid, cache.obs_count)
+    # Only the block of the assets that give a deviation steps, so each pair ages on its
+    # common observations. The factor reads the overlap and the counts before this observation.
+    idx = findall(dvalid)
+    F = centring_pair_factor(cache.overlap, cache.obs_count, ce.decay, idx)
+    dev, _ = centring_location!(ce.centring, cache.location, cache.obs_count, X, valid,
+                                ce.decay)
+    e = view(dev, idx)
+    step = one(ce.decay) - ce.decay
     block = view(cache.covariance, idx, idx)
-    block .+= (one(ce.decay) - ce.decay) * (e * transpose(e))
-    cache.obs_count[idx] .+= 1
+    block .= ce.decay .* block .+ step .* (e * transpose(e)) ./ F
+    wblock = view(cache.weight, idx, idx)
+    wblock .= ce.decay .* wblock .+ step
+    centring_overlap!(cache.overlap, valid, ce.decay)
+    cache.obs_count[valid] .+= 1
 
     return cache
 end
@@ -237,7 +256,7 @@ Covariance method of [`exp_weighted_pass!`](@ref). Runs one forward pass of the 
 
  1. Check `dims`, and check that `active_mask` has the size of `X` when it is not `nothing`.
  2. Take `N` as the number of assets.
- 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of a quotient of two entries of `X`. Its `covariance` and `obs_count` are zero, its `active` entries are `true`, and its `location` is zero where `est.centred` is `true` and `NaN` otherwise. When `state` is given, check that it holds `N` assets and take it as it is.
+ 3. When `state` is `nothing`, make a zero state of `N` assets in the type `T` of `X`, floated where it is an integer. Its `covariance`, `weight` and `obs_count` are zero, its `active` entries are `true`, its `location` is `NaN`, and its `overlap` is [`centring_overlap`](@ref) of `est.centring`. When `state` is given, check that it holds `N` assets and take it as it is.
  4. For each observation `i`, fold the observation and its row of `active_mask` into the state with [`process_observation!`](@ref), then call `f(i, cache)`.
  5. Return the state.
 
@@ -281,13 +300,13 @@ function exp_weighted_pass!(f, est::ExpWeightedCovariance, X::MatNum, dims::Int,
 
     # The state takes the type of the returns, widened to a float only when it is an
     # integer, so an integer panel gets a floating-point state and a `Float32` panel keeps a
-    # `Float32` state. An uncentred location
-    # starts as `NaN`, which marks an asset with no valid observation, and the recursion reads
-    # it as zero.
+    # `Float32` state. The location starts as `NaN`, which marks an asset with no valid
+    # observation.
     T = float_if_integer(eltype(X))
-    location = est.centred ? zeros(T, N) : fill(T(NaN), N)
     cache = if isnothing(state)
-        ExpWeightedCovarianceState(zeros(T, N, N), location, zeros(Int, N), trues(N))
+        ExpWeightedCovarianceState(zeros(T, N, N), zeros(T, N, N), fill(convert(T, NaN), N),
+                                   centring_overlap(est.centring, T, N), zeros(Int, N),
+                                   trues(N))
     else
         @argcheck(size(state.covariance, 1) == N,
                   DimensionMismatch("the state holds $(size(state.covariance, 1)) assets, and `X` holds $N"))
@@ -338,22 +357,113 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Divides each entry of a block of an exponentially weighted state by the weight that its pair holds.
+
+The weight state takes the step of `S` on a unit outer product, so `S[i, j] / W[i, j]` is the exponentially weighted mean of the product over the common observations of the pair. A pair that holds no weight has no common observation, and its entry is zero.
+
+# Algorithm
+
+ 1. Take the block `S[idx, idx]` and the block `W[idx, idx]`.
+ 2. Divide each entry of the first by the entry of the second where that entry is above zero, and take zero elsewhere.
+
+# Arguments
+
+  - `S::MatNum`: Exponentially weighted state, seeded at zero.
+  - `W::MatNum`: Weight that each pair holds in `S`.
+  - `idx::AbstractVector{<:Integer}`: Index of the assets of the block.
+
+# Returns
+
+  - `block::MatNum`: The block of the weighted means.
+
+# Related
+
+  - [`restore_psd!`](@ref)
+  - [`ExpWeightedCovarianceState`](@ref)
+  - [`exp_weighted_moment`](@ref)
+"""
+function pair_weighted_block(S::MatNum, W::MatNum, idx::AbstractVector{<:Integer})
+    Sb = S[idx, idx]
+    Wb = view(W, idx, idx)
+    return ifelse.(Wb .> zero(eltype(Wb)), Sb ./ Wb, zero(eltype(Sb)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Restores a positive semidefinite matrix from a block whose pairs are each divided by their own weight, and keeps its diagonal.
+
+Where every asset has the same valid observations, the division by the weight is a congruence of a sum of outer products, and the block is positive semidefinite. After a holiday it need not be, whatever the weights are: a weight that saturates at one does not show which observations its pair read. So the method tests the block itself. A correlation with a Cholesky factor is positive definite to working precision, and the block is returned unchanged with no eigen decomposition. Otherwise, where the correlation has an eigenvalue below `-n eps` times the largest, the method clips the negative eigenvalues to zero, which is the nearest positive semidefinite matrix in the Frobenius norm, and restores the unit diagonal and the variances. A smaller negative eigenvalue is round-off, and the block is returned unchanged.
+
+The Cholesky test runs first because it costs a fraction of the decomposition. It can accept a correlation whose smallest eigenvalue is slightly below `-n eps` times the largest, because the backward error of the factor is about `n^2 eps`. Such an eigenvalue is round-off, and the block is kept as it is.
+
+# Algorithm
+
+ 1. Take `s` as the root of the diagonal of `sigma`, floored at zero, and `pos` as the assets whose `s` is above zero. Return `sigma` when `pos` is empty.
+ 2. Take the correlation `R = sigma[pos, pos] ./ (s * s')`. Return `sigma` when `R` has a Cholesky factor.
+ 3. Take the eigen decomposition of `R`. Return `sigma` when the smallest eigenvalue is at least `-length(pos) * eps` times the largest magnitude.
+ 4. Rebuild `R` with its eigenvalues floored at zero, divide it by the root of its diagonal on both sides, clamp it to `[-1, 1]`, symmetrise it and set its diagonal to one.
+ 5. Write `R .* (s * s')` into `sigma[pos, pos]`, and return `sigma`.
+
+# Arguments
+
+  - `sigma::MatNum`: Block to repair, a covariance or a correlation. It is written in place.
+
+# Returns
+
+  - `sigma::MatNum`: The repaired block. It is the same object as the argument.
+
+# Related
+
+  - [`pair_weighted_block`](@ref)
+  - [`exp_weighted_moment`](@ref)
+  - [`ExpWeightedCovariance`](@ref)
+"""
+function restore_psd!(sigma::MatNum)
+    T = eltype(sigma)
+    s = sqrt.(max.(LinearAlgebra.diag(sigma), zero(T)))
+    pos = findall(>(zero(T)), s)
+    if isempty(pos)
+        return sigma
+    end
+    sp = s[pos]
+    R = sigma[pos, pos] ./ (sp .* transpose(sp))
+    # A Cholesky factor costs a fraction of the decomposition, and a correlation that has one is
+    # positive definite to working precision, so the test below would keep it (#1612).
+    if LinearAlgebra.issuccess(LinearAlgebra.cholesky(LinearAlgebra.Symmetric(R);
+                                                      check = false))
+        return sigma
+    end
+    vals, vecs = LinearAlgebra.eigen(LinearAlgebra.Symmetric(R))
+    if vals[1] >= -length(pos) * eps(T) * maximum(abs, vals)
+        return sigma
+    end
+    R = vecs * LinearAlgebra.Diagonal(max.(vals, zero(T))) * transpose(vecs)
+    d = inv.(sqrt.(LinearAlgebra.diag(R)))
+    R .= clamp.(R .* (d .* transpose(d)), -one(T), one(T))
+    R .= (R .+ transpose(R)) ./ 2
+    R[LinearAlgebra.diagind(R)] .= one(T)
+    sigma[pos, pos] = R .* (sp .* transpose(sp))
+    return sigma
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Covariance method of [`exp_weighted_moment`](@ref). Reads the exponentially weighted covariance out of a state.
 
 The method reads the state and does not write it, so a forward pass can call it after every observation. The struct docstring of [`ExpWeightedCovariance`](@ref) states the estimate that it computes.
 
 # Algorithm
 
- 1. Copy `cache.covariance` into `sigma`.
- 2. Take `correction` as `1 / sqrt(max(1 - est.decay ^ n, eps(T)))` for each asset with a count `n` above zero, and as one for an asset with no valid observation. The `eps(T)` floor keeps the division finite.
- 3. Multiply each entry `sigma[i, j]` by `correction[i] * correction[j]`.
- 4. Take `not_ready` as the assets that `cache.active` excludes or whose count is below `est.min_obs`, and set their rows and columns of `sigma` to `NaN`.
- 5. Replace the block of the other assets with the mean of the block and its transpose, which removes the round-off asymmetry.
+ 1. Fill `sigma` with `NaN`, and take `ready` as the assets that `cache.active` admits and that [`centring_ready`](@ref) finds ready at `est.min_obs`.
+ 2. On the block of the ready assets, divide each entry of `cache.covariance` by its entry of `cache.weight` with [`pair_weighted_block`](@ref), and replace the block with the mean of the block and its transpose, which removes the round-off asymmetry.
+ 3. Where `repair` is `true`, restore a positive semidefinite block with [`restore_psd!`](@ref). The repair keeps the diagonal.
+ 4. Write the block into `sigma`.
 
 # Arguments
 
   - `cache::ExpWeightedCovarianceState`: State to read.
   - `est::ExpWeightedCovariance`: Exponentially weighted covariance estimator.
+  - `repair::Bool`: Whether to restore a positive semidefinite matrix. A caller that reads the diagonal alone passes `false`.
 
 # Returns
 
@@ -365,25 +475,20 @@ The method reads the state and does not write it, so a forward pass can call it 
   - [`ExpWeightedCovariance`](@ref)
   - [`exp_weighted_moment`](@ref)
 """
-function exp_weighted_moment(cache::ExpWeightedCovarianceState, est::ExpWeightedCovariance)
+function exp_weighted_moment(cache::ExpWeightedCovarianceState, est::ExpWeightedCovariance;
+                             repair::Bool = true)
     T = eltype(cache.covariance)
-    sigma = copy(cache.covariance)
-    counted = cache.obs_count .> zero(eltype(cache.obs_count))
-    correction = ones(T, length(counted))
-    correction[counted] .= inv.(sqrt.(max.(one(est.decay) .-
-                                           est.decay .^ view(cache.obs_count, counted),
-                                           eps(T))))
-    sigma .*= correction .* transpose(correction)
-    not_ready = .!cache.active .| (cache.obs_count .< est.min_obs)
-    if any(not_ready)
-        sigma[not_ready, :] .= T(NaN)
-        sigma[:, not_ready] .= T(NaN)
-    end
-    ready = .!not_ready
+    N = size(cache.covariance, 1)
+    sigma = fill(T(NaN), N, N)
+    ready = cache.active .& centring_ready.(Ref(est.centring), cache.obs_count, est.min_obs)
     if any(ready)
         idx = findall(ready)
-        block = sigma[idx, idx]
-        sigma[idx, idx] = (block + transpose(block)) / 2
+        block = pair_weighted_block(cache.covariance, cache.weight, idx)
+        block .= (block .+ transpose(block)) ./ 2
+        if repair
+            restore_psd!(block)
+        end
+        sigma[idx, idx] = block
     end
 
     return sigma
@@ -543,7 +648,7 @@ The fallback cannot serve this estimator. It slices `X` once per row and passes 
 # Algorithm
 
  1. Check `dims`, and allocate `val` with one row per observation and one column per asset.
- 2. Run one forward pass over `X` with [`exp_weighted_pass!`](@ref). After the observation `i`, write the diagonal of [`exp_weighted_moment`](@ref) of the state into row `i` of `val`.
+ 2. Run one forward pass over `X` with [`exp_weighted_pass!`](@ref). After the observation `i`, write the diagonal of [`exp_weighted_moment`](@ref) of the state into row `i` of `val`, with `repair = false`, because the repair keeps the diagonal.
  3. Return `val`, transposed when `dims == 2`.
 
 # Arguments
@@ -575,7 +680,7 @@ function variance_series(ce::ExpWeightedCovariance, X::MatNum; dims::Int = 1,
     assert_dims(dims)
     val = Matrix{eltype(X)}(undef, size(X, dims), size(X, setdiff((1, 2), (dims,))[1]))
     exp_weighted_pass!(ce, X, dims, active_mask) do i, cache
-        val[i, :] = LinearAlgebra.diag(exp_weighted_moment(cache, ce))
+        val[i, :] = LinearAlgebra.diag(exp_weighted_moment(cache, ce; repair = false))
         return nothing
     end
 
@@ -1016,7 +1121,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses to merge two [`ExpWeightedCovarianceState`](@ref).
 
-The fold ``S = \\lambda^{n_b} S_a + S_b`` is exact only for a centred estimator over a second block in which every asset is valid at every observation. An uncentred block reads the location that the first block carries. A holiday makes the decay of an entry depend on the valid observations of each of its two assets, and a reset discards the first block for its asset. The state records neither the holidays nor the resets, so a merge cannot tell the cases apart. Fold the second block into the first with `partial_fit!`.
+The fold ``S = \\lambda^{n_b} S_a + S_b`` is exact only under [`PreCentred`](@ref) over a second block in which every asset is valid at every observation. Under [`EstimatedCentring`](@ref) a block reads the location and the overlap that the first block carries. A holiday makes the decay of an entry depend on the common valid observations of its two assets, and a reset discards the first block for its asset. The state records neither the holidays nor the resets, so a merge cannot tell the cases apart. Fold the second block into the first with `partial_fit!`.
 
 # Arguments
 
@@ -1042,7 +1147,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Copies an [`ExpWeightedCovarianceState`](@ref), so the copy shares no array with the original.
 
-It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each of the four arrays.
+It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, which [`partial_fit`](@ref) calls before it folds. It copies each array, and keeps an `overlap` of `nothing`.
 
 # Arguments
 
@@ -1059,7 +1164,8 @@ It is the `copy` method of the [`AbstractPartialFitState`](@ref) interface, whic
   - [`AbstractPartialFitState`](@ref)
 """
 function Base.copy(x::ExpWeightedCovarianceState)
-    return ExpWeightedCovarianceState(copy(x.covariance), copy(x.location),
+    return ExpWeightedCovarianceState(copy(x.covariance), copy(x.weight), copy(x.location),
+                                      isnothing(x.overlap) ? nothing : copy(x.overlap),
                                       copy(x.obs_count), copy(x.active))
 end
 

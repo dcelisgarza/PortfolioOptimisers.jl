@@ -11,4 +11,5 @@ expand_investable_weights
 assert_internal_optimiser(::NonFiniteAllocationOptimisationResult)
 assert_external_optimiser(::NonFiniteAllocationOptimisationResult)
 non_investable_universe
+PortfolioOptimisers.shared_series_solve
 ```

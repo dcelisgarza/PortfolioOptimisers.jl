@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Listing Span, public API of PortfolioOptimisers.jl: listing_span, universe_masks."
+Description = "Listing Span, public API of PortfolioOptimisers.jl: listing_span, universe_masks."
 ```
 
-# The Listing Span
+# Listing Span
 
 ## The listing span
 

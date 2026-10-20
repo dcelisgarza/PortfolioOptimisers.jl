@@ -423,7 +423,7 @@ uniform start holds for one period only under equal price relatives.
   the two new geometries. ADR 0161's Result gains `path_length` and `cumulative`, and its
   comparator section names the splitter. ADR 0163's constructor line becomes
   `ExpertMixture(; experts, alg, eset, proj, grad, p0)`.
-- `CONTEXT.md` gains *Mirror Descent*, *Learning-Rate Schedule*, *Gradient Predictor*, *Gradient
+- `GLOSSARY.md` gains *Mirror Descent*, *Learning-Rate Schedule*, *Gradient Predictor*, *Gradient
   Point*, *Risk Loss*, *Hindsight Split*; *Projection Geometry* gains the three maps; *Expert
   Mixture* the two slots; *Online Selection Rule* the fourth set; the roster line moves the names.
 - Five build tickets graduate: `MirrorDescent` with its geometries and schedules, blocked by the
@@ -431,7 +431,61 @@ uniform start holds for one period only under equal price relatives.
   mixture's slots with `Ader`, `Sword` and the switching weighting; the evaluation surface. One
   task ticket asks the maintainer for the closed papers. The forecast-arm, second-set and third-set
   builds each gain a scope comment; the docs build waits on all five.
-- No reference implementation is named here, on the tickets, or in any docstring the builds write;
+- No implementation in another library is named here, on the tickets, or in any docstring the builds write;
   papers are cited by author and year.
 - Issues [#1170](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1170) and
   [#1169](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1169).
+
+## Amendment (2026-10-13)
+
+Issue #1664: the method of `performance_summary` that takes a prediction result defaults
+`benchmark` to the benchmark of the rows the prediction was scored on, `regret_benchmark(pred)`.
+Each fold keeps that series in `pred.rd.B`, and a multi-period result stacks it in `mrd.B`. A
+vector `B` is used as it was given. A matrix `B` was collapsed by each fold's weights, so against
+it `excess_ret` is the return of `(X - B) * w`: the active return against the same weights held
+in the benchmark assets, not the excess over one index. A population reads its first series, as
+the summary reads its first path.
+
+So a prediction over returns data with a `B` answers `excess_ret`, `tracking_error` and
+`information_ratio` with no keyword. Before this amendment the three were `NaN` there. An explicit
+`benchmark` still wins, and `benchmark = nothing` gives the three as `NaN`, as before. Returns data
+with no `B` give `NaN`, as before. The other eight statistics and the turnover do not change.
+
+Only the prediction method reads `B`. The methods over `ret`, over `(w, X)`, over `(w, rd)` and
+over `(res, rd)` keep the default `nothing`: a matrix `B` on raw returns data is one series only
+once a caller gives the weights, and the maintainer chose to keep these methods as they are.
+
+## Amendment (2026-10-20)
+
+Issue #1777: `AdaptiveSubgradient` at `delta = 0` steps when an asset has no gradient mass, and
+`DiagonalProjection` takes a non-negative diagonal. Before this amendment the geometry refused a
+zero entry with a `DomainError`. The rule refused every step on a panel whose window does not price
+an asset under a `RiskLoss`, and every step after an asset's price relatives were all zero.
+
+An entry `s_i` of the gradient mass is zero only where every gradient `g_{1:t,i}` is zero. Duchi,
+Hazan and Singer (2011) take the pseudo-inverse of `H_t` in the raw step there, so the rule does.
+The raw step of such an asset is its weight. The projection in the seminorm of `H_t` then has many
+minimisers. The objective is strictly convex in the weights at the positive entries, so every
+minimiser shares them, and only the weights at the zero entries are free. The geometry returns the
+limit of the projection in `H_t + δI` as `δ → 0⁺`, which is the minimiser nearest the raw step in
+the Euclidean norm. Three reasons fix this choice:
+
+1. It is unique.
+2. It is continuous in `delta`, so the rule at `delta = 0` is the limit of the rule at a positive
+   `delta`. A diagonal of zeros gives the Euclidean projection, so the zero-gradient step is the
+   general step, and the rule has no special case for it.
+3. It is a minimiser of the projection of the paper, so the regret bound of Corollary 6 holds. A
+   rule that holds the unpriced asset at its Price-Adjusted Allocation is not such a minimiser in
+   general, so the amendment does not take it.
+
+On a `BoundedAllocationSet` the limit has a closed form, which `bounded_quadratic_projection`
+states. On a `ProgrammeAllocationSet` the programme solves two stages on one model: the seminorm
+projection, then the free weights nearest the raw step, with the other weights fixed and the
+objective of the first stage held at its minimum.
+
+The same work found that a programme set that fits a prior reduced the raw step to the prior's
+Investable Mask but not the geometry, so `DiagonalProjection` and `GramProjection` threw a
+`DimensionMismatch` under a time-varying panel. `investable_geometry_view` now reduces both. The
+Gram norm couples the assets, so its reduced programme projects
+`q_P + A_PP⁻¹ A_PZ q_Z` in the norm of `A_PP`, which is exact at the zero weights of the assets
+outside the mask.

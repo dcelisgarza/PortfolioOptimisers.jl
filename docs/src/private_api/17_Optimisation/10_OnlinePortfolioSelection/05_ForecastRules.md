@@ -1,8 +1,8 @@
 ```@meta
-Description = "Online selection rules: the forecast-reading arm, private API of PortfolioOptimisers.jl: copy_forecaster, copy_forecaster_prior, assert_forecaster, …"
+Description = "Forecast rules, private API of PortfolioOptimisers.jl: copy_forecaster, copy_forecaster_prior, assert_forecaster, forecaster_seed, forecast_min_rows, …"
 ```
 
-# Online selection rules: the forecast-reading arm: private API
+# Forecast rules: private API
 
 ```@docs
 PortfolioOptimisers.copy_forecaster

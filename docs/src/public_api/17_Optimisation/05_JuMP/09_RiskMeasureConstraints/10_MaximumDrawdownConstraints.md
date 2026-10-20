@@ -1,7 +1,9 @@
 ```@meta
-Description = "Maximum Drawdown Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Maximum Drawdown Constraints, public API of PortfolioOptimisers.jl: set_risk_constraints!."
 ```
 
-# Maximum Drawdown Constraints
+# [Maximum Drawdown Constraints](@id api-maximum-drawdown-constraints)
 
-Every name of this topic is private. The [private page](@ref private-api-maximum-drawdown-constraints) documents them.
+```@docs
+set_risk_constraints!(model::JuMP.Model, ::Any, r::MaximumDrawdown, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+```

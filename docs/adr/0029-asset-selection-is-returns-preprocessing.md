@@ -137,7 +137,7 @@ each" is a helper two of the three redundancy algorithms happen to use.
   Selectors made that latent hazard reachable, so construction now rejects it.
 - `RankRule(; best = k)` returning fewer than `k` assets is documented behaviour, not a bug.
 - New concepts `Asset Selector`, `Selection Rule`, and the trust-neither tie policy are in
-  `CONTEXT.md`.
+  `GLOSSARY.md`.
 - `PairwiseCorrelation` and `CorrelationComponents` give *different answers on the same input*
   by design. The docstrings state the chaining difference at the call site rather than burying
   it, because a caller who sets `t = 0.95` expecting a pairwise guarantee would read

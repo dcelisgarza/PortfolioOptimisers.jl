@@ -349,3 +349,47 @@ On an unweighted sample of ``T`` observations, ``n_{i} = T`` and ``m_{i}`` is `T
 function variance_count(::AbstractVarianceEstimator, ::MatNum)::Nothing
     return nothing
 end
+"""
+    Statistics.cov(ce::AbstractCovarianceEstimator; kwargs...)
+    Statistics.cor(ce::AbstractCovarianceEstimator; kwargs...)
+    Statistics.var(ve::AbstractVarianceEstimator)
+    Statistics.std(ve::AbstractVarianceEstimator)
+
+Reads a moment out of the partial-fit state that a covariance or variance estimator carries.
+
+This is the call with no data of an estimator that has no such call of its own. It reads the state out of the `cache` field with [`partial_fit_cache`](@ref), and it gives the state to the method of the same verb that takes one. A [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, runs the batch verb over the rows of the buffer. A family that folds exactly has a call with no data of its own, so this method serves the estimators that fold by buffering alone, such as [`GerberCovariance`](@ref) and [`WindowedCovariance`](@ref).
+
+# Arguments
+
+  - $(arg_dict[:ce])
+  - $(arg_dict[:ve])
+  - `kwargs...`: Keyword arguments passed to the method that reads the state, `strict` among them.
+
+# Validation
+
+  - The estimator carries a state. An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `sigma::MatNum`: The covariance matrix, or `rho`, the correlation matrix, for `cov` and `cor`.
+  - `sigma::ArrNum`: The variance, or the standard deviation, for `var` and `std`, with one entry per asset.
+
+# Related
+
+  - [`partial_fit_cache`](@ref)
+  - [`SampleBufferState`](@ref)
+  - [`Online`](@ref)
+  - [`partial_fit!`](@ref)
+"""
+function Statistics.cov(ce::AbstractCovarianceEstimator; kwargs...)
+    return Statistics.cov(ce, partial_fit_cache(ce); kwargs...)
+end
+function Statistics.cor(ce::AbstractCovarianceEstimator; kwargs...)
+    return Statistics.cor(ce, partial_fit_cache(ce); kwargs...)
+end
+function Statistics.var(ve::AbstractVarianceEstimator)
+    return Statistics.var(ve, partial_fit_cache(ve))
+end
+function Statistics.std(ve::AbstractVarianceEstimator)
+    return Statistics.std(ve, partial_fit_cache(ve))
+end

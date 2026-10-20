@@ -434,6 +434,29 @@ function FactorRiskBudgeting(; re::RegE_Reg = StepwiseRegression(),
     return FactorRiskBudgeting(re, rkb, sets, flag, hedge)
 end
 """
+    reader_frames(rba::FactorRiskBudgeting, path::AbstractString, refit::Bool) -> ReturnsFrames
+
+Return the frames of the regression reader of `rba`, at `"path.re"`, for the frame walk of a [`RiskBudgeting`](@ref) head.
+
+# Arguments
+
+  - `rba`: The factor risk budgeting algorithm.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of `rba.re`.
+
+# Related
+
+  - [`FactorRiskBudgeting`](@ref)
+  - [`reader_frames`](@ref)
+"""
+function reader_frames(rba::FactorRiskBudgeting, path::AbstractString, refit::Bool)
+    return reader_frames(rba.re, join_path(path, :re), refit)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the static defaults of the [`RiskBudgeting`](@ref) fields that may hold a [`TimeDependent`](@ref).
@@ -477,6 +500,8 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
   - If `r` is a vector: `!isempty(r)`.
   - If `wi` is provided: `!isempty(wi)`.
   - `fb` schedules: `bind !== :nearest`.
+  - If `r` holds a [`DataBenchmarkTracking`](@ref): `opt.pe` must not state `x_src = ExcessSource()`, see [`assert_data_benchmark_prior`](@ref).
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 # Mathematical definition
 
@@ -616,8 +641,11 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
         end
         assert_time_dependent_substitution(RiskBudgeting, (; opt, r, rba, wi, fb),
                                            risk_budgeting_td_defaults())
-        return new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
-                                                                                wi, fb)
+        assert_data_benchmark_prior(r, opt.pe, :r, :RiskBudgeting, "opt.pe")
+        est = new{typeof(opt), typeof(r), typeof(rba), typeof(wi), typeof(fb)}(opt, r, rba,
+                                                                               wi, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function RiskBudgeting(; opt::JuMPOptimiser, r::TD{<:RM_VecRM} = Variance(),
@@ -684,10 +712,11 @@ The axis is only read when `rba.rkb` is a [`RiskBudgetEstimator`](@ref) — a [`
 function risk_budget_universe_key(::AssetRiskBudgeting, ::Integer)
     return nothing
 end
-function risk_budget_universe_key(rba::FactorRiskBudgeting, N::Integer)
-    if !isa(rba.rkb, RiskBudgetEstimator)
-        return nothing
-    end
+function risk_budget_universe_key(::FactorRiskBudgeting, ::Integer)
+    return nothing
+end
+function risk_budget_universe_key(rba::FactorRiskBudgeting{<:Any, <:RiskBudgetEstimator},
+                                  N::Integer)
     key = factor_axis_key(rba.sets, rba.re)
     factor_universe(rba.sets, key, N, "a $(FactorRiskBudgeting) risk budget", "rr.L")
     return key
@@ -881,6 +910,7 @@ function _optimise(rb::RiskBudgeting, rd::ReturnsResult = ReturnsResult();
     # them to `assemble_jump_model!` itself, so it takes the same view of itself and of
     # `rd`. Both are unchanged when every asset is investable.
     rb, rd = investable_view(rb, rd, attrs.pr, attrs.imsk)
+    rb = bind_data_benchmark(rb, rd)
     model = JuMP.Model()
     JuMP.set_string_names_on_creation(model, str_names)
     set_model_scales!(model, rb.opt.sc, rb.opt.so)
@@ -923,7 +953,7 @@ Run the Risk Budgeting portfolio optimisation.
 function optimise(rb::RiskBudgeting{<:Any, <:Any, <:Any, <:Any, Nothing}, rd::ReturnsResult;
                   str_names::Bool = false, save::Bool = true, kwargs...)
     assert_batch_entry(rb, "`optimise`")
-    return _optimise(rb, rd; str_names = str_names, save = save, kwargs...)
+    return shared_series_solve(rb, rd; str_names = str_names, save = save, kwargs...)
 end
 
 @pipe_delegates RiskBudgeting opt

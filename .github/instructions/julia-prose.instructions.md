@@ -72,13 +72,28 @@ file governs, and so does every other rule here.
   [`CoveragePolicy`](@ref).
 - **A concept is a plain phrase in lower case**, and the page defines it in the sentence where it
   first appears. Write "the assets of the training window with enough observations, the coverage
-  universe", then "the coverage universe" from there on. The capitalised forms that `CONTEXT.md`
+  universe", then "the coverage universe" from there on. The capitalised forms that `GLOSSARY.md`
   defines, such as `Coverage Universe`, `Panel Field` and `Online Scheme`, are for a contributor
-  reading `CONTEXT.md`. A reader of a page has no glossary.
-- **A word for the mechanism of the code never appears.** "seam", "carrier", "read-out", "host"
-  for a type that holds another, "to the bit", "refused by name", and the section sign `§`. Say what
+  reading `GLOSSARY.md`. A reader of a page has no glossary.
+- **A word for the mechanism of the code never appears.** "seam", "carrier", "read-out", "door",
+  "host" for a type that holds another, "to the bit", "refused by name", and the section sign `§`. Say what
   happens instead: "the optimiser hands its prior the new rows", not "the optimiser is the host of
   the seam".
+
+---
+
+## A page names a source by its citation
+
+A page names a published work through `[key](@cite)`, or through `[key](@citet)` when the authors
+are the subject of the sentence. It never names a work by words that link to nothing: "the paper",
+"the article", "the authors", or an author list with a year such as "Li and Hoi (2012)". Where a
+paragraph returns to the work, it repeats the citation: "Lemma 9 of [key](@cite) states that …",
+not "Lemma 9 of the paper states that …".
+
+[`.github/instructions/julia-docstrings.instructions.md`](julia-docstrings.instructions.md) §
+*A docstring names a source by its citation* owns the rule, and it holds on a page as it holds on a
+docstring. The one difference is the bibliography: a page that cites carries the block that the
+pages beside it carry.
 
 ---
 
@@ -166,7 +181,7 @@ Two such texts exist, and a page's path tells them apart, as
 already does:
 
 - **The H1 of a mirror page** under `docs/src/public_api/` or `docs/src/private_api/`, whose shape
-  ADR 0128 fixes and which ends in `: public API` or `: private API`.
+  ADR 0128 fixes. It names the page's file, and on the private side it ends in `: private API`.
 - **The `Description` line of a mirror page**, which `docs/page_metadata.jl` derives from the names
   the page hosts, and which
   [`test/test_64_docs_page_metadata_census.jl`](../../test/test_64_docs_page_metadata_census.jl)
@@ -203,7 +218,11 @@ may not rise. A text whose count stands above its row fails, a text with a count
 row fails, and a text whose every count is zero carries no row, so the baseline empties as the
 texts are rewritten. The reader is [`code_health/prose.jl`](../../code_health/prose.jl), which the
 census includes rather than copies. The rules the census cannot read hold by review, in the sense
-of [`STANDARDS.md`](../../STANDARDS.md).
+of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md).
+
+[`test/test_74_source_citation_census.jl`](../../test/test_74_source_citation_census.jl) reads the
+same four corpora through the same reader, and fails on a text that names a source by "paper",
+"article", "the authors" or an author list with a year. It holds no baseline: every match fails.
 
 **Three shapes of text feed one set of counters.** A Literate source gives its `#= … =#` blocks and
 every line that Literate renders as markdown: a bare `#`, or a `#` and a space followed by text,
@@ -228,7 +247,7 @@ for rule 23, `metaphor` for rule 26, `plainword` for rule 31, `bold_label` for r
 `title_case` for rule 17 and `emoji` for rule 18. Rule 7 and rule 23 are read whole. Rule 8 is read
 without "features". Rule 26 is read without "vector", "surface", "primitive", "harness" and
 "ratchet". Rule 31 is read without "leverage" and "leveraged". `glossary` counts the multi-word
-bold terms of [`CONTEXT.md`](../../CONTEXT.md) in their capitalised form, read off that file at
+bold terms of [`GLOSSARY.md`](../../GLOSSARY.md) in their capitalised form, read off that file at
 every run so the list never goes stale, and `mechanism` counts the strings of *A page names a type
 by its identifier and a concept in plain words*. `verdict` counts the strings of *A check is a
 number the reader reads, never a verdict*. `comment` counts the comments in the code of a text that

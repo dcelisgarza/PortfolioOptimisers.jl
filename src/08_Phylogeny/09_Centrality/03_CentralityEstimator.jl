@@ -48,45 +48,53 @@ $(DocStringExtensions.FIELDS)
 
     CentralityEstimator(;
         pl::NwE_ClE = NetworkEstimator(),
-        ct::AbstractCentralityAlgorithm = DegreeCentrality()
+        ct::AbstractCentralityAlgorithm = DegreeCentrality(),
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> CentralityEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `returns_source(pl) === nothing`: the network or clustering estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
 
 # Examples
 
 ```jldoctest
 julia> CentralityEstimator()
 CentralityEstimator
-  pl ┼ NetworkEstimator
-     │    ce ┼ PortfolioOptimisersCovariance
-     │       │   ce ┼ Covariance
-     │       │      │    me ┼ SimpleExpectedReturns
-     │       │      │       │   w ┴ nothing
-     │       │      │    ce ┼ GeneralCovariance
-     │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-     │       │      │       │    w ┴ nothing
-     │       │      │   alg ┼ FullMoment()
-     │       │      │     w ┴ nothing
-     │       │   mp ┼ MatrixProcessing
-     │       │      │     pdm ┼ Posdef
-     │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-     │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │       │      │      dn ┼ nothing
-     │       │      │      dt ┼ nothing
-     │       │      │     alg ┼ nothing
-     │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-     │    de ┼ Distance
-     │       │   power ┼ nothing
-     │       │     alg ┴ CanonicalDistance()
-     │   alg ┼ KruskalTree
-     │       │     args ┼ Tuple{}: ()
-     │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-     │   sep ┼ HopCount
-     │       │   n ┴ Int64: 1
-  ct ┼ DegreeCentrality
-     │     kind ┼ Int64: 0
-     │   kwargs ┴ @NamedTuple{}: NamedTuple()
+     pl ┼ NetworkEstimator
+        │      ce ┼ PortfolioOptimisersCovariance
+        │         │   ce ┼ Covariance
+        │         │      │    me ┼ SimpleExpectedReturns
+        │         │      │       │   w ┴ nothing
+        │         │      │    ce ┼ GeneralCovariance
+        │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │         │      │       │    w ┴ nothing
+        │         │      │   alg ┼ FullMoment()
+        │         │      │     w ┴ nothing
+        │         │   mp ┼ MatrixProcessing
+        │         │      │     pdm ┼ Posdef
+        │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      │      dn ┼ nothing
+        │         │      │      dt ┼ nothing
+        │         │      │     alg ┼ nothing
+        │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │      de ┼ Distance
+        │         │   power ┼ nothing
+        │         │     alg ┴ CanonicalDistance()
+        │     alg ┼ KruskalTree
+        │         │     args ┼ Tuple{}: ()
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     sep ┼ HopCount
+        │         │   n ┴ Int64: 1
+        │   x_src ┴ nothing
+     ct ┼ DegreeCentrality
+        │     kind ┼ Int64: 0
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+  x_src ┴ nothing
 ```
 
 # Related
@@ -107,13 +115,27 @@ CentralityEstimator
     $(field_dict[:cta])
     """
     ct
-    function CentralityEstimator(pl::NwE_ClE, ct::AbstractCentralityAlgorithm)
-        return new{typeof(pl), typeof(ct)}(pl, ct)
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
+    function CentralityEstimator(pl::NwE_ClE, ct::AbstractCentralityAlgorithm,
+                                 x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :CentralityEstimator)
+        assert_inner_reader(pl, :pl, :CentralityEstimator)
+        return new{typeof(pl), typeof(ct), typeof(x_src)}(pl, ct, x_src)
     end
 end
 function CentralityEstimator(; pl::NwE_ClE = NetworkEstimator(),
-                             ct::AbstractCentralityAlgorithm = DegreeCentrality())
-    return CentralityEstimator(pl, ct)
+                             ct::AbstractCentralityAlgorithm = DegreeCentrality(),
+                             x_src::Option{<:AbstractReturnsSource} = nothing)
+    return CentralityEstimator(pl, ct, x_src)
+end
+function returns_source(cte::CentralityEstimator)
+    return cte.x_src
+end
+function reader_frames(cte::CentralityEstimator, path::AbstractString, ::Bool)
+    return source_frames(cte.x_src, path, true)
 end
 
 export CentralityEstimator

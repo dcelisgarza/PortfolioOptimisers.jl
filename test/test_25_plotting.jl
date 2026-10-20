@@ -384,6 +384,20 @@
                   (ps_b.excess_ret, ps_b.tracking_error, ps_b.information_ratio,
                    ps_b.turnover))
         @test is_plot(plot_performance_summary(ps_b))
+        # A prediction over returns data with a benchmark draws the three excess bars with
+        # no keyword, as its summary reads them, and `benchmark = nothing` empties them
+        # again (#1664).
+        rd_b = ReturnsResult(; nx = rd.nx, X = rd.X, ts = rd.ts, nb = ["M"],
+                             B = fill(0.001, size(rd.X, 1)))
+        pred_b = cross_val_predict(EqualWeighted(), rd_b, IndexWalkForward(80, 40))
+        ps_d = performance_summary(pred_b)
+        @test all(isfinite, (ps_d.excess_ret, ps_d.tracking_error, ps_d.information_ratio))
+        @test isequal(plot_performance_summary(pred_b).series_list[1][:y],
+                      plot_performance_summary(ps_d).series_list[1][:y])
+        ps_n = performance_summary(pred_b; benchmark = nothing)
+        @test isnan(ps_n.excess_ret)
+        @test isequal(plot_performance_summary(pred_b; benchmark = nothing).series_list[1][:y],
+                      plot_performance_summary(ps_n).series_list[1][:y])
     end
 
     @testset "plot_rolling_drawdowns" begin
@@ -485,6 +499,21 @@
         bare = CrossSectionalFactorModel(; M = Ms_cs[Tc, :, :], b = zeros(Nc), csr = csr_cs,
                                          Ms = Ms_cs, lag = 1)
         @test is_plot(plot_exposure_vif(bare))
+        # Each figure draws a view of the answer, labelled with the names the view keeps.
+        PO = PortfolioOptimisers
+        t_cs = PO.port_opt_view(cs_regression_t_stats(csfm_cs), [1, 3])
+        for plt in (plot_cs_regression_t_stats, plot_exposure_vif,
+                    plot_cs_regression_t_stat_exceedance_rate)
+            r_cs = if plt === plot_exposure_vif
+                PO.port_opt_view(exposure_vif(csfm_cs), [1, 3])
+            else
+                t_cs
+            end
+            @test is_plot(plt(r_cs))
+        end
+        p_tv = plot_cs_regression_t_stats(t_cs)
+        @test [x[:label] for x in p_tv.series_list] == string.(t_cs.nf)
+        @test isequal(p_tv.series_list[2][:y], t_cs.X[:, 2])
         # A prior result that carries no factor block names the remedy.
         no_rr = LowOrderPrior(; X = randn(rng_cs, Tc, Nc), mu = zeros(Nc),
                               sigma = Matrix(1.0 * I, Nc, Nc))
@@ -600,11 +629,38 @@
                                                                                    Ms_ex[Te,
                                                                                          :,
                                                                                          :]),
-                                           b = zeros(Ne), csr = csr_ex, Ms = Ms_ex,
+                                           b = zeros(Ne),
+                                           # A re-based fit states its factor returns on the
+                                           # reduced axis (#1367).
+                                           csr = CrossSectionalRegression(;
+                                                                          f = PortfolioOptimisers.reduce_factor_returns(fcb_ex,
+                                                                                                                        csr_ex.f),
+                                                                          eps = csr_ex.eps,
+                                                                          n = csr_ex.n),
+                                           Ms = Ms_ex,
                                            rw = abs.(randn(rng_ex, Te, Ne)) .+ 0.1,
                                            fcb = fcb_ex, nf = ["value", "size", "momentum"],
                                            lag = 1)
         @test is_plot(plot_cumulative_exposure_ic(reb_ex; reduced = true))
+        # Each exposure figure draws a view of the answer, labelled with the names the view
+        # keeps.
+        PO = PortfolioOptimisers
+        keep = ["momentum", "value"]
+        p_cv = plot_exposure_correlation(PO.port_opt_view(exposure_correlation(csfm_ex),
+                                                          keep))
+        @test is_plot(p_cv)
+        @test size(p_cv.series_list[1][:z]) == (2, 2)
+        for (plt, r) in ((plot_exposure_dispersion, exposure_dispersion(csfm_ex)),
+                         (plot_exposure_stability, exposure_stability(csfm_ex; step = 3)),
+                         (plot_cumulative_exposure_ic, exposure_ic(csfm_ex)))
+            p_v = plt(PO.port_opt_view(r, keep))
+            @test is_plot(p_v)
+            @test [x[:label] for x in p_v.series_list if !isempty(x[:label])] == keep
+        end
+        @test [x[:label]
+               for x in
+                   plot_cumulative_exposure_ic(exposure_ic(reb_ex; reduced = true)).series_list] ==
+              ["value", "momentum"]
         # A prior result that carries no factor block names the remedy.
         no_rr_ex = LowOrderPrior(; X = randn(rng_ex, Te, Ne), mu = zeros(Ne),
                                  sigma = Matrix(1.0 * I, Ne, Ne))
@@ -635,6 +691,9 @@
         fs = factor_model_summary(csfm_fs; ppy = 252, step = 3)
         @test is_plot(plot_factor_model_summary(fs))
         @test is_plot(plot_factor_model_summary(fs; nf = ["a", "b", "c"]))
+        # A view of the summary draws the factors it keeps.
+        p_fsv = plot_factor_model_summary(PortfolioOptimisers.port_opt_view(fs, 2:3))
+        @test length(p_fsv.series_list) >= 2
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(pr_fs; ppy = 252, step = 3))
         @test is_plot(plot_factor_model_summary(csfm_fs; ppy = 252, step = 3,
@@ -666,6 +725,12 @@
                                                                           n = csr_fs.n),
                                            Ms = Ms_fs, lag = 1)
         @test is_plot(plot_factor_cumulative_returns(gap_fs))
+        # The series are the columns of the history, labelled with the names of the block,
+        # and the running sum holds flat over the absent return.
+        p_cum = plot_factor_cumulative_returns(csfm_fs)
+        @test [x[:label] for x in p_cum.series_list] == csfm_fs.nf
+        p_gap = plot_factor_cumulative_returns(gap_fs)
+        @test p_gap.series_list[2][:y][4] == p_gap.series_list[2][:y][3]
         # A prior result that carries no factor block names the remedy.
         no_rr_fs = LowOrderPrior(; X = randn(rng_fs, Tf, Nf), mu = zeros(Nf),
                                  sigma = Matrix(1.0 * I, Nf, Nf))
@@ -697,6 +762,16 @@
         @test is_plot(plot_idio_tail_rate(csfm_id))
         @test is_plot(plot_idio_tail_rate(pr_id))
         @test is_plot(plot_idio_tail_rate(csfm_id; threshold = 2))
+        # Each plot draws its verb under the same `ahead` (ADR 0187), and the two rules differ.
+        for (plt, f) in ((plot_idio_calibration, idio_calibration),
+                         (plot_idio_tail_rate, idio_tail_rate), (plot_idio_kurtosis, idio_kurtosis),
+                         (plot_idio_skewness, idio_skewness))
+            @test !isequal(f(csfm_id), f(csfm_id; ahead = false))
+            for ahead in (true, false), src in (csfm_id, pr_id)
+                @test isequal(plt(src; ahead = ahead).series_list[1][:y],
+                              f(csfm_id; ahead = ahead))
+            end
+        end
         # A block that carries no idiosyncratic variance history names the field.
         no_vs_id = CrossSectionalFactorModel(; M = randn(rng_id, Ni, Ki), b = zeros(Ni),
                                              csr = csr_id, lag = 1)
@@ -881,6 +956,20 @@
         @test length(p_dbk.series_list) == 4
         @test p_dbk[1][:title] == "Forecast Books by Decay Window"
         @test all(isequal.(p_dbk.series_list[4][:y], t_dc.zscore_sharpe))
+        # `ppy` reaches the table of each book figure (R10 of #1630). It fell into `kwargs...`,
+        # so the figure drew the columns at the `ppy` of the evaluation.
+        p2 = 2 * fe_fp.ppy
+        t_dc2 = forecast_decay(fe_fp, eps_fp; n = 3, ppy = p2)
+        t_hp2 = forecast_holding_period(fe_fp, eps_fp; n = 3, ppy = p2)
+        @test !all(isequal.(t_dc2.rank_ann_return, t_dc.rank_ann_return))
+        @test all(isequal.(plot_forecast_portfolio_decay(fe_fp, eps_fp; n = 3, ppy = p2).series_list[1][:y],
+                           t_dc2.rank_ann_return))
+        @test all(isequal.(plot_forecast_portfolio_by_holding_period(fe_fp, eps_fp; n = 3,
+                                                                     ppy = p2).series_list[1][:y],
+                           t_hp2.rank_ann_return))
+        @test all(isequal.(plot_forecast_portfolio_decay(fe_fp, rd_fp, csfm_fp; n = 3,
+                                                         ppy = p2).series_list[1][:y],
+                           t_dc2.rank_ann_return))
         # The carrier-and-block arity builds the target history off the block, so it draws
         # the same table without the caller holding one.
         @test all(isequal.(plot_forecast_ic_decay(fe_fp, rd_fp, csfm_fp; n = 3).series_list[2][:y],
@@ -914,6 +1003,13 @@
         @test [s[:label]
                for s in plot_forecast_factor_correlation(fe_fp, csfm_fp).series_list] ==
               csfm_fp.nf
+        # The answer of the block method draws with its names, and a view draws the factors
+        # it keeps.
+        c_fp = forecast_factor_correlation(fe_fp, csfm_fp)
+        p_cr = plot_forecast_factor_correlation(PortfolioOptimisers.port_opt_view(c_fp,
+                                                                                  [3]))
+        @test [x[:label] for x in p_cr.series_list] == [csfm_fp.nf[3]]
+        @test isequal(p_cr.series_list[1][:y], c_fp.X[:, 3])
         @test [s[:label]
                for s in
                    plot_forecast_factor_correlation(fe_fp, csfm_fp; nf = ["a", "b", "c"]).series_list] ==

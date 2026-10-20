@@ -1,5 +1,5 @@
 ```@meta
-Description = "Stacking, private API of PortfolioOptimisers.jl: BaseStackingOptimisationEstimator, stacking_td_defaults, is_time_dependent, reset_time_dependent_estimator, …"
+Description = "Stacking, private API of PortfolioOptimisers.jl: BaseStackingOptimisationEstimator, stacking_td_defaults, narrow_optimiser_vector, is_time_dependent, …"
 ```
 
 # Stacking: private API
@@ -7,6 +7,7 @@ Description = "Stacking, private API of PortfolioOptimisers.jl: BaseStackingOpti
 ```@docs
 BaseStackingOptimisationEstimator
 stacking_td_defaults
+narrow_optimiser_vector
 is_time_dependent(opt::Stacking)
 reset_time_dependent_estimator(opt::Stacking)
 assert_special_nco_requirements(opt::Stacking)

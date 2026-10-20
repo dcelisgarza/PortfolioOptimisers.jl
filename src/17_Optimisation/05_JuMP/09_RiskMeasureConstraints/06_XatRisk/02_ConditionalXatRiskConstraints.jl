@@ -47,8 +47,8 @@ Where:
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
-    builds the gain tail of [`ConditionalValueatRiskRange`](@ref) through.
+    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
+    to build the gain tail of [`ConditionalValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -70,6 +70,65 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::ConditionalValueatR
                                              (; var = :var_, z = :z_cvar_,
                                               risk = :cvar_risk_, exceedance = :ccvar_);
                                              prefix = prefix)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Encode the largest loss of `series` among the observations with positive weight, and register it under the names in `keys`.
+
+This is the limit at significance level zero of the conditional and the entropic tail programmes, which [`set_conditional_risk_constraints!`](@ref) and [`set_entropic_risk_constraints!`](@ref) write for a positive level. At zero, the tail holds only the worst observation that has probability, so the programme is one variable above each such loss. The loss of observation `t` is `-series[t]`, as in both programmes. An observation with zero weight adds no row, so it cannot set the risk. [`worst_positive_weight_loss`](@ref) is the value-level twin.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\rho_{0}(\\boldsymbol{w}) &= \\max_{t \\,:\\, w_{t} > 0} \\left(-s_{t}\\right)\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\rho_{0}(\\boldsymbol{w})``: Tail risk at significance level zero.
+  - ``s_{t}``: Entry ``t`` of `series`.
+  - $(math_dict[:w_t_obs]) Every ``w_{t}`` is one when the measure and the prior hold no weights.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - $(arg_dict[:ci])
+  - `r::RiskMeasure`: The tail risk measure, read for `settings`.
+  - $(arg_dict[:opt_rjumpe])
+  - `series`: The per-observation return series from [`risk_series`](@ref).
+  - `wi`: The observation weights of the measure, or of the prior when the measure states none, already resolved and checked by [`checked_observation_weights`](@ref) in the caller. `nothing` gives every observation a row.
+  - `keys::NamedTuple`: Bare Model State entry names for the variable `var`, the risk `risk` and the constraint `bound`.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `risk`: The worst-loss variable, which is the risk expression.
+
+# Related
+
+  - [`worst_positive_weight_loss`](@ref)
+  - [`set_conditional_risk_constraints!`](@ref)
+  - [`set_entropic_risk_constraints!`](@ref)
+  - [`set_risk_bounds_and_expression!`](@ref)
+"""
+function set_worst_loss_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
+                                     opt::RiskConstraintOwner, series, wi, keys::NamedTuple;
+                                     prefix::Symbol = Symbol(""))
+    sc = get_constraint_scale(model)
+    rows = isnothing(wi) ? eachindex(series) : findall(x -> zero(x) < x, wi)
+    risk = state_set!(model, prefix, keys.var, i, JuMP.@variable(model))
+    state_set!(model, prefix, keys.risk, i, risk)
+    state_set!(model, prefix, keys.bound, i,
+               JuMP.@constraint(model, sc * (view(series, rows) .+ risk) >= 0))
+    set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;
+                                    prefix = prefix)
+    return risk
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -109,6 +168,13 @@ function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                                            opt::RiskConstraintOwner,
                                            pr::AbstractPriorResult, series, T::Int,
                                            keys::NamedTuple; prefix::Symbol = Symbol(""))
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = checked_observation_weights(wi, pr.X)
+    if iszero(r.alpha)
+        return set_worst_loss_constraints!(model, i, r, opt, series, wi,
+                                           (; var = keys.var, risk = keys.risk,
+                                            bound = keys.exceedance); prefix = prefix)
+    end
     sc = get_constraint_scale(model)
     var, z = JuMP.@variables(model, begin
                                  ()
@@ -116,8 +182,6 @@ function set_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMea
                              end)
     state_set!(model, prefix, keys.var, i, var)
     state_set!(model, prefix, keys.z, i, z)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
     risk = if isnothing(wi)
         iat = inv(r.alpha * T)
         JuMP.@expression(model, var + sum(z) * iat)
@@ -190,9 +254,9 @@ a nested prefix rather than allowed to collide with those of the loss tail.
 # Keyword arguments
 
   - `loss::Bool`: If `true` (default), the measure is applied to the net portfolio returns;
-    if `false`, to their negation. This is the seam [`set_range_risk_constraints!`](@ref)
-    builds the gain tail of
-    [`DistributionallyRobustConditionalValueatRiskRange`](@ref) through.
+    if `false`, to their negation. [`set_range_risk_constraints!`](@ref) sets it to `false`
+    to build the gain tail of
+    [`DistributionallyRobustConditionalValueatRiskRange`](@ref).
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
 # Returns
@@ -320,7 +384,7 @@ function set_dr_conditional_risk_constraints!(model::JuMP.Model, i::Any, r::Risk
     state_set!(model, prefix, keys.cu_lb, i, JuMP.@constraint(model, sc * (tu .- lb) <= 0))
     state_set!(model, prefix, keys.cv_lb, i, JuMP.@constraint(model, sc * (tv .- lb) <= 0))
     wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
+    wi = checked_observation_weights(wi, pr.X)
     risk = if isnothing(wi)
         JuMP.@expression(model, radius * lb + Statistics.mean(s))
     else

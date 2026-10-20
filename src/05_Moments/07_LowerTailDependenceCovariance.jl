@@ -14,7 +14,8 @@ $(DocStringExtensions.FIELDS)
     LowerTailDependenceCovariance(;
         ve::AbstractVarianceEstimator = SimpleVariance(),
         alpha::Number = 0.05,
-        ex::FLoops.Transducers.Executor = ThreadedEx()
+        ex::FLoops.Transducers.Executor = ThreadedEx(),
+        cache::Option{<:AbstractPartialFitState} = nothing
     ) -> LowerTailDependenceCovariance
 
 Keywords correspond to the struct's fields.
@@ -28,12 +29,14 @@ Keywords correspond to the struct's fields.
 When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
 
   - `ve`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
 When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -78,17 +81,46 @@ LowerTailDependenceCovariance
     $(field_dict[:ex])
     """
     ex
+    """
+    $(field_dict[:pfcache])
+    """
+    @fprop @vprop cache
     function LowerTailDependenceCovariance(ve::AbstractVarianceEstimator, alpha::Number,
-                                           ex::FLoops.Transducers.Executor)
+                                           ex::FLoops.Transducers.Executor,
+                                           cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(alpha, :alpha)
-        return new{typeof(ve), typeof(alpha), typeof(ex)}(ve, alpha, ex)
+        return new{typeof(ve), typeof(alpha), typeof(ex), typeof(cache)}(ve, alpha, ex,
+                                                                         cache)
     end
 end
 function LowerTailDependenceCovariance(; ve::AbstractVarianceEstimator = SimpleVariance(),
                                        alpha::Number = 0.05,
-                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx())::LowerTailDependenceCovariance
-    return LowerTailDependenceCovariance(ve, alpha, ex)
+                                       ex::FLoops.Transducers.Executor = FLoops.ThreadedEx(),
+                                       cache::Option{<:AbstractPartialFitState} = nothing)::LowerTailDependenceCovariance
+    return LowerTailDependenceCovariance(ve, alpha, ex, cache)
 end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Renders every field of a [`LowerTailDependenceCovariance`](@ref) except `cache`.
+
+The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:LowerTailDependenceCovariance, true)` to render it.
+
+# Arguments
+
+  - `::LowerTailDependenceCovariance`: Lower tail dependence covariance estimator, read for its type alone.
+
+# Returns
+
+  - `fields::Tuple`: The field names to render, which is `(:ve, :alpha, :ex)`.
+
+# Related
+
+  - [`LowerTailDependenceCovariance`](@ref)
+  - [`show_fields`](@ref)
+  - [`set_show_nothing_fields!`](@ref)
+"""
+show_fields(::LowerTailDependenceCovariance) = (:ve, :alpha, :ex)
 """
     lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                           ex::FLoops.Transducers.Executor = FLoops.SequentialEx())

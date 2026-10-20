@@ -1,5 +1,5 @@
 ```@meta
-Description = "Gerber covariance, private API of PortfolioOptimisers.jl: gerber_updown, concordance_counts, gerber."
+Description = "Gerber covariance, private API of PortfolioOptimisers.jl: gerber_updown, concordance_counts, gerber, show_fields."
 ```
 
 # Gerber covariance: private API
@@ -18,6 +18,7 @@ concordance_counts
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum, sd::ArrNum)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum, sd::ArrNum)
 gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum, sd::ArrNum)
+PortfolioOptimisers.show_fields(::GerberCovariance)
 ```
 
 ## References

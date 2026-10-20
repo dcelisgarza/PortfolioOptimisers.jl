@@ -50,7 +50,7 @@ Keywords correspond to the struct's fields.
   - `di[j]` indexes `fi[j]`.
   - `ratios` has one column per retained member of a constrained family, `sum(length(fi[j]) - 1)` in all.
   - `ratios` is not empty, and every entry of it is finite.
-  - `K` is greater than the number of families, so the reduced axis is not empty.
+  - The reduced axis is not empty. The rules above imply it: the families are disjoint, each holds at least two members of `1:K`, so `K` is at least twice the number of families, and no separate check is needed.
 
 # Examples
 
@@ -71,6 +71,12 @@ FactorFamilyBasis
   - [`factor_family_basis`](@ref)
   - [`CrossSectionalFactorModel`](@ref)
   - [`has_family_rebasis`](@ref)
+  - [`reduce_factor_names`](@ref): the names of the reduced axis.
+  - [`reduce_exposures`](@ref) and [`reduce_loadings`](@ref): exposures onto the reduced axis.
+  - [`reduce_factor_returns`](@ref), [`reduce_factor_mu`](@ref) and [`reduce_factor_covariance`](@ref): the reduced-axis moments.
+  - [`expand_factor_returns`](@ref), [`expand_factor_mu`](@ref) and [`expand_factor_covariance`](@ref): the raw-axis moments.
+  - [`project_factor_coordinates`](@ref): raw coordinates, such as a factor exposure of a portfolio, into the reduced basis.
+  - [`dropped_factor_weights`](@ref): the reduced-axis weights of the dropped factors.
 """
 @concrete struct FactorFamilyBasis <: AbstractFactorFamilyBasis
     """
@@ -100,8 +106,6 @@ FactorFamilyBasis
         @argcheck(length(fnm) == length(fi) == length(di),
                   DimensionMismatch("fnm ($(length(fnm))), fi ($(length(fi))) and di ($(length(di))) must have the same length"))
         @argcheck(allunique(fnm), ArgumentError("fnm must not repeat a family label"))
-        @argcheck(K > length(fnm),
-                  ArgumentError("K ($K) must exceed the number of constrained families ($(length(fnm))), because each family drops one factor and the reduced axis cannot be empty"))
         seen = Set{Int}()
         C = 0
         for j in eachindex(fi)
@@ -349,6 +353,67 @@ function factor_basis_slice(fcb::FactorFamilyBasis, i)::FactorFamilyBasis
     return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di,
                              ratios = isa(R, AbstractMatrix) ? R : reshape(R, 1, :),
                              K = fcb.K)
+end
+"""
+    append_passthrough_factors(fcb::Nothing, n::Integer) -> nothing
+    append_passthrough_factors(fcb::FactorFamilyBasis, n::Integer) -> FactorFamilyBasis
+
+Extend a Factor Family Basis with `n` factors that it passes through unchanged.
+
+The new factors take the last `n` positions of the raw axis, and they belong to no constrained family. So the basis keeps them on the reduced axis, after every retained factor, and it never re-bases them: their row of the change of basis is an identity row. The families, the dropped members and the ratios do not change. The observed factors of a [`CrossSectionalFactorPrior`](@ref), such as its Currency Factors, join the basis this way, because their returns are observed and the zero-sum condition of a family does not reach them.
+
+A prior that constrains no Factor Family has no basis, and the method over `Nothing` takes that case. Its raw axis is its reduced axis, so a pass-through factor needs no basis there.
+
+# Algorithm
+
+ 1. Refuse a negative `n`.
+ 2. `fcb` is `nothing`: return `nothing`.
+ 3. `n` is zero: return `fcb` itself.
+ 4. Otherwise build the basis again with `K = fcb.K + n`, which runs every check of the constructor.
+
+# Arguments
+
+  - `fcb`: A Factor Family Basis, or `nothing`.
+  - `n`: Number of pass-through factors to append.
+
+# Validation
+
+  - `n >= 0`. Raises a `DomainError`.
+
+# Returns
+
+  - `fcb::Option{<:FactorFamilyBasis}`: The extended basis, or `nothing`.
+
+# Examples
+
+```jldoctest
+julia> fcb = FactorFamilyBasis(; fnm = [\"industry\"], fi = [[2, 3]], di = [2],
+                               ratios = reshape([0.5], 1, 1), K = 3);
+
+julia> fcb2 = PortfolioOptimisers.append_passthrough_factors(fcb, 2);
+
+julia> fcb2.K, PortfolioOptimisers.retained_factor_indices(fcb2)
+(5, [1, 2, 4, 5])
+```
+
+# Related
+
+  - [`FactorFamilyBasis`](@ref)
+  - [`retained_factor_indices`](@ref)
+  - [`expand_factor_returns`](@ref)
+  - [`AbstractObservedExposureEstimator`](@ref)
+"""
+function append_passthrough_factors(::Nothing, n::Integer)::Nothing
+    assert_nonneg(n, :n)
+    return nothing
+end
+function append_passthrough_factors(fcb::FactorFamilyBasis, n::Integer)::FactorFamilyBasis
+    assert_nonneg(n, :n)
+    if iszero(n)
+        return fcb
+    end
+    return FactorFamilyBasis(; fnm = fcb.fnm, fi = fcb.fi, di = fcb.di, ratios = fcb.ratios,
+                             K = fcb.K + n)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

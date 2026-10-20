@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Asset Panel, private API of PortfolioOptimisers.jl: AllTrueMask, RepeatedLeading, panel_axes, features_are_assets, panel_onehot, panel_field_lift, …"
+Description = "Asset Panel, private API of PortfolioOptimisers.jl: AllTrueMask, RepeatedLeading, panel_axes, features_are_assets, panel_onehot, panel_is_static, …"
 ```
 
-# The Asset Panel: private API
+# Asset Panel: private API
 
 ## Types
 
@@ -17,7 +17,6 @@ PortfolioOptimisers.RepeatedLeading
 PortfolioOptimisers.panel_axes
 PortfolioOptimisers.features_are_assets
 PortfolioOptimisers.panel_onehot
-PortfolioOptimisers.panel_field_lift
 PortfolioOptimisers.panel_is_static
 PortfolioOptimisers.panel_value_eltype
 PortfolioOptimisers.panel_field_observed_labels
@@ -33,6 +32,7 @@ PortfolioOptimisers.assert_panel_feature_names
 PortfolioOptimisers.assert_panel_field_name
 PortfolioOptimisers.assert_panel_field_shape
 PortfolioOptimisers.assert_panel_field_mask
+PortfolioOptimisers.assert_panel_field_placeholder
 PortfolioOptimisers.assert_panel_masks
 PortfolioOptimisers.assert_panel_finite
 ```

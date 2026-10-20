@@ -7,6 +7,8 @@ Refuses a risk measure that cannot be the ceiling of a [`ProgrammeAllocationSet`
 
 The ceiling of a measure is its `settings.ub`, and a one-step projection can bound the measure by one number only. The function refuses a measure with no `ub`, with a `Frontier` or with a per-asset vector, and it refuses an empty vector of measures. A set with no measure passes.
 
+The ceiling reads every row that the head holds, and those rows change at every step. A [`ReturnsTracking`](@ref) series is fixed at construction, so it cannot follow them, and the function refuses a measure that holds one. A [`WeightsTracking`](@ref) benchmark reads the rows themselves and passes.
+
 # Arguments
 
   - `r`: The set's risk measure, `nothing`, or a vector of measures.
@@ -14,6 +16,7 @@ The ceiling of a measure is its `settings.ub`, and a one-step projection can bou
 # Validation
 
   - `settings.ub` of a measure is not a finite non-negative number. An `ArgumentError` is thrown.
+  - No field of a measure holds a [`ReturnsTracking`](@ref). An `ArgumentError` that names the field is thrown otherwise.
   - `rs` is empty. An `IsEmptyError` is thrown.
 
 # Returns
@@ -25,6 +28,7 @@ The ceiling of a measure is its `settings.ub`, and a one-step projection can bou
   - [`ProgrammeAllocationSet`](@ref)
   - [`set_allocation_risk_ceiling!`](@ref)
   - [`set_risk_upper_bound!`](@ref): refuses a frontier or a vector for a set that reaches the builder without this check.
+  - [`returns_tracking_path`](@ref)
 """
 function assert_risk_ceiling(::Nothing)::Nothing
     return nothing
@@ -33,6 +37,9 @@ function assert_risk_ceiling(r::RiskMeasure)::Nothing
     ub = r.settings.ub
     @argcheck(isa(ub, Number) && isfinite(ub) && ub >= zero(ub),
               ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet is its `settings.ub`, a finite non-negative number; got `$ub`"))
+    path = returns_tracking_path(r)
+    @argcheck(isnothing(path),
+              ArgumentError("the ceiling of a `$(nameof(typeof(r)))` on a ProgrammeAllocationSet holds a `ReturnsTracking` at `$(path)`, and the ceiling reads every row the head holds, which change at every step. A fixed series cannot follow them. Track the benchmark that the rows carry with `DataBenchmarkTracking`, or a benchmark portfolio with `WeightsTracking`, which reads the rows themselves, or bound the tracking error with the set's `tr`, which cuts its series to the rows."))
     return nothing
 end
 function assert_risk_ceiling(rs::VecRM)::Nothing
@@ -87,7 +94,7 @@ end
 
 Fits the prior result that a programme set's row-reading slots are built on.
 
-The set fits its `pe` on the head's rows carrier the same way a batch head fits a prior on any carrier. The fit reads the rows as they are and the Asset Panel beside them, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
+The set fits its `pe` on the rows that the head holds, the same way a batch head fits a prior on any returns data. The prior reads its own source, whatever the source of the head's step is. When it states `x_src = ExcessSource()` the fit reads `X - B`, which [`benchmark_relative_returns`](@ref) gives. The fit reads the Asset Panel beside the rows, so the result answers `NaN` at an asset outside the prior's Coverage Universe. A set that reads no rows fits nothing, and a bounded set never fits anything.
 
 # Algorithm
 
@@ -99,11 +106,12 @@ The set fits its `pe` on the head's rows carrier the same way a batch head fits 
 # Arguments
 
   - `set`: The resolved Allocation Set.
-  - `X`: The head's rows carrier, a [`ReturnsResult`](@ref), or `nothing` outside an Online Update.
+  - `X`: The rows that the head holds, a [`ReturnsResult`](@ref), or `nothing` outside an Online Update.
 
 # Validation
 
   - A slot reads the rows and `X` is `nothing`. An `ArgumentError` is thrown.
+  - The rules of [`benchmark_relative_returns`](@ref), under the source of `set.pe`.
 
 # Returns
 
@@ -169,7 +177,7 @@ The projection programme reduces the model to the prior's Investable Mask before
 # Arguments
 
   - `pr`: The set's prior result, or `nothing` when the set fitted none.
-  - `X`: The head's rows carrier, or `nothing`.
+  - `X`: The rows that the head holds, or `nothing`.
 
 # Validation
 
@@ -332,17 +340,17 @@ function risk_contribution_constraints(r::Variance, ::ProgrammeAllocationSet, ::
     return r.rc
 end
 """
-    clip_at_zero(w::AbstractVector)
+    clip_at_zero(w::AbstractVector, lb = zero(eltype(w)))
 
-Raises every negative entry of a projection programme's answer to zero.
+Sets every entry of a projection programme's answer at or below the tolerance of its element type to its floor `lb`, which is zero unless the set states a positive floor.
 
-A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes can come back slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds, and would then take `log w` of a negative number. The clip does not renormalise, so the sum rises by the clipped mass, which is at the size of the solver's tolerance.
+A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes comes back slightly above or slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds. It would take `log w` of a negative number, and an exact zero of the raw step keeps the weight at zero. So the clip reads every entry within the tolerance as zero, whatever the sign of the rounding, and a weight that the set forces to zero is zero after the clip. The tolerance is [`weights_bound_tolerance`](@ref): ``\\sqrt{\\epsilon}`` for a floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a `Rational`. The clip does not renormalise, so the sum moves by the clipped mass, which is at most ``N \\tau``. An entry whose floor is positive goes to that floor and not to zero, so the clip keeps a floor at or below ``\\tau`` that the set states.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-w'_i &= \\max(w_i, 0)\\,.
+w'_i &= \\begin{cases} l_i & w_i \\leq \\tau\\,, \\\\ w_i & w_i > \\tau\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -350,20 +358,26 @@ Where:
 
   - ``w_i``: Entry ``i`` of the programme's answer.
   - ``w'_i``: Entry ``i`` of the clipped answer.
+  - ``l_i``: Entry ``i`` of the floor `lb`, non-negative.
+  - $(math_dict[:tau_wb_tol])
+  - $(math_dict[:N])
 
 # Arguments
 
   - `w`: The programme's answer.
+  - `lb`: The floor of the set, a number or a vector, non-negative. A caller's `project` checks the sign.
 
 # Returns
 
-  - `w'::Vector`: `w` with no entry below zero, in the element type of `w`.
+  - `w'::Vector`: `w` with every entry at or below ``\\tau`` set to its floor, in the element type of `w` when `lb` has that type.
 
 # Related
 
   - [`project`](@ref)
   - [`projection_programme`](@ref)
+  - [`weights_bound_tolerance`](@ref)
 """
-function clip_at_zero(w::AbstractVector)
-    return map(x -> max(x, zero(x)), w)
+function clip_at_zero(w::AbstractVector, lb = zero(eltype(w)))
+    tol = weights_bound_tolerance(float_if_integer(eltype(w)))
+    return ifelse.(w .<= tol, zero.(w) .+ lb, w)
 end

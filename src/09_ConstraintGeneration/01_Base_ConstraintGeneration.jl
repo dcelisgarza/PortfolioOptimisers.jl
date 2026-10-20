@@ -13,7 +13,7 @@ In order to implement a new constraint result which will work seamlessly with th
 
   - `PortfolioOptimisers.implicit_constraint_target(res::AbstractConstraintResult) -> Option{Symbol}`: The one [routing target](@ref PIPELINE_ROUTING_TARGETS) a result of this type can land in, or `nothing` when the type names none.
 
-The fallback answers `nothing`, and [`add_constraint_result`](@ref) then pairs the value with the target its step declared, in a [`TargetedConstraint`](@ref). Implement the method only when the type names exactly one field of a [`JuMPOptimiser`](@ref), which is what lets the value be injected bare.
+The fallback answers `nothing`, and `add_constraint_result` then pairs the value with the target its step declared, in a [`TargetedConstraint`](@ref). Implement the method only when the type names exactly one field of a [`JuMPOptimiser`](@ref), which is what lets the value be injected bare.
 
 ### Arguments
 
@@ -75,12 +75,12 @@ The family owns the verb, and the library holds one verb per family rather than 
 
 ## Pipeline step
 
-Implement both methods, or neither. [`pipe_constraint_targets`](@ref) falls back to an empty tuple, which declares that the family computes no value for the `constraints` slot and is therefore not a [`Pipeline`](@ref) step, and [`resolve_constraint_target`](@ref) raises on that tuple before the value is ever reached. [`JuMPConstraintEstimator`](@ref) is the family that takes the fallback: it is configuration for the model rather than a computation over data.
+Implement both methods, or neither. [`pipe_constraint_targets`](@ref) falls back to an empty tuple, which declares that the family computes no value for the `constraints` slot and is therefore not a [`Pipeline`](@ref) step, and `resolve_constraint_target` raises on that tuple before the value is ever reached. [`JuMPConstraintEstimator`](@ref) is the family that takes the fallback: it is configuration for the model rather than a computation over data.
 
   - `PortfolioOptimisers.pipe_constraint_targets(ce::AbstractConstraintEstimator) -> Tuple`: The [routing targets](@ref PIPELINE_ROUTING_TARGETS) the family's result can land in. One target places the value with no annotation, several make the [`PipelineStep`](@ref) wrapper name one.
   - `PortfolioOptimisers.constraint_step_value(ce::AbstractConstraintEstimator, ctx::PipelineContext)`: The value the step contributes, computed by calling the family's own verb above.
 
-[`pipe_reads`](@ref) and [`pipe_writes`](@ref) need no method. The family answers `(:returns,)` and `:constraints` for every subtype, and a family that reads a computed slot as well states so on its own type.
+`pipe_reads` and `pipe_writes` need no method. The family answers `(:returns,)` and `:constraints` for every subtype, and a family that reads a computed slot as well states so on its own type.
 
 ### Arguments
 

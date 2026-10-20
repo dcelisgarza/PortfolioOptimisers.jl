@@ -317,6 +317,15 @@ multiplier stays at one and the estimator is the plain exponentially weighted re
 is what a consumer needs when it reads a volatility rather than a regime-scaled risk figure,
 and [`EWVolatility`](@ref) is the one in the library.
 
+With `debias = ExactDebias()`, the default, `z²` is divided by the bias that the inverse of an
+estimated variance puts in the moment the method reads, and an estimate of four terms or fewer is
+not scored. `debias = RawStatistic()` scores the raw `z²`.
+
+With `centring = EstimatedCentring()`, the default, each deviation is taken from the normalised
+location of the returns before it, and each square is divided by its exact factor, so the variance
+is unbiased from the second valid return whatever the mean. Under HAC the factor also reads the
+mean of each lagged product. `centring = PreCentred()` takes the returns as deviations from zero.
+
 This estimator is mask-aware, so a prior fitted with it keeps a young asset investable and
 zero-fills the rows the asset was missing through [`scenario_fill`](@ref): every consumer of a
 Prior Result reads its returns matrix, and a scenario-based measure then reads a zero return
@@ -336,11 +345,11 @@ v_t &= \\lambda v_{t-1} + (1 - \\lambda)(r_t - \\bar{r})^2\\,.
 \\end{align}
 ```
 
-Standardised innovation:
+Standardised innovation, against the bias-corrected variance that stands before the observation:
 
 ```math
 \\begin{align}
-z_t^2 &= (r_t - \\bar{r})^2 / v_t\\,.
+z_t^2 &= \\frac{(r_t - \\bar{r})^2}{\\beta(K_t)\\, v_{t-1} / (1 - \\lambda^{K_t})}\\,.
 \\end{align}
 ```
 
@@ -368,8 +377,22 @@ Where:
   - ``v_t``: Exponentially weighted variance at time ``t``.
   - ``\\lambda``: EWM decay parameter (`decay` field).
   - ``r_t``: Return at time ``t``.
-  - ``\\bar{r}``: Mean return.
-  - ``z_t^2``: Standardised squared innovation ``(r_t - \\bar{r})^2 / v_t``.
+  - ``\\bar{r}``: The location of the returns before ``t`` under [`EstimatedCentring`](@ref), or
+    zero under [`PreCentred`](@ref). Under `EstimatedCentring` the first return gives no term,
+    and each square, in the variance and in ``z_t^2``, is divided by its exact factor, as
+    [`ExpWeightedVariance`](@ref) states.
+  - ``z_t^2``: Standardised squared innovation.
+  - ``K_t``: Count of the terms in ``v_{t-1}``.
+  - ``\\beta(K_t)``: Bias factor of [`regime_bias_table`](@ref) for the moment that the method
+    reads, or one under [`RawStatistic`](@ref). The inverse of an estimated variance is too large
+    on average (Jensen's inequality), so without it the mean of ``z_t^2`` is 1.07 at a half-life
+    of 10 and 1.017 at a half-life of 40. The factor is exact for this statistic. Under
+    [`ExactDebias`](@ref) an estimate of four terms or fewer is not scored, because the variance
+    of ``z_t^2`` is not finite. A HAC estimate is a quadratic form with a banded weight matrix, and
+    the table reads the spectrum of that matrix, so the factor is exact for it too; an estimate
+    with too few effective observations is not scored. At two lags and a half-life of 10 the
+    squared multiplier of `RootMeanSquaredAdjusted` is 1.002 over 8 seeds with the factor and 1.150
+    without it.
   - ``s_t``: Smoothed regime state at time ``t``.
   - ``\\lambda_r``: Regime decay parameter (`regime_decay` field).
   - ``g(\\cdot)``: Regime state transformation (see [`RegimeAdjustedMethod`](@ref)).
@@ -387,12 +410,14 @@ $(DocStringExtensions.FIELDS)
         decay::Number             = exp2(-inv(40.0)),
         min_obs::Integer          = round(Int, max(1, decay_half_life(decay))),
         hac_lags::Option{<:Integer} = nothing,
+        hac_floor::AbstractHacFloor = NoHacFloor(),
         regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
         regime_decay::Number      = exp2(-2 / decay_half_life(decay)),
         regime_min_obs::Integer   = round(Int, max(1, decay_half_life(decay) / 2)),
-        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = nothing,
-        min_val::Number           = sqrt(eps()),
-        centred::Bool             = false,
+        regime_lohi_mult::Option{<:Tuple{<:Number, <:Number}} = (0.7, 1.6),
+        min_val::Number           = 1e-12,
+        centring::AbstractCentring = EstimatedCentring(),
+        debias::AbstractRegimeDebias = ExactDebias(),
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> RegimeAdjustedExpWeightedVariance
 
@@ -443,6 +468,10 @@ julia> ce.min_obs
     """
     hac_lags
     """
+    $(field_dict[:hac_floor])
+    """
+    hac_floor
+    """
     $(field_dict[:regime_method])
     """
     regime_method
@@ -463,21 +492,27 @@ julia> ce.min_obs
     """
     min_val
     """
-    $(field_dict[:centred])
+    $(field_dict[:centring])
     """
-    centred
+    centring
+    """
+    $(field_dict[:ra_debias])
+    """
+    debias
     """
     Running state of an incremental fit, or `nothing` before the first call to [`partial_fit!`](@ref). It is the one Result this estimator holds, and its type bound is the enforcement of that exception. [`Statistics.var(ce::RegimeAdjustedExpWeightedVariance)`](@ref) reads it, and a fit over a matrix ignores it.
     """
     cache
     function RegimeAdjustedExpWeightedVariance(decay::Number, min_obs::Integer,
                                                hac_lags::Option{<:Integer},
+                                               hac_floor::AbstractHacFloor,
                                                regime_method::Option{<:RegimeAdjustedMethod},
                                                regime_decay::Number,
                                                regime_min_obs::Integer,
                                                regime_lohi_mult::Option{<:Tuple{<:Number,
                                                                                 <:Number}},
-                                               min_val::Number, centred::Bool,
+                                               min_val::Number, centring::AbstractCentring,
+                                               debias::AbstractRegimeDebias,
                                                cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
@@ -490,14 +525,13 @@ julia> ce.min_obs
         if !isnothing(hac_lags)
             assert_nonempty_gt0_finite_val(hac_lags, :hac_lags)
         end
-        return new{typeof(decay), typeof(min_obs), typeof(hac_lags), typeof(regime_method),
-                   typeof(regime_decay), typeof(regime_min_obs), typeof(regime_lohi_mult),
-                   typeof(min_val), typeof(centred), typeof(cache)}(decay, min_obs,
-                                                                    hac_lags, regime_method,
-                                                                    regime_decay,
-                                                                    regime_min_obs,
-                                                                    regime_lohi_mult,
-                                                                    min_val, centred, cache)
+        return new{typeof(decay), typeof(min_obs), typeof(hac_lags), typeof(hac_floor),
+                   typeof(regime_method), typeof(regime_decay), typeof(regime_min_obs),
+                   typeof(regime_lohi_mult), typeof(min_val), typeof(centring),
+                   typeof(debias), typeof(cache)}(decay, min_obs, hac_lags, hac_floor,
+                                                  regime_method, regime_decay,
+                                                  regime_min_obs, regime_lohi_mult, min_val,
+                                                  centring, debias, cache)
     end
 end
 function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
@@ -505,6 +539,7 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                     max(1,
                                                                         decay_half_life(decay))),
                                            hac_lags::Option{<:Integer} = nothing,
+                                           hac_floor::AbstractHacFloor = NoHacFloor(),
                                            regime_method::Option{<:RegimeAdjustedMethod} = FirstMomentRegimeAdjusted(),
                                            regime_decay::Number = exp2(-2 /
                                                                        decay_half_life(decay)),
@@ -513,13 +548,16 @@ function RegimeAdjustedExpWeightedVariance(; decay::Number = exp2(-inv(40.0)),
                                                                                decay_half_life(decay) /
                                                                                2)),
                                            regime_lohi_mult::Option{<:Tuple{<:Number,
-                                                                            <:Number}} = nothing,
-                                           min_val::Number = sqrt(eps()),
-                                           centred::Bool = false,
+                                                                            <:Number}} = (0.7,
+                                                                                          1.6),
+                                           min_val::Number = 1e-12,
+                                           centring::AbstractCentring = EstimatedCentring(),
+                                           debias::AbstractRegimeDebias = ExactDebias(),
                                            cache::Option{<:AbstractPartialFitState} = nothing)::RegimeAdjustedExpWeightedVariance
-    return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, regime_method,
-                                             regime_decay, regime_min_obs, regime_lohi_mult,
-                                             min_val, centred, cache)
+    return RegimeAdjustedExpWeightedVariance(decay, min_obs, hac_lags, hac_floor,
+                                             regime_method, regime_decay, regime_min_obs,
+                                             regime_lohi_mult, min_val, centring, debias,
+                                             cache)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -581,6 +619,14 @@ $(DocStringExtensions.FIELDS)
     $(field_dict[:n_regime_obs])
     """
     n_regime_obs
+    """
+    $(field_dict[:ra_bias])
+    """
+    bias
+    """
+    $(field_dict[:ra_lag_records])
+    """
+    lag_records
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -659,19 +705,474 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes (possibly HAC-corrected) squared returns for the current observation and stores
-the result in `cache.X2`.
+Computes the bias factor that the root-mean-squared adjustment reads, ``\\mathbb{E}[Q^{-1}]``.
+
+`Q` is the estimated variance of one return over its true variance, and
+[`regime_bias_table`](@ref) states it. The method smooths ``z^{2} = u^{2} / \\hat{v}`` and its
+calibration assumes ``\\mathbb{E}[z^{2}] = 1``, but ``\\mathbb{E}[z^{2}] = \\mathbb{E}[Q^{-1}]``.
+
+# Arguments
+
+  - `::RootMeanSquaredAdjusted`: Root-mean-squared regime adjustment method.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `factor::Number`: ``\\int_{0}^{\\infty} G(s)\\, \\mathrm{d}s / (2 c)``.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+  - [`RootMeanSquaredAdjusted`](@ref)
+"""
+function regime_bias_factor(::RootMeanSquaredAdjusted, s::VecNum, G::VecNum, c::Number,
+                            h::Number)
+    return h * sum(i -> G[i] * s[i], eachindex(s, G)) / (2 * c)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the bias factor that the first-moment adjustment reads, ``\\mathbb{E}[Q^{-1/2}]^{2}``.
+
+The method smooths ``|z| = |u| / \\sqrt{\\hat{v}}``, and ``\\mathbb{E}[|z|] = \\mathbb{E}[|u|]\\, \\mathbb{E}[Q^{-1/2}]``, so the statistic ``z^{2}`` is divided by the square of that moment.
+
+# Arguments
+
+  - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `factor::Number`: ``\\left(\\int_{0}^{\\infty} s^{-1/2} G(s)\\, \\mathrm{d}s\\right)^{2} / (2 \\pi c)``.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+  - [`FirstMomentRegimeAdjusted`](@ref)
+"""
+function regime_bias_factor(::FirstMomentRegimeAdjusted, s::VecNum, G::VecNum, c::Number,
+                            h::Number)
+    return (h * sum(i -> G[i] * sqrt(s[i]), eachindex(s, G)))^2 / (2 * c * pi)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the bias factor that the log adjustment reads, ``\\exp(-\\mathbb{E}[\\ln Q])``.
+
+The method smooths ``\\ln z^{2} = \\ln u^{2} - \\ln Q``, so the statistic ``z^{2}`` is divided by
+``\\exp(-\\mathbb{E}[\\ln Q])``, whatever the parameters of the method.
+
+# Arguments
+
+  - `::LogRegimeAdjusted`: Log regime adjustment method.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `factor::Number`: ``\\exp\\left(-\\int_{0}^{\\infty} (e^{-s} - G(s))\\, s^{-1}\\, \\mathrm{d}s - \\ln(2 c)\\right)``.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+  - [`LogRegimeAdjusted`](@ref)
+"""
+function regime_bias_factor(::LogRegimeAdjusted, s::VecNum, G::VecNum, c::Number, h::Number)
+    return exp(-(h * sum(i -> exp(-s[i]) - G[i], eachindex(s, G)) + log(2 * c)))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Names the table of the moments of one term of a sum of regime statistics, which the table of a
+[`DiagonalTarget`](@ref) holds.
+
+A term ``u_{i}^{2} / \\hat{v}_{i}`` reads one estimated variance ``\\hat{v}_{i} = \\sigma_{i}^{2} Q_{i}``,
+and it is divided by the mean's factor ``f = \\mathbb{E}[Q^{-1}]``, so it carries the noise
+``a = 1 / (f Q)``, with ``\\mathbb{E}[a] = 1``. The root and the log of the sum read that noise
+through their own variable, the one in which the statistic is linear along the direction where every
+term carries the same noise: ``a^{1/2}`` for [`FirstMomentRegimeAdjusted`](@ref) and ``\\ln a`` for
+[`LogRegimeAdjusted`](@ref). For each count, [`regime_bias_factor`](@ref) gives the triple
+``(f, b, v)``: the mean's factor, the scale ``b`` at which the variable of the method has its mean,
+and the relative variance ``v`` of that variable.
+
+| Method                              | ``b``                               | ``v``                                 |
+|:----------------------------------- |:----------------------------------- |:------------------------------------- |
+| [`FirstMomentRegimeAdjusted`](@ref) | ``\\mathbb{E}[Q^{-1/2}]^{2} / f``   | ``f / \\mathbb{E}[Q^{-1/2}]^{2} - 1`` |
+| [`LogRegimeAdjusted`](@ref)         | ``\\exp(-\\mathbb{E}[\\ln Q]) / f`` | ``\\mathrm{Var}[\\ln Q]``             |
+| any other method                    | ``1``                               | ``0``                                 |
+
+# Fields
+
+  - `method`: $(field_dict[:ra_term_method])
+
+# Related
+
+  - [`regime_bias_factor`](@ref)
+  - [`regime_bias_table`](@ref)
+  - [`diagonal_law_factor`](@ref)
+"""
+@concrete struct RegimeTermMoments
+    method
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the moments of one term for a method that reads the mean of the sum: the mean's factor, a
+scale of one and no variance.
+
+# Arguments
+
+  - `::RegimeTermMoments`: Table of the moments of one term.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `moments::Tuple`: ``(\\mathbb{E}[Q^{-1}], 1, 0)``.
+
+# Related
+
+  - [`RegimeTermMoments`](@ref)
+"""
+function regime_bias_factor(::RegimeTermMoments, s::VecNum, G::VecNum, c::Number, h::Number)
+    f = regime_bias_factor(RootMeanSquaredAdjusted(), s, G, c, h)
+    return (f, one(f), zero(f))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the moments of one term for the first-moment method, which reads the root of the noise
+``a = 1 / (f Q)``.
+
+# Arguments
+
+  - `m::RegimeTermMoments{<:FirstMomentRegimeAdjusted}`: Table of the moments of one term.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `moments::Tuple`: ``(f, q / f, f / q - 1)``, with ``f = \\mathbb{E}[Q^{-1}]`` and
+    ``q = \\mathbb{E}[Q^{-1/2}]^{2}``, so ``b = \\mathbb{E}[a^{1/2}]^{2}`` and ``v`` is the relative
+    variance of ``a^{1/2}``.
+
+# Related
+
+  - [`RegimeTermMoments`](@ref)
+"""
+function regime_bias_factor(m::RegimeTermMoments{<:FirstMomentRegimeAdjusted}, s::VecNum,
+                            G::VecNum, c::Number, h::Number)
+    f = regime_bias_factor(RootMeanSquaredAdjusted(), s, G, c, h)
+    q = regime_bias_factor(m.method, s, G, c, h)
+    return (f, q / f, f / q - one(f))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the moments of one term for the log method, which reads the log of the noise
+``a = 1 / (f Q)``.
+
+# Arguments
+
+  - `m::RegimeTermMoments{<:LogRegimeAdjusted}`: Table of the moments of one term.
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `c::Number`: Normalised weight of the newest observation.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `moments::Tuple`: ``(f, e^{-\\mathbb{E}[\\ln Q]} / f, \\mathrm{Var}[\\ln Q])``, with
+    ``f = \\mathbb{E}[Q^{-1}]``, so ``b = \\exp(\\mathbb{E}[\\ln a])``, from
+    [`regime_log_variance`](@ref).
+
+# Related
+
+  - [`RegimeTermMoments`](@ref)
+  - [`regime_log_variance`](@ref)
+"""
+function regime_bias_factor(m::RegimeTermMoments{<:LogRegimeAdjusted}, s::VecNum, G::VecNum,
+                            c::Number, h::Number)
+    f = regime_bias_factor(RootMeanSquaredAdjusted(), s, G, c, h)
+    return (f, regime_bias_factor(m.method, s, G, c, h) / f, regime_log_variance(s, G, h))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the variance of the log of an estimated variance, from the Laplace transform of `Q`.
+
+The Mellin transform of ``Q' = 2 c Q`` expands about zero as
+``\\mathbb{E}[Q'^{-\\sigma}] = 1 + \\sigma I_{0} + \\sigma^{2} (I_{1} + \\gamma I_{0}) + O(\\sigma^{3})``,
+so its first two coefficients are the first two moments of ``-\\ln Q'``. A scale does not move a
+variance of a log, so the variance of ``\\ln Q'`` is that of ``\\ln Q``. At equal weights it agrees
+with the trigamma function ``\\psi'(K / 2)``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+I_{0} &= \\int_{0}^{\\infty} \\left(G(s) - e^{-s}\\right) s^{-1}\\, \\mathrm{d}s\\,, \\quad
+I_{1} = \\int_{0}^{\\infty} \\ln s \\left(G(s) - e^{-s}\\right) s^{-1}\\, \\mathrm{d}s\\,, \\\\
+\\mathrm{Var}[\\ln Q] &= 2 (I_{1} + \\gamma I_{0}) - I_{0}^{2}\\,.
+\\end{align}
+```
+
+Where ``\\gamma`` is the Euler-Mascheroni constant.
+
+# Arguments
+
+  - `s::VecNum`: Grid of the integration variable ``s = e^{x}``.
+  - `G::VecNum`: ``G(s)``, the Laplace transform of `Q` on the grid.
+  - `h::Number`: Step of the grid in ``x``.
+
+# Returns
+
+  - `v::Number`: ``\\mathrm{Var}[\\ln Q]``.
+
+# Related
+
+  - [`regime_bias_factor`](@ref)
+  - [`regime_bias_table`](@ref)
+"""
+function regime_log_variance(s::VecNum, G::VecNum, h::Number)
+    I0 = h * sum(i -> G[i] - exp(-s[i]), eachindex(s, G))
+    I1 = h * sum(i -> log(s[i]) * (G[i] - exp(-s[i])), eachindex(s, G))
+    return 2 * (I1 + Base.MathConstants.eulergamma * I0) - I0^2
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the bias factor of a regime statistic that reads one estimated variance, for every count
+of observations from one to `K`.
+
+An exponentially weighted variance estimate of ``K`` observations is ``\\hat{v} = \\sigma^{2} Q``,
+with ``Q = \\sum_{j} w_{j} z_{j}^{2}`` on correctly calibrated returns. The inverse of an estimate
+is too large on average (Jensen's inequality), and each [`RegimeAdjustedMethod`](@ref) reads its
+own moment of it, so [`regime_bias_factor`](@ref) names the factor of each method. The factors
+are exact, not asymptotic: at equal weights they agree with ``K / (K - 2)``, with the ratio of
+gamma functions and with the digamma form to ``10^{-12}``.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+w_{j} &= c\\, \\lambda^{j}\\,, \\quad c = \\frac{1 - \\lambda}{1 - \\lambda^{K}}\\,, \\\\
+\\mathbb{E}[e^{-tQ}] &= G(2 c t)\\,, \\quad G(s) = \\prod_{j=0}^{K-1} (1 + \\lambda^{j} s)^{-1/2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``w_{j}``: Normalised weight of the observation ``j`` steps before the newest.
+  - ``\\lambda``: `decay`.
+  - ``G``: Laplace transform of ``Q``, on the scale ``s = 2 c t``.
+
+# Algorithm
+
+ 1. Lay a grid of step ``h = 1/10`` on ``x = \\ln s \\in [-60, 50]``. The integrands are smooth
+    on it and decay at both ends, the slowest as ``e^{x/2}`` below, so the trapezoid rule on it
+    agrees with a grid of step ``1/200`` on ``[-75, 60]`` to ``1.1 \\times 10^{-12}`` relative from
+    ``K = 5``, at half-lives of 2, 10 and 40.
+ 2. For each ``K``, multiply ``G`` by ``(1 + \\lambda^{K - 1} s)^{-1/2}`` on the log scale, so the
+    whole table costs one pass.
+ 3. Evaluate the factor of the method with [`regime_bias_factor`](@ref).
+
+The mean of ``Q^{-1}`` is finite from ``K = 3`` and its variance from ``K = 5``, so an entry at
+``K \\le 4`` is not read.
+
+# Arguments
+
+  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+    which names the moment, or the table of the moments of one term.
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Largest count of observations in the table.
+
+# Returns
+
+  - `table::AbstractVector`: The factor for each count from one to `K`, or the moments of
+    [`RegimeTermMoments`](@ref).
+
+# Related
+
+  - [`regime_bias_factor`](@ref)
+  - [`regime_bias!`](@ref)
+  - [`mahalanobis_bias`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+"""
+function regime_bias_table(method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+                           decay::Number, K::Integer)
+    h = one(decay) / 10
+    s = exp.(range(-60 * one(h), 50 * one(h); step = h))
+    lG = zero(s)
+    G = similar(s)
+    lam = one(decay)
+    return map(1:K) do k
+        lG .-= log1p.(lam .* s) ./ 2
+        lam *= decay
+        G .= exp.(lG)
+        return regime_bias_factor(method, s, G,
+                                  (one(decay) - decay) / (one(decay) - decay^k), h)
+    end
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns the bias factor of a regime statistic at a count of observations, and grows the table of
+the state where the count is past its end.
+
+The table grows to twice the count, and stops at the count where ``\\lambda^{K}`` falls below the
+machine epsilon of the table: past it the factor no longer changes, so the last entry serves every
+larger count. A fit over ``T`` rows thus makes the table once or a few times, and never more than
+``\\min(2 T, K_{\\mathrm{sat}})`` entries.
+
+# Arguments
+
+  - `bias::AbstractVector`: Table of the state (mutated where it grows).
+  - `method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments}`: Regime adjustment method,
+    which names the moment, or the table of the moments of one term.
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of observations in the estimate.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags of the estimate, or the
+    weight of each lag, whose table [`regime_bias_table`](@ref) computes from its banded weight
+    matrix, or `nothing`.
+  - `centring::AbstractCentring`: The centring of the estimate. Under [`EstimatedCentring`](@ref)
+    the table reads the exact law of the estimated deviations. The default, [`PreCentred`](@ref),
+    reads the law of pre-centred terms.
+  - `debias::AbstractRegimeDebias`: Whether the table reads the dependence of the deviation on the
+    estimate, by [`reads_dependence`](@ref). [`ExactDebias`](@ref) by default.
+
+# Returns
+
+  - `factor`: The factor at `K`, or the moments of [`RegimeTermMoments`](@ref) at `K`.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+  - [`RegimeAdjustedVarianceState`](@ref)
+"""
+function regime_bias!(bias::AbstractVector,
+                      method::Union{<:RegimeAdjustedMethod, <:RegimeTermMoments},
+                      decay::Number, K::Integer,
+                      hac_lags::Option{<:Union{<:Integer, <:VecNum}} = nothing,
+                      centring::AbstractCentring = PreCentred(),
+                      debias::AbstractRegimeDebias = ExactDebias())
+    Ksat = ceil(Int, log(eps(eltype(eltype(bias)))) / log(decay))
+    if K > length(bias) && length(bias) < Ksat
+        table = regime_bias_table(method, decay, min(max(2 * K, 64), Ksat), hac_lags,
+                                  centring, debias)
+        resize!(bias, length(table))
+        copyto!(bias, table)
+    end
+
+    return bias[min(K, length(bias))]
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns one, the factor of a state that takes no bias correction.
+
+# Arguments
+
+  - `::Nothing`: The table of a state whose estimator has `debias = RawStatistic()` or no regime method.
+  - `::Any`: Ignored regime adjustment method.
+  - `decay::Number`: Decay of the weights.
+  - `::Integer`: Ignored count of observations.
+  - `::Any`: Ignored count of HAC lags.
+  - `::Any`: Ignored centring.
+  - `::Any`: Ignored debias rule.
+
+# Returns
+
+  - `one(decay)`.
+
+# Related
+
+  - [`regime_bias!`](@ref)
+"""
+function regime_bias!(::Nothing, ::Any, decay::Number, ::Integer, ::Any = nothing,
+                      ::Any = nothing, ::Any = nothing)
+    return one(decay)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Returns whether an estimate of `K` observations is old enough for its regime statistic to be
+scored.
+
+The statistic of `n` directions reads the inverse of an estimate, and the variance of that inverse
+is finite from ``K > n + 3``. Before that, one observation can hold the smoothed regime state for
+many half-lives. A HAC estimate has a weight matrix with negative eigenvalues, so it can fail to
+be positive definite at any count, and no moment of its inverse is finite. Its effective count of
+observations, ``1 / \\operatorname{tr}(A^{2})`` from [`exp_weight_cross_sum`](@ref), must also pass
+``n + 1``, the count at which the mean of the inverse of a plain estimate is finite. At 12 assets,
+a half-life of 10 and two lags, `K > n + 3` alone scores the estimate at ``K = 16``, where 11 %
+of draws are not positive definite. With the effective count the first scored row is ``K = 54``,
+and over half-lives of 5, 10 and 40, one to five lags and one to 12 assets, the first scored row
+is not positive definite in at most ``2 \\times 10^{-4}`` of draws. An estimate whose steady state
+has too few effective observations, such as 12 assets at a half-life of 5, is never scored.
+Without the correction every observation above `min_obs` is scored.
+
+# Arguments
+
+  - `debias::AbstractRegimeDebias`: Whether the estimator corrects the bias of its statistic.
+  - `n::Integer`: Count of directions that the statistic reads.
+  - `decay::Number`: Decay of the weights.
+  - `K::Integer`: Count of the terms in the estimate.
+  - `hac_lags::Option{<:Union{<:Integer, <:VecNum}}`: Count of HAC lags, the weight of each lag, or
+    `nothing`.
+
+# Returns
+
+  - `open::Bool`: Whether the statistic is scored.
+
+# Related
+
+  - [`regime_bias_table`](@ref)
+  - [`exp_weight_cross_sum`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+"""
+function regime_bias_open(debias::AbstractRegimeDebias, n::Integer, decay::Number,
+                          K::Integer, hac_lags::Option{<:Union{<:Integer, <:VecNum}})
+    return !debiases(debias) ||
+           K > n + 3 && (isnothing(hac_lags) ||
+                         exp_weight_cross_sum(decay, decay, K, hac_lags) * (n + 1) < one(decay))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Computes the terms of the current observation, its squared deviations with the HAC products
+where `hac_lags` is set, each divided by its exact factor, and stores them in `cache.X2`.
+
+The factor is the mean of the term in units of the variance, for returns that are independent in
+time: [`centring_factor`](@ref) of the square plus [`centring_lag_factor`](@ref) of the lagged
+products. Both are one and zero under [`PreCentred`](@ref). The floor rule of `ce.hac_floor` then
+acts on the terms of the valid assets.
 
 # Arguments
 
   - `cache::RegimeAdjustedVarianceState`: Online variance computation cache.
   - `ce::RegimeAdjustedExpWeightedVariance`: Variance estimator configuration.
-  - `X::VecNum`: Current centred returns vector.
-  - `finite_mask::AbstractVector{<:Bool}`: Boolean mask of finite entries in `X`.
+  - `X::VecNum`: The deviations of the current observation.
+  - `valid::AbstractVector{<:Bool}`: Mask of the valid assets.
+  - `dvalid::AbstractVector{<:Bool}`: Mask of the assets whose deviation exists.
+  - `f::VecNum`: The factor of each squared deviation.
 
 # Returns
 
-  - `X2::VecNum`: The HAC-adjusted squared returns stored in `cache.X2`.
+  - `X2::VecNum`: The terms, stored in `cache.X2`.
 
 # Related
 
@@ -680,20 +1181,24 @@ the result in `cache.X2`.
 """
 function hac_squared_returns!(cache::RegimeAdjustedVarianceState,
                               ce::RegimeAdjustedExpWeightedVariance, X::VecNum,
-                              finite_mask::AbstractVector{<:Bool})
+                              valid::AbstractVector{<:Bool}, dvalid::AbstractVector{<:Bool},
+                              f::VecNum)
     copyto!(cache.X2, X .^ 2)
     if isnothing(cache.ret_buffer) || isempty(cache.ret_buffer)
+        cache.X2 ./= f
         return cache.X2
     end
 
+    w = l -> one(eltype(X)) - l / (ce.hac_lags + 1)
     for (i, X_old) in enumerate(Iterators.reverse(cache.ret_buffer))
-        wi = one(eltype(X)) - i / (ce.hac_lags + 1)
         cache.X_old_i .= replace(X_old, NaN => zero(eltype(X_old)))
-        cache.X2 .+= 2 * wi * X .* cache.X_old_i
+        cache.X2 .+= 2 * w(i) * X .* cache.X_old_i
     end
-    cache.X2[finite_mask] .= max.(view(cache.X2, finite_mask), zero(eltype(cache.X2)))
+    cache.X2 ./= f .+
+                 centring_lag_factor(ce.centring, ce.decay, cache.old_obs_count, dvalid,
+                                     cache.lag_records, w, true)
 
-    return cache.X2
+    return hac_floor!(ce.hac_floor, cache.X2, valid)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -738,9 +1243,9 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
         if any(newly_inactive)
             cache.variance[newly_inactive] .= zero(eltype(cache.variance))
             cache.obs_count[newly_inactive] .= 0
-            if !ce.centred
-                cache.location[newly_inactive] .= NaN
-            end
+            cache.location[newly_inactive] .= NaN
+            hac_buffer_reset!(cache.ret_buffer, newly_inactive)
+            centring_lag_reset!(cache.lag_records, newly_inactive)
         end
         cache.active .= active_mask
     else
@@ -752,38 +1257,39 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
     end
 
     copyto!(cache.old_obs_count, cache.obs_count)
-
-    Xi = if ce.centred
-        X
-    else
-        loc = replace(cache.location, NaN => zero(eltype(cache.location)))
-        cache.location[valid] = ce.decay * view(loc, valid) +
-                                (one(eltype(cache.location)) - ce.decay) * view(X, valid)
-        X - loc
-    end
+    Xi, dvalid = centring_location!(ce.centring, cache.location, cache.obs_count, X, valid,
+                                    ce.decay)
+    f = centring_factor.(Ref(ce.centring), ce.decay, cache.old_obs_count)
+    K = centring_terms.(Ref(ce.centring), cache.old_obs_count)
 
     # A `regime_method` of `nothing` empties the mask, so no `z²` is formed and no regime state
-    # advances. It is a conjunction rather than a branch, which keeps one code path.
-    regime_mask = valid .& (cache.old_obs_count .>= ce.min_obs) .&
+    # advances. It is a conjunction rather than a branch, which keeps one code path. The gate
+    # skips an estimate too young for its statistic to have a finite variance.
+    regime_mask = dvalid .&
+                  centring_ready.(Ref(ce.centring), cache.old_obs_count, ce.min_obs) .&
+                  regime_bias_open.(Ref(ce.debias), 1, ce.decay, K, ce.hac_lags) .&
                   !isnothing(ce.regime_method)
     fill!(cache.z2, NaN)
     var_idx = regime_mask .& (cache.variance .>= ce.min_val)
     if any(var_idx)
-        factor = inv.(max.(one(ce.decay) .- ce.decay .^ cache.old_obs_count[var_idx],
-                           eps(ce.decay)))
-        var_corrected = view(cache.variance, var_idx) .* factor
-        cache.z2[var_idx] = view(Xi, var_idx) .^ 2 ./ var_corrected
+        Kv = view(K, var_idx)
+        factor = inv.(max.(one(ce.decay) .- ce.decay .^ Kv, eps(ce.decay)))
+        var_corrected = view(cache.variance, var_idx) .* factor .*
+                        regime_bias!.(Ref(cache.bias), Ref(ce.regime_method), ce.decay, Kv,
+                                      ce.hac_lags, Ref(ce.centring), Ref(ce.debias))
+        cache.z2[var_idx] = view(Xi, var_idx) .^ 2 ./ view(f, var_idx) ./ var_corrected
     end
 
-    X2 = hac_squared_returns!(cache, ce, Xi, valid)
-    cache.variance[valid] .= ce.decay * view(cache.variance, valid) +
-                             (one(ce.decay) - ce.decay) * view(X2, valid)
+    X2 = hac_squared_returns!(cache, ce, Xi, valid, dvalid, f)
+    cache.variance[dvalid] .= ce.decay * view(cache.variance, dvalid) +
+                              (one(ce.decay) - ce.decay) * view(X2, dvalid)
     cache.obs_count[valid] .+= 1
 
     if !isnothing(cache.ret_buffer)
         X_new = copyto!(similar(cache.X2), Xi)
-        X_new[.!valid] .= NaN
+        X_new[.!dvalid] .= NaN
         push!(cache.ret_buffer, X_new)
+        centring_lag_push!(cache.lag_records, cache.old_obs_count, valid, nothing)
     end
 
     if !isnothing(estimation_mask)
@@ -880,17 +1386,17 @@ function regime_adjusted_variance_pass!(f, ce::RegimeAdjustedExpWeightedVariance
     # The state holds a variance and a `NaN`, so an integer panel computes in its floating
     # point type, and every other type is kept: a `Float32` panel keeps a `Float32` state.
     Tf = float_if_integer(eltype(X))
-    # An uncentred estimator seeds its location from the first observation it sees, so the
-    # location starts as `NaN`.
-    location = ce.centred ? zeros(Tf, N) : fill(convert(Tf, NaN), N)
+    # The location starts as `NaN`, which marks an asset with no valid observation.
     cache = if isnothing(state)
         RegimeAdjustedVarianceState(if isnothing(ce.hac_lags)
                                         nothing
                                     else
                                         DataStructures.CircularBuffer{Vector{Tf}}(ce.hac_lags)
                                     end, zeros(Tf, N), zeros(Tf, N), zeros(Tf, N),
-                                    fill(convert(Tf, NaN), N), location, zeros(Int, N),
-                                    zeros(Int, N), trues(N), nothing, zero(Tf))
+                                    fill(convert(Tf, NaN), N), fill(convert(Tf, NaN), N),
+                                    zeros(Int, N), zeros(Int, N), trues(N), nothing,
+                                    zero(Tf), regime_bias_state(ce, Tf),
+                                    centring_lag_records(ce.centring, ce.hac_lags, nothing))
     else
         @argcheck(length(state.variance) == N,
                   DimensionMismatch("the state holds $(length(state.variance)) assets, and `X` holds $N"))
@@ -954,7 +1460,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Read the regime-adjusted variance out of a cache, as it stands.
 
 Applies the exponentially weighted bias correction, blanks every asset that is not ready, and
-scales by the square of the regime multiplier. The cache is read, never written, so the same
+scales by the square of the regime multiplier. A HAC state is a quadratic form whose weight matrix
+is indefinite, so it can fall below zero, and the variance is floored at zero here rather than in
+the recursion, which stays unbiased. The cache is read, never written, so the same
 cache answers this call after every observation of a forward pass.
 
 Where `ce.regime_method` is `nothing`, [`process_observation!`](@ref) advances no regime state, so
@@ -962,7 +1470,8 @@ Where `ce.regime_method` is `nothing`, [`process_observation!`](@ref) advances n
 multiplier is then one and the variance is the plain recursion.
 
 Where `ce.regime_lohi_mult` is not `nothing`, the multiplier is clamped to that `(lo, hi)` range
-before it is squared. Where it is `nothing`, no clamp runs.
+before it is squared. Where it is `nothing`, no clamp runs. The clamp bounds an estimate, so the
+multiplier of one before `regime_min_obs` holds even where `lo > 1` or `hi < 1`.
 
 # Arguments
 
@@ -981,26 +1490,27 @@ before it is squared. Where it is `nothing`, no clamp runs.
 """
 function regime_adjusted_variance(cache::RegimeAdjustedVarianceState,
                                   ce::RegimeAdjustedExpWeightedVariance)
-    variance = copy(cache.variance)
+    variance = max.(cache.variance, zero(eltype(cache.variance)))
     correction = ones(eltype(variance), length(variance))
-    counted = cache.obs_count .> zero(eltype(cache.obs_count))
-    correction[counted] .= inv.(max.(one(ce.decay) .-
-                                     ce.decay .^ view(cache.obs_count, counted),
+    K = centring_terms.(Ref(ce.centring), cache.obs_count)
+    counted = K .> zero(eltype(K))
+    correction[counted] .= inv.(max.(one(ce.decay) .- ce.decay .^ view(K, counted),
                                      eps(eltype(variance))))
     variance .*= correction
-    not_ready = .!cache.active .| (cache.obs_count .< ce.min_obs)
+    not_ready = .!cache.active .| .!centring_ready.(Ref(ce.centring), cache.obs_count, ce.min_obs)
 
     if any(not_ready)
         variance[not_ready] .= NaN
     end
 
+    # The clamp bounds an estimate; the warm-up factor of one is no estimate, so it holds.
     factor = if cache.n_regime_obs < ce.regime_min_obs
         one(eltype(variance))
-    else
+    elseif isnothing(ce.regime_lohi_mult)
         regime_multiplier(ce.regime_method, cache.regime_state)
-    end
-    if !isnothing(ce.regime_lohi_mult)
-        factor = clamp(factor, ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
+    else
+        clamp(regime_multiplier(ce.regime_method, cache.regime_state),
+              ce.regime_lohi_mult[1], ce.regime_lohi_mult[2])
     end
 
     return variance * factor^2
@@ -1055,10 +1565,6 @@ function Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::
                         estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                         active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask)
-    if !ce.centred && any(!, cache.active)
-        cache.location[.!cache.active] .= NaN
-    end
-
     return regime_adjusted_variance(cache, ce)
 end
 """
@@ -1184,7 +1690,7 @@ true
 """
 function partial_fit!(ce::RegimeAdjustedExpWeightedVariance{<:Any, <:Any, <:Any, <:Any,
                                                             <:Any, <:Any, <:Any, <:Any,
-                                                            <:Any,
+                                                            <:Any, <:Any, <:Any,
                                                             <:Option{<:RegimeAdjustedVarianceState}},
                       X::MatNum; dims::Int = 1,
                       estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
@@ -1249,7 +1755,7 @@ true
 """
 function partial_fit!(ce::RegimeAdjustedExpWeightedVariance{<:Any, <:Any, <:Any, <:Any,
                                                             <:Any, <:Any, <:Any, <:Any,
-                                                            <:Any,
+                                                            <:Any, <:Any, <:Any,
                                                             <:Option{<:RegimeAdjustedVarianceState}},
                       x::VecNum;
                       estimation_mask::Option{<:AbstractVector{<:Bool}} = nothing,
@@ -1521,7 +2027,7 @@ end
 
 Refuses a pair of regime-adjusted states, because this family does not merge.
 
-A merge needs the state of a block to be a sufficient statistic for what that block contributes, and this one is not. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count, so a block fitted from a cold start weighs its own first observations differently from the same block fitted after another. The exponentially weighted accumulator itself does fold, as ``\\lambda^{n_B} v_A + v_B``, but the regime state that scales it does not, and an uncentred fit also carries its running location while a HAC fit carries its buffer of recent returns.
+A merge needs the state of a block to be a sufficient statistic for what that block contributes, and this one is not. The regime state reads each observation's standardised squared innovation, which divides by the running variance and is gated by the running observation count, so a block fitted from a cold start weighs its own first observations differently from the same block fitted after another. The exponentially weighted accumulator itself does fold, as ``\\lambda^{n_B} v_A + v_B``, but the regime state that scales it does not, and a fit under [`EstimatedCentring`](@ref) also carries its running location while a HAC fit carries its buffer of recent returns.
 
 Fold the second block into the first with [`partial_fit!`](@ref) instead. A sequential fit is exact, and it is the route this family gives.
 
@@ -1578,7 +2084,7 @@ This family answers `copy` and refuses `merge_states`. The two methods are indep
 # Algorithm
 
  1. Rebuild the circular buffer at the capacity of `x.ret_buffer`, and push a copy of each observation it holds. Take `nothing` when `x.ret_buffer` is `nothing`, which is the estimator that runs no HAC correction.
- 2. Name the constructor, and pass a copy of each array field and the two scalar fields unchanged.
+ 2. Name the constructor, and pass a copy of each array field and the two scalar fields unchanged. The table of bias factors and the buffer of lagged records are each `nothing` or a container, and `deepcopy` copies a container and returns `nothing` unchanged.
 
 # Arguments
 
@@ -1607,7 +2113,8 @@ function Base.copy(x::RegimeAdjustedVarianceState)
     return RegimeAdjustedVarianceState(ret_buffer, copy(x.variance), copy(x.X2),
                                        copy(x.X_old_i), copy(x.z2), copy(x.location),
                                        copy(x.obs_count), copy(x.old_obs_count),
-                                       copy(x.active), x.regime_state, x.n_regime_obs)
+                                       copy(x.active), x.regime_state, x.n_regime_obs,
+                                       deepcopy(x.bias), deepcopy(x.lag_records))
 end
 """
     Statistics.var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum,
@@ -1670,7 +2177,7 @@ function supports_partial_fit(::RegimeAdjustedExpWeightedVariance)
     return true
 end
 function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
-    return exp_weighted_variance_count(ve.decay, X)
+    return exp_weighted_variance_count(ve.decay, X, ve.centring)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance

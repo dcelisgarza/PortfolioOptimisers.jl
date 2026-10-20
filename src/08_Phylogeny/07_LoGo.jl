@@ -148,7 +148,7 @@ Abstract supertype for all inverse matrix sparsification algorithms.
 
 A member of this family imposes a sparsity pattern on the **inverse** of a covariance matrix rather than on the matrix itself. The covariance that comes back is dense; what is sparse is its precision, and the zeros there are the conditional independences the information filtering network selected.
 
-The family declares no seam of its own, and no method dispatches on this supertype. A concrete subtype is reached through the [`matrix_processing_algorithm!`](@ref) of [`AbstractMatrixProcessingAlgorithm`](@ref), which is the interface it inherits and which `src/04_MatrixProcessing/04_MatrixProcessing.jl` owns. [`LoGo`](@ref) is the shipped member, and [`matrix_processing_algorithm!`](@ref) states the contract that method satisfies.
+The family declares no interface of its own, and no method dispatches on this supertype. A concrete subtype is reached through the [`matrix_processing_algorithm!`](@ref) of [`AbstractMatrixProcessingAlgorithm`](@ref), which is the interface it inherits and which `src/04_MatrixProcessing/04_MatrixProcessing.jl` owns. [`LoGo`](@ref) is the shipped member, and [`matrix_processing_algorithm!`](@ref) states the contract that method satisfies.
 
 # Related
 

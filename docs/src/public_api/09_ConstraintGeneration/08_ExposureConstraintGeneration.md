@@ -1,8 +1,8 @@
 ```@meta
-Description = "Exposure Constraints, public API of PortfolioOptimisers.jl: AbstractConstraintSpace, FactorSpace, ExposureConstraintEstimator, constraint_space_basis, …"
+Description = "Exposure constraint generation, public API of PortfolioOptimisers.jl: AbstractConstraintSpace, FactorSpace, ExposureConstraintEstimator, …"
 ```
 
-# Exposure Constraints
+# Exposure constraint generation
 
 ```@docs
 AbstractConstraintSpace

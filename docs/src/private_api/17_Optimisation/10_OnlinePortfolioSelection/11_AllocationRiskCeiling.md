@@ -1,8 +1,8 @@
 ```@meta
-Description = "The risk ceiling of a programme Allocation Set, private API of PortfolioOptimisers.jl: assert_risk_ceiling, risk_reads_rows, allocation_set_prior, …"
+Description = "Allocation risk ceiling, private API of PortfolioOptimisers.jl: assert_risk_ceiling, risk_reads_rows, allocation_set_prior, prior_investable_mask, …"
 ```
 
-# The risk ceiling of a programme Allocation Set: private API
+# Allocation risk ceiling: private API
 
 ```@docs
 PortfolioOptimisers.assert_risk_ceiling

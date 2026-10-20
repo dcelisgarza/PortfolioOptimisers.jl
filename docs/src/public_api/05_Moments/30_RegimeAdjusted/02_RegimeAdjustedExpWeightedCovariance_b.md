@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Covariance (b), public API of PortfolioOptimisers.jl: cov, cor, partial_fit!, var, std, merge_states."
+Description = "Regime adjusted exp weighted covariance (b), public API of PortfolioOptimisers.jl: cov, cor, partial_fit!, var, std, merge_states."
 ```
 
-# Regime Adjusted Exponential Weighted Covariance (b)
+# Regime adjusted exp weighted covariance (b)
 
 ## Functions
 

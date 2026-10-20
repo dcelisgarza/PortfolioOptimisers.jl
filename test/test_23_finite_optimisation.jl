@@ -261,6 +261,29 @@ end
                        1.0 * !iszero(money[1]) +
                        3.0 * !iszero(money[2]))
     end
+    # #1518: a negative short rate is a credit, so the short side's fee falls as its money
+    # grows. The fixed fee's binary needs a share bound, and the credit raises it to
+    # `cash / (p (1 + T s))`.
+    fcr = Fees(; l = 0.002, s = -0.002, fl = 1.0, fs = 3.0)
+    for alloc in (da, ga)
+        rcr = optimise(alloc,
+                       FiniteAllocationInput(; w = wls, prices = p, cash = cash,
+                                             horizon = T, fees = fcr))
+        money = collect(rcr.shares) .* p
+        @test !iszero(money[2])
+        @test isapprox(rcr.fees,
+                       T * (0.002 * money[1] + 0.002 * money[2]) +
+                       1.0 * !iszero(money[1]) +
+                       3.0 * !iszero(money[2]))
+    end
+    # A credit that pays the whole position over the horizon leaves the cash no bound on
+    # the share count, so the binary of the fixed fee has none either.
+    @test_throws DomainError optimise(da,
+                                      FiniteAllocationInput(; w = wls, prices = p,
+                                                            cash = cash, horizon = T,
+                                                            fees = Fees(; l = 2 / T,
+                                                                        s = -2 / T,
+                                                                        fs = 3.0)))
 end
 # Issue #914: an optimisation that reduced to its Investable Mask hands the allocator a
 # **two-axis** `Fees` beside a **full-length** `w`. The input carries the mask, the fee is

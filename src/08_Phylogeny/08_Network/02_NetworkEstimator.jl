@@ -78,10 +78,15 @@ $(DocStringExtensions.FIELDS)
         ce::StatsBase.CovarianceEstimator = PortfolioOptimisersCovariance(),
         de::AbstractDistanceEstimator = Distance(; alg = CanonicalDistance()),
         alg::Tree_SimMat = KruskalTree(),
-        sep::AbstractSeparationAlgorithm = HopCount()
+        sep::AbstractSeparationAlgorithm = HopCount(),
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> NetworkEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
 
 ## Propagated parameters
 
@@ -96,7 +101,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 The one exception is a consumer that reads the **structure** rather than a closure of it, and `sep` is **inert** there: the weighted routes of [`centrality_graph`](@ref) take the weighted graph itself, because a closure is a sum of matrix powers and a power of a weighted matrix sums *products* of distances. So a [`HopCount`](@ref) of `n = 2` moves a [`DegreeCentrality`](@ref) and leaves a [`ClosenessCentrality`](@ref) where it was. At the default `HopCount(; n = 1)` nothing is visible, since the closure of a graph at one hop is the graph.
 
-The budget rides on the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops — which [`PathLength`](@ref) does, budgeting in the distance estimator's units instead.
+The budget is a field of the member: `HopCount(; n = 2)` rather than a bare `n = 2` beside `sep`. A budget stated apart from the rule that measures it has no statable unit, and becomes a dead field the moment a member measures something other than hops — which [`PathLength`](@ref) does, budgeting in the distance estimator's units instead.
 
 Only [`HopCount`](@ref) is admitted by every consumer, and the split falls on whether the consumer walks a **matrix power**. Both [`clusterise`](@ref) methods accumulate ``\\sum_{i=0}^{n}(\\mathbf{D}^i - \\mathbf{A}^i)``, so they read `sep.n` as a power count and refuse [`PathLength`](@ref) at dispatch: a radius has no analogue of a matrix power. [`phylogeny_matrix`](@ref) and [`Proximity`](@ref) take either, each through a method of its own — a hop ball is a clamped power sum, a radius ball is a threshold on [`separation_matrix`](@ref).
 
@@ -105,31 +110,32 @@ Only [`HopCount`](@ref) is admitted by every consumer, and the split falls on wh
 ```jldoctest
 julia> NetworkEstimator()
 NetworkEstimator
-   ce ┼ PortfolioOptimisersCovariance
-      │   ce ┼ Covariance
-      │      │    me ┼ SimpleExpectedReturns
-      │      │       │   w ┴ nothing
-      │      │    ce ┼ GeneralCovariance
-      │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │      │       │    w ┴ nothing
-      │      │   alg ┼ FullMoment()
-      │      │     w ┴ nothing
-      │   mp ┼ MatrixProcessing
-      │      │     pdm ┼ Posdef
-      │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │      │      dn ┼ nothing
-      │      │      dt ┼ nothing
-      │      │     alg ┼ nothing
-      │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-   de ┼ Distance
-      │   power ┼ nothing
-      │     alg ┴ CanonicalDistance()
-  alg ┼ KruskalTree
-      │     args ┼ Tuple{}: ()
-      │   kwargs ┴ @NamedTuple{}: NamedTuple()
-  sep ┼ HopCount
-      │   n ┴ Int64: 1
+     ce ┼ PortfolioOptimisersCovariance
+        │   ce ┼ Covariance
+        │      │    me ┼ SimpleExpectedReturns
+        │      │       │   w ┴ nothing
+        │      │    ce ┼ GeneralCovariance
+        │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │      │       │    w ┴ nothing
+        │      │   alg ┼ FullMoment()
+        │      │     w ┴ nothing
+        │   mp ┼ MatrixProcessing
+        │      │     pdm ┼ Posdef
+        │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │      │      dn ┼ nothing
+        │      │      dt ┼ nothing
+        │      │     alg ┼ nothing
+        │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+     de ┼ Distance
+        │   power ┼ nothing
+        │     alg ┴ CanonicalDistance()
+    alg ┼ KruskalTree
+        │     args ┼ Tuple{}: ()
+        │   kwargs ┴ @NamedTuple{}: NamedTuple()
+    sep ┼ HopCount
+        │   n ┴ Int64: 1
+  x_src ┴ nothing
 ```
 
 # Related
@@ -164,10 +170,19 @@ NetworkEstimator
     $(field_dict[:ntsep])
     """
     sep
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
     function NetworkEstimator(ce::StatsBase.CovarianceEstimator,
                               de::AbstractDistanceEstimator, alg::Tree_SimMat,
-                              sep::AbstractSeparationAlgorithm)
-        return new{typeof(ce), typeof(de), typeof(alg), typeof(sep)}(ce, de, alg, sep)
+                              sep::AbstractSeparationAlgorithm,
+                              x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :NetworkEstimator)
+        return new{typeof(ce), typeof(de), typeof(alg), typeof(sep), typeof(x_src)}(ce, de,
+                                                                                    alg,
+                                                                                    sep,
+                                                                                    x_src)
     end
 end
 function NetworkEstimator(;
@@ -175,8 +190,9 @@ function NetworkEstimator(;
                           de::AbstractDistanceEstimator = Distance(;
                                                                    alg = CanonicalDistance()),
                           alg::Tree_SimMat = KruskalTree(),
-                          sep::AbstractSeparationAlgorithm = HopCount())
-    return NetworkEstimator(ce, de, alg, sep)
+                          sep::AbstractSeparationAlgorithm = HopCount(),
+                          x_src::Option{<:AbstractReturnsSource} = nothing)
+    return NetworkEstimator(ce, de, alg, sep, x_src)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -194,10 +210,16 @@ $(DocStringExtensions.FIELDS)
     NetworkClustersEstimator(;
         nte::AbstractNetworkEstimator = NetworkEstimator(),
         alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters()
+        onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters(),
+        x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> NetworkClustersEstimator
 
 Keywords correspond to the struct's fields.
+
+## Validation
+
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `returns_source(nte) === nothing`: the network estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
 
 ## Propagated parameters
 
@@ -212,43 +234,45 @@ The power sums both [`clusterise`](@ref) methods accumulate are indexed by `nte.
 ```jldoctest
 julia> NetworkClustersEstimator()
 NetworkClustersEstimator
-  nte ┼ NetworkEstimator
-      │    ce ┼ PortfolioOptimisersCovariance
-      │       │   ce ┼ Covariance
-      │       │      │    me ┼ SimpleExpectedReturns
-      │       │      │       │   w ┴ nothing
-      │       │      │    ce ┼ GeneralCovariance
-      │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-      │       │      │       │    w ┴ nothing
-      │       │      │   alg ┼ FullMoment()
-      │       │      │     w ┴ nothing
-      │       │   mp ┼ MatrixProcessing
-      │       │      │     pdm ┼ Posdef
-      │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-      │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │       │      │      dn ┼ nothing
-      │       │      │      dt ┼ nothing
-      │       │      │     alg ┼ nothing
-      │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-      │    de ┼ Distance
-      │       │   power ┼ nothing
-      │       │     alg ┴ CanonicalDistance()
-      │   alg ┼ KruskalTree
-      │       │     args ┼ Tuple{}: ()
-      │       │   kwargs ┴ @NamedTuple{}: NamedTuple()
-      │   sep ┼ HopCount
-      │       │   n ┴ Int64: 1
-  alg ┼ HClustAlgorithm
-      │   linkage ┴ Symbol: :ward
-  onc ┼ OptimalNumberClusters
-      │   max_k ┼ nothing
-      │     alg ┼ SecondOrderDifference
-      │         │   alg ┼ StandardisedValue
-      │         │       │   mv ┼ MeanValue
-      │         │       │      │   w ┴ nothing
-      │         │       │   sv ┼ StdValue
-      │         │       │      │           w ┼ nothing
-      │         │       │      │   corrected ┴ Bool: true
+    nte ┼ NetworkEstimator
+        │      ce ┼ PortfolioOptimisersCovariance
+        │         │   ce ┼ Covariance
+        │         │      │    me ┼ SimpleExpectedReturns
+        │         │      │       │   w ┴ nothing
+        │         │      │    ce ┼ GeneralCovariance
+        │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+        │         │      │       │    w ┴ nothing
+        │         │      │   alg ┼ FullMoment()
+        │         │      │     w ┴ nothing
+        │         │   mp ┼ MatrixProcessing
+        │         │      │     pdm ┼ Posdef
+        │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+        │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │         │      │      dn ┼ nothing
+        │         │      │      dt ┼ nothing
+        │         │      │     alg ┼ nothing
+        │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+        │      de ┼ Distance
+        │         │   power ┼ nothing
+        │         │     alg ┴ CanonicalDistance()
+        │     alg ┼ KruskalTree
+        │         │     args ┼ Tuple{}: ()
+        │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+        │     sep ┼ HopCount
+        │         │   n ┴ Int64: 1
+        │   x_src ┴ nothing
+    alg ┼ HClustAlgorithm
+        │   linkage ┴ Symbol: :ward
+    onc ┼ OptimalNumberClusters
+        │   max_k ┼ nothing
+        │     alg ┼ SecondOrderDifference
+        │         │   alg ┼ StandardisedValue
+        │         │       │   mv ┼ MeanValue
+        │         │       │      │   w ┴ nothing
+        │         │       │   sv ┼ StdValue
+        │         │       │      │           w ┼ nothing
+        │         │       │      │   corrected ┴ Bool: true
+  x_src ┴ nothing
 ```
 
 # Related
@@ -272,16 +296,32 @@ NetworkClustersEstimator
     $(field_dict[:onc])
     """
     onc
+    """
+    $(field_dict[:x_src_graph])
+    """
+    x_src
     function NetworkClustersEstimator(nte::AbstractNetworkEstimator,
                                       alg::AbstractClustersAlgorithm,
-                                      onc::AbstractOptimalNumberClustersEstimator)
-        return new{typeof(nte), typeof(alg), typeof(onc)}(nte, alg, onc)
+                                      onc::AbstractOptimalNumberClustersEstimator,
+                                      x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, ALL_RETURNS_SOURCES, :NetworkClustersEstimator)
+        assert_inner_reader(nte, :nte, :NetworkClustersEstimator)
+        return new{typeof(nte), typeof(alg), typeof(onc), typeof(x_src)}(nte, alg, onc,
+                                                                         x_src)
     end
 end
 function NetworkClustersEstimator(; nte::AbstractNetworkEstimator = NetworkEstimator(),
                                   alg::AbstractClustersAlgorithm = HClustAlgorithm(),
-                                  onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters())
-    return NetworkClustersEstimator(nte, alg, onc)
+                                  onc::AbstractOptimalNumberClustersEstimator = OptimalNumberClusters(),
+                                  x_src::Option{<:AbstractReturnsSource} = nothing)
+    return NetworkClustersEstimator(nte, alg, onc, x_src)
+end
+function returns_source(x::Union{<:NetworkEstimator, <:NetworkClustersEstimator})
+    return x.x_src
+end
+function reader_frames(x::Union{<:NetworkEstimator, <:NetworkClustersEstimator},
+                       path::AbstractString, ::Bool)
+    return source_frames(x.x_src, path, true)
 end
 
 export NetworkEstimator, NetworkClustersEstimator

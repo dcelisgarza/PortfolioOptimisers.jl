@@ -23,9 +23,9 @@ Keywords correspond to the struct's fields.
 
 The composite folds by **composition**, and the state it carries decides which of the two routes it takes.
 
-With `cache` holding `nothing`, [`partial_fit!`](@ref) forwards the observation to `ce.ce` and keeps nothing of its own, because `mp` reads no observation that a moment and a count cannot stand in for: `pdm` and `dt` read `sigma` alone, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) then reads the inner estimator's folded matrix and applies `mp` from [`observation_count`](@ref), which is exactly the `size(X, 1)` the matrix arm would have read. An `mp.alg` of a caller's own is the one step with no shape substitute, and it is refused by name at the fold.
+With `cache` holding `nothing`, [`partial_fit!`](@ref) forwards the observation to `ce.ce` and keeps nothing of its own, because `mp` reads no observation that a moment and a count cannot stand in for: `pdm` and `dt` read `sigma` alone, and `dn` reads the effective sample ratio `T / N`. The one-argument [`Statistics.cov`](@ref) then reads the inner estimator's folded matrix and applies `mp` from [`observation_count`](@ref), which is exactly the `size(X, 1)` the matrix arm would have read. An `mp.alg` of a caller's own is the one step with no shape substitute, and it is refused at the fold with an error that names it.
 
-With `cache` holding a [`SampleBufferState`](@ref) — which [`Online`](@ref) seeds — the composite takes the buffering route instead, and its read-out is the batch verb over the observations the buffer kept. That is the route an `mp.alg` needs.
+With `cache` holding a [`SampleBufferState`](@ref) — which [`Online`](@ref) seeds — the composite takes the buffering route instead, and `cov(ce)` with no data runs the batch verb over the observations the buffer kept. That is the route an `mp.alg` needs.
 
 ## Propagated parameters
 
@@ -432,15 +432,15 @@ end
 
 Folds observations into a [`PortfolioOptimisersCovariance`](@ref) by forwarding them to `ce.ce`.
 
-The composite is **exact by composition** and keeps no state of its own: `ce.ce` folds the raw matrix, and `ce.mp` is a read-out step that runs on whatever matrix it is given. The composite therefore owns no accumulator, and its `cache` stays `nothing` on this route — which is what selects the route, because a composite carrying a [`SampleBufferState`](@ref) is one [`Online`](@ref) seeded and takes the buffering fold instead.
+The composite is **exact by composition** and keeps no state of its own: `ce.ce` folds the raw matrix, and `ce.mp` is a step of `cov(ce)` with no data, which runs on whatever matrix it is given. The composite therefore owns no accumulator, and its `cache` stays `nothing` on this route — which is what selects the route, because a composite carrying a [`SampleBufferState`](@ref) is one [`Online`](@ref) seeded and takes the buffering fold instead.
 
 The step is `O(N²)`, the inner estimator's own, plus nothing.
 
-`ce.mp` reads no observation that a moment and a count cannot stand in for, with one exception: an `mp.alg` of a caller's own is handed the whole sample, and [`assert_shape_only_matrix_processing`](@ref) refuses it here, at the fold, rather than at the read-out where the rows would already be gone.
+`ce.mp` reads no observation that a moment and a count cannot stand in for, with one exception: an `mp.alg` of a caller's own is handed the whole sample, and [`assert_shape_only_matrix_processing`](@ref) refuses it here, at the fold, rather than at `cov(ce)` with no data, where the rows would already be gone.
 
 # Algorithm
 
- 1. Refuse an `mp` carrying a sample-reading `alg`.
+ 1. Refuse an `mp` that does not run from the shape of the sample, with [`assert_shape_only_matrix_processing`](@ref).
  2. Rebind `ce.ce` to the estimator [`partial_fit!`](@ref) gives, with `Accessors.@reset`.
 
 # Arguments
@@ -453,7 +453,7 @@ The step is `O(N²)`, the inner estimator's own, plus nothing.
 
 # Validation
 
-  - `ce.mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ce.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -483,7 +483,7 @@ end
 
 Reads the covariance, or the correlation, a folded [`PortfolioOptimisersCovariance`](@ref) has accumulated.
 
-The read-out of the composition fold. `ce.ce` answers its own folded matrix, and `ce.mp` is applied to it from the **shape** of the sample: [`observation_count`](@ref) reads the number of observations folded off the inner state, and it is exactly the `size(X, 1)` the matrix arm of [`matrix_processing!`](@ref) would have read, `NaN` rows included. The substitution is therefore an identity, not an approximation, and this method answers what a batch fit over the same observations answers.
+The method that makes the estimate from the composition fold, `cov(ce)` or `cor(ce)` with no data. `ce.ce` answers its own folded matrix, and `ce.mp` is applied to it from the **shape** of the sample: [`observation_count`](@ref) reads the number of observations folded off the inner state, and it is exactly the `size(X, 1)` the matrix arm of [`matrix_processing!`](@ref) would have read, `NaN` rows included. The substitution is therefore an identity, not an approximation, and this method answers what a batch fit over the same observations answers.
 
 The matrix the inner estimator returns is copied when it is immutable, because the processing writes in place, exactly as the matrix methods beside this one do.
 
@@ -502,7 +502,7 @@ The matrix the inner estimator returns is copied when it is immutable, because t
 # Validation
 
   - `ce.ce` carries a partial-fit state. An `ArgumentError` is thrown otherwise.
-  - `ce.mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `ce.mp` runs from the shape of the sample, as [`assert_shape_only_matrix_processing`](@ref) states. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
@@ -538,7 +538,7 @@ end
 
 Reads the covariance, or the correlation, of a buffered [`PortfolioOptimisersCovariance`](@ref) by refitting over its buffer.
 
-The read-out of the buffering route, which [`Online`](@ref) seeds and which an `mp.alg` of a caller's own needs. It is the batch verb over the observations the buffer kept, so it answers exactly what a batch fit over those rows answers, `mp.alg` included.
+The method that makes the estimate from the buffering route, which [`Online`](@ref) seeds and which an `mp.alg` of a caller's own needs. It is the batch verb over the observations the buffer kept, so it answers exactly what a batch fit over those rows answers, `mp.alg` included.
 
 # Arguments
 
@@ -573,7 +573,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 [`PortfolioOptimisersCovariance`](@ref) method of [`supports_partial_fit`](@ref).
 
-The composite folds by composition, so it folds exactly when both of its halves allow it: the inner estimator must fold, and `mp` must carry no sample-reading `alg`. A composite a wrapper has given a buffer folds whatever those two say, which is the default and is what makes an `mp.alg` reachable online at all.
+The composite folds by composition, so it folds exactly when both of its halves allow it: the inner estimator must fold, and `mp` must run from the shape of the sample, as [`supports_shape_processing`](@ref) states. A [`MatrixProcessing`](@ref) passes when it carries no sample-reading `alg`, and a matrix processing estimator of a caller never passes. A composite a wrapper has given a buffer folds whatever those two say, which is the default and is what makes an `mp.alg` reachable online at all.
 
 # Arguments
 
@@ -591,7 +591,7 @@ The composite folds by composition, so it folds exactly when both of its halves 
 """
 function supports_partial_fit(ce::PortfolioOptimisersCovariance)
     return isa(ce.cache, SampleBufferState) ||
-           (isnothing(ce.mp.alg) && supports_partial_fit(ce.ce))
+           (supports_shape_processing(ce.mp) && supports_partial_fit(ce.ce))
 end
 
 export PortfolioOptimisersCovariance

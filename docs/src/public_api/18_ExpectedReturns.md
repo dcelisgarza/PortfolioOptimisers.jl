@@ -11,6 +11,11 @@ PerformanceSummaryResult
 expected_risk(r::ExpectedReturn, w::VecNum, pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
 expected_risk(r::ExpectedReturnRiskRatio, w::VecNum, pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
 performance_summary
+probabilistic_sharpe_ratio
+minimum_track_record_length
+expected_max_sharpe_ratio
+deflated_sharpe_ratio
+implied_independent_trials
 expected_risk(r::PrRM, w::VecVecNum, pr::AbstractPriorResult, fees::Option{<:Fees} = nothing; kwargs...)
 expected_risk(r::PrRM, pred::PredictionResult{<:Any, <:PredictionReturnsResult{<:Any, <:VecNum}}; kwargs...)
 expected_return
@@ -22,6 +27,7 @@ factory(r::ExpectedReturn, args...; kwargs...)
 factory(r::ExpectedReturnRiskRatio, args...; kwargs...)
 brinson_attribution
 needs_previous_weights(r::ExpectedReturnRiskRatio)
+supports_precomputed_returns(::PrRM)
 ```
 
 ## References

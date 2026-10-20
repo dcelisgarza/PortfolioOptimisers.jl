@@ -11,7 +11,7 @@ characteristic, such as momentum or low volatility, and holds the top 20 % with 
 Some versions also short the bottom 20 %. Both look naive, and both often do better than the
 portfolios that come from theory.
 
-Zhou and Palomar [quintile](@cite) show that both are the exact solutions of a robust
+[quintile](@citet) show that both are the exact solutions of a robust
 optimisation problem. The problem maximises the worst-case characteristic of the portfolio,
 when the true characteristic lies in an ℓ1 ball around your estimate. The radius `ε` of the
 ball is the only parameter, and it sets how many assets the portfolio holds.
@@ -29,8 +29,9 @@ Because the quintile portfolio is the solution of a robust problem, the library 
 quintile optimiser. An ℓ1 ball is an
 [uncertainty set](@ref example-uncertainty-sets), so the quintile portfolio is a [`MeanRisk`](@ref)
 problem with an ℓ1 `ucs`, and every constraint of the library applies to it. This page computes
-the sweep over `ε` behind the table above, the models of the paper, a ranking on a
-characteristic other than return, and the portfolios from theory that the paper compares with.
+the sweep over `ε` behind the table above, the models of [quintile](@cite), a ranking on a
+characteristic other than return, and the portfolios from theory that [quintile](@cite)
+compares with.
 
 !!! tip "When to reach for this"
     Reach for an ℓ1 set when you have a ranking that you trust in part. Do not set `ε`
@@ -107,7 +108,7 @@ gives almost the 1/N portfolio.
 
 We print the radius that gives each of four portfolios, which hold one asset, 20 % of the
 assets, half of them and all of them. `ladder(k)` is the radius at which the k-th best asset
-joins the portfolio, from Lemma 2 of the paper, so a radius between `ladder(k)` and
+joins the portfolio, from Lemma 2 of [quintile](@cite), so a radius between `ladder(k)` and
 `ladder(k + 1)` gives `k` assets. The last asset has no `ladder(N + 1)`, so every radius past
 `ladder(N)` gives 1/N. At exactly `ladder(N)` the last asset can stay at zero, so the table
 prints `1.25 ladder(N)`, the radius that section 12 solves at.
@@ -125,7 +126,7 @@ pretty_table(DataFrame(;
 
 #=
 You do not need to find these radii by hand. [`ActiveAssetsUncertaintyAlgorithm`](@ref)
-inverts the closed forms of the paper. You give it the number of assets you want to hold, as a
+inverts the closed forms of [quintile](@cite). You give it the number of assets you want to hold, as a
 count or as a fraction, and it finds the radius. We build the set for 20 % of the assets.
 
 !!! warning "The number of assets sets the radius, and it does not constrain the portfolio"
@@ -185,14 +186,14 @@ hline!([round(Int, 0.2 * N)]; label = "quintile (20%)", linestyle = :dash)
 
 The ball above assumes the same error in the estimate of each asset's characteristic. But the
 mean return of a volatile asset is harder to estimate than that of a calm one. The set `A₁` of
-the paper scales the ball by the volatility of each asset. The active assets then take weights
+[quintile](@cite) scales the ball by the volatility of each asset. The active assets then take weights
 in inverse proportion to their volatility, instead of equal weights. Only the shape of the ball
 changes, and the objective and the constraints stay the same.
 
 With the estimator, `scaled = true` on [`L1UncertaintySetAlgorithm`](@ref) gives this set.
 Here we build the set directly and pass the volatilities as `sd`. We solve both portfolios at
 the quintile radius, and print their weights next to the inverse-volatility weights that Lemma
-9 of the paper predicts. `gs(k)` is the ladder of the scaled set: it divides each difference
+9 of [quintile](@cite) predicts. `gs(k)` is the ladder of the scaled set: it divides each difference
 `mu_sorted[i] - mu_sorted[k]` of `ladder(k)` by the volatility of asset `i`.
 =#
 
@@ -210,8 +211,8 @@ pretty_table(DataFrame(; asset = rd.nx[act], volatility = sd_hat[act],
              formatters = [resfmt])
 
 #=
-Compare the `inverse_vol` column with `predicted`. Lemma 9 of the paper states that the two are
-equal, and the table prints the same digits in both. At a larger radius every asset is active,
+Compare the `inverse_vol` column with `predicted`. Lemma 9 of [quintile](@cite) states that the two
+are equal, and the table prints the same digits in both. At a larger radius every asset is active,
 and the weights are the inverse-volatility weights of all the assets, the counterpart of 1/N.
 The cell prints `true` if the weights are within `1e-6` of those.
 =#
@@ -222,8 +223,8 @@ isapprox(w_iv_all, (1 ./ sd_hat) ./ sum(1 ./ sd_hat); atol = 1e-6)
 #=
 ## 6. The dollar-neutral long-short quintile
 
-The long-short quintile portfolio is long the top assets and short the bottom ones. The paper
-needs the antisymmetric pairing of its Lemma 5 to solve it. Here it takes two budgets. `bgt = 0`
+The long-short quintile portfolio is long the top assets and short the bottom ones. [quintile](@citet)
+need the antisymmetric pairing of Lemma 5 of [quintile](@cite) to solve it. Here it takes two budgets. `bgt = 0`
 makes the portfolio dollar-neutral, and `sbgt = 0.5` puts half the gross exposure on each side.
 In the solution, the i-th best asset is long and the i-th worst is short, at equal and opposite
 weights, and no constraint of the model imposes that pairing.
@@ -243,7 +244,7 @@ pretty_table(DataFrame(; asset = rd.nx[nz], weight = w_ls[nz],
              formatters = [resfmt])
 
 #=
-The table shows four long and four short positions. Corollary 7 of the paper gives each weight
+The table shows four long and four short positions. Corollary 7 of [quintile](@cite) gives each weight
 as `±1/(2m)`, the net exposure as zero and the gross exposure as one.
 =#
 
@@ -258,8 +259,8 @@ parts of `w`, so `sbgt = 0.3` means at most 30 % short. You do not usually see t
 because the objective pushes the exposure to the budget.
 
 You see it at a very large radius. Past the radius at which every asset is active, the
-worst-case return of the 50/50 portfolio is negative. The paper still holds that portfolio,
-because its constraint `‖w‖₁ = 1` requires full investment. The problem here only bounds the
+worst-case return of the 50/50 portfolio is negative. The model of [quintile](@cite) still holds that
+portfolio, because its constraint `‖w‖₁ = 1` requires full investment. The problem here only bounds the
 exposure, so its optimum is to hold nothing. A portfolio of zeros is of no use, and the library
 returns an optimisation failure instead. The cell prints `true` if the return code is an
 `OptimisationFailure`.
@@ -271,7 +272,7 @@ relaxed = quintile(L1UncertaintySet(; eps = eps_extreme); bgt = 0.0, sbgt = 0.5,
 isa(relaxed.jr.retcode, PortfolioOptimisers.OptimisationFailure)
 
 #=
-With `xbgt = true` the long and the short parts of `w` equal their budgets, as in the paper. The
+With `xbgt = true` the long and the short parts of `w` equal their budgets, as in [quintile](@cite). The
 portfolio stays fully invested and takes the worst-case loss.
 =#
 
@@ -299,9 +300,9 @@ exposure alone, so we use it here. Without it, only the weight bounds of `-1` an
 gross exposure.
 `gbgt` bounds the gross exposure unless `xbgt = true`, so we set both.
 
-The paper notes that the active assets no longer follow the order of the ranking here, so no
+[quintile](@citet) note that the active assets no longer follow the order of the ranking here, so no
 closed form gives the weights. The solver still solves the problem, which `xbgt = true` makes a
-mixed-integer linear program. The paper assumes a positive market beta for each asset, so we
+mixed-integer linear program. [quintile](@citet) assume a positive market beta for each asset, so we
 take the correlation of each asset with the average return of all the assets, and add 0.5 to
 its absolute value.
 =#
@@ -321,8 +322,8 @@ optimum gives.
 
 ## 9. A characteristic other than a return
 
-The paper states that the construction works for any characteristic of an asset, and its Table
-III ranks the assets on their estimated volatility.
+[quintile](@citet) state that the construction works for any characteristic of an asset.
+Table III of [quintile](@cite) ranks the assets on their estimated volatility.
 
 Put the characteristic in the return term. The `mu` field of [`ArithmeticReturn`](@ref) takes
 the vector, or the estimator that computes it, as here. The optimiser computes the vector from
@@ -357,7 +358,7 @@ pretty_table(DataFrame(; asset = rd.nx[act_vol], volatility = sd_assets[act_vol]
     return, so put it in the return term.
 
 The objective maximises the characteristic. With a ranking on volatility, the most volatile
-assets come first. The low-volatility factor of the paper needs the opposite order. If a smaller
+assets come first. The low-volatility factor of [quintile](@cite) needs the opposite order. If a smaller
 value of a characteristic is better, negate it. Here we pass the `mu` field a plain vector, the
 negated volatilities.
 =#
@@ -459,7 +460,7 @@ the cap, and the cap changes the problem.
 
 ## 12. The benchmarks
 
-The paper compares these portfolios with four portfolios from theory, and each is a `MeanRisk`
+[quintile](@citet) compare these portfolios with four portfolios from theory, and each is a `MeanRisk`
 model. GMVP is the global minimum variance portfolio, MVP the mean-variance portfolio, MSRP the
 maximum Sharpe ratio portfolio and GMRP the global maximum return portfolio. GMRP maximises
 return with no risk term. It uses `NoRisk` as section 2 does, and it is the limit of the ℓ1
@@ -488,8 +489,8 @@ benchmarks = Dict("GMVP (min variance)" =>
                       MeanRisk(; opt = lo_opt(), r = Variance(), obj = MaximumRatio()));
 
 #=
-We solve the four and put them in one table with the ℓ1 portfolios of this page. As in the
-paper, the comparison is in sample, on the same estimates that built every portfolio. It shows
+We solve the four and put them in one table with the ℓ1 portfolios of this page. As in
+[quintile](@cite), the comparison is in sample, on the same estimates that built every portfolio. It shows
 what each objective does, and it says nothing about performance out of sample.
 =#
 

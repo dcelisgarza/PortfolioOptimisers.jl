@@ -1,8 +1,8 @@
 ```@meta
-Description = "Ordered Weights Array (a), private API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayEstimator, AbstractOrderedWeightsArrayAlgorithm, …"
+Description = "OWA risk measures (a), private API of PortfolioOptimisers.jl: AbstractOrderedWeightsArrayEstimator, AbstractOrderedWeightsArrayAlgorithm, …"
 ```
 
-# Ordered Weights Array (a): private API
+# OWA risk measures (a): private API
 
 ```@docs
 AbstractOrderedWeightsArrayEstimator
@@ -14,6 +14,7 @@ UnionRSOCSOCRiskExpr
 EntropyFormulation
 OWA_Func_VecNum
 OrderedWeightsArrayFormulation
+assert_owa_formulation_weights(::OrderedWeightsArrayFormulation, ::VecNum)
 OWA_RevFunc
 OWA_CalOccupant
 owa_l_moment_crm_sumsq_obj

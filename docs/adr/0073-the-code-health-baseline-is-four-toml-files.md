@@ -312,7 +312,7 @@ loaded, and one call per extension module.
 the two extension runs are nearly all zeros. That is the price of a total baseline and it is
 accepted.
 
-**The vocabulary stays out of `CONTEXT.md`**, for the reason
+**The vocabulary stays out of `GLOSSARY.md`**, for the reason
 [ADR 0071](0071-a-dismissed-jet-report-is-keyed-by-file-kind-and-message.md) and
 [ADR 0072](0072-the-complexity-gate-measures-src-and-ext.md) both gave. That file's preamble scopes
 it to the library's domain, and a baseline file is repository process.

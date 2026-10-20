@@ -16,4 +16,5 @@ apply_rf
 remove_excl_views
 PortfolioOptimisers.assert_bl_views_axis
 PortfolioOptimisers.bl_posterior
+PortfolioOptimisers.fold_prior_step(pe::BlackLittermanPrior, rd::ReturnsResult, gaps::PortfolioOptimisers.Option{<:AbstractVector{Bool}})
 ```

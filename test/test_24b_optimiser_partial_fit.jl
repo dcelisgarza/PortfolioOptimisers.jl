@@ -11,6 +11,26 @@ with batch per family.
 The fixture is synthetic, because the identities are structural and a solver run over eight
 assets is what keeps the JuMP families cheap.
 =#
+# A prior of a caller's own that refits from a buffer and reads a Panel Field (#1467). Its
+# covariance moves with the field, so the weights of an optimiser over it show whether the
+# read-out received the Panel Fields.
+struct PanelStepProbe{T} <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A
+    cache::T
+end
+function PanelStepProbe(; cache = nothing)
+    return PanelStepProbe(cache)
+end
+function PortfolioOptimisers.reads_panel_fields(::PanelStepProbe)
+    return true
+end
+function PortfolioOptimisers.prior(::PanelStepProbe, X::PortfolioOptimisers.MatNum,
+                                   ::Union{Nothing, <:PortfolioOptimisers.MatNum} = nothing,
+                                   pnl::Union{Nothing, <:PortfolioOptimisers.AssetPanel} = nothing;
+                                   dims::Int = 1, kwargs...)
+    v = vec(Statistics.mean(panel_field(pnl, "cap").vals; dims = 1))
+    return LowOrderPrior(; X = Matrix(X), mu = vec(Statistics.mean(X; dims = 1)),
+                         sigma = Statistics.cov(X) + LinearAlgebra.Diagonal(v .^ 2))
+end
 @testset "Optimiser partial fit: the step folds, the read-out runs the batch path" begin
     using Test, PortfolioOptimisers, Clarabel, StableRNGs, Statistics, Dates, LinearAlgebra
     po = PortfolioOptimisers
@@ -116,6 +136,44 @@ assets is what keeps the JuMP families cheap.
         o = partial_fit!(MeanRisk(; opt = jopt), rows(rd, 1:50))
         o = step(o, rows(rd, 51:t), t - 50)
         @test isapprox(optimise(o).w, optimise(MeanRisk(; opt = jopt), b).w; atol = 1e-5)
+    end
+
+    @testset "A benchmark-relative step folds X - B into the prior (#1645, #1651)" begin
+        # A prior that states `x_src = ExcessSource()` fits `X - B` in batch. The step folds
+        # `X - B` into the prior, and the Fold Context keeps the raw rows, so the read-out
+        # rebuilds the raw returns data and each reader subtracts the benchmark itself
+        # (ADR 0215, decision 1).
+        t = 80
+        epx = EmpiricalPrior(; x_src = ExcessSource())
+        clx = ClustersEstimator(; x_src = ExcessSource())
+        jopt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)
+        jexc = JuMPOptimiser(; pe = epx, slv = slv)
+        hexc = HierarchicalOptimiser(; pe = epx, cle = clx)
+        fams = (MeanRisk(; opt = jexc), HierarchicalRiskParity(; opt = hexc),
+                HierarchicalEqualRiskContribution(; opt = hexc),
+                InverseVolatility(; pe = epx),
+                NestedClustered(; pe = epx, cle = clx, opti = MeanRisk(; opt = jopt),
+                                opto = MeanRisk(; opt = jopt)),
+                SubsetResampling(; pe = epx, opt = MeanRisk(; opt = jopt), seed = 3,
+                                 n_subsets = 3, subset_size = 5))
+        for r in (rdf, rdv), opt in fams
+            b = rows(r, 1:t)
+            o = step(opt, r, t)
+            # The context gives back the raw rows, field by field.
+            @test same_fields(po.returns_result(o), b)
+            solved = isa(opt, po.JuMPOptimisationEstimator) ||
+                     isa(opt, NestedClustered) ||
+                     isa(opt, SubsetResampling)
+            @test isapprox(optimise(o).w, optimise(opt, b).w; atol = solved ? 1e-5 : 1e-10)
+        end
+        # The subtraction is what the step honours: the weights differ from those over `X`.
+        o = step(InverseVolatility(; pe = epx), rdv, t)
+        @test !isapprox(optimise(o).w, optimise(InverseVolatility(), rows(rdv, 1:t)).w;
+                        atol = 1e-6)
+        # The Excess Frame with no benchmark refuses at the first step, as in batch.
+        @test_throws ArgumentError partial_fit!(InverseVolatility(; pe = epx),
+                                                rows(rd, 1:1))
+        @test_throws ArgumentError optimise(InverseVolatility(; pe = epx), rows(rd, 1:t))
     end
 
     @testset "A factor prior folds both matrices, and a wrapping prior forwards" begin
@@ -226,6 +284,85 @@ assets is what keeps the JuMP families cheap.
         rds = ReturnsResult(; nx = nx, X = X, pnl = spnl)
         o = step(EqualWeighted(), rds, 20)
         @test po.returns_result(o).pnl.pf[1].vals == spnl.pf[1].vals
+        # A refit prior that reads the panel records its Panel Fields and both masks, and
+        # `optimise(opt)` with no returns rebuilds the panel from them (#1467).
+        emsk = copy(amsk)
+        emsk[1:40, 2] .= false
+        cap = NumericPanelField(; name = "cap", vals = 1 .+ rand(rng, T, N))
+        rdp = ReturnsResult(; nx = nx, X = X,
+                            pnl = AssetPanel(; pf = [cap], amsk = amsk, emsk = emsk))
+        for t in (35, 100)
+            o = step(po.update_online_estimator(InverseVolatility(;
+                                                                  pe = po.Online(PanelStepProbe()))),
+                     rdp, t)
+            b = rows(rdp, 1:t)
+            rp = po.returns_result(o)
+            @test isequal(only(rp.pnl.pf).vals, only(b.pnl.pf).vals)
+            @test rp.pnl.amsk == b.pnl.amsk && rp.pnl.emsk == b.pnl.emsk
+            # The read-out reads a view of the buffer and the batch fit reads a matrix, so the
+            # weights can differ in the last bit.
+            @test isapprox(optimise(o).w,
+                           optimise(InverseVolatility(; pe = PanelStepProbe()), b).w;
+                           rtol = 1e-12)
+        end
+    end
+
+    @testset "An implied-volatility surface travels the step with the returns (#1632)" begin
+        # The regression of `ImpliedVolatility` reads windows that end at the last
+        # observation, so a new row moves every window and nothing of it folds. The buffer
+        # that holds the returns records `iv` beside them and pins `ivpa`, and the read-out
+        # refits the regression over the rows of the buffer.
+        ivm = 0.15 .+ 0.1 .* rand(rng, T, N)
+        ivv = collect(range(0.9, 1.3; length = N))
+        rdi = ReturnsResult(; nx = nx, X = X, ts = ts, iv = ivm, ivpa = 1.1)
+        rdiv = ReturnsResult(; nx = nx, X = X, ts = ts, iv = ivm, ivpa = ivv)
+        ivr = ImpliedVolatility(; ppy = 252)
+        ivp = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
+        hopt(pe) = HierarchicalOptimiser(; pe = pe)
+        for r in (rdi, rdiv), t in (61, 80), ce in (ivr, ivp)
+            b = rows(r, 1:t)
+            carry = EmpiricalPrior(; ce = ce)
+            refit = po.Online(EmpiricalPrior(; ce = ce))
+            for opt in (InverseVolatility(; pe = carry),
+                        po.update_online_estimator(InverseVolatility(; pe = refit)),
+                        HierarchicalRiskParity(; opt = hopt(carry)),
+                        po.update_online_estimator(HierarchicalRiskParity(; opt = hopt(refit))))
+                o = step(opt, r, t)
+                # The context gives the surface back, on the carry and on the refit.
+                @test same_fields(po.returns_result(o), b)
+                # The read-out reads a view of the buffer and the batch fit reads a
+                # matrix, so the weights can differ in the last bit.
+                @test isapprox(optimise(o).w, optimise(opt, b).w; rtol = 1e-12)
+            end
+        end
+        # A head with no prior keeps the rows, and the surface with them.
+        o = step(EqualWeighted(), rdiv, 40)
+        @test same_fields(po.returns_result(o), rows(rdiv, 1:40))
+        # A cap drops the rows of `iv` with the rows of `X`.
+        opt = po.update_online_estimator(InverseVolatility(;
+                                                           pe = po.Online(EmpiricalPrior(;
+                                                                                         ce = ivr);
+                                                                          max_history = 70)))
+        o = step(opt, rdi, 110)
+        @test po.returns_result(o).iv == ivm[41:110, :]
+        @test isapprox(optimise(o).w,
+                       optimise(InverseVolatility(; pe = EmpiricalPrior(; ce = ivr)),
+                                rows(rdi, 41:110)).w; rtol = 1e-12)
+        # The first step pins `ivpa`, and fixes whether the steps carry `iv`.
+        o = step(InverseVolatility(; pe = EmpiricalPrior(; ce = ivp)), rdi, 10)
+        r11 = rows(rdi, 11:11)
+        @test_throws ArgumentError partial_fit!(o,
+                                                ReturnsResult(; nx = nx, X = r11.X,
+                                                              ts = r11.ts, iv = r11.iv,
+                                                              ivpa = 2.0))
+        @test_throws ArgumentError partial_fit!(o,
+                                                ReturnsResult(; nx = nx, X = r11.X,
+                                                              ts = r11.ts))
+        # The mask reader leaves the surface to its caller. The exact fold of a covariance
+        # estimator ignores it, as its batch fit does (#1643).
+        @test isnothing(po.step_active_mask(r11))
+        r5 = rows(rdi, 1:5)
+        @test cov(partial_fit!(Covariance(), r5)) == cov(partial_fit!(Covariance(), r5.X))
     end
 
     @testset "What the step refuses, by name" begin
@@ -248,11 +385,6 @@ assets is what keeps the JuMP families cheap.
         # And it still answers the fold-less entry it always had.
         @test optimise(InverseVolatility(; pe = pr)).w ==
               optimise(InverseVolatility(; pe = pr), rd).w
-        # An implied-volatility surface does not travel the step.
-        @test_throws ArgumentError partial_fit!(opt,
-                                                ReturnsResult(; nx = nx, X = X[1:1, :],
-                                                              iv = fill(0.2, 1, N),
-                                                              ivpa = 1.0))
         # A time-varying Panel Field, and an estimation mask narrower than the active one.
         tv = AssetPanel(; pf = [NumericPanelField(; name = "cap", vals = ones(1, N))],
                         amsk = trues(1, N), emsk = trues(1, N))
@@ -298,6 +430,173 @@ assets is what keeps the JuMP families cheap.
         # A state with no rows is refused where the prior's buffer is read.
         @test_throws ArgumentError po.returns_buffer(po.SimpleExpectedReturnsState(; n = 1,
                                                                                    mu = zeros(N)))
+    end
+
+    @testset "A returns tracking series: the step refuses it, a batch fit checks its length (#1656)" begin
+        t = 40
+        bv = X[1:t, :] * fill(inv(N), N)
+        te = TrackingError(; tr = ReturnsTracking(; w = bv), err = 0.01)
+        trm = TrackingRiskMeasure(; tr = ReturnsTracking(; w = bv))
+        mk(pe) = MeanRisk(; opt = JuMPOptimiser(; pe = pe, slv = slv, tr = te))
+        # A batch fit over the rows of the series solves.
+        @test isa(optimise(mk(EmpiricalPrior()), rows(rdv, 1:t)).retcode,
+                  OptimisationSuccess)
+        # A batch fit over other rows names both lengths.
+        err = try
+            optimise(mk(EmpiricalPrior()), rows(rdv, 1:(t + 2)))
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, ArgumentError) &&
+              occursin("$(t) entries", err.msg) &&
+              occursin("$(t + 2) rows", err.msg)
+        # The step refuses the series before it folds a row, expanding and under a rolling
+        # window, whose rows keep the length of the series but not its rows.
+        cases = (mk(EmpiricalPrior()) => "opt.tr.tr",
+                 po.update_online_estimator(mk(po.Online(EmpiricalPrior(); max_history = t))) => "opt.tr.tr",
+                 MeanRisk(; r = trm, opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)) => "r.tr",
+                 HierarchicalRiskParity(; r = trm, opt = HierarchicalOptimiser(; pe = EmpiricalPrior())) => "r.tr",
+                 NestedClustered(; opti = mk(EmpiricalPrior()), opto = MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))) => "opti.opt.tr.tr")
+        for (opt, path) in cases
+            err = try
+                partial_fit!(opt, rows(rdv, 1:t))
+                nothing
+            catch e
+                e
+            end
+            @test isa(err, ArgumentError) && occursin("at `$(path)`", err.msg)
+        end
+        # A weights benchmark reads the rows themselves, so it steps and agrees with batch.
+        wt = MeanRisk(;
+                      opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv,
+                                          tr = TrackingError(;
+                                                             tr = WeightsTracking(;
+                                                                                  w = fill(inv(N),
+                                                                                           N)),
+                                                             err = 0.01)))
+        @test isapprox(optimise(step(wt, rdv, t)).w, optimise(wt, rows(rdv, 1:t)).w;
+                       atol = 1e-6)
+    end
+
+    @testset "A data benchmark follows the rows: batch, online, rolling and walk-forward (#1657)" begin
+        # `DataBenchmarkTracking` binds to the `B` of the rows that each reader holds, so it equals
+        # a returns series of exactly those rows, at every step and in every fold.
+        t = 60
+        bw = X * fill(inv(N), N) .+ randn(StableRNG(7), T) ./ 1000
+        Bh = 0.5 .* X .+ randn(StableRNG(11), T, N) ./ 1000
+        rdb = ReturnsResult(; nx = nx, X = X, nb = ["BM"], B = bw, ts = ts)
+        rdh = ReturnsResult(; nx = nx, X = X, nb = nx, B = Bh, ts = ts)
+        jopt(tr, err; pe = EmpiricalPrior()) = JuMPOptimiser(; pe = pe, slv = slv,
+                                                             tr = TrackingError(; tr = tr,
+                                                                                err = err))
+        te = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        b, h = rows(rdb, 1:t), rows(rdh, 1:t)
+        w0 = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)),
+                      b).w
+        # The bound binds: the weights leave the unconstrained minimum and sit on it.
+        err = 0.85 * expected_risk(te, w0, b)
+        mr = MeanRisk(; opt = jopt(DataBenchmarkTracking(), err))
+        wd = optimise(mr, b).w
+        @test isapprox(expected_risk(te, wd, b), err; rtol = 1e-5)
+        @test !isapprox(wd, w0; atol = 1e-3)
+        @test isapprox(wd,
+                       optimise(MeanRisk(; opt = jopt(ReturnsTracking(; w = bw[1:t]), err)),
+                                b).w; atol = 1e-8)
+        # The step binds the rows of its buffer, expanding and under `max_history`.
+        @test isapprox(optimise(step(mr, rdb, t)).w, wd; atol = 1e-6)
+        roll = po.update_online_estimator(MeanRisk(;
+                                                   opt = jopt(DataBenchmarkTracking(), err;
+                                                              pe = po.Online(EmpiricalPrior();
+                                                                             max_history = 30))))
+        @test isapprox(optimise(step(roll, rdb, t)).w,
+                       optimise(mr, rows(rdb, (t - 29):t)).w; atol = 1e-6)
+        # A matrix benchmark bounds the error of (X - B) w, between its minimum and the
+        # error of the unconstrained minimum.
+        mrr(tr) = MeanRisk(; r = TrackingRiskMeasure(; tr = tr),
+                           opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv))
+        lo = expected_risk(te, optimise(mrr(DataBenchmarkTracking()), h).w, h)
+        hi = expected_risk(te, w0, h)
+        @test lo < hi
+        mh = MeanRisk(; opt = jopt(DataBenchmarkTracking(), (lo + hi) / 2))
+        wh = optimise(mh, h).w
+        @test isapprox(expected_risk(te, wh, h), (lo + hi) / 2; rtol = 1e-5)
+        @test isapprox(sqrt(sum(abs2, (h.X - h.B) * wh) / (t - 1)), (lo + hi) / 2;
+                       rtol = 1e-5)
+        @test isapprox(optimise(step(mh, rdh, t)).w, wh; atol = 1e-6)
+        # A tracking measure in the objective, and every other head that reads one.
+        rt = ReturnsTracking(; w = bw[1:t])
+        jt(tr) = jopt(tr, 0.002)
+        heads = (mrr, tr -> RiskBudgeting(; opt = jt(tr)),
+                 tr -> RelaxedRiskBudgeting(; opt = jt(tr)),
+                 tr -> NearOptimalCentering(; r = TrackingRiskMeasure(; tr = tr),
+                                            opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                                slv = slv)),
+                 tr -> MeanRisk(;
+                                r = TrackingRiskMeasure(; tr = tr,
+                                                        settings = RiskMeasureSettings(;
+                                                                                       ub = Frontier(;
+                                                                                                     N = 3))),
+                                opt = JuMPOptimiser(; pe = EmpiricalPrior(), slv = slv)),
+                 tr -> HierarchicalRiskParity(; r = TrackingRiskMeasure(; tr = tr),
+                                              opt = HierarchicalOptimiser(;
+                                                                          pe = EmpiricalPrior())),
+                 tr -> HierarchicalEqualRiskContribution(;
+                                                         ri = TrackingRiskMeasure(;
+                                                                                  tr = tr),
+                                                         ro = TrackingRiskMeasure(;
+                                                                                  tr = tr),
+                                                         opt = HierarchicalOptimiser(;
+                                                                                     pe = EmpiricalPrior())))
+        for f in heads
+            @test isapprox(optimise(f(DataBenchmarkTracking()), b).w, optimise(f(rt), b).w;
+                           atol = 1e-8)
+        end
+        for f in heads[[1, 6]]
+            @test isapprox(optimise(step(f(DataBenchmarkTracking()), rdb, t)).w,
+                           optimise(f(DataBenchmarkTracking()), b).w; atol = 1e-6)
+        end
+        @test isapprox(optimise(step(mrr(DataBenchmarkTracking()), rdh, t)).w,
+                       optimise(mrr(DataBenchmarkTracking()), h).w; atol = 1e-6)
+        # A prior in the Excess Frame fits on X - B, and a data benchmark would subtract B
+        # twice, so the constructor refuses the pair (ADR 0208, decision 3). Returns data
+        # with no benchmark has none to track.
+        @test_throws ArgumentError jopt(DataBenchmarkTracking(), err;
+                                        pe = EmpiricalPrior(; x_src = ExcessSource()))
+        @test_throws ArgumentError optimise(mr, rows(rd, 1:t))
+        # The online walk-forward equals the batch expanding one, and a rolling fold, whose
+        # length every fold shares, tracks its own rows (#1669).
+        bcv = IndexWalkForward(40, 20; expand_train = true)
+        pb = cross_val_predict(mrr(DataBenchmarkTracking()), rdb, bcv)
+        pn = cross_val_predict(mrr(DataBenchmarkTracking()), rdb,
+                               OnlineIndexWalkForward(40, 20))
+        @test all(isapprox(x.res.w, y.res.w; atol = 1e-6)
+                  for (x, y) in zip(pb.pred, pn.pred))
+        rcv = IndexWalkForward(40, 20)
+        pr = cross_val_predict(mrr(DataBenchmarkTracking()), rdb, rcv)
+        own = [optimise(mrr(ReturnsTracking(; w = bw[tr])), rows(rdb, tr)).w
+               for tr in split(rcv, rdb).train_idx]
+        @test length(own) == length(pr.pred) > 1
+        @test all(isapprox(x.res.w, y; atol = 1e-8) for (x, y) in zip(pr.pred, own))
+        # A returns series as long as every training window passes the length check at
+        # each fold, so the loop refuses it before the folds run. A schedule of one series
+        # per fold aligns each fold, and one fold is one batch fit.
+        refusal = try
+            cross_val_predict(mrr(ReturnsTracking(; w = bw[1:40])), rdb, rcv)
+        catch e
+            e
+        end
+        @test isa(refusal, ArgumentError)
+        @test occursin("at `r.tr`", refusal.msg) &&
+              occursin("DataBenchmarkTracking", refusal.msg)
+        tds = TimeDependent([TrackingRiskMeasure(; tr = ReturnsTracking(; w = bw[tr]))
+                             for tr in split(rcv, rdb).train_idx])
+        pt = cross_val_predict(MeanRisk(; r = tds,
+                                        opt = JuMPOptimiser(; pe = EmpiricalPrior(),
+                                                            slv = slv)), rdb, rcv)
+        @test all(isapprox(x.res.w, y; atol = 1e-8) for (x, y) in zip(pt.pred, own))
+        @test length(cross_val_predict(mrr(ReturnsTracking(; w = bw[1:100])), rdb,
+                                       IndexWalkForward(100, 20)).pred) == 1
     end
 
     @testset "The state merges, copies and slices" begin
@@ -396,7 +695,8 @@ assets is what keeps the JuMP families cheap.
         @test isempty(po.returns_result(o).pnl.pf)
         o = partial_fit!(EqualWeighted(),
                          ReturnsResult(; nx = nx, X = X, iv = fill(0.2, T, N), ivpa = 1.0))
-        @test isnothing(po.returns_result(o).iv) && isnothing(po.returns_result(o).ivpa)
+        # The surface travels with the rows, and the first step pins `ivpa` (#1632).
+        @test po.returns_result(o).iv == fill(0.2, T, N) && po.returns_result(o).ivpa == 1.0
         # The rows and the context must count the same observations.
         @test_throws DimensionMismatch po.returns_result(fold_head(rdn, 1:3),
                                                          fold_head(rdn, 1:4).X)

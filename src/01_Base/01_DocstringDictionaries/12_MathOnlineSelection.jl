@@ -90,7 +90,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :w_plus_proj => "``\\boldsymbol{w}^{+}``: Projected allocation, the answer of the projection onto the Allocation Set.",#
                  :eps_machine => "``\\varepsilon``: Machine epsilon of the element type, twice its unit roundoff ``u``.",#
                  :pi_obj_pen => "``\\pi``: Objective Penalty of the set, zero when the set has no penalty.",#
-                 :h_diag_norm => "``\\boldsymbol{h}``: Positive diagonal of the norm, one entry for each asset.",#
+                 :h_diag_norm => "``\\boldsymbol{h}``: Non-negative diagonal of the norm, one entry for each asset.",#
                  # The constant rebalanced portfolio, the passive-aggressive step and the
                  # set that an expert mixture's weighting projects onto.
                  :b_crp => "``\\boldsymbol{b}``: Target of a constant rebalanced portfolio, the allocation that it rebalances to every period.",#

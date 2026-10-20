@@ -95,6 +95,8 @@ Where:
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
 
+Equation 4 of Section 3 of [gower1966](@cite) relates a similarity matrix with a unit diagonal to the distance of its points by ``\\Delta_{i,\\,j}^{2} = 2(1 - S_{i,\\,j})``, so ``S_{i,\\,j} = 1 - \\Delta_{i,\\,j}^{2} / 2``. That relation halves the squared distance, and this transformation does not. No work that states ``1 - d_{i,\\,j}^{2}`` was found.
+
 !!! warning
 
     The transformation is defined only for a **finite** distance matrix. An infinite entry makes `ceil(Inf^2) - Inf^2`, which is `NaN`, and every other entry `Inf`. This is not a corner case: [`LogDistance`](@ref) maps an exactly zero correlation to an infinite distance, and this member is the default of both [`DBHT`](@ref) and [`LoGo`](@ref). [`assert_similarity_domain`](@ref) refuses it on the PMFG path.
@@ -120,7 +122,8 @@ The branch of [`distance_to_similarity`](@ref) that this tag selects runs these 
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.4.2, footnote 7.
+  - $(ref_dict[:cajas2025]) Section 13.1.4.2, footnote 7. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gower1966]) Section 3, Equation 4.
 """
 struct MaximumDistanceSimilarity <: AbstractNonNegativeSimilarityMatrixAlgorithm end
 """
@@ -329,7 +332,7 @@ Where:
   - $(math_dict[:D_mat_dist])
   - $(math_dict[:D_ij_dist])
 
-For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. Against [`AngularDist`](@ref) the recovered cosine matches the one computed from the features to floating-point precision. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
+For an angular distance ``D_{i,\\,j} = \\arccos(\\rho_{i,\\,j}) / \\pi`` this recovers ``\\rho_{i,\\,j}`` exactly, without reference to the data the distance was computed from. The inverse is algebra, and no source states it. [`AngularDist`](@ref) names the sources of the distance. Against [`AngularDist`](@ref) the recovered cosine matches the one computed from the features to floating-point precision. It maps ``[0,\\,1] \\to [1,\\,-1]``, so the similarity is bounded and the diagonal is unity whenever the distance matrix has a zero diagonal.
 
 # Where this member is correct, and where it is refused
 
@@ -364,7 +367,8 @@ The sign follows from step 2 alone. ``\\cos(\\pi D)`` is positive below ``D = 0.
 
 # References
 
-  - $(ref_dict[:vandongen2012])
+  - $(ref_dict[:vandongen2012]) Section 4, Lemma 3.
+  - $(ref_dict[:charikar2002]) Section 1.
 """
 struct AngularSimilarity <: AbstractSimilarityMatrixAlgorithm end
 """

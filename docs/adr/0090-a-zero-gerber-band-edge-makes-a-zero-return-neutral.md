@@ -128,7 +128,7 @@ a threshold that a caller may be passing today should keep a clean meaning rathe
 rejected.
 
  1. **Tighten the guard to `0 < t`.** The Gerber statistic is defined for a strictly positive
-    threshold, and Riskfolio-Lib asserts `0 < threshold < 1`. `val_dict[:t]` already carries
+    threshold, and oracle 2 asserts `0 < threshold < 1`. `val_dict[:t]` already carries
     `0 < t < 1`, so the neighbouring wording exists.
  2. **Make the bands disjoint at a zero edge.** An exactly zero return becomes neutral rather than
     both up and down. `t = 0` stays legal and becomes the sign concordance, which is what a reader

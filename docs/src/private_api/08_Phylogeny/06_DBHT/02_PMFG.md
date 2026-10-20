@@ -1,8 +1,8 @@
 ```@meta
-Description = "Planar Maximally Filtered Graph, private API of PortfolioOptimisers.jl: PMFG_T2s, assert_pmfg_weights."
+Description = "PMFG, private API of PortfolioOptimisers.jl: PMFG_T2s, assert_pmfg_weights."
 ```
 
-# [Planar Maximally Filtered Graph: private API](@id private-api-planar-maximally-filtered-graph)
+# [PMFG: private API](@id private-api-pmfg)
 
 ```@docs
 PMFG_T2s

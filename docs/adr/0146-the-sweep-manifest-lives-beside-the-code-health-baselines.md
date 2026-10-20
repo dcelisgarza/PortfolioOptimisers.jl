@@ -33,7 +33,7 @@ The name follows its siblings: `<subject>_<kind>.toml`, flat in `code_health/`, 
 the directory reads the manifest and the four baselines as one family.
 
 **The move is structural.** No row of the manifest changes. Every reference under `.github/`,
-`.claude/`, `code_health/`, `docs/adr/`, `test/`, `CLAUDE.md` and `STANDARDS.md` names the new
+`.claude/`, `code_health/`, `docs/adr/`, `test/`, `CLAUDE.md` and `CODING_STANDARDS.md` names the new
 path. No ADR that names the old path has reached `main`, so each is rewritten in place rather than
 amended.
 

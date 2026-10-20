@@ -13,4 +13,5 @@ factory(r::MeanReturnRiskRatio, args...; kwargs...)
 factory(r::MeanReturnRiskRatio, w::VecNum)
 port_opt_view(r::ThirdCentralMoment, i, args...)
 needs_previous_weights(r::MeanReturnRiskRatio)
+supports_precomputed_returns(r::ThirdCentralMoment)
 ```

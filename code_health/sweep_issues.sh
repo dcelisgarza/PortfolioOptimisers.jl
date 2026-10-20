@@ -61,6 +61,23 @@ require_home_repo() {
     echo "$repo"
 }
 
+# Runs its arguments until they succeed, at most five times, two seconds apart, and prints what the
+# run that succeeded printed. The REST read of an issue that `gh issue create` opened a moment before
+# can answer 404 for a short time (#1713), and so can the sub-issues endpoint that names it. A failed
+# `gh api` prints the error body to stdout, so the output of a failed run is dropped: a caller that
+# captures the output would read the bodies of the 404s in front of the id.
+retry() {
+    local attempt out
+    for attempt in 1 2 3 4 5; do
+        if out=$("$@"); then
+            [ -z "$out" ] || printf '%s\n' "$out"
+            return 0
+        fi
+        [ "$attempt" -lt 5 ] && sleep 2
+    done
+    return 1
+}
+
 do_dump() {
     local out="$1" repo
     repo="$(require_home_repo)"
@@ -81,7 +98,7 @@ do_dump() {
 }
 
 do_apply() {
-    local out="$1" dry="$2" repo n stem path parent url child count=0
+    local out="$1" dry="$2" repo n stem path parent url child count=0 orphans=()
 
     if [ ! -f "$out/plan.tsv" ] || [ ! -f "$out/reopen.tsv" ]; then
         echo "No plan in '$out'. Run sweep_triage.jl first." >&2
@@ -114,15 +131,33 @@ do_apply() {
                 --title "$(cat "$out/$stem.title")" \
                 --body-file "$out/$stem.body" </dev/null)
         echo "Opened $url for $path."
+        count=$((count + 1))
         # The sub-issues endpoint takes the child's DATABASE id, which is not the number in the
         # URL. `gh issue create` prints the URL alone, so the id is read back by number.
-        child=$(gh api "repos/$repo/issues/${url##*/}" --jq .id </dev/null)
-        gh api "repos/$repo/issues/$parent/sub_issues" \
-           -F sub_issue_id="$child" --silent </dev/null
-        echo "Attached it to child map #$parent."
-        count=$((count + 1))
+        #
+        # An issue that is open and has no parent is NOT stopped on. The next plan does not open
+        # it again, because the dump reports it, so the rest of this plan is opened and the orphan
+        # is named at the end with the command that attaches it.
+        if child=$(retry gh api "repos/$repo/issues/${url##*/}" --jq .id </dev/null) &&
+           [[ $child =~ ^[0-9]+$ ]] &&
+           retry gh api "repos/$repo/issues/$parent/sub_issues" \
+                 -F sub_issue_id="$child" --silent </dev/null; then
+            echo "Attached it to child map #$parent."
+        else
+            echo "Could not attach #${url##*/} to child map #$parent." >&2
+            orphans+=("${url##*/} $parent")
+        fi
     done < "$out/plan.tsv"
     echo "Opened $count sub-issue(s)."
+
+    if [ "${#orphans[@]}" -gt 0 ]; then
+        echo "${#orphans[@]} sub-issue(s) are open and have no parent. Attach each one by hand:" >&2
+        for n in "${orphans[@]}"; do
+            set -- $n
+            echo "  gh api repos/$repo/issues/$2/sub_issues -F sub_issue_id=\$(gh api repos/$repo/issues/$1 --jq .id)" >&2
+        done
+        exit 1
+    fi
 }
 
 main() {
@@ -143,4 +178,7 @@ main() {
     esac
 }
 
-main "$@"
+# A test sources the file to reach `retry`, so `main` runs only when the file is run.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
+fi

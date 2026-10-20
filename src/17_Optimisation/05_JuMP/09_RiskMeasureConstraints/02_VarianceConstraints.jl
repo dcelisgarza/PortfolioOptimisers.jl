@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the factor of the prior's covariance matrix, and register it in the model on the first call.
 
-The factor is the prior's `chol` when the prior carries one, and [`covariance_factor`](@ref) of the prior's `sigma` otherwise. The factor of a factor prior is not square, and the second-order cone is well posed on it. `G` is a shared entry, so every measure of the model that falls back to the prior reads one factor, and a later call returns it without a second factorisation.
+The factor is the prior's `chol` when the prior carries one, and the transpose of the square root of the prior's `sigma` under `mtx_sqrt` otherwise, which [`matrix_square_root`](@ref) takes. The factor of a factor prior is not square, and the second-order cone is well posed on it. `G` is a shared entry, so every measure of the model that falls back to the prior reads one factor, and a later call returns it without a second factorisation. The first measure that falls back to the prior sets the algorithm. On a positive definite matrix every algorithm gives the Cholesky factor.
 
 # JuMP formulation
 
@@ -19,6 +19,11 @@ Where:
 
   - $(arg_dict[:model])
   - `pr::AbstractPriorResult`: The prior result. The function reads its `sigma` and its `chol`.
+  - `mtx_sqrt`: Square-root algorithm of `pr.sigma`, or `nothing` for the plain Cholesky factor.
+
+# Validation
+
+  - When `pr.chol` is `nothing`, `pr.sigma` has a square root under `mtx_sqrt`, as [`matrix_square_root`](@ref) states. Raises a `LinearAlgebra.PosDefException`.
 
 # Returns
 
@@ -26,68 +31,21 @@ Where:
 
 # Related
 
-  - [`covariance_factor`](@ref)
+  - [`matrix_square_root`](@ref)
   - [`chol_sigma_selector`](@ref)
 """
-function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult)
+function get_chol_or_sigma_pm(model::JuMP.Model, pr::AbstractPriorResult,
+                              mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot())
     if !shared_has(model, :G)
-        G = isnothing(pr.chol) ? covariance_factor(pr.sigma) : pr.chol
+        # The cone reads the upper factor, and the square root is the lower one.
+        G = if isnothing(pr.chol)
+            copy(transpose(matrix_square_root(mtx_sqrt, pr.sigma)))
+        else
+            pr.chol
+        end
         JuMP.@expression(model, G, G)
     end
     return shared_get(model, :G)
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Return a factor ``\\mathbf{G}`` of a covariance matrix with ``\\mathbf{G}^\\intercal \\mathbf{G} = \\mathbf{\\Sigma}``, for a singular matrix as well as a positive definite one.
-
-A positive definite matrix gives its upper Cholesky factor. A singular positive semidefinite matrix, such as a rank-one estimate, has no Cholesky factor, so it gives the factor of its eigendecomposition. The second-order cone ``\\sigma \\geq \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_2`` is well posed on either factor.
-
-# Mathematical definition
-
-```math
-\\begin{align}
-\\mathbf{G} &= \\mathbf{U}\\,, \\quad \\text{when } \\mathbf{\\Sigma} = \\mathbf{U}^\\intercal \\mathbf{U} \\succ 0\\,, \\\\
-\\mathbf{G} &= \\max(\\mathbf{\\Lambda}, 0)^{1/2} \\mathbf{V}^\\intercal\\,, \\quad \\text{when } \\mathbf{\\Sigma} = \\mathbf{V} \\mathbf{\\Lambda} \\mathbf{V}^\\intercal \\text{ is singular}\\,.
-\\end{align}
-```
-
-Where:
-
-  - $(math_dict[:G_cov_factor])
-  - ``\\mathbf{U}``: Upper triangular Cholesky factor.
-  - ``\\mathbf{V}``, ``\\mathbf{\\Lambda}``: Eigenvectors, and the diagonal matrix of the eigenvalues. The maximum with zero removes a negative eigenvalue of rounding.
-
-# Arguments
-
-  - `sigma::AbstractMatrix`: The covariance matrix, `assets × assets`.
-
-# Validation
-
-  - A matrix that has no Cholesky factor and is not Hermitian raises `LinearAlgebra.PosDefException(-1)`.
-  - A matrix whose smallest eigenvalue is below ``-N \\epsilon \\max_i \\lvert \\lambda_i \\rvert`` raises `LinearAlgebra.PosDefException(1)`. Here ``\\epsilon`` is the machine epsilon of the element type. So the function refuses a `BigFloat` copy of a `Float64` matrix that rounding left indefinite, and it accepts the `Float64` matrix.
-
-# Returns
-
-  - `G::AbstractMatrix`: The factor, `assets × assets`.
-
-# Related
-
-  - [`get_chol_or_sigma_pm`](@ref)
-  - [`chol_sigma_selector`](@ref)
-  - [`RankOneCovariance`](@ref)
-"""
-function covariance_factor(sigma::AbstractMatrix)
-    F = LinearAlgebra.cholesky(sigma; check = false)
-    if LinearAlgebra.issuccess(F)
-        return F.U
-    end
-    @argcheck(LinearAlgebra.ishermitian(sigma), LinearAlgebra.PosDefException(-1))
-    E = LinearAlgebra.eigen(LinearAlgebra.Symmetric(sigma))
-    tol = -length(E.values) * eps(eltype(E.values)) * maximum(abs, E.values)
-    @argcheck(minimum(E.values) >= tol, LinearAlgebra.PosDefException(1))
-    return LinearAlgebra.Diagonal(sqrt.(max.(E.values, zero(eltype(E.values))))) *
-           transpose(E.vectors)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -97,14 +55,14 @@ Return the factor of the covariance matrix that a risk measure reads.
 The measure's own matrix wins over the prior's, and a stated factor wins over one computed here:
 
   - `r.chol`, when the measure states it.
-  - [`covariance_factor`](@ref) of `r.sigma`, when the measure states `sigma` alone.
+  - The transpose of the square root of `r.sigma` under `r.mtx_sqrt`, which [`matrix_square_root`](@ref) takes, when the measure states `sigma` alone.
   - [`get_chol_or_sigma_pm`](@ref), the prior's factor, when the measure states neither.
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:pr])
-  - `r::CholRM`: The measure, or the algorithm of a measure, that carries the optional `sigma` and `chol`.
+  - `r::CholRM`: The measure, or the algorithm of a measure, that carries the optional `sigma` and `chol`, and the square-root algorithm `mtx_sqrt`.
 
 # Returns
 
@@ -113,14 +71,14 @@ The measure's own matrix wins over the prior's, and a stated factor wins over on
 # Related
 
   - [`get_chol_or_sigma_pm`](@ref)
-  - [`covariance_factor`](@ref)
+  - [`matrix_square_root`](@ref)
 """
 function chol_sigma_selector(model::JuMP.Model, pr::Option{<:AbstractPriorResult},
                              r::CholRM)
     return if isnothing(r.sigma) && isnothing(r.chol)
-        get_chol_or_sigma_pm(model, pr)
+        get_chol_or_sigma_pm(model, pr, r.mtx_sqrt)
     elseif isnothing(r.chol)
-        covariance_factor(r.sigma)
+        copy(transpose(matrix_square_root(r.mtx_sqrt, r.sigma)))
     else
         r.chol
     end
@@ -445,18 +403,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the semidefinite variance expression, the trace of the covariance matrix times the lifted weight matrix.
 
-The trace has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So under [`MaximumRatio`](@ref) the model maximises the excess return per unit of variance, not the Sharpe ratio. The `## The degree of the risk` subsection of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
+The trace on the lift of [`set_sdp_constraints!`](@ref) has degree one in the weights and ``k``, where the second-order cone expressions have degree two. So when [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), which has degree two, and the model maximises the Sharpe ratio. The bound then reads the trace on the first lift, and the method builds that trace only when `settings.ub` holds a bound. Otherwise the term and the bound read one trace. The method dispatches on `r.ratio_alg`: under [`LinearRatio`](@ref) the term never reads the lift with a constant corner, so that method builds the one trace. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The bound acts on the trace in the units of a variance.
 
 # JuMP formulation
 
 ## Variables
 
   - `W`: read, the lifted matrix that [`set_sdp_constraints!`](@ref) builds once for the owner of the weights.
+  - `lift_W`: read under the lift of the objective, ``\\mathbf{W}_c``, which [`set_sdp_objective_lift!`](@ref) builds once for the owner of the weights.
 
 ## Expressions
 
-  - `sigma_W_`: ``\\mathbf{\\Sigma} \\mathbf{W}``.
-  - `variance_risk_`: ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``.
+  - `sigma_W_`: ``\\mathbf{\\Sigma} \\mathbf{W}``, registered without the lift of the objective.
+  - `variance_risk_`: ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W})``, registered without the lift of the objective, and with it when `settings.ub` holds a bound.
+  - `lift_sigma_W_`: ``\\mathbf{\\Sigma} \\mathbf{W}_c``, registered under the lift of the objective.
+  - `lift_variance_risk_`: ``\\mathrm{Tr}(\\mathbf{\\Sigma} \\mathbf{W}_c)``, the objective term under the lift of the objective.
 
 Each name carries the index `i` of the measure, and the namespace `prefix`.
 
@@ -472,6 +433,7 @@ $(val_dict[:relax])
 
   - `variance_risk_` lies at or above ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} / k``, because ``\\mathbf{W} \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k`` and the covariance matrix is positive semidefinite. It is tight at ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal / k``, which the objective reaches when it minimises the risk and no other row acts on ``\\mathbf{W}``.
   - A bound on `variance_risk_` alone is exact, because the weights satisfy it when their variance is at most the bound. Risk-contribution rows on ``\\mathbf{W}`` make the bound and the rows one relaxation, which [`rc_variance_constraints!`](@ref) states.
+  - `lift_variance_risk_` lies at or above ``\\boldsymbol{w}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} / c``, because ``\\mathbf{W}_c \\succeq \\boldsymbol{w} \\boldsymbol{w}^\\intercal / c``. It is tight at rank one, which the objective reaches when it minimises the risk and no other row acts on ``\\mathbf{W}_c``. The rows of `rc` then read `lift_sigma_W_`, so they act on the matrix that the objective holds down.
 
 # Arguments
 
@@ -497,10 +459,38 @@ $(val_dict[:relax])
 function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
                                 pr::Option{<:AbstractPriorResult};
                                 prefix::Symbol = Symbol(""))
-    W = set_sdp_constraints!(model; prefix = prefix)
+    return set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg; prefix = prefix)
+end
+function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
+                                pr::Option{<:AbstractPriorResult}, ::LinearRatio;
+                                prefix::Symbol = Symbol(""))
     sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    W = set_sdp_constraints!(model; prefix = prefix)
     sigma_W = state_set!(model, prefix, :sigma_W_, i, JuMP.@expression(model, sigma * W))
     return state_set!(model, prefix, :variance_risk_, i,
+                      JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
+end
+function set_sdp_variance_risk!(model::JuMP.Model, i::Any, r::Variance,
+                                pr::Option{<:AbstractPriorResult},
+                                ratio_alg::RatioFormulation; prefix::Symbol = Symbol(""))
+    # `RatioFormulation` is an extension point whose members implement only the flag, so
+    # this method takes the root. Outside a positive term of `MaximumRatio` the term reads
+    # the lift with the corner `k`, which is the term of `LinearRatio`.
+    if !sdp_objective_lift_flag(model, ratio_alg, r.settings)
+        return set_sdp_variance_risk!(model, i, r, pr, LinearRatio(); prefix = prefix)
+    end
+    sigma = isnothing(r.sigma) ? pr.sigma : r.sigma
+    # The objective term reads the lift with a constant corner, so it has degree two
+    # under `MaximumRatio`. The bound reads the lift with the corner `k` (#1676).
+    if !isnothing(r.settings.ub)
+        W = set_sdp_constraints!(model; prefix = prefix)
+        state_set!(model, prefix, :variance_risk_, i,
+                   JuMP.@expression(model, LinearAlgebra.dot(sigma, W)))
+    end
+    Wc = set_sdp_objective_lift!(model, r.corner; prefix = prefix)
+    lp = nested_prefix(prefix, :lift_)
+    sigma_W = state_set!(model, lp, :sigma_W_, i, JuMP.@expression(model, sigma * Wc))
+    return state_set!(model, lp, :variance_risk_, i,
                       JuMP.@expression(model, LinearAlgebra.tr(sigma_W)))
 end
 function set_variance_risk!(model::JuMP.Model, i::Any,
@@ -620,7 +610,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Add linear risk-contribution rows on the variance decomposition to `model`.
 
-The method on `args...` does nothing, and it runs when the measure has no rows. The method on a [`LinearConstraint`](@ref) reads the diagonal of `sigma_W_`, adds the rows, and sets the `rc_variance` mark on the namespace that owns the weights, which [`sdp_variance_flag!`](@ref) reads.
+The method on `args...` does nothing, and it runs when the measure has no rows. The method on a [`LinearConstraint`](@ref) reads the diagonal of `sigma_W_`, adds the rows, and sets the `rc_variance` mark on the namespace that owns the weights, which [`sdp_variance_flag!`](@ref) reads. When the builder stated the objective term on the lift of [`set_sdp_objective_lift!`](@ref), the method reads `lift_sigma_W_` in place of `sigma_W_`, and `variance_risk` is the term on that lift. The rows are homogeneous in the matrix, so they hold on either lift, and they bind only on the matrix that the objective holds down.
 
 # JuMP formulation
 
@@ -680,7 +670,14 @@ end
 function rc_variance_constraints!(model::JuMP.Model, i::Any, rc::LinearConstraint,
                                   variance_risk::JuMP.AbstractJuMPScalar;
                                   prefix::Symbol = Symbol(""))
-    sigma_W = state_get(model, prefix, :sigma_W_, i)
+    # The rows read the matrix of the objective term, the lift with a constant corner when
+    # the builder made one, so the term that holds the matrix down also binds the rows.
+    lp = nested_prefix(prefix, :lift_)
+    sigma_W = if state_has(model, lp, :sigma_W_, i)
+        state_get(model, lp, :sigma_W_, i)
+    else
+        state_get(model, prefix, :sigma_W_, i)
+    end
     sc = get_constraint_scale(model)
     mark_state!(model, weights_prefix(model, prefix), :rc_variance)
     vsw = vec(LinearAlgebra.diag(sigma_W))
@@ -740,9 +737,13 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance, opt::Risk
     mark_objective_variance!(model, prefix, r.settings)
     variance_risk, sdp_flag = set_risk!(model, i, r, opt, pr, pl, args...; prefix = prefix,
                                         kwargs...)
-    var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, sdp_flag;
-                                                               prefix = prefix)
     ub = variance_risk_bounds_val(sdp_flag, r.settings.ub)
+    # Without a bound, the lift of the objective builds no expression for one to read.
+    var_bound_expr, var_bound_name = if isnothing(ub)
+        variance_risk, :variance_risk_
+    else
+        variance_risk_bounds_expr(model, i, sdp_flag; prefix = prefix)
+    end
     set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_name,
                                              i, variance_risk, r.settings; prefix = prefix)
     return variance_risk
@@ -756,16 +757,20 @@ The asset weights are ``\\boldsymbol{w} = \\mathbf{P} \\boldsymbol{z}``. With `f
 
 The risk-contribution rows of `r.rc` read the diagonal of `sigma_W_`, one entry for each factor. At rank one entry ``j`` is ``[\\boldsymbol{w}_1]_j [\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w}]_j``, the Euler contribution of factor ``j`` that [`factor_risk_contribution`](@ref) reports, and the rows state it as a share of the whole variance. The off-factor weights take no row, and their contribution is the remainder.
 
+When [`sdp_objective_lift_flag`](@ref) is `true`, under [`MaximumRatio`](@ref) with [`SquareRootRatio`](@ref), the objective term and the rows read ``\\mathbf{W}_c`` of [`set_sdp_frc_objective_lift!`](@ref) in place of ``\\mathbf{W}_z``, so the term has degree two and the model maximises the Sharpe ratio. The bound reads ``\\mathbf{W}_z``, and the method builds that trace only when `settings.ub` holds a bound.
+
 # JuMP formulation
 
 ## Variables
 
   - `frc_W`: read, ``\\mathbf{W}_z``, the lifted matrix that [`set_sdp_frc_constraints!`](@ref) builds once.
+  - `lift_frc_W`: read under the lift of the objective, ``\\mathbf{W}_c``.
 
 ## Expressions
 
-  - `sigma_W_`: ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z``, the ``N_f`` rows of the factors.
-  - `variance_risk_`: ``\\mathrm{Tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z)``.
+  - `sigma_W_`: ``\\mathbf{B}_1^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z``, the ``N_f`` rows of the factors, registered without the lift of the objective.
+  - `variance_risk_`: ``\\mathrm{Tr}(\\mathbf{P}^\\intercal \\mathbf{\\Sigma} \\mathbf{P} \\mathbf{W}_z)``, registered without the lift of the objective, and with it when `settings.ub` holds a bound.
+  - `lift_sigma_W_`, `lift_variance_risk_`: the same two expressions on ``\\mathbf{W}_c``, registered under the lift of the objective.
 
 Each name carries the index `i` of the measure, and the namespace `prefix`.
 
@@ -815,20 +820,40 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::Variance,
     mark_objective_variance!(model, prefix, r.settings)
     rc = linear_constraints(r.rc, opt.sets; datatype = eltype(pr.X),
                             strict = opt.opt.strict)
-    W = set_sdp_frc_constraints!(model)
     Nf = length(shared_get(model, :w1))
     sigma = nothing_scalar_array_selector(r.sigma, pr.sigma)
     # The covariance of the decision vector. Its first `Nf` rows are the factor rows, and
     # the rest, present under `flag = true`, price the off-factor weights (#1350).
     sigma_z = transpose(b) * sigma * b
-    sigma_W = state_set!(model, prefix, :sigma_W_, i,
-                         JuMP.@expression(model, view(sigma_z, 1:Nf, :) * W))
-    variance_risk = state_set!(model, prefix, :variance_risk_, i,
-                               JuMP.@expression(model, LinearAlgebra.dot(sigma_z, W)))
-    rc_variance_constraints!(model, i, rc, variance_risk; prefix = prefix)
-    var_bound_expr, var_bound_name = variance_risk_bounds_expr(model, i, LinearBound();
-                                                               prefix = prefix)
     ub = variance_risk_bounds_val(LinearBound(), r.settings.ub)
+    lift = sdp_objective_lift_flag(model, r.ratio_alg, r.settings)
+    # The bound reads the lift with the corner `k`, and so does the objective term unless
+    # it reads the lift with a constant corner, which gives it degree two (#1676).
+    if !lift || !isnothing(ub)
+        W = set_sdp_frc_constraints!(model)
+        if !lift
+            state_set!(model, prefix, :sigma_W_, i,
+                       JuMP.@expression(model, view(sigma_z, 1:Nf, :) * W))
+        end
+        state_set!(model, prefix, :variance_risk_, i,
+                   JuMP.@expression(model, LinearAlgebra.dot(sigma_z, W)))
+    end
+    variance_risk = if lift
+        Wc = set_sdp_frc_objective_lift!(model, r.corner)
+        lp = nested_prefix(prefix, :lift_)
+        state_set!(model, lp, :sigma_W_, i,
+                   JuMP.@expression(model, view(sigma_z, 1:Nf, :) * Wc))
+        state_set!(model, lp, :variance_risk_, i,
+                   JuMP.@expression(model, LinearAlgebra.dot(sigma_z, Wc)))
+    else
+        state_get(model, prefix, :variance_risk_, i)
+    end
+    rc_variance_constraints!(model, i, rc, variance_risk; prefix = prefix)
+    var_bound_expr, var_bound_name = if isnothing(ub)
+        variance_risk, :variance_risk_
+    else
+        variance_risk_bounds_expr(model, i, LinearBound(); prefix = prefix)
+    end
     set_variance_risk_bounds_and_expression!(model, opt, var_bound_expr, ub, var_bound_name,
                                              i, variance_risk, r.settings; prefix = prefix)
     return variance_risk
@@ -838,7 +863,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Build the worst-case variance of an uncertainty set over the covariance matrix.
 
-The box, the ellipsoid and the norm ball bound the covariance matrix, so each lifts the weights into ``\\mathbf{W}`` with [`set_sdp_constraints!`](@ref) and states the dual of its worst case over ``\\mathbf{W}``. The compact set bounds a quadratic form in the weights, so it lifts nothing and leaves the programme a second-order cone programme. It factorises its centre with [`covariance_factor`](@ref), so it accepts a singular centre, as [`Variance`](@ref) does.
+The box, the ellipsoid and the norm ball bound the covariance matrix, so each lifts the weights into ``\\mathbf{W}`` with [`set_sdp_constraints!`](@ref) and states the dual of its worst case over ``\\mathbf{W}``. A caller can pass another lifted matrix in the keyword `W`. [`set_risk_constraints!`](@ref) passes ``\\mathbf{W}_c`` of [`set_sdp_objective_lift!`](@ref) for the objective term under [`MaximumRatio`](@ref), with the namespace `lift_` after `prefix`, so the dual variables of that term have names of their own. The compact set bounds a quadratic form in the weights, so it lifts nothing and leaves the programme a second-order cone programme. It takes the square root of its centre under the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), so under the default it accepts a singular centre, as [`Variance`](@ref) does.
 
 # Mathematical definition
 
@@ -847,7 +872,7 @@ The box, the ellipsoid and the norm ball bound the covariance matrix, so each li
 R_{\\mathrm{box}} &= \\underset{\\mathbf{A}_u,\\, \\mathbf{A}_l \\geq 0,\\ \\mathbf{A}_u - \\mathbf{A}_l = \\mathbf{W}}{\\min} \\langle \\mathbf{\\Sigma}_u, \\mathbf{A}_u \\rangle - \\langle \\mathbf{\\Sigma}_l, \\mathbf{A}_l \\rangle\\,, \\\\
 R_{\\mathrm{ell}} &= \\underset{\\mathbf{E} \\succeq 0}{\\min} \\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + k_{e} \\lVert \\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\mathbf{W} + \\mathbf{E}) \\rVert_{2}\\,, \\\\
 R_{\\mathrm{nb}} &= \\underset{\\mathbf{E} \\succeq 0}{\\min} \\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + \\kappa_{b} \\lVert \\mathbf{L}^\\intercal \\mathrm{vec}(\\mathbf{W} + \\mathbf{E}) \\rVert_{p^{*}}\\,, \\\\
-R_{\\mathrm{cpt}} &= \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2}\\,.
+R_{\\mathrm{cpt}} &= \\lVert \\mathbf{G} \\boldsymbol{w} \\rVert_{2}^{2} + \\kappa \\underset{\\boldsymbol{z}}{\\min} \\left( \\lVert \\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z} \\rVert_{2}^{2} + \\lVert \\mathbf{R} \\boldsymbol{z} \\rVert_{2}^{2} \\right)\\,.
 \\end{align}
 ```
 
@@ -858,9 +883,9 @@ Where:
   - ``\\mathbf{A}_l``, ``\\mathbf{A}_u``: Dual matrices of the two sides of the box.
   - ``\\hat{\\mathbf{\\Sigma}}``: Centre of the set, the set's `val` when it states one and `sigma` otherwise.
   - ``\\mathbf{E}``: Dual matrix of the condition that the worst covariance is positive semidefinite.
-  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the upper Cholesky factor of its matrix ``\\mathbf{\\Omega}``, `sigma`.
+  - ``k_{e}``, ``\\mathbf{G}_{\\Omega}``: Radius of the ellipsoid, `k`, and the transpose of the square root of its matrix ``\\mathbf{\\Omega}``, `sigma`, that [`matrix_square_root`](@ref) takes under `mtx_sqrt`, so ``\\mathbf{G}_{\\Omega}^\\intercal \\mathbf{G}_{\\Omega} = \\mathbf{\\Omega}``.
   - ``\\kappa_{b}``, ``\\mathbf{L}``, ``p^{*}``: Radius of the norm ball, its map, and the dual order of its norm.
-  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, and the free coefficients of the basis.
+  - ``\\mathbf{C}``, ``\\mathbf{Q}``, ``\\mathbf{R}``, ``\\boldsymbol{z}``: Diagonal metric of the compact set, its basis, the factor of the rows a view dropped from the basis, and the free coefficients of the basis. A fitted set has no row in ``\\mathbf{R}``.
   - ``\\langle \\mathbf{X}, \\mathbf{Y} \\rangle = \\mathrm{Tr}(\\mathbf{X}^\\intercal \\mathbf{Y})``: Inner product of two matrices.
   - $(math_dict[:kappa_cpt])
   - $(math_dict[:W_lift])
@@ -884,7 +909,7 @@ Where:
   - `WpE`: ``\\mathbf{W} + \\mathbf{E}``.
   - `x_eucs`: ``\\mathbf{G}_{\\Omega} \\, \\mathrm{vec}(\\mathbf{W} + \\mathbf{E})``.
   - `eucs_variance_risk_`: ``\\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + k_{e} t_e``.
-  - `x_cucs`: ``\\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z}``, or ``\\mathbf{C} \\boldsymbol{w}`` when ``\\mathbf{Q}`` has no column.
+  - `x_cucs`: ``[\\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z}; \\mathbf{R} \\boldsymbol{z}]``, or ``\\mathbf{C} \\boldsymbol{w}`` when ``\\mathbf{Q}`` has no column. The second block has one entry per row of ``\\mathbf{R}``, so a fitted set states ``\\mathbf{C} \\boldsymbol{w} - \\mathbf{Q} \\boldsymbol{z}`` alone.
   - `cucs_variance_risk_`: ``d^{2} + \\kappa t^{2}``.
   - `x_nbucs_`: ``\\mathbf{L}^\\intercal \\mathrm{vec}(\\mathbf{W} + \\mathbf{E})``, registered when ``\\mathbf{L}`` has a column. [`norm_ball_dual_norm_epigraph!`](@ref) bounds its norm by ``t_b``.
   - `nbucs_variance_risk_`: ``\\langle \\hat{\\mathbf{\\Sigma}}, \\mathbf{W} + \\mathbf{E} \\rangle + \\kappa_{b} t_b``, or the first term alone when ``\\mathbf{L}`` has no column.
@@ -921,10 +946,12 @@ $(val_dict[:relax])
   - $(arg_dict[:ci])
   - `ucs`: The uncertainty set, a [`BoxUncertaintySet`](@ref), an [`EllipsoidalUncertaintySet`](@ref), a [`CompactCovarianceUncertaintySet`](@ref) or a covariance [`NormBallUncertaintySet`](@ref).
   - `sigma::MatNum`: The fallback centre. The set's own `val` wins over it, and the box ignores both, because it names no centre.
+  - `mtx_sqrt`: Square-root algorithm of the matrix of an ellipsoid and of the centre of a compact set, the `mtx_sqrt` of the [`UncertaintySetVariance`](@ref), or `nothing` for the plain Cholesky factor. The box and the norm ball ignore it.
 
 # Keyword arguments
 
   - `prefix::Symbol`: Model State namespace of the build (default: empty, i.e. the bare key).
+  - `W::AbstractMatrix`: The lifted matrix that the box, the ellipsoid and the norm ball read (default: the matrix of [`set_sdp_constraints!`](@ref) under `prefix`). The compact set has no such keyword.
 
 # Returns
 
@@ -946,8 +973,9 @@ $(val_dict[:relax])
   - $(ref_dict[:cajas2025]) Section 11.3.
 """
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySet, args...;
-                                prefix::Symbol = Symbol(""))
-    W = set_sdp_constraints!(model; prefix = prefix)
+                                prefix::Symbol = Symbol(""),
+                                W::AbstractMatrix = set_sdp_constraints!(model;
+                                                                         prefix = prefix))
     Au = state_build!(model, prefix, :Au) do
         sc = get_constraint_scale(model)
         N = size(W, 1)
@@ -968,9 +996,12 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::BoxUncertaintySe
     return ucs_variance_risk, :bucs_variance_risk_
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncertaintySet,
-                                sigma::MatNum; prefix::Symbol = Symbol(""))
+                                sigma::MatNum,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot();
+                                prefix::Symbol = Symbol(""),
+                                W::AbstractMatrix = set_sdp_constraints!(model;
+                                                                         prefix = prefix))
     sc = get_constraint_scale(model)
-    W = set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
         N = size(W, 1)
         E = JuMP.@variable(model, [1:N, 1:N], Symmetric)
@@ -984,7 +1015,7 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
     sigma = something(ucs.val, sigma)
     k = ucs.k
-    G = LinearAlgebra.cholesky(ucs.sigma).U
+    G = transpose(matrix_square_root(mtx_sqrt, ucs.sigma))
     t_eucs = state_set!(model, prefix, :t_eucs, i, JuMP.@variable(model))
     x_eucs, ucs_variance_risk = JuMP.@expressions(model,
                                                   begin
@@ -1000,14 +1031,15 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any, ucs::EllipsoidalUncer
     return ucs_variance_risk, :eucs_variance_risk_
 end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
-                                ucs::CompactCovarianceUncertaintySet, sigma::MatNum;
+                                ucs::CompactCovarianceUncertaintySet, sigma::MatNum,
+                                mtx_sqrt::Option{<:AbstractMatrixSquareRootAlgorithm} = EigenFallbackSquareRoot();
                                 prefix::Symbol = Symbol(""))
     sc = get_constraint_scale(model)
     w = get_w(model, prefix)
     # The set is a neighbourhood of the covariance it was calibrated on, so it names the
     # centre. The risk measure's field and then the prior are the fallbacks (ADR 0050).
     sigma = something(ucs.val, sigma)
-    G = covariance_factor(sigma)
+    G = transpose(matrix_square_root(mtx_sqrt, sigma))
     dev_cucs = state_set!(model, prefix, :dev_cucs, i, JuMP.@variable(model))
     state_set!(model, prefix, :cdev_cucs_soc, i,
                JuMP.@constraint(model,
@@ -1019,7 +1051,9 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
     x_cucs = if size(Q, 2) > zero(Int)
         z_cucs = state_set!(model, prefix, :z_cucs, i,
                             JuMP.@variable(model, [1:size(Q, 2)]))
-        JuMP.@expression(model, C .* w .- Q * z_cucs)
+        # The rows a view dropped from the basis enter against a zero target, so the
+        # residual of a view is the residual of the full set (ADR 0189).
+        JuMP.@expression(model, vcat(C .* w .- Q * z_cucs, ucs.R * z_cucs))
     else
         JuMP.@expression(model, C .* w)
     end
@@ -1036,9 +1070,10 @@ end
 function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
                                 ucs::NormBallUncertaintySet{<:Any, <:Any, <:Any,
                                                             <:SigmaUncertaintySetClass},
-                                sigma::MatNum; prefix::Symbol = Symbol(""))
+                                sigma::MatNum, ::Any = nothing; prefix::Symbol = Symbol(""),
+                                W::AbstractMatrix = set_sdp_constraints!(model;
+                                                                         prefix = prefix))
     sc = get_constraint_scale(model)
-    W = set_sdp_constraints!(model; prefix = prefix)
     state_build!(model, prefix, :E) do
         N = size(W, 1)
         E = JuMP.@variable(model, [1:N, 1:N], Symmetric)
@@ -1067,11 +1102,36 @@ function set_ucs_variance_risk!(model::JuMP.Model, i::Any,
     return ucs_variance_risk, :nbucs_variance_risk_
 end
 """
+    sdp_lifted_set(ucs)
+
+Return `true` when [`set_ucs_variance_risk!`](@ref) states the worst case of the set `ucs` on a lifted weight matrix.
+
+The box, the ellipsoid and the covariance norm ball bound the covariance matrix, so their worst case is linear in the lifted matrix and its degree is the degree of the lift. [`set_risk_constraints!`](@ref) then states the objective term on the lift of [`set_sdp_objective_lift!`](@ref) when the measure asks for it. The compact set states its worst case on the weights with degree two, and every other set takes the fall-through method.
+
+# Returns
+
+  - `flag::Bool`.
+
+# Related
+
+  - [`set_ucs_variance_risk!`](@ref)
+  - [`sdp_objective_lift_flag`](@ref)
+  - [`UncertaintySetVariance`](@ref)
+"""
+function sdp_lifted_set(::Any)
+    return false
+end
+function sdp_lifted_set(::Union{<:BoxUncertaintySet, <:EllipsoidalUncertaintySet,
+                                <:NormBallUncertaintySet{<:Any, <:Any, <:Any,
+                                                         <:SigmaUncertaintySetClass}})
+    return true
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the expression that the bound of an uncertainty-set variance acts on, the bound in its units, and the bare Model State name of the expression.
 
-The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs an expression of degree one in the weights and ``k``. The box, the ellipsoid and the norm ball state their worst case over the lifted matrix, which has degree one, so the fall-through method returns the risk expression, the bound and the name unchanged. The compact worst case ``d^2 + \\kappa t^2`` has degree two. Its method adds the square root as a second-order cone variable, and converts the bound with [`variance_risk_bounds_val`](@ref). A compact set without a bound takes the fall-through method and adds nothing.
+The row of [`set_risk_upper_bound!`](@ref) multiplies the bound by ``k``, so it needs an expression of degree one in the weights and ``k``. The box, the ellipsoid and the norm ball state their worst case over the lifted matrix of [`set_sdp_constraints!`](@ref), which has degree one, so the fall-through method returns the risk expression, the bound and the name unchanged. The compact worst case ``d^2 + \\kappa t^2`` has degree two. Its method adds the square root as a second-order cone variable, and converts the bound with [`variance_risk_bounds_val`](@ref). A compact set without a bound takes the fall-through method and adds nothing.
 
 # JuMP formulation
 
@@ -1148,6 +1208,8 @@ Add the worst-case variance of an uncertainty set to `model`, bound it by `setti
 
 The set is the measure's own `ucs`, fitted with [`sigma_ucs`](@ref) when it is an estimator. The fit reads the optimisation's returns `rd` and its prior, because an `AbstractPriorUncertaintySetEstimator` fits from the prior result, and an estimator that carries its own `pe` drops it. The centre falls back to the measure's `sigma` and then to the prior's. The bound `settings.ub` is in the units of a variance, and [`ucs_variance_risk_bounds!`](@ref) names the expression of degree one that it acts on.
 
+When [`sdp_lifted_set`](@ref) and [`sdp_objective_lift_flag`](@ref) are both `true`, the objective term of the box, the ellipsoid or the norm ball reads the lift with a constant corner of [`set_sdp_objective_lift!`](@ref), so it has degree two under [`MaximumRatio`](@ref). [`set_ucs_variance_risk!`](@ref) then builds the term on that lift, with its own names under the namespace `lift_`, and builds the worst case on the lift of [`set_sdp_constraints!`](@ref) for the bound only when `settings.ub` holds one.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -1182,10 +1244,31 @@ function set_risk_constraints!(model::JuMP.Model, i::Any, r::UncertaintySetVaria
     # The prior travels beside the returns, because an `AbstractPriorUncertaintySetEstimator`
     # is fitted from the optimisation's own prior result rather than from returns data.
     ucs = sigma_ucs(r.ucs, rd, pr; kwargs...)
-    ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma; prefix = prefix)
-    bound_expr, ub, bound_name = ucs_variance_risk_bounds!(model, i, ucs, ucs_variance_risk,
-                                                           name, r.settings.ub;
-                                                           prefix = prefix)
+    if !(sdp_lifted_set(ucs) && sdp_objective_lift_flag(model, r.ratio_alg, r.settings))
+        ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
+                                                         prefix = prefix)
+        bound_expr, ub, bound_name = ucs_variance_risk_bounds!(model, i, ucs,
+                                                               ucs_variance_risk, name,
+                                                               r.settings.ub;
+                                                               prefix = prefix)
+    else
+        # The objective term reads the lift with a constant corner, under names of their
+        # own, so it has degree two under `MaximumRatio`. The bound reads the lift with the
+        # corner `k` (#1676).
+        Wc = set_sdp_objective_lift!(model, r.corner; prefix = prefix)
+        ucs_variance_risk, name = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
+                                                         prefix = nested_prefix(prefix,
+                                                                                :lift_),
+                                                         W = Wc)
+        bound_expr, ub, bound_name = if isnothing(r.settings.ub)
+            ucs_variance_risk, nothing, name
+        else
+            bound_risk, bname = set_ucs_variance_risk!(model, i, ucs, sigma, r.mtx_sqrt;
+                                                       prefix = prefix)
+            ucs_variance_risk_bounds!(model, i, ucs, bound_risk, bname, r.settings.ub;
+                                      prefix = prefix)
+        end
+    end
     set_variance_risk_bounds_and_expression!(model, opt, bound_expr, ub, bound_name, i,
                                              ucs_variance_risk, r.settings; prefix = prefix)
     return ucs_variance_risk

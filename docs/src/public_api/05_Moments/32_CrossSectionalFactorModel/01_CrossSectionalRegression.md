@@ -1,5 +1,5 @@
 ```@meta
-Description = "Cross-Sectional Regression, public API of PortfolioOptimisers.jl: PseudoInverseFallback, RankDeficiencyRefusal, UncheckedSolve, MinimumNormSolve, …"
+Description = "Cross-Sectional Regression, public API of PortfolioOptimisers.jl: AbstractCrossSectionalSolveAlgorithm, PseudoInverseFallback, RankDeficiencyRefusal, …"
 ```
 
 # [Cross-Sectional Regression](@id api-cross-sectional-regression)
@@ -7,10 +7,15 @@ Description = "Cross-Sectional Regression, public API of PortfolioOptimisers.jl:
 ## Types
 
 ```@docs
+AbstractCrossSectionalSolveAlgorithm
 PseudoInverseFallback
 RankDeficiencyRefusal
 UncheckedSolve
 MinimumNormSolve
+DependentColumnDrop
+AbstractUnseenMemberRule
+ZeroUnseenMember
+SolvedUnseenMember
 CrossSectionalLinearRegression
 CrossSectionalTargetRegression
 CrossSectionalRegression
@@ -24,4 +29,7 @@ StatsAPI.predict(csr::CrossSectionalRegression, Z::Arr3Num)
 cross_sectional_r2
 mean_cross_sectional_r2
 port_opt_view(csr::CrossSectionalRegression, i, args...)
+cross_sectional_solve
+cross_sectional_target_solve
+assert_cross_sectional_target_solve
 ```

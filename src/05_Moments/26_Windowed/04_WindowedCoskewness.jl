@@ -20,6 +20,7 @@
              │       w ┼ nothing
              │   cache ┴ nothing
            w ┼ nothing
-      window ┴ nothing
+      window ┼ nothing
+        rule ┴ RollingWindow()
     """
 end

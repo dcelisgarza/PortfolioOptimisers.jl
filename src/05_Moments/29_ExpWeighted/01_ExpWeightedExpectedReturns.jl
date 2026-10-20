@@ -7,6 +7,8 @@ The state of each asset starts at zero, so a newly listed asset starts cold, and
 
 A young asset stays investable, and the prior pays a cost for it. Every consumer of a Prior Result reads its returns matrix, so a prior fitted with this estimator fills the rows that the asset misses with zero through [`scenario_fill`](@ref). A scenario-based risk measure then reads a zero return where the asset had none, and it understates the risk of that asset over those rows. `mu` and `sigma` stay the estimates that the recursion made from the rows it saw. The fill is silent when the filled share of the asset's observations is at or below the `fill_limit` field of the prior, warns above it, and raises for any fill under `strict`. `fill_limit` defaults to `nothing`, and this family has no `CoveragePolicy` to derive a limit from, so every fill warns.
 
+The estimator has no window of its own. [`WindowedExpectedReturns`](@ref) is its window: the wrapper keeps the last `window` observations of the returns and of the active mask, and the recursion starts cold at the first of them. The example below fits the mean of an [`EmpiricalPrior`](@ref) on the last 500 observations.
+
 # Mathematical definition
 
 A valid observation of asset ``i`` has a finite return, and the active mask marks the asset active there. At each valid observation the state of asset ``i`` takes the step
@@ -76,12 +78,18 @@ true
 
 julia> me.min_obs
 40
+
+julia> pe = EmpiricalPrior(; me = WindowedExpectedReturns(; me = me, window = 500));
+
+julia> pe.me.window
+500
 ```
 
 # Related
 
   - [`AbstractExpectedReturnsEstimator`](@ref)
   - [`ExpWeightedExpectedReturnsState`](@ref)
+  - [`WindowedExpectedReturns`](@ref)
   - [`ExpWeightedVariance`](@ref)
   - [`ExpWeightedCovariance`](@ref)
   - [`partial_fit!`](@ref)

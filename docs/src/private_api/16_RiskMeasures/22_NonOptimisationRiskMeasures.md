@@ -10,5 +10,5 @@ resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult)
 calc_moment_target(::TCM_Sk{Nothing, Nothing}, ::Any, x::VecNum)
 calc_deviations_vec(r::TCM_Sk, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing)
 calc_deviations_vec(r::TCM_Sk, x::VecNum)
-supports_precomputed_returns(r::ThirdCentralMoment)
+PortfolioOptimisers.reader_frames(::MeanReturnRiskRatio, ::AbstractString, ::Bool)
 ```

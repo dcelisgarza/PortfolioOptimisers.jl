@@ -1,8 +1,8 @@
 ```@meta
-Description = "Docstring dictionaries, public API of PortfolioOptimisers.jl: PortfolioOptimisers."
+Description = "Tables, public API of PortfolioOptimisers.jl: PortfolioOptimisers."
 ```
 
-# Docstring dictionaries
+# Tables
 
 ```@docs
 PortfolioOptimisers

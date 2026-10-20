@@ -10,7 +10,7 @@ lower and upper exponential cone.
 
 # Mathematical definition
 
-Entropic Value-at-Risk via exponential cone (Ahmadi-Javid 2012):
+The exponential cone form of the Entropic Value-at-Risk of [evar](@cite) is:
 
 ```math
 \\begin{align}
@@ -55,6 +55,10 @@ Where:
 
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
+
+# References
+
+  - $(ref_dict[:evar])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::EntropicValueatRisk,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
@@ -102,6 +106,13 @@ function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasur
                                         opt::RiskConstraintOwner, pr::AbstractPriorResult,
                                         series, T::Int, keys::NamedTuple;
                                         prefix::Symbol = Symbol(""))
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = checked_observation_weights(wi, pr.X)
+    if iszero(r.alpha)
+        return set_worst_loss_constraints!(model, i, r, opt, series, wi,
+                                           (; var = keys.t, risk = keys.risk,
+                                            bound = keys.cone); prefix = prefix)
+    end
     sc = get_constraint_scale(model)
     t, z, u = JuMP.@variables(model, begin
                                   ()
@@ -111,8 +122,6 @@ function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasur
     state_set!(model, prefix, keys.t, i, t)
     state_set!(model, prefix, keys.z, i, z)
     state_set!(model, prefix, keys.u, i, u)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = get_observation_weights(wi, pr.X)
     at = if isnothing(wi)
         state_set!(model, prefix, keys.budget, i,
                    JuMP.@constraint(model, sc * (sum(u) - z) <= 0))

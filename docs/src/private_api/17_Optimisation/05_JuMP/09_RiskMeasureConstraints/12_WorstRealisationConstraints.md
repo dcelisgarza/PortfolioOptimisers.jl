@@ -1,10 +1,9 @@
 ```@meta
-Description = "Worst Realisation Constraints, private API of PortfolioOptimisers.jl: set_wr_risk_expression!, set_risk_constraints!."
+Description = "Worst Realisation Constraints, private API of PortfolioOptimisers.jl: set_wr_risk_expression!."
 ```
 
 # [Worst Realisation Constraints: private API](@id private-api-worst-realisation-constraints)
 
 ```@docs
 set_wr_risk_expression!
-set_risk_constraints!(model::JuMP.Model, ::Any, r::WorstRealisation, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```

@@ -18,6 +18,8 @@ expand_investable_ucs(set::BoxUncertaintySet{<:MatNum, <:MatNum}, imsk::BitVecto
 expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:SigmaUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
 expand_investable_ucs(set::EllipsoidalUncertaintySet{<:MatNum, <:Any, <:MuUncertaintySetClass}, imsk::BitVector, pr::AbstractPriorResult)
 vec_quantile_bounds
+ucs_dimension
 ellipsoidal_set
 box_quantile_bounds
+PortfolioOptimisers.reader_frames(::AbstractUncertaintySetEstimator, ::AbstractString, ::Bool)
 ```

@@ -29,11 +29,11 @@ Five defects were measured before this decision was taken.
  3. **A second live copy of the templates sits in the prompts.**
     `.github/prompts/julia-docstrings.prompt.md` runs 292 lines and duplicates four whole
     templates. Nothing links it by name. The three `add-*` prompts duplicate more. The four files
-    carry 40 docstring section headings between them. `STANDARDS.md` forbids exactly this.
+    carry 40 docstring section headings between them. `CODING_STANDARDS.md` forbids exactly this.
  4. **Four cited names are dead.** `AbstractDetoneAlgorithm` and `AbstractPosdefAlgorithm` in
     `add-algorithm.prompt.md`, `AbstractLowOrderPriorResult` in `add-result.prompt.md`, and
     `ClustersResult` in `julia-source-code.instructions.md`. None exists in `src/` or `ext/`.
- 5. **`STANDARDS.md` carries a stale measurement.** Its Precedence section states that `dev` holds
+ 5. **`CODING_STANDARDS.md` carries a stale measurement.** Its Precedence section states that `dev` holds
     25 ADRs that `main` has never seen, measured at `9adac7735b`. `origin/main` now stands at
     `cde5bf48cc`, and every ADR is on it. The paragraph counts zero.
 
@@ -45,14 +45,14 @@ That is the mechanism behind the family drift that opened the issue.
 
 The Authority for every rule below is
 `.github/instructions/julia-docstrings.instructions.md`, except where a rule names another file.
-`STANDARDS.md` routes to it.
+`CODING_STANDARDS.md` routes to it.
 
 **1. The Authority carries rules and pointers, not worked examples.** The 380-line
 `## Complete Example` is deleted. A `## Reference docstrings` table replaces it, with one row per
 docstring kind, and each row names a real unit in a file whose sweep-manifest row reads
 `swept = true`. A pointer cannot drift, because a gate holds its target. The small per-section
 templates stay, because a section's shape and order is the rule in normative form. The file gains a
-`## Vocabulary` section, in the shape of the one that `STANDARDS.md` already carries.
+`## Vocabulary` section, in the shape of the one that `CODING_STANDARDS.md` already carries.
 
 **2. `# Details` is abolished.** The section holds facts that five other sections already own, and
 it holds them because nothing said where they belonged. Each fact moves by its subject:
@@ -89,9 +89,9 @@ steps. Each template in `add-estimator.prompt.md`, `add-algorithm.prompt.md` and
 `add-result.prompt.md` becomes a link to the Authority section that owns it.
 
 **7. A sweep ticket routes to the standard.** `body_of` in `code_health/sweep_triage.jl` writes a
-fixed `## Routing` block that names `STANDARDS.md`, the Authority and `CONTEXT.md` directly. The
+fixed `## Routing` block that names `CODING_STANDARDS.md`, the Authority and `GLOSSARY.md` directly. The
 same block is added by hand to the open tickets. Of six tickets read, three named the Authority and
-none named `STANDARDS.md`, and the only existing route was one hop through a 5111-word umbrella
+none named `CODING_STANDARDS.md`, and the only existing route was one hop through a 5111-word umbrella
 issue.
 
 **8. A new census gates the two staleness classes.**
@@ -106,10 +106,10 @@ inline symbol move when that file's sweep ticket opens its docstrings. Only the 
 that carry `# Details` migrate up front, and their 29 sections migrate under #478. The other 77
 files migrate on their own tickets. No file is touched before its mathematics is checked.
 
-**10. The vocabulary splits by kind.** `Selector tag` names a type role, so it enters `CONTEXT.md`
+**10. The vocabulary splits by kind.** `Selector tag` names a type role, so it enters `GLOSSARY.md`
 § 1, *Core Abstractions*, beside the other abstractions. The process terms — Unit, Family,
 Reference docstring, Capability Catalogue, Coverage Exemption — enter the Authority's own
-`## Vocabulary` section. `CONTEXT.md` stays a domain glossary and nothing else.
+`## Vocabulary` section. `GLOSSARY.md` stays a domain glossary and nothing else.
 
 ## Consequences
 
@@ -140,4 +140,4 @@ decision 9 places the migration inside the sweep ticket rather than in one libra
 
 **Two rules stay unenforced.** Decision 4 and the family half of decision 5 cannot be gated by a
 parser, because neither an implementation fact nor an equation's form is a token. They hold by
-review, in the sense of `STANDARDS.md`. That is a known state and not a hidden one.
+review, in the sense of `CODING_STANDARDS.md`. That is a known state and not a hidden one.

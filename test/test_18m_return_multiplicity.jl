@@ -15,7 +15,7 @@ include(joinpath(@__DIR__, "test18_setup.jl"))
     @test_throws PortfolioOptimisers.IsNonFiniteError JuMPReturnsSettings(; lb = Inf)
     @test_throws PortfolioOptimisers.IsEmptyError JuMPReturnsSettings(; lb = Float64[])
     @test_throws PortfolioOptimisers.IsNonFiniteError JuMPReturnsSettings(; lb = [0.1, NaN])
-    # The bundle sits first, matching `Variance(settings, sigma, chol, rc, alg)`.
+    # The bundle sits first, as `settings` does on every risk measure.
     @test fieldnames(ArithmeticReturn)[1] === :settings
     @test fieldnames(LogarithmicReturn)[1] === :settings
     # `lb` lives on the bundle, not on the term.
@@ -342,4 +342,335 @@ end
         @test haskey(res.model, :ret)
         @test isapprox(res.w, res1.w; rtol = tol)
     end
+end
+
+# The frontier sweep is a product: every swept return term and every swept risk measure joins
+# the same `Iterators.product`, so `k` bounds of `N` points each cost `N^k` full solves.
+# `Frontier`'s constructor only caps the `N` of one bound, so the product is capped separately
+# at Model Assembly by `assert_frontier_sweep_cap`.
+
+const PO = PortfolioOptimisers
+
+@testset "Frontier sweep cap: counting one bound" begin
+    @test PO.frontier_point_count(Frontier(; N = 7)) == 7
+    @test PO.frontier_point_count([0.1, 0.2, 0.3]) == 3
+    @test PO.frontier_point_count(range(0.1, 0.2; length = 4)) == 4
+end
+
+@testset "Frontier sweep cap: two risk frontiers at the ceiling" begin
+    # This is the configuration that passes today: `Frontier`'s constructor accepts each `N`
+    # on its own, and nothing sees the 10^10-solve product.
+    cap = PO.RESOURCE_LIMITS[].max_frontier
+    r = [Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = cap))),
+         ConditionalValueatRisk(;
+                                settings = RiskMeasureSettings(; ub = Frontier(; N = cap)))]
+    mr = MeanRisk(; r = r, obj = MaximumReturn(), opt = JuMPOptimiser(; pe = pr, slv = slv))
+    err = try
+        optimise(mr)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    # The message names the product, the factors that made it, and the knob.
+    @test err.val == big(cap)^2
+    @test occursin("$(big(cap)^2)", err.msg)
+    @test length(collect(eachmatch(Regex("_ub = $cap"), err.msg))) == 2
+    @test occursin("max_frontier", err.msg)
+    @test occursin("set_resource_limits!", err.msg)
+    @test occursin("with_resource_limits", err.msg)
+end
+
+@testset "Frontier sweep cap: two return frontiers at the ceiling" begin
+    cap = PO.RESOURCE_LIMITS[].max_frontier
+    ret = [ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = cap))),
+           ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = cap)))]
+    mr = MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret))
+    err = try
+        optimise(mr)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    @test err.val == big(cap)^2
+    @test occursin("ret_lb_1", err.msg)
+    @test occursin("ret_lb_2", err.msg)
+    @test occursin("max_frontier", err.msg)
+end
+
+@testset "Frontier sweep cap: the two sides multiply together" begin
+    # One bound on each side, each well inside the per-`Frontier` cap, whose product is not.
+    cap = PO.RESOURCE_LIMITS[].max_frontier
+    mr = MeanRisk(;
+                  r = Variance(;
+                               settings = RiskMeasureSettings(; ub = Frontier(; N = cap))),
+                  opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                      ret = ArithmeticReturn(;
+                                                             settings = JuMPReturnsSettings(;
+                                                                                            lb = Frontier(;
+                                                                                                          N = cap)))))
+    err = try
+        optimise(mr)
+        nothing
+    catch e
+        e
+    end
+    @test isa(err, DomainError)
+    @test err.val == big(cap)^2
+    @test occursin("ret_lb_1 = $cap", err.msg)
+    @test length(collect(eachmatch(Regex("_ub = $cap"), err.msg))) == 1
+end
+
+@testset "Frontier sweep cap: NearOptimalCentering is guarded through the same seam" begin
+    cap = PO.RESOURCE_LIMITS[].max_frontier
+    ret = [ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = cap))),
+           ArithmeticReturn(; settings = JuMPReturnsSettings(; lb = Frontier(; N = cap)))]
+    noc = NearOptimalCentering(; opt = JuMPOptimiser(; pe = pr, slv = slv, ret = ret))
+    @test_throws DomainError optimise(noc)
+end
+
+@testset "Frontier sweep cap: a stated vector counts by its length" begin
+    # A vector of bounds is swept exactly like a `Frontier`, and `Frontier`'s constructor
+    # never sees it at all, so the product is the only guard it meets.
+    PO.with_resource_limits(; max_frontier = 3) do
+        mr = MeanRisk(;
+                      r = Variance(;
+                                   settings = RiskMeasureSettings(;
+                                                                  ub = [1e-4, 2e-4, 3e-4,
+                                                                        4e-4])),
+                      obj = MaximumReturn(), opt = JuMPOptimiser(; pe = pr, slv = slv))
+        err = try
+            optimise(mr)
+            nothing
+        catch e
+            e
+        end
+        @test isa(err, DomainError)
+        @test err.val == 4
+        @test occursin("RESOURCE_LIMITS[].max_frontier = 3", err.msg)
+    end
+end
+
+@testset "Frontier sweep cap: an unswept model never meets the guard" begin
+    # No frontier registry, no factors, no check — the ordinary path is untouched even at the
+    # tightest ceiling the caps admit.
+    PO.with_resource_limits(; max_frontier = 1) do
+        res = optimise(MeanRisk(; r = Variance(),
+                                opt = JuMPOptimiser(; pe = pr, slv = slv)))
+        @test isa(res.retcode, PO.OptimisationSuccess)
+        @test isa(PO.frontier_sweep_points(res.model),
+                  Tuple{BigInt, Vector{Pair{Symbol, Int}}})
+        @test PO.frontier_sweep_points(res.model) == (big(1), Pair{Symbol, Int}[])
+    end
+end
+
+@testset "Frontier sweep cap: a product inside the ceiling still sweeps" begin
+    # Both registries populated, 3 x 3 = 9 sweep points against a ceiling of 12. The point is
+    # that the two sides multiply rather than being capped one at a time: 3 and 3 each pass a
+    # per-bound check trivially, and 9 is what the guard actually compares.
+    PO.with_resource_limits(; max_frontier = 12) do
+        mr = MeanRisk(;
+                      r = Variance(;
+                                   settings = RiskMeasureSettings(; ub = Frontier(; N = 3))),
+                      opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                          ret = ArithmeticReturn(;
+                                                                 settings = JuMPReturnsSettings(;
+                                                                                                lb = Frontier(;
+                                                                                                              N = 3)))))
+        res = optimise(mr)
+        @test length(res.w) == 9
+        total, factors = PO.frontier_sweep_points(res.model)
+        @test total == 9
+        # The return term is counted first, then the risk measure; both count 3.
+        @test last.(factors) == [3, 3]
+        @test first(factors).first === :ret_lb_1
+        @test endswith(string(last(factors).first), "_ub")
+        # One more point on either side would have been refused.
+        @test_throws DomainError optimise(MeanRisk(;
+                                                   r = Variance(;
+                                                                settings = RiskMeasureSettings(;
+                                                                                               ub = Frontier(;
+                                                                                                             N = 4))),
+                                                   opt = JuMPOptimiser(; pe = pr, slv = slv,
+                                                                       ret = ArithmeticReturn(;
+                                                                                              settings = JuMPReturnsSettings(;
+                                                                                                                             lb = Frontier(;
+                                                                                                                                           N = 4))))))
+    end
+end
+
+using Test, PortfolioOptimisers
+
+const PO = PortfolioOptimisers
+
+# The frontier sweep's flat order is load-bearing, not cosmetic (ADR 0062).
+# `NearOptimalCentering` solves its anchors as one `MeanRisk` sweep over the same two
+# frontiers and pairs anchor `i` with sweep point `i`, so the two sweeps must enumerate
+# their points in the same order. `frontier_sweep_axes` is the one place that order is
+# stated. These tests need no solver and no model: they drive the seam on synthetic
+# registries.
+
+# A registry entry is `(bound_var_key, bound_key) => (expr, points, …)`. `frontier_axis`
+# reads only the first key and the points, so the expression is `nothing` here.
+ret_registry = [(:ret_lb_var_1, :ret_lb_1) => (nothing, [10.0, 20.0], 1)]
+risk_registry = [(:sd_ub_var, :sd_ub) => (nothing, [1.0, 2.0, 3.0], true)]
+
+@testset "Frontier sweep order: one axis enumerates its own points" begin
+    axis = PO.frontier_axis(ret_registry)
+    pts = PO.frontier_sweep_axes(axis, nothing)
+    @test length(pts) == 2
+    # Each point is a tuple of one `(keys, bounds)` pair, and each pair holds one entry.
+    @test [only(p[1][1]) for p in pts] == [:ret_lb_var_1, :ret_lb_var_1]
+    @test [only(p[1][2]) for p in pts] == [10.0, 20.0]
+end
+
+@testset "Frontier sweep order: several entries on one axis are a product" begin
+    two = [(:ret_lb_var_1, :ret_lb_1) => (nothing, [10.0, 20.0], 1),
+           (:ret_lb_var_2, :ret_lb_2) => (nothing, [30.0, 40.0, 50.0], 2)]
+    pts = PO.frontier_sweep_axes(PO.frontier_axis(two), nothing)
+    # Two bounds of 2 and 3 points cost 6 solves, which is what `frontier_sweep_points`
+    # counts.
+    @test length(pts) == 6
+    # Iterate exactly as `frontier_sweep!` does, so this asserts the traversal and not the
+    # shape a comprehension over a product would give back.
+    order = Vector{Float64}[]
+    for p in pts
+        push!(order, collect(p[1][2]))
+    end
+    @test order == [[10.0, 30.0], [20.0, 30.0], [10.0, 40.0], [20.0, 40.0], [10.0, 50.0],
+                    [20.0, 50.0]]
+end
+
+@testset "Frontier sweep order: the risk axis varies fastest" begin
+    ret_axis = PO.frontier_axis(ret_registry)
+    risk_axis = PO.frontier_axis(risk_registry)
+    pts = PO.frontier_sweep_axes(ret_axis, risk_axis)
+    @test length(pts) == 6
+    # `p[1]` is the risk axis and `p[2]` the return axis. The return bound is held while the
+    # risk bound runs, so the flat order is return-outer and risk-inner.
+    order = Tuple{Float64, Float64}[]
+    for p in pts
+        push!(order, (only(p[2][2]), only(p[1][2])))
+    end
+    @test order ==
+          [(10.0, 1.0), (10.0, 2.0), (10.0, 3.0), (20.0, 1.0), (20.0, 2.0), (20.0, 3.0)]
+end
+
+@testset "Frontier sweep order: a sweep with no frontier still has its points" begin
+    # The unconstrained `NearOptimalCentering` sweep: no bound to write, one solve per
+    # anchor.
+    pts = Iterators.repeated((), 4)
+    @test length(pts) == 4
+    @test all(p -> p === (), pts)
+end
+
+# A `:risk_frontier` entry is `(bound_var_key, bound_key) => (expr, points, flag, owner)`.
+# The registry is **not** parallel to the risk measure vector: a measure registers an entry
+# only when its `settings.ub` is a `Front_NumVec`. So an entry names its owner rather than
+# standing at the owner's position, and the rebuild reads both the owner and the expression
+# off the entry it is rebuilding.
+@testset "Frontier rebuild: an entry is rebuilt from itself, not from entry 1" begin
+    X = [0.01 0.02 -0.01; -0.02 0.01 0.03; 0.03 -0.01 0.02; -0.01 0.02 -0.02;
+         0.02 -0.03 0.01; 0.01 0.01 0.01; -0.03 0.02 -0.01; 0.02 0.01 0.02]
+    pr = prior(EmpiricalPrior(), X)
+    w_min = fill(1 / 3, 3)
+    w_max = [0.7, 0.2, 0.1]
+    front = Frontier(; N = 3)
+    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, 1),
+                (:b_ub_var, :b_ub) => (:EXPR_TWO, front, false, 2)]
+    rs = factory([Variance(), ConditionalValueatRisk()], pr)
+
+    entry = PO._rebuild_risk_frontier(pr, nothing, rs[2], registry, w_min, w_max, 2)
+    # The keys, the expression, the polarity and the owner are entry 2's own. Only the bound
+    # changes. Reading the expression off entry 1 bounds the first measure twice and leaves
+    # the second measure unbounded.
+    @test entry.first == (:b_ub_var, :b_ub)
+    @test entry.second[1] === :EXPR_TWO
+    @test entry.second[3] === false
+    @test entry.second[4] === 2
+    # The span is measure 2's own risk at the two corner portfolios.
+    @test collect(entry.second[2]) ≈
+          range(expected_risk(rs[2], w_min, X), expected_risk(rs[2], w_max, X); length = 3)
+
+    entry1 = PO._rebuild_risk_frontier(pr, nothing, rs[1], registry, w_min, w_max, 1)
+    @test entry1.second[1] === :EXPR_ONE
+    @test entry1.second[3] === true
+    @test entry1.second[4] === 1
+end
+
+@testset "Frontier rebuild: registry positions map to their owning measures" begin
+    front = Frontier(; N = 2)
+    # Measure 1 carries no bound, so the only entry belongs to measure 2. Indexing the
+    # measure vector with the registry position picks measure 1 and builds the span from the
+    # wrong measure.
+    registry = [(:b_ub_var, :b_ub) => (:EXPR_TWO, front, true, 2)]
+    @test PO.risk_frontier_owners(registry, [1]) == [2]
+
+    # Three measures, two of them bounded, and the second bounded one is the third measure.
+    registry = [(:a_ub_var, :a_ub) => (:EXPR_ONE, front, true, 1),
+                (:c_ub_var, :c_ub) => (:EXPR_THREE, front, true, 3)]
+    @test PO.risk_frontier_owners(registry, [1, 2]) == [1, 3]
+    @test PO.risk_frontier_owners(registry, [2]) == [3]
+end
+
+# A risk measure registers a `:risk_frontier` entry only when its `settings.ub` is a
+# `Front_NumVec`, so the registry is shorter than the risk measure vector whenever some
+# measure carries no frontier bound. These tests fix the two properties that follow: an entry
+# names the measure that owns it, and an entry is rebuilt from itself.
+
+@testset "Risk frontier multiplicity: an unbounded measure does not shift the registry" begin
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    rf = ConditionalValueatRisk(; settings = RiskMeasureSettings(; ub = Frontier(; N = 3)))
+    # Measure 1 carries no bound. The only registry entry belongs to measure 2, so the span
+    # must be measure 2's own risk between the two corner portfolios.
+    res = optimise(MeanRisk(; r = [Variance(), rf], obj = MaximumReturn(), opt = opt))
+    @test all(x -> isa(x, PortfolioOptimisers.OptimisationSuccess), res.retcode)
+
+    entry = only(res.model[:risk_frontier])
+    @test entry.second[4] == 2
+
+    r_cvar = factory(ConditionalValueatRisk(), pr)
+    res_min = optimise(MeanRisk(; r = [Variance(), ConditionalValueatRisk()], opt = opt))
+    res_max = optimise(MeanRisk(; r = [Variance(), ConditionalValueatRisk()],
+                                obj = MaximumReturn(), opt = opt))
+    span = range(expected_risk(r_cvar, res_min.w, pr), expected_risk(r_cvar, res_max.w, pr);
+                 length = 3)
+    got = [expected_risk(r_cvar, w, pr) for w in res.w]
+    @test issorted(got)
+    # Each sweep point sits at its own bound, because the objective maximises return and the
+    # conditional value at risk bound is what holds it back.
+    @test isapprox(got, collect(span); rtol = 1e-4)
+end
+
+@testset "Risk frontier multiplicity: two frontiers bound two different expressions" begin
+    opt = JuMPOptimiser(; pe = pr, slv = slv)
+    rv = Variance(; settings = RiskMeasureSettings(; ub = Frontier(; N = 2)))
+    rc = ConditionalValueatRisk(; settings = RiskMeasureSettings(; ub = Frontier(; N = 2)))
+    res = optimise(MeanRisk(; r = [rv, rc], obj = MaximumReturn(), opt = opt))
+    @test length(res.w) == 4
+    @test all(x -> isa(x, PortfolioOptimisers.OptimisationSuccess), res.retcode)
+
+    registry = res.model[:risk_frontier]
+    @test length(registry) == 2
+    @test [e.second[4] for e in registry] == [1, 2]
+    # Each entry keeps its own expression. Rebuilding entry 2 from entry 1 bounds the
+    # variance twice and leaves the conditional value at risk unbounded.
+    @test registry[1].second[1] !== registry[2].second[1]
+
+    r_var = factory(Variance(), pr)
+    r_cvar = factory(ConditionalValueatRisk(), pr)
+    res_min = optimise(MeanRisk(; r = [Variance(), ConditionalValueatRisk()], opt = opt))
+    res_max = optimise(MeanRisk(; r = [Variance(), ConditionalValueatRisk()],
+                                obj = MaximumReturn(), opt = opt))
+    var_ub = expected_risk(r_var, res_max.w, pr)
+    cvar_ub = expected_risk(r_cvar, res_max.w, pr)
+    tol = sqrt(eps())
+    # Every sweep point honours both bounds, so neither expression is left unconstrained.
+    @test all(w -> expected_risk(r_var, w, pr) <= var_ub + tol, res.w)
+    @test all(w -> expected_risk(r_cvar, w, pr) <= cvar_ub + tol, res.w)
+    # The conditional value at risk bound binds on at least one point, which it cannot do
+    # while it is written against the variance expression.
+    cvar_lo = expected_risk(r_cvar, res_min.w, pr)
+    @test any(w -> isapprox(expected_risk(r_cvar, w, pr), cvar_lo; rtol = 1e-4), res.w)
 end

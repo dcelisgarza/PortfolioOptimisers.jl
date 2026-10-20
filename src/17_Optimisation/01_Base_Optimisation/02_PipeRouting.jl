@@ -1,27 +1,28 @@
 """
     pipe_route(x, ::Val{target}, v)
 
-Absorb a [Routing Target](@ref PIPELINE_ROUTING_TARGETS)'s value into an optimiser, returning the rebuilt optimiser.
+Puts the value of a [Routing Target](@ref PIPELINE_ROUTING_TARGETS) into an optimiser, and returns the rebuilt optimiser.
 
-This is the optimiser-owned half of the [`Pipeline`](@ref) seam: [`inject_context`](@ref) fans a [`PipelineContext`](@ref) slot out into routing targets and delivers each one here, knowing nothing about where it lands.
+This is the optimiser half of the routing of a [`Pipeline`](@ref) slot into an optimiser. [`inject_context`](@ref) divides a slot of the [`PipelineContext`](@ref) into Routing Targets, and gives each of them to this function. It does not know which field receives the value.
 
-Targets are named after the field they land in — `:pe`, `:cle`, `:wb`, `:lcse`, `:ple` — because those names are this package's shared vocabulary (see `field_dict`) rather than any one optimiser's private layout. The default method therefore *is* the routing rule: a target lands in the like-named field of any optimiser that has one. Nothing is declared per type, so nothing can drift.
+A target has the name of the field that receives it, for example `:pe`, `:cle`, `:wb`, `:lcse` or `:ple`. These names are the field names that the whole package uses, see `field_dict`, and not the private layout of one optimiser. So the fallback method is the routing rule: a target goes into the field of the same name in each optimiser that has one. No type declares its targets, so no declaration can become wrong.
 
-Two targets are exceptions, because they carry validation policy and name no plain field: `:mu_ucs` (requires an [`ArithmeticReturn`](@ref), lands in `ret.ucs`) and `:sigma_ucs` (lands in the [`UncertaintySetVariance`](@ref) measures of `r`, see [`@pipe_route_sigma_ucs`](@ref)).
+Two targets have methods of their own, because they check their value and name no plain field. `:mu_ucs` needs an [`ArithmeticReturn`](@ref), and goes into `ret.ucs`. `:sigma_ucs` goes into the [`UncertaintySetVariance`](@ref) measures of `r`, see [`@pipe_route_sigma_ucs`](@ref).
 
-Optimisers holding their configuration in a field rather than carrying the target fields themselves declare [`@pipe_delegates`](@ref).
+An optimiser that holds its configuration in a field declares [`@pipe_delegates`](@ref). A target with no field in `x` goes to [`unroutable_target`](@ref), which ignores the [optional](@ref PIPELINE_OPTIONAL_TARGETS) targets and throws for the others.
 
-The lookup is `hasfield` rather than `hasproperty`, because routing rebuilds the object through the field: a name reachable only as a forwarded property could be read but not set.
+# Algorithm
 
-A target with no home falls through to [`unroutable_target`](@ref), which ignores the [optional](@ref PIPELINE_OPTIONAL_TARGETS) ones and throws for the rest.
+ 1. When the type of `x` has a field named `target`, return `x` with `v` in that field.
+ 2. Else return `unroutable_target(x, Val(target), v)`.
 
-Internal machinery — not part of the user-facing API.
+The test is `hasfield` and not `hasproperty`, because the rebuild writes the field. A name that only property forwarding reaches can be read but not written.
 
 # Arguments
 
-  - `x`: The optimiser or optimiser configuration.
+  - `x`: The optimiser or the optimiser configuration.
   - `::Val{target}`: One of [`PIPELINE_ROUTING_TARGETS`](@ref).
-  - `v`: The computed result to absorb.
+  - `v`: The value to put into `x`.
 
 # Returns
 
@@ -43,11 +44,9 @@ end
 """
     pipe_accepts(x, ::Val{target}) -> Bool
 
-Whether a [Routing Target](@ref PIPELINE_ROUTING_TARGETS) has a home in `x`.
+Returns `true` if `x` has a field for a [Routing Target](@ref PIPELINE_ROUTING_TARGETS).
 
-For the field-named targets this is exactly `hasfield` — the same fact [`pipe_route`](@ref) dispatches on, so acceptance and routing cannot disagree. The `:mu_ucs`/`:sigma_ucs` exceptions and the [`@pipe_delegates`](@ref) forwarders override it.
-
-Internal machinery — not part of the user-facing API.
+For a target that has the name of a field, the answer is `hasfield`, which is the test of [`pipe_route`](@ref). So `pipe_accepts` returns `true` exactly for the targets that `pipe_route` puts into a field. The targets `:mu_ucs`, `:sigma_ucs` and `:rkb`, and the optimisers that declare [`@pipe_delegates`](@ref), have methods of their own.
 
 # Related
 
@@ -60,11 +59,9 @@ end
 """
     unroutable_target(x, ::Val{target}, v)
 
-Handle a [Routing Target](@ref PIPELINE_ROUTING_TARGETS) that `x` has no home for.
+Handles a [Routing Target](@ref PIPELINE_ROUTING_TARGETS) for which `x` has no field.
 
-Declared here so [`pipe_route`](@ref) can call it; defined beside [`PIPELINE_OPTIONAL_TARGETS`](@ref), which is where the ignore-versus-throw policy belongs.
-
-Internal machinery — not part of the user-facing API.
+The function is declared here, so that [`pipe_route`](@ref) can call it. Its method is beside [`PIPELINE_OPTIONAL_TARGETS`](@ref), which states which targets it ignores and which it refuses.
 
 # Related
 
@@ -75,11 +72,9 @@ function unroutable_target end
 """
     pipe_config_field(x) -> Union{Nothing, Symbol}
 
-The field holding `x`'s optimiser configuration, or `nothing` if it has none.
+Returns the name of the field that holds the optimiser configuration of `x`, or `nothing` when `x` has none.
 
-Declared by [`@pipe_delegates`](@ref) rather than probed, so an estimator whose `opt` field holds an inner *estimator* — [`SubsetResampling`](@ref) — is never mistaken for one holding a [`JuMPOptimiser`](@ref) configuration.
-
-Internal machinery — not part of the user-facing API.
+[`@pipe_delegates`](@ref) declares the field, and no code guesses it from the field types. So an estimator whose field `opt` holds an inner estimator, such as [`SubsetResampling`](@ref), is not taken for an estimator whose `opt` holds a [`JuMPOptimiser`](@ref).
 
 # Related
 
@@ -90,11 +85,11 @@ pipe_config_field(::Any) = nothing
 """
     @pipe_delegates T field
 
-Declare that optimiser type `T` forwards every [Routing Target](@ref PIPELINE_ROUTING_TARGETS) to the configuration held in `field`.
+Declares that the optimiser type `T` gives every [Routing Target](@ref PIPELINE_ROUTING_TARGETS) to the configuration in `field`.
 
-Emits [`pipe_config_field`](@ref) plus forwarding [`pipe_route`](@ref) and [`pipe_accepts`](@ref) methods. Targets the configuration has no home for reach its own [`unroutable_target`](@ref), so the resulting error names the configuration — matching the pre-inversion messages.
+The macro makes a method of [`pipe_config_field`](@ref), and methods of [`pipe_route`](@ref) and [`pipe_accepts`](@ref) that call the same function on the configuration. A target for which the configuration has no field goes to the [`unroutable_target`](@ref) of the configuration, so the error names the configuration.
 
-A type that absorbs a target *itself* rather than through its configuration declares that target on the concrete type (see [`@pipe_route_sigma_ucs`](@ref)), which out-specialises this forwarder.
+A type that puts a target into its own field, and not into its configuration, declares that target on the concrete type, see [`@pipe_route_sigma_ucs`](@ref). That method is more specific than the methods of this macro.
 
 # Examples
 
@@ -112,7 +107,7 @@ macro pipe_delegates(T, field)
     #! The block is escaped whole: hygiene would otherwise rename the three generics being
     #! extended into gensyms, silently defining the methods on throwaway functions.
     return esc(quote
-                   pipe_config_field(::$T) = $f
+                   pipe_config_field(::$T)::Symbol = $f
                    function pipe_route(x::$T, t::Val, v)
                        return Accessors.set(x, Accessors.PropertyLens{$f}(),
                                             pipe_route(getfield(x, $f), t, v))
@@ -125,16 +120,25 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Route a covariance uncertainty set into the [`UncertaintySetVariance`](@ref) risk measure(s) held in an optimiser's `r` field.
+Puts a covariance uncertainty set into the [`UncertaintySetVariance`](@ref) risk measures in the field `r` of an optimiser.
 
-Each [`UncertaintySetVariance`](@ref) found — directly or inside a vector — has its `ucs` replaced with `sig`. An `r` field carrying no such measure is an error rather than a silent no-op: a computed uncertainty set that reaches no risk measure would be dropped.
+A field `r` that holds no such measure is an error. Else the computed uncertainty set reaches no risk measure, and no message tells the caller.
 
-Internal machinery — not part of the user-facing API.
+# Algorithm
+
+ 1. Read the field `r` of `x`.
+ 2. Replace the `ucs` of each [`UncertaintySetVariance`](@ref) with `sig`. When `r` is a vector, do this for each element, and keep the other elements.
+ 3. Check that the new `r` holds at least one `UncertaintySetVariance`.
+ 4. Return `x` with the new `r`.
 
 # Arguments
 
-  - `x`: The optimiser, which must carry an `r` field.
-  - `sig`: The covariance uncertainty set result.
+  - `x`: The optimiser. It must have a field `r`.
+  - `sig`: The covariance uncertainty set.
+
+# Validation
+
+  - The field `r` holds an [`UncertaintySetVariance`](@ref), or a vector with one, else an `ArgumentError` is thrown.
 
 # Returns
 
@@ -166,9 +170,9 @@ end
 """
     @pipe_route_sigma_ucs T
 
-Declare that optimiser type `T` absorbs the `:sigma_ucs` [Routing Target](@ref PIPELINE_ROUTING_TARGETS) into its own `r` field via [`route_sigma_ucs`](@ref).
+Declares that the optimiser type `T` puts the [Routing Target](@ref PIPELINE_ROUTING_TARGETS) `:sigma_ucs` into its own field `r`, with [`route_sigma_ucs`](@ref).
 
-Declared per concrete type rather than on a supertype: the covariance uncertainty set lands in the *estimator's* risk measures while every other target is forwarded to its configuration, so this method must out-specialise the [`@pipe_delegates`](@ref) forwarder on the same type. It is opt-in because carrying a configuration does not imply carrying risk measures — [`RelaxedRiskBudgeting`](@ref) has no `r` field.
+The covariance uncertainty set goes into the risk measures of the estimator, and every other target goes to its configuration. So this method must be more specific than the method of [`@pipe_delegates`](@ref) on the same type, and each concrete type declares it. A type declares it only when it has risk measures, because a configuration does not bring them. [`RelaxedRiskBudgeting`](@ref) has no field `r`.
 
 # Related
 
@@ -187,13 +191,17 @@ end
 """
     @pipe_route_rkb T
 
-Declare that optimiser type `T` absorbs the `:rkb` [Routing Target](@ref PIPELINE_ROUTING_TARGETS) into the `rkb` field of its risk-budgeting algorithm.
+Declares that the optimiser type `T` puts the [Routing Target](@ref PIPELINE_ROUTING_TARGETS) `:rkb` into the field `rkb` of its risk budgeting algorithm.
 
-`:rkb` is the one target named after a field an optimiser does not carry directly. A risk budget belongs to the *algorithm* — `AssetRiskBudgeting` budgets assets, `FactorRiskBudgeting` budgets factors — so it lands one level down, at `rba.rkb`, and the derived `hasfield` rule cannot reach it.
+`:rkb` is the one target that names a field one level down. A risk budget belongs to the algorithm, because `AssetRiskBudgeting` budgets assets and `FactorRiskBudgeting` budgets factors. So the budget goes into `rba.rkb`, which the rule of `hasfield` does not reach.
 
-Acceptance is not a constant: it asks the algorithm the optimiser is actually carrying. A [`TimeDependent`](@ref) schedule in `rba` has no `rkb` to write, so such an optimiser declines the target and a pipeline computing a budget for it is refused at construction rather than failing in the fold loop.
+The answer of `pipe_accepts` reads the algorithm that the optimiser holds. A [`TimeDependent`](@ref) in `rba` has no field `rkb`, so such an optimiser refuses the target. Then the constructor of a pipeline that computes a budget for it refuses the pipeline, before the fold loop runs.
 
-Declared per concrete type, for the same reason as [`@pipe_route_sigma_ucs`](@ref): it must out-specialise the [`@pipe_delegates`](@ref) forwarder on the same type.
+Each concrete type declares it, for the reason that [`@pipe_route_sigma_ucs`](@ref) states: it must be more specific than the method of [`@pipe_delegates`](@ref) on the same type.
+
+# Validation
+
+  - The field `rba` of the optimiser has a field `rkb`, else `pipe_route` throws an `ArgumentError` that names the type of `rba`.
 
 # Related
 

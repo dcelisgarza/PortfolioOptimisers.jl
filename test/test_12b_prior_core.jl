@@ -192,10 +192,14 @@ processing, and the residual block enters `sigma` and `chol` once each. Sweep ti
     @test isapprox(transpose(lt.chol) * lt.chol, systematic)
     @test !isapprox(transpose(lt.chol) * lt.chol, lt.sigma)
 
-    # Every field of the answer of `factor_residual_config` is the estimator's own.
-    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = false)
+    # Every field of the answer of `factor_residual_config` is the estimator's own. Under
+    # `rsd = false` no consumer repairs a covariance, so `pdm` is `nothing` (#1765).
+    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = true)
     cfg = PO.factor_residual_config(fp)
     @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, fp.mp.pdm, fp.rsd)
+    fp = FactorPrior(; ve = SimpleVariance(; corrected = false), rsd = false)
+    cfg = PO.factor_residual_config(fp)
+    @test (cfg.ve, cfg.pdm, cfg.rsd) === (fp.ve, nothing, fp.rsd)
     @test isnothing(PO.factor_residual_config(EmpiricalPrior()))
 
     # Issue #776. The lift returns the residual variances it measured, and they are the
@@ -204,6 +208,205 @@ processing, and the residual block enters `sigma` and `chol` once each. Sweep ti
     @test isapprox(l1.sigma - systematic, diagm(l1.esigma))
     # Under `rsd = false` no residual block was added, so there is nothing to report.
     @test isnothing(l0.esigma)
+end
+
+# Issue #1765. A factor prior repairs its covariance under the estimator that
+# `matrix_processing_posdef` gives for `mp`. The interface of `AbstractMatrixProcessingEstimator`
+# states the verb, so a type of a caller states the repair or is refused at construction.
+struct MyMatrixProcessing1765 <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing!(::MyMatrixProcessing1765,
+                                                sigma::PortfolioOptimisers.MatNum,
+                                                X::PortfolioOptimisers.MatNum; kwargs...)
+    return matrix_processing!(MatrixProcessing(), sigma, X; kwargs...)
+end
+struct MyPosdefMatrixProcessing1765 <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing!(::MyPosdefMatrixProcessing1765,
+                                                sigma::PortfolioOptimisers.MatNum,
+                                                X::PortfolioOptimisers.MatNum; kwargs...)
+    return matrix_processing!(MatrixProcessing(), sigma, X; kwargs...)
+end
+function PortfolioOptimisers.matrix_processing_posdef(::MyPosdefMatrixProcessing1765)
+    return Posdef()
+end
+struct MyWrongPosdefMatrixProcessing1765 <:
+       PortfolioOptimisers.AbstractMatrixProcessingEstimator end
+function PortfolioOptimisers.matrix_processing_posdef(::MyWrongPosdefMatrixProcessing1765)
+    return 1
+end
+@testset "A factor prior reads the repair of mp through matrix_processing_posdef (#1765)" begin
+    PO = PortfolioOptimisers
+    no = MyMatrixProcessing1765()
+    yes = MyPosdefMatrixProcessing1765()
+    bad = MyWrongPosdefMatrixProcessing1765()
+    views = LinearConstraintEstimator(; val = ["MTUM == 0.0001", "QUAL - USMV == -0.0003"])
+    fblp(; kwargs...) = FactorBlackLittermanPrior(; sets = xfsets, views = views, kwargs...)
+    kte(mp) = Cokurtosis(; alg = FullMoment(), mp = mp)
+    @testset "The verb, its fallback and its check" begin
+        @test Base.ispublic(PortfolioOptimisers, :matrix_processing_posdef)
+        @test !Base.isexported(PortfolioOptimisers, :matrix_processing_posdef)
+        mp = MatrixProcessing()
+        @test PO.matrix_processing_posdef(mp) === mp.pdm
+        @test isnothing(PO.matrix_processing_posdef(MatrixProcessing(; pdm = nothing)))
+        @test isa(PO.matrix_processing_posdef(yes), Posdef)
+        @test_throws "`matrix_processing_posdef` is not defined for `MyMatrixProcessing1765`" PO.matrix_processing_posdef(no)
+        @test isnothing(PO.assert_matrix_processing_posdef(mp))
+        @test isnothing(PO.assert_matrix_processing_posdef(yes))
+        @test_throws "must return `nothing` or an `AbstractPosdefEstimator`" PO.assert_matrix_processing_posdef(bad)
+    end
+    @testset "A type with no method is refused at construction, not at the fit" begin
+        msg = "`matrix_processing_posdef` is not defined for `MyMatrixProcessing1765`"
+        @test_throws msg FactorPrior(; mp = no)
+        @test_throws msg fblp(; mp = no)
+        @test_throws msg HighOrderFactorPriorEstimator(; kte = kte(no))
+        @test_throws ArgumentError FactorPrior(; mp = bad)
+        @test_throws ArgumentError fblp(; mp = bad)
+        @test_throws ArgumentError HighOrderFactorPriorEstimator(; kte = kte(bad))
+    end
+    @testset "Under rsd = false no repair runs, so the type builds and fits" begin
+        fp = FactorPrior(; mp = no, rsd = false)
+        @test prior(fp, rd).sigma == prior(FactorPrior(; rsd = false), rd).sigma
+        @test isnothing(PO.factor_residual_config(fp).pdm)
+        bl = fblp(; mp = no, rsd = false)
+        @test prior(bl, rd).sigma == prior(fblp(; rsd = false), rd).sigma
+        @test isnothing(PO.factor_residual_config(bl).pdm)
+        ho = HighOrderFactorPriorEstimator(; kte = kte(no), rsd = false)
+        @test ho.kte.mp === no
+    end
+    @testset "A type that states the default repair fits as the default does" begin
+        fp = FactorPrior(; mp = yes)
+        @test prior(fp, rd).sigma == prior(FactorPrior(), rd).sigma
+        @test isa(PO.factor_residual_config(fp).pdm, Posdef)
+        bl = fblp(; mp = yes)
+        @test prior(bl, rd).sigma == prior(fblp(), rd).sigma
+        @test isa(PO.factor_residual_config(bl).pdm, Posdef)
+        ho = HighOrderFactorPriorEstimator(; kte = kte(yes))
+        @test prior(ho, rd).kt == prior(HighOrderFactorPriorEstimator(), rd).kt
+    end
+end
+
+# Issue #1776. A high order factor prior reads the processor and the expected returns estimator
+# of its `kte` and `ske` through verbs, because the interfaces of `CokurtosisEstimator` and
+# `CoskewnessEstimator` state no field `mp` or `me`. The two `My*1776` types state no verb, as
+# the docstring types do, and the two `MyFull*1776` types state the default verbs.
+struct MyCokurtosis1776 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::MyCokurtosis1776, X::PortfolioOptimisers.MatNum;
+                                        kwargs...)
+    kte = Cokurtosis(; alg = FullMoment(), mp = MatrixProcessing(; pdm = nothing))
+    return cokurtosis(kte, X; kwargs...)
+end
+struct MyFullCokurtosis1776 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::MyFullCokurtosis1776,
+                                        X::PortfolioOptimisers.MatNum; kwargs...)
+    return cokurtosis(Cokurtosis(; alg = FullMoment()), X; kwargs...)
+end
+function PortfolioOptimisers.cokurtosis_processor(::MyFullCokurtosis1776)
+    return MatrixProcessing()
+end
+function PortfolioOptimisers.cokurtosis_expected_returns(::MyFullCokurtosis1776)
+    return SimpleExpectedReturns()
+end
+struct MyCoskewness1776 <: PortfolioOptimisers.CoskewnessEstimator end
+function PortfolioOptimisers.coskewness(::MyCoskewness1776, X::PortfolioOptimisers.MatNum;
+                                        kwargs...)
+    return coskewness(Coskewness(; alg = FullMoment()), X; kwargs...)
+end
+struct MyFullCoskewness1776 <: PortfolioOptimisers.CoskewnessEstimator end
+function PortfolioOptimisers.coskewness(::MyFullCoskewness1776,
+                                        X::PortfolioOptimisers.MatNum; kwargs...)
+    return coskewness(Coskewness(; alg = FullMoment()), X; kwargs...)
+end
+function PortfolioOptimisers.coskewness_processor(::MyFullCoskewness1776)
+    return MatrixProcessing()
+end
+function PortfolioOptimisers.coskewness_expected_returns(::MyFullCoskewness1776)
+    return SimpleExpectedReturns()
+end
+# Issue #1779. The fallback of `cokurtosis_processor` refuses a type with no method, so a type
+# that wants no processing states it. `MyBareCokurtosis1779` gives `nothing`, and
+# `MyBadCokurtosis1779` gives a value that is not a matrix processing estimator.
+struct MyBareCokurtosis1779 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::MyBareCokurtosis1779,
+                                        X::PortfolioOptimisers.MatNum; kwargs...)
+    return cokurtosis(MyCokurtosis1776(), X; kwargs...)
+end
+function PortfolioOptimisers.cokurtosis_processor(::MyBareCokurtosis1779)
+    return nothing
+end
+struct MyBadCokurtosis1779 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis_processor(::MyBadCokurtosis1779)
+    return 1
+end
+@testset "A high order factor prior reads its co-moment estimators through verbs (#1776)" begin
+    PO = PortfolioOptimisers
+    kt = MyCokurtosis1776()
+    sk = MyCoskewness1776()
+    @testset "The verbs are public, and the library types answer them" begin
+        for name in (:cokurtosis_processor, :cokurtosis_expected_returns,
+                     :coskewness_expected_returns, :coskewness_processor)
+            @test Base.ispublic(PortfolioOptimisers, name)
+            @test !Base.isexported(PortfolioOptimisers, name)
+        end
+        k = Cokurtosis(; alg = FullMoment())
+        s = Coskewness(; alg = FullMoment())
+        @test PO.cokurtosis_processor(k) === k.mp
+        @test PO.cokurtosis_expected_returns(k) === k.me
+        @test PO.coskewness_expected_returns(s) === s.me
+        wk = WindowedCokurtosis(; kte = k, window = 50)
+        ws = WindowedCoskewness(; ske = s, window = 50)
+        @test PO.cokurtosis_processor(wk) === k.mp
+        @test PO.cokurtosis_expected_returns(wk) === k.me
+        @test PO.coskewness_expected_returns(ws) === s.me
+        @test_throws "`cokurtosis_processor` is not defined for `MyCokurtosis1776`" PO.cokurtosis_processor(kt)
+        @test isnothing(PO.cokurtosis_processor(MyBareCokurtosis1779()))
+        @test isnothing(PO.matrix_processing_posdef(nothing))
+        @test isnothing(PO.assert_matrix_processing_posdef(nothing))
+        @test_throws "`cokurtosis_expected_returns` is not defined for `MyCokurtosis1776`" PO.cokurtosis_expected_returns(kt)
+        @test_throws "`coskewness_expected_returns` is not defined for `MyCoskewness1776`" PO.coskewness_expected_returns(sk)
+    end
+    @testset "A type with no method is refused at construction under rsd = true" begin
+        @test_throws "`cokurtosis_expected_returns` is not defined for `MyBareCokurtosis1779`" HighOrderFactorPriorEstimator(;
+                                                                                                                             kte = MyBareCokurtosis1779())
+        @test_throws "`coskewness_expected_returns` is not defined for `MyCoskewness1776`" HighOrderFactorPriorEstimator(;
+                                                                                                                         ske = sk)
+        @test isnothing(PO.assert_factor_comoment_residuals(nothing, nothing))
+    end
+    @testset "A cokurtosis type with no processor is refused at construction under every rsd (#1779)" begin
+        for rsd in (true, false)
+            @test_throws "`cokurtosis_processor` is not defined for `MyCokurtosis1776`" HighOrderFactorPriorEstimator(;
+                                                                                                                      kte = kt,
+                                                                                                                      rsd = rsd)
+            @test_throws "`cokurtosis_processor(::MyBadCokurtosis1779)` must return `nothing` or an `AbstractMatrixProcessingEstimator`" HighOrderFactorPriorEstimator(;
+                                                                                                                                                                       kte = MyBadCokurtosis1779(),
+                                                                                                                                                                       rsd = rsd)
+        end
+        @test isnothing(PO.assert_cokurtosis_processor(nothing))
+        @test isnothing(PO.assert_cokurtosis_processor(MyBareCokurtosis1779()))
+    end
+    @testset "Under rsd = false the types with no verb but the processor fit" begin
+        kref = Cokurtosis(; alg = FullMoment(), mp = MatrixProcessing(; pdm = nothing))
+        ref = prior(HighOrderFactorPriorEstimator(; kte = kref, rsd = false), rd)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = MyBareCokurtosis1779(), ske = sk,
+                                                 rsd = false), rd)
+        @test pr.kt == ref.kt
+        @test pr.sk == ref.sk
+    end
+    @testset "The types that state the default verbs fit as the default does" begin
+        ref = prior(HighOrderFactorPriorEstimator(), rd)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = MyFullCokurtosis1776(),
+                                                 ske = MyFullCoskewness1776()), rd)
+        @test pr.kt == ref.kt
+        @test pr.sk == ref.sk
+        @test pr.V == ref.V
+    end
+    @testset "The windowed estimators fit, where the prior read a field they do not hold" begin
+        T = size(rd.F, 1)
+        wk = WindowedCokurtosis(; kte = Cokurtosis(; alg = FullMoment()), window = T)
+        ws = WindowedCoskewness(; ske = Coskewness(; alg = FullMoment()), window = T)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = wk, ske = ws), rd)
+        ref = prior(HighOrderFactorPriorEstimator(), rd)
+        @test isapprox(pr.kt, ref.kt)
+        @test isapprox(pr.sk, ref.sk)
+    end
 end
 
 # Issue #776. A prior that lifts the factor moments writes the residual variances onto the
@@ -662,7 +865,7 @@ end
                                         f_views = LinearConstraintEstimator(;
                                                                             val = ["MTUM == 0.0001",
                                                                                    "QUAL - USMV == -0.0003"]))]
-    # The fixture is the published reference this estimator was ported from, and the
+    # The fixture is the output of oracle 2, which this estimator was ported from, and the
     # covariance still matches it exactly: ADR 0063's amendment moves the intercept and the
     # rate into the prior stack, and the covariance path never reads the prior mean.
     for (i, pe) in enumerate(pes)
@@ -675,17 +878,17 @@ end
         @test success
     end
 
-    # `mu` departs from the reference, deliberately and by a stated amount (#570).
+    # `mu` departs from oracle 2, deliberately and by a stated amount (#570).
     #
-    # Column 1, `l === nothing`: the reference adds the loadings constant to a historical
+    # Column 1, `l === nothing`: oracle 2 adds the loadings constant to a historical
     # mean that already contains it, because least squares with an intercept makes the mean
-    # of `X` equal `M * mu_f + b`. Ours is the reference less `rr.b`, entry by entry.
+    # of `X` equal `M * mu_f + b`. Ours is oracle 2 less `rr.b`, entry by entry.
     pr1 = prior(pes[1], rd)
     @test isapprox(pr1.mu, df[1:20, 1] .- pr1.rr.b; atol = 1e-16)
     @test isapprox(maximum(abs, pr1.rr.b), 0.0016160796925727256; rtol = 1e-6)
 
     # Column 2, `l = 2`: the equilibrium premium carries no intercept, so only the *place*
-    # differs. Ours blends the views against a prior that carries `b`, and the reference
+    # differs. Ours blends the views against a prior that carries `b`, and oracle 2
     # adds `b` whole afterwards, so the departure is `(I - G*P)b - b` on the asset half.
     # That is not a plain offset, so it is pinned here as one measured number.
     pr2 = prior(pes[2], rd)
@@ -834,15 +1037,17 @@ end
                          rd).w, rtol = 5e-5)
 
     # ADR 0116. This pair compares the two solvers, so both sides state the same prior
-    # probabilities. An explicit uniform `w` is now a different fit from no `w` at all: only
-    # a caller's `w` reaches the nested estimator, and a `StepwiseRegression` under uniform
-    # probability weights selects a different factor set for every asset.
+    # probabilities. Only a caller's `w` reaches the nested estimator. Before #1640 a
+    # `StepwiseRegression` under uniform probability weights read one observation and selected
+    # a different factor set for every asset. ADR 0203 scales the weights to their Kish count,
+    # so the nested fit selects the unweighted sets, and the miss is the 5.0e-4 of the fit
+    # with no `w` above.
     pr = prior(EntropyPoolingPrior(; w = StatsBase.pweights(range(iT, iT; length = T)),
                                    alg = H0_EntropyPooling(),
                                    pe = FactorPrior(;
                                                     re = StepwiseRegression(; crit = :bic)),
                                    sets = sets, opt = opt, mu_views = mu_views), rd)
-    @test isapprox(pr.mu[1], 0.002, rtol = 5e-4)
+    @test isapprox(pr.mu[1], 0.002, rtol = 1e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(;
                                              w = StatsBase.pweights(range(iT, iT;
@@ -908,8 +1113,8 @@ end
     # The view is a constraint on the posterior tail mass, so that mass is what the solve meets.
     @test isapprox(sum(pr.w[i] for i in axes(rd.X, 1) if rd.X[i, 1] <= -var_tgt), 0.05,
                    rtol = 1e-6)
-    # The reported value at risk is a sample order statistic, and the mass lands about `1e-8`
-    # short of `0.05`, which reads one observation further down the tail. `var_view_floor` is
+    # The reported value at risk is a sample order statistic, and a mass of `0.05`, or about
+    # `1e-8` short of it, reads one observation further down the tail. `var_view_floor` is
     # that observation. See issues #573 and #695.
     @test ValueatRisk(; w = pr.w)(rd.X[:, 1]) >= var_view_floor(rd.X[:, 1], var_tgt)
     @test isapprox(pr.w,
@@ -962,7 +1167,10 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views, opt = opt), rd)
     r = LowOrderMoment(; w = pr.w, mu = pr.mu[1],
                        alg = SecondMoment(; ve = SimpleVariance(; w = pr.w)))
-    @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007, rtol = 1e-3)
+    # The view pins the uncorrected second moment, and the variance reports the corrected
+    # one, so it lands at the correction of the posterior weights above the target (#1687).
+    @test isapprox(r([1], reshape(pr.X[:, 1], :, 1)), 0.0007 / (1 - sum(abs2, pr.w)),
+                   rtol = 1e-6)
     @test isapprox(pr.sigma[1, 1], r([1], reshape(pr.X[:, 1], :, 1)))
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, sigma_views = sigma_views,
@@ -973,7 +1181,7 @@ end
     pr = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                    sigma_views = sigma_views, opt = opt), rd)
     @test isapprox(pr.mu[1], pr0.mu[1] * 1.7, rtol = 5e-6)
-    @test isapprox(pr.sigma[1, 1], 0.0008, rtol = 1e-3)
+    @test isapprox(pr.sigma[1, 1], 0.0008 / (1 - sum(abs2, pr.w)), rtol = 1e-6)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views), rd).w, rtol = 5e-4)
@@ -996,10 +1204,14 @@ end
                                    opt = opt), rd)
     @test isapprox(pr.mu[1], 1.5 * pr0.mu[1], rtol = 1e-4)
     @test isapprox(pr.sigma[1, 1], 1.3 * pr0.sigma[1, 1], rtol = 5e-3)
+    # The reference reads the skewness under the observation weights of the prior of the
+    # skewness stage, the posterior of the mean and variance views (#1741).
+    ps = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                   sigma_views = sigma_views, opt = opt), rd)
     @test isapprox(Skewness(; w = pr.w, ve = SimpleVariance(; w = pr.w))([1],
                                                                          reshape(pr.X[:, 1],
                                                                                  :, 1)),
-                   2 * Skewness()([1], reshape(pr0.X[:, 1], :, 1)), rtol = 5e-3)
+                   2 * Skewness(; w = ps.w)([1], reshape(ps.X[:, 1], :, 1)), rtol = 5e-3)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -1028,23 +1240,21 @@ end
                                    sigma_views = sigma_views, kt_views = kt_views,
                                    opt = opt), rd)
     @test pr.mu[1] <= 1.5 * pr0.mu[1]
-    @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1], rtol = 1e-3)
-    @test isapprox(HighOrderMoment(; w = pr.w,
-                                   alg = StandardisedHighOrderMoment(; alg = FourthMoment(),
-                                                                     ve = SimpleVariance(;
-                                                                                         w = pr.w)))([1],
-                                                                                                     reshape(pr.X[:,
-                                                                                                                  1],
-                                                                                                             :,
-                                                                                                             1)),
-                   HighOrderMoment(;
-                                   alg = StandardisedHighOrderMoment(;
-                                                                     alg = FourthMoment()))([1],
-                                                                                            reshape(pr.X[:,
-                                                                                                         1],
-                                                                                                    :,
-                                                                                                    1)) *
-                   0.87, rtol = 5.0e-6)
+    @test isapprox(pr.sigma[1, 1], 0.7 * pr0.sigma[1, 1] / (1 - sum(abs2, pr.w)),
+                   rtol = 1e-5)
+    # The reference reads the kurtosis under the observation weights of the prior of the
+    # kurtosis stage, the posterior of the mean and variance views (#1741). The view does not
+    # bind there, so the posterior stays at that prior.
+    pk = prior(EntropyPoolingPrior(; sets = sets, mu_views = mu_views,
+                                   sigma_views = sigma_views, opt = opt), rd)
+    kt = wi -> HighOrderMoment(; w = wi,
+                               alg = StandardisedHighOrderMoment(; alg = FourthMoment()))([1],
+                                                                                          reshape(pr.X[:,
+                                                                                                       1],
+                                                                                                  :,
+                                                                                                  1))
+    @test kt(pr.w) >= 0.87 * kt(pk.w)
+    @test isapprox(pr.w, pk.w, rtol = 1e-5)
     @test isapprox(pr.w,
                    prior(EntropyPoolingPrior(; sets = sets, opt = jopt, mu_views = mu_views,
                                              sigma_views = sigma_views,
@@ -1476,48 +1686,275 @@ end
     @test isnothing(pooled.fpr.w)
 end
 
-@testset "Returns source selector (x_src)" begin
-    # `x_src` picks which of the two asset-returns carriers the clustering, phylogeny and
-    # centrality bridges read: `:prior` takes `pr.X`, `:data` takes `rd.X`. It replaced the
-    # `cle_pr::Bool` flag in ADR 0044, whose name and documented meaning were both wrong.
+# A prior that a caller defines, with no `x_src` field and no `returns_source` method.
+struct MyPriorEstimator1697 <: PortfolioOptimisers.AbstractLowOrderPriorEstimator_A end
+@testset "Each reader states its own returns source (x_src, ADR 0211)" begin
+    # `x_src` is a field of each reader, and its values are singleton types (ADR 0212). The
+    # picker reads the source that a graph reader states, and a prior reads its own field.
     pr = prior(EmpiricalPrior(), rd)
     rd_alt = ReturnsResult(; nx = reverse(rd.nx), X = reverse(rd.X; dims = 2))
     @test pr.X !== rd_alt.X
+    rng = StableRNG(1697)
+    Xb = 0.01 .* randn(rng, 120, 4)
+    Bb = 0.01 .* randn(rng, 120)
+    Fb = 0.01 .* randn(rng, 120, 2)
+    rdb = ReturnsResult(; nx = string.('a':'d'), X = Xb, nb = ["bm"], B = Bb,
+                        nf = ["f1", "f2"], F = Fb)
+    rde = ReturnsResult(; nx = rdb.nx, X = Xb .- Bb, nf = rdb.nf, F = Fb)
 
-    # The picker is the single point where the decision is made; all eight bridge sites
-    # delegate to it.
-    @test PortfolioOptimisers.returns_matrix_picker(pr, nothing, :prior) === pr.X
-    @test PortfolioOptimisers.returns_matrix_picker(pr, rd_alt, :prior) === pr.X
-    @test PortfolioOptimisers.returns_matrix_picker(pr, rd_alt, :data) === rd_alt.X
-    # Without a returns result there is nothing to select between, so `x_src` is inert.
-    @test PortfolioOptimisers.returns_matrix_picker(pr, nothing, :data) === pr.X
-
-    # A `Bool` could not be wrong; a `Symbol` can, so the typo throws where it was written.
-    for src in (:Prior, :data_, :returns, :pr)
-        @test_throws ArgumentError PortfolioOptimisers.returns_matrix_picker(pr, rd_alt,
-                                                                             src)
+    @testset "The picker reads one source per method" begin
+        pick = PortfolioOptimisers.returns_matrix_picker
+        # `nothing` reads the returns data, and `pr.X` when the call holds none.
+        @test pick(pr, rd_alt, nothing) === rd_alt.X
+        @test pick(pr, nothing, nothing) === pr.X
+        @test pick(rd_alt, nothing, nothing) === rd_alt.X
+        @test pick(pr, rd_alt, DataSource()) === rd_alt.X
+        @test pick(pr, rd_alt, PriorSource()) === pr.X
+        @test pick(pr, rdb, ExcessSource()) == Xb .- Bb
+        # Returns data in `pr` are the returns data of the call.
+        @test pick(rdb, nothing, ExcessSource()) == Xb .- Bb
+        # `ExcessSource()` on returns data with no benchmark refuses (ADR 0212, decision 8).
+        @test_throws ArgumentError pick(pr, rd_alt, ExcessSource())
+        # A stated source that the call cannot give warns, then reads `pr.X` (decision 7).
+        @test (@test_logs (:warn, r"no returns data") pick(pr, nothing, DataSource())) ===
+              pr.X
+        @test (@test_logs (:warn, r"no returns data") pick(pr, nothing, ExcessSource())) ===
+              pr.X
+        @test (@test_logs (:warn, r"no prior result") pick(rd_alt, nothing, PriorSource())) ===
+              rd_alt.X
+        # A `Symbol` or a `Bool` is no source.
+        @test_throws MethodError pick(pr, rd_alt, :data)
+        @test_throws MethodError pick(pr, rd_alt, true)
     end
 
-    # The kwarg is wired through the bridge under its new name.
-    ne = NetworkEstimator(;)
-    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :data).X ==
-          phylogeny_matrix(ne, rd_alt.X).X
-    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :prior).X ==
-          phylogeny_matrix(ne, pr.X).X
-    @test phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :data).X !=
-          phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :prior).X
-    @test_throws ArgumentError phylogeny_matrix(ne, pr; rd = rd_alt, x_src = :Prior)
+    @testset "A graph verb reads the source of its reader" begin
+        ne = NetworkEstimator()
+        @test phylogeny_matrix(ne, pr; rd = rd_alt).X == phylogeny_matrix(ne, rd_alt.X).X
+        @test phylogeny_matrix(ne, pr).X == phylogeny_matrix(ne, pr.X).X
+        # The source is a field of the reader: the verb takes no `x_src` keyword.
+        nep = NetworkEstimator(; x_src = PriorSource())
+        @test phylogeny_matrix(nep, pr; rd = rd_alt).X == phylogeny_matrix(ne, pr.X).X
+        @test phylogeny_matrix(NetworkEstimator(; x_src = DataSource()), pr; rd = rd_alt).X ==
+              phylogeny_matrix(ne, rd_alt.X).X
+        # The constraints of one vector can state different sources (ADR 0214): each one reads
+        # its own matrix, and the rows join in the order of the vector.
+        ccd = CentralityConstraint(; B = MinValue(), comp = >=)
+        ccp = CentralityConstraint(; B = MinValue(), comp = >=, x_src = PriorSource())
+        both = centrality_constraints([ccd, ccp], pr; rd = rd_alt)
+        one = PortfolioOptimisers.merge_linear_constraints([centrality_constraints(ccd, pr;
+                                                                                   rd = rd_alt),
+                                                            centrality_constraints(ccp, pr;
+                                                                                   rd = rd_alt)])
+        @test both.ineq.A == one.ineq.A
+        @test both.ineq.B == one.ineq.B
+        @test both.ineq.A[1, :] == centrality_constraints(ccd, rd_alt.X).ineq.A[1, :]
+        @test both.ineq.A[2, :] == centrality_constraints(ccd, pr.X).ineq.A[1, :]
+    end
 
-    # Every optimiser carrying `x_src` validates it at construction.
-    @test_throws ArgumentError HierarchicalOptimiser(; x_src = :typo)
-    @test_throws ArgumentError JuMPOptimiser(; slv = slv, x_src = :typo)
-    @test_throws ArgumentError NestedClustered(; opti = EqualWeighted(),
-                                               opto = EqualWeighted(), x_src = :typo)
-    # The `cle_pr` spelling is gone: a Bool no longer constructs.
-    @test_throws Exception HierarchicalOptimiser(; x_src = true)
-    @test HierarchicalOptimiser().x_src == :prior
-    @test JuMPOptimiser(; slv = slv).x_src == :prior
-    @test NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()).x_src == :prior
+    @testset "The gaps of a fit are found reader by reader" begin
+        Xg = copy(rd.X)
+        Xg[1:5, 2] .= NaN
+        rdg = ReturnsResult(; nx = rd.nx, X = Xg)
+        cle = ClustersEstimator()
+        gaps = PortfolioOptimisers.graph_reader_gaps
+        expected = [j == 2 for j in axes(Xg, 2)]
+        @test gaps(cle, pr, rdg) == expected
+        @test gaps((cle, nothing, [cle]), pr, rdg) == expected
+        @test isnothing(gaps((nothing,), pr, rdg))
+        mask = PortfolioOptimisers.graph_reader_mask
+        @test (@test_logs (:warn, r"plain moment estimator") mask(cle, nothing, pr, rdg,
+                                                                  false)) == .!expected
+        @test_throws IsNonFiniteError mask(cle, nothing, pr, rdg, true)
+        # A reader at `PriorSource()` reads `pr.X`, where the prior kept no gap.
+        @test isnothing(gaps(ClustersEstimator(; x_src = PriorSource()), pr, rdg)) ||
+              !any(gaps(ClustersEstimator(; x_src = PriorSource()), pr, rdg))
+    end
+
+    @testset "A prior reads its own source" begin
+        @test prior(EmpiricalPrior(), rdb).mu ≈ vec(sum(Xb; dims = 1)) ./ 120
+        @test prior(EmpiricalPrior(; x_src = ExcessSource()), rdb).mu ≈
+              vec(sum(Xb .- Bb; dims = 1)) ./ 120
+        @test prior(EmpiricalPrior(; x_src = DataSource()), rdb).sigma ≈
+              prior(EmpiricalPrior(), rdb).sigma
+        @test prior(FactorPrior(; x_src = ExcessSource()), rdb).X ≈
+              prior(FactorPrior(), rde).X
+        # A gap of a vector benchmark drops the observation under `ExcessSource()` only.
+        Bg = copy(Bb)
+        Bg[3] = NaN
+        rdg = ReturnsResult(; nx = rdb.nx, X = Xb, nb = ["bm"], B = Bg)
+        @test prior(EmpiricalPrior(; x_src = ExcessSource()), rdg).mu ≈
+              vec(sum((Xb .- Bb)[setdiff(1:120, 3), :]; dims = 1)) ./ 119
+        @test prior(EmpiricalPrior(), rdg).mu ≈ vec(sum(Xb; dims = 1)) ./ 120
+    end
+
+    @testset "Each prior holds the field, and admits the data sources only" begin
+        views = LinearConstraintEstimator(; val = ["a == 0.001"])
+        fviews = LinearConstraintEstimator(; val = ["f1 == 0.001"])
+        bsets = UniverseSets(; dict = Dict("nx" => rdb.nx, "nf" => rdb.nf))
+        makers = [(; kw...) -> EmpiricalPrior(; kw...), (; kw...) -> FactorPrior(; kw...),
+                  (; kw...) -> HighOrderPriorEstimator(; kw...),
+                  (; kw...) -> HighOrderFactorPriorEstimator(; kw...),
+                  (; kw...) -> LowDimensionEnsemblePrior(; kw...),
+                  (; kw...) -> EntropyPoolingPrior(; kw...),
+                  (; kw...) -> MeucciEntropyPoolingPrior(; kw...),
+                  (; kw...) -> OpinionPoolingPrior(;
+                                                   pes = [EntropyPoolingPrior(),
+                                                          EntropyPoolingPrior()], kw...),
+                  (; kw...) -> BlackLittermanPrior(; views = views, sets = bsets, kw...),
+                  (; kw...) -> BayesianBlackLittermanPrior(; views = fviews, sets = bsets,
+                                                           kw...),
+                  (; kw...) -> FactorBlackLittermanPrior(; views = fviews, sets = bsets,
+                                                         kw...),
+                  (; kw...) -> AugmentedBlackLittermanPrior(; a_views = views,
+                                                            f_views = fviews, sets = bsets,
+                                                            kw...),
+                  (; kw...) -> CrossSectionalFactorPrior(;
+                                                         factors = ["mkt" =>
+                                                                        ConstantExposure()],
+                                                         kw...)]
+        # The loadings decide the walk: a prior that gives no loadings lets a
+        # regression reader at `nothing` refit on the raw returns (ADR 0214, decision 4).
+        refits = [true, false, true, false, true, true, true, true, true, false, false,
+                  false, false]
+        rs = PortfolioOptimisers.returns_source
+        frames = PortfolioOptimisers.reader_frames
+        for (make, refit) in zip(makers, refits)
+            pe = make(; x_src = ExcessSource())
+            @test isnothing(rs(make()))
+            @test rs(pe) === ExcessSource()
+            @test rs(make(; x_src = DataSource())) === DataSource()
+            @test_throws ArgumentError make(; x_src = PriorSource())
+            @test_throws TypeError make(; x_src = :data)
+            # `factory` and a view carry the source.
+            @test rs(PortfolioOptimisers.factory(pe, nothing)) === ExcessSource()
+            @test rs(PortfolioOptimisers.port_opt_view(pe, 1:2)) === ExcessSource()
+            # The printed estimator shows the source.
+            @test occursin("x_src", sprint(show, pe))
+            # The frame walk: an outermost prior at `nothing` reads the raw returns.
+            @test frames(pe, "pe", false).excess
+            @test frames(make(), "pe", false).raw == ["pe"]
+            @test isempty(frames(make(; x_src = DataSource()), "pe", false).raw)
+            @test PortfolioOptimisers.refits_regression(make()) == refit
+        end
+        # A wrapper answers for the prior that gives its loadings.
+        @test PortfolioOptimisers.refits_regression(EntropyPoolingPrior())
+        @test !PortfolioOptimisers.refits_regression(EntropyPoolingPrior(;
+                                                                         pe = FactorPrior()))
+        @test !PortfolioOptimisers.refits_regression(OpinionPoolingPrior(;
+                                                                         pes = [EntropyPoolingPrior()],
+                                                                         pe2 = FactorPrior()))
+        # A prior that a caller defines states no source, and reads the raw returns.
+        @test isnothing(PortfolioOptimisers.returns_source(MyPriorEstimator1697()))
+    end
+
+    @testset "An inner reader states no source (ADR 0211, decision 3)" begin
+        ex = EmpiricalPrior(; x_src = ExcessSource())
+        @test_throws ArgumentError FactorPrior(; pe = ex)
+        @test_throws ArgumentError FactorPrior(;
+                                               re = StepwiseRegression(;
+                                                                       x_src = ExcessSource()))
+        @test_throws ArgumentError HighOrderPriorEstimator(; pe = ex)
+        @test_throws ArgumentError EntropyPoolingPrior(; pe = ex)
+        @test_throws ArgumentError OpinionPoolingPrior(;
+                                                       pes = [EntropyPoolingPrior(),
+                                                              EntropyPoolingPrior(;
+                                                                                  x_src = ExcessSource())])
+        @test_throws ArgumentError OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                       pe1 = ex)
+        @test_throws ArgumentError OpinionPoolingPrior(; pes = [EntropyPoolingPrior()],
+                                                       pe2 = ex)
+        @test_throws ArgumentError PriorExpectedReturns(; pe = ex)
+        err = try
+            FactorPrior(; pe = ex)
+        catch e
+            e
+        end
+        @test occursin("the `pe` of `FactorPrior`", err.msg)
+        # A source of the outer prior is not a source of the inner one.
+        @test FactorPrior(; x_src = ExcessSource()).x_src === ExcessSource()
+        @test_throws ArgumentError PhylogenyPanel(;
+                                                  pl = NetworkEstimator(;
+                                                                        x_src = ExcessSource()))
+    end
+
+    @testset "The partial fit of a prior reads its own source" begin
+        online(est) = PortfolioOptimisers.update_online_estimator(Online(est))
+        for pe0 in (EmpiricalPrior(; x_src = ExcessSource()),
+                    online(EmpiricalPrior(; x_src = ExcessSource())),
+                    online(FactorPrior(; x_src = ExcessSource())))
+            pe = PortfolioOptimisers.partial_fit!(pe0, rdb)
+            pb = prior(pe0, rdb)
+            pp = prior(pe)
+            @test pp.mu ≈ pb.mu
+            @test pp.sigma ≈ pb.sigma
+            @test PortfolioOptimisers.returns_source(pe) === ExcessSource()
+        end
+        pe = PortfolioOptimisers.partial_fit!(EmpiricalPrior(), rdb)
+        @test prior(pe).mu ≈ prior(EmpiricalPrior(), rdb).mu
+    end
+end
+
+@testset "A prior that keeps the last rows pairs them with the last rows of iv (#1655)" begin
+    # A Scenario Cap keeps the last rows of the observations in `pr.X`, and the returns data
+    # keeps every row of `iv`. Under `x_src = PriorSource()` the clustering reads `pr.X`, so it must
+    # read the rows of `iv` of the same observations.
+    rng = StableRNG(1655)
+    T, N, n = 200, 8, 120
+    Xi = 0.01 .* randn(rng, T, N)
+    ivi = 0.15 .+ 0.1 .* rand(rng, T, N)
+    rdi = ReturnsResult(; nx = string.('a':'h'), X = Xi, iv = ivi, ivpa = 1.1)
+
+    pick = PortfolioOptimisers.implied_volatility_picker
+    @test isnothing(pick(rdi, Xi, nothing))
+    @test pick(rdi, Xi, ivi) === ivi
+    @test pick(rdi, Xi[(T - n + 1):end, :], ivi) == ivi[(T - n + 1):end, :]
+    # An `iv` with fewer rows pairs no row, so it passes on unchanged and the estimator
+    # refuses it.
+    @test pick(rdi, Xi, ivi[1:n, :]) == ivi[1:n, :]
+
+    cle = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252))
+    clp = ClustersEstimator(; ce = ImpliedVolatility(; ppy = 252), x_src = PriorSource())
+    pr = prior(EmpiricalPrior(; max_scenarios = n), rdi)
+    @test size(pr.X, 1) == n
+    tail = ReturnsResult(; nx = rdi.nx, X = Xi[(T - n + 1):end, :],
+                         iv = ivi[(T - n + 1):end, :], ivpa = 1.1)
+    # Each forwarder that reads the prior returns gives the answer of the last rows.
+    clr = clusterise(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa)
+    clt = clusterise(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa)
+    @test clr.res.order == clt.res.order
+    @test isapprox(clr.D, clt.D)
+    # `cor` of `ImpliedVolatility` reads `iv` only to check it, so an equal answer does not
+    # show which rows were paired. A surface that is `NaN` on every row that the prior drops
+    # does: only the last rows pass, and the first rows are refused.
+    ivc = copy(ivi)
+    ivc[1:(T - n), :] .= NaN
+    rdc = ReturnsResult(; nx = rdi.nx, X = Xi, iv = ivc, ivpa = 1.1)
+    @test clusterise(clp, pr; rd = rdc, iv = rdc.iv, ivpa = 1.1).res.order == clt.res.order
+    @test_throws IsNonFiniteError clusterise(cle, Xi[1:n, :]; iv = ivc[1:n, :], ivpa = 1.1)
+    @test phylogeny_matrix(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
+          phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
+    ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)),
+                             x_src = PriorSource())
+    @test isapprox(centrality_vector(ct, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X,
+                   centrality_vector(ct, tail.X; iv = tail.iv, ivpa = tail.ivpa).X)
+    # Under `x_src = nothing` the clustering reads `rd.X`, whose rows `iv` already pairs.
+    @test clusterise(cle, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).res.order ==
+          clusterise(cle, rdi.X; iv = rdi.iv, ivpa = rdi.ivpa).res.order
+    # An `iv` with fewer rows than the prior returns is still refused.
+    @test_throws DimensionMismatch clusterise(clp, pr; rd = rdi, iv = rdi.iv[1:(n - 1), :],
+                                              ivpa = rdi.ivpa)
+
+    # An optimiser that clusters the prior returns now fits, where it raised a
+    # `DimensionMismatch` before.
+    hrp = HierarchicalRiskParity(;
+                                 opt = HierarchicalOptimiser(;
+                                                             pe = EmpiricalPrior(;
+                                                                                 max_scenarios = n),
+                                                             cle = clp))
+    res = optimise(hrp, rdi)
+    @test res.clr.res.order == clt.res.order
+    @test isapprox(sum(res.w), 1)
+    @test optimise(hrp, rdc).clr.res.order == clt.res.order
 end
 
 @testset "The prior carrier's `w` is documented as observation weights" begin
@@ -2305,8 +2742,8 @@ end
     =#
     pool = PortfolioOptimisers.prior_result_property_pool()
     @test pool ==
-          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :pr, :kt, :D2, :L2,
-           :S2, :sk, :V, :skmp]
+          [:X, :o_X, :mu, :sigma, :chol, :w, :ens, :kld, :ow, :rr, :fpr, :x_src, :ss_gaps,
+           :pc, :pr, :kt, :D2, :L2, :S2, :sk, :V, :skmp]
     @test allunique(pool)
     # `fpr` is a field of both carriers, so the concatenation is not already unique.
     @test :fpr in fieldnames(LowOrderPrior)
@@ -2320,10 +2757,10 @@ end
 
 #=
 The residual comoments of `src/10_Prior/08_HighOrderFactorPriorEstimator.jl`, checked against
-hand-built matrices rather than read. Sweep ticket #534. Riskfolio-Lib carries the reference
-implementation of both, and this library's branch chain matches it entry for entry; what differs
-is that the reference builds the systematic covariance itself from the loadings, while this
-library takes it as an argument and asks the caller to remove the residual block first.
+hand-built matrices rather than read. Sweep ticket #534. Oracle 2 implements both, and this
+library's branch chain matches it entry for entry; what differs is that oracle 2 builds the
+systematic covariance itself from the loadings, while this library takes it as an argument and
+asks the caller to remove the residual block first.
 =#
 @testset "Residual coskewness and cokurtosis" begin
     PO = PortfolioOptimisers
@@ -2405,7 +2842,7 @@ library takes it as an argument and asks the caller to remove the residual block
     #=
     The docstring used to say that every pattern with a lone index is zero. It is not: only
     the pattern whose four indices are ALL DISTINCT vanishes. A pair with two singles gives
-    `e2[a] * sigma[b, c]`, which is what the reference implementation gives too. Sweep ticket
+    `e2[a] * sigma[b, c]`, which is what oracle 2 gives too. Sweep ticket
     #534 moved the documentation, not the code.
     =#
     N4 = 4
@@ -2492,6 +2929,139 @@ The correction is a subtraction, and it must undo what the factor lift added. Sw
     p_off = prior(HighOrderFactorPriorEstimator(; pe = fp_f, rsd = false), rd)
     kt_ref = PO.cokurtosis_residuals(pr_f.sigma, rd.X - pr_f.X, h_off.kte.me, h_off.ex)
     @test p_on.kt == p_off.kt + kt_ref
+end
+
+#=
+The block that comes off is the block the prior added, under the weights of its fit. A caller's
+`w` on an entropy pooling prior and the pooled weights of an opinion pool reach the `ve` of the
+fit and not the `ve` of the declaration, so a variance of the residuals under the declared `ve`
+missed the block by 7.5 % and 1.3 % on this data. Found after #1649.
+=#
+@testset "The residual block that comes off is the block the prior added" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    mv = LinearConstraintEstimator(; val = "A1 == 0.004")
+    v = collect(range(0.5, 1.5; length = 60))
+    wu = pweights(v ./ sum(v))
+    # The host gives `wu` to `pe` in both, so the two fits are one model, and only the `ve`
+    # that each declares differs. The old variance under the declared `ve` was exact for the
+    # second and 7.5 % off for the first.
+    e1 = EntropyPoolingPrior(; sets = sets, mu_views = mv, pe = FactorPrior(), w = wu)
+    e2 = EntropyPoolingPrior(; sets = sets, mu_views = mv,
+                             pe = PO.factory(FactorPrior(), wu), w = wu)
+    h1 = prior(HighOrderFactorPriorEstimator(; pe = e1), X, F)
+    h2 = prior(HighOrderFactorPriorEstimator(; pe = e2), X, F)
+    @test isapprox(h1.pr.sigma, h2.pr.sigma)
+    @test h1.kt == h2.kt
+    # An opinion pool fits `pe2` under the pooled weights. The correction is the one built on
+    # the covariance less the block that its loadings result records.
+    ops = [EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(; val = "A3 == 0.001")),
+           EntropyPoolingPrior(; sets = sets,
+                               mu_views = LinearConstraintEstimator(; val = "A4 == -0.001"))]
+    op = OpinionPoolingPrior(; pes = ops, pe2 = FactorPrior())
+    h = HighOrderFactorPriorEstimator(; pe = op)
+    p_on = prior(h, X, F)
+    p_off = prior(HighOrderFactorPriorEstimator(; pe = op, rsd = false), X, F)
+    sigma = p_on.pr.sigma - Diagonal(p_on.pr.rr.esigma)
+    posdef!(PO.factor_residual_config(op).pdm, sigma)
+    kt_ref = PO.cokurtosis_residuals(sigma, X - p_on.pr.X, h.kte.me, h.ex)
+    @test isapprox(p_on.kt, p_off.kt + kt_ref)
+end
+
+#=
+R13 of #1630. Under a Scenario Cap the prior carries its last 40 rows, and the reconstruction
+error took the 60 returns less the 40 rows, which raised a bare `DimensionMismatch`. The residual
+co-moments stay with the model, as the residual block of `sigma` does, so the error reads every
+row of the regression (ADR 0206).
+=#
+@testset "The residual co-moments under a Scenario Cap read every row (R13 of #1630)" begin
+    PO = PortfolioOptimisers
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    fp = FactorPrior(; pe = EmpiricalPrior(; max_scenarios = 40))
+    h = HighOrderFactorPriorEstimator(; pe = fp)
+    p_on = prior(h, X, F)
+    p_off = prior(HighOrderFactorPriorEstimator(; pe = fp, rsd = false), X, F)
+    @test size(p_on.pr.X, 1) == 40
+    rr = p_on.pr.rr
+    sigma = p_on.pr.sigma - Diagonal(rr.esigma)
+    posdef!(PO.factor_residual_config(fp).pdm, sigma)
+    err = X - (F * transpose(rr.M) .+ transpose(rr.b))
+    kt_ref = PO.cokurtosis_residuals(sigma, err, h.kte.me, h.ex)
+    @test isapprox(p_on.kt, p_off.kt + kt_ref)
+    sk_ref = PO.coskewness_residuals(err, h.ske.me)
+    @test isapprox(p_on.sk, p_off.sk + sk_ref)
+    # Around an entropy pooling prior the model is the same, and the fit runs.
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    ep = EntropyPoolingPrior(; sets = sets, pe = fp,
+                             mu_views = LinearConstraintEstimator(; val = "A2 == 0.002"))
+    pe = prior(HighOrderFactorPriorEstimator(; pe = ep), X, F)
+    @test size(pe.kt) == (N^2, N^2)
+    @test all(isfinite, pe.kt)
+end
+
+@testset "A Scenario Cap in a nested prior cuts the rows of the wrapping prior (#1743)" begin
+    rng = StableRNG(1472)
+    T, K, N = 200, 4, 5
+    F = randn(rng, T, K) ./ 100
+    X = F * randn(rng, K, N) ./ 2 .+ randn(rng, T, N) ./ 400
+    X, F = X[1:60, :], F[1:60, :]
+    sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A$i" for i in 1:N]))
+    xf = UniverseSets(;
+                      dict = Dict("nx" => ["A$i" for i in 1:N],
+                                  "nf" => ["F$i" for i in 1:K]))
+    gsets = UniverseSets(; xkey = "g", dict = Dict("g" => ["F$i" for i in 1:K]))
+    cap = EmpiricalPrior(; max_scenarios = 40)
+    av = LinearConstraintEstimator(; val = "A1 == 0.001")
+    fv = LinearConstraintEstimator(; val = "F1 == 0.001")
+    fbl(pe) = prior(FactorBlackLittermanPrior(; pe = pe, sets = xf, views = fv), X, F)
+    abl(; kw...) = prior(AugmentedBlackLittermanPrior(; sets = xf, a_views = av,
+                                                      f_views = fv, kw...), X, F)
+    # The result carries the last 40 rows of the uncapped result and of `X`, the moments
+    # stay over every observation, and `ens` states that count.
+    for (c, u) in ((fbl(cap), fbl(EmpiricalPrior())), (abl(; a_pe = cap), abl()),
+                   (abl(; f_pe = cap), abl()), (abl(; a_pe = cap, f_pe = cap), abl()))
+        @test size(c.X, 1) == size(c.fpr.X, 1) == 40
+        @test c.X == u.X[21:end, :]
+        @test c.o_X == X[21:end, :]
+        @test c.mu == u.mu
+        @test c.sigma == u.sigma
+        @test c.fpr.mu == u.fpr.mu
+        @test c.ens == c.fpr.ens == 60
+    end
+    # A nested prior that carries weights cannot be cut to fewer rows than it weighs. The
+    # cap inside it gives weights on the same scenarios.
+    ep(pe) = EntropyPoolingPrior(; pe = pe, sets = gsets,
+                                 mu_views = LinearConstraintEstimator(;
+                                                                      val = "F2 == 0.002"))
+    @test_throws DimensionMismatch abl(; a_pe = cap, f_pe = ep(EmpiricalPrior()))
+    pr = abl(; a_pe = cap, f_pe = ep(cap))
+    @test size(pr.X, 1) == length(pr.fpr.w) == 40
+    # An entropy pooling prior around either one weighs the 40 scenarios.
+    mv = LinearConstraintEstimator(; val = "A2 == 0.002")
+    for pe in (FactorBlackLittermanPrior(; pe = cap, sets = xf, views = fv),
+               AugmentedBlackLittermanPrior(; a_pe = cap, sets = xf, a_views = av, f_views = fv))
+        pr = prior(EntropyPoolingPrior(; pe = pe, sets = sets, mu_views = mv), X, F)
+        @test size(pr.X, 1) == length(pr.w) == 40
+    end
+    # The pool refits `pe2` under weights over its own observations, so a capped `pe2` is
+    # refused by name, and the cap belongs in `pe1`.
+    op = [EntropyPoolingPrior(; sets = sets,
+                              mu_views = LinearConstraintEstimator(; val = "A3 == 0.001"))]
+    pool = OpinionPoolingPrior(; pes = op, pe2 = cap)
+    msg = r"`pe2`, a EmpiricalPrior, answered on 40 observations and the pool has 60"
+    @test_throws msg prior(pool, X)
+    pr = prior(OpinionPoolingPrior(; pes = op, pe1 = cap), X)
+    @test size(pr.X, 1) == length(pr.w) == 40
 end
 
 #=
@@ -3009,4 +3579,111 @@ Sweep ticket #536.
     end
     # This estimator adds no residual block, so it declares none.
     @test isnothing(PO.factor_residual_config(pv))
+end
+
+@testset "LowOrderPrior refuses a non-finite covariance between investable assets" begin
+    X = [0.01 0.02 0.03; -0.01 0.0 0.01; 0.02 -0.01 0.0]
+    mu = [0.001, 0.002, 0.003]
+    sigma = [1.0 0.1 0.0; 0.1 1.0 0.2; 0.0 0.2 1.0]
+    s = copy(sigma)
+    s[1, 2] = s[2, 1] = NaN
+    @test_throws PortfolioOptimisers.IsNonFiniteError LowOrderPrior(; X = X, mu = mu,
+                                                                    sigma = s)
+    # An asset outside the investable set, here one with no mean, may carry a `NaN` row.
+    m = copy(mu)
+    m[1] = NaN
+    @test LowOrderPrior(; X = X, mu = m, sigma = s) isa LowOrderPrior
+end
+
+@testset "A Prior Result records the source of its prior (#1701, #1705)" begin
+    PO = PortfolioOptimisers
+    rngs = StableRNG(1705)
+    Ts, Ns = 80, 4
+    Fs = 0.01 .* randn(rngs, Ts, 2)
+    Xs = Fs * (0.5 .+ rand(rngs, 2, Ns)) .+ 0.005 .* randn(rngs, Ts, Ns)
+    Bs = 0.8 .* Fs[:, 1]
+    rds = ReturnsResult(; nx = ["a", "b", "c", "d"], X = Xs, nf = ["f1", "f2"], F = Fs,
+                        nb = ["m"], B = Bs)
+    xe = ExcessSource()
+    # The returns-data method records the source that the prior states.
+    for (pe, src) in ((EmpiricalPrior(), nothing),
+                      (EmpiricalPrior(; x_src = DataSource()), DataSource()),
+                      (EmpiricalPrior(; x_src = xe), xe), (FactorPrior(; x_src = xe), xe),
+                      (HighOrderPriorEstimator(; x_src = xe), xe))
+        @test PO.prior_returns_source(prior(pe, rds)) === src
+    end
+    # A returns matrix states no frame, and a view and a forward keep the source.
+    @test isnothing(prior(EmpiricalPrior(; x_src = xe), Xs).x_src)
+    pr = prior(EmpiricalPrior(; x_src = xe), rds)
+    @test PO.port_opt_view(pr, [1, 3]).x_src === xe
+    @test PO.forward_prior(pr; mu = pr.mu .+ 1).x_src === xe
+    @test PO.stamp_returns_source(pr, EmpiricalPrior(; x_src = xe)) === pr
+    @test isnothing(PO.stamp_returns_source(pr, EmpiricalPrior()).x_src)
+    # A HighOrderPrior holds no field of its own: it answers from the prior that it wraps.
+    hop = prior(HighOrderPriorEstimator(; x_src = xe), rds)
+    @test !hasfield(typeof(hop), :x_src)
+    @test hop.pr.x_src === xe
+    # The read-out of an online fold records the source of the folded estimator.
+    pf = partial_fit!(EmpiricalPrior(; x_src = xe), Xs .- Bs)
+    @test prior(pf).x_src === xe
+    @test prior(pf).mu ≈ pr.mu
+    @test prior(partial_fit!(HighOrderPriorEstimator(; x_src = xe), Xs .- Bs)).x_src === xe
+    # The frame walk counts a Result by its source, and a Result at `nothing` adds nothing.
+    @test PO.reader_frames(pr, "pe", false).excess
+    frn = PO.reader_frames(prior(EmpiricalPrior(), rds), "pe", false)
+    @test !frn.excess && isempty(frn.raw)
+    # So a data benchmark refuses an excess Result, as it refuses an excess prior (ADR 0208).
+    tr = TrackingError(; tr = DataBenchmarkTracking(), err = 0.01)
+    @test_throws ArgumentError JuMPOptimiser(; pe = pr, tr = tr, slv = slv)
+    @test isa(JuMPOptimiser(; pe = prior(EmpiricalPrior(), rds), tr = tr, slv = slv),
+              JuMPOptimiser)
+    # The outer problem of a meta-optimiser reads the frame that the Result records, so a
+    # precomputed Result equals its estimator.
+    nc(pe) = optimise(NestedClustered(; pe = pe, cle = ClustersEstimator(; x_src = xe),
+                                      opti = InverseVolatility(),
+                                      opto = InverseVolatility()), rds).w
+    @test nc(pr) ≈ nc(EmpiricalPrior(; x_src = xe))
+    @test !isapprox(nc(PO.forward_prior(pr; x_src = nothing)), nc(pr); atol = 1e-3)
+    # The returns-data methods take `strict` and `dims` and no other keyword (ADR 0213).
+    for pe in (EmpiricalPrior(), FactorPrior())
+        @test_throws MethodError prior(pe, rds; brt = true)
+        @test prior(pe, rds; dims = 2, strict = false).mu ≈ prior(pe, rds).mu
+    end
+end
+
+@testset "No verb or type that took `brt` takes it, and no sink swallows it (#1705)" begin
+    PO = PortfolioOptimisers
+    rngs = StableRNG(17051)
+    Xs = 0.01 .* randn(rngs, 60, 4)
+    rds = ReturnsResult(; nx = ["a", "b", "c", "d"], X = Xs, nb = ["m"], B = Xs[:, 1])
+    pr = prior(EmpiricalPrior(), rds)
+    s1 = first(slv)
+    mr = MeanRisk(; opt = JuMPOptimiser(; slv = s1))
+    w = fill(0.25, 4)
+    for f in (() -> JuMPOptimiser(; slv = s1, brt = true),
+              () -> HierarchicalOptimiser(; brt = true), () -> InverseVolatility(; brt = true),
+              () -> NestedClustered(; opti = mr, opto = mr, brt = true),
+              () -> Stacking(; opti = [mr], opto = mr, brt = true),
+              () -> SubsetResampling(; opt = mr, brt = true),
+              () -> OnlinePortfolioSelection(; brt = true), () -> PO.RiskLoss(; brt = true),
+              () -> ProgrammeAllocationSet(; slv = s1, brt = true),
+              () -> ShortTermLossControlPortfolio(; slv = s1, brt = true),
+              () -> LowDimensionEnsemblePortfolio(; N = 4, slv = s1, brt = true),
+              () -> covariance_forecast_evaluation(Covariance(), rds, IndexWalkForward(40, 10);
+                                                   brt = true),
+              () -> benchmark_relative_returns(rds, true),
+              () -> clusterise(ClustersEstimator(), rds; brt = true),
+              () -> clusterise(ClustersEstimator(), pr; rd = rds, x_src = :prior),
+              () -> phylogeny_matrix(NetworkEstimator(), pr; rd = rds, brt = true),
+              () -> phylogeny_constraints(SemiDefinitePhylogenyEstimator(), pr; brt = true),
+              () -> centrality_vector(CentralityEstimator(), pr; rd = rds, brt = true),
+              () -> centrality_vector(NetworkEstimator(), DegreeCentrality(), pr; brt = true),
+              () -> average_centrality(CentralityEstimator(), w, pr; brt = true),
+              () -> asset_phylogeny(NetworkEstimator(), w, pr; brt = true),
+              () -> centrality_constraints(CentralityConstraint(), pr; brt = true))
+        @test_throws MethodError f()
+    end
+    # The keywords that the library forwards still reach the graph verbs.
+    @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1,
+                         branchorder = :optimal), PO.AbstractClusteringResult)
 end

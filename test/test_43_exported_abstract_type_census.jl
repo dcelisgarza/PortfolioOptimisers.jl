@@ -17,17 +17,34 @@
 
     This census closes that hole. Every exported abstract type must appear in the
     allow-list below, so an export becomes a deliberate edit to this file and never an
-    accident. An export is public API: adding an entry is the maintainer's call, not a
+    accident. An export is public API: adding an entry was the maintainer's call, not a
     decision made in passing while landing a feature.
+
+    Issue #1489 (2026-10-05) changed who makes that call. `CLAUDE.md` § *Design rules* now
+    declares a name without approval when it is unambiguously user-facing: `public` when
+    users extend it, exported when users use it directly. An abstract type is extended, so
+    it is `public` and goes on `allowed_public` below. The census still names every entry,
+    so a declaration stays a deliberate edit, and an ambiguous case still goes to the
+    maintainer.
 
     The list held seven names when the census was written. `TimeDependentCallable` and
     `TimeDependentOptimiserCallable` left it on 2026-08-19, when the time-dependent callable
     family was reclassified (ADR 0030, amendment): the family root moved to
     `AbstractEstimator` and gained a third member, `TimeDependentConstraintCallable`, and
     none of the three is exported. Five names remain.
+
+    Both lists hold one name per line, in `sort` order, fenced from the formatter, so two
+    branches that each add a name touch different lines and rebase cleanly.
     =#
-    allowed_export = Set([:AbstractCentralityAlgorithm, :AbstractUncertaintyEpsAlgorithm,
-                          :HierarchicalRiskMeasure, :RegimeAdjustedTarget, :RiskMeasure])
+    #! format: off
+    allowed_export = Set([
+        :AbstractCentralityAlgorithm,
+        :AbstractUncertaintyEpsAlgorithm,
+        :HierarchicalRiskMeasure,
+        :RegimeAdjustedTarget,
+        :RiskMeasure
+    ])
+    #! format: on
 
     #=
     `public` is the weaker declaration, and `names(PortfolioOptimisers)` returns both, so a
@@ -58,82 +75,208 @@
     `AbstractAssetSelector` and `SubPortfolioUniverse` — joined on 2026-09-25 (issue #1301).
     `AbstractPricesResult`, `AbstractPhylogenyFeatureAlgorithm`, `AbstractCollateralAlgorithm`
     and `SchurComplementAlgorithm` joined on 2026-09-26 (PR #1204), after #1012, #848, #1337
-    and #881 wrote their `# Interfaces` sections.
+    and #881 wrote their `# Interfaces` sections. `AbstractObservedExposureEstimator` joined
+    with its `# Interfaces` section on 2026-09-28 (issue #1368). The two Calibration Slot
+    families of `CrossSectionalFactorPrior`, `AbstractSpannedShrinkageCalibrationAlgorithm` and
+    `AbstractOrthogonalForecastScaleCalibrationAlgorithm`, and the two families of the fields of
+    their rules, `AbstractForecastErrorAlgorithm` and `AbstractForecastScaleWarmUpAlgorithm`,
+    joined with their first rules on 2026-10-05 (issue #1483, the maintainer's ruling).
+    Seven families whose concrete members were already exported joined the same day under
+    the rule of #1489: `AbstractLastObservationAlgorithm`, `AbstractEmptyPairAlgorithm`,
+    `AbstractPanelCollapseAlgorithm`, `AbstractWindowRule`, `AbstractChoiceRule`,
+    `AbstractNeutralisationWeights` and `AbstractOrthogonalForecastFit`.
+    `AbstractSystematicRepair`, the family of the Systematic Repair rule of
+    `CrossSectionalFactorPrior`, joined with its `# Interfaces` section and its two members on
+    2026-10-08 (issue #1576). `AbstractCarryRule`, the family of the Carry Rule of the same
+    prior, joined with its two members on 2026-10-08 (issue #1602). `AbstractUnseenMemberRule`,
+    the family of the Unseen Member rule of the same prior, joined with its `# Interfaces`
+    section and its two members on 2026-10-08 (issue #1606). `AbstractCrossSectionalSolveAlgorithm`,
+    the family of the solve rule of the two cross-sectional regression estimators, joined with
+    its `# Interfaces` section on 2026-10-15 (issue #1721, the maintainer's ruling).
+    `RatioFormulation`, the family of the ratio of a lifted variance, joined with its
+    `# Interfaces` section the same day under the rule of #1489, after #1676 exported its two
+    members. `AbstractLeverageOneMask`, the family of the Leverage-One Mask of the
+    Cross-Sectional Factor Prior, joined with its `# Interfaces` section and its two members the
+    same day (issue #1720).
     They are held to their own list for the same reason — public is API too.
     =#
-    allowed_public = Set([:ARCHBootstrapSet, :AbstractAmbiguityRadiusCalibrationAlgorithm,
-                          :AbstractAmbiguityTailWeightCalibrationAlgorithm, :AbstractBins,
-                          :AbstractCompactRadiusAlgorithm, :AbstractConfidenceUpdate,
-                          :AbstractConstraintEstimator, :AbstractConstraintResult,
-                          :AbstractConstraintSpace, :AbstractCovarianceEstimator,
-                          :AbstractCovarianceShrinkageTarget, :AbstractCoverageAlgorithm,
-                          :AbstractCrossSectionalRegressionEstimator,
-                          :AbstractCrossSectionalTransform,
-                          :AbstractCrossSectionalWeightsAlgorithm,
-                          :AbstractDeformationCalibrationAlgorithm,
-                          :AbstractDenoiseAlgorithm, :AbstractDenoiseEstimator,
-                          :AbstractDescriptorEstimator, :AbstractDetoneEstimator,
-                          :AbstractEstimatorValueAlgorithm,
-                          :AbstractExpectedReturnsEstimator, :AbstractExposureEstimator,
-                          :AbstractForecastTarget, :AbstractGapReturnAlgorithm,
-                          :AbstractGradientPredictor, :AbstractGradientTransform,
-                          :AbstractLearningRateSchedule, :AbstractHighOrderPriorEstimator_F,
-                          :AbstractLowOrderPriorEstimator_A,
-                          :AbstractLowOrderPriorEstimator_AF,
-                          :AbstractLowOrderPriorEstimator_F,
-                          :AbstractMatrixProcessingAlgorithm,
-                          :AbstractMatrixProcessingEstimator,
-                          :AbstractNormCeilingCalibrationAlgorithm,
-                          :AbstractOptimisationEstimator, :AbstractAllocationSet,
-                          :AbstractProgrammeAllocationSet, :AbstractOnlineObjective,
-                          :AbstractOnlinePortfolioSelectionAlgorithm,
-                          :AbstractOrderedWeightsArrayFunction, :AbstractOrthogonalScaling,
-                          :AbstractOrthogonalityMetric, :AbstractPanelField,
-                          :AbstractPanelFieldInput, :AbstractPanelFillAlgorithm,
-                          :AbstractPartialFitState, :AbstractPassiveAggressiveSlack,
-                          :AbstractPatternMatchSelector, :AbstractPosdefEstimator,
-                          :AbstractPreorderBy, :AbstractPreviousWeightsSource,
-                          :AbstractPriceLevelStatistic, :AbstractPriorEstimator,
-                          :AbstractPriorResult, :AbstractProjectionGeometry,
-                          :AbstractPriorUncertaintySetEstimator, :AbstractRealisedTarget,
-                          :AbstractRedundancyAlgorithm, :AbstractReturnForecastEstimator,
-                          :AbstractRiskMeasureSettings, :AbstractSampleSelector,
-                          :AbstractSparsePortfolioAlgorithm,
-                          :AbstractSearchCrossValidationResult, :AbstractSelectionRule,
-                          :AbstractTrendTest, :AbstractSignificanceCalibrationAlgorithm,
-                          :AbstractTimeSeriesRegressionEstimator,
-                          :AbstractTrackingAlgorithm, :AbstractUncertaintyKAlgorithm,
-                          :AbstractUncertaintySetAlgorithm, :AbstractUncertaintySetClass,
-                          :AbstractUncertaintySetEstimator, :AbstractUncertaintySetResult,
-                          :AbstractVarianceEstimator, :BaseGerberCovariance,
-                          :BaseGerberIQCovariance, :BaseHierarchicalOptimisationResult,
-                          :BaseOptimisationEstimator, :BinWidthBins,
-                          :BootstrapUncertaintySetEstimator, :CokurtosisEstimator,
-                          :CoskewnessEstimator, :CrossValidationSearchScorer,
-                          :CustomExpectedReturnsValueAlgorithm, :CustomJuMPConstraint,
-                          :CustomJuMPObjective, :DynamicAbstractWeights,
-                          :FrontierBoundEstimator, :GerberCovarianceAlgorithm,
-                          :GerberIQCovarianceAlgorithm, :GerberIQDecayEstimator,
-                          :GerberIQEpsEstimator, :GerberIQGammaEstimator,
-                          :GerberIQScalerEstimator, :HierarchicalOptimisationResult,
-                          :ImpliedVolatilityAlgorithm, :JuMPWeightFinaliserFormulation,
-                          :NonFiniteAllocationOptimisationEstimator,
-                          :NonFiniteAllocationOptimisationResult,
-                          :NonJuMPOptimisationResult, :NormError, :OpinionPoolingAlgorithm,
-                          :OptimisationAlgorithm, :OptimisationEstimator,
-                          :OptimisationModelResult, :OptimisationResult,
-                          :OptimisationReturnCode, :RegimeAdjustedMethod, :Scalariser,
-                          :TimeDependentCallable, :TimeDependentConstraintCallable,
-                          :TimeDependentOptimiserCallable, :VecJuMPConstr, :VecJuMPObj,
-                          :VectorAbstractEstimatorValueAlgorithm, :VectorToScalarMeasure,
-                          :WeightFinaliser, :AbstractPreprocessingEstimator,
-                          :AbstractPricesPreprocessingEstimator,
-                          :AbstractReturnsPreprocessingEstimator,
-                          :AbstractPreprocessingResult, :AbstractPricesPreprocessingResult,
-                          :AbstractReturnsPreprocessingResult, :AbstractReturnsResult,
-                          :AbstractAssetSelector, :SubPortfolioUniverse,
-                          :AbstractPricesResult, :AbstractPhylogenyFeatureAlgorithm,
-                          :AbstractCollateralAlgorithm, :SchurComplementAlgorithm])
+    #! format: off
+    allowed_public = Set([
+        :ARCHBootstrapSet,
+        :AbstractAllocationSet,
+        :AbstractAmbiguityRadiusCalibrationAlgorithm,
+        :AbstractAmbiguityTailWeightCalibrationAlgorithm,
+        :AbstractAssetSelector,
+        :AbstractBins,
+        :AbstractBootstrapDraws,
+        :AbstractCalibrationWarmup,
+        :AbstractCarryRule,
+        :AbstractCentring,
+        :AbstractChoiceRule,
+        :AbstractCollateralAlgorithm,
+        :AbstractCompactRadiusAlgorithm,
+        :AbstractConfidenceUpdate,
+        :AbstractConstraintEstimator,
+        :AbstractConstraintResult,
+        :AbstractConstraintSpace,
+        :AbstractCorrelationVolatility,
+        :AbstractCovarianceEstimator,
+        :AbstractCovarianceShrinkageTarget,
+        :AbstractCoverageAlgorithm,
+        :AbstractCrossSectionalRegressionEstimator,
+        :AbstractCrossSectionalSolveAlgorithm,
+        :AbstractCrossSectionalTransform,
+        :AbstractCrossSectionalWeightsAlgorithm,
+        :AbstractDeformationCalibrationAlgorithm,
+        :AbstractDenoiseAlgorithm,
+        :AbstractDenoiseEstimator,
+        :AbstractDescriptorEstimator,
+        :AbstractDetoneEstimator,
+        :AbstractDiagonalConstruction,
+        :AbstractEmptyPairAlgorithm,
+        :AbstractEstimatorValueAlgorithm,
+        :AbstractExpectedReturnsEstimator,
+        :AbstractExposureEstimator,
+        :AbstractForecastErrorAlgorithm,
+        :AbstractForecastScaleWarmUpAlgorithm,
+        :AbstractForecastTarget,
+        :AbstractGapReturnAlgorithm,
+        :AbstractGradientPredictor,
+        :AbstractGradientTransform,
+        :AbstractHacFloor,
+        :AbstractHacVolatilityTiming,
+        :AbstractHighOrderPriorEstimator_F,
+        :AbstractIndefiniteBlockRule,
+        :AbstractLastObservationAlgorithm,
+        :AbstractLearningRateSchedule,
+        :AbstractLevelRecursion,
+        :AbstractLeverageOneMask,
+        :AbstractLongRunForm,
+        :AbstractLongRunKernel,
+        :AbstractLowOrderPriorEstimator_A,
+        :AbstractLowOrderPriorEstimator_AF,
+        :AbstractLowOrderPriorEstimator_F,
+        :AbstractMatrixProcessingAlgorithm,
+        :AbstractMatrixProcessingEstimator,
+        :AbstractMatrixSquareRootAlgorithm,
+        :AbstractMeanTestEstimator,
+        :AbstractMeanTestSpan,
+        :AbstractMissingDataFilterAlgorithm,
+        :AbstractNeutralisationWeights,
+        :AbstractNormCeilingCalibrationAlgorithm,
+        :AbstractObservedExposureEstimator,
+        :AbstractOnlineObjective,
+        :AbstractOnlinePortfolioSelectionAlgorithm,
+        :AbstractOptimisationEstimator,
+        :AbstractOrderedWeightsArrayFunction,
+        :AbstractOrthogonalForecastFit,
+        :AbstractOrthogonalForecastScaleCalibrationAlgorithm,
+        :AbstractOrthogonalScaling,
+        :AbstractOrthogonalityMetric,
+        :AbstractOverlapStudentLaw,
+        :AbstractPanelCollapseAlgorithm,
+        :AbstractPanelField,
+        :AbstractPanelFieldInput,
+        :AbstractPanelFillAlgorithm,
+        :AbstractPartialFitState,
+        :AbstractPassiveAggressiveSlack,
+        :AbstractPatternMatchSelector,
+        :AbstractPeel,
+        :AbstractPhylogenyFeatureAlgorithm,
+        :AbstractPosdefEstimator,
+        :AbstractPreorderBy,
+        :AbstractPreprocessingEstimator,
+        :AbstractPreprocessingResult,
+        :AbstractPreviousWeightsSource,
+        :AbstractPriceLevelStatistic,
+        :AbstractPricesPreprocessingEstimator,
+        :AbstractPricesPreprocessingResult,
+        :AbstractPricesResult,
+        :AbstractPriorEstimator,
+        :AbstractPriorResult,
+        :AbstractPriorUncertaintySetEstimator,
+        :AbstractProgrammeAllocationSet,
+        :AbstractProjectionGeometry,
+        :AbstractRealisedTarget,
+        :AbstractRedundancyAlgorithm,
+        :AbstractRegimeDebias,
+        :AbstractRegressionTarget,
+        :AbstractReturnForecastEstimator,
+        :AbstractReturnsPreprocessingEstimator,
+        :AbstractReturnsPreprocessingResult,
+        :AbstractReturnsResult,
+        :AbstractReturnsSource,
+        :AbstractRiskMeasureSettings,
+        :AbstractSampleSelector,
+        :AbstractSearchCrossValidationResult,
+        :AbstractSelectionRule,
+        :AbstractSignificanceCalibrationAlgorithm,
+        :AbstractSortingNetworkMerge,
+        :AbstractSortingNetworkOrdering,
+        :AbstractSpannedShrinkageCalibrationAlgorithm,
+        :AbstractSparsePortfolioAlgorithm,
+        :AbstractStepWeighting,
+        :AbstractSystematicRepair,
+        :AbstractTimeSeriesRegressionEstimator,
+        :AbstractTrackingAlgorithm,
+        :AbstractTrendTest,
+        :AbstractUncertaintyKAlgorithm,
+        :AbstractUncertaintySetAlgorithm,
+        :AbstractUncertaintySetClass,
+        :AbstractUncertaintySetEstimator,
+        :AbstractUncertaintySetResult,
+        :AbstractUnknownEntryRule,
+        :AbstractUnseenMemberRule,
+        :AbstractVarianceEstimator,
+        :AbstractWindowRule,
+        :BaseGerberCovariance,
+        :BaseGerberIQCovariance,
+        :BaseHierarchicalOptimisationResult,
+        :BaseOptimisationEstimator,
+        :BinWidthBins,
+        :BootstrapUncertaintySetEstimator,
+        :CokurtosisEstimator,
+        :CoskewnessEstimator,
+        :CrossValidationSearchScorer,
+        :CustomExpectedReturnsValueAlgorithm,
+        :CustomJuMPConstraint,
+        :CustomJuMPObjective,
+        :DynamicAbstractWeights,
+        :FrontierBoundEstimator,
+        :GerberCovarianceAlgorithm,
+        :GerberIQCovarianceAlgorithm,
+        :GerberIQDecayEstimator,
+        :GerberIQEpsEstimator,
+        :GerberIQGammaEstimator,
+        :GerberIQScalerEstimator,
+        :HierarchicalOptimisationResult,
+        :ImpliedVolatilityAlgorithm,
+        :JuMPWeightFinaliserFormulation,
+        :NonFiniteAllocationOptimisationEstimator,
+        :NonFiniteAllocationOptimisationResult,
+        :NonJuMPOptimisationResult,
+        :NormError,
+        :OpinionPoolingAlgorithm,
+        :OptimisationAlgorithm,
+        :OptimisationEstimator,
+        :OptimisationModelResult,
+        :OptimisationResult,
+        :OptimisationReturnCode,
+        :RatioFormulation,
+        :RegimeAdjustedMethod,
+        :Scalariser,
+        :SchurComplementAlgorithm,
+        :SubPortfolioUniverse,
+        :TimeDependentCallable,
+        :TimeDependentConstraintCallable,
+        :TimeDependentOptimiserCallable,
+        :VecJuMPConstr,
+        :VecJuMPObj,
+        :VectorAbstractEstimatorValueAlgorithm,
+        :VectorToScalarMeasure,
+        :WeightFinaliser
+    ])
+    #! format: on
 
     is_abstract(n) = isdefined(PortfolioOptimisers, n) &&
                      isa(getfield(PortfolioOptimisers, n), Type) &&

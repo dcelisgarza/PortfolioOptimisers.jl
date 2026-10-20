@@ -66,7 +66,7 @@ const WindowSizeEC = Union{<:WindowSizeEstimator, <:Function}
 
 Union of a concrete subset-size value or an estimator/function for it.
 """
-const SubsetSizeE = Union{<:Number, <:SubsetSizeEC}
+const SubsetSizeE = Union{<:Real, <:SubsetSizeEC}
 """
     const NumberSubsetsE
 
@@ -78,7 +78,7 @@ const NumberSubsetsE = Union{<:Integer, <:NumberSubsetsEC}
 
 Union of a concrete window-size value or an estimator/function for it.
 """
-const WindowSizeE = Union{<:Number, <:WindowSizeEC}
+const WindowSizeE = Union{<:Real, <:WindowSizeEC}
 """
 $(DocStringExtensions.TYPEDEF)
 
@@ -107,11 +107,11 @@ $(DocStringExtensions.FIELDS)
 ## Validation
 
   - If `subset_size` is an `Integer`: `subset_size >= 1`.
-  - If `subset_size` is a float: `0 < subset_size < 1`.
+  - If `subset_size` is any other real number: `0 < subset_size < 1`.
   - If `n_subsets` is an `Integer`: `n_subsets >= 2`.
   - `max_comb > 0` and finite.
   - If `window_size` is an `Integer`: `window_size >= 2`.
-  - If `window_size` is a float: `0 < window_size < 1`.
+  - If `window_size` is any other real number: `0 < window_size < 1`.
 
 # Related
 
@@ -161,7 +161,7 @@ $(DocStringExtensions.FIELDS)
                                 seed::Option{<:Integer})
         if isa(subset_size, Integer)
             assert_nonempty_nonneg_finite_val(subset_size - 1, "subset_size - 1")
-        elseif isa(subset_size, AbstractFloat)
+        elseif isa(subset_size, Real)
             assert_unit_interval(subset_size, :subset_size)
         end
         if isa(n_subsets, Integer)
@@ -170,7 +170,7 @@ $(DocStringExtensions.FIELDS)
         assert_nonempty_gt0_finite_val(max_comb, :max_comb)
         if isa(window_size, Integer)
             assert_nonempty_nonneg_finite_val(window_size - 2, "window_size - 2")
-        elseif isa(window_size, AbstractFloat)
+        elseif isa(window_size, Real)
             assert_unit_interval(window_size, :window_size)
         end
         return new{typeof(cv), typeof(subset_size), typeof(n_subsets), typeof(max_comb),
@@ -364,13 +364,15 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
               DomainError((k, N),
                           "`k` is $k and `N` is $N. A subset draws `k` assets from a universe of `N`, so `k <= N` must hold."))
     assert_nonempty_finite_val(n_subsets, :n_subsets)
-    n_comb = binomial(N, k)
+    # The count overflows a machine integer from about 70 assets, so it is exact in `BigInt`.
+    n_comb = binomial(big(N), k)
     @argcheck(n_subsets <= n_comb,
               "n_subsets = $n_subsets must not be greater than `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`.")
     rng = resolve_rng(rng, seed)
     subsets = Matrix{typeof(N)}(undef, k, n_subsets)
     if n_comb <= max_comb
-        ranks = StatsBase.sample(rng, 1:n_comb, n_subsets; replace = false)
+        ranks = StatsBase.sample(rng, one(N):convert(typeof(N), n_comb), n_subsets;
+                                 replace = false)
         @inbounds for (i, rank) in enumerate(ranks)
             subsets[:, i] .= combination_by_index(rank, N, k)
         end
@@ -391,7 +393,7 @@ Resolves the subset size from either an integer (direct count) or a fraction of 
 
 # Arguments
 
-  - `subset_size`: Integer or float subset size specification.
+  - `subset_size`: An integer count of assets, any other real number as a fraction of the assets, or a callable.
   - `rd`: Returns result or prior.
   - `args...`: Additional arguments.
 
@@ -410,8 +412,8 @@ function get_subset_size(subset_size::Integer, rd::Union{<:Pr_RR, <:AbstractPric
               "subset_size must not be greater than the number of assets")
     return subset_size
 end
-function get_subset_size(subset_size::AbstractFloat,
-                         rd::Union{<:Pr_RR, <:AbstractPricesResult}, args...)
+function get_subset_size(subset_size::Real, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+                         args...)
     subset_size = max(round(Int, subset_size * size(rd.X, 2)), 1)
     return subset_size
 end
@@ -428,11 +430,11 @@ end
 
 Get the actual rolling window size for multiple-randomised cross-validation.
 
-Resolves the window size from `nothing` (no windowing), an integer (direct count), a float (fraction of observations), or a callable.
+Resolves the window size from `nothing` (no windowing), an integer (direct count), any other real number (fraction of observations), or a callable.
 
 # Arguments
 
-  - `window_size`: Window size specification (`nothing`, integer, float, or callable).
+  - `window_size`: Window size specification (`nothing`, an integer, any other real number, or a callable).
   - `rd`: Returns result or prior.
   - `args...`: Additional arguments.
 
@@ -456,8 +458,8 @@ function get_window_size(window_size::Integer, rd::Union{<:Pr_RR, <:AbstractPric
               "window_size must not be greater than the number of observations")
     return window_size
 end
-function get_window_size(window_size::AbstractFloat,
-                         rd::Union{<:Pr_RR, <:AbstractPricesResult}, args...)
+function get_window_size(window_size::Real, rd::Union{<:Pr_RR, <:AbstractPricesResult},
+                         args...)
     window_size = max(round(Int, window_size * size(rd.X, 1)), 2)
     @argcheck(window_size <= size(rd.X, 1),
               "window_size must not be greater than the number of observations")
@@ -582,7 +584,9 @@ function Base.split(mrcv::MultipleRandomised, rd::Prices_RR)
             start_obs = 1
             rdi = rd
         else
-            start_obs = rand(rng, 1:(T - window_size))
+            # A window of `window_size` rows fits at `T - window_size + 1` starts, the last
+            # of which ends on row `T`; a window of all `T` rows has the one start `1`.
+            start_obs = rand(rng, 1:(T - window_size + 1))
             idx = start_obs:(start_obs + window_size - 1)
             rdi = port_opt_view(rd, idx, :)
         end

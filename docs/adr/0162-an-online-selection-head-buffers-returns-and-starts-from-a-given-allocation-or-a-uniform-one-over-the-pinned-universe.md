@@ -164,7 +164,7 @@ zero.
 - ADR 0157 is rewritten in place at its state table row for `X`, its fill section and the two
   consequence lines that name the fill; ADR 0158 at its closing sentence on the buffer; ADR 0159
   at the tracking-error formula; ADR 0155 at the head's field list, which gains `w0`.
-- `CONTEXT.md` gains *Start Allocation*; *Rule State* says the buffer holds returns.
+- `GLOSSARY.md` gains *Start Allocation*; *Rule State* says the buffer holds returns.
 - The head's first build,
   [#1161](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1161), owes: the returns
   buffer with `x = 1 .+ r` formed at the step, the Held Gap warning, `w0` on

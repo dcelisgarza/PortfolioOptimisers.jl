@@ -301,7 +301,7 @@ end
 
 Register an epigraph variable of the dual norm of `x`, and bound it below by that norm.
 
-The dual order ``q`` picks the cone. At ``q = 2`` it is the second-order cone, as in [`set_weight_norm_2_constraints!`](@ref). At ``q = 1`` (``p = \\infty``) it is the norm-one cone, as in [`set_l1_regularisation!`](@ref). At ``q = \\infty`` (``p = 1``) it is the norm-infinity cone, as in [`set_weight_norm_inf_constraints!`](@ref). At every other order it is one power cone for each entry of `x`, as in [`set_weight_norm_p_constraints!`](@ref). The two norm-ball consumers call it, the mean builder on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}`` and the covariance builder on ``\\mathbf{L}^{\\intercal}\\operatorname{vec}(\\mathbf{W} + \\mathbf{E})``, so it takes `prefix` and `i` and registers every entry under both. The variable equals the dual norm only where the caller's objective pulls it down.
+The dual order ``q`` picks the cone. At ``q = 2`` it is the second-order cone, as in [`set_weight_norm_2_constraints!`](@ref). At ``q = 1`` (``p = \\infty``) it is the norm-one cone, as in [`set_l1_regularisation!`](@ref). At ``q = \\infty`` (``p = 1``) it is the norm-infinity cone, as in [`set_weight_norm_inf_constraints!`](@ref). At every other order it is one power cone for each entry of `x`, as in [`set_weight_norm_p_constraints!`](@ref). The two norm-ball consumers call it, the mean builder on ``\\mathbf{L}^{\\intercal}\\boldsymbol{w}`` and the covariance builder on ``\\mathbf{L}^{\\intercal}\\operatorname{vec}(\\mathbf{W} + \\mathbf{E})``, so it takes `prefix` and `i` and registers every entry under both. A model can carry a set on each axis, and then both builders share one `prefix`, so the mean builder passes the index `w_i` and the covariance builder the index `i`. The variable equals the dual norm only where the caller's objective pulls it down.
 
 # Mathematical definition
 
@@ -343,7 +343,7 @@ Where:
 
   - $(arg_dict[:model])
   - `prefix`: Model State prefix that the entries are registered under.
-  - `i`: Index of the term, which suffixes every name that the builder registers.
+  - `i`: Index of the term, which suffixes every name that the builder registers. The mean builder passes `Symbol(:w_, i)`, so its names differ from those of the covariance builder.
   - `x`: Affine expression, a vector of at least one entry.
   - `p::Number`: Norm order of the ball, `p >= 1`, with `Inf` admitted.
 

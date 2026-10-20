@@ -1,8 +1,8 @@
 ```@meta
-Description = "Portfolio and asset fees, private API of PortfolioOptimisers.jl: AbstractFeeAmortisation, FeesE_Fees, calc_periodic_fees, calc_one_off_fees, …"
+Description = "Fees, private API of PortfolioOptimisers.jl: AbstractFeeAmortisation, FeesE_Fees, calc_periodic_fees, calc_one_off_fees, calc_asset_periodic_fees, …"
 ```
 
-# Portfolio and asset fees: private API
+# Fees: private API
 
 ```@docs
 AbstractFeeAmortisation
@@ -16,9 +16,10 @@ calc_fixed_liquidation_fees
 calc_asset_liquidation_fees
 calc_asset_fixed_liquidation_fees
 add_liquidation_terms
+assert_short_fee_convex
 override_fee_amortisation
 two_axis_fees_view
-strip_liquidation_carriers
+strip_liquidation_charges
 investable_fees_view
 mark_fees
 lift_fees

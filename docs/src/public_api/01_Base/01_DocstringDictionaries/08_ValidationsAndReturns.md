@@ -1,7 +1,7 @@
 ```@meta
-Description = "Validation and return descriptions has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Validations and returns has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Validation and return descriptions
+# Validations and returns
 
-This file defines no name. The [private page](@ref private-api-validation-and-return-descriptions) says which table it fills.
+This file defines no name. The [private page](@ref private-api-validations-and-returns) says which table it fills.

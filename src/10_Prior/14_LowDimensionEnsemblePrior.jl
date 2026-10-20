@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Forecasts the next price relative and its covariance by averaging many low-dimensional lagged regressions, weighted by their in-sample fit.
 
-This is the prior of Xi, Li, Song and Ning (2023). It treats the market as one high-dimensional system and draws many small subsystems of `subsystem_size` assets from it at random. In each subsystem, the price relative of every asset is regressed on the price relatives of the subsystem's assets one period earlier. The forecast of a subsystem counts in proportion to a Gaussian kernel of its in-sample mean squared error. Each subsystem also gives a predictive covariance, and the aggregate weighs it by the product of the kernel weights of the two assets.
+It is the prior of [xi2023oldem](@citet). It treats the market as one high-dimensional system and draws many small subsystems of `subsystem_size` assets from it at random. In each subsystem, the price relative of every asset is regressed on the price relatives of the subsystem's assets one period earlier. The forecast of a subsystem counts in proportion to a Gaussian kernel of its in-sample mean squared error. Each subsystem also gives a predictive covariance, and the aggregate weighs it by the product of the kernel weights of the two assets.
 
 The mean and the covariance come from the same regressions. So the risk term of a programme that reads this prior measures the uncertainty of the forecast that its return term reads. A window of ``w`` regression pairs needs ``w + 1`` rows.
 
@@ -54,7 +54,7 @@ Where:
   - $(math_dict[:Sigma_hat_pred])
   - $(math_dict[:N])
 
-These are the equations 4 to 10 of the paper. When ``\\mathbf{X}^{(l)}`` has full column rank, the pseudo-inverse gives the paper's ``(\\mathbf{X}^{(l)\\intercal} \\mathbf{X}^{(l)})^{-1} \\mathbf{X}^{(l)\\intercal} \\boldsymbol{y}_k``. When the window has fewer pairs than the subsystem has assets, it gives the least-squares coefficients of least norm.
+These are Equations 4 to 10 of [xi2023oldem](@cite). When ``\\mathbf{X}^{(l)}`` has full column rank, the pseudo-inverse gives the estimate ``(\\mathbf{X}^{(l)\\intercal} \\mathbf{X}^{(l)})^{-1} \\mathbf{X}^{(l)\\intercal} \\boldsymbol{y}_k`` of [xi2023oldem](@cite). When the window has fewer pairs than the subsystem has assets, it gives the least-squares coefficients of least norm.
 
 Every ``\\hat{\\mathbf{\\Sigma}}^{(l)}`` is positive semidefinite. But ``\\hat{\\mathbf{\\Sigma}}_{t+1}`` averages them under weights that differ from entry to entry, so it need not be positive semidefinite itself.
 
@@ -64,15 +64,16 @@ $(DocStringExtensions.FIELDS)
 
 # Constructors
 
-    LowDimensionEnsemblePrior(; n_subsystems::Integer = 300, subsystem_size::Integer = 3, sigma::Real = 0.025, pdm::Option{<:Posdef} = Posdef(), rng::Random.AbstractRNG = Random.default_rng(), seed::Option{<:Integer} = nothing) -> LowDimensionEnsemblePrior
+    LowDimensionEnsemblePrior(; n_subsystems::Integer = 300, subsystem_size::Integer = 3, sigma::Real = 0.025, pdm::Option{<:Posdef} = Posdef(), rng::Random.AbstractRNG = Random.default_rng(), seed::Option{<:Integer} = nothing, x_src::Option{<:AbstractReturnsSource} = nothing) -> LowDimensionEnsemblePrior
 
-Keywords correspond to the struct's fields. The defaults are the paper's. The paper scans ``L`` from 100 to 2000 and finds that the mean squared prediction error converges once ``L`` exceeds 300. It sets three assets in each subsystem and a kernel bandwidth of `0.025`.
+Keywords correspond to the struct's fields. The defaults are those of Section 5.3 of [xi2023oldem](@cite). [xi2023oldem](@citet) scan ``L`` from 100 to 2000 and find that the mean squared prediction error converges once ``L`` exceeds 300. [xi2023oldem](@citet) set three assets in each subsystem and a kernel bandwidth of `0.025`.
 
 ## Validation
 
   - `n_subsystems >= 1`. A `DomainError` is thrown otherwise.
   - `subsystem_size >= 1`. A `DomainError` is thrown otherwise.
   - `sigma > 0` and finite. A `DomainError` is thrown otherwise.
+  - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
 
 # Examples
 
@@ -86,7 +87,8 @@ LowDimensionEnsemblePrior
                  │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
                  │   kwargs ┴ @NamedTuple{}: NamedTuple()
              rng ┼ Random.TaskLocalRNG: Random.TaskLocalRNG()
-            seed ┴ nothing
+            seed ┼ nothing
+           x_src ┴ nothing
 ```
 
 # Related
@@ -102,53 +104,58 @@ LowDimensionEnsemblePrior
 
   - $(ref_dict[:xi2023oldem]) Equations 4 to 10 and Section 5.3.
 """
-struct LowDimensionEnsemblePrior{T1 <: Integer, T2 <: Integer, T3 <: Real,
-                                 T4 <: Option{<:Posdef}, T5 <: Random.AbstractRNG,
-                                 T6 <: Option{<:Integer}} <:
-       AbstractLowOrderPriorEstimator_A
+@concrete struct LowDimensionEnsemblePrior <: AbstractLowOrderPriorEstimator_A
     """
-    The number of subsystems that every fit draws, the paper's ``L``.
+    The number of subsystems that every fit draws, ``L`` in [xi2023oldem](@cite).
     """
-    n_subsystems::T1
+    n_subsystems
     """
-    The number of assets in every subsystem, the paper's ``s``. When the rows hold fewer assets, the fit uses all of them.
+    The number of assets in every subsystem, ``s`` in [xi2023oldem](@cite). When the rows hold fewer assets, the fit uses all of them.
     """
-    subsystem_size::T2
+    subsystem_size
     """
-    The kernel bandwidth of the subsystem weights, the paper's ``\\sigma``.
+    The kernel bandwidth of the subsystem weights, ``\\sigma`` in [xi2023oldem](@cite).
     """
-    sigma::T3
+    sigma
     """
     The positive definite repair of the aggregated covariance, or `nothing` to leave the aggregate as it is. On short windows the aggregate is usually indefinite.
     """
-    pdm::T4
+    pdm
     """
     $(field_dict[:rng])
     """
-    rng::T5
+    rng
     """
     $(field_dict[:seed])
     """
-    seed::T6
+    seed
+    """
+    $(field_dict[:x_src_pe])
+    """
+    x_src
     function LowDimensionEnsemblePrior(n_subsystems::Integer, subsystem_size::Integer,
                                        sigma::Real, pdm::Option{<:Posdef},
-                                       rng::Random.AbstractRNG, seed::Option{<:Integer})
+                                       rng::Random.AbstractRNG, seed::Option{<:Integer},
+                                       x_src::Option{<:AbstractReturnsSource})
+        assert_returns_source(x_src, DATA_RETURNS_SOURCES, :LowDimensionEnsemblePrior)
         @argcheck(n_subsystems >= 1, DomainError(n_subsystems, "n_subsystems must be >= 1"))
         @argcheck(subsystem_size >= 1,
                   DomainError(subsystem_size, "subsystem_size must be >= 1"))
         @argcheck(zero(sigma) < sigma && isfinite(sigma),
                   DomainError(sigma, "sigma must be positive and finite"))
         return new{typeof(n_subsystems), typeof(subsystem_size), typeof(sigma), typeof(pdm),
-                   typeof(rng), typeof(seed)}(n_subsystems, subsystem_size, sigma, pdm, rng,
-                                              seed)
+                   typeof(rng), typeof(seed), typeof(x_src)}(n_subsystems, subsystem_size,
+                                                             sigma, pdm, rng, seed, x_src)
     end
 end
 function LowDimensionEnsemblePrior(; n_subsystems::Integer = 300,
                                    subsystem_size::Integer = 3, sigma::Real = 0.025,
                                    pdm::Option{<:Posdef} = Posdef(),
                                    rng::Random.AbstractRNG = Random.default_rng(),
-                                   seed::Option{<:Integer} = nothing)::LowDimensionEnsemblePrior
-    return LowDimensionEnsemblePrior(n_subsystems, subsystem_size, sigma, pdm, rng, seed)
+                                   seed::Option{<:Integer} = nothing,
+                                   x_src::Option{<:AbstractReturnsSource} = nothing)::LowDimensionEnsemblePrior
+    return LowDimensionEnsemblePrior(n_subsystems, subsystem_size, sigma, pdm, rng, seed,
+                                     x_src)
 end
 function factor_residual_config(::LowDimensionEnsemblePrior)
     # The ensemble estimates the asset covariance directly; there is no factor lift and so no
@@ -207,7 +214,7 @@ function fit_min_rows(::LowDimensionEnsemblePrior)
     return 3
 end
 """
-    prior(pe::LowDimensionEnsemblePrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+    prior(pe::LowDimensionEnsemblePrior, X::MatNum, F::Option{<:MatNum} = nothing, pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 
 Computes the low-dimension ensemble prior of the rows, with the forecast return as `mu` and the aggregated predictive covariance as `sigma`.
 
@@ -216,11 +223,11 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
 # Algorithm
 
  1. Orient `X` to observations by assets, giving `Xf`.
- 2. Reduce `Xf` to its Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk` and the reduced returns `X` of `T` rows and `N` assets.
+ 2. Reduce `Xf` to its Coverage Universe with [`coverage_reduction`](@ref), giving the mask `cmsk` and the reduced returns `X` of `T` rows and `N` assets. The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one.
  3. Check that `T >= 3`.
  4. Form the price relatives `P = 1 + X`. Split them into the targets `Y`, every row but the first, the regressors `Z`, every row but the last, and the last row `z`.
  5. Clip the subsystem size to `N`, giving `s`.
- 6. Resolve the random number generator from `rng` and `seed`, and draw `L` subsystems `idxs` of `s` assets each, without replacement. One draw serves every target asset. With a `seed`, every call draws the same subsystems. Without one, every call draws new ones, so a rule that refits the prior at every period draws new subsystems at every period, as the paper does.
+ 6. Resolve the random number generator from `rng` and `seed`, and draw `L` subsystems `idxs` of `s` assets each, without replacement. One draw serves every target asset. With a `seed`, every call draws the same subsystems. Without one, every call draws new ones, so a rule that refits the prior at every period draws new subsystems at every period, as in [xi2023oldem](@cite).
  7. Solve one least-squares problem for each subsystem, for all the targets at once, giving the `s × N` coefficient matrices `Bs`. Julia's `\\` gives the coefficients of least norm when the window has fewer pairs than `s`.
  8. Compute the `L × N` in-sample mean squared errors `R` and the subsystem forecasts `F`.
  9. Subtract the smallest error of each asset from its column of `R`, giving `E`. This leaves every kernel ratio unchanged. It also stops the kernel from underflowing to zero for every subsystem when the errors are large against ``\\sigma^2``.
@@ -228,7 +235,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
 11. Compute `mu` as the weighted forecasts less one.
 12. For each pair of assets, find the smallest sum `m` of their two shifted errors over the subsystems. The covariance weight of subsystem `l` for the pair is the kernel of its sum less `m`. The two shifts cancel in the ratio, and the largest weight of each pair is one, so no denominator underflows to zero.
 13. Accumulate the weighted subsystem covariances in `num` and the weights in `den`, and divide, giving `sigma`.
-14. Symmetrise `sigma`, because a matrix product need not be symmetric to the bit.
+14. Symmetrise `sigma`, because a matrix product need not be exactly symmetric.
 15. Repair `sigma` with [`posdef`](@ref) under `pdm`, and expand `mu` and `sigma` to the full universe with [`expand_moment`](@ref).
 
 # Arguments
@@ -238,6 +245,7 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
   - `F`: Factor returns matrix, ignored.
   - `pnl`: Asset Panel, whose active mask enters the Coverage Universe.
   - $(arg_dict[:dims])
+  - $(arg_dict[:cvg_active_mask])
   - `kwargs...`: Ignored.
 
 # Validation
@@ -255,11 +263,16 @@ The fit reads the Coverage Universe of the rows, as every prior does. An asset w
   - [`prior`](@ref)
   - [`coverage_reduction`](@ref)
   - [`expand_moment`](@ref)
+
+# References
+
+  - $(ref_dict[:xi2023oldem])
 """
 function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = nothing,
-               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1, kwargs...)
+               pnl::Option{<:AssetPanel} = nothing; dims::Int = 1,
+               active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     Xf = dims_oriented(dims, X)
-    cmsk, X = coverage_reduction(Xf, pnl)
+    cmsk, X = coverage_reduction(Xf, pnl; active_mask = dims_oriented(dims, active_mask))
     T, N = size(X)
     @argcheck(T >= 3,
               ArgumentError("the low-dimension ensemble needs at least three observations, got $T: two regression pairs are the fewest whose regressor covariance exists"))
@@ -304,11 +317,17 @@ function prior(pe::LowDimensionEnsemblePrior, X::MatNum, ::Option{<:MatNum} = no
         den .+= u
     end
     sigma = num ./ den
-    # Symmetrised to the bit, so a consumer's Hermitian check holds; a matrix product need
+    # Symmetrised exactly, so a consumer's Hermitian check holds; a matrix product need
     # not be.
     sigma = (sigma .+ transpose(sigma)) ./ 2
     return LowOrderPrior(; X = Xf, mu = expand_moment(mu, cmsk, 1),
                          sigma = expand_moment(posdef(pe.pdm, sigma), cmsk))
+end
+# The ensemble reads no observation weights, so an entropy pooling prior around it would
+# refit it unchanged under its posterior weights, and its views would not reach `mu` and
+# `sigma`. `assert_scenario_model` documents every method.
+function assert_scenario_model(::LowDimensionEnsemblePrior)
+    return throw(ArgumentError("An entropy pooling prior refits the prior that it embeds under its posterior weights. LowDimensionEnsemblePrior reads no observation weights, so its moments would ignore the views. Give the entropy pooling prior a prior that reads weights, such as EmpiricalPrior."))
 end
 
 export LowDimensionEnsemblePrior

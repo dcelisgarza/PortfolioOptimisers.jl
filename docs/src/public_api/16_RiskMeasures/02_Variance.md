@@ -1,5 +1,5 @@
 ```@meta
-Description = "Variance, public API of PortfolioOptimisers.jl: QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, SOCRiskExpr, Variance, StandardDeviation, …"
+Description = "Variance, public API of PortfolioOptimisers.jl: QuadRiskExpr, SquaredSOCRiskExpr, RSOCRiskExpr, SOCRiskExpr, RatioFormulation, SquareRootRatio, LinearRatio, …"
 ```
 
 # Variance
@@ -9,6 +9,9 @@ QuadRiskExpr
 SquaredSOCRiskExpr
 RSOCRiskExpr
 SOCRiskExpr
+RatioFormulation
+SquareRootRatio
+LinearRatio
 Variance
 StandardDeviation
 UncertaintySetVariance

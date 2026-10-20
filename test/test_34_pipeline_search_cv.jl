@@ -64,9 +64,17 @@
         # a structureless symbol that is not a step name fails closed rather than
         # silently becoming a property access on the pipeline struct
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :gap_fill_typo)
-        # a dotted symbol rooted at `steps` still falls through to parse_lens
-        @test PortfolioOptimisers.pipeline_lens(pipe, Symbol("steps[1].col_thr")) isa
-              Accessors.PropertyLens
+        # a dotted symbol is one property name, so `parse_lens` would build a lens on a
+        # field of that literal name, which no Pipeline has: it is refused, and the message
+        # asks for a String path
+        derr = try
+            PortfolioOptimisers.pipeline_lens(pipe, Symbol("steps[1].col_thr"))
+            nothing
+        catch e
+            e
+        end
+        @test derr isa ArgumentError
+        @test occursin("write a property path as a `String`", derr.msg)
         # a dotted symbol rooted anywhere else is refused: the root is allowlisted, so the
         # step-name table cannot be addressed
         @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
@@ -329,5 +337,217 @@
         @test res_pr.opt isa Pipeline
         @test size(res_pr.test_scores) == (maximum(split(ccv, pr).path_ids), 2)
         @test all(isfinite, res_pr.test_scores)
+    end
+
+    @testset "an Expr key is rooted at `steps`, and a prebuilt lens passes through" begin
+        pipe = Pipeline(;
+                        steps = ("filter" => MissingDataFilter(),
+                                 "gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
+        l = PortfolioOptimisers.pipeline_lens(pipe, :(steps[1].col_thr))
+        @test l(pipe) == pipe.steps[1].col_thr
+        @test Accessors.set(pipe, l, 0.5).steps[1].col_thr == 0.5
+        # the String arm refuses a path into the step-name table, and so does the Expr arm:
+        # a search wrote the grid value into `names` on every fold
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe, :(names[1]))
+        @test_throws ArgumentError PortfolioOptimisers.pipeline_lens(pipe,
+                                                                     :(filter.col_thr))
+        pre = PortfolioOptimisers.parse_lens("steps[2].fill")
+        @test PortfolioOptimisers.pipeline_lens(pipe, pre) === pre
+        # a dotted Symbol key reaches the grid as a refusal, not as an error from the
+        # lens setter inside the candidate loop
+        rd = make_returns()
+        pipe2 = Pipeline(; steps = ("prior" => EmpiricalPrior(), EqualWeighted()))
+        @test_throws ArgumentError search_cross_validation(pipe2,
+                                                           GridSearchCrossValidation([Symbol("steps[1].ce") =>
+                                                                                          [PortfolioOptimisersCovariance()]];
+                                                                                     cv = IndexWalkForward(60,
+                                                                                                           20),
+                                                                                     r = ConditionalValueatRisk()),
+                                                           rd)
+    end
+
+    @testset "pipeline_lens_val_grid builds the grid of lens_val_grid" begin
+        pipe = Pipeline(;
+                        steps = ("filter" => MissingDataFilter(),
+                                 "gap_fill" => PriceGapFill(), PricesToReturns(),
+                                 EmpiricalPrior(), EqualWeighted()))
+        fills = [PriceGapFill(; fill = MeanValue()), PriceGapFill(; fill = MedianValue())]
+        # one set of pairs: the product, first key fastest, and the same grid as the raw
+        # paths give to `lens_val_grid`
+        lenses, vals = PortfolioOptimisers.pipeline_lens_val_grid(pipe,
+                                                                  ["filter.col_thr" =>
+                                                                       [0.5, 0.6, 0.7],
+                                                                   "gap_fill" => fills])
+        rl, rv = PortfolioOptimisers.lens_val_grid(["steps[1].col_thr" => [0.5, 0.6, 0.7],
+                                                    "steps[2]" => fills])
+        @test length(vals) == 6
+        @test vals == rv
+        @test vals[1] == (0.5, fills[1]) &&
+              vals[2] == (0.6, fills[1]) &&
+              vals[4] == (0.5, fills[2])
+        for k in eachindex(vals)
+            @test [l(pipe) for l in lenses[k]] == [l(pipe) for l in rl[k]]
+        end
+        # a dictionary
+        dl, dv = PortfolioOptimisers.pipeline_lens_val_grid(pipe,
+                                                            Dict("filter.col_thr" =>
+                                                                     [0.5, 0.6]))
+        @test dv == [(0.5,), (0.6,)]
+        @test dl[1][1](pipe) == pipe.steps[1].col_thr
+        # a vector of sets concatenates, so the sizes add
+        sl, sv = PortfolioOptimisers.pipeline_lens_val_grid(pipe,
+                                                            Union{Vector{Pair{String,
+                                                                              Vector{Float64}}},
+                                                                  Dict{String,
+                                                                       typeof(fills)}}[["filter.col_thr" =>
+                                                                                            [0.5,
+                                                                                             0.6]],
+                                                                                       Dict("gap_fill" =>
+                                                                                                fills)])
+        @test length(sv) == length(sl) == 2 + 2
+        @test sv[3] == (fills[1],)
+        @test sl[3][1](pipe) === pipe.steps[2]
+        # an empty value vector and a grid over the cap are refused
+        @test_throws PortfolioOptimisers.IsEmptyError PortfolioOptimisers.pipeline_lens_val_grid(pipe,
+                                                                                                 ["filter.col_thr" =>
+                                                                                                      Float64[]])
+        PortfolioOptimisers.with_resource_limits(; max_search_grid = 5) do
+            @test_throws DomainError PortfolioOptimisers.pipeline_lens_val_grid(pipe,
+                                                                                ["filter.col_thr" =>
+                                                                                     [0.5,
+                                                                                      0.6,
+                                                                                      0.7],
+                                                                                 "gap_fill" =>
+                                                                                     fills])
+            @test_throws DomainError PortfolioOptimisers.pipeline_lens_val_grid(pipe,
+                                                                                [["filter.col_thr" =>
+                                                                                      [0.5,
+                                                                                       0.6,
+                                                                                       0.7]],
+                                                                                 ["filter.col_thr" =>
+                                                                                      [0.5,
+                                                                                       0.6,
+                                                                                       0.7]]])
+        end
+    end
+
+    @testset "the views and the score type of a Pipeline search" begin
+        pr = PricesResult(; X = make_prices())
+        rd = make_returns()
+        @test values(PortfolioOptimisers.pipeline_asset_view(pr, [2, 4]).X) ==
+              values(pr.X)[:, [2, 4]]
+        @test PortfolioOptimisers.pipeline_asset_view(rd, [2, 4]).X == rd.X[:, [2, 4]]
+        @test values(PortfolioOptimisers.pipeline_data_view(pr, 11:20).X) ==
+              values(pr.X)[11:20, :]
+        @test PortfolioOptimisers.pipeline_data_view(rd, 11:20, [1, 3]).X ==
+              rd.X[11:20, [1, 3]]
+        @test PortfolioOptimisers.cv_data_eltype(rd) === Float64
+        @test PortfolioOptimisers.cv_data_eltype(ReturnsResult(; nx = rd.nx,
+                                                               X = Float32.(rd.X))) ===
+              Float32
+        # integer prices: a score is a fraction and a failed fold scores NaN, so the score
+        # matrix is floating point, and the search agrees with the same prices as Float64
+        Xi = round.(Int, 100 .+ cumsum(randn(StableRNG(1), 120, 5); dims = 1))
+        ts = make_ts()
+        pri = PricesResult(; X = TimeArray(ts, Xi, string.("A", 1:5)))
+        prf = PricesResult(; X = TimeArray(ts, float.(Xi), string.("A", 1:5)))
+        @test PortfolioOptimisers.cv_data_eltype(pri) === Float64
+        pipe = Pipeline(;
+                        steps = (PricesToReturns(), "prior" => EmpiricalPrior(),
+                                 EqualWeighted()))
+        gscv = GridSearchCrossValidation(["opt" => [EqualWeighted(), InverseVolatility()]];
+                                         cv = IndexWalkForward(60, 20),
+                                         r = ConditionalValueatRisk(), train_score = true)
+        resi = search_cross_validation(pipe, gscv, pri)
+        resf = search_cross_validation(pipe, gscv, prf)
+        @test eltype(resi.test_scores) === Float64
+        @test resi.test_scores ≈ resf.test_scores
+        @test resi.idx == resf.idx
+        cgscv = GridSearchCrossValidation(["opt" => [EqualWeighted(), InverseVolatility()]];
+                                          cv = CombinatorialCrossValidation(; n_folds = 4,
+                                                                            n_test_folds = 2),
+                                          r = ConditionalValueatRisk(), train_score = true)
+        cresi = search_cross_validation(pipe, cgscv, pri)
+        cresf = search_cross_validation(pipe, cgscv, prf)
+        @test eltype(cresi.test_scores) === Float64
+        @test cresi.test_scores ≈ cresf.test_scores
+    end
+
+    @testset "the scores, the train scores and the winner, checked against the fold loop" begin
+        rd = make_returns()
+        pr = PricesResult(; X = make_prices())
+        r = ConditionalValueatRisk()
+        l = PortfolioOptimisers.parse_lens("steps[2]")
+        cands = [EqualWeighted(), InverseVolatility()]
+        # a grid search at the price level: S_fi = -CVaR of fold f, since CVaR is not
+        # bigger-is-better, and the winner is the column of greatest mean
+        ppipe = Pipeline(;
+                         steps = (PricesToReturns(), EmpiricalPrior(),
+                                  "opt" => EqualWeighted()))
+        pl = PortfolioOptimisers.parse_lens("steps[3]")
+        cv = IndexWalkForward(60, 20)
+        res = search_cross_validation(ppipe,
+                                      GridSearchCrossValidation(["opt" => cands]; cv = cv,
+                                                                r = r, train_score = true),
+                                      pr)
+        for (i, c) in enumerate(cands)
+            loop = cross_val_predict(Accessors.set(ppipe, pl, c), pr, cv)
+            @test res.test_scores[:, i] == [-expected_risk(r, p) for p in loop.pred]
+            @test res.train_scores[:, i] == [-expected_risk(r, p.res) for p in loop.pred]
+        end
+        @test res.idx == argmax(vec(mean(res.test_scores; dims = 1)))
+        @test res.opt.steps[3] === cands[res.idx]
+        # a combinatorial search: one score per path, and one train score per fold of a path
+        pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), "opt" => EqualWeighted()))
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        cres = search_cross_validation(pipe,
+                                       GridSearchCrossValidation(["opt" => cands]; cv = ccv,
+                                                                 r = r, train_score = true),
+                                       rd)
+        n_paths = maximum(split(ccv, rd).path_ids)
+        @test length(cres.train_scores) == n_paths
+        for (i, c) in enumerate(cands)
+            preds = cross_val_predict(Accessors.set(pipe, l, c), rd, ccv)
+            @test cres.test_scores[:, i] == -expected_risk(r, preds)
+            for (p, path) in enumerate(preds.pred)
+                @test cres.train_scores[p][:, i] ==
+                      [-expected_risk(r, fp.res) for fp in path.pred]
+            end
+        end
+        @test cres.idx == argmax(vec(mean(cres.test_scores; dims = 1)))
+        @test cres.opt.steps[2] === cands[cres.idx]
+    end
+
+    @testset "the combinatorial search checks its entry like the grid search" begin
+        rd = make_returns()
+        r = ConditionalValueatRisk()
+        ccv = CombinatorialCrossValidation(; n_folds = 4, n_test_folds = 2)
+        cands = [EqualWeighted(), InverseVolatility()]
+        # a warm pipeline carries a partial-fit state that no fold reads
+        warm = PortfolioOptimisers.partial_fit!(Pipeline(;
+                                                         steps = (EmpiricalPrior(),
+                                                                  EqualWeighted())),
+                                                PortfolioOptimisers.port_opt_view(rd, 1:60,
+                                                                                  :))
+        for scheme in (IndexWalkForward(60, 20), ccv)
+            @test_throws ArgumentError search_cross_validation(warm,
+                                                               GridSearchCrossValidation(["steps[2]" =>
+                                                                                              cands];
+                                                                                         cv = scheme,
+                                                                                         r = r),
+                                                               rd)
+            # a lens that writes a holdout into a candidate is refused before the parallel
+            # loop, so the error is the refusal itself and not a TaskFailedException
+            pipe = Pipeline(; steps = ("prior" => EmpiricalPrior(), EqualWeighted()))
+            @test_throws ArgumentError search_cross_validation(pipe,
+                                                               GridSearchCrossValidation(["prior" =>
+                                                                                              [EmpiricalPrior(),
+                                                                                               TrainTestSplit(;
+                                                                                                              test_size = 0.2)]];
+                                                                                         cv = scheme,
+                                                                                         r = r),
+                                                               rd)
+        end
     end
 end

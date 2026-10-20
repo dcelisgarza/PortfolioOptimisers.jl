@@ -268,6 +268,155 @@ function (r::AbstractBaseRiskMeasure)(::VecNum)
     return throw(ArgumentError("`$(typeof(r))` has no precomputed-return-series form `r(x::VecNum)`: its risk depends on portfolio weights and/or per-asset data (e.g. a variance-carrying composite such as `VarianceSkewKurtosis`). Evaluate it through `expected_risk(r, w, X, fees)` with explicit weights instead."))
 end
 """
+    assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)
+    assert_observation_weights(args...)
+
+Validate the observation weights of a risk measure.
+
+A risk measure divides by the sum of its observation weights, so a weight vector that sums to zero has no value to give. This assertion refuses it with the rules of [`assert_nonempty_nonneg_finite_val`](@ref) and one rule more. A [`DynamicAbstractWeights`](@ref) has no values until it resolves against the data, so it selects the `args...` method, and [`checked_observation_weights`](@ref) validates its values after it resolves.
+
+# Arguments
+
+  - `w`: Observation weights.
+  - `w_sym`: Symbolic name used in the error messages.
+
+# Validation
+
+  - `w` is not empty, finite and nonnegative, through [`assert_nonempty_nonneg_finite_val`](@ref).
+  - `sum(w) > 0`, so at least one observation carries weight. Otherwise a `DomainError` is raised.
+  - Any other type, `nothing` and a [`DynamicAbstractWeights`](@ref) among them, passes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`checked_observation_weights`](@ref)
+  - [`assert_nonempty_nonneg_finite_val`](@ref)
+  - [`ObsWeights`](@ref)
+"""
+function assert_observation_weights(w::VecNum, w_sym::Sym_Str = :w)::Nothing
+    assert_nonempty_nonneg_finite_val(w, w_sym)
+    sw = sum(w)
+    @argcheck(zero(sw) < sw,
+              DomainError(sw,
+                          "0 < sum($w_sym) must hold, so that at least one observation carries weight. Got\nsum($w_sym) => $sw"))
+    return nothing
+end
+function assert_observation_weights(args...)::Nothing
+    return nothing
+end
+"""
+    checked_observation_weights(w::Option{<:ObsWeights}, X::VecNum_MatNum) -> Option{<:VecNum}
+
+Resolve the observation weights of a risk measure against its data, and check that they fit the data.
+
+The rows of `X`, or the entries of a return series `X`, are the observations. A risk measure reads one weight for each of them, and a weighted quantile reads the weights through the sort permutation of the returns. A weight vector with the wrong length therefore gives a wrong value in silence, or an error that does not name the weights. This function names them.
+
+# Algorithm
+
+ 1. Resolve `w` with [`get_observation_weights`](@ref). `nothing` stays `nothing`.
+ 2. Validate the values of the resolved weights with [`assert_observation_weights`](@ref). A `StatsBase.AbstractWeights` was validated by the constructor of its measure, but a [`DynamicAbstractWeights`](@ref) and the weights of a prior result were not.
+ 3. Check that the length of the weights equals `size(X, 1)`.
+
+# Arguments
+
+  - $(arg_dict[:oow])
+  - `X`: Returns matrix `observations × assets`, or a return series of length `observations`.
+
+# Validation
+
+  - The resolved weights pass [`assert_observation_weights`](@ref).
+  - `length(w) == size(X, 1)`. Otherwise a `DimensionMismatch` is raised.
+
+# Returns
+
+  - `w::Option{<:VecNum}`: The resolved observation weights, or `nothing` when `w` is `nothing`. The vector is borrowed, as [`get_observation_weights`](@ref) states.
+
+# Related
+
+  - [`get_observation_weights`](@ref)
+  - [`assert_observation_weights`](@ref)
+  - [`ObsWeights`](@ref)
+"""
+function checked_observation_weights(w::Option{<:Union{<:ObsWeights, <:VecNum}},
+                                     X::VecNum_MatNum)
+    w = get_observation_weights(w, X)
+    if isnothing(w)
+        return w
+    end
+    assert_observation_weights(w, :w)
+    T = size(X, 1)
+    @argcheck(length(w) == T,
+              DimensionMismatch("length(w) == size(X, 1) must hold: a risk measure reads one observation weight for each observation. Got\nlength(w) => $(length(w))\nsize(X, 1) => $T"))
+    return w
+end
+"""
+    assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)
+    assert_half_open_unit_interval(args...)
+
+Validate that `0 <= val < 1`.
+
+The significance level of a tail measure whose limit at zero is defined takes this interval. At `val = 0` the tail holds only the worst observation with positive weight, which [`worst_positive_weight_loss`](@ref) gives. A level of one would hold the whole sample, so it stays open. A Calibration Rule has no value until it resolves, so it selects the `args...` method, and the rebuild after the resolution checks the number.
+
+# Arguments
+
+  - `val`: Input value to validate.
+  - `sym`: Symbolic name used in the error messages.
+
+# Validation
+
+  - `0 <= val < 1`. Otherwise a `DomainError` is raised.
+  - Any other type passes.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`assert_unit_interval`](@ref)
+  - [`assert_closed_unit_interval`](@ref)
+  - [`worst_positive_weight_loss`](@ref)
+"""
+function assert_half_open_unit_interval(val::Number, sym::Sym_Str = :val)::Nothing
+    @argcheck(zero(val) <= val < one(val),
+              DomainError(val, "0 <= $sym < 1 must hold. Got\n$sym => $val"))
+    return nothing
+end
+function assert_half_open_unit_interval(args...)::Nothing
+    return nothing
+end
+"""
+    worst_positive_weight_loss(x::VecNum, ::Nothing) -> Number
+    worst_positive_weight_loss(x::VecNum, w::VecNum) -> Number
+
+Return the largest loss of `x` among the observations with positive weight.
+
+This is the value of a tail measure at significance level zero. [`ConditionalValueatRisk`](@ref) and [`EntropicValueatRisk`](@ref) read it on the returns, and [`ConditionalDrawdownatRisk`](@ref) and [`EntropicDrawdownatRisk`](@ref) read it on the drawdowns. An observation with zero weight has no probability, so it cannot be the worst outcome. [`WorstRealisation`](@ref) and [`MaximumDrawdown`](@ref) read every observation instead.
+
+# Arguments
+
+  - `x`: Return or drawdown series. A loss is a negative entry. Not modified.
+  - `w`: Resolved observation weights from [`checked_observation_weights`](@ref), or `nothing`. The weights have at least one positive entry.
+
+# Returns
+
+  - `Number`: The largest loss, `-minimum(x[t] for t with w[t] > 0)`.
+
+# Related
+
+  - [`assert_half_open_unit_interval`](@ref)
+  - [`checked_observation_weights`](@ref)
+"""
+function worst_positive_weight_loss(x::VecNum, ::Nothing)
+    return -minimum(x)
+end
+function worst_positive_weight_loss(x::VecNum, w::VecNum)
+    return -minimum(x[t] for t in axes(x, 1) if zero(w[t]) < w[t])
+end
+"""
     supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
     supports_precomputed_returns(rk::RiskInputKind, r::AbstractBaseRiskMeasure) -> Bool
 
@@ -335,7 +484,7 @@ Erroring tripwire for [`WeightsReturnsFeesInput`](@ref) measures that have not d
 must declare it there: moment measures as `supports_precomputed_returns(r::T) = weight_independent_target(r.mu)`; weights-dependent measures (tracking, variance-carrying
 composites) as `supports_precomputed_returns(::T) = false`. Reaching this leaf means a
 measure forgot to declare it — throws an `ArgumentError` with instructions rather than
-silently mis-routing (and the completeness test in `test_09c_risk_input_kind.jl` turns that
+silently mis-routing (and the completeness test in `test_09_risk_measures.jl` turns that
 into a CI failure).
 
 # Validation
@@ -481,7 +630,7 @@ Subtype `RiskMeasure` to implement concrete risk measures that quantify portfoli
 
 # Interfaces
 
-In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — [`set_risk_expression!`](@ref) reads its `scale` and `rke`, [`set_risk_upper_bound!`](@ref) its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
+In order to implement a new risk measure that works seamlessly with the library, subtype `RiskMeasure` with a `settings::RiskMeasureSettings` field — `set_risk_expression!` reads its `scale` and `rke`, `set_risk_upper_bound!` its `ub`, and [`expected_risk`](@ref) its `scale` when several measures combine — and implement the following methods:
 
 ## `risk_input_kind`
 
@@ -503,19 +652,23 @@ In order to implement a new risk measure that works seamlessly with the library,
   - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
   - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
 
-A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+## `supports_precomputed_returns`
 
-## The model builder
+  - `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`: Whether the risk of the measure is a function of the net return series alone. A [`WeightsReturnsFeesInput`](@ref) measure declares it, and the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
 
-A `JuMP` optimiser, or a programme Allocation Set, builds the measure into its model through [`set_risk_constraints!`](@ref), as `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`, which has no fallback. The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
+## `set_risk_constraints!`
+
+  - `set_risk_constraints!(model::JuMP.Model, i, r::MyRiskMeasure, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)`: Builds the measure into the model of a `JuMP` optimiser, or of a programme Allocation Set. There is no fallback.
+
+The method builds the risk expression from the model's weights, then registers it with [`set_risk_bounds_and_expression!`](@ref), which reads the bound and the contribution to the aggregate risk expression off `r.settings`. Scale every constraint by [`get_constraint_scale`](@ref), and multiply any constant bound by [`get_k`](@ref), so the bound is compared against unrescaled weights under a ratio objective.
 
 ## Optional methods
 
 Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 
-  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
-  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
-  - [`range_tails`](@ref): the two point measures a range measure is the sum of; the fallback throws.
+  - `needs_previous_weights(r::MyRiskMeasure) -> Bool`: `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - `bigger_is_better(r::MyRiskMeasure) -> Bool`: `true` for a measure a caller maximises; the fallback answers `false`.
+  - `range_tails(r::MyRiskMeasure) -> NamedTuple`: The two point measures `(; loss, gain)` that a range measure is the sum of; the fallback throws.
   - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
 
 # Related
@@ -582,14 +735,16 @@ A hierarchical measure is only ever evaluated at the value level, through [`expe
   - `(r::MyRiskMeasure)(w::VecNum, X::MatNum, fees::Option{<:Fees}) -> Number` under [`WeightsReturnsFeesInput`](@ref).
   - `(r::MyRiskMeasure)(w::VecNum) -> Number` under [`WeightsInput`](@ref).
 
-A [`WeightsReturnsFeesInput`](@ref) measure also declares [`supports_precomputed_returns`](@ref), as `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`, stating whether its risk is a function of the net return series alone; the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
+## `supports_precomputed_returns`
+
+  - `supports_precomputed_returns(r::MyRiskMeasure) -> Bool`: Whether the risk of the measure is a function of the net return series alone. A [`WeightsReturnsFeesInput`](@ref) measure declares it, and the fallback for that kind throws rather than guessing. The other two kinds answer through the kind itself.
 
 ## Optional methods
 
 Each has a fallback on [`AbstractBaseRiskMeasure`](@ref):
 
-  - [`needs_previous_weights`](@ref): `true` for a measure that reads the previous weights; the fallback answers `false`.
-  - [`bigger_is_better`](@ref): `true` for a measure a caller maximises; the fallback answers `false`.
+  - `needs_previous_weights(r::MyRiskMeasure) -> Bool`: `true` for a measure that reads the previous weights; the fallback answers `false`.
+  - `bigger_is_better(r::MyRiskMeasure) -> Bool`: `true` for a measure a caller maximises; the fallback answers `false`.
   - [`factory`](@ref): rebuild the measure against a prior result before it is evaluated, for a measure whose slots are filled from the prior.
 
 # Related
@@ -614,7 +769,7 @@ In order to implement a new concrete settings type, subtype `AbstractRiskMeasure
 
 ## Required fields
 
-  - `scale::Number`: Combination weight, read by [`set_risk_expression!`](@ref) and by the value-level readers.
+  - `scale::Number`: Combination weight, read by `set_risk_expression!` and by the value-level readers.
   - `rke::Bool`: Whether the measure contributes to the model's aggregate risk expression.
 
 ## Optional field
@@ -666,7 +821,7 @@ In order to implement a new bound transformation, subtype `FrontierBoundEstimato
 
   - The converted bound, in the units of the risk expression.
 
-The [`Frontier`](@ref) arm of `variance_risk_bounds_val` is generic and needs no method. The sweep applies the same transformation to both ends of its span in [`rebuild_risk_frontier`](@ref), which reads `bound` off the `Frontier` and branches on it there.
+The [`Frontier`](@ref) arm of `variance_risk_bounds_val` is generic and needs no method. The sweep applies the same transformation to both ends of its span in `rebuild_risk_frontier`, which reads `bound` off the `Frontier` and branches on it there.
 
 # Related
 
@@ -1720,26 +1875,33 @@ function fit_deferred_quantity(dq::CoskewnessEstimator, pr::AbstractPriorResult;
 end
 """
     coskewness_processor(ske::CoskewnessEstimator)
+    coskewness_processor(ske::Coskewness)
+    coskewness_processor(ske::WindowedCoskewness)
 
 Return the matrix-processing estimator that a [`CoskewnessEstimator`](@ref) uses to build `V`, or `nothing` when the estimator names none.
 
 `V = negative_spectral_coskewness(sk, X, mp)`, so building `V` always names a processor. When a coskewness estimator stands in a [`NegativeSkewness`](@ref) `sk` slot, **that** estimator's processor is the one that built the `V` it hands back, and the measure records it in place of its own `mp` so that a later rebuild uses the same one. This mirrors [`HighOrderPrior`](@ref)'s `skmp`.
 
-The [`CoskewnessEstimator`](@ref) interface does not require an `mp` field, so the default answers `nothing` and the measure keeps the processor it already holds. Declare a method for an estimator that names one.
+The [`CoskewnessEstimator`](@ref) interface does not require an `mp` field, so the default answers `nothing` and the measure keeps the processor it already holds. Declare a method for an estimator that names one. A [`WindowedCoskewness`](@ref) answers the processor of its inner estimator, which builds its `V`.
 
 # Related
 
   - [`CoskewnessEstimator`](@ref)
   - [`Coskewness`](@ref)
+  - [`WindowedCoskewness`](@ref)
   - [`NegativeSkewness`](@ref)
   - [`fit_deferred_quantity`](@ref)
   - [`negative_spectral_coskewness`](@ref)
+  - [`HighOrderPrior`](@ref)
 """
 function coskewness_processor(::CoskewnessEstimator)
     return nothing
 end
 function coskewness_processor(ske::Coskewness)
     return ske.mp
+end
+function coskewness_processor(ske::WindowedCoskewness)
+    return coskewness_processor(ske.ske)
 end
 """
     deferred_centre(dq, pr::AbstractPriorResult)
@@ -1889,6 +2051,50 @@ function fan_out_slot(fitted, slot, key::Symbol)
     return isnothing(slot) ? deferred_quantity(fitted, key) : slot
 end
 """
+    fan_out_pe(x, pe::Nothing, pr::AbstractPriorResult, slots::NamedTuple)
+    fan_out_pe(x, pe::AbstractPriorEstimator, pr::AbstractPriorResult, slots::NamedTuple)
+
+Rebuild a measure with its resolved slots, and fill the slots that are still `nothing` from its fan-out estimator `pe`.
+
+A measure with two or more deferrable slots resolves each deferred slot first, and then gives the resolved slots to this function. The type of `pe` selects the method. Without a `pe` the measure takes the resolved slots as they are. With a `pe` the function runs [`fit_deferred_quantity`](@ref) one time and fills each slot with [`fan_out_slot`](@ref), so a resolved slot wins over the fan-out. The rebuilt measure holds `pe = nothing`, because the fit is done.
+
+A measure whose slots carry a derived quantity, such as `chol` beside `sigma`, declares its own method for a `pe`, because the derived quantity comes from the fan-out only when the fan-out also gives its source.
+
+# Algorithm
+
+ 1. `pe` is `nothing`: rebuild `x` with `slots`.
+ 2. Otherwise fit `pe` against `pr` one time. Fill each slot of `slots` with [`fan_out_slot`](@ref) under its own name, and rebuild `x` with the filled slots and `pe = nothing`.
+
+# Arguments
+
+  - `x`: The measure, or the algorithm of a measure, that holds the slots.
+  - `pe`: The fan-out estimator of `x`, or `nothing`.
+  - `pr`: The prior result that `pe` is fitted against.
+  - `slots`: The resolved slots, keyed by field name.
+
+# Returns
+
+  - The rebuilt `x`.
+
+# Related
+
+  - [`fan_out_slot`](@ref)
+  - [`fit_deferred_quantity`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function fan_out_pe(x, ::Nothing, ::AbstractPriorResult, slots::NamedTuple)
+    return rebuild_with_slots(x, slots)
+end
+function fan_out_pe(x, pe::AbstractPriorEstimator, pr::AbstractPriorResult,
+                    slots::NamedTuple)
+    fitted = fit_deferred_quantity(pe, pr)
+    ks = keys(slots)
+    # Map over the keys, not over `values(slots)`: the keys are a constant, and `values` of a
+    # `NamedTuple` whose field types are abstract infers to a `Tuple` of any length.
+    filled = NamedTuple{ks}(map(k -> fan_out_slot(fitted, slots[k], k), ks))
+    return rebuild_with_slots(x, merge(filled, (; pe = nothing)))
+end
+"""
     deferred_derived_quantity(fitted, key::Symbol)
 
 Read a **derived** quantity named by `key` off what [`fit_deferred_quantity`](@ref) produced — `chol`, the factorisation that travels with `sigma`; `V`, the negative spectral part that travels with `sk`; `mu`, the centre a higher moment was taken about; `skmp`, the processor that built `V`.
@@ -1944,6 +2150,37 @@ function resolve_slot(dq::DeferredQuantity, key::Symbol, pr::AbstractPriorResult
     return deferred_quantity(fit_deferred_quantity(dq, pr), key)
 end
 """
+    resolve_sigma_chol(sigma, chol, pr::AbstractPriorResult)
+
+Resolve the `sigma` slot of a measure against prior result `pr`, and return it with the `chol` slot as one pair.
+
+`chol` is a factorisation of `sigma`, so both come from the same fit. A covariance estimator gives no factorisation, so `chol` becomes `nothing` and the model derives it from the resolved `sigma`. A prior estimator gives both. The type of `sigma` selects the method, so an analysis of a measure whose `sigma` is a matrix never reaches the fit.
+
+# Algorithm
+
+ 1. Return `sigma` and `chol` unchanged when `sigma` is not a [`DeferredQuantity`](@ref).
+ 2. Run the Deferred Quantity against `pr` with [`fit_deferred_quantity`](@ref), giving `fitted`.
+ 3. Read `sigma` off `fitted` with [`deferred_quantity`](@ref), and `chol` with [`deferred_derived_quantity`](@ref).
+
+# Returns
+
+  - `(; sigma, chol)`: the pair, to give to [`rebuild_with_slots`](@ref).
+
+# Related
+
+  - [`resolve_slot`](@ref)
+  - [`sigma_chol_selector`](@ref)
+  - [`resolve_deferred_quantities`](@ref)
+"""
+function resolve_sigma_chol(sigma, chol, ::AbstractPriorResult)
+    return (; sigma = sigma, chol = chol)
+end
+function resolve_sigma_chol(sigma::DeferredQuantity, ::Any, pr::AbstractPriorResult)
+    fitted = fit_deferred_quantity(sigma, pr)
+    return (; sigma = deferred_quantity(fitted, :sigma),
+            chol = deferred_derived_quantity(fitted, :chol))
+end
+"""
     deferred_slots(x)
 
 Declare the slots of `x` that may hold a **Deferred Quantity**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type with no deferrable slot needs no method.
@@ -1966,7 +2203,7 @@ deferred_slots(::Any) = (;)
 
 Declare the slots of `x` that its functor reads **as they stand**, as a `NamedTuple` mapping each slot's name to its current value. The default is empty: a type whose functor computes every moment from the returns it is handed needs no method.
 
-[`assert_resolved_slots`](@ref) reads this beside [`deferred_slots`](@ref). A slot named here that holds `nothing` is refused at a value-level entry point by name, because nothing on that route fills it and the functor would otherwise meet the `nothing` several frames down, as `dot(w, nothing, w)` inside `LinearAlgebra`.
+[`assert_resolved_slots`](@ref) reads this beside [`deferred_slots`](@ref). A slot named here that holds `nothing` is refused at a value-level entry point with an error that names it, because nothing on that route fills it and the functor would otherwise meet the `nothing` several frames down, as `dot(w, nothing, w)` inside `LinearAlgebra`.
 
 A slot is named here only when `nothing` there has **no** value-level reading. The covariance a [`Variance`](@ref) contracts the weights with is one: the functor is `dot(w, r.sigma, w)`, and a bare matrix cannot stand in. A moment measure's `mu` is not: `nothing` there means *centre on the sample mean*, which the functor computes from the returns, so [`LowOrderMoment`](@ref) declares no method. A slot that holds a child measure is not named here either — the child names its own, and [`assert_resolved_slots`](@ref) reaches it through [`deferred_slots`](@ref). A container that reads a **grandchild** directly names it by the path the caller wrote, so a refusal reads `VarianceSkewKurtosis.sk.sk`.
 
@@ -2187,7 +2424,7 @@ Refuse a **Deferred Quantity**, or an empty slot the functor reads, that reached
 
 [`expected_risk`](@ref) takes either a prior result or a plain returns matrix. Given the prior it resolves the measure through [`factory`](@ref) first. Given the matrix it cannot: that call has no `pr.w` to thread and no factor returns to reach, so resolving there would use a different rule than the settled one. So it refuses instead, naming the slot and the Estimator standing in it — without the refusal the failure lands several frames down, inside a kernel that expected a matrix.
 
-The same door refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot. Which slots those are is declared by [`functor_slots`](@ref), so a slot whose `nothing` **has** a value-level reading — a moment measure's `mu`, which then means the sample mean — is never refused. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the door refuses by name and states the two ways out.
+The same check refuses a slot that holds `nothing` when the functor reads it as it stands. `Variance()` is built with `sigma` at `nothing`, and the prior route fills it through [`factory`](@ref); the matrix route has nothing to fill it from, and `dot(w, nothing, w)` raised a bare `MethodError` inside `LinearAlgebra` that named neither the measure nor the slot. Which slots those are is declared by [`functor_slots`](@ref), so a slot whose `nothing` **has** a value-level reading — a moment measure's `mu`, which then means the sample mean — is never refused. Resolving the slot from the matrix instead would pick an estimator the caller never named, and would make the matrix route and the prior route disagree whenever the prior is not empirical, so the check refuses the slot with an error that names it and states the two ways out.
 
 This is the shape [`HopCount`](@ref) and [`PathLength`](@ref) already use: the consumer resolves, the kernel refuses.
 
@@ -2453,12 +2690,14 @@ export Frontier, RiskMeasureSettings, HierarchicalRiskMeasureSettings, SumScalar
        MaxScalariser, MinScalariser, LogSumExpScalariser, expected_risk,
        expected_risk_from_returns, RiskMeasure, HierarchicalRiskMeasure, SquareRootBound,
        LinearBound, SquaredBound
-# The verb the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
-# (ADR 0154). Public, not exported: it is only ever extended, and an extension must qualify
-# it as `PortfolioOptimisers.risk_input_kind` anyway.
-public risk_input_kind
+# The verbs the `# Interfaces` sections of `RiskMeasure` and `HierarchicalRiskMeasure` name
+# (ADR 0154, #1775). Public, not exported: they are only ever extended, and an extension must
+# qualify them as `PortfolioOptimisers.risk_input_kind` and so on anyway.
+public risk_input_kind, supports_precomputed_returns, bigger_is_better, range_tails
 # The `# Interfaces`-marked types and verbs of #1137 (ADR 0154): AbstractRiskMeasureSettings
 # names required fields only; FrontierBoundEstimator and Scalariser each name the verb(s) an
 # extension must implement.
 public AbstractRiskMeasureSettings, FrontierBoundEstimator, variance_risk_bounds_val,
        Scalariser, scalarise, scalarise_risk_expression!
+# The `# Interfaces` section of `CoskewnessEstimator` names this verb (#1776).
+public coskewness_processor

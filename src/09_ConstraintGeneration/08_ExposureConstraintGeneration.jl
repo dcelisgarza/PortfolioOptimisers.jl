@@ -28,11 +28,11 @@ There is no fallback. Every check the basis needs is made here, so that the asse
   - `space`: The basis.
   - `sets`: The declared universe the names resolve against.
   - `rr`: The prior's loadings, or `nothing`.
-  - `rd`: Returns the space may refit from, or `nothing`.
+  - `rd`: Returns the space may refit from, or `nothing`. A space that refits from `rd` states the source of the refit on its own reader, for example the `x_src` field of a regression estimator.
 
 ### Returns
 
-  - `basis`: The change of basis, in whatever form [`rebase_linear_constraints`](@ref) reads for this space.
+  - `basis`: The change of basis, in whatever form `rebase_linear_constraints` reads for this space.
   - `key::AbstractString`: The key of `sets.dict` the row's names resolve against.
 
 ## Asset view
@@ -112,7 +112,7 @@ Keywords correspond to the struct's fields.
   - [`ExposureConstraintEstimator`](@ref)
   - [`UniverseSets`](@ref)
   - [`Regression`](@ref)
-  - [`factor_space_regression`](@ref): ranks the three carriers `re` competes with, and states the order.
+  - [`factor_space_regression`](@ref): ranks the three sources of loadings that `re` competes with, and states the order.
   - [`resolve_factor_regression`](@ref): the shared precedence, which [`FactorRiskContribution`](@ref) and [`FactorRiskBudgeting`](@ref) read too.
 
 # References
@@ -316,18 +316,18 @@ end
                             rd::Option{<:ReturnsResult})
         -> Option{<:AbstractLoadingsRegressionResult}
 
-Apply [`resolve_factor_regression`](@ref)'s precedence to the three carriers a [`FactorSpace`](@ref) can read its loadings from, and return `nothing` when none of them holds any.
+Apply [`resolve_factor_regression`](@ref)'s precedence to the three sources a [`FactorSpace`](@ref) can read its loadings from, and return `nothing` when none of them holds any.
 
-The precedence is the one [`FactorRiskContribution`](@ref) already uses — a stated result, then the prior's own `rr`, then a refit — and the refit arm delegates to [`resolve_factor_regression`](@ref) rather than repeating it. What differs is the carriers: constraint generation is handed the loadings as `rr`, already read off the prior, so the prior arm is a plain argument rather than a field read, and both `re` and `rd` are optional here because a space that names no source and a route that carries no returns are both ordinary.
+The precedence is the one [`FactorRiskContribution`](@ref) already uses — a stated result, then the prior's own `rr`, then a refit — and the refit arm delegates to [`resolve_factor_regression`](@ref) rather than repeating it. What differs is the sources: constraint generation is handed the loadings as `rr`, already read off the prior, so the prior arm is a plain argument rather than a field read, and both `re` and `rd` are optional here because a space that names no source and a route that carries no returns are both ordinary.
 
 Returning `nothing` rather than throwing is deliberate: the diagnosis for "no basis anywhere" belongs to [`constraint_space_basis`](@ref), which knows it is assembling a constraint.
 
 # Algorithm
 
  1. Return `re` when it is a precomputed [`Regression`](@ref). The caller has stated the basis, and no data is needed.
- 2. Otherwise return `rr` when the prior carries one. This is what a `re === nothing` always resolves to, and it is the behaviour of every [`FactorSpace`](@ref) written before the field existed.
- 3. Otherwise return `nothing` when `re` is `nothing` too. No carrier holds a basis, and [`constraint_space_basis`](@ref) writes the diagnosis.
- 4. Otherwise `re` is an estimator. Raise when `rd` is `nothing`, and return `resolve_factor_regression(re, rd)` when it is not, which refits the loadings from the returns.
+ 2. Otherwise return `rr` when `re` is `nothing`. This is the behaviour of every [`FactorSpace`](@ref) written before the field existed. When `rr` is `nothing` too, no source holds a basis, and [`constraint_space_basis`](@ref) writes the diagnosis.
+ 3. Otherwise `re` is an estimator. Return the loadings that [`source_loadings`](@ref) takes from `rr` under the source of `re`, when they are not `nothing`. At `x_src = nothing` that is `rr`, and [`PriorSource`](@ref) refuses `rr === nothing`.
+ 4. Otherwise raise when `rd` is `nothing`, and return `refit_factor_regression(re, rd)` when it is not, which refits the loadings from the returns that the source of `re` names: `rd.X`, or `rd.X - rd.B` under [`ExcessSource`](@ref).
 
 Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re = StepwiseRegression())` is **a factor mandate on a prior that carries no loadings**, which previously threw.
 
@@ -339,33 +339,41 @@ Step 4 is a capability the field adds rather than a fallback: `FactorSpace(; re 
 
 # Validation
 
-  - An estimator in `re` with no `rd` throws an [`IsNothingError`](@ref) naming both fixes. The refit needs the returns, so it is available at a [`JuMPOptimiser`](@ref) and as a [`Pipeline`](@ref) step, and refused on the standalone [`linear_constraints`](@ref) route, which receives none.
+  - The rule of [`source_loadings`](@ref): an estimator in `re` at `x_src = PriorSource()` with `rr === nothing` throws an `ArgumentError`.
+  - An estimator in `re` that must refit with no `rd` throws an [`IsNothingError`](@ref) naming both fixes. The refit needs the returns, so it is available at a [`JuMPOptimiser`](@ref) and as a [`Pipeline`](@ref) step, and refused on the standalone [`linear_constraints`](@ref) route, which receives none.
 
 # Returns
 
-  - `rr::Option{<:AbstractLoadingsRegressionResult}`: The loadings the highest-ranked carrier holds, or `nothing` when none of the three holds any.
+  - `rr::Option{<:AbstractLoadingsRegressionResult}`: The loadings the highest-ranked source holds, or `nothing` when none of the three holds any.
 
 # Related
 
   - [`constraint_space_basis`](@ref)
   - [`FactorSpace`](@ref)
   - [`resolve_factor_regression`](@ref)
+  - [`source_loadings`](@ref)
+  - [`refit_factor_regression`](@ref)
 """
-function factor_space_regression(re::Option{<:RegE_Reg},
+function factor_space_regression(re::AbstractTimeSeriesRegressionEstimator,
                                  rr::Option{<:AbstractLoadingsRegressionResult},
                                  rd::Option{<:ReturnsResult})
-    if isa(re, AbstractLoadingsRegressionResult)
-        return re
-    end
+    rr = source_loadings(returns_source(re), rr, re)
     if !isnothing(rr)
         return rr
     end
-    if isnothing(re)
-        return nothing
-    end
     @argcheck(!isnothing(rd),
               IsNothingError("a `FactorSpace` whose `re` is a regression *estimator* ($(nameof(typeof(re)))) must fit the loadings from returns, and this route carries none. `linear_constraints(ece, sets; rr = ...)` is the standalone entry point: it receives the loadings directly and never the data they would be fitted from.\nEither state the basis outright, `FactorSpace(; re = Regression(; M = ...))`, or pass the loadings as `rr` and leave `re === nothing`, or generate the constraint through a `JuMPOptimiser` or a `Pipeline` step, where the returns are in scope and the refit happens per fold."))
-    return resolve_factor_regression(re, rd)
+    return refit_factor_regression(re, rd)
+end
+# A stated result is the basis, and no stated source reads the loadings of the prior.
+function factor_space_regression(re::AbstractLoadingsRegressionResult,
+                                 ::Option{<:AbstractLoadingsRegressionResult},
+                                 ::Option{<:ReturnsResult})
+    return re
+end
+function factor_space_regression(::Nothing, rr::Option{<:AbstractLoadingsRegressionResult},
+                                 ::Option{<:ReturnsResult})
+    return rr
 end
 """
     constraint_space_basis(space::AbstractConstraintSpace, sets::UniverseSets, rr, rd)
@@ -373,14 +381,14 @@ end
 
 Resolve the basis a re-based constraint projects through, and the key its names resolve against, throwing if either is unusable.
 
-Every check a space needs before a single row is assembled lives here, so the assembly loop can assume a consistent basis. For [`FactorSpace`](@ref) that is: the loadings resolve from one of the three carriers [`factor_space_regression`](@ref) ranks, and — via [`factor_universe`](@ref), shared with every other consumer of the declared axis — the factor axis is declared and agrees with those loadings on how many factors there are.
+Every check a space needs before a single row is assembled lives here, so the assembly loop can assume a consistent basis. For [`FactorSpace`](@ref) that is: the loadings resolve from one of the three sources [`factor_space_regression`](@ref) ranks, and — via [`factor_universe`](@ref), shared with every other consumer of the declared axis — the factor axis is declared and agrees with those loadings on how many factors there are.
 
 `rd` is the returns the space may refit from. It is threaded from the [`JuMPOptimiser`](@ref) and from the [`Pipeline`](@ref) step, and is `nothing` on the standalone route.
 
 # Algorithm
 
- 1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three carriers `space.re`, `rr` and `rd`.
- 2. Raise when `rr` is `nothing`. No carrier holds a basis, and no row can be assembled.
+ 1. Resolve `rr`, the loadings, with [`factor_space_regression`](@ref) over the three sources `space.re`, `rr` and `rd`, under the source of `space.re`.
+ 2. Raise when `rr` is `nothing`. No source holds a basis, and no row can be assembled.
  3. Check the declared factor axis with [`factor_universe`](@ref), against `size(rr.M, 2)`. The call raises and returns no value the assembly reads.
  4. Return `rr` and the factor axis key [`factor_axis_key`](@ref) reads off `rr`, which is the key the row's names resolve against.
 
@@ -395,7 +403,7 @@ Every check a space needs before a single row is assembled lives here, so the as
 
 The names are looked up on the factor axis, but the *basis* comes from the prior, so the two can disagree in ways a single object cannot check. That is why all three of these are checked here and not at construction.
 
-  - **A missing basis throws, ignoring `strict`.** `strict` governs unknown *names*: a per-row, recoverable condition where the offending row is dropped and the rest of the problem is still the problem the caller described. A missing regression is not that — it makes every row unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying none of the requested exposure. "Missing" means no carrier holds any: the space can supply its own through [`FactorSpace`](@ref)'s `re`, which is what makes a factor mandate legal on a prior with no factor block. Raises an [`IsNothingError`](@ref).
+  - **A missing basis throws, ignoring `strict`.** `strict` governs unknown *names*: a per-row, recoverable condition where the offending row is dropped and the rest of the problem is still the problem the caller described. A missing regression is not that — it makes every row unbuildable, and dropping them silently yields a feasible, plausible-looking portfolio carrying none of the requested exposure. "Missing" means no source holds any: the space can supply its own through [`FactorSpace`](@ref)'s `re`, which is what makes a factor mandate legal on a prior with no factor block. Raises an [`IsNothingError`](@ref).
   - **A missing factor axis throws**, naming the key [`factor_axis_key`](@ref) chose. The axis is optional on [`UniverseSets`](@ref); it is not optional for a constraint written against it. [`factor_universe`](@ref) raises a `KeyError`.
   - **`size(rr.M, 2) == length(sets.dict[key])` always.** [`factor_universe`](@ref) raises a `DimensionMismatch` otherwise. The name-level cross-check against `rd.nf` needs the returns and lives at the optimiser.
 
@@ -416,7 +424,7 @@ function constraint_space_basis(space::FactorSpace, sets::UniverseSets,
                                 rd::Option{<:ReturnsResult} = nothing)
     rr = factor_space_regression(space.re, rr, rd)
     @argcheck(!isnothing(rr),
-              IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a source for them, and none of the three carriers holds any: the space states none (`space.re === nothing`) and the prior carries none (`rr === nothing`). Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure.\nState the basis on the space instead, `FactorSpace(; re = Regression(; M = ...))` to pin it or `FactorSpace(; re = StepwiseRegression())` to refit it from the returns. $prior_regression_remedy"))
+              IsNothingError("a factor exposure constraint is written in factor names and re-based through the regression loadings, so it needs a source for them, and none of the three sources holds any: the space states none (`space.re === nothing`) and the prior carries none (`rr === nothing`). Unlike an unknown name, this is not recoverable per row and is not governed by `strict`: every row of the constraint would be dropped, leaving a feasible portfolio with none of the requested exposure.\nState the basis on the space instead, `FactorSpace(; re = Regression(; M = ...))` to pin it or `FactorSpace(; re = StepwiseRegression())` to refit it from the returns. $prior_regression_remedy"))
     key = factor_axis_key(sets, rr)
     factor_universe(sets, key, size(rr.M, 2), "a $(FactorSpace) constraint", "rr.M")
     return rr, key
@@ -606,6 +614,36 @@ function linear_constraints(lcs::VecEcE_LcE_Lc, sets::UniverseSets;
                             rd::Option{<:ReturnsResult} = nothing)
     return [linear_constraints(lc, sets; datatype = datatype, strict = strict,
                                bl_flag = bl_flag, rr = rr, rd = rd) for lc in lcs]
+end
+"""
+    reader_frames(space::FactorSpace, path::AbstractString, refit::Bool)
+    reader_frames(ece::ExposureConstraintEstimator, path::AbstractString, refit::Bool)
+
+Return the frames that the regression reader of a constraint space adds to the group of the optimiser that holds the constraint.
+
+A [`FactorSpace`](@ref) holds its reader in `re`, and an [`ExposureConstraintEstimator`](@ref) holds the space in `space`. Each method walks the field at its path, so the warning of [`warn_raw_readers`](@ref) names a reader as, for example, `"lcse.space.re"`. A precomputed [`Regression`](@ref) and `re = nothing` are no readers, and add no frames.
+
+# Arguments
+
+  - `space`, `ece`: The constraint space, or the constraint estimator that holds it.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the reader in the field.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`FactorSpace`](@ref)
+  - [`ExposureConstraintEstimator`](@ref)
+"""
+function reader_frames(space::FactorSpace, path::AbstractString, refit::Bool)
+    return reader_frames(space.re, join_path(path, :re), refit)
+end
+function reader_frames(ece::ExposureConstraintEstimator, path::AbstractString, refit::Bool)
+    return reader_frames(ece.space, join_path(path, :space), refit)
 end
 
 export FactorSpace, ExposureConstraintEstimator

@@ -1,8 +1,8 @@
 ```@meta
-Description = "Regime Adjusted Exponential Weighted Variance, public API of PortfolioOptimisers.jl: RegimeAdjustedMethod, LogRegimeAdjusted, FirstMomentRegimeAdjusted, …"
+Description = "Regime adjusted exp weighted variance, public API of PortfolioOptimisers.jl: RegimeAdjustedMethod, LogRegimeAdjusted, FirstMomentRegimeAdjusted, …"
 ```
 
-# Regime Adjusted Exponential Weighted Variance
+# Regime adjusted exp weighted variance
 
 ## Types
 
@@ -18,6 +18,7 @@ RegimeAdjustedExpWeightedVariance
 
 ```@docs
 regime_multiplier
+regime_bias_table
 var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
 var(ce::RegimeAdjustedExpWeightedVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 partial_fit!(ce::RegimeAdjustedExpWeightedVariance, X::MatNum; dims::Int = 1, estimation_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)

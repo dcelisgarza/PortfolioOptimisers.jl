@@ -37,6 +37,10 @@ These three abstract hierarchies form the backbone of the library. Understanding
 - **Struct types**:
 
   - Use `@concrete` from `ConcreteStructs.jl` — it auto-generates type parameters so `struct MyType{T1, T2}` boilerplate is not needed.
+  - Do not bound a type parameter in the header, neither as `struct MyType{T1 <: Real}` nor as a `@concrete` field `x <: Real`. Bound the argument of the inner constructor instead (see *Constructor Pattern*). A bound in the header is one that every signature naming the type must meet, and inference can fail or take very long on it. A struct that `@concrete` cannot write, because its parameters reach a parametric supertype or two fields share one, declares its parameters by hand with no bound. `test/test_75_concrete_struct_census.jl` gates the rule and holds each exception with its reason.
+  - **The common instance of a struct wastes no padding (#1754).** Julia lays out the fields in the order of their declaration and aligns each field to the alignment of its type, so a narrow field before a wider one gets padding. A `Bool` before an `Int` or a pointer costs seven bytes.
+    The common instance is the one that the keyword constructor builds from its defaults. Put its 8-byte fields first, and put its narrow fields together after them: `Bool`, `Int32`, `Float32`, a small isbits struct. Julia rounds the size of a struct up to its largest alignment, so a struct with one narrow field loses the same bytes in every order, and its narrow field can stand anywhere. A field that holds a singleton, such as `nothing`, takes no bytes and never breaks the alignment, so it can stand anywhere too.
+    In the order that wastes no byte, keep a field next to the fields it relates to, then next to the fields of its category. The positional constructor follows the field order, and a new order of the fields is not a breaking change. `test/test_80_struct_layout_census.jl` gates the rule on every struct that has a constructor with no arguments.
   - Use `DocStringExtensions.TYPEDEF` in the docstring header for struct types.
   - All fields must be documented using inline `"$(field_dict[:key])"` strings and reflected in the `# Fields` section via `$(DocStringExtensions.FIELDS)`.
   - Call `@define_pretty_show(TypeName)` immediately after any new struct that should display nicely in the REPL (all estimators, algorithms, and results).
@@ -170,6 +174,54 @@ method converts internally. An index is the usual case.
 to `<:Real` only where the body needs an order, and to a concrete type only where the body needs
 that exact representation.
 
+## A divisor's correction is named by who makes it
+
+The divisor of a spread is the number of observations, less a correction. Two keywords name that
+correction, and each one names who makes it.
+
+- **`ddof::Integer` where the library makes the correction itself.** The code subtracts the integer
+  from the number of observations, `T - ddof`, and refuses a negative one. The members of
+  `NormError` and `EvenMoment` take it.
+- **`corrected::Bool` where `Statistics` or `StatsBase` makes it.** The code passes the flag on, to
+  `Statistics.std`, `Statistics.var`, `StatsBase.SimpleCovariance` or `StatsBase.varcorrection`.
+  `SimpleVariance`, `StdValue` and `VarValue` take it. Under observation weights the flag selects a
+  divisor for each weight type, and no integer states that divisor.
+
+One definition never names both, and a definition that names `ddof` never calls an upstream
+spread. Such a site states an integer and applies a flag, so `ddof = 2` either raises or silently
+means `ddof = 1`. To offer an integer, subtract it yourself. To delegate, take `corrected` and pass
+it on.
+
+A partial fit that reproduces a correction `StatsBase` makes on the batch path subtracts the flag
+itself, as `n - corrected`. It keeps the name `corrected`, because it reads the field of an
+estimator whose batch path delegates. One field cannot carry two names.
+
+The default of each keyword is written at its site and is the site's own decision.
+[ADR 0087](../../docs/adr/0087-one-written-bias-correction-default-not-the-upstream-one.md) fixes
+`corrected = true`.
+
+## A Returns Result drops no field that the mathematics lets it carry
+
+Code that builds a `ReturnsResult` from another one, or from a buffer, a state or a window of one,
+carries every field: `nx`, `X`, `nf`, `F`, `nb`, `B`, `ne`, `E`, `ts`, `iv`, `ivpa` and `pnl`. A
+field that a consumer does not read today is carried too, because the next consumer cannot see
+that it was dropped.
+
+- **Drop a field only when it has no meaning on the new axis.** An asset-indexed field after a
+  collapse to synthetic assets with no collapse rule is an example. State the reason in a comment
+  or in the docstring at the site.
+- **Subtract at the point of use rather than rebuild.** A flag that changes the returns a reader
+  fits on, such as `brt`, never rebuilds the `ReturnsResult`. Each reader takes the flag as an
+  argument and reads `benchmark_relative_returns(rd, brt)`, a matrix, so `rd` keeps its raw `X`
+  and `B`, and no reader subtracts twice. A reader that a change adds takes `brt` too.
+- **Refuse by name where a field cannot travel.** A fold that holds numbers alone refuses `iv` with
+  an error that names it. A silent drop is never correct.
+- **Refuse a flag that needs a field the data does not carry.** `brt = true` on returns with no `B`
+  is an `ArgumentError`, not a pass-through.
+
+[ADR 0204](../../docs/adr/0204-a-returns-result-drops-no-field-that-the-mathematics-lets-it-carry.md)
+owns the rule.
+
 ## Union Type Aliases and Dispatch Groups
 
 When multiple abstract subtypes share a common interface, define a `const` union alias and dispatch on it:
@@ -259,6 +311,57 @@ already carries the shape and names the symbol the caller passed.
   function prior(pr::AbstractPriorResult, args...; kwargs...) = pr  # passthrough
   ```
 
+### A branch that a type decides is a method
+
+An early exit is the usual place where an `if` on a type hides: `isnothing(x) && return y`, or
+`if !(r.sigma isa DeferredQuantity) return r end`, which more statements follow. When the
+condition only tests the type of a positional argument, or of a field of one, the definition is
+two cases, and each case is a method. Split it by dispatch on that type:
+
+- a `::Nothing` method beside the method for a value. It types every other argument like the
+  method for a value. An `::Any` there takes calls that the method for a value refuses, and an
+  `args...` can make a call ambiguous;
+- one method for each type that the `isa` tests;
+- for a field, a method that forwards the field as an argument, and one method for each type
+  of the field:
+
+  ```julia
+  set_sdp_variance_risk!(model, i, r, pr) = set_sdp_variance_risk!(model, i, r, pr, r.ratio_alg)
+  function set_sdp_variance_risk!(model, i, r, pr, ::LinearRatio) ... end
+  function set_sdp_variance_risk!(model, i, r, pr, ratio_alg::RatioFormulation) ... end
+  ```
+
+When the type that the condition tests is an extension point, the method for the general case
+takes the abstract type, and the method for the known case takes the concrete type. A user's
+own subtype then reaches the general case, as it did through the branch. Above, a user's own
+`RatioFormulation` implements only `sdp_objective_lift_flag`, which the general method reads.
+
+The split changes the source, not the compiled code. The compiler knows the type of each
+argument of a method, and it removes the dead arm of a branch on that type: under `LinearRatio`
+the typed body of the early-return form of `set_sdp_variance_risk!` held no call to the lift of
+the objective (#1752). The gain is that a method states one case, its signature names the case,
+and the reader finds the case by dispatch, not inside the body of another case.
+
+Inside a method, the type of each argument is known, and so is the type of a field that the
+type of the argument carries as a parameter or as an entry of a `NamedTuple`. That holds also
+when the caller holds a `Union`, because the call splits the union before it reaches the
+method. Keep the branch when no dispatch can take it:
+
+- a field that declares a `Union`, such as `SampleBufferState.G`, because one struct type holds
+  a value of either type;
+- a keyword argument, because a keyword does not dispatch;
+- a local, or an argument that the body assigns again.
+
+A condition that also tests a value, such as `isnothing(x) || isempty(x)`, is a run-time branch
+and stays. An early exit on a value is not a breach of this rule. A mix of type tests that two
+methods cannot state also stays, such as `isnothing(a) && !isa(b, T)` or
+`isnothing(a) || isnothing(b)`: it needs a method for each combination, and more methods to
+settle their ambiguities, which is harder to read than the branch.
+
+`test/test_79_type_decided_early_return_census.jl` gates the rule over `src/` and `ext/`. Its
+`RUN_TIME` list names each site of a field that declares a `Union`, with its reason, and every
+other early exit on a type fails it.
+
 ## A unit that offers nothing but indirection is inlined
 
 A unit is a dead-end when it has **one method**, a body that is **one depth-one forward**, and
@@ -288,6 +391,47 @@ application, and the allow-list is where that application is named.
 `test/test_70_trivial_unit_census.jl` is the census and the allow-list. A flagged name outside
 the list fails the build, and an entry whose name is no longer flagged is stale and fails too, so
 the list can only shrink on its own.
+
+## Branches that share an outcome are one branch
+
+When two branches do the same thing, write one branch whose condition joins theirs. Each branch
+is a path that the reader must follow and that a test must reach, so a chain of branches with one
+outcome costs more to read and to test than one branch. Merge these four shapes:
+
+- **Two exits in a row with the same body**, which ends in `return`, `continue`, `break`, `throw`,
+  `error` or `rethrow`. Join the conditions with `||`. The form `c || return x` exits when `c` is false,
+  so its condition is `!c`.
+
+  ```julia
+  if n < 2 ||
+     !isfinite(m) ||
+     (!isnothing(mt.min_obs) && n < mt.min_obs) ||
+     (!isnothing(mt.min_periods) && T / window < mt.min_periods)
+      return false
+  end
+  ```
+
+- **Two adjacent arms of an `if` chain with the same body.** Join the conditions with `||`, as in
+  `elseif (i == k && j == l) || (i == l && j == k)`.
+- **An `if` with no `else` whose body is only an `if` with no `else`.** Join the conditions with
+  `&&`.
+- **An `else` whose body is only an `if`**, a ternary included. Write it as an `elseif`.
+
+The merge costs nothing at run time. `||` and `&&` evaluate from left to right and stop at the
+first operand that decides the result, so the merged condition tests the same conditions in the
+same order.
+
+Keep the branches apart in two cases, because the merge makes the text harder to read:
+
+- A later exit whose condition calls a function whose name ends in `!`. In a merged
+  `posdef_accepts(pdm.alg, X) || zero_variance_block!(f, X)`, the change of `X` happens only
+  when the first test fails, and the reader of the condition does not see that.
+- An `else` whose `if` tests the same condition as the last `if` of the first arm. The two arms
+  are a table of two rows and two columns, and the nesting shows the table.
+
+`test/test_81_one_outcome_branch_census.jl` gates the rule over `src/` and `ext/`. A site whose
+merge makes the text harder to read for a different reason goes on its `KEEP` list with that
+reason.
 
 ## Return Type Annotations
 

@@ -173,14 +173,17 @@ Hosts whose `port_opt_view` is the identity a surface declares, so no view reach
 `cache`. Each is a `@concrete` struct rather than a `@propagatable` one, and each holds its
 own family state, which a view therefore never meets. The day one of them becomes
 `@propagatable` this list reds, and its state owes `port_opt_view` -- the exact slice for the
-exponentially weighted moments and the preprocessing steps, and the `nothing` refusal ADR 0107
+exponentially weighted moments, the preprocessing steps and the rolling Descriptor, and the `nothing` refusal ADR 0107
 names for the two regime families, whose regime state reads the standardised innovation of
 every asset in the universe and so has no exact slice.
 =#
 const NO_VIEW_HOSTS = (ExpWeightedExpectedReturns, ExpWeightedVariance,
                        ExpWeightedCovariance, RegimeAdjustedExpWeightedVariance,
                        RegimeAdjustedExpWeightedCovariance, PricesToReturns, PriceGapFill,
-                       MissingDataFilter)
+                       MissingDataFilter, RollingLogReturn, EWMean, EWVolumeRatio,
+                       DaysToCover, GrowthRate, ChangeToScale, ChangeInIntensity,
+                       EWVolatility, EWResidualVolatility, EWBeta, EWMacroSensitivity,
+                       EWDownsideBeta)
 
 # Hosts whose `port_opt_view` refuses outright, so a cache never travels a view of them. A
 # `Pipeline`'s asset universe is fitted state, which ADR 0028 says a view cannot select.
@@ -201,7 +204,13 @@ const UNVIEWED_STATES = (po.ExpWeightedExpectedReturnsState => ExpWeightedExpect
                              RegimeAdjustedExpWeightedCovariance,
                          po.PricesToReturnsState => PricesToReturns,
                          po.PriceGapFillState => PriceGapFill,
-                         po.MissingDataFilterState => MissingDataFilter)
+                         po.MissingDataFilterState => MissingDataFilter,
+                         po.RollingLogReturnState => RollingLogReturn,
+                         po.EWMeanState => EWMean, po.LagDescriptorState => GrowthRate,
+                         po.EWVolatilityState => EWVolatility,
+                         po.EWBetaState => EWResidualVolatility, po.EWBlockState => EWBeta,
+                         po.EWMacroSensitivityState => EWMacroSensitivity,
+                         po.EWDownsideBetaState => EWDownsideBeta)
 
 # ------------------------------------------------------------------------------ the census
 

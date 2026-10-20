@@ -68,12 +68,15 @@ issue that is already open.
 
 ## When it throws
 
-The manifest and the tracker must agree before one issue is planned, and three disagreements each
+The manifest and the tracker must agree before one issue is planned, and four disagreements each
 throw with no plan written:
 
 1. A child map the manifest names has no issue titled `Child map <n>: <name>`.
 2. An issue's name differs from the manifest's, so one of the two was renamed alone.
 3. A row names a map that `[map]` does not list.
+4. An open `sweep` issue names a `.jl` file that has no row. Its file moved, or the title names it
+   by its bare name. Retitle the issue to name the current path of every file it sweeps, then run
+   the triage again. Do not file a second ticket for a file that moved.
 
 A loud refusal is right. A wrong parent is work somebody must undo by hand.
 

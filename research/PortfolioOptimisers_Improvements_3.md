@@ -7,26 +7,6 @@ Sample code below is **standalone** (JuMP / plain Julia). It is illustrative onl
 
 ---
 
-## Already Implemented (for reference)
-
-| Feature | Notes |
-| --------- | ------- |
-| OWA / L-moments | Present |
-| Relaxed risk parity | Expanded to integer formulations + factor risk parity |
-| Worst-case formulations | Uncertainty sets (box, ellipse, …) on μ and Σ |
-| Distributionally Robust CVaR / CVaR Range / CDaR | Present (do **not** re-implement these) |
-| Cardinality, threshold, conditional inclusion (MIP) + set counterparts | Present |
-| HRP | Present |
-| HERC | Generalised to different inner/outer risk measures |
-| Schur complementary allocation | Present |
-| Index tracking + weight tracking objectives/constraints | Present |
-| NCO | Generalised to arbitrary inner/outer estimators + CV prediction for outer returns |
-| Stacking optimiser | Present |
-| Walk-forward + combinatorial purged CV | Present |
-| TimeDependent | Can implement rebalancing policies (dedicated higher-level machinery still useful) |
-
----
-
 ## Priority 1 – High Leverage / Practical Impact
 
 ### 1. Dedicated Rebalancing Policy Layer
@@ -34,10 +14,9 @@ Sample code below is **standalone** (JuMP / plain Julia). It is illustrative onl
 **Idea**
 Elevate `TimeDependent` into (or wrap it with) first-class **rebalancing policies**:
 
-- Calendar-based (daily / weekly / monthly / quarter-end)
 - Threshold-based (turnover, drift from target, risk-budget violation)
 - Cost-aware (trade only when expected benefit > estimated transaction cost)
-- Hybrid (calendar + threshold + cost)
+- Hybrid (threshold + cost)
 
 **Standalone sample**
 
@@ -45,10 +24,6 @@ Elevate `TimeDependent` into (or wrap it with) first-class **rebalancing policie
 using Dates, LinearAlgebra
 
 abstract type RebalancePolicy end
-
-struct CalendarRebalance <: RebalancePolicy
-    period::Period          # e.g. Month(1), Week(1)
-end
 
 struct ThresholdRebalance <: RebalancePolicy
     tol::Float64            # max L1 drift from target before trade
@@ -108,51 +83,8 @@ linear_tc(w_old, w_new; bps = 5.0) = bps * 1e-4 * norm(w_new - w_old, 1)
 
 **Idea**
 
-- Piecewise-linear / quadratic / market-impact (power-law) transaction costs
-- Bid–ask spread models
+- Piecewise-linear / quadratic transaction costs
 - Simple tax-lot / short-term vs long-term capital-gains approximations
-
-**Standalone sample (JuMP market-impact + linear TC)**
-
-```julia
-using JuMP, Clarabel
-
-function portfolio_with_market_impact(μ, Σ, w0;
-                                      γ = 1.0,           # risk aversion
-                                      a = 1e-3,          # linear TC coeff
-                                      b = 1e-4,          # market-impact coeff
-                                      beta = 1.5)        # impact exponent
-    n = length(μ)
-    model = Model(Clarabel.Optimizer)
-    set_silent(model)
-
-    @variable(model, w[1:n] >= 0)
-    @variable(model, trade[1:n])          # w - w0
-    @variable(model, abs_trade[1:n] >= 0)
-    @variable(model, impact[1:n] >= 0)
-
-    @constraint(model, sum(w) == 1)
-    @constraint(model, trade .== w - w0)
-    @constraint(model, abs_trade .>= trade)
-    @constraint(model, abs_trade .>= -trade)
-
-    # power-law impact approximated by SOCP for beta=1.5
-    # impact_i >= b * |trade_i|^1.5  (convex)
-    for i in 1:n
-        # t^{1.5} = t * sqrt(t) → auxiliary
-        @variable(model, s >= 0)
-        @constraint(model, [s; abs_trade[i]] in SecondOrderCone()) # s >= sqrt(|trade|)
-        @constraint(model, impact[i] >= b * abs_trade[i] * s)
-    end
-
-    @objective(model, Max,
-        μ ⋅ w - γ * w' * Σ * w
-        - a * sum(abs_trade) - sum(impact)
-    )
-    optimize!(model)
-    return value.(w), value.(abs_trade), value.(impact)
-end
-```
 
 **Simple tax-lot sketch**
 
@@ -234,71 +166,6 @@ end
 ---
 
 ## Priority 2 – Robustness & Scenario Tools
-
-### 4. Wasserstein-Style Uncertainty / Ambiguity Sets
-
-**Idea**
-Wasserstein (and Gelbrich) ambiguity sets usable with mean-risk objectives — **excluding** the already-implemented DR-CVaR / CVaR-range / CDaR.
-
-**Standalone sample (Wasserstein mean-variance style regularisation)**
-
-A common tractable reformulation of worst-case expectation under a type-1 Wasserstein ball of radius ε around the empirical measure yields a regularised empirical problem. For mean-variance this often appears as an extra term proportional to ‖w‖_* (dual norm).
-
-```julia
-using JuMP, Clarabel, LinearAlgebra, Statistics
-
-"""
-Wasserstein-robust mean-variance (illustrative dual form).
-ε = Wasserstein radius, p = 1 or 2.
-"""
-function wasserstein_mvo(returns::AbstractMatrix; ε = 0.01, γ = 1.0, p = 1)
-    T, n = size(returns)
-    μ = vec(mean(returns; dims = 1))
-    Σ = cov(returns)
-
-    model = Model(Clarabel.Optimizer)
-    set_silent(model)
-    @variable(model, w[1:n] >= 0)
-    @constraint(model, sum(w) == 1)
-
-    # dual-norm regulariser: for p=1 → ∞-norm, for p=2 → 2-norm
-    if p == 1
-        @variable(model, t >= 0)
-        @constraint(model, -t .<= w .<= t)          # t ≥ ‖w‖_∞
-        reg = t
-    else
-        @variable(model, t >= 0)
-        @constraint(model, [t; w] in SecondOrderCone()) # t ≥ ‖w‖₂
-        reg = t
-    end
-
-    # worst-case mean ≈ μ'w - ε * ‖w‖_*
-    @objective(model, Max, μ ⋅ w - ε * reg - γ * w' * Σ * w)
-    optimize!(model)
-    return value.(w)
-end
-
-# Gelbrich-style outer approximation (moment ball)
-function gelbrich_mvo(μ, Σ; ρ = 0.05, γ = 1.0)
-    n = length(μ)
-    model = Model(Clarabel.Optimizer)
-    set_silent(model)
-    @variable(model, w[1:n] >= 0)
-    @constraint(model, sum(w) == 1)
-
-    # Gelbrich upper bound on worst-case variance involves
-    # (√(w'Σw) + ρ‖w‖)²  (simplified)
-    @variable(model, s >= 0)
-    @constraint(model, [s; sqrt(Σ) * w] in SecondOrderCone()) # s ≥ √(w'Σw)
-    @variable(model, u >= 0)
-    @constraint(model, [u; w] in SecondOrderCone())
-    @objective(model, Max, μ ⋅ w - γ * (s + ρ * u)^2)
-    optimize!(model)
-    return value.(w)
-end
-```
-
----
 
 ### 5. Scenario Generation & Stress Testing
 
@@ -422,59 +289,12 @@ end
 
 ---
 
-### 8. Online / Streaming Estimators & Incremental Updates
-
-**Idea**
-O(1) / O(n²) updates for mean and covariance when a new return vector arrives.
-
-**Standalone sample**
-
-```julia
-mutable struct OnlineMeanCov
-    n::Int
-    t::Int
-    μ::Vector{Float64}
-    Σ::Matrix{Float64}          # running covariance (population or sample)
-    α::Float64                  # EWMA decay (1 = equal weight)
-end
-
-function OnlineMeanCov(n; α = 0.99)
-    OnlineMeanCov(n, 0, zeros(n), zeros(n, n), α)
-end
-
-function update!(o::OnlineMeanCov, x::AbstractVector)
-    o.t += 1
-    if o.t == 1
-        o.μ .= x
-        return o
-    end
-    # EWMA
-    δ = x - o.μ
-    o.μ .+= (1 - o.α) * δ
-    # rank-1 covariance update (EWMA)
-    o.Σ .= o.α * o.Σ + (1 - o.α) * (δ * δ')
-    return o
-end
-
-# incremental minimum-variance weights (analytic)
-function minvar_weights(Σ)
-    n = size(Σ, 1)
-    ones_n = ones(n)
-    invΣ = inv(Σ)
-    w = invΣ * ones_n
-    w ./= sum(w)
-    return w
-end
-```
-
----
-
 ## Priority 4 – Graph & Network Extensions
 
 ### 9. Richer Graph / Network Constraints & Objectives
 
 **Idea**
-Laplacian regularisation, centrality / neighbourhood constraints on top of existing MST / clustering graphs.
+Laplacian regularisation on top of existing MST / clustering graphs.
 
 **Standalone sample**
 
@@ -497,26 +317,6 @@ function mvo_laplacian(μ, Σ, L; λ = 0.1, γ = 1.0)
     return value.(w)
 end
 
-"""
-Neighbourhood constraint: if (i,j) is an edge, at most one of them may be held
-(or their total weight ≤ cap).  Requires MIP.
-"""
-function mvo_neighbourhood(μ, Σ, edges; cap = 0.05)
-    n = length(μ)
-    model = Model(HiGHS.Optimizer)          # MIP solver
-    set_silent(model)
-    @variable(model, w[1:n] >= 0)
-    @variable(model, z[1:n], Bin)
-    @constraint(model, sum(w) == 1)
-    @constraint(model, w .<= z)             # z_i = 1 if asset i selected
-    for (i, j) in edges
-        @constraint(model, z[i] + z[j] <= 1)
-    end
-    @objective(model, Max, μ ⋅ w - w' * Σ * w)
-    optimize!(model)
-    return value.(w)
-end
-
 # build Laplacian from adjacency
 laplacian(A) = Diagonal(vec(sum(A; dims = 2))) - A
 ```
@@ -524,42 +324,6 @@ laplacian(A) = Diagonal(vec(sum(A; dims = 2))) - A
 ---
 
 ## Priority 5 – Higher-Order & Non-Convex / Advanced Risk
-
-### 10. Additional Higher-Order / Non-Convex Risk Measures with Good Relaxations
-
-**Idea**
-Full MVSK with SDP relaxations, etc.
-
-**Standalone sketch (mean-variance-skewness via moment relaxation)**
-
-```julia
-# Highly simplified illustration – real MVSK needs the full coskewness tensor
-# and specialised SDP / polynomial optimisation tools (e.g. SumOfSquares.jl)
-
-using JuMP, SCS, LinearAlgebra
-
-function rough_mvsk_sdp(μ, Σ, coskew_slice; γ2 = 1.0, γ3 = 0.1)
-    # coskew_slice is a matrix approximation / marginal slice of the tensor
-    n = length(μ)
-    model = Model(SCS.Optimizer)
-    set_silent(model)
-    @variable(model, w[1:n] >= 0)
-    @constraint(model, sum(w) == 1)
-
-    # variance
-    @variable(model, v >= 0)
-    @constraint(model, [v; √Σ * w] in SecondOrderCone())
-
-    # crude skewness proxy
-    skew_proxy = w' * coskew_slice * w   # not the real cubic form
-
-    @objective(model, Max, μ ⋅ w - γ2 * v + γ3 * skew_proxy)
-    optimize!(model)
-    return value.(w)
-end
-```
-
----
 
 ### 11. Automatic Differentiation Through the Whole Pipeline
 
@@ -599,41 +363,6 @@ end
 
 ## Priority 6 – Usability & Ecosystem
 
-### 12. Batteries-Included End-to-End Pipelines
-
-**Idea**
-High-level convenience pipelines that still expose the full type system.
-
-**Standalone sketch**
-
-```julia
-struct PortfolioPipeline
-    preprocess
-    select
-    optimise
-    allocate
-    rebalance
-    validate
-end
-
-function fit_predict(pipe::PortfolioPipeline, prices; dates = nothing)
-    rd = pipe.preprocess(prices)
-    assets = pipe.select(rd)
-    rd_sel = rd[:, assets]          # simplified
-    w = pipe.optimise(rd_sel)
-    shares = pipe.allocate(w, prices[end, assets])
-    # optional walk-forward
-    if pipe.validate !== nothing
-        score = pipe.validate(pipe.optimise, rd_sel)
-    else
-        score = nothing
-    end
-    return (; w, shares, score, assets)
-end
-```
-
----
-
 ### 13. Mixed-Frequency / Alternative-Data Support
 
 **Idea**
@@ -671,14 +400,12 @@ end
 ## Suggested Near-Term Ordering
 
 1. Dedicated rebalancing policy layer + richer transaction-cost models
-2. Wasserstein-style (and Gelbrich) uncertainty / ambiguity sets (tractable reformulations for mean-risk objectives)
-3. Scenario generation / stress-testing toolkit (vine-copula + conditional sampling)
-4. Multi-period / rolling-horizon formulations
-5. Uncertainty quantification on weights (bootstrap / conformal)
-6. Differentiable layers (DiffOpt integration or native)
-7. Graph-constraint primitives
-8. Online/streaming estimators
-9. Usability pipelines and mixed-frequency support
+2. Scenario generation / stress-testing toolkit (vine-copula + conditional sampling)
+3. Multi-period / rolling-horizon formulations
+4. Uncertainty quantification on weights (bootstrap / conformal)
+5. Differentiable layers (DiffOpt integration or native)
+6. Graph-constraint primitives (Laplacian regularisation)
+7. Mixed-frequency support
 
 ---
 

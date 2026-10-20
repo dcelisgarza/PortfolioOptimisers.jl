@@ -21,9 +21,9 @@ never blocked. The **estimation mask** is `amsk .& isfinite.(returns)`. What bot
 what this ADR settles, is *where they live*.
 
 [Issue #957](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/957) measured the
-reference implementation and found no route from a price table to a masked panel at all: its
+oracle and found no route from a price table to a masked panel at all: its
 returns verb emits no mask, and its panel takes a mask and no prices. The destination's route is
-one the reference does not have, so the decomposition is not a port.
+one the oracle does not have, so the decomposition is not a port.
 
 [Issue #958](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/958) verified that
 deriving the masks **panel-wide** is leak-free: identical Coverage Universe and identical weights
@@ -232,7 +232,7 @@ collapse are `PriceIngestion`; the active mask is `listing_span` and the estimat
 `TrainTestSplit`, which the layer does not own; and the elementwise map is owned by nothing, which
 *The value-only side of the rule mints nothing* states and argues.
 
-`CONTEXT.md` mints **Listing Span** and **Span Rule**, and amends **Asset Panel** — its
+`GLOSSARY.md` mints **Listing Span** and **Span Rule**, and amends **Asset Panel** — its
 point-in-time shape is now stated by the two masks, with Panel Fields as optional payload rather
 than as the panel's defining content.
 

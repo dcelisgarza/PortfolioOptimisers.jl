@@ -34,14 +34,15 @@ scalarise_logsumexp
 nothing_scalar_array_selector
 deferred_factors
 fit_deferred_quantity
-coskewness_processor
 deferred_centre
 centring_target
 fit_deferred_moment
 deferred_quantity
 fan_out_slot
+fan_out_pe
 deferred_derived_quantity
 resolve_slot
+resolve_sigma_chol
 deferred_slots
 functor_slots
 resolve_calibration_slots(x, pr::AbstractPriorResult)
@@ -54,13 +55,10 @@ sigma_chol_selector
 assert_derived_slot_has_source
 risk_measure_nothing_scalar_array_view
 solver_selector
-bigger_is_better
-range_tails
-supports_precomputed_returns(r::AbstractBaseRiskMeasure)
-supports_precomputed_returns(rs::VecBaseRM)
-supports_precomputed_returns(::NetReturnsInput, ::Any)
-supports_precomputed_returns(::WeightsInput, ::Any)
-supports_precomputed_returns(::WeightsReturnsFeesInput, r::AbstractBaseRiskMeasure)
+assert_observation_weights
+checked_observation_weights
+assert_half_open_unit_interval
+worst_positive_weight_loss
 weight_independent_target(::Nothing)
 weight_independent_target(::Number)
 weight_independent_target(::Any)

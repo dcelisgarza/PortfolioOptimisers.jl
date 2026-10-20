@@ -1024,3 +1024,4 @@ function risk_series(model::JuMP.Model, ::DrawdownRiskSeries, pr::AbstractPriorR
     T = length(dd) - 1
     return -view(dd, 2:(T + 1)), T
 end
+public set_risk_constraints!, set_risk_bounds_and_expression!

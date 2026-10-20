@@ -60,7 +60,9 @@ Regression
        b ┼ nothing
   esigma ┼ nothing
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -123,7 +125,10 @@ CrossSectionalRegression
     f ┼ 1×2 Matrix{Float64}
   eps ┼ 1×3 Matrix{Float64}
     n ┼ Vector{Int64}: [3]
-    b ┴ nothing
+    b ┼ nothing
+   h1 ┼ nothing
+   dc ┼ nothing
+   lv ┴ nothing
 ```
 
 # Related
@@ -426,17 +431,178 @@ Abstract supertype for all regression target types.
 
 All concrete and/or abstract types representing regression targets (such as linear or generalised linear models) should be subtypes of `AbstractRegressionTarget`.
 
+A target is the model a regression estimator fits, and the library ships two: [`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref). Any other model that fits under observation weights and exposes its coefficients runs as a target, for example a robust M-estimator the caller writes on top of `StatsAPI`. The library ships no such model: the route below is the contract.
+
+# Interfaces
+
+In order to implement a new regression target that works seamlessly with the regression estimators of the library, subtype `AbstractRegressionTarget` with all necessary parameters as part of the struct, and implement the following methods. Each estimator reads only some of them, so a target implements the methods of the estimators it runs under:
+
+| Estimator                                | Methods it reads                                                                                                               |
+|:---------------------------------------- |:------------------------------------------------------------------------------------------------------------------------------ |
+| [`CrossSectionalTargetRegression`](@ref) | `factory`, `StatsAPI.fit`, `StatsAPI.coef`, `is_basis_invariant`                                                               |
+| [`TargetReturnForecast`](@ref)           | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
+| [`ImpliedVolatilityRegression`](@ref)    | `StatsAPI.fit`, `StatsAPI.predict`                                                                                             |
+| [`StepwiseRegression`](@ref)             | `StatsAPI.fit`, and `StatsAPI.coeftable` under [`PValue`](@ref) or the score verb of its criterion under every other criterion |
+| [`DimensionReductionRegression`](@ref)   | `StatsAPI.fit`, `StatsAPI.coef`, `regression_target_weights`                                                                   |
+
+The three time-series estimators carry their target through [`factory`](@ref), so each of them also reads `factory` when it is given observation weights.
+
+## `factory`
+
+  - `factory(tgt::MyRegressionTarget, w::StatsBase.AbstractWeights) -> MyRegressionTarget`: Return a target that carries the observation weights `w` into its fit.
+
+The cross-sectional regression fits every observation under its cross-sectional weights, so it calls this method on each observation. A target with no such method is refused by [`factory(::AbstractRegressionTarget, ::ObsWeights)`](@ref), because the fit would otherwise ignore the weights. A target that must also accept a [`DynamicAbstractWeights`](@ref) resolves it against the design with [`get_observation_weights`](@ref) at the fit, as [`LinearModel`](@ref) does.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `w`: Observation weights, one per row of the design the target is fitted to.
+
+### Returns
+
+  - `tgt::MyRegressionTarget`: Target whose fit weighs row `i` by `w[i]`.
+
+## `StatsAPI.fit`
+
+  - `StatsAPI.fit(tgt::MyRegressionTarget, A::MatNum, y::VecNum) -> MyRegressionFit`: Fit the target to the design `A` and the response `y`.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+  - `A`: Design matrix, `samples × regressors`. The library adds no intercept column: the caller's estimator states the intercept.
+  - `y`: Response vector, one entry per row of `A`.
+
+### Returns
+
+  - `m::MyRegressionFit`: Fitted model.
+
+## `StatsAPI.coef`
+
+  - `StatsAPI.coef(m::MyRegressionFit) -> VecNum`: Return the fitted coefficients.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+
+### Returns
+
+  - `b::VecNum`: Coefficients, one per column of the design.
+
+## `StatsAPI.predict`
+
+  - `StatsAPI.predict(m::MyRegressionFit, A::MatNum) -> VecNum`: Return the fitted response on a new design.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+  - `A`: Design matrix, `samples × regressors`, with the columns of the fit.
+
+### Returns
+
+  - `yhat::VecNum`: Predicted response, one entry per row of `A`.
+
+## `StatsAPI.coeftable`
+
+  - `StatsAPI.coeftable(m::MyRegressionFit) -> StatsBase.CoefTable`: Return the coefficient table of the fit, with the p-value of each coefficient in column 4.
+
+[`StepwiseRegression`](@ref) reads it under [`PValue`](@ref) only. It reads column 4 of the table, which is the column `GLM` puts the p-values in, and it reads one row per column of the design, in the order of the design.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+
+### Returns
+
+  - `ct::StatsBase.CoefTable`: Coefficient table, one row per column of the design. Column 4 holds the p-values.
+
+## The score verbs
+
+  - `StatsAPI.aic(m::MyRegressionFit) -> Number`, and the same signature for `StatsAPI.aicc`, `StatsAPI.bic`, `StatsAPI.r2` and `StatsAPI.adjr2`: Return the score of the fit that the criterion of the same name in [`STEPWISE_REGRESSION_CRITERIA`](@ref) reads.
+
+[`StepwiseRegression`](@ref) reads the verb of its own criterion and no other, so a target implements only the verbs of the criteria it runs under. A criterion whose verb has no method for the fit raises a `MethodError` at the first fit.
+
+### Arguments
+
+  - `m`: Fitted model that `StatsAPI.fit` returns.
+
+### Returns
+
+  - `s::Number`: Score of the fit. The criterion states whether a smaller or a larger score is better.
+
+## `regression_target_weights`
+
+  - `regression_target_weights(tgt::MyRegressionTarget) -> Option{ObsWeights}`: Return the observation weights the fit of `tgt` applies, or `nothing` when it applies none.
+
+[`DimensionReductionRegression`](@ref) rebuilds the intercept of each asset from the mean of the response, and it weights that mean by these weights, so that the intercept agrees with the fit. A target with no such method is refused by [`regression_target_weights(::AbstractRegressionTarget)`](@ref) when the estimator is built, because the intercept would otherwise ignore the weights that `factory` stored in the target.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+
+### Returns
+
+  - `w::Option{ObsWeights}`: The weights that `factory(tgt, w)` stored in `tgt`, or `nothing` when `tgt` carries none.
+
+## `is_basis_invariant`
+
+  - `is_basis_invariant(tgt::MyRegressionTarget) -> Bool`: Return whether the fit of `tgt` gives the same coefficients under an invertible change of the columns of the design, mapped back to the original columns.
+
+The carry fold of [`CrossSectionalFactorPrior`](@ref) reads it when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. That move is an invertible change of the columns. A target that answers `true` lets the fold keep the factor returns of each past observation, so the move runs no regression again. The default answers `false`, and the move then fits every past observation again. A fit that minimises a loss of the fitted values alone, such as the weighted squared residuals, can answer `true`. An iterative fit of such a loss, such as [`GeneralisedLinearModel`](@ref), answers `true` when each of its iterates is invariant too. The fold then equals the batch fit to rounding, unless rounding stops the two bases at different iterates. A penalty on the coefficients, such as a ridge, makes the answer depend on the basis, so such a target keeps the default.
+
+### Arguments
+
+  - `tgt`: The new regression target.
+
+### Returns
+
+  - `flag::Bool`: `true` when the coefficients of the fit do not depend on the basis of the design.
+
 # Related
 
   - [`AbstractRegressionAlgorithm`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+  - [`TargetReturnForecast`](@ref)
+  - [`ImpliedVolatilityRegression`](@ref)
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`factory`](@ref)
+  - [`regression_target_weights`](@ref)
+  - [`is_basis_invariant`](@ref)
 """
 abstract type AbstractRegressionTarget <: AbstractRegressionAlgorithm end
+"""
+    factory(tgt::AbstractRegressionTarget, w::ObsWeights)
+
+Refuse a regression target that has no method to carry observation weights into its fit.
+
+A target that states no `factory(tgt, w)` method of its own would otherwise fall to the generic [`factory`](@ref), which returns it unchanged, and its fit would ignore the weights. Only a call that carries weights reaches this method, so a target fitted without weights, as [`TargetReturnForecast`](@ref) fits it, needs no weight method.
+
+# Arguments
+
+  - `tgt`: Regression target with no weight method of its own.
+  - $(arg_dict[:ow])
+
+# Validation
+
+  - The call always throws an `ArgumentError` that names the method `tgt` lacks. The `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states that method.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+  - [`factory`](@ref)
+"""
+function factory(tgt::AbstractRegressionTarget, w::ObsWeights)
+    return throw(ArgumentError("$(nameof(typeof(tgt))) has no method factory(::$(nameof(typeof(tgt))), ::$(nameof(typeof(w)))), so its fit cannot carry the observation weights. Define PortfolioOptimisers.factory(tgt::$(nameof(typeof(tgt))), w::StatsBase.AbstractWeights) to return a target whose fit weighs each row by w, as the # Interfaces section of AbstractRegressionTarget states"))
+end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Fits each response by ordinary least squares through `GLM.LinearModel`.
 
-The `kwargs` field is forwarded verbatim to `GLM`, so any option that routine accepts — observation weights among them — reaches the fit. This is the default target of every regression estimator in the library.
+The `kwargs` field is forwarded to `GLM`, so any option that routine accepts — observation weights among them — reaches the fit. The one entry that changes on the way is `weights`: [`glm_weights`](@ref) scales it to the count that `GLM` reads, which leaves the coefficients unchanged. This is the default target of every regression estimator in the library.
 
 # Fields
 
@@ -504,6 +670,85 @@ function factory(re::LinearModel, w::ObsWeights)::LinearModel
     return LinearModel(; kwargs = (; re.kwargs..., weights = w))
 end
 """
+    glm_weights(w::StatsBase.AbstractWeights) -> StatsBase.FrequencyWeights
+
+Return the frequency weights that `GLM` reads as the observation weights `w`.
+
+`GLM` reads every weight vector as frequency weights, so the number of observations of a weighted fit is ``\\sum_t w_t``. A count is what `StatsBase.FrequencyWeights` state, so they pass unchanged. Every other kind states the relative weight of each observation and no count. Probability weights that sum to one would read as one observation, a residual degree of freedom at or below zero, and a p-value of one for every coefficient. So the other kinds are scaled to sum to their Kish effective sample size, which leaves the coefficients unchanged, because a weighted fit is invariant to a constant scale of its weights.
+
+The Kish count is the correct count for observations that are drawn alike and then reweighted, which is what the scenario probabilities and the decay weights of the library are. It reads ``T`` under uniform weights, so the fit equals the unweighted one, and ``k`` under equal weights on ``k`` of the rows, so the fit equals the fit of those rows alone. `docs/adr/0203-a-weighted-regression-reads-the-kish-count-of-its-weights.md` records the choice and the null test that measured it. A caller who wants another count states it with `StatsBase.fweights`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+T_{e} &= \\frac{\\left(\\sum_{t} w_{t}\\right)^2}{\\sum_{t} w_{t}^2}\\,,\\\\
+\\tilde{w}_{t} &= w_{t} \\frac{T_{e}}{\\sum_{s} w_{s}} = w_{t} \\frac{\\sum_{s} w_{s}}{\\sum_{s} w_{s}^2}\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_t_obs])
+  - $(math_dict[:cal_T_e])
+  - ``\\tilde{w}_{t}``: Frequency weight of observation ``t``. The frequency weights sum to ``T_{e}``.
+
+# Arguments
+
+  - `w`: Resolved observation weights, one per row of the design.
+
+# Returns
+
+  - `w::StatsBase.FrequencyWeights`: `w` itself when it is `StatsBase.FrequencyWeights`, otherwise ``\\tilde{w}``.
+
+# Related
+
+  - [`glm_fit_kwargs`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+"""
+function glm_weights(w::StatsBase.FrequencyWeights)
+    return w
+end
+function glm_weights(w::StatsBase.AbstractWeights)
+    return StatsBase.fweights(w .* (sum(w) / sum(abs2, w)))
+end
+"""
+    glm_fit_kwargs(kwargs::NamedTuple, X::MatNum) -> NamedTuple
+
+Return the keyword arguments that a library regression target passes to `GLM`.
+
+[`LinearModel`](@ref) and [`GeneralisedLinearModel`](@ref) keep their observation weights under the `weights` key of their `kwargs`, where [`factory`](@ref) puts them. A [`DynamicAbstractWeights`](@ref) holds no values until it meets the design, and `GLM` reads every weight vector as a count, so both targets resolve and scale the entry here before the fit.
+
+# Algorithm
+
+ 1. Read the `weights` entry of `kwargs`. When it is not an [`ObsWeights`](@ref), return `kwargs` unchanged.
+ 2. Resolve the entry against `X` with [`get_observation_weights`](@ref), and scale it with [`glm_weights`](@ref).
+ 3. Return `kwargs` with the scaled weights under the `weights` key.
+
+# Arguments
+
+  - `kwargs`: The `kwargs` field of the regression target.
+  - `X`: The design matrix (observations × factors).
+
+# Returns
+
+  - `kwargs::NamedTuple`: The keyword arguments of the call to `GLM`.
+
+# Related
+
+  - [`glm_weights`](@ref)
+  - [`StatsAPI.fit(::LinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+"""
+function glm_fit_kwargs(kwargs::NamedTuple, X::MatNum)
+    w = get(kwargs, :weights, nothing)
+    if !isa(w, ObsWeights)
+        return kwargs
+    end
+    return (; kwargs..., weights = glm_weights(get_observation_weights(w, X)))
+end
+"""
     StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
 
 Fit a standard linear regression model using a [`LinearModel`](@ref) regression target.
@@ -512,7 +757,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
 
 # Algorithm
 
- 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 1. Resolve and scale the `weights` entry of `tgt.kwargs` with [`glm_fit_kwargs`](@ref), giving `kwargs`. Weights that are not `StatsBase.FrequencyWeights` then sum to their Kish effective sample size, so the inference of the fit reads that count of observations.
  2. Call `StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)`, giving the fitted model.
 
 # Arguments
@@ -531,14 +776,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.LinearModel` type, passin
   - [`GLM.LinearModel`](https://juliastats.org/GLM.jl/stable/api/#GLM.LinearModel)
 """
 function StatsAPI.fit(tgt::LinearModel, X::MatNum, y::VecNum)
-    kwargs = if haskey(tgt.kwargs, :weights) &&
-                isa(tgt.kwargs.weights, DynamicAbstractWeights)
-        w = get_observation_weights(tgt.kwargs.weights, X)
-        (; tgt.kwargs..., weights = w)
-    else
-        tgt.kwargs
-    end
-    return StatsAPI.fit(GLM.LinearModel, X, y; kwargs...)
+    return StatsAPI.fit(GLM.LinearModel, X, y; glm_fit_kwargs(tgt.kwargs, X)...)
 end
 """
     PSEUDO_R2_VARIANTS
@@ -638,6 +876,8 @@ Fits each response by a generalised linear model through `GLM.GeneralizedLinearM
 
 The `args` field carries the response distribution and, optionally, the link function; `kwargs` carries the remaining `GLM` options. The default `args = (Normal(),)` with the canonical identity link reproduces ordinary least squares. `GLM` defines ``R^2`` for a fitted [`LinearModel`](@ref) only, so `variant` names the pseudo-``R^2`` a maximisation criterion reads instead, and it supplies it to the `:r2` and `:adjr2` members of [`STEPWISE_REGRESSION_CRITERIA`](@ref). A `nothing` `variant` takes the default of the criterion, which [`default_regression_criterion_variant`](@ref) states. The field is dead under a minimisation criterion, which reads no variant at all.
 
+The fit is iterative, and `kwargs` sets where it stops. `GLM` stops when the change in the deviance falls below `max(rtol * deviance, atol)`, with `rtol = 1e-6`, `atol = 1e-6` and `maxiter = 30` by default. A tighter tolerance, such as `kwargs = (; rtol = 1e-12, atol = 1e-12)`, brings the fit nearer to the maximum-likelihood answer at the cost of more iterations, and a tolerance below the rounding of the deviance makes `GLM` throw. [`is_basis_invariant`](@ref) answers `true`, so a move of the dropped member of a Factor Family folds on the carry fold of [`CrossSectionalFactorPrior`](@ref). The fold keeps the coefficients of the old basis, where the batch fit iterates in the new basis. The two take the same iterates and agree to rounding, unless the tolerance is near the rounding of the deviance: then rounding can stop them one iteration apart at an observation, and they differ by that iteration.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -677,6 +917,7 @@ GeneralisedLinearModel
   - [`default_regression_criterion_variant`](@ref)
   - [`regression_criterion_func`](@ref)
   - [`StatsAPI.fit(::GeneralisedLinearModel, ::MatNum, ::VecNum)`](@ref)
+  - [`is_basis_invariant`](@ref)
 
 # References
 
@@ -746,7 +987,7 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
 
 # Algorithm
 
- 1. Read `tgt.kwargs`. When it carries a `weights` entry holding a [`DynamicAbstractWeights`](@ref), resolve that entry against `X` with [`get_observation_weights`](@ref) and write the resolved weights back under the same key, giving `kwargs`. Otherwise take `tgt.kwargs` unchanged.
+ 1. Resolve and scale the `weights` entry of `tgt.kwargs` with [`glm_fit_kwargs`](@ref), giving `kwargs`. Weights that are not `StatsBase.FrequencyWeights` then sum to their Kish effective sample size, so the inference of the fit reads that count of observations.
  2. Call `StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)`, giving the fitted model.
 
 # Arguments
@@ -765,14 +1006,108 @@ This method dispatches to `StatsAPI.fit` with the `GLM.GeneralizedLinearModel` t
   - [`GLM.GeneralizedLinearModel`](https://juliastats.org/GLM.jl/stable/examples/#Probit-regression)
 """
 function StatsAPI.fit(tgt::GeneralisedLinearModel, X::MatNum, y::VecNum)
-    kwargs = if haskey(tgt.kwargs, :weights) &&
-                isa(tgt.kwargs.weights, DynamicAbstractWeights)
-        w = get_observation_weights(tgt.kwargs.weights, X)
-        (; tgt.kwargs..., weights = w)
-    else
-        tgt.kwargs
-    end
-    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...; kwargs...)
+    return StatsAPI.fit(GLM.GeneralizedLinearModel, X, y, tgt.args...;
+                        glm_fit_kwargs(tgt.kwargs, X)...)
+end
+"""
+    regression_target_weights(tgt::AbstractRegressionTarget)
+
+Refuse a regression target that does not state the observation weights its fit applies.
+
+[`DimensionReductionRegression`](@ref) weights the mean of the response by the weights of its target, so it must read them. A target states them with its own method, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states. Only a target with no such method reaches this one, and the estimator calls it at construction, so the refusal comes before any fit.
+
+# Arguments
+
+  - `tgt`: Regression target with no `regression_target_weights` method of its own.
+
+# Validation
+
+  - The call always throws an `ArgumentError` that names the method `tgt` lacks.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`regression_target_weights(::Union{LinearModel, GeneralisedLinearModel})`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`factory(::AbstractRegressionTarget, ::ObsWeights)`](@ref)
+"""
+function regression_target_weights(tgt::AbstractRegressionTarget)
+    return throw(ArgumentError("$(nameof(typeof(tgt))) has no method regression_target_weights(::$(nameof(typeof(tgt)))), so the estimator cannot read the observation weights its fit applies. Define PortfolioOptimisers.regression_target_weights(tgt::$(nameof(typeof(tgt)))) to return those weights, or nothing when the fit applies none, as the # Interfaces section of AbstractRegressionTarget states"))
+end
+"""
+    regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
+
+Return the observation weights a library target carries into its fit, or `nothing`.
+
+Both targets keep the weights under the `weights` key of `tgt.kwargs`, where [`factory`](@ref) puts them. The entry is returned as stored, so a [`DynamicAbstractWeights`](@ref) is not resolved against a design here.
+
+# Arguments
+
+  - `tgt`: A [`LinearModel`](@ref) or a [`GeneralisedLinearModel`](@ref).
+
+# Returns
+
+  - `w::Option{ObsWeights}`: `tgt.kwargs.weights`, or `nothing` when `tgt.kwargs` has no `weights` key.
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`regression_target_weights(::AbstractRegressionTarget)`](@ref)
+  - [`factory(::LinearModel, ::ObsWeights)`](@ref)
+  - [`factory(::GeneralisedLinearModel, ::ObsWeights)`](@ref)
+"""
+function regression_target_weights(tgt::Union{LinearModel, GeneralisedLinearModel})
+    return get(tgt.kwargs, :weights, nothing)
+end
+"""
+    is_basis_invariant(tgt::Union{LinearModel, GeneralisedLinearModel}) -> Bool
+    is_basis_invariant(tgt::AbstractRegressionTarget) -> Bool
+
+Return whether the fit of a regression target gives the same coefficients under an invertible change of the columns of the design, mapped back to the original columns.
+
+Take the columns of the design times an invertible matrix as a new design. A target is invariant to the basis when its coefficients on the new design, times that matrix, are its coefficients on the old design. Then the fitted values do not change either.
+
+A weighted least-squares fit projects the response onto the span of the design, and the change keeps the span. So [`LinearModel`](@ref) answers `true`, on each design of full rank. A maximum-likelihood fit reads the design through the linear predictor alone, and the change keeps the set of linear predictors. So [`GeneralisedLinearModel`](@ref) answers `true` too. Its fit is iterative, but each iteration is a weighted least-squares fit, and the start reads the response alone. So the two bases take the same iterates and stop at the same one, and they agree to rounding. `GLM` stops when the change in the deviance falls below `max(rtol * deviance, atol)`, with `rtol = 1e-6`, `atol = 1e-6` and `maxiter = 30` by default, and the `kwargs` of the target set them. A tolerance near the rounding of the deviance lets rounding stop the two bases one iteration apart, so the two answers then differ by that iteration. A tighter tolerance brings each fit nearer to the maximum-likelihood answer, and it does not bring the two bases nearer to each other.
+
+On a rank-deficient design `GLM` drops a collinear column by a pivot, so the answer depends on the basis there, and a caller that reads the verb solves such a design again. Every other target answers `false`, because a target that this verb does not know can penalise its coefficients.
+
+The carry fold of [`CrossSectionalFactorPrior`](@ref) reads the verb on the target of a [`CrossSectionalTargetRegression`](@ref), when a [`BatchChoice`](@ref) moves the dropped member of a Factor Family. A caller's own target states its answer with its own method, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states.
+
+# Arguments
+
+  - `tgt`: Regression target.
+
+# Returns
+
+  - `flag::Bool`: `true` when the coefficients of the fit do not depend on the basis of a design of full rank.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.is_basis_invariant(LinearModel())
+true
+
+julia> PortfolioOptimisers.is_basis_invariant(GeneralisedLinearModel())
+true
+
+julia> struct RidgeTarget <: PortfolioOptimisers.AbstractRegressionTarget end
+
+julia> PortfolioOptimisers.is_basis_invariant(RidgeTarget())
+false
+```
+
+# Related
+
+  - [`AbstractRegressionTarget`](@ref)
+  - [`LinearModel`](@ref)
+  - [`GeneralisedLinearModel`](@ref)
+  - [`CrossSectionalTargetRegression`](@ref)
+"""
+function is_basis_invariant(::Union{LinearModel, GeneralisedLinearModel})::Bool
+    return true
+end
+function is_basis_invariant(::AbstractRegressionTarget)::Bool
+    return false
 end
 """
     MIN_VAL_STEPWISE_REGRESSION_CRITERIA
@@ -1000,15 +1335,15 @@ Return the function that scores a fitted model under a stepwise regression crite
 
 The method dispatches on the `Val` naming the criterion and on the regression target, because the two maximisation criteria read a different quantity under each target. The map is:
 
-| Criterion | [`LinearModel`](@ref) | [`GeneralisedLinearModel`](@ref)          |
-|:--------- |:--------------------- |:----------------------------------------- |
-| `:aic`    | `StatsAPI.aic`        | `StatsAPI.aic`                            |
-| `:aicc`   | `StatsAPI.aicc`       | `StatsAPI.aicc`                           |
-| `:bic`    | `StatsAPI.bic`        | `StatsAPI.bic`                            |
-| `:r2`     | `StatsAPI.r2`         | `model -> StatsAPI.r2(model, variant)`    |
-| `:adjr2`  | `StatsAPI.adjr2`      | `model -> StatsAPI.adjr2(model, variant)` |
+| Criterion | [`GeneralisedLinearModel`](@ref)          | Every other target |
+|:--------- |:----------------------------------------- |:------------------ |
+| `:aic`    | `StatsAPI.aic`                            | `StatsAPI.aic`     |
+| `:aicc`   | `StatsAPI.aicc`                           | `StatsAPI.aicc`    |
+| `:bic`    | `StatsAPI.bic`                            | `StatsAPI.bic`     |
+| `:r2`     | `model -> StatsAPI.r2(model, variant)`    | `StatsAPI.r2`      |
+| `:adjr2`  | `model -> StatsAPI.adjr2(model, variant)` | `StatsAPI.adjr2`   |
 
-`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either target, so the three minimisation criteria take one method each. `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant, and a fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, so the two maximisation criteria take two methods each. [`PValue`](@ref) has no method here: it reads the coefficient p-values of the fitted model rather than one score, so its stepwise methods are separate.
+`StatsAPI.aic`, `StatsAPI.aicc` and `StatsAPI.bic` accept a fitted model of either library target, so the three minimisation criteria take one method each. `StatsAPI.r2` and `StatsAPI.adjr2` accept a fitted [`LinearModel`](@ref) without a variant, and a fitted [`GeneralisedLinearModel`](@ref) needs a named pseudo-``R^2`` variant, so the two maximisation criteria take two methods each. The method of every other target serves [`LinearModel`](@ref) and a caller's own target alike: it returns the `StatsAPI` verb, and the fit of a caller's target states that verb, as the `# Interfaces` section of [`AbstractRegressionTarget`](@ref) states. [`PValue`](@ref) has no method here: it reads the coefficient p-values of the fitted model rather than one score, so its stepwise methods are separate.
 
 # Algorithm
 
@@ -1043,10 +1378,10 @@ end
 function regression_criterion_func(::Val{:bic}, ::AbstractRegressionTarget)
     return StatsAPI.bic
 end
-function regression_criterion_func(::Val{:r2}, ::LinearModel)
+function regression_criterion_func(::Val{:r2}, ::AbstractRegressionTarget)
     return StatsAPI.r2
 end
-function regression_criterion_func(::Val{:adjr2}, ::LinearModel)
+function regression_criterion_func(::Val{:adjr2}, ::AbstractRegressionTarget)
     return StatsAPI.adjr2
 end
 function regression_criterion_func(crit::Val{:r2}, tgt::GeneralisedLinearModel)
@@ -1131,6 +1466,8 @@ Holds the loadings matrix, the intercept vector, the reduced-basis loadings and 
 
 `edof` and `ediv` record how each idiosyncratic variance was measured, so a consumer that prices the sampling error of `esigma` reads the count off the block instead of guessing it. [`StepwiseRegression`](@ref) and [`DimensionReductionRegression`](@ref) write `edof` as the number of observations less the parameters that the fit of each asset spent, the intercept included. The prior that writes `esigma` restates `edof` in the effective count of its variance estimator and writes `ediv`, the divisor of each variance in that count, with [`variance_count`](@ref). A block built by hand, or measured by a variance estimator that states no count, leaves both unset. [`ResidualInflation`](@ref) reads both fields.
 
+`idx` and `ts` are the row key of the block. The loadings are one fit over the sample, so the block has no rows of its own: the key names the observations of the factor returns and the reconstruction of the prior result that carries the block. [`FactorPrior`](@ref) writes the key, and a block built by hand or by another prior leaves it unset. A realised [`factor_attribution`](@ref) of a cross-validation reads the key to find the observations of each fold.
+
 # Mathematical definition
 
 ```math
@@ -1161,7 +1498,9 @@ $(DocStringExtensions.FIELDS)
         b::Option{<:VecNum} = nothing,
         esigma::Option{<:VecNum_MatNum} = nothing,
         edof::Option{<:VecNum} = nothing,
-        ediv::Option{<:VecNum} = nothing
+        ediv::Option{<:VecNum} = nothing,
+        idx::Option{<:VecInt} = nothing,
+        ts::Option{<:VecDate} = nothing
     ) -> Regression
 
 Keywords correspond to the struct's fields.
@@ -1173,6 +1512,7 @@ Keywords correspond to the struct's fields.
   - If provided, `!isempty(L)`, and `size(L, 1) == size(M, 1)`.
   - If provided, `!isempty(esigma)`, and `esigma` carries `size(M, 1)` entries when it is a vector, or is square with `size(M, 1)` rows when it is a matrix.
   - If provided, `edof` and `ediv` each carry `size(M, 1)` entries.
+  - [`assert_row_key_part`](@ref) on `idx` and on `ts`. When both are provided, `length(ts) == length(idx)`.
 
 # Examples
 
@@ -1184,7 +1524,9 @@ Regression
        b ┼ Vector{Int64}: [1, 2]
   esigma ┼ Vector{Float64}: [0.1, 0.2]
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -1223,9 +1565,18 @@ Regression
     $(arg_dict[:ediv])
     """
     ediv
+    """
+    Position of each observation that the prior result describes, in the returns data that the prior read, or `nothing`. A Scenario Cap keeps the last observations alone, so the positions are then the last positions of the data.
+    """
+    idx
+    """
+    Timestamp of each observation that `idx` names, or `nothing` when the returns data that the prior read carries no timestamps. When the folds of a cross-validation carry timestamps too, a [`factor_attribution`](@ref) matches the two by timestamp, so a prior fitted on other returns data still finds its observations.
+    """
+    ts
     function Regression(M::MatNum, L::Option{<:MatNum}, b::Option{<:VecNum},
                         esigma::Option{<:VecNum_MatNum}, edof::Option{<:VecNum},
-                        ediv::Option{<:VecNum})
+                        ediv::Option{<:VecNum}, idx::Option{<:VecInt},
+                        ts::Option{<:VecDate})
         @argcheck(!isempty(M), IsEmptyError)
         if isa(b, VecNum)
             @argcheck(!isempty(b), IsEmptyError)
@@ -1238,16 +1589,21 @@ Regression
         assert_idiosyncratic_covariance(esigma, size(M, 1))
         assert_idiosyncratic_count(edof, size(M, 1), :edof)
         assert_idiosyncratic_count(ediv, size(M, 1), :ediv)
+        Tk = row_key_length(idx)
+        assert_row_key_part(idx, Tk, :idx)
+        assert_row_key_part(ts, Tk, :ts)
         return new{typeof(M), typeof(L), typeof(b), typeof(esigma), typeof(edof),
-                   typeof(ediv)}(M, L, b, esigma, edof, ediv)
+                   typeof(ediv), typeof(idx), typeof(ts)}(M, L, b, esigma, edof, ediv, idx,
+                                                          ts)
     end
 end
 function Regression(; M::MatNum, L::Option{<:MatNum} = nothing,
                     b::Option{<:VecNum} = nothing,
                     esigma::Option{<:VecNum_MatNum} = nothing,
-                    edof::Option{<:VecNum} = nothing,
-                    ediv::Option{<:VecNum} = nothing)::Regression
-    return Regression(M, L, b, esigma, edof, ediv)
+                    edof::Option{<:VecNum} = nothing, ediv::Option{<:VecNum} = nothing,
+                    idx::Option{<:VecInt} = nothing,
+                    ts::Option{<:VecDate} = nothing)::Regression
+    return Regression(M, L, b, esigma, edof, ediv, idx, ts)
 end
 # When `L` is unset (`Nothing` type parameter), `:L` falls back to the loadings matrix `M`;
 # when `L` is a stored matrix the default field access already returns it, so only the
@@ -1270,7 +1626,7 @@ This function constructs a new `Regression` result, where the coefficient matrix
  4. Take an element view of `b` over `i` when step 1 found a vector, and `nothing` otherwise.
  5. View `esigma` with [`idiosyncratic_covariance_view`](@ref), which reads its shape: a vector of variances is indexed once, and a full covariance is indexed on both axes.
  6. View `edof` and `ediv` with [`nothing_scalar_array_view`](@ref), which indexes a vector once and passes `nothing` through.
- 7. Build a new [`Regression`](@ref) from the six, which re-runs every guard of the constructor.
+ 7. Build a new [`Regression`](@ref) from the six, passing the row key `idx` and `ts` through, which re-runs every guard of the constructor. The key names observations, so it does not follow an asset selection.
 
 # Arguments
 
@@ -1291,7 +1647,9 @@ Regression
        b ┼ Vector{Int64}: [7, 8, 9]
   esigma ┼ nothing
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 
 julia> PortfolioOptimisers.port_opt_view(re, [1, 3])
 Regression
@@ -1300,7 +1658,9 @@ Regression
        b ┼ SubArray{Int64, 1, Vector{Int64}, Tuple{Vector{Int64}}, false}: [7, 9]
   esigma ┼ nothing
     edof ┼ nothing
-    ediv ┴ nothing
+    ediv ┼ nothing
+     idx ┼ nothing
+      ts ┴ nothing
 ```
 
 # Related
@@ -1318,17 +1678,18 @@ function port_opt_view(re::Regression, i, args...)::Regression
                       b = isnothing(b) ? nothing : view(b, i),
                       esigma = idiosyncratic_covariance_view(re.esigma, i),
                       edof = nothing_scalar_array_view(re.edof, i),
-                      ediv = nothing_scalar_array_view(re.ediv, i))
+                      ediv = nothing_scalar_array_view(re.ediv, i), idx = re.idx,
+                      ts = re.ts)
 end
 """
     set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_MatNum},
                                  edof::Option{<:VecNum}, ediv::Option{<:VecNum})
 
-Return a [`Regression`](@ref) that carries `esigma`, `edof` and `ediv`, with every other field unchanged.
+Return a [`Regression`](@ref) that carries `esigma`, `edof` and `ediv`, with every other field unchanged, the row key included.
 
 A regression estimator fits loadings alone, so the block a fit returns carries no idiosyncratic covariance. The prior that lifts the factor moments measures the residual variances on the way, and it writes them here rather than making every consumer recompute them. It writes the counts of those variances beside them. [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) are the two callers, and each passes what [`factor_lift`](@ref) returned: the variances and their counts under `rsd = true`, and `nothing` for the variances and the divisors under `rsd = false`.
 
-`Accessors.@set` cannot do this. It reads the fields through property access, and the `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so the rebuilt result would carry a copy of `M` under `L` and `isnothing(getfield(re, :L))` would stop being true. This method reads `L` and `b` with `getfield` for that reason, as [`port_opt_view`](@ref) does.
+This method reads `L` and `b` with `getfield`, as [`port_opt_view`](@ref) does. The `swap(L, M)` rule of [`Regression`](@ref) makes `re.L` return `re.M` when `L` is unset, so a read through the property would write a copy of `M` under `L`, and `isnothing(getfield(re, :L))` would stop being true.
 
 # Arguments
 
@@ -1351,7 +1712,36 @@ function set_idiosyncratic_covariance(re::Regression, esigma::Option{<:VecNum_Ma
                                       edof::Option{<:VecNum},
                                       ediv::Option{<:VecNum})::Regression
     return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
-                      esigma = esigma, edof = edof, ediv = ediv)
+                      esigma = esigma, edof = edof, ediv = ediv, idx = re.idx, ts = re.ts)
+end
+"""
+    set_row_key(re::Regression, idx::Option{<:VecInt}, ts::Option{<:VecDate})
+
+Return a [`Regression`](@ref) that carries the row key `idx` and `ts`, with every other field unchanged.
+
+A regression estimator fits loadings alone and knows nothing of the observations it read. [`FactorPrior`](@ref) writes the key after the fit, because it knows which observations its prior result describes. The method reads `L` and `b` with `getfield`, for the reason that [`set_idiosyncratic_covariance`](@ref) states.
+
+# Arguments
+
+  - `re`: The regression result to rewrite.
+  - `idx`: The position of each observation in the returns data that the prior read, or `nothing`.
+  - `ts`: The timestamp of each observation, or `nothing`.
+
+# Returns
+
+  - `re::Regression`: A new result carrying `idx` and `ts`, which re-runs every guard of the constructor.
+
+# Related
+
+  - [`Regression`](@ref)
+  - [`attribution_row_key`](@ref)
+  - [`set_idiosyncratic_covariance`](@ref)
+"""
+function set_row_key(re::Regression, idx::Option{<:VecInt},
+                     ts::Option{<:VecDate})::Regression
+    return Regression(; M = re.M, L = getfield(re, :L), b = getfield(re, :b),
+                      esigma = re.esigma, edof = re.edof, ediv = re.ediv, idx = idx,
+                      ts = ts)
 end
 """
     regression(re::Regression, args...)
@@ -1386,7 +1776,10 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 # Algorithm
 
  1. Check that `rd` carries both matrices, per `# Validation` below.
- 2. Call `regression(re, rd.X, rd.F)`, giving the regression result.
+ 2. Read the source that `re` states with [`returns_source`](@ref), giving `x_src`. A regression reader that receives the returns data states its own source.
+ 3. Drop the observations at which a factor return is not finite, and under `x_src = ExcessSource()` the observations of a gap of a vector benchmark, with [`shared_series_view`](@ref). A regression on such an observation has no regressor for any asset.
+ 4. Read the asset returns with [`benchmark_relative_returns`](@ref) under `x_src`, giving `X`. It is `rd.X`, or `rd.X - rd.B` under `ExcessSource()`.
+ 5. Call `regression(re, X, rd.F)` on the kept observations, giving the regression result.
 
 # Arguments
 
@@ -1397,6 +1790,7 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 
   - `!isnothing(rd.X)`. A regression needs the asset returns it explains.
   - `!isnothing(rd.F)`. A regression needs the factor returns it explains them with.
+  - The rules of [`benchmark_relative_returns`](@ref). So `x_src = PriorSource()` throws an `ArgumentError`, because the call gives no Prior Result, and `x_src = ExcessSource()` refuses returns data with no benchmark.
 
 # Returns
 
@@ -1410,7 +1804,71 @@ This method dispatches to `regression(re, rd.X, rd.F)`, allowing both regression
 function regression(re::AbstractTimeSeriesRegressionEstimator, rd::ReturnsResult)
     @argcheck(!isnothing(rd.X), IsNothingError)
     @argcheck(!isnothing(rd.F), IsNothingError)
-    return regression(re, rd.X, rd.F)
+    x_src = returns_source(re)
+    rd = shared_series_view(rd, x_src, true)
+    return regression(re, benchmark_relative_returns(rd, x_src), rd.F)
+end
+"""
+    assert_finite_factor_rows(F::MatNum) -> Nothing
+
+Refuse a factor returns matrix with a non-finite entry, for a regression on matrices.
+
+A factor return is a regressor of every asset, so a gap at one observation leaves that observation with no regressor for any asset. A fit through a [`ReturnsResult`](@ref) drops such an observation with [`shared_series_view`](@ref) before it reaches a matrix. A caller of a matrix method gives the observations that it chose, so the method refuses a gap rather than answer `NaN` loadings.
+
+# Arguments
+
+  - $(arg_dict[:F])
+
+# Validation
+
+  - Every entry of `F` is finite. An [`IsNonFiniteError`](@ref) that names the first observations with a gap is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`shared_series_view`](@ref)
+  - [`regression`](@ref)
+"""
+function assert_finite_factor_rows(F::MatNum)::Nothing
+    if all(isfinite, F)
+        return nothing
+    end
+    rows = findall(t -> !all(isfinite, view(F, t, :)), axes(F, 1))
+    throw(IsNonFiniteError("a factor return is a regressor of every asset, and the factor returns are not finite at observation(s) $(first(rows, 5)) of $(size(F, 1)), so no asset has a regressor there. Fit through a ReturnsResult, which drops those observations, or drop them from X and F before the call."))
+    return nothing
+end
+"""
+    pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, X::MatNum, F::MatNum,
+                          w::Option{<:ObsWeights} = nothing)
+
+Returns a regression estimator unchanged, because it has no choice to pin.
+
+The online step of a prior that fits a regression calls [`pin_regression_choice`](@ref) after the fold, over the rows of its buffer. A regression that makes a choice over every observation, such as the factor set of [`StepwiseRegression`](@ref) or the components of [`DimensionReductionRegression`](@ref), has a method of its own under a [`PinnedChoice`](@ref), which writes the choice of the first fit into its configuration. This method answers every other regression, and a regression under [`BatchChoice`](@ref).
+
+# Arguments
+
+  - `re`: Regression estimator.
+  - $(arg_dict[:X])
+  - $(arg_dict[:F])
+  - $(arg_dict[:w_pin])
+
+# Returns
+
+  - `re::AbstractTimeSeriesRegressionEstimator`: The input estimator, unchanged.
+
+# Related
+
+  - [`StepwiseRegression`](@ref)
+  - [`DimensionReductionRegression`](@ref)
+  - [`PinnedChoice`](@ref)
+  - [`pin_prior_choice`](@ref)
+"""
+function pin_regression_choice(re::AbstractTimeSeriesRegressionEstimator, ::MatNum,
+                               ::MatNum, ::Option{<:ObsWeights} = nothing)
+    return re
 end
 
 export regression, Regression, LinearModel, GeneralisedLinearModel, BenchmarkWeightMetric,
@@ -1420,3 +1878,8 @@ public AbstractTimeSeriesRegressionEstimator, AbstractCrossSectionalRegressionEs
 # verbs an extension must implement, whose concrete methods live under
 # src/11_UncertaintySets/09_OrthogonalUncertaintySets.jl -- the same split #1137 already used.
 public AbstractOrthogonalityMetric, orthogonality_weights, cs_diagnostic_weights
+# The `# Interfaces`-marked type of #1397 (ADR 0154): a caller's own regression target. The
+# verbs its section names are `factory`, which is exported, `StatsAPI` verbs, and
+# `regression_target_weights`, which #1441 added for the time-series estimators, and
+# `is_basis_invariant`, which #1614 added for the carry fold of the cross-sectional prior.
+public AbstractRegressionTarget, regression_target_weights, is_basis_invariant

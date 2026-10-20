@@ -1,17 +1,20 @@
 ```@meta
-Description = "The Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_sentinel, coverage_reduction, coverage_reduced_pair, …"
+Description = "Coverage Universe, private API of PortfolioOptimisers.jl: coverage_mask, coverage_mask_source, coverage_sentinel, coverage_reduction, coverage_reduced_pair, …"
 ```
 
-# The Coverage Universe: private API
+# Coverage Universe: private API
 
 The coverage universe of a fit is the set of assets whose returns are finite, and whose entries in the active mask of the [`AssetPanel`](@ref) are `true`, on every row of the window. A prior fits each ordinary moment estimator on the returns of those assets alone. It then writes the results into arrays over all the assets, where the entries of every other asset are `NaN`.
 
 Every moment function takes the asset panel as its third positional argument. Its panel method does this reduction and expansion. An estimator that reads the active mask itself replaces that method, and takes the whole window.
 
+A matrix call can give the active mask as the `active_mask` keyword, with no panel. The panel method reads that mask as it reads the mask of a panel, so both calls reach the same coverage universe.
+
 ## The universe and the reduction
 
 ```@docs
 PortfolioOptimisers.coverage_mask
+PortfolioOptimisers.coverage_mask_source
 PortfolioOptimisers.coverage_sentinel
 PortfolioOptimisers.coverage_reduction(X::MatNum, pnl::Option{<:AssetPanel})
 PortfolioOptimisers.coverage_reduction(rd::AbstractReturnsResult)
@@ -36,8 +39,11 @@ PortfolioOptimisers.expand_idiosyncratic_covariance
 
 ## The check for missing returns
 
+An ordinary estimator reads a cell that the active mask turns off as a missing return. Its matrix method refuses such a sample, and its incremental fit writes `NaN` in that cell.
+
 ```@docs
 PortfolioOptimisers.assert_finite_sample
+PortfolioOptimisers.inactive_as_nonfinite
 ```
 
 ## The panel method of `variance_series`
@@ -61,4 +67,7 @@ PortfolioOptimisers.coverage_variance_series(ce::AbstractCovarianceEstimator, ::
 PortfolioOptimisers.variance_series(ce::Covariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.variance_series(ve::SimpleVariance, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)
 PortfolioOptimisers.coverage_floor
+PortfolioOptimisers.coverage_keyword_reduction
+PortfolioOptimisers.coverage_keyword_mask
+PortfolioOptimisers.coverage_columns
 ```

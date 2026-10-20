@@ -286,19 +286,10 @@ end
     kept = Dict{Symbol, String}(#
                                 # Public descriptor factories: one keyword call each, the
                                 # user's door to a named exposure (ADR 0135).
-                                :ReturnOnAssets => "public descriptor factory",
                                 :ReturnOnEquity => "public descriptor factory",
-                                :AssetTurnover => "public descriptor factory",
-                                :CashFlowToAssets => "public descriptor factory",
                                 :SalesToEnterpriseValue => "public descriptor factory",
                                 :LogMarketCap => "public descriptor factory",
-                                :BookToPrice => "public descriptor factory",
-                                :CashFlowToPrice => "public descriptor factory",
-                                :SalesToPrice => "public descriptor factory",
-                                :EarningsToPrice => "public descriptor factory",
-                                :ForwardEarningsToPrice => "public descriptor factory",
                                 :EbitdaToEnterpriseValue => "public descriptor factory",
-                                :DebtToAssets => "public descriptor factory",
                                 :AssetsGrowthRate => "public descriptor factory",
                                 :SalesGrowthRate => "public descriptor factory",
                                 :IssuanceGrowthRate => "public descriptor factory",
@@ -320,7 +311,6 @@ end
                                 # names it for a subtype to answer.
                                 :matrix_processing_algorithm => "public seam, the out-of-place arm of an Open Family",
                                 # Private names that are simple and convenient.
-                                :pipe_config_field => "the fallback of a family `@pipe_delegates` generates methods for",
                                 :cv_sequential_info => "the one message of the sequential fold loop, named beside the rule that sends a run there",
                                 :_expr_to_lens => "the base case of the lens-building recursion of `expr_to_lens_chain`",
                                 :attribution_no_errors => "the empty answer of an attribution, named where the Result reads three fields from it")

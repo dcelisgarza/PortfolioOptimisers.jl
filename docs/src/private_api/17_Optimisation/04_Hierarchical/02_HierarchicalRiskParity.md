@@ -1,5 +1,5 @@
 ```@meta
-Description = "Hierarchical Risk Parity, private API of PortfolioOptimisers.jl: hierarchical_risk_parity_td_defaults, split_factor_weight_constraints, hrp_scalarised_risk."
+Description = "Hierarchical Risk Parity, private API of PortfolioOptimisers.jl: hierarchical_risk_parity_td_defaults, split_factor_weight_constraints, hrp_scalarised_risk, …"
 ```
 
 # Hierarchical Risk Parity: private API
@@ -8,4 +8,5 @@ Description = "Hierarchical Risk Parity, private API of PortfolioOptimisers.jl: 
 hierarchical_risk_parity_td_defaults
 split_factor_weight_constraints(alpha::Number, wb::WeightBounds, w::VecNum, lc::VecNum, rc::VecNum)
 hrp_scalarised_risk
+PortfolioOptimisers.bind_data_benchmark(::HierarchicalRiskParity, ::ReturnsResult)
 ```

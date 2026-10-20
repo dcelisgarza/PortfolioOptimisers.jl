@@ -4,16 +4,17 @@ The covariance forecast evaluation, issue #1023, against the decision of #873 (A
 One verb through the one fold loop: `covariance_forecast_evaluation(est, rd, cv)` scores a
 covariance estimator's, or a prior's, forecast on the test rows of every fold, in batch when
 the walk-forward refits and online when it is an Online Scheme. Around the verb sit
-the per-step kernel and its parity with the reference implementation's, the two realised
+the per-step kernel and its parity with the oracle's, the two realised
 targets, the location the test rows are centred on, the online and rolling identities over a
-panel with a listing and a delisting, the date form, the summary against the reference's
+panel with a listing and a delisting, the date form, the summary against the oracle's
 summaries, the Diebold–Mariano–West comparison, the re-projection, and every refusal.
 
-The kernel's parity literals were produced by the reference's per-step kernel on the fixed
+The kernel's parity literals were produced by the oracle's per-step kernel on the fixed
 forecast and test rows below, with two test portfolios, once with every cell finite and once
 with one cell missing; the summary literals by its summary verbs on a run of seven such
 steps. Both sides read the same formula-built inputs, so no random stream is shared.
 =#
+include(joinpath(@__DIR__, "parity_harness.jl"))
 # A caller's covariance estimator with no location of its own, for the fallback. A struct is
 # declared at the top level because a testset body is a local scope.
 struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator end
@@ -42,7 +43,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
     columns = (:mahalanobis_ratio, :diagonal_ratio, :qlike, :frobenius,
                :standardised_return, :portfolio_qlike)
 
-    @testset "The kernel against the reference, with and without a missing cell" begin
+    @testset "The kernel against the oracle, with and without a missing cell" begin
         A = [1.0 0.3 -0.2 0.1; 0.2 1.1 0.4 -0.3; -0.1 0.5 0.9 0.2; 0.3 -0.2 0.1 1.2]
         sig = (A * A') / 1e4 + Diagonal([1e-4, 2e-4, 1.5e-4, 1.2e-4])
         Zr = [sin(0.7 * t + 0.29 * i) / 100 + 0.004 * cos(0.11 * t * i)
@@ -50,33 +51,43 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         Zn = copy(Zr)
         Zn[2, 3] = NaN
         W = [[0.25, 0.25, 0.25, 0.25], [0.1, 0.2, 0.3, 0.4]]
-        # The reference centres nothing, so its numbers are ours at a zero location under
+        # The oracle centres nothing, so its numbers are ours at a zero location under
         # its own target, the horizon return.
         k(Z, wt) = covariance_forecast_step(sig, Z, zeros(4), wt, HorizonReturn())
+        # Measured maxrel 2.4e-16 at most, on every statistic of the four steps below.
         s = k(Zr, nothing)
         @test s.n_valid == 4
-        @test isapprox(s.mahalanobis_ratio, 0.978852966148661; atol = 1e-14)
-        @test isapprox(mean(s.diagonal_ratio), 1.1925335096638512; atol = 1e-14)
-        @test isapprox(s.standardised_return, [1.9211917469757487]; atol = 1e-14)
-        @test isapprox(s.portfolio_qlike, [-6.949593962426171]; atol = 1e-13)
+        @test parity_compare([s.mahalanobis_ratio], [0.978852966148661]; rtol = 1e-14,
+                             name = "mahalanobis Zr").ok
+        @test parity_compare([mean(s.diagonal_ratio)], [1.1925335096638512]; rtol = 1e-14,
+                             name = "diagonal mean Zr").ok
+        @test parity_compare(s.standardised_return, [1.9211917469757487]; rtol = 1e-14,
+                             name = "stdret Zr").ok
+        @test parity_compare(s.portfolio_qlike, [-6.949593962426171]; rtol = 1e-14,
+                             name = "pqlike Zr").ok
         s = k(Zr, W)
-        @test isapprox(s.standardised_return, [1.894133508777383, 1.6253620587183681];
-                       atol = 1e-14)
-        @test isapprox(s.portfolio_qlike, [-6.961786146396911, -7.110698408378284];
-                       atol = 1e-13)
+        @test parity_compare(s.standardised_return, [1.894133508777383, 1.6253620587183681];
+                             rtol = 1e-14, name = "stdret Zr W").ok
+        @test parity_compare(s.portfolio_qlike, [-6.961786146396911, -7.110698408378284];
+                             rtol = 1e-14, name = "pqlike Zr W").ok
         # One missing cell: the pairwise count scales the forecast, `H ⊙ Σ̂`, and the
-        # reference's numbers move with it.
+        # oracle's numbers move with it.
         s = k(Zn, nothing)
         @test s.n_valid == 4
-        @test isapprox(s.mahalanobis_ratio, 0.9039713006494878; atol = 1e-14)
-        @test isapprox(mean(s.diagonal_ratio), 1.0830084753657339; atol = 1e-14)
-        @test isapprox(s.standardised_return, [1.850608226250147]; atol = 1e-14)
-        @test isapprox(s.portfolio_qlike, [-7.149655216935746]; atol = 1e-13)
+        @test parity_compare([s.mahalanobis_ratio], [0.9039713006494878]; rtol = 1e-14,
+                             name = "mahalanobis Zn").ok
+        @test parity_compare([mean(s.diagonal_ratio)], [1.0830084753657339]; rtol = 1e-14,
+                             name = "diagonal mean Zn").ok
+        @test parity_compare(s.standardised_return, [1.850608226250147]; rtol = 1e-14,
+                             name = "stdret Zn").ok
+        @test parity_compare(s.portfolio_qlike, [-7.149655216935746]; rtol = 1e-14,
+                             name = "pqlike Zn").ok
         s = k(Zn, W)
-        @test isapprox(s.standardised_return, [1.8276572778164961, 1.5382386137061885];
-                       atol = 1e-14)
-        @test isapprox(s.portfolio_qlike, [-7.156129366719016, -7.322586405112045];
-                       atol = 1e-13)
+        @test parity_compare(s.standardised_return,
+                             [1.8276572778164961, 1.5382386137061885]; rtol = 1e-14,
+                             name = "stdret Zn W").ok
+        @test parity_compare(s.portfolio_qlike, [-7.156129366719016, -7.322586405112045];
+                             rtol = 1e-14, name = "pqlike Zn W").ok
         # An independent re-derivation of the missing-cell case in plain Julia, so the
         # literals above are not the only oracle: with `H` the pairwise finite count,
         # `m = R' (H ⊙ Σ̂)⁻¹ R / N`, `d_i = R_i² / (H_ii Σ̂_ii)`, `b = w'R / √(w'(H ⊙ Σ̂)w)`.
@@ -91,7 +102,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         v = dot(wn, seff, wn)
         @test isapprox(s.standardised_return[2], dot(wn, R) / sqrt(v); rtol = 1e-12)
         @test isapprox(s.portfolio_qlike[2], log(v) + sum(abs2, Zf * wn) / v; rtol = 1e-12)
-        # The whole-matrix losses, which the reference does not compute, against their
+        # The whole-matrix losses, which the oracle does not compute, against their
         # closed forms on the finite case: `h log|Σ̂| + tr(Σ̂⁻¹ S)` and `‖S / h − Σ̂‖²_F`.
         sr = covariance_forecast_step(sig, Zr, zeros(4), nothing, RealisedCovariance())
         S = Zr' * Zr
@@ -136,7 +147,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # With `R` the raw column sums of the test rows, `S_raw − S_c = R c' + c R' − h c c'`,
         # so the raw Mahalanobis ratio exceeds the centred one by
         # `(2 R' Σ̂⁻¹ c − h c' Σ̂⁻¹ c) / (N h)` at every step, exactly; its expectation when
-        # `E[z] = c` is the bias `c' Σ̂⁻¹ c / N` the reference's raw ratio carries.
+        # `E[z] = c` is the bias `c' Σ̂⁻¹ c / N` the oracle's raw ratio carries.
         Xm = X .+ 0.02
         sig = cov(Covariance(), Xm[1:60, :])
         c = vec(mean(Xm[1:60, :]; dims = 1))
@@ -156,8 +167,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test po.forecast_location(GeneralCovariance(; w = ow), Xm[1:60, :]) ≈
               vec(mean(Xm[1:60, :], ow; dims = 1))
         @test po.forecast_location(PortfolioOptimisersCovariance(), Xm[1:60, :]) ≈ c
-        @test po.forecast_location(ExpWeightedCovariance(; centred = true), Xm[1:60, :]) ==
-              zeros(N)
+        @test po.forecast_location(ExpWeightedCovariance(; centring = PreCentred()),
+                                   Xm[1:60, :]) == zeros(N)
         @test all(!iszero, po.forecast_location(ExpWeightedCovariance(), Xm[1:60, :]))
         @test po.forecast_location(EmpiricalPrior(), po.port_opt_view(rd, 1:60, :)) ≈
               vec(mean(X[1:60, :]; dims = 1))
@@ -258,7 +269,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                  (Covariance(; cvg = CoveragePolicy()), rdg, 0.0),
                  (EmpiricalPrior(), rd, 1e-12), (EmpiricalPrior(), rdg, 1e-12),
                  (ExpWeightedCovariance(), rd, 0.0),
-                 (ExpWeightedCovariance(; centred = true), rdg, 0.0),
+                 (ExpWeightedCovariance(; centring = PreCentred()), rdg, 0.0),
                  (RegimeAdjustedExpWeightedCovariance(), rd, 0.0))
         for (est, r, tol) in cases
             b = cfe(est, r, batch_cv)
@@ -318,6 +329,210 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         end
     end
 
+    @testset "A bare covariance estimator reads the implied volatilities (#1643)" begin
+        # The regression reads windows of 20 rows and needs more than two of them, so the
+        # first training window is longer than the one above.
+        wv = 90
+        cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
+        cvo = OnlineIndexWalkForward(wv, h; purged_size = p)
+        iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
+        ivpas = (1.1, collect(range(1.05, 1.2; length = N)))
+        algs = (ImpliedVolatilityRegression(), ImpliedVolatilityPremium())
+        poc(ce) = PortfolioOptimisersCovariance(; ce = ce)
+        for alg in algs, ivpa in ivpas
+            ce = ImpliedVolatility(; alg = alg, ppy = 252)
+            r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = ivpa, ts = ts)
+            # Batch: the bare estimator answers what the prior that holds it answers.
+            b = cfe(ce, r, cvb)
+            @test length(b.dates) == 14
+            for est in (EmpiricalPrior(; ce = ce), poc(ce))
+                bb = cfe(est, r, cvb)
+                for f in columns
+                    @test finite_max(getfield(b, f), getfield(bb, f)) == 0
+                end
+            end
+            # Online: the buffer of the composite records the surface beside the rows, so
+            # the stepped run is the batch run.
+            o = cfe(po.Online(poc(ce)), r, cvo)
+            @test b.n_valid == o.n_valid
+            for f in columns
+                @test finite_max(getfield(b, f), getfield(o, f)) == 0
+            end
+            # The bare estimator carries a buffer of its own, so it steps with no composite
+            # (#1653).
+            ob = cfe(po.Online(ce), r, cvo)
+            @test b.n_valid == ob.n_valid
+            for f in columns
+                @test finite_max(getfield(b, f), getfield(ob, f)) == 0
+            end
+        end
+        r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = 1.1, ts = ts)
+        ce = ImpliedVolatility(; ppy = 252)
+        # The rolling identity, through a capped buffer.
+        b = cfe(ce, r, IndexWalkForward(wv + p, h; purged_size = p))
+        o = cfe(po.Online(poc(ce); max_history = wv), r,
+                OnlineIndexWalkForward(wv + p, h; purged_size = p))
+        for f in columns
+            @test finite_max(getfield(b, f), getfield(o, f)) == 0
+        end
+        # An estimator that reads no surface ignores it, in batch, in an exact fold and in a
+        # buffer alike.
+        for (est, cv) in
+            ((Covariance(), cvb), (Covariance(), cvo), (po.Online(Covariance()), cvo))
+            a = cfe(est, r, cv)
+            z = cfe(est, rd, cv)
+            for f in columns
+                @test finite_max(getfield(a, f), getfield(z, f)) == 0
+            end
+        end
+        # The buffer pins `ivpa` and the presence of `iv` at its first append.
+        ob = po.partial_fit!(po.update_online_estimator(po.Online(poc(ce))),
+                             po.port_opt_view(r, 1:wv, :))
+        @test ob.cache.iv == iv[1:wv, :] && ob.cache.ivpa == 1.1
+        @test_throws ArgumentError po.partial_fit!(ob, X[(wv + 1):(wv + 2), :];
+                                                   iv = iv[(wv + 1):(wv + 2), :],
+                                                   ivpa = 2.0)
+        @test_throws ArgumentError po.partial_fit!(ob, X[(wv + 1):(wv + 2), :])
+        o1 = po.partial_fit!(ob, X[wv + 1, :]; iv = iv[wv + 1, :], ivpa = 1.1)
+        @test o1.cache.n == wv + 1 && po.sample_buffer(o1.cache) == X[1:(wv + 1), :]
+        # The read-out runs over a view of the buffer, so it differs from a fit over a
+        # contiguous copy by rounding alone.
+        @test isapprox(cov(o1),
+                       cov(poc(ce), X[1:(wv + 1), :]; iv = iv[1:(wv + 1), :], ivpa = 1.1);
+                       rtol = 1e-12)
+        # A covariance estimator of another package carries no buffer, and the refusal names
+        # the composite.
+        e = @test_throws ArgumentError po.Online(StatsBase.SimpleCovariance())
+        @test occursin("PortfolioOptimisersCovariance", e.value.msg)
+    end
+
+    @testset "x_src = ExcessSource() evaluates a forecast of the returns in excess of the benchmark (#1658, #1704)" begin
+        # A vector `B` is one benchmark for every asset, and a matrix `B` is one per asset.
+        Bv = randn(StableRNG(1658), T) ./ 100
+        Bm = randn(StableRNG(16580), T, N) ./ 100
+        wt = [fill(1 / N, N), collect(1.0:N) ./ sum(1:N)]
+        runs = ((Covariance(), batch_cv), (Covariance(), online_cv),
+                (EmpiricalPrior(), batch_cv), (EmpiricalPrior(), online_cv),
+                (po.Online(Covariance()), online_cv))
+        for (nb, B) in ((["bm"], Bv), (["bm$i" for i in 1:N], Bm))
+            rb = ReturnsResult(; nx = nx, X = X, nb = nb, B = B, ts = ts)
+            # The evaluation of a hand-built `X - B`, which loses `B`.
+            rx = ReturnsResult(; nx = nx, X = X .- B, ts = ts)
+            for (est, cv) in runs
+                a = cfe(est, rb, cv; x_src = ExcessSource(), store_forecasts = true)
+                z = cfe(est, rx, cv; store_forecasts = true)
+                # The Result records the frame that the verb read, `DataSource()` for `nothing`.
+                @test a.x_src === ExcessSource() && z.x_src === DataSource()
+                @test a.n_valid == z.n_valid
+                for f in columns
+                    @test finite_max(getfield(a, f), getfield(z, f)) == 0
+                end
+                @test a.sigma == z.sigma && a.location == z.location
+                # The re-projection reads the test rows in the frame of the evaluation.
+                @test isequal(covariance_forecast_portfolio(a, rb, wt),
+                              covariance_forecast_portfolio(z, rx, wt))
+            end
+            # Under `x_src = nothing` and `DataSource()` the benchmark is not read.
+            a = cfe(Covariance(), rb, batch_cv)
+            z = cfe(Covariance(), rd, batch_cv)
+            @test a.x_src === DataSource()
+            @test cfe(Covariance(), rb, batch_cv; x_src = DataSource()).qlike == a.qlike
+            for f in columns
+                @test finite_max(getfield(a, f), getfield(z, f)) == 0
+            end
+        end
+        # An `ImpliedVolatility` reads the surface of the assets beside `X - B`.
+        wv = 90
+        cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
+        iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
+        ce = ImpliedVolatility(; ppy = 252)
+        a = cfe(ce,
+                ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, iv = iv, ivpa = 1.1,
+                              ts = ts), cvb; x_src = ExcessSource())
+        z = cfe(ce, ReturnsResult(; nx = nx, X = X .- Bv, iv = iv, ivpa = 1.1, ts = ts),
+                cvb)
+        for f in columns
+            @test finite_max(getfield(a, f), getfield(z, f)) == 0
+        end
+        # No excess return exists without a benchmark.
+        e = @test_throws ArgumentError cfe(Covariance(), rd, batch_cv;
+                                           x_src = ExcessSource())
+        @test occursin("carries no benchmark", e.value.msg)
+        rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, ts = ts)
+        a = cfe(Covariance(), rb, batch_cv; x_src = ExcessSource(), store_forecasts = true)
+        e = @test_throws ArgumentError covariance_forecast_portfolio(a, rd, nothing)
+        @test occursin("carries no benchmark", e.value.msg)
+        # Two evaluations in different frames do not compare.
+        e = @test_throws ArgumentError covariance_forecast_compare(a,
+                                                                   cfe(Covariance(), rb,
+                                                                       batch_cv))
+        @test occursin("read different returns", e.value.msg)
+        @test occursin("x_src = ExcessSource()", e.value.msg)
+        # `nothing` and `DataSource()` read one frame, so their evaluations compare.
+        cmp = covariance_forecast_compare(cfe(Covariance(), rb, batch_cv),
+                                          cfe(GeneralCovariance(), rb, batch_cv;
+                                              x_src = DataSource()))
+        @test cmp isa CovarianceForecastComparisonResult
+        # The verb reads no prior, so it refuses `PriorSource()`.
+        e = @test_throws ArgumentError cfe(Covariance(), rb, batch_cv;
+                                           x_src = PriorSource())
+        @test occursin("covariance_forecast_evaluation", e.value.msg)
+        # A positional `Bool` in the place of the source builds no Result.
+        vals = Any[getfield(a, f) for f in fieldnames(typeof(a))]
+        @test fieldnames(typeof(a))[5] === :x_src
+        vals[5] = true
+        @test_throws MethodError CovarianceForecastEvaluationResult(vals...)
+        # The verb picks the frame, so the estimator is an inner reader and states no source.
+        # A prior in the Excess Frame would subtract `B` from the `X - B` that the verb holds.
+        for est in (EmpiricalPrior(; x_src = ExcessSource()),
+                    EmpiricalPrior(; x_src = DataSource()),
+                    po.Online(EmpiricalPrior(; x_src = ExcessSource())))
+            e = @test_throws ArgumentError cfe(est, rb, online_cv; x_src = ExcessSource())
+            @test occursin("the `est` of `covariance_forecast_evaluation`", e.value.msg)
+        end
+    end
+
+    @testset "A prior that states a source reads its location in its own frame (#1704)" begin
+        # A shrunk mean makes the location read the returns through `ce`, so a location read
+        # off the raw `X` would differ from the location in the Excess Frame.
+        Bv = randn(StableRNG(1704), T) ./ 100
+        rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bv, ts = ts)
+        rx = ReturnsResult(; nx = nx, X = X .- Bv, ts = ts)
+        sh = ShrunkExpectedReturns()
+        c = po.forecast_location(EmpiricalPrior(; me = sh, x_src = ExcessSource()), rb)
+        @test c ≈ po.forecast_location(EmpiricalPrior(; me = sh), rx)
+        @test maximum(abs, c - po.forecast_location(EmpiricalPrior(; me = sh), rb)) > 1e-5
+        # A gap in the vector benchmark drops its observation from the fit and the location.
+        Bg = copy(Bv)
+        Bg[[40, 97]] .= NaN
+        keep = setdiff(1:T, [40, 97])
+        rg = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bg, ts = ts)
+        rk = ReturnsResult(; nx = nx, X = X[keep, :] .- Bv[keep], ts = ts[keep])
+        @test po.forecast_location(EmpiricalPrior(; me = sh, x_src = ExcessSource()), rg) ≈
+              po.forecast_location(EmpiricalPrior(; me = sh), rk)
+    end
+
+    @testset "A gap in a vector benchmark re-projects on the kept rows (#1691)" begin
+        # The evaluation drops the observations with a gap in `B` before it splits the folds,
+        # so `test_idx` counts the kept rows, and the re-projection must drop the same rows.
+        Bv = randn(StableRNG(1658), T) ./ 100
+        Bg = copy(Bv)
+        Bg[[40, 97]] .= NaN
+        keep = setdiff(1:T, [40, 97])
+        wt = [fill(1 / N, N), collect(1.0:N) ./ sum(1:N)]
+        rb = ReturnsResult(; nx = nx, X = X, nb = ["bm"], B = Bg, ts = ts)
+        rx = ReturnsResult(; nx = nx, X = X[keep, :] .- Bv[keep], ts = ts[keep])
+        for cv in (batch_cv, online_cv)
+            a = cfe(Covariance(), rb, cv; x_src = ExcessSource(), store_forecasts = true,
+                    w = wt)
+            z = cfe(Covariance(), rx, cv; store_forecasts = true, w = wt)
+            @test isequal(a.standardised_return, z.standardised_return)
+            pa = covariance_forecast_portfolio(a, rb, wt)
+            @test isequal(pa.standardised_return, a.standardised_return)
+            @test isequal(pa.portfolio_qlike, a.portfolio_qlike)
+        end
+    end
+
     @testset "The date form" begin
         bd = DateWalkForward(w, h; period = Day(1), purged_size = p, expand_train = true)
         od = OnlineDateWalkForward(w, h; period = Day(1), purged_size = p)
@@ -344,7 +559,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test rn.dates == first.(split(batch_cv, rd).test_idx)
     end
 
-    @testset "The summary against the reference's summaries" begin
+    @testset "The summary against the oracle's summaries" begin
         A = [1.0 0.3 -0.2 0.1; 0.2 1.1 0.4 -0.3; -0.1 0.5 0.9 0.2; 0.3 -0.2 0.1 1.2]
         sig = (A * A') / 1e4 + Diagonal([1e-4, 2e-4, 1.5e-4, 1.2e-4])
         W = [[0.25, 0.25, 0.25, 0.25], [0.1, 0.2, 0.3, 0.4]]
@@ -361,7 +576,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         stack(f) = reduce(vcat, [permutedims(getfield(s, f)) for s in steps])
         cfer = CovarianceForecastEvaluationResult(collect(0:(M - 1)),
                                                   [(1:3) .+ 3k for k in 0:(M - 1)],
-                                                  fill(3, M), HorizonReturn(),
+                                                  fill(3, M), HorizonReturn(), DataSource(),
                                                   [s.n_valid for s in steps],
                                                   [s.mahalanobis_ratio for s in steps],
                                                   stack(:diagonal_ratio),
@@ -370,28 +585,28 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                                                   stack(:standardised_return),
                                                   stack(:portfolio_qlike), W, nothing,
                                                   nothing)
-        @test isapprox(cfer.mahalanobis_ratio,
-                       [0.978852966148661, 0.4653960403261437, 0.011680925757934219,
-                        0.315530814251327, 0.34876711552388395, 0.15922909197779334,
-                        0.2726172060164678]; atol = 1e-14)
+        # Measured maxrel 1.8e-16.
+        @test parity_compare(cfer.mahalanobis_ratio,
+                             [0.978852966148661, 0.4653960403261437, 0.011680925757934219,
+                              0.315530814251327, 0.34876711552388395, 0.15922909197779334,
+                              0.2726172060164678]; rtol = 1e-14,
+                             name = "cfer mahalanobis ratio").ok
         s = covariance_forecast_summary(cfer)
         @test s.names == ["forecast_1"]
-        # The reference's `summary()` rows, to the six digits it prints.
-        @test isapprox(s.mahalanobis_mean[1], 0.364582; atol = 5e-7)
-        @test isapprox(s.mahalanobis_median[1], 0.315531; atol = 5e-7)
-        @test isapprox(s.mahalanobis_p5[1], 0.055945; atol = 5e-7)
-        @test isapprox(s.mahalanobis_p95[1], 0.824816; atol = 5e-7)
-        @test isapprox(s.diagonal_mean[1], 0.425925; atol = 5e-7)
-        @test isapprox(s.diagonal_median[1], 0.36462; atol = 5e-6)
-        @test isapprox(s.diagonal_p5[1], 0.057891; atol = 5e-7)
-        @test isapprox(s.diagonal_p95[1], 0.988609; atol = 5e-7)
-        @test isapprox(s.portfolio_qlike_mean[1], -7.520415; atol = 5e-7)
-        # Its `bias_statistic_summary()`.
-        @test isapprox(s.bias_statistic[1], 1.090341; atol = 5e-7)
-        @test isapprox(s.bias_p5[1], 1.054794; atol = 5e-7)
-        @test isapprox(s.bias_p25[1], 1.070593; atol = 5e-7)
-        @test isapprox(s.bias_p75[1], 1.110090; atol = 5e-7)
-        @test isapprox(s.bias_p95[1], 1.125889; atol = 5e-7)
+        # The oracle's `summary()` rows and its `bias_statistic_summary()`, at full digits:
+        # its own step kernel and summaries, run on this closed-form fixture.
+        ours = [s.mahalanobis_mean[1], s.mahalanobis_median[1], s.mahalanobis_p5[1],
+                s.mahalanobis_p95[1], s.diagonal_mean[1], s.diagonal_median[1],
+                s.diagonal_p5[1], s.diagonal_p95[1], s.portfolio_qlike_mean[1],
+                s.bias_statistic[1], s.bias_p5[1], s.bias_p25[1], s.bias_p75[1],
+                s.bias_p95[1]]
+        oracle = [0.36458202285745867, 0.315530814251327, 0.05594537562389196,
+                  0.8248158884019055, 0.42592521496695807, 0.36461964662163726,
+                  0.05789099926930382, 0.9886089390858581, -7.520415207825884,
+                  1.09034120664011, 1.0547936163414997, 1.0705925453631042,
+                  1.1100898679171156, 1.1258887969387201]
+        # Measured maxrel 2.4e-16.
+        @test parity_compare(ours, oracle; name = "cfe summary").ok
         # Its `exceedance_summary()` at (0.95, 0.99): no step exceeds.
         @test s.levels == (0.95, 0.99)
         @test s.exceedance == [0.0 0.0]
@@ -407,8 +622,8 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         # The realised covariance has `N h` degrees of freedom per step, so its band is
         # narrower by `√h` and its exceedance threshold sits at `χ²_{N h}`.
         cfr = CovarianceForecastEvaluationResult(cfer.dates, cfer.test_idx, cfer.horizon,
-                                                 RealisedCovariance(), cfer.n_valid,
-                                                 cfer.mahalanobis_ratio,
+                                                 RealisedCovariance(), DataSource(),
+                                                 cfer.n_valid, cfer.mahalanobis_ratio,
                                                  cfer.diagonal_ratio, cfer.qlike,
                                                  cfer.frobenius, cfer.standardised_return,
                                                  cfer.portfolio_qlike, W, nothing, nothing)
@@ -549,6 +764,53 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
     end
 
+    @testset "The step weighting: the plain mean is one keyword away (#1513)" begin
+        # A listing and a delisting move N_t, and a calendar walk-forward moves h_t, so the
+        # two rules differ on both ratios.
+        z = po.Distributions.cquantile(po.Distributions.Normal(), 0.025)
+        for r in (cfe(Covariance(), rdg, batch_cv),
+                  cfe(Covariance(), rd, DateWalkForward(2, 1; period = Month(1))))
+            k = r.n_valid .> 0
+            sd = covariance_forecast_summary(r)
+            se = covariance_forecast_summary(r; step_weighting = EqualStepWeighting())
+            @test sd.step_weighting === DofStepWeighting()
+            @test se.step_weighting === EqualStepWeighting()
+            sx = covariance_forecast_summary(r; step_weighting = DofStepWeighting())
+            @test all(f -> isequal(getfield(sd, f), getfield(sx, f)),
+                      fieldnames(typeof(sd)))
+            m = r.mahalanobis_ratio[k]
+            nu = po.target_dof.(Ref(r.target), r.n_valid[k], r.horizon[k])
+            dbar = po.covariance_diagonal_mean(r)[k]
+            snu = po.target_step_dof.(Ref(r.target), r.horizon[k])
+            # The plain mean, and the band of the plain mean: Var = 2 sum(1 / nu_t) / M^2.
+            @test se.mahalanobis_mean[1] ≈ mean(m) rtol = 1e-14
+            @test se.diagonal_mean[1] ≈ mean(dbar) rtol = 1e-14
+            M = length(m)
+            @test se.mahalanobis_band_hi[1] - 1 ≈ z * sqrt(2 * sum(inv, nu)) / M rtol = 1e-14
+            @test 1 - se.diagonal_band_lo[1] ≈ z * sqrt(2 * sum(inv, snu)) / M rtol = 1e-14
+            # The default band is the chi-squared variance 2 / sum(nu), to the last bit.
+            @test sd.mahalanobis_band_hi[1] == 1 + z * sqrt(2 / sum(nu))
+            @test sd.diagonal_band_lo[1] == 1 - z * sqrt(2 / sum(snu))
+            @test sd.mahalanobis_mean[1] == dot(nu, m) / sum(nu)
+            # The plain mean has the wider band: sum(1/nu) / M^2 >= 1 / sum(nu).
+            @test se.mahalanobis_band_hi[1] > sd.mahalanobis_band_hi[1]
+            # Every other column reads no weight.
+            for f in (:mahalanobis_median, :mahalanobis_p5, :diagonal_p95, :bias_statistic,
+                      :qlike_mean, :exceedance, :n_steps)
+                @test isequal(getfield(sd, f), getfield(se, f))
+            end
+        end
+        # The two rules agree when every step has the same degrees of freedom.
+        r = cfe(Covariance(), rd, batch_cv)
+        @test allequal(r.n_valid) && allequal(r.horizon)
+        @test covariance_forecast_summary(r; step_weighting = EqualStepWeighting()).mahalanobis_mean[1] ≈
+              covariance_forecast_summary(r).mahalanobis_mean[1] rtol = 1e-14
+        @test po.covariance_step_weights(DofStepWeighting(), [8, 8, 7]) == [8, 8, 7]
+        @test po.covariance_step_weights(EqualStepWeighting(), [8, 8, 7]) == [1, 1, 1]
+        @test DofStepWeighting() isa po.AbstractStepWeighting
+        @test EqualStepWeighting() isa po.AbstractStepWeighting
+    end
+
     @testset "A wrapper centres where the estimator it holds centres" begin
         # The panel arm of the wrapper's `cov` hands the panel to the estimator it holds, so a
         # mask-aware estimator inside it admits the young asset; the location follows.
@@ -588,14 +850,18 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test_throws DimensionMismatch covariance_forecast_step(sig, Z, c,
                                                                 [ones(N), ones(3)],
                                                                 RealisedCovariance())
-        e = @test_throws ArgumentError covariance_forecast_step(sig, fill(NaN, 2, N), c,
-                                                                nothing,
-                                                                RealisedCovariance())
-        @test occursin("no asset is active", e.value.msg)
-        nan_sig = fill(NaN, N, N)
-        e = @test_throws ArgumentError covariance_forecast_step(nan_sig, Z, c, nothing,
-                                                                RealisedCovariance())
-        @test occursin("no asset is active", e.value.msg)
+        # A step with no active asset is valid input with nothing to score (#1389): no test
+        # return, or no forecast. It is unscored, and it still checks the portfolios.
+        for (sg, Zs) in ((sig, fill(NaN, 2, N)), (fill(NaN, N, N), Z))
+            u = covariance_forecast_step(sg, Zs, c, [ones(N), ones(N)],
+                                         RealisedCovariance())
+            @test u.n_valid == 0
+            @test isnan(u.mahalanobis_ratio) && isnan(u.qlike) && isnan(u.frobenius)
+            @test all(isnan, u.diagonal_ratio) && length(u.diagonal_ratio) == N
+            @test all(isnan, u.standardised_return) && length(u.portfolio_qlike) == 2
+            @test_throws DimensionMismatch covariance_forecast_step(sg, Zs, c, ones(3),
+                                                                    RealisedCovariance())
+        end
         # A non-finite location drops the asset from the active subset.
         cn = copy(c)
         cn[2] = NaN

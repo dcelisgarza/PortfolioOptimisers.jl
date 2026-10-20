@@ -1,8 +1,8 @@
 ```@meta
-Description = "The Coverage Universe, public API of PortfolioOptimisers.jl: cov, cor, var, std, mean, coskewness, cokurtosis."
+Description = "Coverage Universe, public API of PortfolioOptimisers.jl: cov, cor, var, std, mean, coskewness, cokurtosis."
 ```
 
-# [The Coverage Universe](@id api-coverage-universe)
+# [Coverage Universe](@id api-coverage-universe)
 
 An asset is in the coverage universe of one fit when its return is finite and the active mask of the [`AssetPanel`](@ref) is `true` at every row of the window. A prior keeps only those assets of its returns matrix and fits each estimator on the smaller matrix. It then puts every result back on the full set of assets, with `NaN` for each asset outside the coverage universe.
 

@@ -1,7 +1,9 @@
 ```@meta
-Description = "No Risk Constraints has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "No Risk Constraints, public API of PortfolioOptimisers.jl: set_risk_constraints!."
 ```
 
-# No Risk Constraints
+# [No Risk Constraints](@id api-no-risk-constraints)
 
-Every name of this topic is private. The [private page](@ref private-api-no-risk-constraints) documents them.
+```@docs
+set_risk_constraints!(model::JuMP.Model, ::Any, r::NoRisk, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
+```

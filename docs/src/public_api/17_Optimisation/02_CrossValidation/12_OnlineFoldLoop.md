@@ -1,7 +1,7 @@
 ```@meta
-Description = "The online arm of the fold loop has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Online fold loop has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# The online arm of the fold loop
+# Online fold loop
 
-Every name of this topic is private. The [private page](@ref private-api-the-online-arm-of-the-fold-loop) documents them.
+Every name of this topic is private. The [private page](@ref private-api-online-fold-loop) documents them.

@@ -175,7 +175,7 @@ safety guarantee off the functor onto a gated contract entry: a predicate
 whether its `mu` target is weight-independent) consulted by `expected_risk_from_returns(r, x)`,
 through which the precomputed-series call sites route. Ratio composites recurse into their
 constituents. The amended Decision bullet above describes the result. Guarded by a behavioural +
-completeness test in `test/test_09c_risk_input_kind.jl`.
+completeness test in `test/test_09_risk_measures.jl`.
 
 ## Correction 2 — eligibility moves to the definition site (ADR 0006 consistency)
 

@@ -422,14 +422,12 @@ Step 3 is what separates this function from [`try_field_name`](@ref), which retu
   - [`@propagatable`](@ref)
 """
 function extract_field_name(expr)
-    if expr isa Symbol
-        return expr
-    end
     if expr isa Expr && expr.head == :(::)
         return expr.args[1]
     end
     return error("@propagatable: @fprop must precede a bare field name or field::Type, got: $(repr(expr))")
 end
+extract_field_name(expr::Symbol) = expr
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -515,17 +513,12 @@ Steps 2 and 3 compose, so `Name{T} <: Super` peels the supertype first and then 
   - [`@propagatable`](@ref)
 """
 function propagatable_bare_name(n)
-    if n isa Symbol
-        return n
-    end
-    if n isa Expr && n.head == :curly
-        return propagatable_bare_name(n.args[1])
-    end
-    if n isa Expr && n.head == :<:
+    if n isa Expr && n.head in (:curly, :<:)
         return propagatable_bare_name(n.args[1])
     end
     return error("@propagatable: cannot extract struct name from: $(repr(n))")
 end
+propagatable_bare_name(n::Symbol) = n
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -560,14 +553,12 @@ Step 2 tests the first argument as well as the head, which [`extract_field_name`
   - [`@propagatable`](@ref)
 """
 function try_field_name(expr)
-    if expr isa Symbol
-        return expr
-    end
     if expr isa Expr && expr.head == :(::) && expr.args[1] isa Symbol
         return expr.args[1]
     end
     return nothing
 end
+try_field_name(expr::Symbol) = expr
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

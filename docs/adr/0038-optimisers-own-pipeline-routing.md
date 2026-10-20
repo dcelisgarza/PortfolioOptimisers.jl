@@ -186,7 +186,7 @@ defect; rename-immunity was never on offer.
 
 **Verified.** test_26 2/2, test_28 14/14, test_30 71/71, test_31 50/50, test_32 74/74,
 test_33 117/117, test_34 51/51, test_37 523/523, and a new solver-free
-`test_38_pipeline_routing.jl` 76/76 whose expected-routing table locks the derived
+`test_30_pipeline_base.jl` 76/76 whose expected-routing table locks the derived
 consequences of the field layouts in both directions.
 
 **Rejected: recursion into the optimisers a meta-optimiser wraps.** Pushing targets down

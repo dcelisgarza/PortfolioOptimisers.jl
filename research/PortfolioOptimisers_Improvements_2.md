@@ -1,25 +1,5 @@
 # PortfolioOptimisers.jl Implementation Plan (from v0.28.0)
 
-## Current State Assessment
-
-The `dev` branch at v0.28.0 is already one of the most comprehensive open-source portfolio optimization libraries. It includes:
-
-- **Hierarchical methods:** HRP, HERC, NCO (generalized with inner/outer risk measures and cross-validation)
-- **Meta-optimization:** Stacking, Subset Resampling, Nested Clustered Optimization
-- **Advanced priors:** Black-Litterman (5 variants), Entropy Pooling, Opinion Pooling, Feature Priors, High-Order Factor Priors
-- **Uncertainty sets:** Delta, Normal, Bootstrap, L1
-- **Risk measures:** Variance, moment-based, VaR, CVaR, EVaR, RLVaR, power norms, drawdowns, tracking, turnover, ratio measures, equal risk, MAD, Brownian distance variance, variance-skewness-kurtosis composite
-- **Constraints:** MIP indicators, SDP, cardinality, threshold, turnover, fees, tracking error, regularisation (L1/L2/Lp/L∞), weight norms, integer phylogeny
-- **Cross-validation:** KFold, combinatorially purged, walk-forward, multiple randomised, grid search, randomised search
-- **Pipelines:** Bespoke pipeline system with `StepExecution`, `PredictionCV`, `SearchCrossValidation`
-- **Finite allocation:** Discrete MIP and greedy algorithms
-- **Moments:** Gerber, Smyth-Broby, distance, lower tail dependence, rank, mutual information, regime-adjusted exponential weighted, coskewness, cokurtosis, implied volatility
-- **Clustering/Phylogeny:** Hierarchical, DBHT, non-hierarchical
-
-The following features are **confirmed absent** and represent the highest-value additions.
-
----
-
 ## Phase 1: Exact & Robust Methods
 
 *Target: v0.29.0 – v0.30.0 | 2–3 months*
@@ -145,40 +125,14 @@ The following features are **confirmed absent** and represent the highest-value 
 
 ---
 
-### 2.2 Online / Sequential Portfolio Selection
-
-**Gap:** All methods are batch. No regret-minimizing streaming algorithms.
-
-**Design:**
-
-- New directory: `29_OnlinePortfolio/`
-- `OnlinePortfolioSelector <: AbstractEstimator`
-- Implementations:
-  - `UniversalPortfolio` (Cover, 1991)
-  - `OnlineNewtonStep`
-  - `FollowTheRegularizedLeader`
-- `StreamingReturns` wrapper around `ReturnsResult` that yields batches sequentially
-- `OnlineResult` — time-varying weights and wealth trajectory
-
-**Integration:**
-
-- Can be evaluated using existing walk-forward cross-validation.
-- Plotting extension: wealth trajectories, cumulative regret.
-
-**Effort:** High
-
----
-
 ### 2.3 Market Impact & Optimal Execution
 
-**Gap:** `Fees.jl` has proportional costs but no market impact models.
+**Gap:** The library has a power-law market impact cost, but no temporary + permanent impact model and no execution schedule.
 
 **Design:**
 
 - New directory: `30_MarketImpact/`
 - `MarketImpactModel <: AbstractModel`
-  - `LinearImpact`
-  - `SquareRootImpact` (square-root law)
   - `AlmgrenChriss` — temporary + permanent impact
 - `ExecutionSchedule <: AbstractEstimator` — optimizes trade trajectory over a horizon
 - Extends `DiscreteFiniteAllocation` or works as a post-processing step on `MeanRisk` results
@@ -371,7 +325,6 @@ The following features are **confirmed absent** and represent the highest-value 
 | Tax-Aware Optimization | Very High | Very High | High | 1 |
 | ESG Multi-Objective | High | Medium | Medium | 3 |
 | Multi-Stage Stochastic | Very High | High | Very High | 2 |
-| Online / Sequential | High | High | High | 2 |
 | Market Impact | High | Medium | High | 2 |
 | Copula Tail Dependence | High | Very High | Very High | 3 |
 | Interpretability | High | Medium | Medium | 4 |

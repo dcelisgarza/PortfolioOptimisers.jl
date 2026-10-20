@@ -3,12 +3,12 @@
 # number is ever summed. The ratchet binds on `reviewed`; `raw` is context.
 
 [provenance]
-julia = "1.13.1"
-jet = "0.12.1"
+julia = "1.13.2"
+jet = "0.12.3"
 filter = "AnyFrameModule"
 attribution = "deepest_repository_frame"
 load_set = ["GraphRecipes", "StatsPlots"]
-commit = "fbb67d78c4"
+commit = "5f8ec9bccb"
 
 [run.main]
 load_set = ["GraphRecipes", "StatsPlots"]
@@ -26,6 +26,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -53,20 +54,24 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/14_PartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base/15_Online.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/15_Online_a.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/15_Online_b.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/04_Factory.jl" = { raw = 0, reviewed = 0 }
-"src/02_Tools/05_Propagatable.jl" = { raw = 2, reviewed = 2 }
+"src/02_Tools/05_Propagatable.jl" = { raw = 1, reviewed = 1 }
 "src/02_Tools/06_ForwardProperties.jl" = { raw = 4, reviewed = 4 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { raw = 2, reviewed = 2 }
-"src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
+"src/02_Tools/08_MeanTest.jl" = { raw = 0, reviewed = 0 }
+"src/02_Tools/09_MeanTestDraws.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/01_AssetPanel.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_CarrierViews.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/05_PanelViews.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
@@ -76,15 +81,20 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/12_TrainTestSplit.jl" = { raw = 1, reviewed = 1 }
 "src/03_InputData/13_Base_AssetSelection.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/14_CrossSectionalTransforms.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/15_FeatureSelector.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/16_PanelDataFrame.jl" = { raw = 4, reviewed = 4 }
+"src/03_InputData/15_FeatureSelector.jl" = { raw = 1, reviewed = 1 }
+"src/03_InputData/16_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 16, reviewed = 16 }
+"src/03_InputData/19_AssetPanelConcat.jl" = { raw = 5, reviewed = 5 }
+"src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/22_PanelRoundTrip.jl" = { raw = 1, reviewed = 1 }
+"src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 4, reviewed = 4 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 1, reviewed = 1 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/01_Base_Moments.jl" = { raw = 1, reviewed = 1 }
+"src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/01_Base_Moments.jl" = { raw = 3, reviewed = 3 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/03_Covariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/04_SimpleVariance.jl" = { raw = 0, reviewed = 0 }
@@ -94,7 +104,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/05_Gerber/03_GerberIQCovariance_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/06_DistanceCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/07_LowerTailDependenceCovariance.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/08_RankCovariance.jl" = { raw = 9, reviewed = 9 }
+"src/05_Moments/08_RankCovariance.jl" = { raw = 8, reviewed = 8 }
 "src/05_Moments/09_Histogram.jl" = { raw = 2, reviewed = 2 }
 "src/05_Moments/10_MutualInfoCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/11_DenoiseCovariance.jl" = { raw = 0, reviewed = 0 }
@@ -118,14 +128,23 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/29_ExpWeighted/04_ExpWeightedCentring.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/06_EstimatedRegimeBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
@@ -135,7 +154,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -143,6 +163,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl" = { raw = 0, reviewed = 0 }
@@ -159,10 +180,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { raw = 0, reviewed = 0 }
@@ -173,6 +196,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/04_Similarity.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { raw = 3, reviewed = 3 }
+"src/06_Distance/06_FeatureDistanceActiveRows.jl" = { raw = 0, reviewed = 0 }
 "src/07_JuMPModelOptimisation.jl" = { raw = 5, reviewed = 5 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { raw = 0, reviewed = 0 }
@@ -186,12 +210,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/08_Phylogeny/06_DBHT/05_BubbleTree.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/06_DBHTDendrogram.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/06_DBHT/07_DBHTClustering.jl" = { raw = 1, reviewed = 1 }
-"src/08_Phylogeny/07_LoGo.jl" = { raw = 3, reviewed = 3 }
+"src/08_Phylogeny/07_LoGo.jl" = { raw = 4, reviewed = 4 }
 "src/08_Phylogeny/08_Network/01_MinimumSpanningTree.jl" = { raw = 1, reviewed = 1 }
 "src/08_Phylogeny/08_Network/02_NetworkEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/08_Network/03_NetworkGraph.jl" = { raw = 2, reviewed = 2 }
 "src/08_Phylogeny/08_Network/04_Separation.jl" = { raw = 0, reviewed = 0 }
-"src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 18, reviewed = 18 }
+"src/08_Phylogeny/09_Centrality/01_Centrality.jl" = { raw = 17, reviewed = 17 }
 "src/08_Phylogeny/09_Centrality/02_CentralityPolarity.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/03_CentralityEstimator.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/09_Centrality/04_CentralityQueries.jl" = { raw = 0, reviewed = 0 }
@@ -222,7 +246,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/03_EntropyPoolingViewTypes.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/04_EntropyPoolingSolvers.jl" = { raw = 1, reviewed = 1 }
 "src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/05_EntropyPoolingMomentViews.jl" = { raw = 2, reviewed = 2 }
-"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/06_EntropyPoolingTailViewSolve.jl" = { raw = 1, reviewed = 1 }
+"src/10_Prior/06_EntropyPooling/01_Base_EntropyPoolingPrior/06_EntropyPoolingTailViewSolve.jl" = { raw = 9, reviewed = 9 }
 "src/10_Prior/06_EntropyPooling/02_MeucciEntropyPoolingPrior.jl" = { raw = 11, reviewed = 11 }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_a.jl" = { raw = 15, reviewed = 15 }
 "src/10_Prior/06_EntropyPooling/03_EntropyPoolingPrior_b.jl" = { raw = 0, reviewed = 0 }
@@ -235,6 +259,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/12_PriorPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/15_CrossSectionalPriorFold.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/19_PriorScenarios.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/20_PriorReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -255,8 +285,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/16_RiskMeasures/04_Kurtosis.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { raw = 0, reviewed = 0 }
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { raw = 1, reviewed = 1 }
-"src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { raw = 8, reviewed = 8 }
-"src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { raw = 3, reviewed = 3 }
+"src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { raw = 4, reviewed = 4 }
+"src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl" = { raw = 2, reviewed = 2 }
 "src/16_RiskMeasures/06_XatRisk/04_RelativisticXatRisk.jl" = { raw = 21, reviewed = 21 }
 "src/16_RiskMeasures/06_XatRisk/05_PowerNormXatRisk.jl" = { raw = 5, reviewed = 5 }
 "src/16_RiskMeasures/07_OWARiskMeasures_a.jl" = { raw = 4, reviewed = 4 }
@@ -287,10 +317,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/01_Base_Optimisation/06_PanelCollapse.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/01_Base_Optimisation/07_ResultInvestableView.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_a.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { raw = 8, reviewed = 8 }
+"src/17_Optimisation/02_CrossValidation/01_Base_CrossValidation_b.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/02_KFold.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/03_Combinatorial.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { raw = 1, reviewed = 1 }
+"src/17_Optimisation/02_CrossValidation/04_WalkForward.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/05_MultipleRandomised.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/06_Validation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/02_CrossValidation/07_Scoring.jl" = { raw = 0, reviewed = 0 }
@@ -319,9 +349,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/02_Returns_and_ObjectiveFunctions/03_ReturnConstraints.jl" = { raw = 5, reviewed = 5 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl" = { raw = 4, reviewed = 4 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/04_WeightConstraints.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { raw = 0, reviewed = 0 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/05_SDPConstraints.jl" = { raw = 1, reviewed = 1 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/06_IntegerPhylogenyConstraints.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { raw = 3, reviewed = 3 }
+"src/17_Optimisation/05_JuMP/02_JuMPConstraints/07_CardinalityConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/08_ThresholdConstraints.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/09_TurnoverConstraints.jl" = { raw = 2, reviewed = 2 }
 "src/17_Optimisation/05_JuMP/02_JuMPConstraints/10_FeesConstraints.jl" = { raw = 4, reviewed = 4 }
@@ -361,7 +391,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/17_Optimisation/06_Meta/01_Base_MetaOptimisation.jl" = { raw = 4, reviewed = 4 }
 "src/17_Optimisation/06_Meta/02_NestedClustered.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/06_Meta/03_Stacking.jl" = { raw = 0, reviewed = 0 }
-"src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { raw = 1, reviewed = 1 }
+"src/17_Optimisation/06_Meta/04_SubsetResampling.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/07_FiniteAllocation/01_Base_FiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/07_FiniteAllocation/02_DiscreteFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
 "src/17_Optimisation/07_FiniteAllocation/03_GreedyFiniteAllocation.jl" = { raw = 0, reviewed = 0 }
@@ -384,6 +414,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/18_ExpectedReturns.jl" = { raw = 1, reviewed = 1 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { raw = 0, reviewed = 0 }
 "src/20_AssetSelection.jl" = { raw = 1, reviewed = 1 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { raw = 1, reviewed = 1 }
 "src/21_Pipeline/02_StepExecution.jl" = { raw = 0, reviewed = 0 }
@@ -411,6 +442,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "ext/PortfolioOptimisersPlotsExt/10_FrontierPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/11_FactorDiagnosticsPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/12_ForecastEvaluationPlots.jl" = { raw = 0, reviewed = 0 }
+"ext/PortfolioOptimisersPlotsExt/13_CovarianceForecastPlots.jl" = { raw = 0, reviewed = 0 }
 "ext/PortfolioOptimisersPlotsExt/PortfolioOptimisersPlotsExt.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/01_Tables.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/01_DocstringDictionaries/02_ArgDataAndMoments.jl" = { raw = 0, reviewed = 0 }
@@ -438,8 +470,10 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/01_Base/12_NormError.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/13_KappaLog.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/14_PartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/01_Base/15_Online.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/15_Online_a.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/15_Online_b.jl" = { raw = 0, reviewed = 0 }
 "src/01_Base/16_CoveragePolicy.jl" = { raw = 0, reviewed = 0 }
+"src/01_Base/17_ReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/01_Operators.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/02_ArrayViews.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/03_TypeUtilities.jl" = { raw = 0, reviewed = 0 }
@@ -447,11 +481,13 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/02_Tools/05_Propagatable.jl" = { raw = 0, reviewed = 0 }
 "src/02_Tools/06_ForwardProperties.jl" = { raw = 1, reviewed = 1 }
 "src/02_Tools/07_VectorToScalarMeasures.jl" = { raw = 0, reviewed = 0 }
+"src/02_Tools/08_MeanTest.jl" = { raw = 0, reviewed = 0 }
+"src/02_Tools/09_MeanTestDraws.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/01_AssetPanel.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/02_AssetPanelBuilder.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/03_ListingSpan.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/04_Preprocessing.jl" = { raw = 0, reviewed = 0 }
-"src/03_InputData/05_CarrierViews.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/05_PanelViews.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/06_PricesResult.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/07_PriceIngestion.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/08_PriceGapFill.jl" = { raw = 0, reviewed = 0 }
@@ -465,10 +501,15 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/03_InputData/16_PanelDataFrame.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/17_ReturnsBufferState.jl" = { raw = 0, reviewed = 0 }
 "src/03_InputData/18_PreprocessingPartialFit.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/19_AssetPanelConcat.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/20_PanelFieldValues.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/21_AssetPanelSummary.jl" = { raw = 0, reviewed = 0 }
+"src/03_InputData/22_PanelRoundTrip.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/01_PosdefMatrix.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/02_Denoise.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/03_Detone.jl" = { raw = 0, reviewed = 0 }
 "src/04_MatrixProcessing/04_MatrixProcessing.jl" = { raw = 0, reviewed = 0 }
+"src/04_MatrixProcessing/05_MatrixSquareRoot.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/01_Base_Moments.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/02_SimpleExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/03_Covariance.jl" = { raw = 0, reviewed = 0 }
@@ -491,9 +532,9 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/17_ExcessExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/18_Coskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/19_Cokurtosis.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/20_Base_Regression.jl" = { raw = 6, reviewed = 6 }
+"src/05_Moments/20_Base_Regression.jl" = { raw = 4, reviewed = 4 }
 "src/05_Moments/21_TimeSeriesRegression/01_StepwiseRegression.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/21_TimeSeriesRegression/02_DimensionReductionRegression.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/22_ImpliedVolatility.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/23_CorrelationCovariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/24_AbstractCovarianceVariance.jl" = { raw = 0, reviewed = 0 }
@@ -503,16 +544,25 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/02_ExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/29_ExpWeighted/03_ExpWeightedCovariance.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/29_ExpWeighted/04_ExpWeightedCentring.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/01_RegimeAdjustedExpWeightedVariance.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_a.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/30_RegimeAdjusted/02_RegimeAdjustedExpWeightedCovariance_b.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/03_MahalanobisRegimeBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/04_HacRowKernel.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/05_RegimeSwitches.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/06_EstimatedRegimeBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/07_EstimatedMahalanobisBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/08_SeparatePortfolioBias.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/30_RegimeAdjusted/09_MahalanobisLevelClosure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/31_HigherMomentPartialFit.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/01_CrossSectionalRegression.jl" = { raw = 1, reviewed = 1 }
 "src/05_Moments/32_CrossSectionalFactorModel/02_CrossSectionalWeights.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/03_CrossSectionalFactorModel.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/01_Base_Descriptor.jl" = { raw = 0, reviewed = 0 }
@@ -520,7 +570,8 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/03_LagDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/04_EWMeanDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/05_EWVolatilityDescriptors.jl" = { raw = 0, reviewed = 0 }
-"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_a.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/06_EWBetaDescriptors_b.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/07_RollingDescriptors.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/08_Base_Exposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/09_CompositeExposure.jl" = { raw = 0, reviewed = 0 }
@@ -528,6 +579,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/11_OneHotExposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/12_ConstantExposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/13_ExposureNeutralisation.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/04_FactorExposures/14_ObservedExposure.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/05_FactorFamilyBasis.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/06_FactorFamilyBasisTransforms.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/01_Base_ReturnForecast.jl" = { raw = 0, reviewed = 0 }
@@ -544,10 +596,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/12_ForecastForwardWindows.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/13_ForecastCalibration.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/14_ForecastSummary.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/07_ReturnForecasts/15_TargetReturnForecastStep.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/08_CrossSectionalRegressionDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/09_CrossSectionalExposureDiagnostics.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/10_FactorModelSummary.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/32_CrossSectionalFactorModel/11_CrossSectionalIdiosyncraticDiagnostics.jl" = { raw = 0, reviewed = 0 }
+"src/05_Moments/32_CrossSectionalFactorModel/12_CrossSectionalExposureIC.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/33_CoverageUniverse.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/34_PriceLevelExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/05_Moments/35_CompositePriceLevelStatistics.jl" = { raw = 0, reviewed = 0 }
@@ -558,6 +612,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/06_Distance/03_DistanceDistance.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/04_Similarity.jl" = { raw = 0, reviewed = 0 }
 "src/06_Distance/05_FeatureDistance.jl" = { raw = 0, reviewed = 0 }
+"src/06_Distance/06_FeatureDistanceActiveRows.jl" = { raw = 0, reviewed = 0 }
 "src/07_JuMPModelOptimisation.jl" = { raw = 5, reviewed = 5 }
 "src/08_Phylogeny/01_Base_Phylogeny.jl" = { raw = 0, reviewed = 0 }
 "src/08_Phylogeny/02_Clusters.jl" = { raw = 0, reviewed = 0 }
@@ -620,6 +675,12 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/10_Prior/12_PriorPartialFit.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/13_PriorExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/10_Prior/14_LowDimensionEnsemblePrior.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/15_CrossSectionalPriorFold.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/16_CrossSectionalForecastHistoryCarry.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/17_CrossSectionalCalibrationRules.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/18_CrossSectionalCarryHistories.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/19_PriorScenarios.jl" = { raw = 0, reviewed = 0 }
+"src/10_Prior/20_PriorReturnsSource.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/01_Base_UncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/02_DeltaUncertaintySets.jl" = { raw = 0, reviewed = 0 }
 "src/11_UncertaintySets/03_NormalUncertaintySets.jl" = { raw = 0, reviewed = 0 }
@@ -769,6 +830,7 @@ load_set = ["GraphRecipes", "StatsPlots"]
 "src/18_ExpectedReturns.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/01_FactorAttribution.jl" = { raw = 0, reviewed = 0 }
 "src/19_FactorAttribution/02_FactorAttributionRealised.jl" = { raw = 0, reviewed = 0 }
+"src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { raw = 0, reviewed = 0 }
 "src/20_AssetSelection.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { raw = 0, reviewed = 0 }
 "src/21_Pipeline/02_StepExecution.jl" = { raw = 0, reviewed = 0 }

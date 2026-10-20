@@ -285,17 +285,17 @@ end
         # is the buffer under the pinned names with the masks as a time-varying panel.
         ob = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
                              rows(rdg, 9:12))
-        B = ob.cache.X
+        B = ob.cache.X.X
         @test B.n == 3 && size(B.A) == size(B.X)
         @test isnan(po.sample_buffer(B)[1, 4]) && !B.A[B.off + 1, 4]
         @test all(isfinite, po.sample_buffer(B)[2:3, :]) &&
               all(B.A[(B.off + 2):(B.off + 3), :])
-        crd = po.rows_carrier(B, ob.cache.nx)
+        crd = po.buffer_returns_result(ob.cache.X)
         @test isa(crd, ReturnsResult) && crd.nx == nx && size(crd.X) == (3, 4)
         @test crd.pnl.amsk == amsk[10:12, :] && crd.pnl.emsk == amsk[10:12, :]
-        @test isnothing(po.rows_carrier(nothing, nx)) &&
-              isnothing(po.rows_carrier(nothing, nothing))
-        @test_throws po.IsNothingError po.rows_carrier(B, nothing)
+        @test isnothing(po.buffer_returns_result(nothing))
+        @test_throws po.IsNothingError po.buffer_returns_result(po.ReturnsBufferState(;
+                                                                                      X = B))
         # The fold arm reads the current row under the last mask row of the carrier.
         @test po.last_active_mask(crd.pnl) == amsk[12, :]
         @test isnothing(po.last_active_mask(nothing))
@@ -315,14 +315,35 @@ end
         # On a static panel the buffer records no mask and the carrier carries no panel.
         os = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)),
                              rows(rd, 1:4))
-        @test isnothing(os.cache.X.A) && isnothing(po.buffer_panel(os.cache.X))
-        @test isnothing(po.rows_carrier(os.cache.X, nx).pnl)
+        @test isnothing(os.cache.X.X.A) && isnothing(po.buffer_panel(os.cache.X.X))
+        @test isnothing(po.buffer_returns_result(os.cache.X).pnl)
+        # The rows that the rules read drop no field of the Returns Result (ADR 0204): the
+        # factor returns, the benchmark, the Exogenous Series, the timestamps and the
+        # implied volatilities travel with the rows, under the cap of the buffer.
+        Tx = 12
+        tsx = Date(2021, 1, 1) .+ Day.(0:(Tx - 1))
+        rdx = ReturnsResult(; nx = nx, X = R[1:Tx, :], ts = tsx, nf = ["F1"],
+                            F = R[1:Tx, 1:1] ./ 2, nb = ["BM"], B = R[1:Tx, 2] ./ 3,
+                            ne = ["E1"], E = R[1:Tx, 3:3], iv = 0.2 .+ abs.(R[1:Tx, :]),
+                            ivpa = 1.1)
+        ox = po.partial_fit!(OPS(; alg = MovingAverageReversion(; window = 4)), rdx)
+        wx = po.buffer_returns_result(ox.cache.X)
+        kx = (Tx - size(wx.X, 1) + 1):Tx
+        @test wx.X == rdx.X[kx, :] &&
+              wx.F == rdx.F[kx, :] &&
+              wx.B == rdx.B[kx] &&
+              wx.E == rdx.E[kx, :] &&
+              wx.ts == tsx[kx] &&
+              wx.iv == rdx.iv[kx, :]
+        @test wx.nf == ["F1"] && wx.nb == ["BM"] && wx.ne == ["E1"] && wx.ivpa == 1.1
+        @test isa(optimise(OPS(; alg = MovingAverageReversion(; window = 4)), rdx).retcode,
+                  OptimisationSuccess)
         # A windowed statistic over a relisted asset reads the rows it has, not filled
         # zeros: at row 15 a plain moving average over D is undefined, so the step holds
         # that leg, and the answer is finite.
         mar = MovingAverageReversion(; window = 15)
         om = po.partial_fit!(OPS(; alg = mar), rows(rdg, 1:15))
-        crd15 = po.rows_carrier(om.cache.X, nx)
+        crd15 = po.buffer_returns_result(om.cache.X)
         muD = vec(mean(PriceLevelExpectedReturns(; alg = MovingAverage(; window = 15)),
                        crd15.X, crd15.pnl; dims = 1))
         @test isnan(muD[4]) && all(isfinite, muD[1:3])
@@ -343,11 +364,58 @@ end
         held = OPS(; alg = BuyAndHold(), fb = PreviousWeights(; w = fill(0.25, 4)))
         hs = po.partial_fit!(held, rd0)
         @test optimise(hs).w == fill(0.25, 4)
+        # A fallback that needs rows steps with the head, so online it answers from the
+        # rows that it reads in batch, and the chain records the same attempts (#1633).
+        amsk1 = trues(T, N)
+        amsk1[T, 1:2] .= false
+        R1 = copy(R)
+        R1[T, 1:2] .= NaN
+        rd1 = ReturnsResult(; nx = nx, X = R1,
+                            pnl = AssetPanel(; amsk = amsk1, emsk = amsk1))
+        w0 = [0.5, 0.5, 0.0, 0.0]
+        for fb in (EqualWeighted(), InverseVolatility(),
+                   OPS(; alg = BuyAndHold(), w0 = w0, fb = EqualWeighted()))
+            head = OPS(; alg = BuyAndHold(), w0 = w0, fb = fb)
+            b = optimise(head, rd1)
+            o = optimise(po.partial_fit!(po.partial_fit!(head, rows(rd1, 1:20)),
+                                         rows(rd1, 21:T)))
+            @test isa(o.retcode, OptimisationSuccess)
+            @test o.w[1:2] == [0.0, 0.0]
+            @test isapprox(o.w, b.w; atol = 1e-14)
+            @test length(o.fb) == length(b.fb)
+        end
+        # The fallback of a `PreviousWeights` that is itself the fallback steps too, so
+        # the chain answers online at fold 1, where `w` is `nothing` (#1745).
+        for fb in (PreviousWeights(; fb = EqualWeighted()),
+                   PreviousWeights(; fb = InverseVolatility()))
+            head = OPS(; alg = BuyAndHold(), w0 = w0, fb = fb)
+            b = optimise(head, rd1)
+            o = optimise(po.partial_fit!(po.partial_fit!(head, rows(rd1, 1:20)),
+                                         rows(rd1, 21:T)))
+            @test isa(o.retcode, OptimisationSuccess)
+            @test o.w[1:2] == [0.0, 0.0]
+            @test isapprox(o.w, b.w; atol = 1e-14)
+            @test length(o.fb) == length(b.fb) == 2
+        end
+        # A `PreviousWeights` that holds `w` still holds it, and its fallback never runs.
+        pwh = OPS(; alg = BuyAndHold(), w0 = w0,
+                  fb = PreviousWeights(; w = fill(0.25, N), fb = EqualWeighted()))
+        opwh = optimise(po.partial_fit!(pwh, rd1))
+        @test opwh.w == fill(0.25, N) && length(opwh.fb) == 1
+        # The warm-up resolves a wrapper in the prior of the fallback of a
+        # `PreviousWeights`, because that fallback steps.
+        pwo = OPS(; alg = BuyAndHold(), w0 = w0,
+                  fb = PreviousWeights(;
+                                       fb = InverseVolatility(;
+                                                              pe = Online(EmpiricalPrior();
+                                                                          max_history = 10))))
+        @test isnothing(po.online_unreached_path(pwo))
+        @test isa(po.update_online_estimator(pwo).fb.fb.pe, EmpiricalPrior)
         # The identity holds under the time-varying panel too.
         og = po.partial_fit!(po.partial_fit!(opt, rows(rdg, 1:12)), rows(rdg, 13:28))
         @test optimise(og).w == optimise(opt, rows(rdg, 1:28)).w
-        # The fold loop's Held Gap idiom is reused: `iv`, a panel with fields and
-        # `emsk != amsk` are refused by name.
+        # The fold loop's Held Gap idiom is reused: a panel with fields and
+        # `emsk != amsk` are refused by name. The head takes `iv` (ADR 0204).
         emsk = copy(amsk)
         emsk[2, 1] = false
         @test_throws ArgumentError optimise(opt,
@@ -360,7 +428,7 @@ end
         opt = OPS(; alg = MovingAverageReversion(; window = 4))
         o = po.partial_fit!(opt, rows(rd, 1:9))
         st = o.cache
-        @test st.X.n == 3 && st.X.max_history == 3
+        @test st.X.X.n == 3 && st.X.max_history == 3
         @test st.nx == nx && st.n == 9 && isnothing(st.amsk)
         @test isnothing(po.partial_fit!(OPS(; alg = BuyAndHold()), rows(rd, 1:3)).cache.X)
         @test isnothing(po.partial_fit!(OPS(; alg = NewtonStep()), rows(rd, 1:3)).cache.X) ==
@@ -370,11 +438,11 @@ end
         # verbatim that the fold reads (ADR 0158, ADR 0170).
         pref = OPS(; alg = ForecastReversion(; me = MedianExpectedReturns()))
         @test isnothing(po.partial_fit!(pref, rows(rd, 1:9)).cache.X.max_history)
-        @test po.partial_fit!(pref, rows(rd, 1:9)).cache.X.n == 9
+        @test po.partial_fit!(pref, rows(rd, 1:9)).cache.X.X.n == 9
         pfold = po.partial_fit!(OPS(;
                                     alg = ForecastReversion(; me = SimpleExpectedReturns())),
                                 rows(rd, 1:9)).cache
-        @test pfold.X.n == 1 && pfold.X.max_history == 1
+        @test pfold.X.X.n == 1 && pfold.X.max_history == 1
         @test pfold.st isa po.ForecasterState && pfold.st.me.cache.n == 9
         @test pfold.st.me.cache.mu ≈ vec(mean(R[1:9, :]; dims = 1))
         # A copy aliases no array.
@@ -387,7 +455,7 @@ end
         v = po.port_opt_view(st, [1, 3], R)
         @test isapprox(sum(v.w), 1; atol = 1e-14)
         @test v.w == st.w[[1, 3]] ./ sum(st.w[[1, 3]])
-        @test size(po.sample_buffer(v.X), 2) == 2 && v.nx == ["A", "C"] && v.ts == st.ts
+        @test size(po.sample_buffer(v.X.X), 2) == 2 && v.nx == ["A", "C"] && v.ts == st.ts
         vn = po.port_opt_view(ns, [2, 4], R)
         @test vn.st.A == ns.st.A[[2, 4], [2, 4]] && vn.st.b == ns.st.b[[2, 4]]
         mixs = po.partial_fit!(OPS(;
@@ -426,7 +494,7 @@ end
                                                                  X = R[10:10, :]))
         # The refusals of the online seams.
         @test_throws ArgumentError optimise(opt)
-        @test_throws ArgumentError po.online_readout(o)
+        @test_throws ArgumentError po.batch_from_state(o)
         @test_throws ArgumentError po.update_online_estimator(Online(opt; max_history = 5))
         cv = OnlineIndexWalkForward(5, 1)
         @test_throws ArgumentError cross_val_predict(o, rd, cv)
@@ -795,6 +863,228 @@ end
             end
             @test isa(err, ArgumentError) && occursin(outside, err.msg)
         end
+    end
+
+    @testset "An inner prior reads the implied volatilities of the rows (#1644)" begin
+        # A forecaster and a Risk Loss fit their prior on the rows that the head holds, and
+        # those rows carry `iv` and `ivpa`. So an `ImpliedVolatility` inside the prior reads
+        # the surface over the same rows, and the online fold equals the batch fit.
+        iv = 0.15 .+ 0.1 .* rand(StableRNG(1644), T, N)
+        rdv = ReturnsResult(; nx = nx, X = R, iv = iv, ivpa = 1.0)
+        pe_iv = EmpiricalPrior(;
+                               ce = PortfolioOptimisersCovariance(;
+                                                                  ce = ImpliedVolatility(;
+                                                                                         alg = ImpliedVolatilityPremium(),
+                                                                                         ppy = 1),
+                                                                  mp = MatrixProcessing(;
+                                                                                        pdm = nothing)))
+        fr = PriorExpectedReturns(; pe = pe_iv)
+        wme = WindowedExpectedReturns(; me = fr, window = 6)
+        # The refit arm gives the surface to the prior of the adapter, and a windowed
+        # adapter cuts it to its window first.
+        win = rows(rdv, 1:12)
+        x12 = 1 .+ R[12, :]
+        @test po.forecast_relative(fr, nothing, x12, win)[2] ≈ 1 .+ prior(pe_iv, win).mu
+        @test po.forecast_relative(wme, nothing, x12, win)[2] ≈
+              1 .+ prior(pe_iv, rows(rdv, 7:12)).mu
+        # A forecaster that reads no surface ignores it.
+        @test po.forecast_relative(PriorExpectedReturns(), nothing, x12, win)[2] ==
+              po.forecast_relative(PriorExpectedReturns(), nothing, x12, rows(rd, 1:12))[2]
+        for alg in (ForecastReversion(; me = fr), ForecastReversion(; me = wme),
+                    ForecastTracking(; me = fr),
+                    MirrorDescent(; obj = RiskLoss(; window = 8, pe = pe_iv)))
+            opt = OPS(; alg = alg)
+            wb = optimise(opt, rdv).w
+            o = opt
+            for t in 1:T
+                o = po.partial_fit!(o, rows(rdv, t:t))
+            end
+            @test optimise(o).w == wb
+            ob = po.partial_fit!(po.partial_fit!(opt, rows(rdv, 1:11)), rows(rdv, 12:T))
+            @test optimise(ob).w == wb
+        end
+        # The Risk Loss reads the surface: its path differs from the one under the
+        # sample covariance.
+        md(pe) = optimise(OPS(;
+                              alg = MirrorDescent(; obj = RiskLoss(; window = 8, pe = pe))),
+                          rdv).w
+        @test !isapprox(md(pe_iv), md(EmpiricalPrior()); atol = 1e-6)
+    end
+
+    @testset "The head selects in the Excess Frame under x_src = ExcessSource() (#1662)" begin
+        # Under `x_src = ExcessSource()` the step reads `1 + r - b`, and every reader of the
+        # rows inside a rule reads `X - B`. The rows stay raw. So the head in the Excess Frame
+        # equals the head on hand-built excess returns, under a vector and a matrix benchmark.
+        xs = ExcessSource()
+        rngb = StableRNG(1662)
+        Bv = 0.01 .* randn(rngb, T)
+        Bm = 0.01 .* randn(rngb, T, N)
+        nbm = nx .* "_b"
+        rdb = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bv, ts = ts)
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nbm, B = Bm, ts = ts)
+        exv = ReturnsResult(; nx = nx, X = R .- Bv, ts = ts)
+        exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
+        # The price relative alone, a refit forecaster, a folded forecaster, a scale and a
+        # correlation window.
+        algs = (ExponentiatedGradient(), PassiveAggressiveMeanReversion(),
+                ForecastReversion(), ForecastReversion(; me = SimpleExpectedReturns()),
+                ForecastReversion(; scale = MovingAverage()), AntiCorrelation(; window = 5))
+        for alg in algs, (b, e) in ((rdb, exv), (rdm, exm)), t in (6, 15, T)
+            @test optimise(OPS(; alg = alg, x_src = xs), rows(b, 1:t)).w ==
+                  optimise(OPS(; alg = alg), rows(e, 1:t)).w
+        end
+        # The frame moves a rule that is not invariant to it.
+        @test !isapprox(optimise(OPS(; x_src = xs), rdb).w, optimise(OPS(), rdb).w;
+                        atol = 1e-8)
+        # `DataSource()` reads the raw rows, as `nothing` does.
+        @test optimise(OPS(; x_src = DataSource()), rdb).w == optimise(OPS(), rdb).w
+        # The step reads no prior, so it refuses `PriorSource()`, and a `Bool` builds no head.
+        @test_throws ArgumentError OPS(; x_src = PriorSource())
+        @test_throws TypeError OPS(; x_src = true)
+        # Online equals batch in the Excess Frame.
+        for alg in algs
+            opt = OPS(; alg = alg, x_src = xs)
+            o = opt
+            for t in 1:T
+                o = po.partial_fit!(o, rows(rdm, t:t))
+            end
+            @test optimise(o).w == optimise(opt, rdm).w
+        end
+        # Each reader of the rows reads the frame inside a step, and the raw rows outside.
+        win, wine = rows(rdm, 1:12), rows(exm, 1:12)
+        inside(f) = first(po.with_projection_step(f, win, 12; x_src = xs))
+        @test inside(() -> po.head_frame_returns(win)) == wine.X
+        @test po.head_frame_returns(win) === win.X
+        x12 = 1 .+ wine.X[12, :]
+        me = SimpleExpectedReturns()
+        @test inside(() -> po.forecast_relative(me, nothing, x12, win))[2] ==
+              po.forecast_relative(me, nothing, x12, wine)[2]
+        @test inside(() -> po.forecast_relative(me, po.forecaster_seed(me), x12, win))[2] ==
+              po.forecast_relative(me, po.forecaster_seed(me), x12, wine)[2]
+        @test inside(() -> po.scale_relative(MovingAverage(), x12, win)) ==
+              po.scale_relative(MovingAverage(), x12, wine)
+        # A pattern selector reads the frame, and the leader reads the raw rows, so a
+        # selector that reads no returns does not move.
+        ftl(sel, x_src) = Logging.with_logger(Logging.NullLogger()) do
+            return optimise(OPS(; alg = FollowTheLeader(; sel = sel), x_src = x_src),
+                            rows(rdm, 1:12)).w
+        end
+        @test !isapprox(ftl(CorrelationMatch(), xs), ftl(CorrelationMatch(), nothing);
+                        atol = 1e-6)
+        @test ftl(Prefix(), xs) == ftl(Prefix(), nothing)
+        # The wealth that `predict` reports stays raw: the fund holds the assets.
+        res = optimise(OPS(; x_src = xs), rdb)
+        @test vec(predict(res, rdb).rd.X) ≈ R * res.w
+        # Returns data with no benchmark is refused.
+        @test_throws ArgumentError optimise(OPS(; x_src = xs), rd)
+        @test_throws ArgumentError po.partial_fit!(OPS(; x_src = xs), rows(rd, 1:3))
+        # A gap in the benchmark is a Held Gap.
+        Bg = copy(Bv)
+        Bg[5] = NaN
+        rdg = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bg)
+        @test_throws ArgumentError optimise(OPS(; x_src = xs, strict = true), rdg)
+        # The state pins the benchmark names only when a reader of the group states
+        # `ExcessSource()`.
+        o = po.partial_fit!(OPS(; x_src = xs), rows(rdb, 1:3))
+        @test o.cache.nb == ["BM"]
+        rdb2 = ReturnsResult(; nx = nx, X = R, nb = ["BM2"], B = Bv, ts = ts)
+        @test_throws ArgumentError po.partial_fit!(o, rows(rdb2, 4:5))
+        o0 = po.partial_fit!(OPS(), rows(rdb, 1:3))
+        @test isnothing(o0.cache.nb)
+        @test po.partial_fit!(o0, rows(rdb2, 4:5)).cache.n == 5
+        # A Risk Loss whose prior reads the Excess Frame is a reader of the group, so its
+        # head pins the names, whatever the source of the step is.
+        ol = OPS(; x_src = DataSource(),
+                 alg = MirrorDescent(;
+                                     obj = RiskLoss(; window = 2,
+                                                    pe = EmpiricalPrior(; x_src = xs))))
+        ol = po.partial_fit!(ol, rows(rdb, 1:3))
+        @test ol.cache.nb == ["BM"]
+        @test_throws ArgumentError po.partial_fit!(ol, rows(rdb2, 4:5))
+        # A view slices the names of a matrix benchmark and keeps that of a vector one.
+        om = po.partial_fit!(OPS(; x_src = xs), rows(rdm, 1:3))
+        @test po.port_opt_view(om.cache, [1, 3]).nb == nbm[[1, 3]]
+        @test po.port_opt_view(o.cache, [1, 3]).nb == ["BM"]
+        @test copy(om.cache).nb == nbm
+    end
+
+    @testset "A Risk Loss fits its prior in the frame that its prior states (#1663)" begin
+        # The rows stay raw, and the loss gives them to its prior, which reads its own
+        # source: under `x_src = ExcessSource()` the gradient equals that of the same loss on
+        # hand-built `X - B` rows, under a vector and a matrix benchmark, and a Variance loss
+        # becomes a tracking variance.
+        xs = ExcessSource()
+        loss(src; kw...) = RiskLoss(; window = 8, pe = EmpiricalPrior(; x_src = src), kw...)
+        rngb = StableRNG(1663)
+        Bv = 0.01 .* randn(rngb, T)
+        Bm = 0.01 .* randn(rngb, T, N)
+        rdb = ReturnsResult(; nx = nx, X = R, nb = ["BM"], B = Bv, ts = ts)
+        rdm = ReturnsResult(; nx = nx, X = R, nb = nx .* "_b", B = Bm, ts = ts)
+        exv = ReturnsResult(; nx = nx, X = R .- Bv, ts = ts)
+        exm = ReturnsResult(; nx = nx, X = R - Bm, ts = ts)
+        u = [0.1, 0.2, 0.3, 0.4]
+        grad(src, r) = po.loss_gradient(loss(src), u, ones(N), r)
+        for (b, e) in ((rdb, exv), (rdm, exm)), t in (2, 8, 30)
+            @test grad(xs, rows(b, 1:t)) == grad(nothing, rows(e, 1:t))
+            @test !isapprox(grad(xs, rows(b, 1:t)), grad(nothing, rows(b, 1:t)))
+        end
+        # The head: the loss's prior and the step in the Excess Frame together equal the
+        # plain head on `X - B`. The loss's prior alone moves the head, and online equals
+        # batch. The step states `DataSource()`, so the mix is stated and silent.
+        md(src) = MirrorDescent(; eta = 50.0, obj = loss(src))
+        @test optimise(OPS(; alg = md(xs), x_src = xs), rdm).w ==
+              optimise(OPS(; alg = md(nothing)), exm).w
+        w = optimise(OPS(; alg = md(xs), x_src = DataSource()), rdm).w
+        @test !isapprox(w, optimise(OPS(; alg = md(nothing)), rdm).w; atol = 1e-6)
+        o = OPS(; alg = md(xs), x_src = DataSource())
+        for t in 1:T
+            o = po.partial_fit!(o, rows(rdm, t:t))
+        end
+        @test optimise(o).w == w
+        @test po.factory(loss(xs), u).pe.x_src === xs
+        # Rows with no benchmark are refused.
+        @test_throws ArgumentError optimise(OPS(; alg = md(xs), x_src = DataSource()),
+                                            rows(rd, 1:10))
+        @test_throws ArgumentError po.partial_fit!(OPS(; alg = md(xs),
+                                                       x_src = DataSource()),
+                                                   rows(rd, 1:10))
+        # A data benchmark under a prior of the Excess Frame would subtract the benchmark
+        # twice, so the constructor refuses it (ADR 0208, decision 3). Under a raw prior the
+        # loss builds.
+        dtr = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        @test_throws ArgumentError loss(xs; r = dtr)
+        @test_throws ArgumentError loss(xs; r = [Variance(), dtr])
+        @test loss(DataSource(); r = dtr).r === dtr
+    end
+
+    @testset "The source of the step and the readers of a Risk Loss form one group (ADR 0214)" begin
+        # A step at `nothing` reads the raw rows. Beside a prior of the Excess Frame it is a
+        # reader that the caller can have forgotten, so the head warns once and builds.
+        xs = ExcessSource()
+        md(src) = MirrorDescent(; obj = RiskLoss(; pe = EmpiricalPrior(; x_src = src)))
+        raw_step = r"`OnlinePortfolioSelection` holds a reader that states `x_src = ExcessSource\(\)`.*: `OnlinePortfolioSelection`\."
+        @test_logs (:warn, raw_step) OPS(; alg = md(xs))
+        # A prior at `nothing` beside a step of the Excess Frame warns with its path.
+        raw_loss = r"read the raw returns data: `alg.obj.pe`\."
+        @test_logs (:warn, raw_loss) OPS(; alg = md(nothing), x_src = xs)
+        # The paths of a rule over rules name each expert.
+        mix = ExpertMixture(; experts = [md(nothing), md(xs)])
+        @test_logs (:warn, r"`alg.experts\[1\].obj.pe`\.") OPS(; alg = mix)
+        # A stated mix is silent, and so is a group with no reader of the Excess Frame.
+        @test_logs OPS(; alg = md(xs), x_src = DataSource())
+        @test_logs OPS(; alg = md(DataSource()), x_src = xs)
+        @test_logs OPS(; alg = md(nothing))
+        fr = po.group_frames(OPS(; alg = md(nothing), x_src = xs))
+        @test fr.excess && fr.raw == ["alg.obj.pe"]
+        @test po.group_source(OPS(; alg = md(xs), x_src = DataSource())) === xs
+        @test isnothing(po.group_source(OPS()))
+        # A leader is a head with its own group, so the walk stops at it.
+        lead = MeanRisk(;
+                        opt = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = xs),
+                                            slv = Solver(; solver = nothing)))
+        @test po.group_frames(OPS(; alg = FollowTheLeader(; opt = lead))).raw ==
+              ["OnlinePortfolioSelection"]
+        @test !po.group_frames(OPS(; alg = FollowTheLeader(; opt = lead))).excess
     end
 
     @testset "Show, docs and the search seam" begin

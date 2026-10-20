@@ -40,7 +40,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores a Return Forecast against the forward idiosyncratic return.
 
-It is the default target, because it is the component a Return Forecast forecasts. A fitted member regresses its Descriptor scores on the forward idiosyncratic return inside [`CrossSectionalFactorPrior`](@ref), so the forecast answers for the idiosyncratic history. [`forecast_idiosyncratic_returns`](@ref) refuses a block that carries no cross-sectional fit.
+It is the default target, because it is the component a Return Forecast forecasts. A fitted member regresses its Descriptor scores on the forward idiosyncratic return inside [`CrossSectionalFactorPrior`](@ref), so the forecast answers for the idiosyncratic history. [`forecast_idiosyncratic_returns`](@ref) refuses a block that carries no cross-sectional fit, and gives `NaN` at a pair whose leverage is one, so that pair is not a sample of the target.
 
 # Examples
 
@@ -83,7 +83,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Scores a Return Forecast against the forward mean of a named numeric Panel Field.
 
-[`panel_field_values`](@ref) reads the field, so a cell the panel fill touched comes back as `NaN` and never enters the target. The target holds the name of the field, not its values. So the Result can carry and print it, and the read refuses a field that the panel does not hold.
+[`descriptor_field_values`](@ref) reads the field, so a cell the panel fill touched comes back as `NaN` and never enters the target. The target holds the name of the field, not its values. So the Result can carry and print it, and the read refuses a field that the panel does not hold.
 
 # Fields
 
@@ -112,7 +112,7 @@ PanelFieldTarget
   - [`AbstractForecastTarget`](@ref)
   - [`IdiosyncraticTarget`](@ref)
   - [`AssetReturnTarget`](@ref)
-  - [`panel_field_values`](@ref)
+  - [`descriptor_field_values`](@ref)
 """
 @concrete struct PanelFieldTarget <: AbstractForecastTarget
     """
@@ -138,7 +138,7 @@ end
 
 Return the history a forward target is taken over, on the observation axis of a factor-model block.
 
-It is the one seam of the [`AbstractForecastTarget`](@ref) family, and the one place that reconciles the two observation axes. The idiosyncratic history lives on the block's rows already. The asset returns and the Panel Fields live on the carrier's rows, and the block is a suffix of the carrier, so the method cuts both through [`return_forecast_rows`](@ref) and [`return_forecast_cut`](@ref). Every member answers on the same axis as the `hist` of a Return Forecast Result.
+It is the one method that each member of the [`AbstractForecastTarget`](@ref) family implements, and the one place that reconciles the two observation axes. The idiosyncratic history lives on the block's rows already. The asset returns and the Panel Fields live on the rows of the returns data, and the block is a suffix of the returns data, so the method cuts both through [`return_forecast_rows`](@ref) and [`return_forecast_cut`](@ref). Every member answers on the same axis as the `hist` of a Return Forecast Result.
 
 # Arguments
 
@@ -150,7 +150,7 @@ It is the one seam of the [`AbstractForecastTarget`](@ref) family, and the one p
 
   - `csfm.csr` is given, for [`IdiosyncraticTarget`](@ref). Raises an [`IsNothingError`](@ref).
   - The rules of [`return_forecast_rows`](@ref), for the other two members.
-  - The rules of [`panel_field_values`](@ref), for [`PanelFieldTarget`](@ref).
+  - The rules of [`descriptor_field_values`](@ref), for [`PanelFieldTarget`](@ref).
 
 # Returns
 
@@ -173,7 +173,7 @@ function forecast_target_history(::AssetReturnTarget, rd::ReturnsResult,
 end
 function forecast_target_history(target::PanelFieldTarget, rd::ReturnsResult,
                                  csfm::CrossSectionalFactorModel)::MatNum
-    return return_forecast_cut(panel_field_values(rd, target.name),
+    return return_forecast_cut(descriptor_field_values(rd, target.name),
                                return_forecast_rows(rd, csfm))
 end
 """
@@ -301,11 +301,11 @@ Producing `alpha` can cost a rolling refit, so the Result stores it rather than 
 
 # The dates are row indices
 
-`dates` indexes the rows of `alpha` and `y`, which live on the observation axis of the factor-model block rather than on that of the carrier. A caller who wants timestamps reads them off the carrier's `ts` at the block's rows, through [`return_forecast_rows`](@ref).
+`dates` indexes the rows of `alpha` and `y`, which live on the observation axis of the factor-model block rather than on that of the returns data. A caller who wants timestamps reads them off the `ts` of the returns data at the block's rows, through [`return_forecast_rows`](@ref).
 
 # The universe is carried, not re-read
 
-`umsk` is the estimation mask of the Asset Panel, cut to the block's rows, and it is what [`forecast_coverage`](@ref) divides by. The Result carries it for two reasons. The coverage reads it at the Result layer, where no carrier is in hand, and every consumer of the evaluation must read the same universe: the summary, the window tables and the plots. On a point-in-time panel it keeps an asset that has not listed yet, or has delisted, out of the denominator. A late lister is not a lost Descriptor. The bare method of [`forecast_evaluation`](@ref) takes it as a keyword and defaults it to every asset.
+`umsk` is the estimation mask of the Asset Panel, cut to the block's rows, and it is what [`forecast_coverage`](@ref) divides by. The Result carries it for two reasons. The coverage reads it at the Result layer, where no returns data is in hand, and every consumer of the evaluation must read the same universe: the summary, the window tables and the plots. On a point-in-time panel it keeps an asset that has not listed yet, or has delisted, out of the denominator. A late lister is not a lost Descriptor. The bare method of [`forecast_evaluation`](@ref) takes it as a keyword and defaults it to every asset.
 
 # The forecast is written on the universe
 
@@ -384,7 +384,7 @@ end
 
 Refuse an evaluation parameter outside its domain, before any history is built.
 
-Each method of [`forecast_evaluation`](@ref) runs this check first. The two methods that take a carrier build the forward target through [`forward_mean_returns`](@ref), which reads the history at observation `t + lag`. A negative `lag` reads before the first observation, so the check runs before the target is built, and all three methods refuse the same parameter with the same `DomainError`. The Estimator method also refits a member before it pairs, and the check runs before the refit, so a refused call costs no refit.
+Each method of [`forecast_evaluation`](@ref) runs this check first. The two methods that take returns data build the forward target through [`forward_mean_returns`](@ref), which reads the history at observation `t + lag`. A negative `lag` reads before the first observation, so the check runs before the target is built, and all three methods refuse the same parameter with the same `DomainError`. The Estimator method also refits a member before it pairs, and the check runs before the refit, so a refused call costs no refit.
 
 # Arguments
 
@@ -431,9 +431,9 @@ end
                                 ties::Symbol = :average,
                                 ppy::Number = 1) -> ForecastEvaluationResult
 
-Pair a Return Forecast history with the forward target built from a carrier and a block.
+Pair a Return Forecast history with the forward target built from returns data and a block.
 
-The two methods of [`forecast_evaluation`](@ref) that take a carrier and a block differ only in where the history comes from. A fitted Result publishes one, and [`forecast_history`](@ref) builds one for an Estimator. So this function builds the target once for both, together with the axis check that refuses a carrier the forecast was not fitted on. It also reads the universe that the coverage divides by. That is the estimation mask of the Asset Panel, cut to the block's rows through [`return_forecast_rows`](@ref), because the block is a suffix of the carrier and the mask lives on the carrier's axis.
+The two methods of [`forecast_evaluation`](@ref) that take returns data and a block differ only in where the history comes from. A fitted Result publishes one, and [`forecast_history`](@ref) builds one for an Estimator. So this function builds the target once for both, together with the axis check that refuses returns data that the forecast was not fitted on. It also reads the universe that the coverage divides by. That is the estimation mask of the Asset Panel, cut to the block's rows through [`return_forecast_rows`](@ref), because the block is a suffix of the returns data and the mask lives on the axis of the returns data.
 
 # Algorithm
 
@@ -483,7 +483,7 @@ function forecast_evaluation_pairing(alpha::MatNum, rd::ReturnsResult,
     forecast_evaluation_assert_parameters(; horizon, lag, step, min_count, ties, ppy)
     X = forecast_target_history(target, rd, csfm)
     @argcheck(size(X, 1) == size(alpha, 1) && size(X, 2) == size(alpha, 2),
-              DimensionMismatch("the target history ($(size(X, 1))×$(size(X, 2))) must match the Return Forecast history ($(size(alpha, 1))×$(size(alpha, 2))). Hand the carrier and the block the forecast was fitted on."))
+              DimensionMismatch("the target history ($(size(X, 1))×$(size(X, 2))) must match the Return Forecast history ($(size(alpha, 1))×$(size(alpha, 2))). Hand in the returns data and the block that the forecast was fitted on."))
     y = forward_mean_returns(X, horizon, lag)
     umsk = descriptor_asset_panel(rd).emsk[return_forecast_rows(rd, csfm), :]
     return forecast_evaluation(alpha, y; umsk = umsk, target = target, horizon = horizon,
@@ -512,7 +512,7 @@ end
 
 Pair a Return Forecast with the forward target it is answerable for, out of sample.
 
-This is the bottom of the evaluation hierarchy. The bare method takes the two matrices, writes the forecast onto the universe and finds the evaluation dates, and computes nothing else. So every statistic above it is testable without a fit, and a caller can score a forecast the library did not produce. It takes the universe as a keyword, and defaults it to every asset. The Result method reads the forecast history off a fitted member and builds the target from the carrier and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
+This is the bottom of the evaluation hierarchy. The bare method takes the two matrices, writes the forecast onto the universe and finds the evaluation dates, and computes nothing else. So every statistic above it is testable without a fit, and a caller can score a forecast the library did not produce. It takes the universe as a keyword, and defaults it to every asset. The Result method reads the forecast history off a fitted member and builds the target from the returns data and the block, so a caller who holds a Result writes one call. The Estimator method asks [`forecast_history`](@ref) for the history instead, which refits a member that publishes none, so every member the family ships is evaluable through it.
 
 The evaluation and every statistic above it compute in the element types of `alpha` and `y`, so each of the two must hold every value a statistic writes: a fraction, and `NaN` for a value that cannot be scored. A floating-point type holds both. An integer type holds neither, so an integer forecast or target raises an `InexactError` at the first statistic that writes one, and at the pairing itself when a universe mask writes `NaN` into the forecast. A `Rational` holds a fraction and no `NaN`, so [`forecast_ic`](@ref) scores it and [`forecast_portfolio`](@ref) raises. Convert such a matrix to a floating-point type before the call. The evaluation does not convert the pair and does not refuse it by its type, because both would close it to number types it has never seen. A conversion picks a floating-point type on the caller's behalf, and a check for `AbstractFloat` refuses a type that holds both values without being one, such as an automatic-differentiation dual number. A `Float32` or a `BigFloat` pair is scored in its own precision.
 
@@ -540,7 +540,7 @@ The evaluation and every statistic above it compute in the element types of `alp
   - `step`: Number of observations between two evaluation dates. The default of `horizon` gives forward windows that do not overlap. A smaller stride scores more dates whose windows overlap, and the t-statistic of every summary reads that overlap through [`forecast_ic_lags`](@ref), so a smaller stride does not inflate it.
   - `min_count`: Least number of assets a cross-section needs before a statistic of it is reported. It is carried rather than applied here, because the pairing is the same whatever the threshold.
   - $(arg_dict[:cs_ties]) It is carried rather than applied here, and [`forecast_ic`](@ref), [`forecast_factor_correlation`](@ref) and the `:rank` book of [`forecast_portfolio`](@ref) read it. The default gives equal forecasts equal ranks. A caller who wants the other rule on the same pairing calls the bare method again on `fe.alpha`, `fe.y` and `umsk = fe.umsk`, which refits nothing.
-  - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period. It is carried rather than applied here, and the verbs above map it onto `performance_summary`'s `periods_per_year`.
+  - `ppy`: Periods per year. `252` annualises a daily fit, and the default of `1` reports the statistics per period. It is carried rather than applied here, and the verbs above pass it to the `ppy` of `performance_summary`.
 
 # Validation
 

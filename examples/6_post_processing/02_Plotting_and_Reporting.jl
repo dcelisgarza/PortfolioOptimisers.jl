@@ -106,15 +106,19 @@ plot_drawdowns(res_ratio.w, rd)
 [`PerformanceSummaryResult`](@ref), which [`performance_summary`](@ref) computes. Call
 `performance_summary` when you want the numbers and not the plot, for example to put them in a
 table, to compare two portfolios, or to test them. It needs no plotting package.
+
+The keyword `ppy` is the number of periods in one year. Its default of `1` states each figure
+per period, which is right at any data frequency. Our returns are daily, so `ppy = 252`
+annualises them.
 =#
 
-performance_summary(res_ratio, rd)
+performance_summary(res_ratio, rd; ppy = 252)
 
 #=
 We draw the same summary as a figure.
 =#
 
-plot_performance_summary(res_ratio, rd)
+plot_performance_summary(res_ratio, rd; ppy = 252)
 
 #=
 ## 6. Risk and return

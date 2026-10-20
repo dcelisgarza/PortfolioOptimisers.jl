@@ -6,6 +6,13 @@ struct UnimplementedPreprocessingResult <: PortfolioOptimisers.AbstractPreproces
 # A price-level carrier that implements no `port_opt_view`, used to reach the fallback of
 # the family.
 struct BarePricesResult <: PortfolioOptimisers.AbstractPricesResult end
+# A missing-data rule that keeps the last asset, used to prove that a new rule plugs in
+# through `fit_universe`.
+struct KeepLastAsset <: PortfolioOptimisers.AbstractMissingDataFilterAlgorithm end
+function PortfolioOptimisers.fit_universe(::KeepLastAsset, ::MissingDataFilter,
+                                          pr::PricesResult)
+    return [size(values(pr.X), 2)]
+end
 # A Gap Return algorithm that ignores the invariant entirely and answers the whole column with
 # one sentinel. `apply_gap_return` reads back only the writable cells, so the invariant is the
 # driver's and not the algorithm's, and this is what proves it.
@@ -50,7 +57,8 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # `missing_row_percent`, and the oracles below were recorded on the twenty assets
         # and five factors that survived it. The conversion now deletes nothing, so the
         # gap column arrives as a column of gaps and the oracle covers the columns beside
-        # it, bit for bit.
+        # it, bit for bit. #1414 recorded both files again from `(p_t - p_{t-1}) / p_{t-1}`,
+        # which is the correctly rounded return on every cell of this fixture.
         rd = prices_to_returns(price_ingestion(PriceIngestion(), Px; F = Py))
         ts1 = rd.ts
         X1 = rd.X
@@ -381,13 +389,15 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         end
 
         @testset "other ReturnsResult constructors thread Z" begin
-            # returns_result_picker folds B into X; it must not lose Z on the way.
+            # The online step of a prior at `x_src = ExcessSource()` folds X - B in a rebuilt ReturnsResult;
+            # it must not lose Z on the way.
             rdb = ReturnsResult(; nx = ["A", "B"], X = rand(rng, 4, 2), nb = ["bm"],
                                 B = rand(rng, 4), pnl = matrix_panel(nz, rand(rng, 2, 2)))
-            rp = returns_result_picker(rdb, true)
+            rp = PortfolioOptimisers.prior_step_returns(rdb, ExcessSource())
             @test panel_feature_matrix(rp.pnl)[2] == panel_feature_matrix(rdb.pnl)[2]
             @test panel_feature_matrix(rp.pnl)[1] == panel_feature_matrix(rdb.pnl)[1]
-            @test isnothing(returns_result_picker(rdb, false).B) == false
+            @test rp.X == rdb.X .- rdb.B && rp.B === rdb.B
+            @test PortfolioOptimisers.prior_step_returns(rdb, nothing) === rdb
 
             # AssetSelectorResult subselects through port_opt_view, so it is carried for free.
             rds = ReturnsResult(; nx = ["A", "B", "C"], X = rand(rng, 5, 3),
@@ -399,31 +409,62 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
     end
 
     @testset "prices_to_returns closed form" begin
-        # A two-row example, computed by hand. `TimeSeries.percentchange` routes the simple
-        # branch through `expm1(ln P_t - ln P_{t-1})` rather than the quotient the docstring
-        # states, so the two agree to floating point and not to the last bit.
+        # A two-row example, computed by hand. The simple branch is the formula the
+        # docstring states, bit for bit (#1414). The log branch is `log1p` of it (#1519).
         ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
         P = TimeArray(ts, [100.0 50.0; 110.0 45.0; 121.0 54.0], [:a, :b])
-        simple = [110/100-1 45/50-1; 121/110-1 54/45-1]
+        simple = [(110-100)/100 (45-50)/50; (121-110)/110 (54-45)/45]
         logret = [log(110 / 100) log(45 / 50); log(121 / 110) log(54 / 45)]
 
         rs = prices_to_returns(P)
-        @test rs.X ≈ simple
-        @test rs.X ==
-              expm1.(log.([110.0 45.0; 121.0 54.0]) .- log.([100.0 50.0; 110.0 45.0]))
+        @test rs.X == simple
         @test rs.nx == ["a", "b"]
         @test rs.ts == ts[2:3]
 
         rl = prices_to_returns(P; ret_method = :log)
         @test rl.X ≈ logret
-        @test rl.X == log.([110.0 45.0; 121.0 54.0]) .- log.([100.0 50.0; 110.0 45.0])
+        @test rl.X == log1p.(simple)
 
         # `padding` keeps the first observation and fills its return with `NaN`, so the
         # returns keep the length of the price clock.
         rp = prices_to_returns(P; padding = true)
         @test rp.ts == ts
         @test all(isnan, rp.X[1, :])
-        @test rp.X[2:3, :] ≈ simple
+        @test rp.X[2:3, :] == simple
+
+        # #1414: the difference of two prices within a factor of two of each other is exact,
+        # so the division is the one rounding and the return is correctly rounded. The jump
+        # from 100.3 to 1000.7 rounds twice, and stays within one ulp. The old route,
+        # `expm1` of a log difference, matched no cell of this example exactly.
+        pq = [100.0, 100.1, 99.95, 100.3, 1000.7, 999.9]
+        tq = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
+        rq = vec(prices_to_returns(TimeArray(tq, reshape(pq, :, 1), [:a])).X)
+        exact = big.(pq[2:end]) ./ big.(pq[1:(end - 1)]) .- 1
+        @test rq == (pq[2:end] .- pq[1:(end - 1)]) ./ pq[1:(end - 1)]
+        @test rq[[1, 2, 3, 5]] == Float64.(exact[[1, 2, 3, 5]])
+        @test abs(rq[4] - exact[4]) <= eps(rq[4])
+        @test rq != expm1.(log.(pq[2:end]) .- log.(pq[1:(end - 1)]))
+
+        # #1519: the log branch is `log1p` of the simple return. The simple return has one
+        # rounding, and `log1p` adds about one ulp, so every log return is within one ulp of
+        # the exact one. The difference of logarithms cancels on two close prices: each
+        # logarithm carries an absolute error of about `eps * |log p|`, so the error grows
+        # with the price level and not with the return.
+        lq = vec(prices_to_returns(TimeArray(tq, reshape(pq, :, 1), [:a]);
+                                   ret_method = :log).X)
+        lexact = log.(big.(pq[2:end]) ./ big.(pq[1:(end - 1)]))
+        @test lq == log1p.(rq)
+        @test all(abs.(lq .- lexact) .<= eps.(lq))
+        # Prices near 1e5 and a return of 1e-9: the old difference of logarithms is
+        # thousands of ulps off, and the fix stays within one ulp.
+        ph = [1.0e5, 1.0e5 * (1 + 1e-9), 1.0e5 * (1 + 2e-9)]
+        th = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
+        lh = vec(prices_to_returns(TimeArray(th, reshape(ph, :, 1), [:a]);
+                                   ret_method = :log).X)
+        hexact = log.(big.(ph[2:end]) ./ big.(ph[1:(end - 1)]))
+        hold = log.(ph[2:end]) .- log.(ph[1:(end - 1)])
+        @test all(abs.(lh .- hexact) .<= eps.(lh))
+        @test all(abs.(hold .- hexact) .> 1000 .* eps.(lh))
 
         # A `NaN` price is carried, not deleted. The clock keeps its row, and the two
         # returns of `a` that read the absent price are the ones left non-finite: nothing
@@ -444,15 +485,23 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
               [210/200-1 145/150-1; 221/210-1 154/145-1]
         @test_throws MethodError prices_to_returns(P; map_func = (t, v) -> (t, 2 .* v))
 
-        # Both branches run through a logarithm, so both need a positive price. The simple
-        # branch throws too, although the closed form it documents is defined there.
-        @test_throws DomainError prices_to_returns(TimeArray(ts,
-                                                             [100.0 50.0; -110.0 45.0;
-                                                              121.0 54.0], [:a, :b]))
-        @test_throws DomainError prices_to_returns(TimeArray(ts,
-                                                             [100.0 50.0; -110.0 45.0;
-                                                              121.0 54.0], [:a, :b]);
-                                                   ret_method = :log)
+        # A price has no sign, so both branches refuse a negative price. The quotient of
+        # the simple branch takes no logarithm, so an explicit check refuses it (#1414),
+        # names the column, and skips an absent price.
+        neg_px = TimeArray(ts, [100.0 50.0; -110.0 45.0; 121.0 54.0], [:a, :b])
+        @test_throws DomainError prices_to_returns(neg_px)
+        @test_throws DomainError prices_to_returns(neg_px; ret_method = :log)
+        neg_err = try
+            prices_to_returns(neg_px)
+        catch err
+            err
+        end
+        @test neg_err.val == ["a"]
+        neg_f = TimeArray(ts, reshape([101.0, -102.0, 103.0], :, 1), [:f1])
+        @test_throws DomainError prices_to_returns(price_ingestion(PriceIngestion(), P;
+                                                                   F = neg_f))
+        @test prices_to_returns(TimeArray(ts, [100.0 -0.0; 110.0 45.0; 121.0 54.0],
+                                          [:a, :b])).X[1, 2] == Inf
         # A zero price is an infinity rather than a throw, on either branch.
         zero_px = TimeArray(ts, [100.0 50.0; 0.0 45.0; 121.0 54.0], [:a, :b])
         @test prices_to_returns(zero_px).X[:, 1] == [-1.0, Inf]
@@ -594,9 +643,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
     @testset "PriceGapFill fits on the training window and never refits" begin
         # Map #955, ADR 0130. `missing` is the other spelling of an absent price, and the
-        # fill accepts it through `is_missing_value` exactly as `NaN`; `test_06g` drives the
-        # conventions and the bound on `NaN`, so what is pinned here is the `missing` path
-        # and the fit/apply replay across a train/test split.
+        # fill accepts it through `is_missing_value` exactly as `NaN`; the top-level testsets
+        # of this file from "The fill is bounded by the Listing Span under both conventions"
+        # on drive the conventions and the bound on `NaN`, so what is pinned here is the
+        # `missing` path and the fit/apply replay across a train/test split.
         ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
         # `a` is never observed, `b` is observed everywhere, and `c` is observed in the
         # training window alone.
@@ -816,6 +866,109 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws DomainError MissingDataFilter(; row_thr = 1.1)
     end
 
+    @testset "MissingDataFilter fits its universe to a fixed point (#1758)" begin
+        @test MissingDataFilter().alg isa FixedPointFilter
+        ts10 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 10))
+        # `c` misses 4 of 10 observations, which col_thr = 0.4 admits. The row filter drops
+        # the first three, where `a` and `b` miss, and over the 7 that stay `c` misses 4.
+        M = [NaN NaN 70; NaN NaN 71; NaN NaN 72; 100 50 NaN; 101 51 NaN; 102 52 NaN;
+             103 53 NaN; 104 54 77; 105 55 78; 106 56 79]
+        pr = PricesResult(; X = TimeArray(ts10, M, [:a, :b, :c]))
+        fp = MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3)
+        sp = MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3, alg = SinglePassFilter())
+        rsp = fit_preprocessing(sp, pr)
+        @test rsp.nx == [:a, :b, :c]
+        psp = apply_preprocessing(rsp, pr)
+        @test count(isnan, values(psp.X)[:, 3]) == 4
+        @test size(values(psp.X), 1) == 7
+        # The single pass is not a fixed point: a second fit drops `c`.
+        @test fit_preprocessing(sp, psp).nx == [:a, :b]
+        rfp = fit_preprocessing(fp, pr)
+        @test rfp.nx == [:a, :b]
+        pfp = apply_preprocessing(rfp, pr)
+        @test TimeSeries.timestamp(pfp.X) == ts10[4:10]
+        # At the fixed point a second fit changes nothing, and every kept asset and every
+        # kept observation meets its threshold on the rows that the apply step keeps.
+        @test fit_preprocessing(fp, pfp).nx == rfp.nx
+        gaps = isnan.(values(pfp.X))
+        @test all(vec(count(gaps; dims = 1)) .// size(gaps, 1) .<= 4 // 10)
+        @test all(vec(count(gaps; dims = 2)) .// size(gaps, 2) .<= 1 // 3)
+
+        # The rows come back from the whole window on each pass. Row 7 misses `a` and `c`,
+        # 2 of 4, so the first pass drops it. Over the 6 rows that stay `c` misses 3, more
+        # than 0.4, so `c` drops. Over `a`, `b` and `d` row 7 misses 1 of 3, which
+        # row_thr = 1/3 admits, so the fixed point keeps it.
+        Mr = [NaN NaN 70 80; NaN NaN 71 81; NaN NaN 72 82; 100 50 NaN 83; 101 51 NaN 84;
+              102 52 NaN 85; NaN 53 NaN 86; 104 54 77 87; 105 55 78 88; 106 56 79 89]
+        prr = PricesResult(; X = TimeArray(ts10, Mr, [:a, :b, :c, :d]))
+        rr = fit_preprocessing(MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3), prr)
+        @test rr.nx == [:a, :b, :d]
+        @test TimeSeries.timestamp(apply_preprocessing(rr, prr).X) == ts10[4:10]
+        rs = fit_preprocessing(MissingDataFilter(; col_thr = 0.4, row_thr = 1 // 3,
+                                                 alg = SinglePassFilter()), prr)
+        @test rs.nx == [:a, :b, :c, :d]
+        @test TimeSeries.timestamp(apply_preprocessing(rs, prr).X) ==
+              ts10[[4, 5, 6, 8, 9, 10]]
+        t4 = ts10[1:4]
+
+        # At row_thr = 1 the first pass is the fixed point, and the two rules agree.
+        for thr in (0.3, 0.4, 0.5, 1.0)
+            @test fit_preprocessing(MissingDataFilter(; col_thr = thr), pr).nx ==
+                  fit_preprocessing(MissingDataFilter(; col_thr = thr,
+                                                      alg = SinglePassFilter()), pr).nx
+        end
+
+        # The fixed point runs the row filter in the fit, so a row filter that keeps no
+        # observation is refused at the fit. The single pass refuses only at the apply.
+        Mz = [1.0 NaN; NaN 2.0; NaN 3.0; 4.0 NaN]
+        prz = PricesResult(; X = TimeArray(t4, Mz, [:a, :b]))
+        @test_throws PortfolioOptimisers.IsEmptyError fit_preprocessing(MissingDataFilter(;
+                                                                                          col_thr = 0.5,
+                                                                                          row_thr = 0.0),
+                                                                        prz)
+        rz = fit_preprocessing(MissingDataFilter(; col_thr = 0.5, row_thr = 0.0,
+                                                 alg = SinglePassFilter()), prz)
+        @test rz.nx == [:a, :b]
+        @test_throws PortfolioOptimisers.IsEmptyError apply_preprocessing(rz, prz)
+
+        # An asset with no price stays at col_thr = 1, so a row filter below 1 drops every
+        # observation. The fit refuses, and the message names the asset and the way out.
+        pe = PricesResult(;
+                          X = TimeArray(t4,
+                                        [1.0 2.0 NaN; 1.1 2.1 NaN; 1.2 2.2 NaN;
+                                         1.3 2.3 NaN], [:a, :b, :c]))
+        e = try
+            fit_preprocessing(MissingDataFilter(; row_thr = 0.0), pe)
+        catch err
+            err
+        end
+        @test e isa PortfolioOptimisers.IsEmptyError
+        @test occursin("row_thr = 0.0 drops every observation", e.msg)
+        @test occursin("The assets c have no observation", e.msg)
+        @test occursin("col_thr below 1", e.msg)
+        @test fit_preprocessing(MissingDataFilter(; col_thr = 0.99, row_thr = 0.0), pe).nx ==
+              [:a, :b]
+
+        # A factor with a gap at every observation misses every asset everywhere, and no
+        # filter drops a series, so the message says to fill it or remove it.
+        Ff = TimeArray(t4, [1.0 NaN; 1.1 NaN; 1.2 NaN; 1.3 NaN], [:f1, :f2])
+        pf = PricesResult(;
+                          X = TimeArray(t4, [1.0 2.0; 1.1 2.1; 1.2 2.2; 1.3 2.3], [:a, :b]),
+                          F = Ff)
+        e = try
+            apply_preprocessing(fit_preprocessing(MissingDataFilter(; row_thr = 0.5), pf),
+                                pf)
+        catch err
+            err
+        end
+        @test e isa PortfolioOptimisers.IsEmptyError
+        @test occursin("gap at every observation", e.msg)
+        @test !occursin("have no observation", e.msg)
+
+        # A new rule plugs in through `fit_universe`.
+        @test fit_preprocessing(MissingDataFilter(; alg = KeepLastAsset()), pr).nx == [:c]
+    end
+
     @testset "prices_to_returns filters neither axis" begin
         # Issue #473 was a defect in the interaction of the conversion's two threshold
         # keywords: the column filter counted the missing entries over the table as it was
@@ -823,7 +976,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # ADR 0133 removed both keywords rather than the arithmetic -- deleting a row or a
         # column is a Universe Policy, and a stateless conversion cannot fit one -- so the
         # interaction the defect lived in no longer exists. `MissingDataFilter` owns both
-        # axes, and `test_31` covers the split across its fit/apply seam.
+        # axes, and `test_30_pipeline_base.jl` covers the split across its fit/apply seam.
         ts4 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 4))
         # Row 1 alone is incomplete. `A` and `B` are missing there, and `C` is complete.
         X = TimeArray(ts4, [NaN NaN 1.0; 2.0 2.0 2.0; 3.0 3.0 3.0; 4.0 4.0 4.0],
@@ -975,7 +1128,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @testset "the writable set is the invariant, held once" begin
             base = prices_to_returns(Zg)
             rB = view(base.X, :, 2)
-            # `percentchange` reads two consecutive prices, so the k = 2 suspension leaves
+            # A return reads two consecutive prices, so the k = 2 suspension leaves
             # k + 1 = 3 non-finite returns, and the inception and the delisting one each.
             @test findall(!isfinite, rB) == [1, 3, 4, 5, 7]
             @test findall(!isfinite, view(base.X, :, 1)) == Int[]
@@ -1011,8 +1164,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # stay non-finite and the re-pricing observation carries the whole move. The
             # inception cell (1) and the delisting cell (7) are untouched.
             @test findall(!isfinite, rB) == [1, 3, 4, 7]
-            @test rB[5] ≈ 24 / 21 - 1
-            @test rB[5] == expm1(log(24.0) - log(21.0))
+            @test rB[5] == (24 - 21) / 21
             # No return is written before the first price, and none after the last.
             @test !isfinite(rB[1])
             @test !isfinite(rB[7])
@@ -1025,7 +1177,9 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
             # The log branch reads the same pair of prices through the same arithmetic.
             glog = prices_to_returns(Zg; ret_method = :log,
                                      gap_return_alg = CatchUpGapReturn())
-            @test glog.X[5, 2] == log(24.0) - log(21.0)
+            @test glog.X[5, 2] == log1p((24.0 - 21.0) / 21.0)
+            @test PortfolioOptimisers.gap_return_value(:log, 24.0, 21.0) ==
+                  log1p(PortfolioOptimisers.gap_return_value(:simple, 24.0, 21.0))
 
             # Under `padding` the padded row stays untouched for every asset.
             gpad = prices_to_returns(Zg; padding = true,
@@ -1218,25 +1372,25 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test PortfolioOptimisers.panel_feature_names(pnl) == panel_feature_matrix(pnl)[1]
 
         # The view cuts the label axis of a square tensor field only when it has the names.
-        @test isnothing(PortfolioOptimisers.panel_carrier_view(nothing, 1:2, 1:2, nothing))
+        @test isnothing(PortfolioOptimisers.asset_panel_view(nothing, 1:2, 1:2, nothing))
         sq = AssetPanel(;
                         pf = [TensorPanelField(; name = "prox", axis = "asset",
                                                labels = ["A", "B", "C"],
                                                vals = [1.0 2.0 3.0; 4.0 5.0 6.0;
                                                        7.0 8.0 9.0])])
-        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
-                                                                          ["A", "B", "C"])) ==
+        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
+                                                                        ["A", "B", "C"])) ==
               (["prox=B", "prox=C"], [5.0 6.0; 8.0 9.0])
-        @test panel_feature_matrix(PortfolioOptimisers.panel_carrier_view(sq, :, [2, 3],
-                                                                          nothing)) ==
+        @test panel_feature_matrix(PortfolioOptimisers.asset_panel_view(sq, :, [2, 3],
+                                                                        nothing)) ==
               (["prox=A", "prox=B", "prox=C"], [4.0 5.0 6.0; 7.0 8.0 9.0])
         # A time-varying panel is cut on both axes, and a static one ignores the rows.
         Z3 = reshape(Float64.(1:36), 6, 3, 2)
-        tv = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
-                                                    [1, 3], nothing)
+        tv = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3), [2, 5],
+                                                  [1, 3], nothing)
         @test panel_feature_matrix(tv)[2] == Z3[[2, 5], [1, 3], :]
-        st = PortfolioOptimisers.panel_carrier_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
-                                                    [2, 5], [1, 3], nothing)
+        st = PortfolioOptimisers.asset_panel_view(matrix_panel(["f1", "f2"], Z3[1, :, :]),
+                                                  [2, 5], [1, 3], nothing)
         @test panel_feature_matrix(st)[2] == Z3[1, [1, 3], :]
     end
     @testset "the preprocessing family: its levels, its missing values and its stubs" begin
@@ -1300,4 +1454,1980 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test occursin("UnimplementedPreprocessingResult subtypes AbstractPreprocessingEstimator or AbstractPreprocessingResult",
                        msg(() -> apply_preprocessing(UnimplementedPreprocessingResult(), pr)))
     end
+end
+
+#=
+Check `src/03_InputData/14_CrossSectionalTransforms.jl` against the rules its docstrings
+state, and against the oracle that the map of issue #643 ports. Issue #716.
+
+THREE FACTS SHAPE THE PROBES.
+
+1. THE STORED MATRICES COME FROM THE ORACLE. Every `ORACLE_*` matrix below was produced
+   by the oracle's own five transformers, driven on the inputs written beside them. `The five
+   members reproduce the oracle` compares each one cell by cell, including the position of
+   every `NaN`, and states the measured worst cell beside its tolerance.
+
+2. A SECOND, INDEPENDENT DERIVATION STANDS BESIDE THEM. `naive_winsorise`,
+   `naive_tanh_shrink`, `naive_standardise`, `naive_percentile_rank` and
+   `naive_gaussian_rank` re-derive the same quantities in plain Julia, one observation at a
+   time, sharing no code with the implementation: the rank counting is a double loop rather
+   than a sorted search, and the inverse normal comes from `Distributions` rather than from
+   `erfinv`. So no testset compares the file against itself.
+
+3. THE ESTIMATION SET IS THE ONE RULE EVERY MEMBER SHARES. It is the finite cells carrying a
+   positive weight when `w` is given, and the finite cells otherwise. Three testsets pin its
+   three consequences separately: an observation with an empty set returns all `NaN`, a cell
+   outside the set is still transformed against it, and a group too small to estimate from
+   takes the whole observation's statistics.
+=#
+
+using Statistics, Distributions
+include(joinpath(@__DIR__, "parity_harness.jl"))
+
+# --- the second derivation ---------------------------------------------------------------
+#
+# Written one observation at a time from the definitions in the docstrings. It shares no code
+# with `src/03_InputData/14_CrossSectionalTransforms.jl`.
+
+function naive_masks(x, wrow)
+    fin = isfinite.(x)
+    est = isnothing(wrow) ? fin : fin .& (wrow .> 0)
+    return fin, est
+end
+function naive_centre(x, wrow, est)
+    idx = findall(est)
+    return if isnothing(wrow)
+        sum(x[idx]) / length(idx)
+    else
+        sum(wrow[i] * x[i] for i in idx) / sum(wrow[i] for i in idx)
+    end
+end
+function naive_scale(x, est, mu)
+    idx = findall(est)
+    return length(idx) < 2 ? 0.0 : sqrt(sum((x[i] - mu)^2 for i in idx) / (length(idx) - 1))
+end
+function naive_winsorise(X, w, low, high)
+    Y = fill(NaN, size(X))
+    for t in axes(X, 1)
+        wrow = isnothing(w) ? nothing : view(w, t, :)
+        _, est = naive_masks(view(X, t, :), wrow)
+        if !any(est)
+            continue
+        end
+        v = X[t, findall(est)]
+        qlo, qhi = quantile(v, low), quantile(v, high)
+        Y[t, :] .= clamp.(view(X, t, :), qlo, qhi)
+    end
+    return Y
+end
+function naive_tanh_shrink(X, w, knee)
+    Y = fill(NaN, size(X))
+    for t in axes(X, 1)
+        wrow = isnothing(w) ? nothing : view(w, t, :)
+        _, est = naive_masks(view(X, t, :), wrow)
+        if !any(est)
+            continue
+        end
+        v = X[t, findall(est)]
+        m = median(v)
+        s = 1.4826022185056018 * median(abs.(v .- m))
+        h = knee * s
+        Y[t, :] .= s > 1e-12 ? m .+ h .* tanh.((view(X, t, :) .- m) ./ h) : view(X, t, :)
+    end
+    return Y
+end
+function naive_standardise(X, w)
+    Y = fill(NaN, size(X))
+    for t in axes(X, 1)
+        wrow = isnothing(w) ? nothing : view(w, t, :)
+        fin, est = naive_masks(view(X, t, :), wrow)
+        if !any(est)
+            continue
+        end
+        mu = naive_centre(view(X, t, :), wrow, est)
+        s = naive_scale(view(X, t, :), est, mu)
+        for i in axes(X, 2)
+            Y[t, i] = !fin[i] ? NaN : (s > 1e-12 ? (X[t, i] - mu) / s : 0.0)
+        end
+    end
+    return Y
+end
+function naive_percentile_rank(X, w)
+    P = fill(NaN, size(X))
+    for t in axes(X, 1)
+        wrow = isnothing(w) ? nothing : view(w, t, :)
+        fin, est = naive_masks(view(X, t, :), wrow)
+        n = count(est)
+        if iszero(n)
+            continue
+        end
+        for i in axes(X, 2)
+            if !fin[i]
+                continue
+            end
+            nlt = count(j -> est[j] && X[t, j] < X[t, i], axes(X, 2))
+            nle = count(j -> est[j] && X[t, j] <= X[t, i], axes(X, 2))
+            P[t, i] = clamp((nlt + nle) / (2n), 0.5 / n, 1 - 0.5 / n)
+        end
+    end
+    return P
+end
+function naive_gaussian_rank(X, w, scale)
+    P = naive_percentile_rank(X, w)
+    Q = [isnan(p) ? NaN : quantile(Normal(), p) for p in P]
+    Y = fill(NaN, size(X))
+    for t in axes(X, 1)
+        wrow = isnothing(w) ? nothing : view(w, t, :)
+        fin, est = naive_masks(view(X, t, :), wrow)
+        if !any(est)
+            continue
+        end
+        mu = naive_centre(view(Q, t, :), wrow, est)
+        C = [fin[i] ? Q[t, i] - mu : NaN for i in axes(X, 2)]
+        if !scale
+            Y[t, :] .= C
+            continue
+        end
+        s = naive_scale(C, est, 0.0)
+        for i in axes(X, 2)
+            Y[t, i] = !fin[i] ? NaN : (s > 1e-12 ? C[i] / s : 0.0)
+        end
+    end
+    return Y
+end
+
+# Cell-by-cell agreement, with every `NaN` in the same place.
+function same_matrix(A, B; atol = 1e-12)
+    if !(size(A) == size(B))
+        return false
+    end
+    if !(all(isnan.(A) .== isnan.(B)))
+        return false
+    end
+    return all(isnan(a) || isapprox(a, b; atol = atol) for (a, b) in zip(A, B))
+end
+
+# Cell-by-cell agreement with a stored oracle matrix, with every `NaN` in the same place.
+# Measured on 2026-10-07: 11 of the 18 cases are bit-equal, and the worst cell is maxrel
+# 3.1e-15 (maxabs 3.3e-16), on `GAUSSIAN_WG`. The Gaussian rank goes through an inverse normal
+# that the oracle computes by another routine, so its cells differ by a few ulps, and a small
+# cell near the median shows that as a larger relative difference. The ranks, the
+# standardisations and the clips differ by 2e-16 at most. No cell needs an absolute tolerance.
+oracle_matrix(A, B, name) = parity_compare(A, B; rtol = 1e-14, name).ok
+
+# --- the inputs --------------------------------------------------------------------------
+
+# The four-asset panel the oracle documents its own transformers on. The
+# `NaN`s are the blanks, and the two weight matrices are the same estimation universe read
+# two ways: `DOC_MASK_W` selects, and `DOC_W` selects and weights.
+const DOC_X = [1.0 NaN 3.0 4.0; 4.0 3.0 2.0 1.0; 10.0 20.0 NaN 40.0]
+const DOC_MASK_W = [1.0 0.0 1.0 1.0; 1.0 0.0 1.0 1.0; 1.0 1.0 0.0 1.0]
+const DOC_W = [3.0 0.0 1.0 2.0; 4.0 0.0 2.0 3.0; 2.0 3.0 0.0 5.0]
+const DOC_G = [0 0 1 1; 0 0 1 1; 0 0 1 1]
+
+# A nine-observation panel that carries every awkward observation at once: row 3 has an empty
+# estimation set, row 4 is constant, row 5 holds a three-way tie, row 6 holds a single
+# estimation asset, row 7 holds finite cells outside the estimation set, row 8 holds two
+# assets with no group, and row 9 puts every asset in one group.
+const RAND_X = [0.9167957292444923 -0.2346415855536521 NaN -1.8344670329243553 1.7512914063517457 -1.915160074432138 -2.83204471683961;
+                NaN 0.8278383772321528 3.0584612838608565 -3.7948411456558597 0.9802467543908795 NaN -1.891796716385608;
+                3.9521462606205207 -1.7992302110956562 0.28066323584990494 2.0201470488940534 1.4558208123822998 3.3299888687167467 2.5909454750713525;
+                2.5 2.5 2.5 2.5 2.5 2.5 2.5;
+                0.4833674175087648 0.4833674175087648 0.4833674175087648 0.830940810334497 6.5726769365446875 4.984498338092746 -0.9726551899575635;
+                5.3468383172369585 -4.029556022202094 0.2317386451977349 -0.15643354451165647 1.9531666627800435 1.3469968901429301 0.26289521569212204;
+                -0.3065184759687538 -0.7164225092092993 0.0910216470675862 0.4321792560280313 -2.10594472643264 3.637122847535857 1.8817284105300176;
+                6.428499233323535 3.2375237670223345 1.5083789238399274 2.6099672161637946 3.4229991281360674 -1.291445788814194 2.3210754150873134;
+                1.8056965631636879 -1.8203448982661925 5.891948972017129 0.7467212510705343 2.0126134625870966 4.904709938139171 0.6976501658294585]
+const RAND_W = [0.5293353138499124 0.8254881420992161 0.193431752815708 0.5175582505024171 0.607300723965417 0.32042470656143174 0.4682345584677836;
+                0.6035528976738073 0.8573179041511593 0.6076849715570043 0.6068553966090401 0.35383753035283527 0.33009970445355086 0.04293537002890879;
+                0.0 0.0 0.0 0.0 0.0 0.0 0.0;
+                0.12291250798791231 0.34824939185828174 0.8683775294494073 0.13242557607534244 0.606589419258639 0.24523033475580702 0.4302263422780156;
+                0.1765644206371929 0.18539480983631107 0.0340164908541416 0.3181686270804682 0.8953686587304909 0.5562418460520835 0.8154129546588738;
+                0.0 0.0 0.0 1.0 0.0 0.0 0.0;
+                0.0 0.0 0.9177651090153105 0.33878329894824777 0.45698619943304253 0.19143230229673658 0.9975335267830137;
+                0.5023892905062024 0.0784366938959522 0.12574614208271728 0.9674584440088674 0.9785237030989982 0.014975039536811674 0.32338743459952624;
+                0.9644706890855015 0.00914155886312662 0.949220954680857 0.9973446825549453 0.06995279607591554 0.055587314029686974 0.5168602940358353]
+const RAND_G = [1 0 1 2 1 2 0;
+                0 0 1 2 0 2 2;
+                2 1 2 2 1 0 2;
+                2 2 2 0 1 0 1;
+                0 1 0 1 0 0 2;
+                2 2 1 0 2 0 0;
+                2 1 0 2 2 2 1;
+                -1 -1 2 0 1 0 1;
+                0 0 0 0 0 0 0]
+
+# --- the oracle --------------------------------------------------------------------------
+#
+# Produced by the oracle on the inputs above.
+
+const ORACLE_STD_VECTOR = [-0.806225774829855 -0.558156305651438 -0.062017367294604234 1.4263994477758974]
+const ORACLE_STANDARDISE = [-1.0910894511799618 NaN 0.2182178902359925 0.8728715609439697;
+                               1.161895003862225 0.3872983346207417 -0.3872983346207417 -1.161895003862225;
+                               -0.8728715609439694 -0.2182178902359923 NaN 1.091089451179962]
+const ORACLE_STANDARDISE_WG = [-0.5545432546903087 NaN -0.6218206328680191 1.1427251984694726;
+                                  0.6225458561187999 -0.1532420568907816 0.5035012041966656 -1.165728610956177;
+                                  -1.3373607497456683 0.20821245125832238 NaN 0.4100168291432739]
+const ORACLE_WINSORISE = [1.4 NaN 3.0 3.8; 3.7 3.0 2.0 1.3; 12.0 20.0 NaN 36.0]
+const ORACLE_WINSORISE_W = [1.4 NaN 3.0 3.8; 3.6 3.0 2.0 1.2; 12.0 20.0 NaN 36.0]
+const ORACLE_TANH = [1.1247186586948457 NaN 3.0 3.983484358943085;
+                        3.945606186343971 2.9979044051347525 2.0020955948652475 1.0543938136560287;
+                        10.165156410569153 20.0 NaN 38.75281341305154]
+const ORACLE_TANH_W = [1.1247186586948457 NaN 3.0 3.983484358943085;
+                          3.875281341305154 2.983484358943085 2.0 1.0165156410569152;
+                          10.165156410569153 20.0 NaN 38.75281341305154]
+const ORACLE_GAUSSIAN = [-1.0 NaN 0.0 1.0;
+                            1.1803020040387493 0.32693604766393136 -0.32693604766393136 -1.1803020040387493;
+                            -1.0 0.0 NaN 1.0]
+const ORACLE_GAUSSIAN_WG = [-0.6791367019533091 NaN -0.3454139090430476 1.1914120074514876;
+                               0.6985779156934256 0.08635889733764598 0.36442411553058796 -1.1743866312782931;
+                               -1.3330544887858795 0.13413753156684322 NaN 0.4527392765742459]
+const ORACLE_PERCENTILE = [0.16666666666666666 NaN 0.5 0.8333333333333334;
+                              0.875 0.625 0.375 0.125;
+                              0.16666666666666666 0.5 NaN 0.8333333333333334]
+const ORACLE_PERCENTILE_WG = [0.16666666666666666 NaN 0.25 0.75;
+                                 0.8333333333333334 0.6666666666666666 0.75 0.25;
+                                 0.25 0.75 NaN 0.8333333333333334]
+const ORACLE_GAUSSIAN_N2 = [-0.7071067811865475 0.7071067811865475]
+const ORACLE_PERCENTILE_N2 = [0.25 0.75]
+const ORACLE_RAND_STANDARDISE_WG = [-0.9732008167705817 0.636947972680258 NaN 0.6795691885714986 0.8482610664787932 -1.0976576809784284 -1.1229265099574306;
+                                       NaN -0.8756374006965427 1.080447936381937 -0.4495311256884143 0.9139345921394546 NaN 1.0141679977191214;
+                                       NaN NaN NaN NaN NaN NaN NaN;
+                                       0.0 0.0 0.0 0.0 0.0 0.0 0.0;
+                                       -1.0712573956327813 -0.6485309453126881 -1.0712573956327813 1.0636569223729115 0.8428459233594862 0.34362053221355515 -1.1508225008148423;
+                                       0.0 0.0 0.0 0.0 0.0 0.0 0.0;
+                                       -0.24327457408267078 -1.0076442814090247 -0.5015503879445279 0.08454059373357573 -1.0418139396690067 1.5068126216329571 0.6208377684732352;
+                                       1.1738887597746162 -0.2805141217053441 -1.0686346412704182 -0.17219720648544495 0.1654182691247276 -1.3213157849182775 -1.2642889406776139;
+                                       -0.25239203459984605 -1.60893090238727 1.2763164137624106 -0.6485654336528176 -0.17498232501554672 0.9069802835781051 -0.6669234240735282]
+const ORACLE_RAND_GAUSSIAN_WG = [-1.0696547877373648 0.7228452820190501 NaN 0.7228452820190501 0.7228452820190501 -1.0696547877373648 -1.0696547877373648;
+                                    NaN -0.757003048462599 1.3634123286129871 -0.757003048462599 0.7053366541669216 NaN 0.7053366541669216;
+                                    NaN NaN NaN NaN NaN NaN NaN;
+                                    0.0 0.0 0.0 0.0 0.0 0.0 0.0;
+                                    -0.699638117711332 -0.699638117711332 -0.699638117711332 0.7280556914298366 1.2316822089792752 0.3514410777490456 -1.5365228692952078;
+                                    0.0 0.0 0.0 0.0 0.0 0.0 0.0;
+                                    -0.4557525008713562 -0.98085346447882 -0.5754619697240673 0.09469446620253628 -1.1416197117323017 1.331008644137374 0.7648509021291396;
+                                    0.887209798643473 -0.2205969096129938 -1.3874840205140937 0.09022163677638026 0.09022163677638026 -1.2694100956729926 -1.2694100956729926;
+                                    -0.18782517131387136 -1.6451994006771897 1.2695490580494466 -0.5519677213087968 0.17631737868105415 0.5995670603242557 -0.9752174029519983]
+const ORACLE_RAND_PERCENTILE_G = [0.25 0.75 NaN 0.75 0.75 0.25 0.25;
+                                     NaN 0.25 0.9 0.25 0.75 NaN 0.75;
+                                     0.875 0.25 0.125 0.375 0.75 0.7857142857142857 0.625;
+                                     0.5 0.5 0.5 0.5 0.5 0.5 0.5;
+                                     0.25 0.25 0.25 0.75 0.875 0.625 0.07142857142857142;
+                                     0.8333333333333334 0.16666666666666666 0.35714285714285715 0.16666666666666666 0.5 0.8333333333333334 0.5;
+                                     0.375 0.25 0.5 0.625 0.125 0.875 0.75;
+                                     0.9285714285714286 0.6428571428571429 0.21428571428571427 0.75 0.75 0.25 0.25;
+                                     0.5 0.07142857142857142 0.9285714285714286 0.35714285714285715 0.6428571428571429 0.7857142857142857 0.21428571428571427]
+const ORACLE_RAND_TANH_W = [0.8498457315787247 -0.2394168817853104 NaN -1.829691736692697 1.5644530718248375 -1.908798591751048 -2.7793873412298233;
+                               NaN 0.8278383772321528 3.021621116601644 -3.487027965653941 0.9802347671245752 NaN -1.8256649614232;
+                               NaN NaN NaN NaN NaN NaN NaN;
+                               2.5 2.5 2.5 2.5 2.5 2.5 2.5;
+                               0.4833674175087648 0.4833674175087648 0.4833674175087648 0.825200412937653 2.028135099480493 2.0201871796463102 -0.6545444604955515;
+                               5.3468383172369585 -4.029556022202094 0.2317386451977349 -0.15643354451165647 1.9531666627800435 1.3469968901429301 0.26289521569212204;
+                               -0.30330298712025716 -0.7044233300567011 0.09133970051814871 0.4321792560280313 -1.9824758962839528 3.396856856400813 1.8577881769999078;
+                               5.445467122458685 3.2312988916503693 1.5412344260974788 2.6099672161637946 3.409571384910116 -0.25688731337487525 2.32168842877521;
+                               1.8056965631636879 -1.2822718982051673 5.1570281236189555 0.7627235664124943 2.0124919691460788 4.55194756701089 0.7159502624022387]
+const ORACLE_RAND_WINSORISE_W = [0.9167957292444923 -0.2346415855536521 NaN -1.8344670329243553 1.7095666224963832 -1.915160074432138 -2.7862004847192363;
+                                    NaN 0.8278383772321528 2.9753327026820573 -3.7187193684850497 0.9802467543908795 NaN -1.891796716385608;
+                                    NaN NaN NaN NaN NaN NaN NaN;
+                                    2.5 2.5 2.5 2.5 2.5 2.5 2.5;
+                                    0.4833674175087648 0.4833674175087648 0.4833674175087648 0.830940810334497 6.4773862206375705 4.984498338092746 -0.8852938335095838;
+                                    -0.15643354451165647 -0.15643354451165647 -0.15643354451165647 -0.15643354451165647 -0.15643354451165647 -0.15643354451165647 -0.15643354451165647;
+                                    -0.3065184759687538 -0.7164225092092993 0.0910216470675862 0.4321792560280313 -2.0180660714926306 3.566907070055623 1.8817284105300176;
+                                    6.248169227012285 3.2375237670223345 1.5083789238399274 2.6099672161637946 3.4229991281360674 -1.1234563060549467 2.3210754150873134;
+                                    1.8056965631636879 -1.6692651944204535 5.8327146299844514 0.7467212510705343 2.0126134625870966 4.904709938139171 0.6976501658294585]
+
+@testset "The five members reproduce the oracle" begin
+    # The three-observation panel, read with no weights, with a mask, and with a weight and a
+    # classification.
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
+                                                                           high = 0.9),
+                                                  DOC_X), ORACLE_WINSORISE, "WINSORISE")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1,
+                                                                           high = 0.9),
+                                                  DOC_X; w = DOC_MASK_W),
+                        ORACLE_WINSORISE_W, "WINSORISE_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X),
+                        ORACLE_TANH, "TANH")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), DOC_X;
+                                                  w = DOC_MASK_W), ORACLE_TANH_W, "TANH_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(), DOC_X),
+                        ORACLE_STANDARDISE, "STANDARDISE")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
+                                                                             min_group_size = 2),
+                                                  DOC_X; w = DOC_W, groups = DOC_G),
+                        ORACLE_STANDARDISE_WG, "STANDARDISE_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), DOC_X),
+                        ORACLE_GAUSSIAN, "GAUSSIAN")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
+                                                                             min_group_size = 2),
+                                                  DOC_X; w = DOC_W, groups = DOC_G),
+                        ORACLE_GAUSSIAN_WG, "GAUSSIAN_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), DOC_X),
+                        ORACLE_PERCENTILE, "PERCENTILE")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                               min_group_size = 2),
+                                                  DOC_X; w = DOC_MASK_W, groups = DOC_G),
+                        ORACLE_PERCENTILE_WG, "PERCENTILE_WG")
+    # The census's own four-value cross-section, and the two-asset cross-section that pins
+    # the smallest rank a member can carry.
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(),
+                                                  [1.0 2.0 4.0 10.0]), ORACLE_STD_VECTOR,
+                        "STD_VECTOR")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), [1.0 2.0]),
+                        ORACLE_GAUSSIAN_N2, "GAUSSIAN_N2")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(),
+                                                  [1.0 2.0]), ORACLE_PERCENTILE_N2,
+                        "PERCENTILE_N2")
+    # The nine-observation panel, which carries every awkward observation at once.
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X;
+                                                  w = RAND_W), ORACLE_RAND_WINSORISE_W,
+                        "RAND_WINSORISE_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), RAND_X;
+                                                  w = RAND_W), ORACLE_RAND_TANH_W,
+                        "RAND_TANH_W")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalStandardiser(;
+                                                                             min_group_size = 2),
+                                                  RAND_X; w = RAND_W, groups = RAND_G),
+                        ORACLE_RAND_STANDARDISE_WG, "RAND_STANDARDISE_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
+                                                                             min_group_size = 2),
+                                                  RAND_X; w = RAND_W, groups = RAND_G),
+                        ORACLE_RAND_GAUSSIAN_WG, "RAND_GAUSSIAN_WG")
+    @test oracle_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                               min_group_size = 2),
+                                                  RAND_X; groups = RAND_G),
+                        ORACLE_RAND_PERCENTILE_G, "RAND_PERCENTILE_G")
+end
+
+@testset "An independent derivation agrees with the port" begin
+    for w in (nothing, RAND_W)
+        @test same_matrix(cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X;
+                                                    w = w),
+                          naive_winsorise(RAND_X, w, 0.01, 0.99))
+        @test same_matrix(cross_sectional_transform(CrossSectionalTanhShrinker(), RAND_X;
+                                                    w = w),
+                          naive_tanh_shrink(RAND_X, w, 3.0))
+        @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(), RAND_X;
+                                                    w = w), naive_standardise(RAND_X, w))
+        @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X;
+                                                    w = w),
+                          naive_percentile_rank(RAND_X, w))
+        @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(), RAND_X;
+                                                    w = w),
+                          naive_gaussian_rank(RAND_X, w, true))
+        @test same_matrix(cross_sectional_transform(CrossSectionalGaussianRank(;
+                                                                               scale = false),
+                                                    RAND_X; w = w),
+                          naive_gaussian_rank(RAND_X, w, false))
+    end
+    # A group large enough to hold the whole observation reproduces the ungrouped answer,
+    # because the fallback then never fires and the re-centring is idempotent.
+    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                             min_group_size = 1),
+                                                RAND_X; groups = fill(4, size(RAND_X))),
+                      naive_percentile_rank(RAND_X, nothing))
+end
+
+@testset "The estimation set is the finite cells that carry a positive weight" begin
+    # A weight of zero removes an asset from every statistic. Winsorising with the mask must
+    # therefore differ from winsorising without it exactly where the excluded asset would
+    # have moved a percentile.
+    Y0 = cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1, high = 0.9), DOC_X)
+    Y1 = cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1, high = 0.9), DOC_X;
+                                   w = DOC_MASK_W)
+    @test Y0[2, :] != Y1[2, :]
+    @test Y0[1, [1, 3, 4]] == Y1[1, [1, 3, 4]]
+    # A weight that is positive everywhere selects every finite cell, so it recovers the
+    # unweighted answer for a member that reads the weights as a mask alone.
+    @test same_matrix(cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X;
+                                                w = ones(size(RAND_X))),
+                      cross_sectional_transform(CrossSectionalWinsoriser(), RAND_X))
+    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X;
+                                                w = ones(size(RAND_X))),
+                      cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X))
+    # The standardiser reads them as a weight as well, so a non-constant weight moves the
+    # centre and the unweighted answer is not recovered.
+    @test !same_matrix(cross_sectional_transform(CrossSectionalStandardiser(), RAND_X;
+                                                 w = RAND_W),
+                       cross_sectional_transform(CrossSectionalStandardiser(), RAND_X))
+    @test same_matrix(cross_sectional_transform(CrossSectionalStandardiser(), RAND_X;
+                                                w = fill(2.5, size(RAND_X))),
+                      cross_sectional_transform(CrossSectionalStandardiser(), RAND_X))
+end
+
+@testset "An observation with an empty estimation set returns all NaN" begin
+    # Row 3 of the nine-observation panel carries a zero weight at every asset, so no
+    # member has anything to transform it against, and no cell of it survives.
+    for ct in (CrossSectionalWinsoriser(), CrossSectionalTanhShrinker(),
+               CrossSectionalStandardiser(; min_group_size = 2),
+               CrossSectionalGaussianRank(; min_group_size = 2),
+               CrossSectionalPercentileRank(; min_group_size = 2))
+        Y = cross_sectional_transform(ct, RAND_X; w = RAND_W, groups = RAND_G)
+        @test all(isnan, Y[3, :])
+        @test !all(isnan, Y[4, :])
+    end
+    # A whole matrix of blanks is the same rule read at every observation.
+    @test all(isnan,
+              cross_sectional_transform(CrossSectionalStandardiser(), fill(NaN, 2, 3)))
+end
+
+@testset "A cell outside the estimation set is still transformed against it" begin
+    # Row 7 of the nine-observation panel holds two finite assets of zero weight. They carry
+    # a value in the output, and that value is scored against the other five.
+    Y = cross_sectional_transform(CrossSectionalStandardiser(), RAND_X; w = RAND_W)
+    @test all(isfinite, Y[7, [1, 2]])
+    idx = [3, 4, 5, 6, 7]
+    mu = sum(RAND_W[7, i] * RAND_X[7, i] for i in idx) / sum(RAND_W[7, i] for i in idx)
+    s = sqrt(sum((RAND_X[7, i] - mu)^2 for i in idx) / (length(idx) - 1))
+    @test Y[7, 1] ≈ (RAND_X[7, 1] - mu) / s
+    # The excluded assets are scored, and they do not move the score of the included ones.
+    Y2 = cross_sectional_transform(CrossSectionalStandardiser(), RAND_X[:, idx];
+                                   w = RAND_W[:, idx])
+    @test Y[7, idx] ≈ Y2[7, :]
+end
+
+@testset "A small group and a missing group take the whole observation's statistics" begin
+    # Row 8 labels two assets `CS_MISSING_GROUP`. Raising the threshold above every group
+    # size sends every asset to the fallback, which is the ungrouped answer up to the final
+    # re-centring, and the ranks are then exactly the ungrouped ranks.
+    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                             min_group_size = 8),
+                                                RAND_X; groups = RAND_G),
+                      cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X))
+    # A matrix labelled entirely missing is the same fallback read at every cell.
+    @test same_matrix(cross_sectional_transform(CrossSectionalPercentileRank(;
+                                                                             min_group_size = 1),
+                                                RAND_X;
+                                                groups = fill(PortfolioOptimisers.CS_MISSING_GROUP,
+                                                              size(RAND_X))),
+                      cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X))
+    # The two assets of row 8 that carry no group are ranked against the whole observation,
+    # while their neighbours in a standing group are not.
+    P = cross_sectional_transform(CrossSectionalPercentileRank(; min_group_size = 2),
+                                  RAND_X; groups = RAND_G)
+    Pg = cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X)
+    @test P[8, 1] == Pg[8, 1]
+    @test P[8, 2] == Pg[8, 2]
+    @test P[8, 5] != Pg[8, 5]
+end
+
+@testset "The two outlier members accept groups and ignore them" begin
+    for ct in (CrossSectionalWinsoriser(), CrossSectionalTanhShrinker())
+        @test same_matrix(cross_sectional_transform(ct, RAND_X; groups = RAND_G),
+                          cross_sectional_transform(ct, RAND_X))
+        @test same_matrix(cross_sectional_transform(ct, RAND_X; w = RAND_W,
+                                                    groups = RAND_G),
+                          cross_sectional_transform(ct, RAND_X; w = RAND_W))
+    end
+end
+
+@testset "The three scoring members re-centre and re-scale the whole observation" begin
+    # After the grouped pass every observation that carries dispersion has a weighted centre
+    # of zero and a unit equal-weighted scale over its own estimation set.
+    for ct in (CrossSectionalStandardiser(; min_group_size = 2),
+               CrossSectionalGaussianRank(; min_group_size = 2))
+        Y = cross_sectional_transform(ct, RAND_X; w = RAND_W, groups = RAND_G)
+        for t in (1, 2, 5, 7, 8, 9)
+            idx = [i for i in axes(RAND_X, 2) if isfinite(RAND_X[t, i]) && RAND_W[t, i] > 0]
+            mu = sum(RAND_W[t, i] * Y[t, i] for i in idx) / sum(RAND_W[t, i] for i in idx)
+            @test isapprox(mu, 0.0; atol = 1e-12)
+            s = sqrt(sum(Y[t, i]^2 for i in idx) / (length(idx) - 1))
+            @test isapprox(s, 1.0; atol = 1e-12)
+        end
+    end
+    # `scale = false` recentres and stops, so the scale is whatever the ranks give.
+    Y = cross_sectional_transform(CrossSectionalGaussianRank(; scale = false), RAND_X)
+    idx = [i for i in axes(RAND_X, 2) if isfinite(RAND_X[1, i])]
+    @test isapprox(sum(Y[1, i] for i in idx) / length(idx), 0.0; atol = 1e-12)
+    @test !isapprox(sqrt(sum(Y[1, i]^2 for i in idx) / (length(idx) - 1)), 1.0; atol = 1e-6)
+end
+
+@testset "An observation with no dispersion scores zero, and one asset carries no scale" begin
+    # Row 4 of the nine-observation panel is constant, so its scale is zero and every finite
+    # cell scores zero rather than dividing by it.
+    @test all(iszero, cross_sectional_transform(CrossSectionalStandardiser(), RAND_X)[4, :])
+    # The tanh shrinker has no scale either, so it returns that observation unchanged.
+    @test cross_sectional_transform(CrossSectionalTanhShrinker(), RAND_X)[4, :] ==
+          RAND_X[4, :]
+    # Row 6 carries a single estimation asset, so the divisor of the scale is zero and the
+    # same convention applies.
+    @test all(iszero,
+              cross_sectional_transform(CrossSectionalStandardiser(), RAND_X; w = RAND_W)[6,
+                                                                                          :])
+    # A percentile rank still exists on both, because it needs an order and not a scale.
+    @test all(==(0.5),
+              cross_sectional_transform(CrossSectionalPercentileRank(), RAND_X)[4, :])
+end
+
+@testset "The output element type follows the inputs" begin
+    @test eltype(cross_sectional_transform(CrossSectionalPercentileRank(),
+                                           Float32[1.0 2.0 3.0])) === Float32
+    @test eltype(cross_sectional_transform(CrossSectionalStandardiser(), [1 2 3; 4 5 6])) ===
+          Float64
+    @test eltype(cross_sectional_transform(CrossSectionalWinsoriser(; low = 0.1f0,
+                                                                    high = 0.9f0),
+                                           Float32[1.0 2.0 3.0])) === Float32
+    # A weight matrix widens the answer when it is wider than the data.
+    @test eltype(cross_sectional_transform(CrossSectionalStandardiser(),
+                                           Float32[1.0 2.0 3.0];
+                                           w = [1.0, 1.0, 1.0]' .* 1.0)) === Float64
+end
+
+@testset "Constructors refuse what their validation states" begin
+    @test_throws DomainError CrossSectionalWinsoriser(; low = 0.9, high = 0.1)
+    @test_throws DomainError CrossSectionalWinsoriser(; low = -0.1, high = 0.9)
+    @test_throws DomainError CrossSectionalWinsoriser(; low = 0.1, high = 1.1)
+    @test_throws DomainError CrossSectionalTanhShrinker(; knee = 0.0)
+    @test_throws DomainError CrossSectionalTanhShrinker(; knee = Inf)
+    @test_throws DomainError CrossSectionalTanhShrinker(; atol = -1.0)
+    @test_throws DomainError CrossSectionalTanhShrinker(; atol = NaN)
+    @test_throws DomainError CrossSectionalStandardiser(; min_group_size = 0)
+    @test_throws DomainError CrossSectionalStandardiser(; atol = -1.0)
+    @test_throws DomainError CrossSectionalStandardiser(; atol = Inf)
+    @test_throws DomainError CrossSectionalGaussianRank(; min_group_size = 0)
+    @test_throws DomainError CrossSectionalGaussianRank(; atol = -1.0)
+    @test_throws DomainError CrossSectionalGaussianRank(; atol = Inf)
+    @test_throws DomainError CrossSectionalPercentileRank(; min_group_size = 0)
+    # The keyword constructors reach the same objects the positional ones do.
+    @test CrossSectionalWinsoriser().low == 0.01
+    @test CrossSectionalTanhShrinker().knee == 3.0
+    @test CrossSectionalStandardiser().min_group_size == 8
+    @test CrossSectionalGaussianRank().scale
+    @test CrossSectionalPercentileRank().min_group_size == 8
+end
+
+@testset "The verb refuses a malformed X, w or groups" begin
+    ct = CrossSectionalStandardiser()
+    @test_throws PortfolioOptimisers.IsEmptyError cross_sectional_transform(ct,
+                                                                            Matrix{Float64}(undef,
+                                                                                            0,
+                                                                                            0))
+    @test_throws DomainError cross_sectional_transform(ct, [1.0 Inf; 2.0 3.0])
+    @test_throws DomainError cross_sectional_transform(ct, [1.0 -Inf; 2.0 3.0])
+    @test_throws DimensionMismatch cross_sectional_transform(ct, [1.0 2.0];
+                                                             w = [1.0 2.0 3.0])
+    @test_throws DomainError cross_sectional_transform(ct, [1.0 2.0]; w = [1.0 -1.0])
+    @test_throws PortfolioOptimisers.IsNonFiniteError cross_sectional_transform(ct,
+                                                                                [1.0 2.0];
+                                                                                w = [1.0 NaN])
+    @test_throws DimensionMismatch cross_sectional_transform(ct, [1.0 2.0];
+                                                             groups = [1 2 3])
+    @test_throws DomainError cross_sectional_transform(ct, [1.0 2.0]; groups = [0 -2])
+    # `CS_MISSING_GROUP` itself is admitted: it is the label that says an asset has no group.
+    @test size(cross_sectional_transform(ct, [1.0 2.0];
+                                         groups = [0 PortfolioOptimisers.CS_MISSING_GROUP])) ==
+          (1, 2)
+end
+
+@testset "cross_sectional_groups reads a one-hot block" begin
+    B = reshape([1.0, 0.0, 0.0, 0.0, 1.0, 0.0], 1, 2, 3)
+    @test cross_sectional_groups(B) == [1 PortfolioOptimisers.CS_MISSING_GROUP]
+    B2 = zeros(2, 3, 2)
+    B2[1, 1, 1] = 1.0
+    B2[1, 2, 2] = 1.0
+    B2[2, 3, 1] = 1.0
+    @test cross_sectional_groups(B2) == [1 2 PortfolioOptimisers.CS_MISSING_GROUP;
+                                         PortfolioOptimisers.CS_MISSING_GROUP PortfolioOptimisers.CS_MISSING_GROUP 1]
+    # The derived labels drive the verb, which is the route the exposure build takes.
+    G = cross_sectional_groups(B2)
+    @test size(cross_sectional_transform(CrossSectionalPercentileRank(; min_group_size = 1),
+                                         [1.0 2.0 3.0; 4.0 5.0 6.0]; groups = G)) == (2, 3)
+end
+
+@testset "cross_sectional_groups reads an Asset Panel's categorical field" begin
+    # A categorical Panel Field stores its codes, so a group label is read rather than
+    # recovered from a one-hot block, and every cell carries one.
+    pnl = AssetPanel(;
+                     pf = [CategoricalPanelField(; name = "sector", levels = ["a", "b"],
+                                                 codes = [1 2 1; 2 1 1]),
+                           NumericPanelField(; name = "size", vals = ones(2, 3))],
+                     amsk = trues(2, 3), emsk = trues(2, 3))
+    @test cross_sectional_groups(pnl, "sector") == [1 2 1; 2 1 1]
+    @test_throws ArgumentError cross_sectional_groups(pnl, "size")
+    @test_throws KeyError cross_sectional_groups(pnl, "country")
+    # A cell a fill policy wrote is not a membership: it reads as CS_MISSING_GROUP, which is
+    # what OneHotExposure and descriptor_field_values answer for the same cell.
+    filled = asset_panel([CategoricalPanelInput(; name = "sector",
+                                                vals = ["a" "b" missing; missing "a" "a"],
+                                                alg = ForwardPanelFill(; val = "b"))];
+                         amsk = trues(2, 3), emsk = trues(2, 3))
+    @test cross_sectional_groups(filled, "sector") ==
+          [1 2 PortfolioOptimisers.CS_MISSING_GROUP;
+           PortfolioOptimisers.CS_MISSING_GROUP 1 1]
+    # A field that admits no blank carries no mask, and its codes are the labels whole.
+    whole = asset_panel([CategoricalPanelInput(; name = "sector",
+                                               vals = ["a" "b" "b"; "b" "a" "a"])];
+                        amsk = trues(2, 3), emsk = trues(2, 3))
+    @test cross_sectional_groups(whole, "sector") == [1 2 2; 2 1 1]
+    # The verb reads one label per observation and asset, so a static panel has none.
+    stat = AssetPanel(;
+                      pf = [CategoricalPanelField(; name = "sector", levels = ["a", "b"],
+                                                  codes = [1, 2, 1])])
+    @test_throws DimensionMismatch cross_sectional_groups(stat, "sector")
+end
+
+@testset "The internal helpers answer on their own" begin
+    # An estimation set whose weights are all zero is excluded by the estimation set's own
+    # definition, so the guard is reached only by a direct call. It answers zero rather than
+    # dividing by nothing.
+    @test PortfolioOptimisers.cross_sectional_weighted_mean([1.0 2.0], [0.0 0.0], 1,
+                                                            [1, 2]) == 0.0
+    @test PortfolioOptimisers.cross_sectional_weighted_mean([1.0 3.0], [1.0 3.0], 1,
+                                                            [1, 2]) == 2.5
+    @test PortfolioOptimisers.cross_sectional_weighted_mean([1.0 3.0], nothing, 1,
+                                                            [1, 2]) == 2.0
+    @test PortfolioOptimisers.cross_sectional_equal_std([1.0 3.0], 1, [1], 1.0) == 0.0
+    @test PortfolioOptimisers.cross_sectional_equal_std([1.0 3.0], 1, [1, 2], 2.0) ==
+          sqrt(2.0)
+    @test PortfolioOptimisers.cross_sectional_indices([true false true], 1) == [1, 3]
+    @test PortfolioOptimisers.cross_sectional_stat([1.0, 2.0], 2) == 2.0
+    @test PortfolioOptimisers.cross_sectional_stat(3.0, 2) == 3.0
+    @test PortfolioOptimisers.cross_sectional_weight_type(nothing) === Bool
+    @test PortfolioOptimisers.cross_sectional_weight_type([1.0f0 2.0f0]) === Float32
+    @test PortfolioOptimisers.cross_sectional_estimation_mask([true true], nothing) ==
+          [true true]
+    @test PortfolioOptimisers.cross_sectional_estimation_mask([true true], [1.0 0.0]) ==
+          [true false]
+    @test PortfolioOptimisers.cross_sectional_row_groups([true true true], [1 1 2], 1) ==
+          Dict(1 => [1, 2], 2 => [3])
+    @test PortfolioOptimisers.cross_sectional_row_groups([true true true],
+                                                         [1 PortfolioOptimisers.CS_MISSING_GROUP 2],
+                                                         1) == Dict(1 => [1], 2 => [3])
+end
+
+#=
+The Span Rule and the estimation-mask rule (issue #961, map #955).
+
+The ingestion layer seams at a Listing Span: `listing_span` reads the raw price gaps and states
+the interval each asset is listed over, on the price clock; `universe_masks` projects that
+interval onto the returns clock and intersects it with finiteness, giving an Asset Panel's two
+universe masks. ADR 0129 fixes the pieces, ADR 0131 fixes the projection as `[first + 1, last]`,
+and ADR 0132 fixes that the estimation mask is never the caller's to state.
+
+The fixture below carries one column per row of the Span Rule's table, plus the four corner cases
+the ticket names: a column that is a gap throughout, an interior gap of length one, a leading gap
+that runs to the last observation but one, and a panel that is active throughout.
+
+Two expectations of the ticket were refined after it was written, and the tests below follow the
+ADRs rather than the ticket text:
+
+  - Under padding the leading observation is active for **nobody**, because a return consumes the
+    earlier price of its pair (ADR 0131). So a panel active throughout is all-`true` on the
+    unpadded clock, and all-`true` below the leading row on the padded one.
+  - There is no both-supplied override form. A caller's declaration replaces the active mask
+    outright, and the estimation mask is always re-derived (ADR 0132), which is what makes
+    `emsk ⊆ amsk` hold by construction.
+=#
+function span_961_prices()
+    # observations × assets, one column per case:
+    #  1 active throughout      2 leading gap (not yet listed)   3 trailing gap (delisted)
+    #  4 interior gap, k = 1    5 gap throughout                 6 priced on the last row alone
+    #  7 interior gap, k = 2    8 leading and trailing gap
+    return [10.0 NaN 30.0 40.0 NaN NaN 70.0 NaN
+            11.0 NaN 31.0 41.0 NaN NaN 71.0 NaN
+            12.0 20.0 32.0 NaN NaN NaN NaN 82.0
+            13.0 21.0 33.0 43.0 NaN NaN NaN 83.0
+            14.0 22.0 NaN 44.0 NaN NaN 74.0 84.0
+            15.0 23.0 NaN 45.0 NaN 60.0 75.0 NaN]
+end
+function span_961_returns(X::AbstractMatrix, padding::Bool)
+    T = size(X, 1)
+    R = X[2:T, :] ./ X[1:(T - 1), :] .- 1
+    return padding ? vcat(fill(NaN, 1, size(X, 2)), R) : R
+end
+function span_961_amsk_padded()
+    return Bool[0 0 0 0 0 0 0 0
+                1 0 1 1 0 0 1 0
+                1 0 1 1 0 0 1 0
+                1 1 1 1 0 0 1 1
+                1 1 0 1 0 0 1 1
+                1 1 0 1 0 0 1 0]
+end
+function span_961_emsk_padded()
+    return Bool[0 0 0 0 0 0 0 0
+                1 0 1 1 0 0 1 0
+                1 0 1 0 0 0 0 0
+                1 1 1 0 0 0 0 1
+                1 1 0 1 0 0 0 1
+                1 1 0 1 0 0 1 0]
+end
+@testset "The Span Rule derives a Listing Span from a price panel" begin
+    X = span_961_prices()
+    span = listing_span(X)
+    @test isa(span, PortfolioOptimisers.ListingSpan)
+    @test size(span) == size(X)
+    # One row of the Span Rule's table per column, and the corner cases beside them.
+    @test span.first == [1, 3, 1, 1, 1, 6, 1, 3]
+    @test span.last == [6, 6, 4, 6, 0, 6, 6, 5]
+    # A leading run of gaps is an asset not yet listed; a trailing run is a delisting; an interior
+    # gap leaves the asset listed, whatever its length.
+    @test Matrix(span) == Bool[1 0 1 1 0 0 1 0
+                               1 0 1 1 0 0 1 0
+                               1 1 1 1 0 0 1 1
+                               1 1 1 1 0 0 1 1
+                               1 1 0 1 0 0 1 1
+                               1 1 0 1 0 1 1 0]
+    # A column that is a gap throughout is the empty interval, and a column priced on one
+    # observation alone is a leading run that ends on the last row but one.
+    @test span.first[5] > span.last[5]
+    @test span.first[6] == span.last[6] == 6
+    # An absent price is spelled `missing` or non-finite, and the rule unifies both.
+    Xm = Matrix{Union{Missing, Float64}}(X)
+    Xm[.!isfinite.(X)] .= missing
+    spanm = listing_span(Xm)
+    @test spanm.first == span.first
+    @test spanm.last == span.last
+    # A panel with no gap at all is active throughout, on the price clock.
+    @test Matrix(listing_span(ones(4, 3))) == trues(4, 3)
+    @test_throws PortfolioOptimisers.IsEmptyError listing_span(zeros(0, 3))
+end
+@testset "A Listing Span is a lazy matrix of booleans" begin
+    span = listing_span(span_961_prices())
+    @test isa(span, AbstractMatrix{Bool})
+    @test Base.IndexStyle(typeof(span)) == IndexCartesian()
+    @test span[1, 1]
+    @test !span[1, 2]
+    @test_throws BoundsError span[7, 1]
+    @test_throws BoundsError span[1, 9]
+    @test sprint(show, span) == "ListingSpan(6 × 8)"
+    @test sprint(show, MIME"text/plain"(), span) == "ListingSpan(6 × 8)"
+    @test_throws DimensionMismatch PortfolioOptimisers.ListingSpan([1, 2], [3], 3)
+    @test_throws DomainError PortfolioOptimisers.ListingSpan([1], [2], -1)
+end
+@testset "universe_masks projects the span and intersects it with finiteness" begin
+    X = span_961_prices()
+    span = listing_span(X)
+    amsk_exp = span_961_amsk_padded()
+    emsk_exp = span_961_emsk_padded()
+    # The padded convention: the clocks align row for row, and the leading observation carries a
+    # non-finite return for everybody, so it is active for nobody.
+    Rp = span_961_returns(X, true)
+    amsk, emsk = universe_masks(span, Rp)
+    @test size(Rp, 1) == size(X, 1)
+    @test size(amsk) == size(emsk) == size(Rp)
+    @test isa(amsk, PortfolioOptimisers.ListingSpan)
+    @test isa(emsk, BitMatrix)
+    @test Matrix(amsk) == amsk_exp
+    @test Matrix(emsk) == emsk_exp
+    # The compression survives the crossing: `[first + 1, last]`.
+    @test amsk.first == span.first .+ 1
+    @test amsk.last == span.last
+    # Without padding the returns clock is one observation shorter, and the masks are the padded
+    # ones with the leading row dropped.
+    Ru = span_961_returns(X, false)
+    amsku, emsku = universe_masks(span, Ru)
+    @test size(Ru, 1) == size(X, 1) - 1
+    @test size(amsku) == size(emsku) == size(Ru)
+    @test Matrix(amsku) == amsk_exp[2:end, :]
+    @test Matrix(emsku) == emsk_exp[2:end, :]
+    @test amsku.first == span.first
+    @test amsku.last == span.last .- 1
+    # The estimation mask is the active mask intersected with the finiteness of the returns, and
+    # it is a subset of it by construction.
+    @test Matrix(emsk) == Matrix(amsk) .& isfinite.(Rp)
+    @test all(Matrix(emsk) .<= Matrix(amsk))
+    # An interior gap is the one thing the two masks disagree about: a Held Gap of `k + 1`
+    # observations for a run of `k` gapped prices, and never at an inception or a delisting.
+    @test findall(Matrix(amsk) .& .!Matrix(emsk)) ==
+          CartesianIndex.([(3, 4), (4, 4), (3, 7), (4, 7), (5, 7)])
+end
+@testset "universe_masks refuses a statement that does not fit the returns clock" begin
+    X = span_961_prices()
+    span = listing_span(X)
+    R = span_961_returns(X, true)
+    @test_throws DimensionMismatch universe_masks(span, R[:, 1:3])
+    @test_throws DimensionMismatch universe_masks(span, R[1:3, :])
+    @test_throws DimensionMismatch universe_masks(span, vcat(R, R))
+end
+@testset "A panel active throughout gives all-true masks" begin
+    X = 100.0 .+ collect(1.0:6.0) * ones(1, 3)
+    span = listing_span(X)
+    # Without padding both masks are all-true. Under padding the leading row is active for
+    # nobody, because a return consumes the earlier price of its pair (ADR 0131).
+    amsku, emsku = universe_masks(span, span_961_returns(X, false))
+    @test Matrix(amsku) == trues(5, 3)
+    @test Matrix(emsku) == trues(5, 3)
+    amskp, emskp = universe_masks(span, span_961_returns(X, true))
+    @test Matrix(amskp) == vcat(falses(1, 3), trues(5, 3))
+    @test Matrix(emskp) == vcat(falses(1, 3), trues(5, 3))
+end
+@testset "A caller's declaration replaces the active mask outright" begin
+    X = span_961_prices()
+    span = listing_span(X)
+    R = span_961_returns(X, true)
+    # A declaration enters at the same point as the derived span, under the same
+    # `AbstractMatrix{Bool}` bound. Here it says the delisted column is listed throughout, which
+    # the Span Rule would deny.
+    decl = Matrix(span)
+    decl[:, 3] .= true
+    amsk, emsk = universe_masks(decl, R)
+    @test isa(amsk, BitMatrix)
+    @test amsk[:, 3] == Bool[0, 1, 1, 1, 1, 1]
+    # The derived answer is not merged in: it is replaced.
+    @test amsk[:, 3] != span_961_amsk_padded()[:, 3]
+    # The estimation mask is never the caller's to state, and is re-derived from the values, so
+    # the subset invariant holds by construction rather than by refusal.
+    @test Matrix(emsk) == Matrix(amsk) .& isfinite.(R)
+    @test all(Matrix(emsk) .<= Matrix(amsk))
+    @test emsk[:, 3] == Bool[0, 1, 1, 1, 0, 0]
+    # A declaration that leaves and rejoins books no return across its absence.
+    gappy = trues(6, 1)
+    gappy[3:4] .= false
+    amskg, _ = universe_masks(gappy, R[:, 1:1])
+    @test vec(amskg) == Bool[0, 1, 0, 0, 0, 1]
+    # Applied to a Listing Span's own cells, the cell-by-cell rule reproduces the compressed one,
+    # under both conventions.
+    @test PortfolioOptimisers.project_span(Matrix(span), 6) == span_961_amsk_padded()
+    @test PortfolioOptimisers.project_span(Matrix(span), 5) ==
+          span_961_amsk_padded()[2:end, :]
+end
+@testset "The two masks round trip through an Asset Panel" begin
+    X = span_961_prices()
+    span = listing_span(X)
+    amsk, emsk = universe_masks(span, span_961_returns(X, true))
+    ax = size(amsk)
+    @test isnothing(PortfolioOptimisers.assert_panel_masks(ax, amsk, emsk))
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "mcap",
+                                             vals = reshape(collect(1.0:48.0), 6, 8))],
+                     amsk = amsk, emsk = emsk)
+    @test !PortfolioOptimisers.panel_is_static(pnl)
+    # The compressed active mask rides into the panel as it stands, under the public
+    # `AbstractMatrix{Bool}` bound.
+    @test isa(pnl.amsk, PortfolioOptimisers.ListingSpan)
+    @test pnl.amsk == amsk
+    @test pnl.emsk == emsk
+    # The invariant is checked rather than coerced, so a pair that breaks it is refused.
+    bad = trues(size(emsk)...)
+    @test_throws ArgumentError PortfolioOptimisers.assert_panel_masks(ax, amsk, bad)
+end
+using Dates
+#=
+The docstrings of `03_ListingSpan.jl` against numbers. Each unit states a closed form, and the
+tests below compute it cell by cell and compare it with the unit.
+
+A window of a longer clock gives a `ListingSpan` whose bounds lie outside the window, because
+`listing_span_view` moves them by the rows the window drops in front. The padded projection moved
+such an opening bound to `first + 1 <= 1`, so the first row of the returns clock was active for an
+asset listed before the window. The same window as a `Matrix{Bool}` leaves that row inactive. The
+projection now clamps the opening bound to the clock first.
+=#
+function span_974_priced(x)
+    return !ismissing(x) && isfinite(x)
+end
+function span_974_oracle(X::AbstractMatrix)
+    T, N = size(X)
+    a = falses(T, N)
+    for i in 1:N
+        ts = findall(t -> span_974_priced(X[t, i]), 1:T)
+        isempty(ts) || (a[ts[1]:ts[end], i] .= true)
+    end
+    return a
+end
+function span_974_project(a::AbstractMatrix{Bool}, m::Integer)
+    n, N = size(a)
+    o = n - m
+    return [t + o - 1 >= 1 && a[t + o - 1, i] && a[t + o, i] for t in 1:m, i in 1:N]
+end
+@testset "The docstrings of 03_ListingSpan.jl against numbers" begin
+    rng = StableRNG(974)
+    @testset "listing_span and project_span equal their closed forms" begin
+        for _ in 1:500
+            T = rand(rng, 1:8)
+            N = rand(rng, 1:5)
+            X = Matrix{Union{Missing, Float64}}(rand(rng, T, N) .+ 1)
+            for k in eachindex(X)
+                r = rand(rng)
+                X[k] = r < 0.15 ? NaN : r < 0.25 ? missing : r < 0.3 ? Inf : X[k]
+            end
+            span = listing_span(X)
+            a = span_974_oracle(X)
+            @test Matrix(span) == a
+            for m in (T, T - 1)
+                @test Matrix(PortfolioOptimisers.project_span(span, m)) ==
+                      PortfolioOptimisers.project_span(a, m) ==
+                      span_974_project(a, m)
+            end
+        end
+    end
+    @testset "A window's bounds outside the clock project as the matrix they hold" begin
+        for _ in 1:500
+            n = rand(rng, 1:8)
+            N = rand(rng, 1:4)
+            f = rand(rng, -4:(n + 3), N)
+            l = rand(rng, -4:(n + 3), N)
+            span = PortfolioOptimisers.ListingSpan(f, l, n)
+            for m in (n, n - 1)
+                o = n - m
+                p = PortfolioOptimisers.project_span(span, m)
+                @test p.first == max.(f, 1) .+ (1 - o)
+                @test p.last == l .- o
+                @test Matrix(p) ==
+                      PortfolioOptimisers.project_span(Matrix(span), m) ==
+                      span_974_project(Matrix(span), m)
+            end
+        end
+    end
+    @testset "A fold window of a derived span leaves the padded first row inactive" begin
+        ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 8))
+        P = [1.0 2.0; 1.1 2.1; 1.2 2.2; 1.3 NaN; 1.4 2.4; 1.5 2.5; 1.6 2.6; 1.7 2.7]
+        X = TimeArray(ts, P, [:A, :B])
+        pr = PricesResult(; X = X, span = listing_span(P))
+        prm = PricesResult(; X = X, span = Matrix(listing_span(P)))
+        pv = PortfolioOptimisers.port_opt_view(pr, 3:8)
+        @test pv.span isa PortfolioOptimisers.ListingSpan
+        @test pv.span.first == [-1, -1]
+        for padding in (true, false)
+            rr = prices_to_returns(pv; padding = padding)
+            rm = prices_to_returns(PortfolioOptimisers.port_opt_view(prm, 3:8);
+                                   padding = padding)
+            @test Matrix(rr.pnl.amsk) == Matrix(rm.pnl.amsk)
+            @test rr.pnl.emsk == rm.pnl.emsk
+        end
+        rr = prices_to_returns(pv; padding = true)
+        @test !any(rr.pnl.amsk[1, :])
+        @test Matrix(rr.pnl.amsk) == Bool[0 0; 1 1; 1 1; 1 1; 1 1; 1 1]
+        @test rr.pnl.emsk == Bool[0 0; 1 0; 1 0; 1 1; 1 1; 1 1]
+    end
+    @testset "An interior gap next to an end of the listing is a Held Gap" begin
+        # Asset 1 has a gap after its first price, and asset 2 a gap before its last one.
+        P = [1.0 NaN; NaN 2.0; 1.2 2.1; 1.3 NaN; 1.4 2.3; 1.5 NaN]
+        amsk, emsk = universe_masks(listing_span(P), span_961_returns(P, true))
+        @test Matrix(amsk) == Bool[0 0; 1 0; 1 1; 1 1; 1 1; 1 0]
+        @test emsk == Bool[0 0; 0 0; 0 1; 1 0; 1 0; 1 0]
+        # The active mask opens on the first return that reads two listed prices, which
+        # is not finite here, so the asset is held with no return.
+        @test amsk[2, 1] && !emsk[2, 1]
+        @test amsk[5, 2] && !emsk[5, 2]
+        @test all(emsk .<= Matrix(amsk))
+    end
+end
+
+#=
+The span-bounded price fill (issue #970, map #955).
+
+ADR 0130 gives the ingestion layer exactly one fill, off unless a caller asks for it. It exists to
+state a price convention across a suspension rather than to remove a gap, it is bounded by the
+Listing Span so it touches Held Gaps alone, and it is fitted on a training window and replayed.
+
+`CarriedPrice` states the Held Price convention and conserves wealth across a gap; a
+`Num_VecToScaM` reduction states a constant and manufactures two moves the market never printed.
+Both are asserted below, so the difference between them is pinned rather than assumed.
+
+The span the fill is bounded by is the carrier's, always. A carrier that states none bounds the
+fill by nothing at all and no price is written, because the window cannot supply one: a suspension
+straddling its edge reads there as an inception or a delisting, so a window-local derivation fills
+the wrong cells rather than fewer of them (ADR 0133). The carriers below therefore state a span, as
+`price_ingestion` builds them, and the span-less case is asserted in its own testset. The seed path
+— a window that opens inside a gap — is driven through `gap_fill_span` and `gap_fill_column!` with
+a stated span, which is the same public `AbstractMatrix{Bool}` bound a caller's listing calendar
+enters at.
+=#
+function pgf_970_prices()
+    # observations × assets, one column per case:
+    #  A interior gap, k = 2   B leading gap (not yet listed)
+    #  C trailing gap (delisted)   D a gap throughout
+    return [100.0 NaN 300.0 NaN
+            101.0 NaN 301.0 NaN
+            102.0 200.0 302.0 NaN
+            NaN 201.0 303.0 NaN
+            NaN 202.0 304.0 NaN
+            120.0 203.0 NaN NaN
+            121.0 204.0 NaN NaN
+            122.0 205.0 NaN NaN]
+end
+function pgf_970_carrier(X::AbstractMatrix)
+    ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(size(X, 1) - 1))
+    # The carrier states the Span Rule's reading of the whole panel, which is what
+    # `price_ingestion` puts in the field. Nothing below relies on a window deriving one.
+    return PricesResult(; X = TimeArray(collect(ts), X, ["A", "B", "C", "D"]),
+                        span = listing_span(X))
+end
+function pgf_970_quiet_apply(res, pr)
+    # A carrier that states a span reports nothing, so this is a belt-and-braces silence: the
+    # one carrier that reports is the span-less one, and it has its own testset.
+    return Logging.with_logger(Logging.NullLogger()) do
+        return apply_preprocessing(res, pr)
+    end
+end
+function pgf_970_returns(X::AbstractMatrix)
+    T = size(X, 1)
+    return X[2:T, :] ./ X[1:(T - 1), :] .- 1
+end
+@testset "A Held Price conserves wealth across a gap; a constant manufactures two moves" begin
+    X = pgf_970_prices()
+    pr = pgf_970_carrier(X)
+    res = fit_preprocessing(PriceGapFill(), pr)
+    @test isa(res, PriceGapFillResult)
+    @test isa(res.fill, CarriedPrice)
+    # A column with no observed price gets no fitted value and no entry, so it is untouched.
+    @test res.nx == [:A, :B, :C]
+    # C is delisted after its last price, so the window ends outside its listing and C gets
+    # no seed (#1330). It keeps its entry.
+    @test isequal(res.v, [122.0, 205.0, missing])
+    Xc = values(pgf_970_quiet_apply(res, pr).X)
+    # The k = 2 interior gap takes the last priced observation, and nothing else moved.
+    @test Xc[4:5, 1] == [102.0, 102.0]
+    @test Xc[[1, 2, 3, 6, 7, 8], 1] == X[[1, 2, 3, 6, 7, 8], 1]
+    Rc = pgf_970_returns(Xc)
+    # `k` zero returns inside the gap, and the whole move on the observation that ends it.
+    @test Rc[3:4, 1] == [0.0, 0.0]
+    @test Rc[5, 1] ≈ 120.0 / 102.0 - 1
+    # Wealth is conserved: the compounded product over the gap is exactly the price ratio.
+    @test prod(1 .+ Rc[3:5, 1]) ≈ 120.0 / 102.0
+    # The same gap under a per-asset reduction: two fabricated moves instead of one real one.
+    resm = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
+    @test resm.fill === MedianValue()
+    @test resm.v[1] ≈ 111.0
+    Xm = values(pgf_970_quiet_apply(resm, pr).X)
+    @test Xm[4:5, 1] ≈ [111.0, 111.0]
+    Rm = pgf_970_returns(Xm)
+    @test Rm[3, 1] ≈ 111.0 / 102.0 - 1
+    @test Rm[4, 1] == 0.0
+    @test Rm[5, 1] ≈ 120.0 / 111.0 - 1
+    # Wealth is conserved over the run either way — the conventions differ in where the move
+    # lands, not in how much of it there is.
+    @test prod(1 .+ Rm[3:5, 1]) ≈ 120.0 / 102.0
+    # A plain number and a plain function reach the same slot.
+    resn = fit_preprocessing(PriceGapFill(; fill = 99.0), pr)
+    @test values(pgf_970_quiet_apply(resn, pr).X)[4:5, 1] == [99.0, 99.0]
+    resf = fit_preprocessing(PriceGapFill(; fill = minimum), pr)
+    @test values(pgf_970_quiet_apply(resf, pr).X)[4:5, 1] == [100.0, 100.0]
+end
+@testset "The fill is bounded by the Listing Span under both conventions" begin
+    X = pgf_970_prices()
+    pr = pgf_970_carrier(X)
+    for fill in (CarriedPrice(), MedianValue())
+        res = fit_preprocessing(PriceGapFill(; fill = fill), pr)
+        Xf = values(pgf_970_quiet_apply(res, pr).X)
+        # A leading run is an asset not yet listed and a trailing run is a delisting. Neither is
+        # inside the span, so neither is written whatever the convention states.
+        @test all(isnan, Xf[1:2, 2])
+        @test all(isnan, Xf[6:8, 3])
+        # A column with no observed price at all is untouched.
+        @test all(isnan, Xf[:, 4])
+        # The span the Span Rule reads off the filled panel is the one it read off the raw panel,
+        # so the fill cannot erase a delisting or invent a listing.
+        span_raw = listing_span(X)
+        span_filled = listing_span(Xf)
+        @test span_filled.first == span_raw.first
+        @test span_filled.last == span_raw.last
+        # The active mask still reports the leading and the trailing run inactive after the fill.
+        amsk, emsk = universe_masks(span_filled, pgf_970_returns(Xf))
+        @test !any(Matrix(amsk)[1:2, 2])
+        @test !any(Matrix(amsk)[5:7, 3])
+        # A filled cell is finite in the returns, so its estimation mask entry is true — the
+        # design ADR 0130 states, not an oversight — and the subset invariant still holds.
+        @test all(emsk[3:5, 1])
+        @test all(Matrix(emsk) .<= Matrix(amsk))
+        @test isnothing(PortfolioOptimisers.assert_panel_masks(size(amsk), amsk, emsk))
+    end
+end
+@testset "A window that opens inside a gap fills from the fitted seed" begin
+    X = pgf_970_prices()
+    # Fit on the head of the panel, then replay on a tail whose first observations are a gap. The
+    # tail states a span of its own — the public `AbstractMatrix{Bool}` bound, which is where a
+    # caller's listing calendar enters — saying the asset is listed throughout it.
+    res = fit_preprocessing(PriceGapFill(), pgf_970_carrier(X[1:3, :]))
+    @test res.v[1] == 102.0
+    # The result records where the training window ended, which is what tells a replay
+    # whether the seed precedes the window it is written onto.
+    @test res.te == Date(2020, 1, 3)
+    tail = copy(X[4:8, :])
+    # A deliberately different in-window price: were the fill reading the window rather than the
+    # seed, the two gapped observations would take 120.0 and not 102.0.
+    @test tail[3, 1] == 120.0
+    span = trues(size(tail))
+    @test PortfolioOptimisers.gap_fill_span(span, tail, false) === span
+    # Every observation of the tail follows the training window, so the seed applies from
+    # its first row.
+    PortfolioOptimisers.gap_fill_column!(res.fill, tail, span, 1, res.v[1], 1)
+    @test tail[1:2, 1] == [102.0, 102.0]
+    @test tail[3:5, 1] == X[6:8, 1]
+    # Once the window observes a price of its own, the convention tracks it: a later gap fills
+    # from the most recent observed price rather than from the seed.
+    later = [NaN, 130.0, NaN, 140.0, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(later, 5, 1), trues(5, 1),
+                                         1, 102.0, 1)
+    @test later == [102.0, 130.0, 130.0, 140.0, 140.0]
+    # A reduction carries nothing, so every gap of the column takes the one fitted value.
+    flat = [NaN, 130.0, NaN, 140.0, NaN]
+    PortfolioOptimisers.gap_fill_column!(MedianValue(), reshape(flat, 5, 1), trues(5, 1), 1,
+                                         111.0, 1)
+    @test flat == [111.0, 130.0, 111.0, 140.0, 111.0]
+    # The bound is read before the price, so a stated span that excludes an observation keeps the
+    # fill out of it whatever the convention says.
+    bounded = [NaN, NaN, 130.0, NaN, NaN]
+    span_b = reshape(Bool[0, 1, 1, 1, 0], 5, 1)
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(bounded, 5, 1), span_b, 1,
+                                         102.0, 1)
+    @test isnan(bounded[1])
+    @test isnan(bounded[5])
+    # Row 1 is an absence from the listing, so the seed, a price from before it, does not
+    # reach row 2: the return at row 3 would be a move across the absence.
+    @test isnan(bounded[2])
+    @test bounded[3:4] == [130.0, 130.0]
+end
+@testset "The seed is written only after the training window (#1068)" begin
+    # Issue #1068. The seed is the last observed training price, so on a window that follows
+    # the training window it precedes every row it is written onto. On the training window
+    # itself, which a Pipeline transforms with the step it just fitted, it is a price from the
+    # window's end, and a gap that opens the window inside an asset's suspension must not take
+    # it: the first return the conversion would compute is a move the market never printed,
+    # computed with a price observations in the future.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 12)
+    P = [100.0 NaN 50.0 10.0; 101.0 NaN 51.0 10.1; 102.0 NaN 52.0 10.2; 103.0 20.0 53.0 10.3
+         NaN 20.5 54.0 10.4; NaN 21.0 55.0 10.5; 106.0 21.5 56.0 10.6; 107.0 22.0 57.0 10.7
+         108.0 22.5 58.0 10.8; 109.0 23.0 NaN 10.9; 110.0 23.5 NaN 11.0;
+         111.0 24.0 NaN 11.1]
+    pr = price_ingestion(PriceIngestion(), TimeArray(collect(ts), P, ["A", "B", "C", "D"]))
+    # A training window that opens inside A's suspension: the span is `true` there and the
+    # price is `NaN`.
+    w = PortfolioOptimisers.port_opt_view(pr, 5:12)
+    @test all(Matrix(w.span)[1:2, 1])
+    @test all(isnan, values(w.X)[1:2, 1])
+    res = fit_preprocessing(PriceGapFill(), w)
+    a = findfirst(==(:A), res.nx)
+    @test res.v[a] == 111.0
+    @test res.te == Date(2020, 1, 12)
+    # On the training window the two leading cells stay a Held Gap: no price precedes them.
+    # Every later cell of the column is observed, and the other columns are untouched.
+    Xw = values(apply_preprocessing(res, w).X)
+    @test all(isnan, Xw[1:2, 1])
+    @test Xw[3:8, 1] == P[7:12, 1]
+    @test isequal(Xw[:, 2:4], P[5:12, 2:4])
+    # The returns the conversion computes for A then start at its first observed price, and
+    # the -4.5 % move from 111 to 106 the seed manufactured is not among them.
+    rd = prices_to_returns(PricesToReturns(), apply_preprocessing(res, w))
+    ra = Matrix(rd.X)[:, 1]
+    @test all(isnan, ra[1:2])
+    @test ra[3] ≈ 107.0 / 106.0 - 1
+    @test !any(x -> isfinite(x) && x ≈ 106.0 / 111.0 - 1, ra)
+    # A window that follows the training window is seeded exactly as ADR 0130 describes: its
+    # leading in-span gap takes the last training price.
+    head = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(pr, 1:4))
+    @test head.te == Date(2020, 1, 4)
+    @test head.v[findfirst(==(:A), head.nx)] == 103.0
+    Xt = values(apply_preprocessing(head, w).X)
+    @test Xt[1:2, 1] == [103.0, 103.0]
+    @test Xt[3:8, 1] == P[7:12, 1]
+    # A window that overlaps the training window interpolates: the rows at or before its end
+    # are not seeded, and the rows after it are. Fitted on 1:5, applied to 4:8, the gap at row
+    # 5 (at the training end) stays, and the gap at row 6 (after it) takes the seed.
+    mid = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(pr, 1:5))
+    @test mid.te == Date(2020, 1, 5)
+    @test mid.v[findfirst(==(:A), mid.nx)] == 103.0
+    ov = PortfolioOptimisers.port_opt_view(pr, 5:8)
+    Xo = values(apply_preprocessing(mid, ov).X)
+    @test isnan(Xo[1, 1])
+    @test Xo[2, 1] == 103.0
+    @test Xo[3:4, 1] == P[7:8, 1]
+    # A gap the window's own earlier price precedes fills from that price whether or not the
+    # seed applies: fitted and applied on 1:12, A's suspension takes 103 and C's trailing run
+    # is outside the span and untouched.
+    full = fit_preprocessing(PriceGapFill(), pr)
+    Xf = values(apply_preprocessing(full, pr).X)
+    @test Xf[5:6, 1] == [103.0, 103.0]
+    @test all(isnan, Xf[10:12, 3])
+    # The reduction arm is unaffected: replaying a fitted statistic on the window it was
+    # fitted on is the meaning of fitted state, so the leading in-span gap takes the median.
+    resm = fit_preprocessing(PriceGapFill(; fill = MedianValue()), w)
+    Xm = values(apply_preprocessing(resm, w).X)
+    @test Xm[1:2, 1] == fill(resm.v[findfirst(==(:A), resm.nx)], 2)
+    # The walk itself: before `t0` a gap no observed price precedes stays a gap, from `t0` on
+    # the seed is the carry, and an observed price replaces it either side of `t0`.
+    col = [NaN, NaN, 130.0, NaN, NaN, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(col, 6, 1), trues(6, 1), 1,
+                                         102.0, 5)
+    @test all(isnan, col[1:2])
+    @test col[3:6] == [130.0, 130.0, 130.0, 130.0]
+    col2 = [NaN, NaN, NaN, NaN, 130.0, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(col2, 6, 1), trues(6, 1),
+                                         1, 102.0, 3)
+    @test all(isnan, col2[1:2])
+    @test col2[3:6] == [102.0, 102.0, 130.0, 130.0]
+    col3 = [NaN, NaN, NaN]
+    PortfolioOptimisers.gap_fill_column!(CarriedPrice(), reshape(col3, 3, 1), trues(3, 1),
+                                         1, 102.0, 4)
+    @test all(isnan, col3)
+end
+@testset "A carrier that states no Listing Span fills nothing, and refuses under strict" begin
+    X = pgf_970_prices()
+    ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(size(X, 1) - 1))
+    bare = PricesResult(; X = TimeArray(collect(ts), copy(X), ["A", "B", "C", "D"]))
+    @test isnothing(PortfolioOptimisers.prices_listing_span(bare))
+    res = fit_preprocessing(PriceGapFill(), bare)
+    @test !res.strict
+    out = @test_logs (:warn,) match_mode = :any apply_preprocessing(res, bare)
+    # An all-`false` span bounds the fill by nothing, so not one cell is written: the window
+    # cannot answer the question, and answering it wrongly is worse than not answering it.
+    @test isequal(values(out.X), X)
+    @test PortfolioOptimisers.gap_fill_span(nothing, X, false) == falses(size(X))
+    strict = fit_preprocessing(PriceGapFill(; strict = true), bare)
+    @test strict.strict
+    @test_throws ArgumentError apply_preprocessing(strict, bare)
+    # A window that holds no gap has nothing to fill and nothing to get wrong, so a carrier
+    # stating no span is silent there and the values pass through untouched.
+    cleanX = 100.0 .+ collect(1.0:8.0) * ones(1, 4)
+    clean = PricesResult(; X = TimeArray(collect(ts), cleanX, ["A", "B", "C", "D"]))
+    quiet = fit_preprocessing(PriceGapFill(; strict = true), clean)
+    cout = @test_logs apply_preprocessing(quiet, clean)
+    @test values(cout.X) == values(clean.X)
+    # The carrier is not mutated by an apply, and every field but `X` passes through.
+    pr = pgf_970_carrier(X)
+    @test all(isnan, values(pr.X)[4:5, 1])
+    filled = pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), pr), pr)
+    @test TimeSeries.timestamp(filled.X) == TimeSeries.timestamp(pr.X)
+    @test TimeSeries.colnames(filled.X) == TimeSeries.colnames(pr.X)
+    @test isnothing(filled.F) && isnothing(filled.B) && isnothing(filled.pnl)
+    # A stated span must fit the window it bounds.
+    @test_throws DimensionMismatch PortfolioOptimisers.gap_fill_span(trues(3, 4), X, false)
+end
+@testset "A fitted universe is replayed by name" begin
+    X = pgf_970_prices()
+    res = fit_preprocessing(PriceGapFill(), pgf_970_carrier(X))
+    # A window that carries only some of the fitted names fills those and skips the rest.
+    ts = Date(2021, 1, 1):Day(1):(Date(2021, 1, 1) + Day(size(X, 1) - 1))
+    sub = PricesResult(; X = TimeArray(collect(ts), X[:, [1, 4]], ["A", "D"]),
+                       span = listing_span(X[:, [1, 4]]))
+    out = pgf_970_quiet_apply(res, sub)
+    @test TimeSeries.colnames(out.X) == [:A, :D]
+    @test values(out.X)[4:5, 1] == [102.0, 102.0]
+    @test all(isnan, values(out.X)[:, 2])
+    # A window whose names the fit never saw is left alone entirely.
+    other = PricesResult(; X = TimeArray(collect(ts), X[:, 1:1], ["Z"]),
+                         span = listing_span(X[:, 1:1]))
+    @test isequal(values(pgf_970_quiet_apply(res, other).X), values(other.X))
+end
+#=
+The docstrings of `08_PriceGapFill.jl` state the fill as a closed form: a gap inside the listing
+takes the last observed price of its own listed run, or the seed from `t0` on while no absence
+precedes it, or the fitted value under a statistic. The references below restate that form cell
+by cell, and the fill must equal them on random panels and random spans.
+=#
+function pgf_978_is_gap(x)
+    return ismissing(x) || (isa(x, Number) && isnan(x))
+end
+function pgf_978_held_price(X::AbstractMatrix, span::AbstractMatrix{Bool}, i::Integer,
+                            v::Union{Missing, Number}, t0::Integer)
+    Y = copy(X)
+    for t in axes(X, 1)
+        if !(span[t, i] && pgf_978_is_gap(X[t, i]))
+            continue
+        end
+        a = findlast(u -> !span[u, i], 1:(t - 1))
+        r = isnothing(a) ? 1 : a + 1
+        s = findlast(u -> !pgf_978_is_gap(X[u, i]), r:(t - 1))
+        if !isnothing(s)
+            Y[t, i] = X[r + s - 1, i]
+        elseif t >= t0 && r == 1 && !ismissing(v)
+            Y[t, i] = v
+        end
+    end
+    return Y
+end
+function pgf_978_constant(X::AbstractMatrix, span::AbstractMatrix{Bool}, i::Integer,
+                          v::Number)
+    Y = copy(X)
+    for t in axes(X, 1)
+        if span[t, i] && pgf_978_is_gap(X[t, i])
+            Y[t, i] = v
+        end
+    end
+    return Y
+end
+@testset "The docstrings of 08_PriceGapFill.jl against numbers" begin
+    rng = StableRNG(978)
+    for trial in 1:1500
+        nobs, nas = rand(rng, 1:9), rand(rng, 1:3)
+        P = Matrix{Union{Missing, Float64}}(100 .+ 10 .* rand(rng, nobs, nas))
+        for k in eachindex(P)
+            if rand(rng) < 0.3
+                P[k] = isodd(trial) && rand(rng) < 0.5 ? missing : NaN
+            end
+        end
+        # A Span Rule span, or a caller's span that can leave the listing and join again.
+        span = rand(rng) < 0.5 ? rand(rng, Bool, nobs, nas) : listing_span(P)
+        for i in 1:nas
+            v = 1000.0 + i
+            t0 = rand(rng, 1:(nobs + 1))
+            # A `missing` seed, which the fit gives after an absence, is never written.
+            held = PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, i,
+                                                        missing, t0)
+            @test isequal(held, pgf_978_held_price(P, span, i, missing, t0))
+            held = PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, i, v,
+                                                        t0)
+            @test isequal(held, pgf_978_held_price(P, span, i, v, t0))
+            con = PortfolioOptimisers.gap_fill_column!(MedianValue(), copy(P), span, i, v,
+                                                       t0)
+            @test isequal(con, pgf_978_constant(P, span, i, v))
+        end
+    end
+    # A caller's span takes the asset out of the listing at row 3 and back in at row 4. The
+    # gap at row 4 takes neither the price before the absence nor the seed, so the return at
+    # row 5 is not a move across the absence. The fill leaves the returns as they are.
+    P = reshape([10.0, 11.0, 50.0, NaN, 12.0, 13.0], :, 1)
+    span = reshape(Bool[1, 1, 0, 1, 1, 1], :, 1)
+    @test isequal(vec(PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), span, 1,
+                                                           9.0, 1)),
+                  [10.0, 11.0, 50.0, NaN, 12.0, 13.0])
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 6)
+    pr = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = span)
+    filled = pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), pr), pr)
+    @test isequal(values(prices_to_returns(filled).X), values(prices_to_returns(pr).X))
+    # Without the absence, the same gap takes the price before it.
+    @test vec(PortfolioOptimisers.gap_fill_column!(CarriedPrice(), copy(P), trues(6, 1), 1,
+                                                   9.0, 1))[4] == 50.0
+    # The fitted value: the last observed training price, or the reduction of the observed
+    # training prices. An asset with no observed price has no fitted value.
+    P = [100.0 NaN 5.0; NaN NaN 6.0; 103.0 NaN NaN]
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
+    pr = PricesResult(; X = TimeArray(collect(ts), P, [:a, :b, :c]), span = listing_span(P))
+    held = fit_preprocessing(PriceGapFill(), pr)
+    @test held.nx == [:a, :c]
+    # The window ends after the delisting of `c`, so its carried seed is retired (#1330).
+    @test isequal(held.v, [103.0, missing])
+    @test held.te == Date(2020, 1, 3)
+    med = fit_preprocessing(PriceGapFill(; fill = MedianValue()), pr)
+    @test med.v == [median([100.0, 103.0]), median([5.0, 6.0])]
+    @test PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0], true) == 7.0
+    @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0], true) == 3.0
+    # An absence after the last price retires a carried seed, and does not touch a statistic.
+    @test ismissing(PortfolioOptimisers.gap_fill_seed(CarriedPrice(), [1.0, 2.0, 7.0],
+                                                      false))
+    @test PortfolioOptimisers.gap_fill_seed(MeanValue(), [1.0, 2.0, 6.0], false) == 3.0
+    # The Held Price conserves wealth: across p0, _, _, p3 the returns are 0, 0, p3/p0 - 1.
+    P = reshape([100.0, NaN, NaN, 130.0], :, 1)
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 4)
+    pr = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = listing_span(P))
+    rr = prices_to_returns(pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), pr), pr))
+    @test vec(values(rr.X)) ≈ [0.0, 0.0, 0.3]
+    @test prod(1 .+ vec(values(rr.X))) ≈ 130.0 / 100.0
+    # The replay start: one past the end on the training window, the first row of a later
+    # window, and the row after the end of training on a window that overlaps it.
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 8)
+    P = reshape([100.0, 101.0, 102.0, NaN, NaN, 105.0, NaN, 107.0], :, 1)
+    full = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = listing_span(P))
+    res = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:3))
+    later = PortfolioOptimisers.port_opt_view(full, 4:8)
+    @test vec(values(pgf_970_quiet_apply(res, later).X)) ==
+          [102.0, 102.0, 105.0, 105.0, 107.0]
+    overlap = PortfolioOptimisers.port_opt_view(full, 2:6)
+    @test vec(values(pgf_970_quiet_apply(res, overlap).X)) ==
+          [101.0, 102.0, 102.0, 102.0, 105.0]
+    # A Float32 panel and a panel with `missing` keep their element types.
+    P32 = Float32[1 NaN; NaN 2; 3 4]
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 3)
+    pr32 = PricesResult(; X = TimeArray(collect(ts), P32, [:a, :b]),
+                        span = listing_span(P32))
+    for fill in (CarriedPrice(), MedianValue())
+        res32 = fit_preprocessing(PriceGapFill(; fill = fill), pr32)
+        @test eltype(res32.v) == Float32
+        @test eltype(values(pgf_970_quiet_apply(res32, pr32).X)) == Float32
+    end
+    Pm = Union{Missing, Float64}[1.0 missing; missing 2.0; 3.0 4.0]
+    prm = PricesResult(; X = TimeArray(collect(ts), Pm, [:a, :b]), span = listing_span(Pm))
+    outm = pgf_970_quiet_apply(fit_preprocessing(PriceGapFill(), prm), prm)
+    @test isequal(values(outm.X), Union{Missing, Float64}[1.0 missing; 1.0 2.0; 3.0 4.0])
+    # A statistic fill has no online form.
+    @test !PortfolioOptimisers.supports_partial_fit(PriceGapFill(; fill = MedianValue()))
+    @test PortfolioOptimisers.supports_partial_fit(PriceGapFill())
+    @test_throws ArgumentError PortfolioOptimisers.partial_fit_transform(PriceGapFill(;
+                                                                                      fill = MedianValue()),
+                                                                         pr32)
+end
+#=
+Issue #1330. `ff27cc22b8` (#978) stopped the carry at an absence inside the window, but a window
+cannot see an absence before its first row. When the listing breaks after the last observed
+training price, the fit must give no seed, or a later window books a return across the absence.
+The asset keeps its entry, with a `missing` seed, so a later window still fills its gaps from its
+own prices. The checks below pin the case from the issue, then pin on random caller's spans that
+a later window fills as the same rows of the full clock do, and that the online form agrees.
+=#
+@testset "A seed does not cross an absence at the end of the training window (#1330)" begin
+    ts = Date(2020, 1, 1):Day(1):Date(2020, 1, 6)
+    P = reshape([10.0, 11.0, NaN, NaN, 12.0, 13.0], :, 1)
+    span = reshape(Bool[1, 1, 0, 1, 1, 1], :, 1)
+    full = PricesResult(; X = TimeArray(collect(ts), P, [:A]), span = span)
+    res = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:3))
+    # The asset stays in the result, but row 3 is an absence after its last price.
+    @test res.nx == [:A]
+    @test isequal(res.v, [missing])
+    later = pgf_970_quiet_apply(res, PortfolioOptimisers.port_opt_view(full, 4:6))
+    @test isequal(vec(values(later.X)), [NaN, 12.0, 13.0])
+    @test isequal(vec(values(pgf_970_quiet_apply(res, full).X)), vec(P))
+    # The last price lies before an absence inside the training window, and the window ends
+    # inside the listing again: the seed would still cross the absence.
+    res4 = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:4))
+    @test isequal(res4.v, [missing])
+    # With no absence after the last price, the seed stays.
+    res2 = fit_preprocessing(PriceGapFill(), PortfolioOptimisers.port_opt_view(full, 1:2))
+    @test res2.v == [11.0]
+    # A statistic carries no price, so an absence does not retire it.
+    @test fit_preprocessing(PriceGapFill(; fill = MedianValue()),
+                            PortfolioOptimisers.port_opt_view(full, 1:3)).v == [10.5]
+    # A carrier that states no span states no absence, so the seed stays.
+    nospan = PricesResult(; X = TimeArray(collect(ts)[1:3], P[1:3, :], [:A]))
+    @test fit_preprocessing(PriceGapFill(), nospan).v == [11.0]
+    @test PortfolioOptimisers.gap_fill_open(span, 1, 2) === false
+    @test PortfolioOptimisers.gap_fill_open(span, 1, 4) === true
+    @test PortfolioOptimisers.gap_fill_open(nothing, 1, 2) === true
+    # The online form retires the carried price at the end of the block that holds the absence.
+    est = PortfolioOptimisers.partial_fit!(PriceGapFill(),
+                                           PortfolioOptimisers.port_opt_view(full, 1:3))
+    @test est.cache.held == [false]
+    blk = PortfolioOptimisers.partial_fit_transform(est,
+                                                    PortfolioOptimisers.port_opt_view(full,
+                                                                                      4:6))[2]
+    @test isequal(vec(values(blk.X)), [NaN, 12.0, 13.0])
+    @test isequal(fit_preprocessing(est).v, [missing])
+    rng = StableRNG(1330)
+    for trial in 1:800
+        nobs, nas = rand(rng, 2:10), rand(rng, 1:3)
+        X = 100 .+ 10 .* rand(rng, nobs, nas)
+        X[rand(rng, nobs, nas) .< 0.35] .= NaN
+        sp = rand(rng) < 0.8 ? rand(rng, nobs, nas) .< 0.75 : listing_span(X)
+        ts = Date(2020, 1, 1):Day(1):(Date(2020, 1, 1) + Day(nobs - 1))
+        full = PricesResult(; X = TimeArray(collect(ts), X, [:a, :b, :c][1:nas]), span = sp)
+        k = rand(rng, 1:(nobs - 1))
+        res = fit_preprocessing(PriceGapFill(),
+                                PortfolioOptimisers.port_opt_view(full, 1:k))
+        tail = pgf_970_quiet_apply(res,
+                                   PortfolioOptimisers.port_opt_view(full, (k + 1):nobs))
+        whole = pgf_970_quiet_apply(res, full)
+        @test isequal(values(tail.X), values(whole.X)[(k + 1):nobs, :])
+        # Two blocks fold to the batch fit over the whole clock, and two halves merge to it.
+        a = PortfolioOptimisers.partial_fit_transform(PriceGapFill(),
+                                                      PortfolioOptimisers.port_opt_view(full,
+                                                                                        1:k))
+        b = PortfolioOptimisers.partial_fit_transform(a[1],
+                                                      PortfolioOptimisers.port_opt_view(full,
+                                                                                        (k + 1):nobs))
+        bres = fit_preprocessing(PriceGapFill(), full)
+        @test isequal(vcat(values(a[2].X), values(b[2].X)),
+                      values(pgf_970_quiet_apply(bres, full).X))
+        @test isequal(fit_preprocessing(b[1]).nx, bres.nx)
+        @test isequal(fit_preprocessing(b[1]).v, bres.v)
+        h2 = PortfolioOptimisers.partial_fit!(PriceGapFill(),
+                                              PortfolioOptimisers.port_opt_view(full,
+                                                                                (k + 1):nobs))
+        m = PortfolioOptimisers.merge_states(a[1].cache, h2.cache)
+        @test isequal(m.v, b[1].cache.v)
+        @test m.held == b[1].cache.held
+    end
+end
+
+#=
+The concatenation of Asset Panels along the observation axis.
+
+`vcat` joins the parts of one universe. A panel split into two views and joined again is the
+panel it came from, for each kind of Panel Field, with and without an observed mask. A part
+whose schema differs from the first part is refused, one refusal per testset entry. A lazy
+lift and an all-true mask stay lazy when every part holds the same one.
+=#
+const PO = PortfolioOptimisers
+
+function concat_test_panel(T::Integer, N::Integer; rng = StableRNG(1401))
+    num = NumericPanelField(; name = "mcap", vals = rand(rng, T, N),
+                            omsk = rand(rng, T, N) .> 0.2)
+    cat = CategoricalPanelField(; name = "sector", levels = ["Tech", "Energy", "Retail"],
+                                codes = rand(rng, 1:3, T, N))
+    ten = TensorPanelField(; name = "beta", axis = "factor",
+                           labels = ["size", "value", "mom"],
+                           groups = ["style", "style", "momentum"],
+                           vals = randn(rng, T, N, 3), omsk = rand(rng, T, N, 3) .> 0.1)
+    amsk = rand(rng, T, N) .> 0.1
+    emsk = amsk .& (rand(rng, T, N) .> 0.2)
+    return AssetPanel(; pf = [num, cat, ten], amsk = amsk, emsk = emsk)
+end
+
+function same_panel(a::AssetPanel, b::AssetPanel)
+    return isequal(panel_feature_matrix(a), panel_feature_matrix(b)) &&
+           isequal(Matrix(a.amsk), Matrix(b.amsk)) &&
+           isequal(Matrix(a.emsk), Matrix(b.emsk))
+end
+
+function flat_omsk(f)
+    if isnothing(f.omsk)
+        return nothing
+    end
+    return Matrix(reshape(f.omsk, size(f.omsk, 1), :))
+end
+
+function tv_panel(pf; T::Integer, N::Integer)
+    return AssetPanel(; pf = pf, amsk = trues(T, N), emsk = trues(T, N))
+end
+
+@testset "A split panel joins back to itself, for every kind of Panel Field" begin
+    T, N = 9, 4
+    pnl = concat_test_panel(T, N)
+    parts = [PO.port_opt_view(pnl, r, :) for r in (1:3, 4:4, 5:T)]
+    joined = vcat(parts...)
+    @test same_panel(joined, pnl)
+    @test PO.panel_axes(joined) == (T, N)
+    @test [typeof(f).name.wrapper for f in joined.pf] ==
+          [NumericPanelField, CategoricalPanelField, TensorPanelField]
+    # Each field keeps its values and its observed mask cell for cell.
+    for (f, g) in zip(joined.pf, pnl.pf)
+        @test f.name == g.name
+        @test isequal(flat_omsk(f), flat_omsk(g))
+    end
+    @test panel_field(joined, "sector").levels == ["Tech", "Energy", "Retail"]
+    @test panel_field(joined, "sector").codes == panel_field(pnl, "sector").codes
+    @test panel_field(joined, "beta").groups == ["style", "style", "momentum"]
+    @test panel_field(joined, "beta").axis == "factor"
+    @test panel_field(joined, "beta").vals == panel_field(pnl, "beta").vals
+    # `reduce` gives the same panel, and so does a concatenation of one part.
+    @test same_panel(reduce(vcat, parts), pnl)
+    @test same_panel(vcat(pnl), pnl)
+end
+
+@testset "A part with no observed mask joins a part with one as observed cells" begin
+    a = tv_panel([NumericPanelField(; name = "x", vals = [1.0 2.0; 3.0 4.0])]; T = 2, N = 2)
+    b = tv_panel([NumericPanelField(; name = "x", vals = [5.0 6.0], omsk = [true false])];
+                 T = 1, N = 2)
+    c = vcat(a, b)
+    @test c.pf[1].vals == [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    @test c.pf[1].omsk == [true true; true true; true false]
+    # With no mask in any part, the result has none.
+    @test isnothing(vcat(a, a).pf[1].omsk)
+end
+
+@testset "The element types promote as vcat promotes them" begin
+    a = tv_panel([NumericPanelField(; name = "x", vals = Float32[1 2])]; T = 1, N = 2)
+    b = tv_panel([NumericPanelField(; name = "x", vals = [3.0 4.0])]; T = 1, N = 2)
+    @test eltype(vcat(a, b).pf[1].vals) === Float64
+    @test eltype(vcat(a, a).pf[1].vals) === Float32
+end
+
+@testset "A panel with no Panel Field joins its masks" begin
+    a = AssetPanel(; amsk = [true true; false true], emsk = [true false; false true])
+    b = AssetPanel(; amsk = [true false], emsk = [true false])
+    c = vcat(a, b)
+    @test isempty(c.pf)
+    @test c.pf === a.pf
+    @test Matrix(c.amsk) == [true true; false true; true false]
+    @test Matrix(c.emsk) == [true false; false true; true false]
+end
+
+@testset "A lazy lift and an all-true mask stay lazy" begin
+    s = NumericPanelField(; name = "size", vals = [1.0, 2.0, 3.0])
+    lifted(n) = AssetPanel(; pf = [PO.panel_field_lift(s, n)], amsk = PO.AllTrueMask(n, 3),
+                           emsk = PO.AllTrueMask(n, 3))
+    c = vcat(lifted(2), lifted(5))
+    @test isa(c.pf[1].vals, PO.RepeatedLeading)
+    @test size(c.pf[1].vals) == (7, 3)
+    @test c.pf[1].vals == repeat([1.0 2.0 3.0], 7)
+    @test isa(c.amsk, PO.AllTrueMask) && isa(c.emsk, PO.AllTrueMask)
+    @test size(c.amsk) == (7, 3)
+    # A lift of an equal array in a new object is the same lift.
+    t = NumericPanelField(; name = "size", vals = [1.0, 2.0, 3.0])
+    d = vcat(lifted(2),
+             AssetPanel(; pf = [PO.panel_field_lift(t, 1)], amsk = PO.AllTrueMask(1, 3),
+                        emsk = PO.AllTrueMask(1, 3)))
+    @test isa(d.pf[1].vals, PO.RepeatedLeading)
+    # A lift of another array makes the field time-varying, and a mask with a false cell
+    # makes the mask dense.
+    u = NumericPanelField(; name = "size", vals = [4.0, 5.0, 6.0])
+    e = vcat(lifted(2),
+             AssetPanel(; pf = [PO.panel_field_lift(u, 1)], amsk = trues(1, 3),
+                        emsk = [true false true]))
+    @test !isa(e.pf[1].vals, PO.RepeatedLeading)
+    @test e.pf[1].vals == [1.0 2.0 3.0; 1.0 2.0 3.0; 4.0 5.0 6.0]
+    @test !isa(e.amsk, PO.AllTrueMask)
+    @test Matrix(e.emsk) == [true true true; true true true; true false true]
+end
+
+@testset "Equal static panels join to the first one" begin
+    mk() = AssetPanel(;
+                      pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0]),
+                            CategoricalPanelField(; name = "sector", levels = ["A", "B"],
+                                                  codes = [2, 1])])
+    a = mk()
+    @test vcat(a, mk(), mk()) === a
+    b = AssetPanel(;
+                   pf = [NumericPanelField(; name = "mcap", vals = [1.0, 3.0]),
+                         CategoricalPanelField(; name = "sector", levels = ["A", "B"],
+                                               codes = [2, 1])])
+    @test_throws "part 3 holds values, observed masks or placeholder masks that differ" vcat(a,
+                                                                                             mk(),
+                                                                                             b)
+    # The Feature Matrix holds no placeholder mask, so a placeholder `0.0` and a datum `0.0`
+    # derived one Feature Matrix, and the answer was the first part, whichever it was (R7 of
+    # #1630).
+    p = AssetPanel(;
+                   pf = [NumericPanelField(; name = "x", vals = [0.0, 1.0],
+                                           omsk = [false, true], pmsk = [true, false])])
+    d = AssetPanel(;
+                   pf = [NumericPanelField(; name = "x", vals = [0.0, 1.0],
+                                           omsk = [false, true])])
+    @test_throws "part 2 holds values, observed masks or placeholder masks that differ" vcat(p,
+                                                                                             d)
+    @test_throws "part 2 holds values, observed masks or placeholder masks that differ" vcat(d,
+                                                                                             p)
+    @test vcat(p, p) === p
+    # A missing mask reads as the time-varying concatenation reads it: no observed mask is
+    # `true` in each cell, and no placeholder mask is `false` in each cell (#1769).
+    v = [1.0, 2.0, 3.0]
+    nump(; kw...) = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = v, kw...)])
+    o = [true, false, true]
+    for (x, y) in ((nump(), nump(; omsk = trues(3))),
+                   (nump(; omsk = o), nump(; omsk = o, pmsk = falses(3))),
+                   (nump(), nump(; omsk = trues(3), pmsk = falses(3))))
+        @test vcat(x, y) === x
+        @test vcat(y, x) === y
+    end
+    msg = "part 2 holds values, observed masks or placeholder masks that differ"
+    @test_throws msg vcat(nump(), nump(; omsk = o))
+    @test_throws msg vcat(nump(; omsk = o, pmsk = [false, true, false]), nump(; omsk = o))
+    @test_throws msg vcat(nump(; omsk = o), nump(; omsk = [true, true, false]))
+    # The codes of a categorical field and the values of a tensor field are compared.
+    catp(c; kw...) = AssetPanel(;
+                                pf = [CategoricalPanelField(; name = "sector",
+                                                            levels = ["A", "B"], codes = c,
+                                                            kw...)])
+    @test vcat(catp([1, 2]), catp([1, 2]; omsk = trues(2))) isa AssetPanel
+    @test_throws msg vcat(catp([1, 2]), catp([2, 1]))
+    tenp(x; kw...) = AssetPanel(;
+                                pf = [TensorPanelField(; name = "beta", axis = "factor",
+                                                       labels = ["size", "value"], vals = x,
+                                                       kw...)])
+    @test vcat(tenp(ones(2, 2)),
+               tenp(ones(2, 2); omsk = trues(2, 2), pmsk = falses(2, 2))) isa AssetPanel
+    @test_throws msg vcat(tenp(ones(2, 2)), tenp([1.0 1.0; 1.0 2.0]))
+end
+
+@testset "A part whose schema differs is refused" begin
+    T, N = 2, 3
+    base = concat_test_panel(T, N)
+    num(name = "mcap"; n = N) = NumericPanelField(; name = name, vals = ones(T, n))
+    function catf(levels = ["Tech", "Energy", "Retail"]; n = N)
+        return CategoricalPanelField(; name = "sector", levels = levels,
+                                     codes = ones(Int, T, n))
+    end
+    function ten(; axis = "factor", labels = ["size", "value", "mom"],
+                 groups = ["style", "style", "momentum"], n = N)
+        return TensorPanelField(; name = "beta", axis = axis, labels = labels,
+                                groups = groups, vals = ones(T, n, 3))
+    end
+    part(pf; n = N) = tv_panel(pf; T = T, N = n)
+    # The schema of `base` itself joins.
+    @test PO.panel_axes(vcat(base, part([num(), catf(), ten()]))) == (2T, N)
+
+    static = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = ones(N))])
+    @test_throws "the first part is time-varying and part 2 is static" vcat(base, static)
+    @test_throws "the first part is static and part 2 is time-varying" vcat(static, base)
+    narrow = part([num(; n = 2), catf(; n = 2), ten(; n = 2)]; n = 2)
+    @test_throws DimensionMismatch vcat(base, narrow)
+    @test_throws "got 2 assets in part 2 against 3" vcat(base, narrow)
+    msg = "the same Panel Fields in the same order"
+    @test_throws msg vcat(base, part([num(), catf()]))
+    @test_throws msg vcat(base, part([catf(), num(), ten()]))
+    @test_throws msg vcat(base, part([num("size"), catf(), ten()]))
+    kind = NumericPanelField(; name = "sector", vals = ones(T, N))
+    msg = "is a `NumericPanelField` in part 2 and a `CategoricalPanelField`"
+    @test_throws msg vcat(base, part([num(), kind, ten()]))
+    msg = "the codes of the two parts name different categories"
+    @test_throws msg vcat(base, part([num(), catf(["Energy", "Tech", "Retail"]), ten()]))
+    msg = "the tensor Panel Field \"beta\""
+    @test_throws msg vcat(base, part([num(), catf(), ten(; axis = "loading")]))
+    @test_throws msg vcat(base,
+                          part([num(), catf(), ten(; labels = ["size", "mom", "value"])]))
+    @test_throws msg vcat(base, part([num(), catf(), ten(; groups = ["a", "b", "c"])]))
+    @test_throws msg vcat(base, part([num(), catf(), ten(; groups = nothing)]))
+    # The message names the position of the part.
+    @test_throws "in part 3" vcat(base, base,
+                                  part([num(), catf(), ten(; axis = "loading")]))
+end
+
+@testset "Two blocks of returns data join their panels with every Panel Field" begin
+    T, N = 8, 4
+    pnl = concat_test_panel(T, N)
+    rd = ReturnsResult(; nx = ["A", "B", "C", "D"], X = randn(StableRNG(7), T, N),
+                       pnl = pnl)
+    joined = PO.vcat_observations(PO.port_opt_view(rd, 1:5, :),
+                                  PO.port_opt_view(rd, 6:T, :))
+    @test joined.X == rd.X
+    @test same_panel(joined.pnl, pnl)
+end
+
+#=
+The missing-share report, the info report and the active-mask alignment of an Asset Panel (#1400).
+
+`describe` counts the cells that the builder filled, `panel_info` prints the dimensions, the mask
+coverage and the level coverage, and `panel_align_active` moves the start of each asset to the
+first active observation where each named Panel Field is observed. Each is checked by hand on a
+small panel, and against the oracle on the parity fixture of map #1375 with an observed mask
+that has leading gaps, a field that is never observed, a categorical field with unobserved
+cells, and a tensor field.
+=#
+const PO = PortfolioOptimisers
+
+function summary_small_panel()
+    mcap = NumericPanelField(; name = "mcap",
+                             vals = [1.0 2.0 3.0; 4.0 5.0 6.0; 7.0 8.0 9.0],
+                             omsk = Bool[0 1 1; 1 1 0; 1 0 0])
+    sector = CategoricalPanelField(; name = "sector", levels = ["Tech", "Energy"],
+                                   codes = [1 2 1; 1 2 1; 1 2 1],
+                                   omsk = Bool[1 1 1; 1 1 0; 1 1 1])
+    beta = TensorPanelField(; name = "beta", axis = "factor", labels = ["size", "value"],
+                            vals = zeros(3, 3, 2),
+                            omsk = cat(Bool[1 1 1; 1 1 1; 1 1 1], Bool[0 1 1; 1 1 1; 1 1 0];
+                                       dims = 3))
+    amsk = Bool[1 1 0; 1 1 1; 1 1 1]
+    emsk = Bool[1 0 0; 1 1 1; 1 1 1]
+    return AssetPanel(; pf = [mcap, sector, beta], amsk = amsk, emsk = emsk)
+end
+
+# The parity fixture with observed masks that the alignment acts on. Asset 1 starts
+# `book_equity` late; asset 2 lists late and starts it later still; asset 4 misses it at its
+# relisting, which is not a leading cell; asset 12 never reports it. `sales_ttm` is observed on
+# asset 7 at the first observation only and then from observation 10, while `book_equity`
+# starts on it at observation 5, so the order of the two fields matters to a one-pass rule.
+# `industry` is not observed on asset 5 for its first ten observations, and the tensor field
+# misses one label on asset 3 for its first three.
+function summary_parity_panel()
+    fx = parity_small_panel()
+    pnl = fx.rd.pnl
+    T, N = size(pnl.amsk)
+    book = panel_field(pnl, "book_equity")
+    bo = copy(book.omsk)
+    bo[1:6, 1] .= false
+    bo[21:26, 2] .= false
+    bo[41:43, 4] .= false
+    bo[:, 12] .= false
+    bo[1:4, 7] .= false
+    sales = panel_field(pnl, "sales_ttm")
+    so = copy(sales.omsk)
+    so[2:9, 7] .= false
+    so[1:2, 1] .= false
+    ind = panel_field(pnl, "industry")
+    io_ = trues(T, N)
+    io_[1:10, 5] .= false
+    rng = StableRNG(1400)
+    eo = trues(T, N, 3)
+    eo[1:3, 3, 2] .= false
+    eo[60:62, 8, 1] .= false
+    expo = TensorPanelField(; name = "exposure", axis = "factor",
+                            labels = ["size", "value", "mom"], vals = randn(rng, T, N, 3),
+                            omsk = eo)
+    pf = [NumericPanelField(; name = "book_equity", vals = book.vals, omsk = bo),
+          NumericPanelField(; name = "sales_ttm", vals = sales.vals, omsk = so),
+          panel_field(pnl, "adj_close"),
+          CategoricalPanelField(; name = "industry", levels = ind.levels, codes = ind.codes,
+                                omsk = io_), panel_field(pnl, "currency"), expo]
+    return AssetPanel(; pf = pf, amsk = pnl.amsk, emsk = pnl.emsk)
+end
+
+const SUMMARY_ALIGN_CASES = ["Book" => ["book_equity"],
+                             "BookSales" => ["book_equity", "sales_ttm"],
+                             "SalesBook" => ["sales_ttm", "book_equity"],
+                             "Industry" => ["industry"]]
+
+@testset "describe counts the filled cells of each Panel Field" begin
+    pnl = summary_small_panel()
+    df = describe(pnl)
+    @test df.field == ["mcap", "sector", "beta"]
+    @test df.kind == [:numeric, :categorical, :tensor]
+    @test df.cells == [9, 9, 18]
+    @test df.missing ≈ [4 / 9, 1 / 9, 2 / 18] rtol = 1e-15
+    @test df.active_cells == [8, 8, 16]
+    # mcap: active and missing at (1, 1), (2, 3), (3, 2) and (3, 3); (1, 3) is inactive.
+    @test df.active_missing ≈ [4 / 8, 1 / 8, 2 / 16] rtol = 1e-15
+    # Asset 3 is active at observations 2 and 3, and mcap is missing at both.
+    @test df.assets_missing == [1, 0, 0]
+    by = describe(pnl; by = "sector")
+    @test by.field == ["mcap", "mcap", "beta", "beta"]
+    @test by.level == ["Tech", "Energy", "Tech", "Energy"]
+    # Tech: (1, 1), (2, 1), (3, 1), (3, 3); (2, 3) is not observed and (1, 3) is inactive.
+    @test by.cells == [4, 3, 8, 6]
+    @test by.missing ≈ [2 / 4, 1 / 3, 2 / 8, 0 / 6] rtol = 1e-15
+    @test_throws ArgumentError describe(pnl; by = "mcap")
+    @test_throws KeyError describe(pnl; by = "industry")
+end
+
+@testset "describe on a static panel, an empty level and a panel with no Panel Field" begin
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0, 3.0],
+                                             omsk = Bool[1, 0, 1]),
+                           CategoricalPanelField(; name = "sector",
+                                                 levels = ["Tech", "Energy", "Retail"],
+                                                 codes = [1, 2, 1])])
+    df = describe(pnl)
+    @test df.cells == [3, 3]
+    @test df.active_cells == [3, 3]
+    @test df.missing == df.active_missing
+    @test df.assets_missing == [1, 0]
+    by = describe(pnl; by = "sector")
+    @test by.cells == [2, 1, 0]
+    # A share over no cell is NaN.
+    @test isnan(by.missing[3])
+    @test by.missing[1:2] == [0.0, 1.0]
+    empty = AssetPanel(; amsk = trues(2, 2), emsk = trues(2, 2))
+    @test size(describe(empty)) == (0, 7)
+end
+
+@testset "panel_info prints the dimensions, the masks, the fields and the levels" begin
+    pnl = summary_small_panel()
+    s = sprint(io -> panel_info(io, pnl; ts = ["t1", "t2", "t3"]))
+    @test occursin("observations : 3 (t1 to t3)", s)
+    @test occursin("Panel Fields : 3", s)
+    @test occursin("missing      : 19.4% of the cells, 21.9% of the active cells", s)
+    @test occursin("in mask          : 8 / 9 cells (88.9%)", s)
+    @test occursin("in mask          : 7 / 9 cells (77.8%)", s)
+    @test occursin("sector: 2 levels", s)
+    @test occursin("< 10    : 2 levels (Tech, Energy)", s)
+    @test !occursin("equal to the active mask", s)
+    @test_throws DimensionMismatch panel_info(devnull, pnl; ts = ["t1"])
+    @test isnothing(panel_info(devnull, pnl))
+    # The method with no stream prints to `stdout`, so the report goes to the test log.
+    @test isnothing(panel_info(pnl))
+    same = AssetPanel(; pf = pnl.pf, amsk = pnl.amsk, emsk = pnl.amsk)
+    @test occursin("estimation mask: equal to the active mask", sprint(panel_info, same))
+    static = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0])])
+    s = sprint(io -> panel_info(io, static; ts = [1]))
+    @test occursin("observations : none, the panel is static", s)
+    @test occursin("active mask: none, the panel is static", s)
+    @test !occursin("categorical", s)
+    # A group of more than six levels prints four names and the count of the others.
+    levels = ["L$k" for k in 1:8]
+    many = AssetPanel(;
+                      pf = [CategoricalPanelField(; name = "g", levels = levels,
+                                                  codes = [1:8;])])
+    @test occursin("< 10    : 8 levels (L1, L2, L3, L4, … +4 more)",
+                   sprint(panel_info, many))
+    # A panel with no row prints no spread.
+    norow = AssetPanel(; amsk = falses(0, 2), emsk = falses(0, 2))
+    s = sprint(panel_info, norow)
+    @test !occursin("assets per obs.", s)
+    @test !occursin("duration", s)
+end
+
+@testset "panel_info prints the median of an even count of assets or observations" begin
+    # Better than the oracle (R80 of #1416). The median of an even count of numbers is the mean
+    # of its two middle numbers. The oracle takes that median and prints its integer part.
+    # The four observations hold 1, 2, 3 and 4 assets, and the four assets last 4, 3, 2 and 1
+    # observations. Each middle pair is 2 and 3, so each median is (2 + 3) / 2 = 2.5. The
+    # oracle prints 2.
+    amsk = Bool[1 0 0 0; 1 1 0 0; 1 1 1 0; 1 1 1 1]
+    c = PO.panel_mask_coverage(amsk)
+    @test c.per_observation == (; min = 1, median = 2.5, max = 4)
+    @test c.durations == (; min = 1, median = 2.5, max = 4)
+    s = sprint(panel_info, AssetPanel(; amsk = amsk, emsk = amsk))
+    @test occursin("assets per obs.  : min 1, median 2.5, max 4", s)
+    @test occursin("duration (obs.)  : min 1, median 2.5, max 4", s)
+end
+
+@testset "panel_align_active moves the start of each asset to its first observed cell" begin
+    pnl = summary_small_panel()
+    res = panel_align_active(pnl, "mcap")
+    # Asset 1 starts at 2; asset 2 is observed at its first cell; asset 3 is never observed
+    # while active, so it leaves the universe.
+    @test res.n == 1 + 2
+    @test res.pnl.amsk == Bool[0 1 0; 1 1 0; 1 1 0]
+    @test res.pnl.emsk == res.pnl.emsk .& res.pnl.amsk
+    @test res.pnl.emsk == Bool[0 0 0; 1 1 0; 1 1 0]
+    @test res.pnl.pf === pnl.pf
+    # The tensor field is observed at a pair when each label is. Its gap at (3, 3) follows
+    # the first active cell of asset 3, which is observed, so it stays.
+    res = panel_align_active(pnl, ["beta"])
+    @test res.n == 1
+    @test res.pnl.amsk == Bool[0 1 0; 1 1 1; 1 1 1]
+    # The order of the fields does not change the result, and a second call removes nothing.
+    a = panel_align_active(pnl, ["mcap", "beta", "sector"])
+    b = panel_align_active(pnl, ["sector", "beta", "mcap"])
+    @test a.pnl.amsk == b.pnl.amsk
+    @test a.n == b.n
+    @test panel_align_active(a.pnl, ["mcap", "beta", "sector"]).n == 0
+    # No field, or a field that cannot blank, removes nothing.
+    @test panel_align_active(pnl, String[]).n == 0
+    lifted = AssetPanel(;
+                        pf = [NumericPanelField(; name = "x",
+                                                vals = PO.RepeatedLeading([1.0, 2.0, 3.0],
+                                                                          3))],
+                        amsk = pnl.amsk, emsk = pnl.emsk)
+    @test panel_align_active(lifted, "x").n == 0
+    @test_throws KeyError panel_align_active(pnl, "nope")
+    static = AssetPanel(; pf = [NumericPanelField(; name = "mcap", vals = [1.0, 2.0])])
+    @test_throws ArgumentError panel_align_active(static, "mcap")
+end
+
+@testset "describe equals the oracle on the parity fixture" begin
+    pnl = summary_parity_panel()
+    df = describe(pnl)
+    # The oracle gives each share as a percentage; the stored file holds it over 100.
+    ref = parity_load("AssetPanelSummary", "Small", "Describe")
+    r = parity_compare([df.missing df.active_missing], ref; name = "describe")
+    @test r.ok
+    # The oracle's rows are level by level; ours are field by field.
+    by = describe(pnl; by = "industry")
+    ref = parity_load("AssetPanelSummary", "Small", "DescribeBy")
+    names = [f.name for f in pnl.pf]
+    lv = panel_field(pnl, "industry").levels
+    ord = [findfirst(i -> by.field[i] == names[Int(row[1]) + 1] &&
+                          by.level[i] == lv[Int(row[2]) + 1], eachindex(by.field))
+           for row in eachrow(ref)]
+    @test by.cells[ord] == Int.(ref[:, 3])
+    r = parity_compare(by.missing[ord], ref[:, 4]; name = "describe by industry")
+    @test r.ok
+end
+
+@testset "the numbers of panel_info equal the oracle on the parity fixture" begin
+    pnl = summary_parity_panel()
+    for (msk, name) in ((pnl.amsk, "InfoActive"), (pnl.emsk, "InfoEstimation"))
+        c = PO.panel_mask_coverage(msk)
+        ref = Int.(vec(parity_load("AssetPanelSummary", "Small", name)))
+        # The oracle truncates a median to an integer. The testset above pins our median.
+        @test [c.in_mask, c.cells, c.per_observation.min,
+               floor(Int, c.per_observation.median), c.per_observation.max, c.assets, c.N,
+               floor(Int, c.durations.median), c.durations.min, c.durations.max] == ref
+    end
+    # The oracle reports the fully missing assets of a numeric or categorical field.
+    df = describe(pnl)
+    ref = parity_load("AssetPanelSummary", "Small", "InfoFullyMissing")
+    @test df.assets_missing[Int.(ref[:, 1]) .+ 1] == Int.(ref[:, 2])
+    # The level groups: each row is a field, a level and a group, all zero-based.
+    ref = Int.(parity_load("AssetPanelSummary", "Small", "InfoLevels"))
+    s = sprint(panel_info, pnl)
+    groups = ["< 10", "10 - 19", "20 - 49", ">= 50"]
+    for row in eachrow(ref)
+        f = pnl.pf[row[1] + 1]
+        line = only(filter(l -> occursin("    $(rpad(groups[row[3] + 1], 8)):", l),
+                           split(s[findfirst("  $(f.name): ", s)[1]:end], '\n')[2:5]))
+        @test occursin(f.levels[row[2] + 1], line)
+    end
+end
+
+@testset "panel_align_active equals the oracle on the parity fixture" begin
+    pnl = summary_parity_panel()
+    for (case, fs) in SUMMARY_ALIGN_CASES
+        res = panel_align_active(pnl, fs)
+        n = Int.(vec(parity_load("AssetPanelSummary", "Align$case", "N")))
+        # The oracle's second call; one call of ours gives it.
+        amsk = parity_load("AssetPanelSummary", "Align$case", "ActiveMask2")
+        @test res.pnl.amsk == (amsk .== 1)
+        @test res.n == sum(n)
+        @test res.pnl.emsk ==
+              (parity_load("AssetPanelSummary", "Align$case", "EstimationMask") .== 1) .&
+              res.pnl.amsk
+        first = parity_load("AssetPanelSummary", "Align$case", "ActiveMask") .== 1
+        if case == "SalesBook"
+            # Better: the oracle's first call walks the fields in turn, so it stops at
+            # observation 5 on asset 7, where `sales_ttm` is not observed, and its second
+            # call moves on to observation 10. The rule of the library is its fixed point.
+            @test findfirst(first[:, 7]) == 5
+            @test findfirst(res.pnl.amsk[:, 7]) == 10
+            @test n[2] > 0
+        else
+            # The oracle's second call aligns nothing more, so its first call is the result.
+            @test n[2] == 0
+            @test first == res.pnl.amsk
+        end
+    end
+    # Better: the oracle refuses a tensor field; the library aligns asset 3 past the three
+    # observations where the label "value" is not observed. The gap of asset 8 is not a
+    # leading one, so it stays.
+    res = panel_align_active(pnl, "exposure")
+    @test res.n == 3
+    @test findfirst(res.pnl.amsk[:, 3]) == 4
 end

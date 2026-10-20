@@ -1,8 +1,8 @@
 ```@meta
-Description = "Rank Covariances, public API of PortfolioOptimisers.jl: KendallCovariance, SpearmanCovariance, cor."
+Description = "Rank covariance, public API of PortfolioOptimisers.jl: KendallCovariance, SpearmanCovariance, cor."
 ```
 
-# Rank Covariances
+# Rank covariance
 
 ```@docs
 KendallCovariance

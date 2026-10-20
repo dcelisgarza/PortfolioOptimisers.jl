@@ -53,7 +53,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 # Functor
 
@@ -96,7 +96,7 @@ MeanReturn
     flag
     function MeanReturn(settings::HierarchicalRiskMeasureSettings, w::Option{<:ObsWeights},
                         flag::Bool)
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         return new{typeof(settings), typeof(w), typeof(flag)}(settings, w, flag)
     end
 end
@@ -109,7 +109,7 @@ function (r::MeanReturn)(x::VecNum)
     if r.flag
         x = log1p.(x)
     end
-    w = get_observation_weights(r.w, x)
+    w = checked_observation_weights(r.w, x)
     return isnothing(w) ? Statistics.mean(x) : Statistics.mean(x, w)
 end
 """
@@ -242,6 +242,33 @@ end
 # nothing, so only the risk side is declared.
 deferred_slots(r::MeanReturnRiskRatio) = (; rk = r.rk)
 """
+    reader_frames(r::MeanReturnRiskRatio, path::AbstractString,
+                  refit::Bool) -> ReturnsFrames
+
+Return the frames of the readers inside the risk side of a [`MeanReturnRiskRatio`](@ref), for the frame walk of a head.
+
+The risk side `rk` can hold a risk measure with a reader, such as an [`UncertaintySetVariance`](@ref). Each of those readers belongs to the group of the head that holds the measure, so the method walks every field of `r` with [`field_frames`](@ref). A field that holds no reader adds nothing.
+
+# Arguments
+
+  - `r`: The risk measure.
+  - $(arg_dict[:frame_path])
+  - $(arg_dict[:frame_refit])
+
+# Returns
+
+  - `fr::ReturnsFrames`: The frames of the fields of `r`.
+
+# Related
+
+  - [`reader_frames`](@ref)
+  - [`field_frames`](@ref)
+  - [`MeanReturnRiskRatio`](@ref)
+"""
+function reader_frames(r::MeanReturnRiskRatio, path::AbstractString, refit::Bool)
+    return field_frames(r, path, refit)
+end
+"""
 $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return whether [`MeanReturnRiskRatio`](@ref) `r` requires previous portfolio weights.
@@ -300,7 +327,7 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - $(val_dict[:oow])
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -355,7 +382,7 @@ ThirdCentralMoment
     @pprop @vprop mu
     function ThirdCentralMoment(settings::HierarchicalRiskMeasureSettings,
                                 w::Option{<:ObsWeights}, mu::Option{<:MuSlot})
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
@@ -381,9 +408,11 @@ Resolve a **Deferred Quantity** in [`ThirdCentralMoment`](@ref)'s `mu` slot agai
 """
 function resolve_deferred_quantities(r::ThirdCentralMoment, pr::AbstractPriorResult,
                                      ::Any = nothing)
-    if !isa(r.mu, DeferredQuantity)
-        return r
-    end
+    return r
+end
+function resolve_deferred_quantities(r::ThirdCentralMoment{<:Any, <:Any,
+                                                           <:DeferredQuantity},
+                                     pr::AbstractPriorResult, ::Any = nothing)
     return rebuild_with_slots(r, (; mu = resolve_slot(r.mu, :mu, pr)))
 end
 # Deferrable slots — see `deferred_slots`.

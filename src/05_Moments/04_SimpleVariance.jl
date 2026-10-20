@@ -225,7 +225,7 @@ The `cvg` field of the estimator is passed as the third argument, so the arm is 
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
   - `mean`: A precomputed centre, or `nothing`.
-  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm ignores it.
+  - `active_mask`: The active mask of the Asset Panel, `observations × assets`, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return.
   - `kwargs...`: Additional keyword arguments passed to the centring estimator and the weights.
 
 # Returns
@@ -243,7 +243,7 @@ function coverage_variance end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of [`coverage_variance`](@ref). The Coverage Universe arm, which is the body [`simple_variance_kernel`](@ref) has always had: it refuses a gapped sample with [`assert_finite_sample`](@ref) and ignores the active mask.
+`Nothing` method of [`coverage_variance`](@ref). The Coverage Universe arm, which is the body [`simple_variance_kernel`](@ref) has always had: it refuses a gapped sample with [`assert_finite_sample`](@ref). A cell is a gap when its return is non-finite or when `active_mask` is `false` there, so the arm refuses an inactive cell too.
 
 # Related
 
@@ -256,7 +256,7 @@ function coverage_variance(f::F, ve::SimpleVariance, ::Nothing,
                            active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                            kwargs...) where {F}
     assert_dims(dims)
-    assert_finite_sample(X)
+    assert_finite_sample(X, active_mask)
     mu = weighted_centre(X, me, ve.w; dims = dims, mean = mean, kwargs...)
     w = get_observation_weights(ve.w, X; dims = dims, kwargs...)
     return if isnothing(w)
@@ -961,7 +961,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleVarianceState, x::VecNum)`](@ref), and the active mask is ignored.
+`Nothing` method of the coverage arm of [`partial_fit!`](@ref) for a [`SimpleVarianceState`](@ref). An estimator that carries no [`CoveragePolicy`](@ref) folds through [`partial_fit!(state::SimpleVarianceState, x::VecNum)`](@ref). A plain state carries one count for every asset, so it cannot skip an inactive cell. [`inactive_as_nonfinite`](@ref) writes `NaN` there, and the asset then answers `NaN`, as the Asset Panel method answers an asset outside the Coverage Universe of the same rows.
 
 # Related
 
@@ -970,8 +970,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
   - [`SimpleVarianceState`](@ref)
 """
 function partial_fit!(state::SimpleVarianceState, x::VecNum, ::Nothing,
-                      ::Option{<:AbstractVector{<:Bool}})
-    return partial_fit!(state, x)
+                      active_mask::Option{<:AbstractVector{<:Bool}})
+    return partial_fit!(state, inactive_as_nonfinite(x, active_mask))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1240,7 +1240,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the read-out arm of [`coverage_variance`](@ref). Every asset shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
+`Nothing` method of [`coverage_variance`](@ref) for a state, which `var(ve)` with no data calls. Every asset shares one count, so the whole answer is `NaN` until the count passes the Bessel correction.
 
 # Related
 
@@ -1254,7 +1254,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-[`CoveragePolicy`](@ref) method of the read-out arm of [`coverage_variance`](@ref). Each asset's accumulator is divided by that asset's own count less the Bessel correction, and an asset the policy refuses is `NaN`.
+[`CoveragePolicy`](@ref) method of [`coverage_variance`](@ref) for a state, which `var(ve)` with no data calls. Each asset's accumulator is divided by that asset's own count less the Bessel correction, and an asset the policy refuses is `NaN`.
 
 # Related
 
@@ -1270,6 +1270,30 @@ function coverage_variance(ve::SimpleVariance, cvg::CoveragePolicy,
 end
 function Statistics.var(ve::SimpleVariance)
     return Statistics.var(ve, partial_fit_cache(ve))
+end
+"""
+    Statistics.std(ve::SimpleVariance, state::SimpleVarianceState) -> VecNum
+
+Read the standard deviation of an incremental fit out of a [`SimpleVarianceState`](@ref).
+
+`std(ve)` with no data reads the state that the `cache` field of `ve` carries through this method.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `state`: The state to read.
+
+# Returns
+
+  - `sd::VecNum`: Per-asset standard deviation of the fit, `assets × 1`, or `NaN` where the state holds too few observations.
+
+# Related
+
+  - [`SimpleVarianceState`](@ref)
+  - [`Statistics.var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref)
+"""
+function Statistics.std(ve::SimpleVariance, state::SimpleVarianceState)
+    return sqrt.(Statistics.var(ve, state))
 end
 # Every configuration of this family folds, for the reason [`SimpleExpectedReturns`](@ref)
 # does (see [`supports_partial_fit`](@ref)).

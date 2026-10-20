@@ -51,6 +51,13 @@ In order to implement a new cokurtosis estimator which will work seamlessly with
 
   - $(ret_dict[:ktev])
 
+## Factor prior
+
+[`HighOrderFactorPriorEstimator`](@ref) reads two more verbs of its `kte`:
+
+  - `PortfolioOptimisers.cokurtosis_processor(kte::CokurtosisEstimator) -> Option{<:AbstractMatrixProcessingEstimator}`: The matrix processing estimator of the lifted cokurtosis, or `nothing` to skip the processing and the repair. The fallback refuses the type by name, and the prior calls it at construction under every `rsd`. See [`cokurtosis_processor`](@ref).
+  - `PortfolioOptimisers.cokurtosis_expected_returns(kte::CokurtosisEstimator) -> AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments. It is necessary under `rsd = true`. The fallback refuses the type by name, and the prior calls it at construction. See [`cokurtosis_expected_returns`](@ref).
+
 # Examples
 
 We can create a dummy cokurtosis estimator as follows:
@@ -102,6 +109,8 @@ MyCokurtosisEstimator
 
   - [`Cokurtosis`](@ref)
   - [`AbstractEstimator`](@ref)
+  - [`cokurtosis_processor`](@ref)
+  - [`cokurtosis_expected_returns`](@ref)
 
 # References
 
@@ -451,7 +460,7 @@ The `cvg` field of the estimator is passed as the second argument, so the arm is
   - `X`: Data matrix (observations × assets).
   - $(arg_dict[:dims])
   - `mean`: Optional mean vector. The available-case arm refuses one.
-  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm ignores it.
+  - `active_mask`: The active mask of the Asset Panel over the window, or `nothing`. The Coverage Universe arm refuses an inactive cell, as it refuses a non-finite return.
   - `kwargs...`: Additional keyword arguments passed to the mean estimator.
 
 # Returns
@@ -469,7 +478,7 @@ function coverage_cokurtosis end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which centres the whole window on one vector and delegates to [`_cokurtosis`](@ref), and which is the body the verb has always had.
+`Nothing` method of the [`FullMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which centres the whole window on one vector and delegates to [`_cokurtosis`](@ref), and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -481,7 +490,7 @@ function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:FullMoment}, ::Noth
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...)
     X = dims_oriented(dims, X)
-    assert_finite_sample(X)
+    assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = X .- mu
@@ -490,7 +499,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero before delegating, and which is the body the verb has always had.
+`Nothing` method of the [`SemiMoment`](@ref) arm of [`coverage_cokurtosis`](@ref). The Coverage Universe arm, which clips the de-meaned returns at zero before delegating, and which is the body the verb has always had. It refuses an inactive cell of `active_mask` with [`assert_finite_sample`](@ref), because a plain estimator reads that cell as a non-finite return.
 
 # Related
 
@@ -502,7 +511,7 @@ function coverage_cokurtosis(kte::Cokurtosis{<:Any, <:Any, <:SemiMoment}, ::Noth
                              active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                              kwargs...)
     X = dims_oriented(dims, X)
-    assert_finite_sample(X)
+    assert_finite_sample(X, dims_oriented(dims, active_mask))
     w = get_observation_weights(kte.w, X; dims = 1, kwargs...)
     mu = weighted_centre(X, kte.me, kte.w; dims = 1, mean = mean, kwargs...)
     X = min.(X .- mu, zero(eltype(X)))

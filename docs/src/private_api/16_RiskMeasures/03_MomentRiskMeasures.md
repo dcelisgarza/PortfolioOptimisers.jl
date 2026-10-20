@@ -20,6 +20,5 @@ calc_deviations_vec(r::LoHiOrderMoment, w::VecNum, X::MatNum, fees::Option{<:Fee
 calc_deviations_vec(r::LoHiOrderMoment, x::VecNum)
 resolve_deferred_quantities(r::LowOrderMoment, pr::AbstractPriorResult)
 resolve_deferred_quantities(r::HighOrderMoment, pr::AbstractPriorResult)
-supports_precomputed_returns(r::LoHiOrderMoment)
 moment_risk
 ```

@@ -120,7 +120,7 @@ Keywords correspond to the struct's fields. A `w` that is not `nothing` is passe
 
   - If `sk` is not `nothing`: `!isempty(sk)` and `size(sk, 1)^2 == size(sk, 2)`.
   - If `mu` is a `VecNum`: `!isempty(mu)`.
-  - If `w` is not `nothing`: `!isempty(w)`.
+  - $(val_dict[:oow_rm])
 
 !!! warning
 
@@ -205,12 +205,13 @@ Skewness
     function Skewness(settings::MaxRiskMeasureSettings, ve::AbstractVarianceEstimator,
                       sk::Option{<:SkSlot}, w::Option{<:ObsWeights}, mu::Option{<:MuSlot},
                       pe::Option{<:AbstractPriorEstimator})
+        assert_returns_source(returns_source(pe), (nothing,), :Skewness, "pe.x_src")
         if isa(sk, MatNum)
             @argcheck(!isempty(sk), IsEmptyError("sk cannot be empty"))
             @argcheck(size(sk, 1)^2 == size(sk, 2),
                       DimensionMismatch("size(sk, 1)^2 ($(size(sk, 1)^2)) must equal size(sk, 2) ($(size(sk, 2)))"))
         end
-        assert_nonempty_nonneg_finite_val(w, :w)
+        assert_observation_weights(w, :w)
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
         end
@@ -259,13 +260,7 @@ function resolve_deferred_quantities(r::Skewness, pr::AbstractPriorResult,
         sk = deferred_quantity(fitted, :sk)
         mu = nothing_scalar_array_selector(centre, deferred_derived_quantity(fitted, :mu))
     end
-    if isnothing(r.pe)
-        return rebuild_with_slots(r, (; sk = sk, mu = mu))
-    end
-    fitted = fit_deferred_quantity(r.pe, pr)
-    return rebuild_with_slots(r,
-                              (; sk = fan_out_slot(fitted, sk, :sk),
-                               mu = fan_out_slot(fitted, mu, :mu), pe = nothing))
+    return fan_out_pe(r, r.pe, pr, (; sk = sk, mu = mu))
 end
 # Deferrable slots — see `deferred_slots`. `ve` holds a variance estimator by design, not a
 # Deferred Quantity, so it is not declared here.
@@ -549,14 +544,17 @@ VarianceSkewKurtosis
            │      ub ┼ nothing
            │     rke ┴ Bool: true
         vr ┼ Variance
-           │   settings ┼ RiskMeasureSettings
-           │            │   scale ┼ Float64: 1.0
-           │            │      ub ┼ nothing
-           │            │     rke ┴ Bool: false
-           │      sigma ┼ nothing
-           │       chol ┼ nothing
-           │         rc ┼ nothing
-           │        alg ┴ SquaredSOCRiskExpr()
+           │    settings ┼ RiskMeasureSettings
+           │             │   scale ┼ Float64: 1.0
+           │             │      ub ┼ nothing
+           │             │     rke ┴ Bool: false
+           │       sigma ┼ nothing
+           │        chol ┼ nothing
+           │          rc ┼ nothing
+           │         alg ┼ SquaredSOCRiskExpr()
+           │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+           │   ratio_alg ┼ SquareRootRatio()
+           │      corner ┴ nothing
         sk ┼ Skewness
            │   settings ┼ MaxRiskMeasureSettings
            │            │   scale ┼ Float64: 1.0
@@ -582,7 +580,8 @@ VarianceSkewKurtosis
            │          N ┼ nothing
            │       alg1 ┼ FullMoment()
            │       alg2 ┼ SOCRiskExpr()
-           │         pe ┴ nothing
+           │         pe ┼ nothing
+           │   mtx_sqrt ┴ EigenFallbackSquareRoot()
         pe ┴ nothing
 ```
 
@@ -623,6 +622,8 @@ VarianceSkewKurtosis
     pe
     function VarianceSkewKurtosis(settings::RiskMeasureSettings, vr::Variance, sk::Skewness,
                                   kt::Kurtosis, pe::Option{<:AbstractPriorEstimator})
+        assert_returns_source(returns_source(pe), (nothing,), :VarianceSkewKurtosis,
+                              "pe.x_src")
         vr = no_risk_expr_risk_measure(vr)
         sk = no_risk_expr_risk_measure(sk)
         kt = no_risk_expr_risk_measure(kt)
@@ -673,10 +674,14 @@ function resolve_deferred_quantities(r::VarianceSkewKurtosis, pr::AbstractPriorR
     vr = resolve_deferred_quantities(r.vr, pr, slv)
     sk = resolve_deferred_quantities(r.sk, pr, slv)
     kt = resolve_deferred_quantities(r.kt, pr, slv)
-    if isnothing(r.pe)
-        return rebuild_with_slots(r, (; vr = vr, sk = sk, kt = kt))
-    end
-    fitted = fit_deferred_quantity(r.pe, pr)
+    return fan_out_pe(r, r.pe, pr, (; vr = vr, sk = sk, kt = kt))
+end
+# The children carry their own slots, and `chol` is derived from `sigma`, so the fan-out of
+# this measure is its own method of `fan_out_pe`.
+function fan_out_pe(r::VarianceSkewKurtosis, pe::AbstractPriorEstimator,
+                    pr::AbstractPriorResult, slots::NamedTuple)
+    (; vr, sk, kt) = slots
+    fitted = fit_deferred_quantity(pe, pr)
     # `chol` is derived from `sigma`, so it comes from the fan-out only when the fan-out
     # also supplies the `sigma` it factorises.
     chol = isnothing(vr.sigma) ? deferred_derived_quantity(fitted, :chol) : vr.chol

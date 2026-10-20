@@ -215,7 +215,7 @@ end
 
 Per-field view helper called by [`@propagatable`](@ref)-generated [`port_opt_view`](@ref) methods, and by the hand-written view of every optimiser that holds a fallback `fb`.
 
-It is the view twin of [`factory_child`](@ref). A child is viewed at the asset index, with one exception: a precomputed optimisation result is kept as it is. A result sits in a field as a fallback `fb`, and the fallback loop of [`optimise`](@ref) answers it without a solve, on the universe it was solved on. A door such as [`investable_reduction`](@ref) views an optimiser whose own fallback it never reads, so a refusal there would reject a fallback that nothing reaches.
+It is the view twin of [`factory_child`](@ref). A child is viewed at the asset index, with one exception: a precomputed optimisation result is kept as it is. A result sits in a field as a fallback `fb`, and the fallback loop of [`optimise`](@ref) answers it without a solve, on the universe it was solved on. A function such as [`investable_reduction`](@ref) views an optimiser whose own fallback it never reads, so a refusal there would reject a fallback that nothing reaches.
 
 A [`TimeDependent`](@ref) schedule is not a result, so it reaches [`port_opt_view`](@ref), and a schedule that holds a result still refuses a subset view.
 
@@ -411,6 +411,7 @@ end
         ::Any
     ) -> x
     nothing_scalar_array_getindex(x::AbstractVector, i) -> x[i]
+    nothing_scalar_array_getindex(x::StatsBase.AbstractWeights, i) -> weights of the same kind
     nothing_scalar_array_getindex(x::VecScalar, i) -> VecScalar(; v = x.v[i], s = x.s)
     nothing_scalar_array_getindex(x::AbstractMatrix, i) -> x[i, i]
     nothing_scalar_array_getindex(
@@ -426,6 +427,7 @@ The method that Julia selects is the algorithm. It is the copying twin of [`noth
 
  1. `x` carries no asset axis, because it is `nothing`, a scalar, a pair, a dictionary, a value algorithm or a set of dynamic weights: return `x` itself.
  2. `x` is a vector: return `x[i]`, a new vector with one entry per selected asset.
+      + `x` is a set of `StatsBase.Weights`, `AnalyticWeights`, `FrequencyWeights` or `ProbabilityWeights`: build weights of the same kind from `x.values[i]`. The `getindex` of `StatsBase` builds the result with the type of the stored values, so it fails on weights that store a range.
  3. `x` is a [`VecScalar`](@ref): return a new [`VecScalar`](@ref) whose vector part is `x.v[i]` and whose scalar part `x.s` is carried through.
  4. `x` is a matrix: return `x[i, i]`, which selects the **same** index on **both** axes. This is the rule for a square per-asset matrix. A matrix whose two axes are different needs [`nothing_scalar_array_getindex_odd_order`](@ref) instead.
  5. `x` is a vector of vectors, matrices or [`VecScalar`](@ref)s: apply step 2, 3 or 4 to each element, and collect the results into a new vector. The vector's **element type** selects this step, and it must be a subtype of the `Union` the signature names. A vector holding both a vector and a matrix has the element type `Array{T}`, which is a subtype of neither `AbstractVector` nor `AbstractMatrix`, so it resolves on step 2 and the index selects the elements of the outer vector.
@@ -443,6 +445,7 @@ The type list of step 1 is **shorter** than the one [`nothing_scalar_array_view`
 
       + `::Union{Nothing, <:Number, <:Pair, <:VecPair, <:Dict, <:AbstractEstimatorValueAlgorithm, <:DynamicAbstractWeights}`: Returns `x` unchanged.
       + `::AbstractVector`: Returns `x[i]`.
+      + `::StatsBase.AbstractWeights`, except `StatsBase.UnitWeights`: Returns weights of the same kind that hold `x.values[i]`.
       + `::VecScalar`: Returns `VecScalar(; v = x.v[i], s = x.s)`.
       + `::AbstractVector{<:Union{<:AbstractVector, <:AbstractMatrix, <:VecScalar}}`: Returns a vector of elements indexed by `i`.
       + `::AbstractMatrix`: Returns `x[i, i]`.
@@ -478,6 +481,12 @@ function nothing_scalar_array_getindex(x::Union{Nothing, <:Number, <:Pair, <:Vec
 end
 function nothing_scalar_array_getindex(x::AbstractVector, i)
     return x[i]
+end
+function nothing_scalar_array_getindex(x::Union{<:StatsBase.Weights,
+                                                <:StatsBase.AnalyticWeights,
+                                                <:StatsBase.FrequencyWeights,
+                                                <:StatsBase.ProbabilityWeights}, i)
+    return Base.typename(typeof(x)).wrapper(x.values[i])
 end
 function nothing_scalar_array_getindex(x::VecScalar, i)
     return VecScalar(; v = x.v[i], s = x.s)

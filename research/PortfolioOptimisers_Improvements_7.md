@@ -4,53 +4,14 @@
 
 This review was grounded in the current implementation and docs of the `dev` branch, especially the optimizer and risk stack in [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl), the uncertainty-set machinery in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl), the Black-Litterman prior implementation in [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl), the risk-budgeting abstractions in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and the time-dependent CV mechanics shown in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl).
 
-The codebase is already unusually strong in a few directions:
+The gaps that remain are in the move from static single-period portfolio design toward practical portfolio engineering workflows:
 
-- composable estimation and optimization layers,
-- rich constraint generation and risk budgets,
-- multiple uncertainty-set and prior formulations,
-- time-dependent cross-validation and constraint schedules,
-- a mature JuMP-centric optimization abstraction.
-
-The biggest gap is not “more mean-variance variants”; it is the move from static single-period portfolio design toward practical portfolio engineering workflows:
-
-1. multi-period rebalancing with turnover and transaction cost awareness,
-2. robust and distributionally robust optimization under parameter uncertainty,
-3. regime-aware or benchmark-relative optimization,
-4. better execution-aware diagnostics and explainability.
+1. multi-period rebalancing over a horizon,
+2. distributionally robust optimization as a first-class type with a bootstrap-calibrated radius,
+3. regime-aware priors,
+4. explainability and attribution diagnostics.
 
 These ideas fit naturally into the library’s current design because the package already exposes the right abstraction boundaries: `JuMPOptimiser`, `AbstractLowOrderPriorEstimator`, `AbstractUncertaintySetEstimator`, `RiskBudgetingAlgorithm`, and `TimeDependent` schedules.
-
----
-
-## 2. What the codebase already does well
-
-### 2.1 Optimization architecture
-
-The current mean-risk optimizer in [src/17_Optimisation/05_JuMP/04_MeanRisk.jl](../src/17_Optimisation/05_JuMP/04_MeanRisk.jl) already supports a broad objective family:
-
-- minimum risk,
-- maximum return,
-- maximum Sharpe ratio,
-- maximum utility,
-- general risk-measure-driven formulations.
-
-This is a strong base for extensions, because the library cleanly separates:
-
-- objective definition (`ObjectiveFunction`),
-- risk measure (`RiskMeasure`),
-- constraint construction (`JuMPOptimiser` and constraint generation),
-- result interpretation (`MeanRiskResult`, `RiskBudgetingResult`, etc.).
-
-### 2.2 Uncertainty sets and priors
-
-The uncertainty set code in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl) already formalizes box and ellipsoidal uncertainty around mean/covariance estimates. The library also incorporates Black-Litterman-style priors in [src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl](../src/10_Prior/05_BlackLitterman/02_BlackLittermanPrior.jl), which is exactly the right foundation for Bayesian or robust portfolio workflows.
-
-### 2.3 Risk budget and time-dependent dynamics
-
-The library already contains detailed risk-budgeting machinery in [src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl](../src/17_Optimisation/05_JuMP/07_RiskBudgeting.jl), and it already supports time-dependent schedules in [examples/5_validation_tuning/04_Time_Dependent_Constraints.jl](../examples/5_validation_tuning/04_Time_Dependent_Constraints.jl). That is a particularly important signal: the package is already thinking in terms of dynamic, folded, rebalancing-aware optimization problems.
-
-This means the next leap is not a brand-new conceptual layer; it is a tighter integration of these ideas into a single multi-period, uncertainty-aware optimization workflow.
 
 ---
 
@@ -190,40 +151,6 @@ This would sit naturally alongside the current `MeanRisk` and `RiskBudgeting` op
 
 The library already has uncertainty-set abstractions, and the package is structured for robust estimation and optimization. The dynamic is already there, especially in [src/11_UncertaintySets/03_NormalUncertaintySets.jl](../src/11_UncertaintySets/03_NormalUncertaintySets.jl), but the strongest next move is more direct robust optimization as a first-class optimizer feature.
 
-### Mathematical formulation
-
-Let:
-
-- $N$ = number of assets,
-- $w \in \mathbb{R}^N$ = portfolio weights,
-- $\mu \in \mathbb{R}^N$ = expected return vector,
-- $\Sigma_Q$ = covariance matrix under a candidate distribution $Q$,
-- $\hat P$ = empirical distribution from historical data,
-- $\epsilon \ge 0$ = radius of the ambiguity set,
-- $W_1(\cdot, \cdot)$ = 1-Wasserstein distance,
-- $\mathcal{W}$ = feasible set of weights,
-- $\lambda \ge 0$ = risk-aversion parameter,
-- $r$ = random asset return vector,
-- $\gamma \in (0, 1)$ = tail probability in CVaR.
-
-A Wasserstein distributionally robust mean-risk formulation is:
-
-$$
-\min_{w \in \mathcal{W}} \max_{Q: W_1(Q, \hat P) \le \epsilon}
-\mathbb{E}_{Q}\left[-\mu^\top w + \lambda \, w^\top \Sigma_Q w\right].
-$$
-
-Alternatively, for CVaR robust optimization:
-
-$$
-\min_{w \in \mathcal{W}, \alpha, \eta}
-\alpha + \frac{1}{(1-\gamma)}\mathbb{E}[\max(\ell(w, r)-\alpha, 0)]
-$$
-
-with ambiguity-ball constraints on the empirical distribution.
-
-This is exactly the type of “distributionally robust portfolio optimization” that is valuable in real data settings where the sample covariance or expected return estimate is noisy and unstable.
-
 ### Library-shape idea
 
 Add a `WassersteinDROUncertaintySet` or a `DROMeanRisk` estimator built into the same abstraction family as `NormalUncertaintySet` and `BlackLittermanPrior`.
@@ -259,73 +186,6 @@ where:
 - $W_1(\cdot, \cdot)$ is the 1-Wasserstein distance.
 
 This means the ambiguity radius expands just enough to cover the empirical distributional drift one expects with probability $1-\delta$.
-
-For a simpler first implementation, a good heuristic is:
-
-$$
-\epsilon = c \cdot \mathrm{median}_{t}\left(\|r_t - \bar r\|_2\right),
-\quad \bar r = \frac{1}{T}\sum_{t=1}^{T} r_t,
-$$
-
-with $c \in [0.5, 2.0]$ as a calibration parameter. In portfolio settings, a more interpretable version is:
-
-$$
-\epsilon = c \cdot \sqrt{\frac{\operatorname{tr}(\Sigma)}{T}},
-$$
-
-where $\Sigma$ is the sample covariance matrix. This scales the ambiguity radius with the sample noise level and the number of observations.
-
-This gives a practical progression for the library:
-
-1. default to a bootstrap quantile if a robust calibration routine is available,
-2. fall back to a heuristic based on dispersion for fast use,
-3. allow user-specified $\epsilon$ for custom calibration.
-
-### Implementation sketch
-
-```julia
-using LinearAlgebra, Statistics
-
-abstract type AbstractUncertaintySetEstimator <: AbstractEstimator end
-
-@concrete struct WassersteinDRO <: AbstractUncertaintySetEstimator
-    pe::AbstractLowOrderPriorEstimator
-    epsilon::Float64
-    q::Float64
-    n_sim::Int
-end
-
-function estimate_wasserstein_epsilon(returns; delta = 0.05, B = 200, c = 1.0)
-    T, N = size(returns)
-    rbar = vec(mean(returns, dims = 1))
-    disp = vec(sum((returns .- rbar') .^ 2, dims = 2))
-    heuristic = c * mean(sqrt.(disp)) / sqrt(T)
-    return heuristic
-end
-
-function add_wasserstein_dro_constraint!(model, w, returns, ue::WassersteinDRO)
-    T, N = size(returns)
-    @variable(model, s[1:T] >= 0)
-    @variable(model, λ >= 0)
-    @expression(model, r[t = 1:T], sum(w[i] * returns[t, i] for i in 1:N))
-    @constraint(model, [t in 1:T], r[t] + s[t] >= 0)
-    @constraint(model, sum(s) / T <= ue.epsilon * λ)
-    return nothing
-end
-
-function robust_mean_risk_optimiser(X, mu, ue::WassersteinDRO; solver = Clp.Optimizer)
-    T, N = size(X)
-    model = Model(solver)
-    @variable(model, w[1:N] >= 0)
-    @constraint(model, sum(w) == 1.0)
-    add_wasserstein_dro_constraint!(model, w, X, ue)
-    @objective(model, Max, dot(mu, w) - ue.q * dot(w, cov(X) * w))
-    optimize!(model)
-    return value.(w)
-end
-```
-
-This keeps the feature faithful to the package’s pattern: uncertainty set + optimizer + risk measure, but implements a compact, usable first pass rather than a purely abstract concept.
 
 ---
 
@@ -425,20 +285,6 @@ This integrates directly with the existing prior + covariance architecture and g
 
 ## 3.4 Explainability and attribution diagnostics
 
-### Why it fits
-
-The library already has the core primitives for this: asset-level risk contribution is implemented through `risk_contribution(...)`, and factor-level decomposition is available via `FactorRiskContribution` and factor-regression-based assembly. That means the strongest next step is not to invent a new attribution framework from scratch, but to package these existing building blocks into richer, action-oriented diagnostics for users.
-
-### What is already in place
-
-The current library already supports:
-
-- per-asset risk contribution via `risk_contribution(r, w, X, fees; ...)`,
-- factor-risk attribution via the factor-model decomposition machinery,
-- optimiser-level budgets and contribution constraints via `RiskBudgeting`, `RelaxedRiskBudgeting`, and `FactorRiskContribution`.
-
-This is the right foundation for decision-support outputs rather than a brand-new feature family.
-
 ### Priority expansion ideas
 
 #### 1. Rebalance attribution and drift decomposition
@@ -466,7 +312,7 @@ This is very useful for PM dashboards and explainable rebalancing reports.
 
 #### 2. Benchmark-vs-active attribution
 
-The library already has benchmark-relative tracking machinery, but the missing layer is a clean decomposition of active risk into contributions by asset, factor, and sector relative to a benchmark $w_b$.
+The missing layer is a clean decomposition of active risk into contributions by asset, factor, and sector relative to a benchmark $w_b$.
 
 Define active risk as
 
@@ -484,12 +330,9 @@ This would let users answer “what changed the benchmark gap?” in a way that 
 
 #### 3. Grouped and nested factor attribution
 
-The factor decomposition is already conceptually present, but a stronger product feature would be a multi-level attribution tree:
+A stronger product feature would be a multi-level attribution tree over the existing asset and factor contributions:
 
-- asset contribution,
 - sector contribution,
-- factor contribution,
-- idiosyncratic residue,
 - cluster contribution for hierarchical portfolios.
 
 A useful decomposition is
@@ -498,7 +341,7 @@ $$
 \rho(w) = \sum_{g \in \mathcal{G}} \rho_g(w) + \rho_{\text{idio}}(w),
 $$
 
-where $\mathcal{G}$ denotes sector, factor, or cluster groups. This is a natural next step from the current `FactorRiskContribution` support.
+where $\mathcal{G}$ denotes sector, factor, or cluster groups.
 
 #### 4. Scenario and stress attribution
 
@@ -532,8 +375,6 @@ and attribute the change to:
 - turnover and implementation shortfall,
 - risk-model changes.
 
-This is the natural extension of the static decomposition already represented by `risk_contribution`.
-
 #### 6. Robustness and model-drift attribution
 
 A very practical missing feature is attribution of portfolio risk changes between a baseline model and a robust or uncertainty-aware variant. For example:
@@ -550,34 +391,6 @@ can be decomposed into changes from:
 - factor-loading revisions.
 
 This would turn robust optimization from a black-box replacement into a transparent model-selection tool.
-
-### Mathematical view
-
-Let:
-
-- $N$ = number of assets,
-- $w \in \mathbb{R}^N$ = portfolio weights,
-- $\rho(w)$ = portfolio risk,
-- $RC_i(w)$ = per-asset contribution,
-- $FC_k(w)$ = factor contribution,
-- $\Sigma \in \mathbb{S}_{+}^{N}$ = covariance matrix,
-- $\beta$ = factor loading matrix.
-
-A clean decomposition is
-
-$$
-\rho(w) = \sum_i RC_i(w) = \sum_k FC_k(w) + \rho_{\text{idio}}(w),
-$$
-
-with
-
-$$
-RC_i(w) = w_i \frac{\partial \rho(w)}{\partial w_i},
-\qquad
-FC_k(w) = \beta_{k,\cdot}^\top \frac{\partial \rho(w)}{\partial \beta_{k,\cdot}}.
-$$
-
-This is exactly the right level of abstraction for a portfolio explanation layer built on top of the existing risk and factor machinery.
 
 ### Good library shape
 
@@ -636,19 +449,8 @@ The most relevant comparators are not “portfolio libraries” in the abstract,
 
 #### 1. PyPortfolioOpt
 
-PyPortfolioOpt is excellent at making standard portfolio optimization practical and accessible: mean-variance, max Sharpe, minimum volatility, Black-Litterman, risk parity, and constrained optimization wrappers are all straightforward to use. Its main gap relative to this codebase is not mathematical breadth; it is engineering breadth.
-
-What is worth copying:
-
-- a clean user-facing optimizer API,
-- a broad set of classical formulations,
-- fast, understandable examples,
-- a good separation between objective, constraints, and result reporting.
-
 What is worth adapting here:
 
-- move more of the library toward domain-specific but low-friction user ergonomics,
-- keep the existing typed Julia interfaces, but expose small, higher-level `optimise(...)` wrappers with clear defaults,
 - make the “results + attribution + diagnostics” story easier for non-experts.
 
 #### 2. CVXPortfolio
@@ -667,228 +469,43 @@ How to adapt it here:
 - add mathematically explicit time-step models with `TimeDependent` schedules,
 - allow execution penalties and trade-amount constraints to be added as modular extensions rather than bespoke solver hacks.
 
-#### 3. Riskfolio-Lib and factor-based library ecosystems
+#### 3. oracle 2 and factor-based library ecosystems
 
-Riskfolio-Lib is a particularly good reference for factor models, risk decomposition, and style attribution. The idea that a portfolio can be understood as a combination of factor risk, sector risk, and idiosyncratic risk is central to modern portfolio risk reporting.
+oracle 2 is a particularly good reference for factor models, risk decomposition, and style attribution. The idea that a portfolio can be understood as a combination of factor risk, sector risk, and idiosyncratic risk is central to modern portfolio risk reporting.
 
-This library already has `FactorRiskContribution`, which is good evidence that the right conceptual direction is already present. The next step is not to replace it but to broaden it into a full decomposition suite:
+The next step is to broaden the existing factor risk contribution into a full decomposition suite:
 
 - sector and style attribution,
 - benchmark-relative factor attribution,
 - hierarchical cluster attribution,
 - macro regime attribution.
 
-#### 4. skfolio
-
-skfolio is a Python portfolio-optimization library built on the scikit-learn API and designed around estimator/transformer/pipeline composition, model selection, and cross-validation. It is especially strong in the combination of classical optimization with modern model-evaluation workflow.
-
-What is worth copying:
-
-- the scikit-learn-style estimator API and pipeline compatibility,
-- easy model selection and hyperparameter tuning via `GridSearchCV`, `RandomizedSearchCV`, and walk-forward / purged cross-validation,
-- a rich risk-measure and prior-estimation ecosystem,
-- `Benchmark Tracker`, `Risk Budgeting`, `Hierarchical Risk Parity`, and nested-cluster optimization models,
-- explicit support for uncertainty sets and factor models as first-class estimators.
-
-What is worth adapting here:
-
-- keep the package’s type-driven Julia design, but add a higher-level, sklearn-style workflow layer for train/test evaluation and parameter tuning,
-- expose a clean `fit`/`predict`-style portfolio workflow that is easier for users to compose in experiments,
-- treat benchmark tracking, factor priors, and uncertainty sets as plug-in components rather than one-off objective customizations,
-- align the library’s result-reporting with the skfolio pattern of portfolio objects summarizing risk, return, and out-of-sample diagnostics.
-
-This matters because skfolio is not just “another optimizer.” It is one of the clearest examples of a portfolio library centered on model evaluation and composable workflows rather than only one-shot optimization.
-
 #### 5. Robust optimization and DRO literature
 
 The robust optimization literature (Wasserstein DRO, distributional uncertainty, ambiguity set optimization) is mature and practically important. It is not enough to have a robust covariance estimate; real users want to understand how uncertainty in the estimation problem changes the portfolio decision.
 
-This library already has `AbstractUncertaintySetEstimator`, which makes it one of the more natural Julia ecosystems to integrate a stronger robust layer. The barrier is mostly interface design and user-facing reporting, not pure mathematics.
+The barrier is mostly interface design and user-facing reporting, not pure mathematics.
 
 ### Why this is useful for this project
 
-The current project is already strong in:
+The main opportunity is to turn the library's capabilities into a portfolio toolkit that is both mathematically expressive and operationally interpretable. That means blending the best of:
 
-- typed estimator composition,
-- risk-measure abstraction,
-- JuMP integration,
-- pipeline and workflow ergonomics inspired by scikit-learn patterns,
-- time-dependent and schedule-aware constraints,
-- factor and risk-budgeting concepts.
-
-The main opportunity is to turn these capabilities into a portfolio toolkit that is both mathematically expressive and operationally interpretable. That means blending the best of:
-
-- classical optimizer ergonomics from PyPortfolioOpt,
-- workflow ergonomics and model selection from skfolio,
 - dynamic execution-aware modeling from CVXPortfolio,
-- factor decomposition from Riskfolio-Lib and factor-analytics work,
+- factor decomposition from oracle 2 and factor-analytics work,
 - robust optimization from modern operations-research practice.
 
 ### Suggested sources
 
 1. PyPortfolioOpt documentation and source — <https://pyportfolioopt.readthedocs.io/>
-2. CVXPortfolio: A convex optimization approach to portfolio construction — <https://github.com/cvxgrp/cvxportfolio>
-3. skfolio documentation and examples — <https://skfolio.org/>
-4. Riskfolio-Lib documentation — <https://riskfolio-lib.readthedocs.io/>
-5. Meucci, A. (2005), Risk and Asset Allocation.
-6. Black, F. and Litterman, B. (1992), Global Asset Allocation.
-7. Delage, E. and Ye, Y. (2010), Distributionally Robust Optimization Under Moment Uncertainty.
-8. Rockafellar, R. T. and Uryasev, S. (2000), Optimization of Conditional Value-at-Risk.
+2. CVXPortfolio: A convex optimization approach to portfolio construction.
+3. Meucci, A. (2005), Risk and Asset Allocation.
+4. Black, F. and Litterman, B. (1992), Global Asset Allocation.
+5. Delage, E. and Ye, Y. (2010), Distributionally Robust Optimization Under Moment Uncertainty.
+6. Rockafellar, R. T. and Uryasev, S. (2000), Optimization of Conditional Value-at-Risk.
 
 ---
 
 ## 3.6 Good additions to the library, and how to adapt them here
-
-### 3.6.1 Execution-aware optimization and market impact
-
-This is one of the strongest additions to make because real portfolio implementation is never frictionless. In a live allocator workflow, the optimization should know that moving from $w_{t-1}$ to $w_t$ has a cost.
-
-#### Why it would be nice to have
-
-- reduces unrealistic turnover and trade-size assumptions,
-- aligns the model with implementation constraints,
-- helps produce more realistic portfolio recommendations,
-- connects naturally to the existing `Turnover` and fee machinery.
-
-#### Mathematical formulation
-
-Let $w_t$ be the target portfolio at time $t$ and $w_{t-1}$ the previous portfolio. Let $\Delta w_t = w_t - w_{t-1}$ be the trade vector. A simple implementation-aware objective is:
-
-$$
-\min_{w_t}
-\rho(w_t)
-+ \lambda_{\text{turn}} \|\Delta w_t\|_1
-+ \lambda_{\text{impact}} \sum_i \left|\Delta w_{t,i}\right|^{1+\eta}
-- \lambda_{\text{return}} \mu_t^\top w_t,
-$$
-
-with $\eta > 0$ capturing the nonlinear impact of larger trades.
-
-#### Standalone implementation
-
-```julia
-"""
-    market_impact_cost(w::Vector{<:Real}, w_prev::Vector{<:Real}; gamma::Real = 1e-4,
-                       eta::Real = 0.5)
-
-Compute a convex trade-impact penalty for a portfolio rebalance.
-
-# Variables
-- `w`: target portfolio weights.
-- `w_prev`: previous portfolio weights.
-- `gamma`: scale of the execution cost.
-- `eta`: curvature of the impact penalty. Larger values make large trades more costly.
-
-The formulation is
-
-    cost = gamma * sum(abs.(w - w_prev) .^ (1 + eta)).
-
-This can be plugged into a rebalancing objective or used as a constraint on total
-trade size when a more realistic execution budget is desired.
-"""
-function market_impact_cost(w::Vector{<:Real}, w_prev::Vector{<:Real};
-                           gamma::Real = 1e-4, eta::Real = 0.5)
-    trade = w .- w_prev
-    return gamma * sum(abs.(trade) .^ (1 + eta))
-end
-```
-
-#### How to adapt it here
-
-- extend the existing turnover and fee concepts rather than creating a parallel system,
-- allow cost coefficients to be `TimeDependent` if needed,
-- expose as either an objective penalty or a separate execution constraint.
-
----
-
-### 3.6.2 Distributionally robust optimization
-
-This is a strong extension point because the library already has uncertainty sets and priors. A distributionally robust layer would complement the current mean-risk architecture instead of replacing it.
-
-#### Why it would be nice to have
-
-- better stability in noisy regimes,
-- explicit handling of parameter uncertainty,
-- more realistic allocation when expected returns and covariances are estimated from finite samples,
-- natural compatibility with the existing uncertainty-set abstraction.
-
-#### Mathematical formulation
-
-Let $\hat P$ be the empirical return distribution and $\mathcal{P}$ an ambiguity set around it. The distributionally robust problem is:
-
-$$
-\min_{w \in \mathcal{W}} \sup_{P \in \mathcal{P}} \mathbb{E}_{P}\left[-\mu^\top w + \lambda w^\top \Sigma_P w\right].
-$$
-
-A practical ambiguity set is a Wasserstein ball:
-
-$$
-\mathcal{P} = \{P : W_1(P, \hat P) \le \epsilon\}.
-$$
-
-#### Standalone implementation
-
-```julia
-"""
-    wasserstein_radius(X::AbstractMatrix; c::Real = 1.0)
-
-Estimate a simple Wasserstein-style ambiguity radius from historical returns.
-
-# Variables
-- `X`: return matrix with rows as observations and columns as assets.
-- `c`: scale factor controlling the magnitude of the ambiguity radius.
-
-This is intentionally a fast, heuristic first implementation. It scales the radius by
-sample dispersion and is easy to replace later by a more principled bootstrap or
-transport-based estimate.
-"""
-function wasserstein_radius(X::AbstractMatrix; c::Real = 1.0)
-    T, N = size(X)
-    rbar = vec(mean(X, dims = 1))
-    disp = vec(sum((X .- rbar') .^ 2, dims = 2))
-    return c * mean(sqrt.(disp)) / sqrt(T)
-end
-
-"""
-    robust_mean_variance_opt(X::AbstractMatrix, mu::AbstractVector; epsilon::Real = 0.05,
-                             q::Real = 1.0, solver = nothing)
-
-A simple robust mean-variance-style optimizer using an ambiguity radius.
-
-# Variables
-- `X`: historical return matrix.
-- `mu`: expected return vector.
-- `epsilon`: uncertainty radius.
-- `q`: risk-aversion strength.
-- `solver`: optional JuMP-compatible optimizer.
-"""
-function robust_mean_variance_opt(X::AbstractMatrix, mu::AbstractVector;
-                                epsilon::Real = 0.05, q::Real = 1.0,
-                                solver = nothing)
-    T, N = size(X)
-    if solver === nothing
-        throw(ArgumentError("A JuMP-compatible solver is required for this implementation."))
-    end
-
-    model = Model(solver)
-    @variable(model, w[1:N] >= 0)
-    @constraint(model, sum(w) == 1.0)
-    @constraint(model, sum(abs.(w)) <= 1.0)
-
-    Sigma = cov(X)
-    @objective(model, Max, dot(mu, w) - q * dot(w, Sigma * w) - epsilon * sum(abs.(w)))
-    optimize!(model)
-    return value.(w)
-end
-```
-
-#### How to adapt it here
-
-- integrate with `AbstractUncertaintySetEstimator` and `JuMPOptimiser`,
-- route the robust penalty through existing risk-measure logic rather than creating a disconnected solver,
-- make `epsilon` a calibrated or prior-driven quantity instead of a constant.
-
----
 
 ### 3.6.3 Multi-period attribution and scenario decomposition
 
@@ -968,7 +585,6 @@ The implementation should stay consistent with the package style, which already 
 - `src/17_Optimisation/18_MultiPeriodRebalance.jl`
 - `src/11_UncertaintySets/06_WassersteinDRO.jl`
 - `src/10_Prior/14_RegimeAwarePrior.jl`
-- `src/18_Tracking/02_BenchmarkRelativeTracking.jl` or extend the existing tracking file
 
 This is consistent with the numerical grouping already visible in the package root file [src/PortfolioOptimisers.jl](../src/PortfolioOptimisers.jl).
 
@@ -978,7 +594,6 @@ This is consistent with the numerical grouping already visible in the package ro
 
 - Add `MultiPeriodRebalance` estimator.
 - Reuse current `JuMPOptimiser`.
-- Add `TurnoverEstimator` and fee-aware constraints.
 - Validate with walk-forward examples.
 
 ### Phase 2: robust optimization extension
@@ -987,15 +602,15 @@ This is consistent with the numerical grouping already visible in the package ro
 - Reuse `NormalUncertaintySet` and `JuMPOptimiser` integration points.
 - Add a cross-validation stress test to compare robust vs non-robust outcomes.
 
-### Phase 3: regime-aware priors and benchmark tracking
+### Phase 3: regime-aware priors
 
-- Add `RegimeAwarePrior` and `BenchmarkRelative` optimizer.
+- Add `RegimeAwarePrior`.
 - Keep output objects consistent with existing result patterns.
 - Add tests and examples to match the style of the existing docs.
 
 ### Phase 4: explainability layer
 
-- Add `risk_contribution` and `portfolio_attribution` result types.
+- Add `portfolio_attribution` result types.
 - Return them through optimisation results, as the library already does for risk-budgeting and other processed outputs.
 
 ---
@@ -1028,11 +643,6 @@ res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv, ucs = ue), r = Varian
 # Regime-aware returns
 pr = RegimeAwarePrior(; pe = EmpiricalPrior(), regime_model = HierarchicalClustering())
 res = optimise(MeanRisk(; opt = JuMPOptimiser(; slv = slv), r = Variance()), rd, pr)
-```
-
-```julia
-# Benchmark-relative optimization
-res = optimise(BenchmarkRelativeRisk(; benchmark = b, active_risk_limit = 0.05), rd)
 ```
 
 ---
@@ -1069,8 +679,7 @@ The strongest contribution to this library would be a cohesive “portfolio engi
 
 1. multi-period rebalancing,
 2. robust objectives under parameter uncertainty,
-3. benchmark-relative active management controls,
-4. richer risk attribution and explainability.
+3. richer risk attribution and explainability.
 
 This approach respects the project’s current architecture, extends it with real-world portfolio constraints, and preserves the library’s composable, type-driven style.
 

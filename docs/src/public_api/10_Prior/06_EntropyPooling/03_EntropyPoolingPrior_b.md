@@ -1,7 +1,7 @@
 ```@meta
-Description = "Entropy Pooling (b) has no public API in PortfolioOptimisers.jl; its names are in the private API."
+Description = "Entropy pooling Prior (b) has no public API in PortfolioOptimisers.jl; its names are in the private API."
 ```
 
-# Entropy Pooling (b)
+# Entropy pooling Prior (b)
 
-Every name of this topic is private. The [private page](@ref private-api-entropy-pooling-b) documents them.
+Every name of this topic is private. The [private page](@ref private-api-entropy-pooling-prior-b) documents them.

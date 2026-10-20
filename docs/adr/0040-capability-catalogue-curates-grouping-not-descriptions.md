@@ -48,7 +48,7 @@ descriptions of one thing, neither validated against the other.
 
 **The grouping was not.** The section's nesting is not the type hierarchy — it
 groups by the job a thing does, cutting across `src/` files and across the
-subtype tree, and its ordering deliberately follows the `CONTEXT.md` pipeline
+subtype tree, and its ordering deliberately follows the `GLOSSARY.md` pipeline
 spine. `FullMoment` and `SemiMoment` each appear in about eight different
 groups. None of that is derivable.
 
@@ -142,14 +142,14 @@ the grouping would live next to the type it describes. Rejected on three counts
 checked against the actual content: a tag cannot express *order* (neither of
 groups nor of entries within one, and `Gerber0`/`Gerber1`/`Gerber2` is not
 alphabetical), cannot place one type in several groups (`FullMoment` needs
-about eight), and cannot state that the top-level order follows the `CONTEXT.md`
+about eight), and cannot state that the top-level order follows the `GLOSSARY.md`
 pipeline spine. It also couples the package to a docs concern.
 
 **Range the check over exported symbols.** Rejected: 133 of 704 exports are
 alias constructors, and the rest include error types and `Base` overloads, so
 the check would need a ~200-name denylist — the drifting list again, relocated.
 Ranging over concrete leaf Estimators and Algorithms instead gives a boundary
-derived from the domain model in `CONTEXT.md`, which a contributor can apply
+derived from the domain model in `GLOSSARY.md`, which a contributor can apply
 without consulting a list.
 
 ## Amendment (2026-08-18)

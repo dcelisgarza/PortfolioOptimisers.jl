@@ -9,6 +9,7 @@ applyTo: "test/test_*.jl"
 - All test files must be named `test_*.jl` and placed in the `test/` directory.
 - Tests are auto-discovered and run by the test harness in `test/runtests.jl`.
 - Each test file should focus on testing a specific module or feature.
+- A comment, a doc or a tool that names a test file names a file that exists, by its full name or by its `test_<number>` prefix. A commit that merges, renames or deletes a test file corrects every live name of it in the same change. A released ADR keeps the old name, because it is history. `test/test_82_test_file_name_census.jl` gates the rule.
 
 ## Test Patterns
 
@@ -24,6 +25,13 @@ applyTo: "test/test_*.jl"
 
 - **Import rare packages**: write `using` at the top of the file for a package that `init_code` does not load.
 - **Nested test sets**: Use `@testset` for grouping related tests within a top-level `@testset`.
+- **A case named for a route asserts that the route ran**: When a testset or a comment names a branch — a choice that moves, a fallback, a refusal, a factor that comes alive — assert a value that only that branch produces, before the values the branch shares with the others. The outputs of two branches can agree on the data the case uses, and then every check passes on the branch the case does not name. A case that names a choice that moves opens with the choice at each step:
+
+    ```julia
+    @test [dropped(x.pr) for x in sb] == [["style1"], ["style2"], ["style2"]]
+    ```
+
+    This is a judgement for review, not a mechanical rule, so no census gates it.
 
 ## Validation Testing
 

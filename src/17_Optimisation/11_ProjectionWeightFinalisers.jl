@@ -328,7 +328,7 @@ Where:
   - $(math_dict[:w_port])
   - $(math_dict[:lb_ub_finaliser])
   - ``s``: The budget of the weights before the finaliser moved them.
-  - ``\\tau``: The tolerance that [`weights_bound_tolerance`](@ref) gives for the element type of ``\\boldsymbol{w}``, which is ``\\sqrt{\\epsilon}`` for a floating-point type and zero for an exact type such as `Rational`.
+  - $(math_dict[:tau_wb_tol])
 
 The tolerance on the bounds is absolute. The tolerance on the budget is relative when ``\\lvert s \\rvert > 1``.
 

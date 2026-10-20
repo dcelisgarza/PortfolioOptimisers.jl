@@ -703,7 +703,7 @@ The method that Julia selects is the algorithm. `measure` names the reduction, a
  6. `measure` is a [`StdValue`](@ref) or a [`VarValue`](@ref): return `Statistics.std` or `Statistics.var` of `val`, with `corrected = measure.corrected`, with the weights `measure.w` when the measure carries them, and with `kwargs...` forwarded. A tuple is `collect`ed first on the weighted branch.
  7. `measure` is a [`StandardisedValue`](@ref): follow that type's own algorithm, which reduces twice and guards the denominator.
 
-Step 1 is the case that makes a plain number a legal `measure`: a caller that already holds the value writes it where a reduction goes, and the seam needs no second signature.
+Step 1 is the case that makes a plain number a legal `measure`: a caller that already holds the value writes it where a reduction goes, and `vec_to_real_measure` needs no second signature.
 
 # Arguments
 

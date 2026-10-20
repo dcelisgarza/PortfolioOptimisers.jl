@@ -267,10 +267,10 @@ The branch of [`schur_complement_weights`](@ref) that this tag selects runs thes
  2. Make `nm_params`, a [`NonMonotonicSchurComplement`](@ref) copy of the bundle with `flag = false`. The `objective` of a value runs the allocation of `nm_params` at that value and returns the weights and ``v``. A failed allocation scores the largest value of the weight type.
  3. Make `gammas`, `N` evenly spaced values from zero to `gamma`.
  4. Evaluate `objective` at each entry of `gammas` in order. At the first entry `gammas[i]` whose variance is not lower than the variance at `gammas[i - 1]`, bisect the bracket with [`schur_complement_binary_search`](@ref) and return its result. The bracket is `gammas[i - 2]` to `gammas[i]`, or `gammas[1]` to `gammas[2]` when `i` is 2.
- 5. When the scan finds no rise, evaluate `objective` at `gamma - tol`. If the variance at `gamma` is not higher, return `gamma` and its weights.
+ 5. When the scan finds no rise, evaluate `objective` at `gamma - tol`, or reuse the variance at zero when `gamma <= tol`. If the variance at `gamma` is not higher, return `gamma` and its weights.
  6. Otherwise, bisect the bracket from `gammas[N - 1]` to `gamma`.
 
-The scan sees a turning point only to the resolution of `gammas`. A rise and a fall again between two neighbouring entries stay unseen. The probe at `gamma - tol` in step 5, and the probe at `mgamma - tol` in the bisection, can evaluate a negative value. The formula of the augmentation has a value there, and the probe estimates the slope of ``v`` from the left.
+The scan sees a turning point only to the resolution of `gammas`. A rise and a fall again between two neighbouring entries stay unseen. Every value that the search evaluates is in ``[0, \\gamma]``, the range of the definition, so each probe of the slope from the left stops at zero.
 
 # Fields
 
@@ -285,7 +285,7 @@ $(DocStringExtensions.FIELDS)
         strict::Bool = false
     ) -> MonotonicSchurComplement
 
-Keywords correspond to the struct's fields. `iter` defaults to `nothing`, which means the bisection derives its own budget from the bracket and `tol`, as `ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 10)`.
+Keywords correspond to the struct's fields. `iter` defaults to `nothing`, which means the bisection derives its own budget from the bracket and `tol`, as `max(1, ceil(Int, log2((hgamma - lgamma) / tol) * 2 + 1))`.
 
 ## Validation
 
@@ -535,7 +535,7 @@ A part of two or three leaves has a half ``C_1`` of one leaf, and the recursion 
 
 The fit of [`optimise`](@ref) runs these steps.
 
- 1. Resolve every [`TimeDependent`](@ref) field to its static default, and pick the returns `rd` that `opt.brt` selects.
+ 1. Resolve every [`TimeDependent`](@ref) field to its static default.
  2. Compute the prior `pr` with `opt.pe`, and the investable mask `imsk` of the prior.
  3. Resolve the fees `fees` on the full asset universe.
  4. Reduce `pr`, the estimator and `rd` to the investable universe.
@@ -564,6 +564,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref) or [`TDO_
 
   - If `params` is a vector: `!isempty(params)`.
   - `fb` schedules: `bind !== :nearest`.
+  - A reader that states no source and reads the raw returns data, beside a reader that states `x_src = ExcessSource()`, logs one warning that names its path, see [`warn_raw_readers`](@ref). The head then builds as configured.
 
 ## Propagated parameters
 
@@ -607,39 +608,41 @@ SchurComplementHierarchicalRiskParity
          │          │           me ┼ SimpleExpectedReturns
          │          │              │   w ┴ nothing
          │          │      horizon ┼ nothing
-         │          │   fill_limit ┴ nothing
+         │          │   fill_limit ┼ nothing
+         │          │        x_src ┴ nothing
          │      cle ┼ ClustersEstimator
-         │          │    ce ┼ PortfolioOptimisersCovariance
-         │          │       │   ce ┼ Covariance
-         │          │       │      │    me ┼ SimpleExpectedReturns
-         │          │       │      │       │   w ┴ nothing
-         │          │       │      │    ce ┼ GeneralCovariance
-         │          │       │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
-         │          │       │      │       │    w ┴ nothing
-         │          │       │      │   alg ┼ FullMoment()
-         │          │       │      │     w ┴ nothing
-         │          │       │   mp ┼ MatrixProcessing
-         │          │       │      │     pdm ┼ Posdef
-         │          │       │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
-         │          │       │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
-         │          │       │      │      dn ┼ nothing
-         │          │       │      │      dt ┼ nothing
-         │          │       │      │     alg ┼ nothing
-         │          │       │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
-         │          │    de ┼ Distance
-         │          │       │   power ┼ nothing
-         │          │       │     alg ┴ CanonicalDistance()
-         │          │   alg ┼ HClustAlgorithm
-         │          │       │   linkage ┴ Symbol: :ward
-         │          │   onc ┼ OptimalNumberClusters
-         │          │       │   max_k ┼ nothing
-         │          │       │     alg ┼ SecondOrderDifference
-         │          │       │         │   alg ┼ StandardisedValue
-         │          │       │         │       │   mv ┼ MeanValue
-         │          │       │         │       │      │   w ┴ nothing
-         │          │       │         │       │   sv ┼ StdValue
-         │          │       │         │       │      │           w ┼ nothing
-         │          │       │         │       │      │   corrected ┴ Bool: true
+         │          │      ce ┼ PortfolioOptimisersCovariance
+         │          │         │   ce ┼ Covariance
+         │          │         │      │    me ┼ SimpleExpectedReturns
+         │          │         │      │       │   w ┴ nothing
+         │          │         │      │    ce ┼ GeneralCovariance
+         │          │         │      │       │   ce ┼ StatsBase.SimpleCovariance: StatsBase.SimpleCovariance(true)
+         │          │         │      │       │    w ┴ nothing
+         │          │         │      │   alg ┼ FullMoment()
+         │          │         │      │     w ┴ nothing
+         │          │         │   mp ┼ MatrixProcessing
+         │          │         │      │     pdm ┼ Posdef
+         │          │         │      │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
+         │          │         │      │         │   kwargs ┴ @NamedTuple{}: NamedTuple()
+         │          │         │      │      dn ┼ nothing
+         │          │         │      │      dt ┼ nothing
+         │          │         │      │     alg ┼ nothing
+         │          │         │      │   order ┴ NTuple{4, Symbol}: (:pdm, :dn, :dt, :alg)
+         │          │      de ┼ Distance
+         │          │         │   power ┼ nothing
+         │          │         │     alg ┴ CanonicalDistance()
+         │          │     alg ┼ HClustAlgorithm
+         │          │         │   linkage ┴ Symbol: :ward
+         │          │     onc ┼ OptimalNumberClusters
+         │          │         │   max_k ┼ nothing
+         │          │         │     alg ┼ SecondOrderDifference
+         │          │         │         │   alg ┼ StandardisedValue
+         │          │         │         │       │   mv ┼ MeanValue
+         │          │         │         │       │      │   w ┴ nothing
+         │          │         │         │       │   sv ┼ StdValue
+         │          │         │         │       │      │           w ┼ nothing
+         │          │         │         │       │      │   corrected ┴ Bool: true
+         │          │   x_src ┴ nothing
          │      slv ┼ nothing
          │       wb ┼ WeightBounds
          │          │   lb ┼ Float64: 0.0
@@ -648,19 +651,20 @@ SchurComplementHierarchicalRiskParity
          │     sets ┼ nothing
          │       wf ┼ IterativeWeightFinaliser
          │          │   iter ┴ Int64: 100
-         │      brt ┼ Bool: false
-         │    x_src ┼ Symbol: :prior
          │   strict ┴ Bool: false
   params ┼ SchurComplementParams
          │       r ┼ Variance
-         │         │   settings ┼ RiskMeasureSettings
-         │         │            │   scale ┼ Float64: 1.0
-         │         │            │      ub ┼ nothing
-         │         │            │     rke ┴ Bool: true
-         │         │      sigma ┼ nothing
-         │         │       chol ┼ nothing
-         │         │         rc ┼ nothing
-         │         │        alg ┴ SquaredSOCRiskExpr()
+         │         │    settings ┼ RiskMeasureSettings
+         │         │             │   scale ┼ Float64: 1.0
+         │         │             │      ub ┼ nothing
+         │         │             │     rke ┴ Bool: true
+         │         │       sigma ┼ nothing
+         │         │        chol ┼ nothing
+         │         │          rc ┼ nothing
+         │         │         alg ┼ SquaredSOCRiskExpr()
+         │         │    mtx_sqrt ┼ EigenFallbackSquareRoot()
+         │         │   ratio_alg ┼ SquareRootRatio()
+         │         │      corner ┴ nothing
          │   gamma ┼ Float64: 0.5
          │     pdm ┼ Posdef
          │         │      alg ┼ UnionAll: NearestCorrelationMatrix.Newton
@@ -720,7 +724,9 @@ SchurComplementHierarchicalRiskParity
         assert_time_dependent_substitution(SchurComplementHierarchicalRiskParity,
                                            (; opt, params, fb),
                                            schur_complement_hrp_td_defaults())
-        return new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
+        est = new{typeof(opt), typeof(params), typeof(fb)}(opt, params, fb)
+        warn_raw_readers(est)
+        return est
     end
 end
 function SchurComplementHierarchicalRiskParity(;
@@ -965,11 +971,12 @@ This method takes a [`NonMonotonicSchurComplement`](@ref) bundle. The [`Monotoni
  2. Take `gamma` from the argument, or from `params.gamma` when the argument is `nothing`.
  3. Set every entry of the weights `w` to one.
  4. Split each entry of `items` of more than one leaf into its halves, giving the new `items`. Stop when no entry has more than one leaf.
- 5. For each pair of halves `lc` and `rc`, read the blocks `A` and `C` of `sigma`. When `lc` holds more than one leaf, augment both blocks with [`schur_augmentation`](@ref), giving `A_aug` and `C_aug`, and write them back into `sigma`. A later split then reads the augmented blocks. Otherwise `A_aug` and `C_aug` are `A` and `C`.
- 6. When `params.flag` is `true`, repair `A_aug` and `C_aug` with `params.pdm`. The repaired copies give the risks of step 7, and `sigma` keeps the blocks of step 5. When `params.flag` is `false` and either block is not positive definite, return `nothing` as the weights.
- 7. Compute the risks `lrisk` and `rrisk` of the two blocks with [`naive_portfolio_risk`](@ref), and the split factor `alpha` from them.
- 8. Clamp `alpha` to `wb` with [`split_factor_weight_constraints`](@ref). Multiply the weights of `lc` by `alpha`, and the weights of `rc` by `1 - alpha`.
- 9. Go back to step 4.
+ 5. For each pair of halves `lc` and `rc`, read the blocks `A` and `C` of `sigma`. When `lc` holds more than one leaf, augment both blocks with [`schur_augmentation`](@ref). The results are `A_aug` and `C_aug`. Otherwise `A_aug` and `C_aug` are `A` and `C`.
+ 6. When `params.flag` is `true`, repair `A_aug` and `C_aug` with `params.pdm`. When `params.flag` is `false` and either block is not positive definite, return `nothing` as the weights.
+ 7. Write `A_aug` and `C_aug` back into `sigma`. A later split then reads the augmented and repaired blocks.
+ 8. Compute the risks `lrisk` and `rrisk` of the two blocks with [`naive_portfolio_risk`](@ref), and the split factor `alpha` from them.
+ 9. Clamp `alpha` to `wb` with [`split_factor_weight_constraints`](@ref). Multiply the weights of `lc` by `alpha`, and the weights of `rc` by `1 - alpha`.
+10. Go back to step 4.
 
 # Arguments
 
@@ -981,7 +988,7 @@ This method takes a [`NonMonotonicSchurComplement`](@ref) bundle. The [`Monotoni
 
 # Validation
 
-  - With `params.flag` true, a repair that throws, for example on a negative diagonal entry, is rethrown as an `ArgumentError` that names `gamma`. A repair that only warns lets the recursion continue.
+  - With `params.flag` true, a repair that throws, for example on a negative diagonal entry, is rethrown as an `ArgumentError` that names `gamma`. A repair that returns a matrix that is positive semidefinite to round-off lets the recursion continue, and [`posdef!`](@ref) refuses every other result with a [`PosdefRepairError`](@ref), which is rethrown the same way.
 
 # Returns
 
@@ -1028,8 +1035,6 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                 B = sigma[lc, rc]
                 A_aug = schur_augmentation(A, B, C, gamma)
                 C_aug = schur_augmentation(C, transpose(B), A, gamma)
-                sigma[lc, lc] = A_aug
-                sigma[rc, rc] = C_aug
             end
             if flag
                 try
@@ -1038,15 +1043,16 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
                 catch e
                     throw(ArgumentError("Augmented matrix could not be made positive definite. Use `MonotonicSchurComplement()` or reduce gamma: $gamma. Original error: $(sprint(showerror, e))"))
                 end
-            else
-                if !LinearAlgebra.isposdef(A_aug) || !LinearAlgebra.isposdef(C_aug)
-                    # Three values, like every other return of this method, and the real
-                    # `gamma` so a caller can name the value that failed. The monotonic
-                    # search reads `[1]` and treats `nothing` as an infinite risk; a caller
-                    # that destructures three names must not get a `BoundsError` instead.
-                    return nothing, gamma, r
-                end
+            elseif !LinearAlgebra.isposdef(A_aug) || !LinearAlgebra.isposdef(C_aug)
+                # Three values, like every other return of this method, and the real
+                # `gamma` so a caller can name the value that failed. The monotonic
+                # search reads `[1]` and treats `nothing` as an infinite risk; a caller
+                # that destructures three names must not get a `BoundsError` instead.
+                return nothing, gamma, r
             end
+            # After the repair, so that a later split reads the repaired blocks.
+            sigma[lc, lc] = A_aug
+            sigma[rc, rc] = C_aug
             lrisk = naive_portfolio_risk(r, A_aug)
             rrisk = naive_portfolio_risk(r, C_aug)
             # Allocate weight to clusters.
@@ -1074,18 +1080,18 @@ The scan of [`MonotonicSchurComplement`](@ref) gives a bracket in which the port
 
 # Algorithm
 
- 1. When `iter` is `nothing`, derive the budget `ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 10)`. A bracket that is already narrow can derive a budget of zero or less.
- 2. Stop when the bracket is at most `tol` wide.
- 3. Evaluate `objective` at the midpoint `mgamma`, giving the weights `mw` and the variance `risk`, and at `mgamma - tol`, giving `hrisk`.
- 4. When `risk` is not above `lrisk` and not above `hrisk`, the variance still falls at the midpoint, so `mgamma`, `risk` and `mw` become the incumbent `lgamma`, `lrisk` and `lw`. Otherwise `mgamma` becomes `hgamma`.
- 5. Go back to step 2, at most `iter` times.
+ 1. When `iter` is `nothing`, derive the budget `max(1, ceil(Int, log2((hgamma - lgamma) / tol) * 2 + 1))`.
+ 2. Keep the first `lgamma` and `lrisk` as the start of the bracket.
+ 3. Evaluate `objective` at the midpoint `mgamma`, giving the weights `mw` and the variance `risk`.
+ 4. When `mw` exists and `risk` is not above `lrisk`, probe the slope. Evaluate `objective` at `max(0, mgamma - tol)`, or reuse the variance at the start when the probe is the start. When `risk` is not above that variance either, the variance still falls at the midpoint, so `mgamma`, `risk` and `mw` become the incumbent `lgamma`, `lrisk` and `lw`. Otherwise `mgamma` becomes `hgamma`.
+ 5. Stop when the incumbent is above the start, `mw` exists, and the bracket is at most `tol` wide. Otherwise go back to step 3, at most `iter` times.
  6. When the bracket is still wider than `tol`, report it through [`strict_diagnostic`](@ref). Return `lw` and `lgamma`.
 
-When no midpoint passes the test of step 4, the answer is the first `lgamma`. The scan measured that the variance falls up to that value.
+Step 5 does not stop before a midpoint passes, so a narrow bracket still halves towards its start. A decrease of the variance just above the start is still a decrease, and a turning point below `tol` is found above the start. Step 5 also does not stop at a midpoint that fails, so the bisection moves to the largest value at which the allocation exists. When no midpoint passes the test of step 4, the answer is the first `lgamma`. The scan measured that the variance falls up to that value.
 
 # Arguments
 
-  - `objective`: Takes a value of ``\\gamma`` and returns `(w, risk)`. `risk` is the largest value of its type when the allocation fails.
+  - `objective`: Takes a value of ``\\gamma`` and returns `(w, risk)`. `w` is `nothing` and `risk` is the largest value of its type when the allocation fails.
   - `lgamma`: Lower end of the bracket, and the incumbent.
   - `hgamma`: Upper end of the bracket.
   - `lrisk`: The variance at `lgamma`, which a midpoint must not exceed.
@@ -1114,24 +1120,35 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
                                         iter::Option{<:Integer} = nothing,
                                         strict::Bool = false)
     if isnothing(iter)
-        iter = ceil(Int, log2((hgamma - lgamma) / tol) * 4 + 10)
+        # A bracket narrower than about `0.7 * tol` derives a budget below one.
+        iter = max(1, ceil(Int, log2((hgamma - lgamma) / tol) * 2 + 1))
     end
+    # The start of the bracket, where the scan measured the variance.
+    sgamma, srisk = lgamma, lrisk
     for _ in 1:iter
-        # A bracket that is already narrow enough ends the search before a bisection. A
-        # bracket narrower than about `0.18 * tol` derives a budget of zero or less, and
-        # it must not be reported as unconverged.
-        if hgamma - lgamma <= tol
-            break
-        end
         mgamma = (lgamma + hgamma) / 2
         mw, risk = objective(mgamma)
-        hrisk = objective(mgamma - tol)[2]
-        if risk <= lrisk && risk <= hrisk
+        # A midpoint that fails, or whose variance is higher, selects the lower half
+        # without a probe of the slope.
+        accept = !isnothing(mw) && risk <= lrisk
+        if accept
+            # The probe stays in [0, gamma]. At the start of the bracket it reuses the
+            # variance of the scan.
+            pgamma = max(zero(mgamma), mgamma - tol)
+            accept = risk <= (pgamma == sgamma ? srisk : objective(pgamma)[2])
+        end
+        if accept
             # The variance still falls at the midpoint: it becomes the incumbent.
             lgamma, lrisk, lw = mgamma, risk, mw
         else
             # The turning point lies below the midpoint. The incumbent keeps its weights.
             hgamma = mgamma
+        end
+        # Until a midpoint passes, a narrow bracket still halves towards its start, because
+        # a decrease just above the start is still a decrease. A midpoint that fails also
+        # continues the halving, towards the value where the allocation starts to fail.
+        if lgamma > sgamma && !isnothing(mw) && hgamma - lgamma <= tol
+            break
         end
     end
     if hgamma - lgamma > tol
@@ -1182,6 +1199,7 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
     gammas = range(zero(max_gamma), max_gamma; length = params.alg.N)
     # The two previous scan points, `i - 2` and `i - 1`, with their weights.
     w2, risk2 = w1, risk1 = objective(gammas[1])
+    risk0 = risk1
     for i in 2:length(gammas)
         w, risk = objective(gammas[i])
         if risk >= risk1
@@ -1195,8 +1213,9 @@ function schur_complement_weights(pr::AbstractPriorResult, items::VecVecInt,
         w2, risk2 = w1, risk1
         w1, risk1 = w, risk
     end
-    # No turning point in the scan: check the derivative at the last gamma.
-    if risk1 <= objective(max_gamma - tol)[2]
+    # No turning point in the scan: check the derivative at the last gamma. The probe stays
+    # in [0, gamma], so a range narrower than `tol` reuses the variance at zero.
+    if risk1 <= (max_gamma <= tol ? risk0 : objective(max_gamma - tol)[2])
         return w1, max_gamma, r
     end
     # The turning point lies between the last two gammas.
@@ -1250,13 +1269,16 @@ Fit a Schur complement allocation with one bundle.
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
-    rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
-    # variance or a standard deviation, which a fee does not move. The fee rides on the
-    # result, where the net returns and a fold's forced exit read it.
-    imsk = investable_mask(pr)
+    # variance or a standard deviation, which a fee does not move. The result holds the
+    # fee, and the net returns and a fold's forced exit read it there.
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
+    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in
@@ -1274,8 +1296,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any},
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = sh.opt.x_src)
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
@@ -1321,13 +1342,16 @@ The denominator is the sum of the blended weights, because each ``\\boldsymbol{w
 function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVector},
                    rd::ReturnsResult = ReturnsResult(); kwargs...)
     sh = reset_time_dependent_estimator(sh)
-    rd = returns_result_picker(rd, sh.opt.brt)
     pr = prior(sh.opt.pe, rd)
-    # Resolve the fee on the caller's own universe, before the door below narrows `sets`,
+    # Resolve the fee on the caller's universe before `investable_reduction` narrows `sets`,
     # as `HierarchicalRiskParity` does. The allocation reads no fee: its measure is a
-    # variance or a standard deviation, which a fee does not move. The fee rides on the
-    # result, where the net returns and a fold's forced exit read it.
-    imsk = investable_mask(pr)
+    # variance or a standard deviation, which a fee does not move. The result holds the
+    # fee, and the net returns and a fold's forced exit read it there.
+    # An asset that a `FeatureDistance` of the clustering cannot read in the window of its
+    # Asset Panel departs with the non-investable assets (`feature_readable_mask`). So does
+    # an asset with a gap in the rows that a plain graph reader reads (`graph_reader_mask`).
+    imsk = feature_readable_mask(sh.opt.cle, investable_mask(pr), rd)
+    imsk = graph_reader_mask(sh.opt.cle, imsk, pr, rd, sh.opt.strict)
     # A split factor is a quotient of two risks, so the weights, their bounds and the fee
     # take the type of the returns, widened to a float only when it is an integer. An
     # integer sample then allocates in floating point, and a `Float32` sample stays in
@@ -1345,8 +1369,7 @@ function _optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:AbstractVe
     X = pr.X
     # No `branchorder`: recursive bisection splits `clr.res.order`, so the leaf
     # permutation is the algorithm's input and must stay `:optimal` (ADR 0055).
-    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa,
-                     x_src = sh.opt.x_src)
+    clr = clusterise(sh.opt.cle, pr; rd = rd, iv = rd.iv, ivpa = rd.ivpa)
     assert_clustering_universe(clr, size(X, 2))
     items = [clr.res.order]
     wb = weight_bounds_constraints(sh.opt.wb, sh.opt.sets; N = size(X, 2),
@@ -1397,7 +1420,7 @@ Unlike [`HierarchicalEqualRiskContribution`](@ref) and [`NestedClustered`](@ref)
 function optimise(sh::SchurComplementHierarchicalRiskParity{<:Any, <:Any, Nothing},
                   rd::ReturnsResult; kwargs...)
     assert_batch_entry(sh, "`optimise`")
-    return _optimise(sh, rd; kwargs...)
+    return shared_series_solve(sh, rd; kwargs...)
 end
 
 export SchurComplementHierarchicalRiskParityResult, SchurComplementParams,
