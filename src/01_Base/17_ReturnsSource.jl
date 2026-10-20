@@ -476,7 +476,7 @@ end
 
 Return the source that the gap rule of a group reads: `ExcessSource()` when a reader of the group states it, and `nothing` otherwise.
 
-A head drops each observation at which a vector benchmark has a gap when a reader of its group states [`ExcessSource`](@ref). A raw reader of the group loses the observations too, so every reader of the head pairs the same observations. The head passes the answer to [`shared_series_view`](@ref) in batch, and to [`shared_series_gaps`](@ref) in an online step. The method on a head reads [`group_frames`](@ref).
+A head drops each observation at which a vector benchmark has a gap when a reader of its group states [`ExcessSource`](@ref). A raw reader of the group loses the observations too, so every reader of the head pairs the same observations. The head passes the answer to [`shared_series_view`](@ref) in batch, and to [`shared_series_gaps`](@ref) in an online step. A [`Pipeline`](@ref) passes the answer for its group to each step of the group, see [`pipeline_gap_sources`](@ref). The method on a head reads [`group_frames`](@ref).
 
 # Arguments
 
@@ -497,6 +497,52 @@ function group_source(fr::ReturnsFrames)
 end
 function group_source(head)
     return group_source(group_frames(head))
+end
+"""
+    gap_source(gsrc::ExcessSource, x_src) -> ExcessSource
+    gap_source(gsrc::Nothing, x_src) -> typeof(x_src)
+
+Return the source that decides the gap drop of one reader in a group: the source of the group when it is [`ExcessSource`](@ref), and the source of the reader otherwise.
+
+A group drops a gap of a vector benchmark when any reader of it states `ExcessSource()`, see [`group_source`](@ref). A group source of `nothing` drops nothing for the group, and the reader still drops by its own source. So the reader drops a gap when the group or the reader reads the Excess Frame. The answer decides only which observations the reader reads, never its frame.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `gsrc` is `ExcessSource()`: return `gsrc`.
+ 2. `gsrc` is `nothing`: return `x_src`.
+
+# Arguments
+
+  - `gsrc`: The source of the group, from [`group_source`](@ref).
+  - $(arg_dict[:x_src_read])
+
+# Returns
+
+  - `src::Option{<:AbstractReturnsSource}`: The source of the gap drop of the reader.
+
+# Examples
+
+```jldoctest
+julia> PortfolioOptimisers.gap_source(ExcessSource(), DataSource())
+ExcessSource()
+
+julia> PortfolioOptimisers.gap_source(nothing, DataSource())
+DataSource()
+```
+
+# Related
+
+  - [`group_source`](@ref)
+  - [`shared_series_gaps`](@ref)
+  - [`fold_pipeline_owner`](@ref)
+"""
+function gap_source(gsrc::ExcessSource, ::Option{<:AbstractReturnsSource})
+    return gsrc
+end
+function gap_source(::Nothing, x_src::Option{<:AbstractReturnsSource})
+    return x_src
 end
 """
     warn_raw_readers(head, fr::ReturnsFrames = group_frames(head)) -> Nothing

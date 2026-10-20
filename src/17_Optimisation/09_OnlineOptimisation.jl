@@ -124,7 +124,7 @@ A batch fit drops an observation with a gap in a Shared Series that it reads, se
 
   - `pe`: The prior that the optimiser holds.
   - `rd`: The returns data to fold, `observations × assets`.
-  - `gsrc`: The source of the group of the head, see [`group_source`](@ref). It decides the marks of a gap of a vector benchmark. The default is the source of `pe`, for a prior that no head holds.
+  - `gsrc`: The source of the group of the head, see [`group_source`](@ref). It decides the marks of a gap of a vector benchmark. The default is the source of `pe`, for a prior that no head holds. The prior step of a [`Pipeline`](@ref) passes the source of the group of the optimiser that receives it, see [`fold_pipeline_owner`](@ref).
 
 # Validation
 
@@ -339,16 +339,76 @@ function partial_fit!(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRisk
                                  <:HierarchicalEqualRiskContribution,
                                  <:SchurComplementHierarchicalRiskParity},
                       rd::ReturnsResult)
-    assert_step_tracks_no_series(opt)
     # The configuration does not see the risk measures of the head, so the head passes the
     # source of its whole group, which decides the marks of a gap of a vector benchmark.
-    return rebuild_estimator(opt, (; opt = fold_returns(opt.opt, rd, group_source(opt))))
+    return fold_optimiser(opt, rd, group_source(opt))
 end
 function partial_fit!(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
                                  <:InverseVolatility, <:NestedClustered, <:Stacking,
                                  <:SubsetResampling}, rd::ReturnsResult)
+    return fold_optimiser(opt, rd, group_source(opt))
+end
+"""
+    fold_optimiser(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
+                              <:HierarchicalEqualRiskContribution,
+                              <:SchurComplementHierarchicalRiskParity},
+                   rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
+    fold_optimiser(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                              <:InverseVolatility, <:NestedClustered, <:Stacking,
+                              <:SubsetResampling},
+                   rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
+    fold_optimiser(opt::OptimisationEstimator, rd::ReturnsResult,
+                   gsrc::Option{<:AbstractReturnsSource})
+
+Takes the online step of an optimiser that holds a prior, with the marks of a gap of a vector benchmark under the group source `gsrc`.
+
+This is the step of [`partial_fit!`](@ref), which passes the source of the group of `opt` itself, see [`group_source`](@ref). A [`Pipeline`](@ref) whose optimiser owns the rows passes the source of the group of the Pipeline instead, because the steps whose values the optimiser receives join that group, see [`pipeline_gap_sources`](@ref). An optimiser that holds no prior marks no gap, so it takes its own step and ignores `gsrc`.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. A JuMP head or a hierarchical head refuses a [`ReturnsTracking`](@ref) in its tree, through [`assert_step_tracks_no_series`](@ref). It folds the bundle it holds in `opt` through [`fold_returns`](@ref) under `gsrc`, because the bundle does not see the risk measures of the head. It rebuilds itself around the result.
+ 2. A configuration or a meta-optimiser refuses a `ReturnsTracking` in the same way, and folds through `fold_returns` under `gsrc`.
+ 3. Any other optimiser takes its step through [`partial_fit!`](@ref).
+
+# Arguments
+
+  - `opt`: The optimiser to fold into.
+  - `rd`: The returns data to fold, `observations × assets`.
+  - `gsrc`: The source that decides the marks of a gap of a vector benchmark, see [`group_source`](@ref).
+
+# Validation
+
+  - Everything [`partial_fit!`](@ref) of `opt` refuses.
+
+# Returns
+
+  - `opt`: The optimiser, with its prior folded and its context recorded.
+
+# Related
+
+  - [`partial_fit!`](@ref)
+  - [`fold_returns`](@ref)
+  - [`fold_pipeline_owner`](@ref)
+"""
+function fold_optimiser(opt::Union{<:JuMPOptimisationEstimator, <:HierarchicalRiskParity,
+                                   <:HierarchicalEqualRiskContribution,
+                                   <:SchurComplementHierarchicalRiskParity},
+                        rd::ReturnsResult, gsrc::Option{<:AbstractReturnsSource})
     assert_step_tracks_no_series(opt)
-    return fold_returns(opt, rd)
+    return rebuild_estimator(opt, (; opt = fold_returns(opt.opt, rd, gsrc)))
+end
+function fold_optimiser(opt::Union{<:JuMPOptimiser, <:HierarchicalOptimiser,
+                                   <:InverseVolatility, <:NestedClustered, <:Stacking,
+                                   <:SubsetResampling}, rd::ReturnsResult,
+                        gsrc::Option{<:AbstractReturnsSource})
+    assert_step_tracks_no_series(opt)
+    return fold_returns(opt, rd, gsrc)
+end
+function fold_optimiser(opt::OptimisationEstimator, rd::ReturnsResult,
+                        ::Option{<:AbstractReturnsSource})
+    return partial_fit!(opt, rd)
 end
 """
     optimiser_shared_series_rows(rd::ReturnsResult,

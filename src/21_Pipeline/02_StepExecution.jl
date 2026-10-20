@@ -153,7 +153,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Read the slot an uncertainty-set step fits from, as the arguments its verb takes.
 
-An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The estimator reads the source that its own prior states, [`returns_source`](@ref) of `ue.pe`, as the verb over a [`ReturnsResult`](@ref) reads it. The observations of a Shared Series gap that the fit reads are dropped first with [`shared_series_view`](@ref): a gap of a vector benchmark under `ExcessSource()`, and a gap of the factor returns when the prior of the estimator reads them. The asset returns are then read with [`benchmark_relative_returns`](@ref) under the same source. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
+An estimator that reads a prior result — [`reads_prior_result`](@ref) answers `true` — is fitted from the `prior` slot, and never touches the returns; every other estimator is fitted from the `returns` slot, whose `X` and `F` its verb takes. The estimator reads the source that its own prior states, [`returns_source`](@ref) of `ue.pe`, as the verb over a [`ReturnsResult`](@ref) reads it. The observations of a Shared Series gap that the fit reads are dropped first with [`shared_series_view`](@ref): a gap of a vector benchmark under `ExcessSource()`, and a gap of the factor returns when the prior of the estimator reads them. When the optimiser receives the set, the `returns` slot already has the gaps of its group dropped, see [`run_group_step`](@ref), so a raw prior in an excess group reads the same observations as the other readers of the group. The asset returns are then read with [`benchmark_relative_returns`](@ref) under the same source. The required slot is checked here, so a missing one is refused with an error that names it before any fit. The predicate reads the type, so the branch folds.
 
 # Arguments
 
@@ -815,9 +815,9 @@ The checks that compare the earlier steps with the optimiser read it here: [`ass
 
 # Algorithm
 
- 1. Return `nothing` when the pipeline has one step, or when its last step writes a slot other than `:opt`.
- 2. Read the optimiser from the last step, without its [`PipelineStep`](@ref) wrapper.
- 3. Return it when it is an [`OptimisationEstimator`](@ref). Otherwise return `nothing`. A [`TimeDependent`](@ref) schedule and a precomputed result are such steps, and the fold loop resolves them later.
+ 1. Read the optimiser from the last step, without its [`PipelineStep`](@ref) wrapper.
+ 2. Return `nothing` when the pipeline has one step, or when the optimiser is not an [`OptimisationEstimator`](@ref). A [`TimeDependent`](@ref) schedule and a precomputed result are such steps, and the fold loop resolves them later. The type is checked first, because [`fit`](@ref) also reads the optimiser for the gap drop of the group, see [`pipeline_gap_sources`](@ref), and in a fold of a mixed schedule the last step is a precomputed result, whose written slot [`pipe_writes`](@ref) cannot infer.
+ 3. Return the optimiser when its step writes `:opt`, and `nothing` otherwise.
 
 # Arguments
 
@@ -835,11 +835,11 @@ The checks that compare the earlier steps with the optimiser read it here: [`ass
 """
 function pipe_terminal_optimiser(ests)
     n = length(ests)
-    if n < 2 || !(pipe_writes(ests[n]) === :opt)
+    opt = isa(ests[n], PipelineStep) ? ests[n].est : ests[n]
+    if n < 2 || !isa(opt, OptimisationEstimator)
         return nothing
     end
-    opt = isa(ests[n], PipelineStep) ? ests[n].est : ests[n]
-    return isa(opt, OptimisationEstimator) ? opt : nothing
+    return pipe_writes(ests[n]) === :opt ? opt : nothing
 end
 """
     pipeline_frames(ests) -> ReturnsFrames
@@ -880,13 +880,149 @@ function pipeline_frames(ests)::ReturnsFrames
         return ReturnsFrames()
     end
     n = length(ests)
-    received = [Symbol[t for t in pipe_step_targets(ests[i]) if pipe_accepts(opt, Val(t))]
-                for i in 1:(n - 1)]
+    received = pipeline_received(ests, opt)
     step_refit, opt_refit = pipeline_refits(ests, received, opt)
     fs = ReturnsFrames[reader_frames(ests[i], string("steps[", i, "]"), step_refit)
                        for i in 1:(n - 1) if !isempty(received[i])]
     push!(fs, terminal_frames(ests[n], n, opt, received, opt_refit))
     return merge_frames(fs...)
+end
+"""
+    pipeline_received(ests, opt) -> Vector{Vector{Symbol}}
+
+Return, for each step of a [`Pipeline`](@ref) before the last, the routing targets of the step that the last optimiser `opt` accepts.
+
+A step with no such target does not reach `opt`, so it stays out of the group of `opt`.
+
+Internal machinery — not part of the user-facing API.
+
+# Arguments
+
+  - `ests`: The step estimators, with the optimisation step last, see [`assert_opt_last`](@ref).
+  - `opt`: The optimiser of the last step.
+
+# Returns
+
+  - `received::Vector{Vector{Symbol}}`: The targets that `opt` receives from each earlier step.
+
+# Related
+
+  - [`pipeline_frames`](@ref)
+  - [`pipeline_gap_sources`](@ref)
+  - [`pipe_step_targets`](@ref)
+  - [`pipe_accepts`](@ref)
+"""
+function pipeline_received(ests, opt)::Vector{Vector{Symbol}}
+    return [Symbol[t for t in pipe_step_targets(ests[i]) if pipe_accepts(opt, Val(t))]
+            for i in 1:(length(ests) - 1)]
+end
+"""
+    pipeline_gap_sources(ests) -> Vector{Option{ExcessSource}}
+
+Return, for each step of a [`Pipeline`](@ref), the source under which the Pipeline drops a gap of a vector benchmark before the step runs.
+
+The steps whose values the last optimiser receives join its group, see [`pipeline_frames`](@ref). A head drops a gap of a vector benchmark when any reader of its group states [`ExcessSource`](@ref), see [`group_source`](@ref), so every reader of the head pairs the same observations. The Pipeline applies the same rule: each step of the group, and the optimiser, reads the returns data with the gaps of the group dropped. A raw reader of the group loses the observations too. The rule decides which observations a step reads, and not its frame: each reader still reads the frame that its own `x_src` states. A step outside the group gets `nothing`, so it drops by the rule of its own reader alone.
+
+Internal machinery — not part of the user-facing API.
+
+# Algorithm
+
+ 1. Read the optimiser `opt` of the last step with [`pipe_terminal_optimiser`](@ref). Answer `nothing` for every step when there is none.
+ 2. Find the source of the group with [`group_source`](@ref) of [`pipeline_frames`](@ref), giving `gsrc`.
+ 3. Answer `gsrc` for each step that `opt` receives ([`pipeline_received`](@ref)) and for the last step, and `nothing` for every other step.
+
+# Arguments
+
+  - `ests`: The step estimators, with the optimisation step last, see [`assert_opt_last`](@ref).
+
+# Returns
+
+  - `gsrcs::Vector{Option{ExcessSource}}`: One source for each step.
+
+# Related
+
+  - [`run_group_step`](@ref)
+  - [`pipeline_frames`](@ref)
+  - [`group_source`](@ref)
+"""
+function pipeline_gap_sources(ests)::Vector{Option{ExcessSource}}
+    n = length(ests)
+    gsrcs = Vector{Option{ExcessSource}}(nothing, n)
+    opt = pipe_terminal_optimiser(ests)
+    if isnothing(opt)
+        return gsrcs
+    end
+    gsrc = group_source(pipeline_frames(ests))
+    received = pipeline_received(ests, opt)
+    for i in 1:(n - 1)
+        if !isempty(received[i])
+            gsrcs[i] = gsrc
+        end
+    end
+    gsrcs[n] = gsrc
+    return gsrcs
+end
+"""
+    run_group_step(step, ctx::PipelineContext, gsrc::Nothing) -> (fitted, ctx′)
+    run_group_step(step, ctx::PipelineContext, gsrc::ExcessSource) -> (fitted, ctx′)
+
+Run one step of a [`Pipeline`](@ref) with the gaps of the group of its optimiser dropped from the returns data that the step reads.
+
+The step reads the `returns` slot with each observation at which a vector benchmark has a gap dropped, through [`shared_series_view`](@ref) under `gsrc`. The returns data is then put back in the slot, so the next step, and the context of the [`PipelineResult`](@ref), hold the returns data that the caller gave. A step of the group never writes the `returns` slot, because the optimiser receives no Data Slot. The reader of the step then drops a gap of the factor returns, and a gap of the benchmark under its own source, as it does in a head. Both drops are idempotent on a view with no gap left.
+
+Internal machinery — not part of the user-facing API.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `gsrc` is `nothing`: run the step with [`run_step`](@ref).
+ 2. `gsrc` is [`ExcessSource`](@ref): view the `returns` slot with [`group_returns_view`](@ref), run the step on that context, and put the returns data back.
+
+# Arguments
+
+  - `step`: The step, after [`maybe_inject_step`](@ref).
+  - `ctx`: The pipeline context.
+  - `gsrc`: The source of the gap drop of the step, see [`pipeline_gap_sources`](@ref).
+
+# Returns
+
+  - `(fitted, ctx′)`: The fitted object and the updated context.
+
+# Related
+
+  - [`pipeline_gap_sources`](@ref)
+  - [`run_step`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function run_group_step(step, ctx::PipelineContext, ::Nothing)
+    return run_step(step, ctx)
+end
+function run_group_step(step, ctx::PipelineContext, gsrc::ExcessSource)
+    rd = ctx.returns
+    fitted, ctx = run_step(step, set_slot(ctx, :returns, group_returns_view(rd, gsrc)))
+    return fitted, set_slot(ctx, :returns, rd)
+end
+"""
+    group_returns_view(rd::ReturnsResult, gsrc::ExcessSource) -> ReturnsResult
+    group_returns_view(rd, gsrc::ExcessSource)
+
+Return the returns data that a step of the group of a [`Pipeline`](@ref) reads: `rd` with each gap of a vector benchmark dropped, see [`shared_series_view`](@ref).
+
+A slot that holds no [`ReturnsResult`](@ref), such as an empty slot before a step that reads prices, is returned unchanged.
+
+Internal machinery — not part of the user-facing API.
+
+# Related
+
+  - [`run_group_step`](@ref)
+  - [`shared_series_view`](@ref)
+"""
+function group_returns_view(rd::ReturnsResult, gsrc::ExcessSource)
+    return shared_series_view(rd, gsrc, false)
+end
+function group_returns_view(rd, ::ExcessSource)
+    return rd
 end
 """
     pipeline_refits(ests, received, opt) -> Tuple{Bool, Bool}

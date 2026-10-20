@@ -59,7 +59,18 @@ The maintainer decided on 2026-10-13, and decided decision 3 again on 2026-10-14
    the rows by the same rule, and `batch_from_state` cuts by it. A raw reader of the group loses the
    rows too, so every reader of the head pairs the same observations. The gap of the factor returns
    keeps its rule, which reads the prior. A fallback is a head with its own group, so it drops by its
-   own rule, as today.
+   own rule, as today. A `Pipeline` follows the same rule, because its steps join the group of its
+   optimiser (ADR 0214, decision 6). Each step whose value the optimiser receives, and the
+   optimiser, reads the returns data with the gaps of the group dropped: a prior step, a clustering
+   step, an uncertainty step and a constraint step alike. Online, a prior owner marks the gaps of
+   the group, and an optimiser owner folds under the source of the group of the Pipeline. A step
+   that the optimiser does not receive drops by the rule of its own reader. The maintainer decided
+   this on 2026-10-20 (#1774), for one default in a head and in a `Pipeline`.
+   **The gap rule decides which observations a reader reads, never its frame.** Each reader reads
+   the frame that its own `x_src` states, so the readers of one group can still mix frames (ADR
+   0214, decision 1). The one rule about the frame is the refusal of a double subtraction of the
+   benchmark: a `DataBenchmarkTracking` beside a prior at `ExcessSource()`, in a head or through a
+   prior step of a `Pipeline`, is refused at construction.
 3. **The outer problem reads the source that the Prior Result records.** `LowOrderPrior` holds
    `x_src`, and a `HighOrderPrior` answers it from the `LowOrderPrior` that it wraps, as it answers
    `X`. `prior(pe, rd)` and the read-out `prior(pe)` of an online fold record the source of `pe`,
@@ -97,7 +108,9 @@ The maintainer decided on 2026-10-13, and decided decision 3 again on 2026-10-14
   marks of a gap. The walk of ADR 0214 serves the warning and the gap rule, so one shared function
   answers both.
 - A raw prior in a group with an excess reader loses the gap rows of `B`. So its Prior Result inside
-  the head can differ from `prior(pe, rd)` on the same data, which keeps those rows.
+  the head can differ from `prior(pe, rd)` on the same data, which keeps those rows. The same holds
+  for a raw prior step of a `Pipeline` in such a group, so the Prior Result of the step equals the
+  Prior Result that the same head fits.
 - A precomputed Prior Result keeps the frame that its prior stated, because `prior(pe, rd)` records
   it. A caller who builds a Prior Result by hand states its frame with
   `forward_prior(pr; x_src = ExcessSource())`. A printed `LowOrderPrior` shows an `x_src` row.
@@ -115,6 +128,10 @@ The maintainer decided on 2026-10-13, and decided decision 3 again on 2026-10-14
   Frame beside a raw prior reads `NaN` rows.
 - **Each reader drops its own gap rows.** The readers of one head then read different observations,
   which the head drop of ADR 0117 exists to prevent.
+- **A step of a `Pipeline` drops by its own reader** (the code before #1774). The prior step and the
+  uncertainty step dropped under their own source, so a raw prior step in an excess group kept the
+  gap rows that the optimiser dropped. The Pipeline then differed from the same head, and a head
+  and a Pipeline had two defaults for one configuration.
 - **The outer problem reads the source of the meta's prior estimator** (the decision of
   2026-10-13). Three paths put a Prior Result in the place of the estimator: the read-out of an
   online fold, a prior step of a `Pipeline`, and a precomputed Result. Each one read as raw, so the

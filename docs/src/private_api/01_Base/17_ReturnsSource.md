@@ -17,5 +17,6 @@ PortfolioOptimisers.reader_frames(::Any, ::AbstractString, ::Bool)
 PortfolioOptimisers.refits_regression(::Any)
 PortfolioOptimisers.group_frames
 PortfolioOptimisers.group_source
+PortfolioOptimisers.gap_source
 PortfolioOptimisers.warn_raw_readers
 ```

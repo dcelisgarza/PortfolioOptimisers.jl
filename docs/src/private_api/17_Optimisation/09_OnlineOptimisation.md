@@ -10,6 +10,7 @@ PortfolioOptimisers.prior_step_returns
 PortfolioOptimisers.fold_prior
 PortfolioOptimisers.fold_context
 PortfolioOptimisers.fold_returns
+PortfolioOptimisers.fold_optimiser
 PortfolioOptimisers.online_state_seed(::Union{<:EqualWeighted, <:RandomWeighted, <:BestConstantRebalancedPortfolio}, max_history::PortfolioOptimisers.Option{<:Integer})
 PortfolioOptimisers.update_online_member
 PortfolioOptimisers.update_online_estimator(opt::PortfolioOptimisers.JuMPOptimisationEstimator)

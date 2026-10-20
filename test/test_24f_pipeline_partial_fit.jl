@@ -420,6 +420,80 @@ what keeps the JuMP families cheap.
         end
     end
 
+    @testset "The group of the optimiser decides the gap drop of every step it receives (#1774)" begin
+        # A raw reader in a group with an excess reader loses the observations of a gap of
+        # the vector benchmark, in a head and in a Pipeline alike. The rule picks the
+        # observations, never the frame: each reader keeps its own `x_src`.
+        Xb = randn(StableRNG(1774), T, N) ./ 100
+        Bb = Xb * fill(1 / N, N) .+ randn(StableRNG(17740), T) ./ 1000
+        Bb[[50, 90]] .= NaN
+        rdb = ReturnsResult(; nx = nx, X = Xb, nb = ["BM"], B = Bb, ts = ts)
+        keep = setdiff(1:80, [50])
+        pd = EmpiricalPrior(; x_src = DataSource())
+        pstep = PipelineStep(; est = pd, writes = :prior)
+        cex = ClustersEstimator(; x_src = ExcessSource())
+        hrpg = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pd, cle = cex))
+        # A prior owner. The step drops the gap, as the head drops it for its own prior.
+        pipe = Pipeline(; steps = (pstep, hrpg))
+        @test po.pipeline_gap_sources(pipe.steps) == [ExcessSource(), ExcessSource()]
+        ba = fit(pipe, rows(rdb, 1:80))
+        @test size(ba.ctx.prior.X, 1) == length(keep)
+        @test ba.ctx.prior.mu ≈ prior(pd, rows(rdb, keep)).mu
+        @test ba.w ≈ optimise(hrpg, rows(rdb, 1:80)).w
+        # The context keeps the returns data that the caller gave.
+        @test size(ba.ctx.returns.X, 1) == 80
+        on = fit(stepped(pipe, rdb, blocks))
+        @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+        @test isapprox(on.w, ba.w; atol = 1e-10)
+        # An optimiser owner. A clustering step in the Excess Frame joins the group of a raw
+        # head, so the head drops the gap in batch and marks it online.
+        hrpd = HierarchicalRiskParity(; opt = HierarchicalOptimiser(; pe = pd))
+        cstep = PipelineStep(; est = cex, writes = :phylogeny)
+        pipe = Pipeline(; steps = (cstep, hrpd))
+        ba = fit(pipe, rows(rdb, 1:80))
+        @test ba.w ≈ optimise(hrpd, rows(rdb, keep)).w
+        @test isapprox(fit(stepped(pipe, rdb, blocks)).w, ba.w; atol = 1e-10)
+        b = cross_val_predict(pipe, rdb, batch_cv)
+        o = cross_val_predict(pipe, rdb, online_cv)
+        @test all(isapprox(po_.res.w, pb.res.w; atol = 1e-10)
+                  for (pb, po_) in zip(b.pred, o.pred))
+        # An uncertainty step over a raw prior, in a group with an excess constraint.
+        ue = DeltaUncertaintySet(; pe = pd)
+        ustep = PipelineStep(; est = ue, reads = (:returns,), writes = :uncertainty,
+                             target = :sigma)
+        jo = JuMPOptimiser(; pe = pd, cte = CentralityConstraint(; x_src = ExcessSource()),
+                           slv = slv)
+        mru = MeanRisk(; r = UncertaintySetVariance(; ucs = ue), opt = jo)
+        pipe = Pipeline(; steps = (pstep, ustep, mru))
+        ba = fit(pipe, rows(rdb, 1:80))
+        @test ba.ctx.uncertainty.sigma.ub ≈ sigma_ucs(ue, rows(rdb, keep)).ub
+        @test isapprox(ba.w, optimise(mru, rows(rdb, 1:80)).w; atol = 1e-5)
+        @test isapprox(fit(stepped(pipe, rdb, blocks)).w, ba.w; atol = 1e-5)
+        # A step that no optimiser receives drops by its own reader alone, in batch and
+        # online.
+        pex = PipelineStep(; est = EmpiricalPrior(; x_src = ExcessSource()),
+                           writes = :prior)
+        @test po.pipeline_gap_sources((pex,)) == [nothing]
+        ba = fit(Pipeline(; steps = (pex,)), rows(rdb, 1:80))
+        @test size(ba.ctx.prior.X, 1) == length(keep)
+        on = fit(stepped(Pipeline(; steps = (pex,)), rdb, blocks))
+        @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+        # A raw prior step in an excess group keeps its frame, so a data benchmark subtracts
+        # the benchmark once and builds. A prior step in the Excess Frame is still refused.
+        dbt = TrackingRiskMeasure(; tr = DataBenchmarkTracking())
+        jt = JuMPOptimiser(; pe = pd, cte = CentralityConstraint(; x_src = ExcessSource()),
+                           slv = slv)
+        res = fit(Pipeline(; steps = (pstep, MeanRisk(; r = dbt, opt = jt))),
+                  rows(rdb, 1:80))
+        @test all(isfinite, res.w)
+        @test_throws ArgumentError Pipeline(;
+                                            steps = (PipelineStep(;
+                                                                  est = EmpiricalPrior(;
+                                                                                       x_src = ExcessSource()),
+                                                                  writes = :prior),
+                                                     MeanRisk(; r = dbt, opt = jt)))
+    end
+
     @testset "A benchmark-relative uncertainty or constraint step reads the excess returns (#1670, #1702)" begin
         # The steps before the owner run over the Fold Context of the Pipeline, which keeps
         # the raw rows and the benchmark, so each reads the returns from the source of its

@@ -59,6 +59,7 @@ The maintainer decided on 2026-10-13.
    of a `ProgrammeAllocationSet` form one group.
 6. **A `Pipeline` joins the group of its optimiser.** The steps whose values the last optimiser
    receives join the group of that optimiser, and the `Pipeline` constructor warns by decision 3.
+   The group also decides the gap drop of those steps, as ADR 0215, decision 2, states (#1774).
    `assert_benchmark_frame` and its refusal are deleted.
 7. **Each different mismatch logs one time.** The warning is a `@warn` with `maxlog = 1` and an `_id`
    made from its message. The message names the type of the head and the path of the reader, so a

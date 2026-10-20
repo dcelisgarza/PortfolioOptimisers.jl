@@ -35,6 +35,10 @@ cut_frames
 cut_children
 pipe_terminal_optimiser
 pipeline_frames
+pipeline_received
+pipeline_gap_sources
+run_group_step
+group_returns_view
 pipeline_refits
 terminal_frames
 pipe_data_benchmark_path

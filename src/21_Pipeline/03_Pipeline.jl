@@ -366,7 +366,7 @@ Give the steps in the order of execution. Each element is a step estimator or a 
   - No step writes a slot that makes stale a slot that an earlier step wrote, see [`PIPELINE_INVALIDATES`](@ref). A step that rewrites `:returns` after a prior, phylogeny, uncertainty or constraint step leaves that result on an old asset universe. Raises an `ArgumentError`.
   - The step names are unique. Raises an `ArgumentError`.
 
-The steps whose values the last optimiser receives join the group of that optimiser. When a reader of the group states `x_src = ExcessSource()`, and a reader at `x_src = nothing` reads the raw returns data, the constructor logs one warning that names the path of that reader, see [`warn_raw_readers`](@ref) and [`pipeline_frames`](@ref). The pipeline then builds as configured.
+The steps whose values the last optimiser receives join the group of that optimiser. When a reader of the group states `x_src = ExcessSource()`, and a reader at `x_src = nothing` reads the raw returns data, the constructor logs one warning that names the path of that reader, see [`warn_raw_readers`](@ref) and [`pipeline_frames`](@ref). The pipeline then builds as configured. The group also decides the gap drop, as in a head: when a reader of the group states `ExcessSource()`, each step of the group and the optimiser read the returns data without the observations at which a vector benchmark has a gap, in batch and online, see [`pipeline_gap_sources`](@ref). Each reader still reads the frame that its own `x_src` states.
 
 # Online form
 
@@ -954,8 +954,9 @@ Fit a [`Pipeline`](@ref) on price data or returns data.
 
  1. When the pipeline has a schedule step, reset each schedule to its `default`.
  2. Fill the slot of the input type, giving `ctx`. A [`PricesResult`](@ref) fills `prices`, and a [`ReturnsResult`](@ref) fills `returns`. So a pipeline for returns data has no price steps, because a price step raises an `IsNothingError` when the `prices` slot is empty.
- 3. For each step in order, inject `ctx` into an optimisation step with [`maybe_inject_step`](@ref). Then run the step with [`run_step`](@ref), giving its fitted result and the new `ctx`.
- 4. Return the step names, the fitted results in step order and the last `ctx` as a [`PipelineResult`](@ref).
+ 3. Find the source of the gap drop of each step with [`pipeline_gap_sources`](@ref). The steps whose values the last optimiser receives, and the optimiser, drop a gap of a vector benchmark when a reader of their group states `ExcessSource()`, as the readers of one head do.
+ 4. For each step in order, inject `ctx` into an optimisation step with [`maybe_inject_step`](@ref). Then run the step with [`run_group_step`](@ref) under its source, giving its fitted result and the new `ctx`.
+ 5. Return the step names, the fitted results in step order and the last `ctx` as a [`PipelineResult`](@ref).
 
 # Arguments
 
@@ -999,9 +1000,10 @@ function StatsAPI.fit(pipe::Pipeline, data::Prices_RR)::PipelineResult
         PipelineContext(; returns = data)
     end
     fitted = Vector{Any}(undef, length(pipe.steps))
+    gsrcs = pipeline_gap_sources(pipe.steps)
     for (i, est) in enumerate(pipe.steps)
         step = maybe_inject_step(est, ctx)
-        fitted[i], ctx = run_step(step, ctx)
+        fitted[i], ctx = run_group_step(step, ctx, gsrcs[i])
     end
     return PipelineResult(pipe.names, Tuple(fitted), ctx)
 end
