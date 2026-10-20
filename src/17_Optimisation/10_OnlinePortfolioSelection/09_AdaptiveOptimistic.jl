@@ -1,9 +1,11 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Projects the raw step onto the Allocation Set in the norm of a positive diagonal matrix.
+Projects the raw step onto the Allocation Set in the norm of a non-negative diagonal matrix.
 
 This is the geometry of the diagonal adaptive subgradient method of [duchi2011](@citet). [`AdaptiveSubgradient`](@ref) builds one at every step from the gradient mass it has accrued, as [`NewtonStep`](@ref) binds its Gram matrix onto [`GramProjection`](@ref). The rule projects the Start Allocation before it sees a gradient, so [`projection_geometry`](@ref) returns [`EuclideanProjection`](@ref) for that projection. The geometry admits a negative lower bound, as the Euclidean geometry does.
+
+A zero entry of ``\\boldsymbol{h}`` makes the norm a seminorm. The projection then has many minimisers, and all of them have the same weights at the positive entries of ``\\boldsymbol{h}``. The geometry returns the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``, which is the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm. So the projection is continuous in ``\\boldsymbol{h}`` at a zero entry. A diagonal of equal entries, zero included, is a multiple of the identity, and on a [`BoundedAllocationSet`](@ref) its projection is the Euclidean one.
 
 # Mathematical definition
 
@@ -22,7 +24,7 @@ Where:
   - $(math_dict[:lu_i_aset])
   - $(math_dict[:theta_aset])
 
-On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at that root. At ``\\boldsymbol{h} = \\boldsymbol{1}`` it is the Euclidean projection.
+On a [`BoundedAllocationSet`](@ref) with a positive ``\\boldsymbol{h}`` the projection is ``\\boldsymbol{w}(\\theta)`` at that root, and [`bounded_quadratic_projection`](@ref) states the limit at a zero entry. At ``\\boldsymbol{h} = \\boldsymbol{1}`` it is the Euclidean projection.
 
 # Fields
 
@@ -36,7 +38,7 @@ The positional argument is the struct's field. The rule builds the geometry at e
 
 ## Validation
 
-  - `all(> 0, h)`. A `DomainError` is thrown otherwise.
+  - `all(>= 0, h)`. A `DomainError` is thrown otherwise.
 
 # Examples
 
@@ -61,12 +63,13 @@ PortfolioOptimisers.DiagonalProjection
 """
 @concrete struct DiagonalProjection <: AbstractProjectionGeometry
     """
-    The diagonal of the norm of the projection. The rule sets it to `delta` plus its gradient mass at the step.
+    The diagonal of the norm of the projection, non-negative. The rule sets it to `delta` plus its gradient mass at the step.
     """
     h
     function DiagonalProjection(h::AbstractVector)
-        @argcheck(all(x -> x > zero(x), h),
-                  DomainError(h, "the diagonal of the projection norm must be positive"))
+        @argcheck(all(x -> x >= zero(x), h),
+                  DomainError(h,
+                              "the diagonal of the projection norm must be non-negative"))
         return new{typeof(h)}(h)
     end
 end
@@ -82,12 +85,13 @@ On a bounded set the weights of the norm break the sort that projects onto the s
 
 On a [`BoundedAllocationSet`](@ref):
 
- 1. Find the allocation `wn` at the weighted scalar root with [`bounded_quadratic_projection`](@ref), on the bounds of `set` and the weights `proj.h`.
- 2. Return `wn`, or the Held Step `w` when `wn` misses the budget in floating point, with [`budget_or_held_step`](@ref).
+ 1. When every entry of `proj.h` is equal, zero included, return the Euclidean projection of [`project`](@ref). Stop.
+ 2. Find the allocation `wn` at the weighted scalar root with [`bounded_quadratic_projection`](@ref), on the bounds of `set` and the weights `proj.h`.
+ 3. Return `wn`, or the Held Step `w` when `wn` misses the budget in floating point, with [`budget_or_held_step`](@ref).
 
 On a [`ProgrammeAllocationSet`](@ref):
 
- 1. Solve the programme of [`projection_programme`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation.
+ 1. Solve the programme of [`projection_programme`](@ref), whose objective [`set_projection_objective!`](@ref) writes, and return its allocation. When `proj.h` has a zero entry, [`solve_projection_programme!`](@ref) solves a second stage that picks the limit of [`DiagonalProjection`](@ref).
 
 # Related
 
@@ -96,9 +100,14 @@ On a [`ProgrammeAllocationSet`](@ref):
   - [`bounded_quadratic_projection`](@ref)
   - [`budget_or_held_step`](@ref)
   - [`projection_programme`](@ref)
+  - [`solve_projection_programme!`](@ref)
 """
 function project(proj::DiagonalProjection, set::BoundedAllocationSet, q::AbstractVector,
                  w::AbstractVector)
+    if allequal(proj.h)
+        # A multiple of the identity, zero included, projects as the identity does.
+        return project(EuclideanProjection(), set, q, w)
+    end
     return budget_or_held_step(bounded_quadratic_projection(q, set.wb, proj.h), w, proj,
                                set)
 end
@@ -115,6 +124,33 @@ function set_projection_objective!(model::JuMP.Model, proj::DiagonalProjection,
     set_distance_cone!(model, t_proj, sc * (sqrt.(proj.h) .* (w - q)), sc)
     set_divergence_objective!(model, t_proj, so)
     return nothing
+end
+function solve_projection_programme!(model::JuMP.Model, proj::DiagonalProjection,
+                                     q::AbstractVector, slv::Slv_VecSlv)
+    res = optimise_JuMP_model!(model, slv)
+    zer = findall(iszero, proj.h)
+    if !res.success || isempty(zer)
+        return res
+    end
+    # The first stage fixes the weights where `h` is positive. The second keeps them, keeps
+    # the Objective Penalty at its minimum, and takes the rest nearest `q`: the limit of the
+    # projection in `h + δ` as `δ → 0⁺`.
+    pos = findall(x -> x > zero(x), proj.h)
+    w = get_w(model)
+    sc = get_constraint_scale(model)
+    so = get_objective_scale(model)
+    # JuMP reads a solution only before the model changes.
+    v = JuMP.objective_value(model)
+    wp = JuMP.value.(w[pos])
+    if shared_has(model, :op)
+        JuMP.@constraint(model, proj_face, so * model[:obj_expr] <= v)
+    end
+    JuMP.@constraint(model, proj_fix, sc * (w[pos] - wp) .== 0)
+    JuMP.@variable(model, t_sel)
+    JuMP.@constraint(model, proj_sel,
+                     [sc * t_sel; sc * (w[zer] - q[zer])] in JuMP.SecondOrderCone())
+    JuMP.@objective(model, Min, so * t_sel)
+    return optimise_JuMP_model!(model, slv)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -156,7 +192,7 @@ Steps each asset at its own rate, set by the gradient mass that the asset has ac
 
 This is the diagonal adaptive subgradient method of Algorithm 1 of [duchi2011](@cite), with its composite mirror descent update. The rule projects in the norm of its gradient mass, through a [`DiagonalProjection`](@ref) that it builds at every step, so it holds no `proj` slot.
 
-At `delta = 0` an asset whose every price relative so far is zero has no gradient mass. The diagonal of the norm then has a zero entry, and [`DiagonalProjection`](@ref) refuses it with a `DomainError`. [duchi2011](@citet) take a pseudo-inverse there, but the projection in a seminorm has no unique answer, so the rule refuses instead.
+At `delta = 0` an asset with no gradient so far has no gradient mass, and the diagonal of the norm has a zero entry there. This happens to an asset whose every price relative so far is zero, and under a [`RiskLoss`](@ref) to an asset that the window does not price. [duchi2011](@citet) take the pseudo-inverse of ``H_t`` in the raw step there, and so does the rule. The gradient of such an asset is zero, so its raw step is its weight. The projection in the seminorm of ``H_t`` fixes the weights of the other assets, and [`DiagonalProjection`](@ref) gives the asset its limit as ``\\delta \\to 0^{+}``. So the rule at `delta = 0` is the limit of the rule at a positive `delta`, and its answer is a minimiser of the projection of [duchi2011](@citet), on which the bound below holds.
 
 # Mathematical definition
 
@@ -164,7 +200,7 @@ At `delta = 0` an asset whose every price relative so far is zero has no gradien
 \\begin{align}
 s_{t, i} &= \\sqrt{\\textstyle\\sum_{s \\leq t} g_{s, i}^2}\\,, \\\\
 H_t &= \\delta I + \\mathrm{diag}(\\boldsymbol{s}_t)\\,, \\\\
-\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta \\langle \\boldsymbol{g}_t, \\boldsymbol{w} \\rangle + \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t} = \\mathrm{Proj}^{H_t}_{\\mathcal{W}} \\left( \\boldsymbol{w}_t - \\eta H_t^{-1} \\boldsymbol{g}_t \\right)\\,.
+\\boldsymbol{w}_{t+1} &= \\underset{\\boldsymbol{w} \\in \\mathcal{W}}{\\arg\\min} \\; \\eta \\langle \\boldsymbol{g}_t, \\boldsymbol{w} \\rangle + \\tfrac{1}{2} \\lVert \\boldsymbol{w} - \\boldsymbol{w}_t \\rVert^2_{H_t} = \\mathrm{Proj}^{H_t}_{\\mathcal{W}} \\left( \\boldsymbol{w}_t - \\eta H_t^{\\dagger} \\boldsymbol{g}_t \\right)\\,.
 \\end{align}
 ```
 
@@ -177,10 +213,11 @@ Where:
   - ``\\boldsymbol{s}_t``: Gradient mass after period ``t``, with one entry for each asset.
   - ``\\delta``: Offset that the rule adds to the gradient mass of every asset.
   - ``H_t``: Diagonal matrix of the norm of the step at period ``t``.
+  - ``H_t^{\\dagger}``: Pseudo-inverse of ``H_t``, the diagonal matrix with ``1 / H_{t, ii}`` at a positive entry and zero at a zero entry.
   - ``\\eta``: Fixed learning rate of the rule.
   - $(math_dict[:W_aset])
-  - ``\\lVert \\boldsymbol{z} \\rVert^2_{H} = \\boldsymbol{z}^\\intercal H \\boldsymbol{z}``: Squared norm of a vector ``\\boldsymbol{z}`` in a positive diagonal matrix ``H``.
-  - ``\\mathrm{Proj}^{H}_{\\mathcal{W}}``: Projection onto ``\\mathcal{W}`` in the norm of ``H``, which is [`DiagonalProjection`](@ref) with the diagonal of ``H``.
+  - ``\\lVert \\boldsymbol{z} \\rVert^2_{H} = \\boldsymbol{z}^\\intercal H \\boldsymbol{z}``: Squared norm, or seminorm, of a vector ``\\boldsymbol{z}`` in a non-negative diagonal matrix ``H``.
+  - ``\\mathrm{Proj}^{H}_{\\mathcal{W}}``: Projection onto ``\\mathcal{W}`` in the norm of ``H``, which is [`DiagonalProjection`](@ref) with the diagonal of ``H``. At a zero entry of ``H`` it is the limit that [`DiagonalProjection`](@ref) states.
 
 Under log wealth the raw step is ``\\boldsymbol{w}_t + \\eta \\boldsymbol{x}_t / (\\langle \\boldsymbol{w}_t, \\boldsymbol{x}_t \\rangle (\\delta + \\boldsymbol{s}_t))``, with the division taken asset by asset. At ``\\delta = 0`` the first raw step is ``\\boldsymbol{w}_1 + \\eta \\boldsymbol{1}``, a uniform shift, because ``s_{1, i} = \\lvert g_{1, i} \\rvert``. The projection in the norm of ``H_1`` then takes more of the shift back from the assets with the smaller gradient, so the first step moves weight toward the assets that rose the most. It leaves the allocation unchanged only when every price relative is equal.
 
@@ -194,14 +231,13 @@ The seven-argument [`online_update!`](@ref) runs these steps at the period's row
 
  1. Form the Price-Adjusted Allocation `wh` of the book `w` after the row.
  2. Resolve `obj` against `wh` with [`factory`](@ref), so that a benchmark or a turnover reference of a [`RiskLoss`](@ref) that is not fixed takes `wh`. Take the gradient `g` of that objective at `point`, from `x` and the head's `rows`, with [`loss_gradient`](@ref).
- 3. When every entry of `g` is zero, project `w` onto the set from `wh` in the Euclidean geometry. Count the period, keep the gradient mass, and return that allocation. Stop.
- 4. Add `g` to the gradient mass `st.s` in place, as the root of the sum of squares of each asset.
- 5. Form the diagonal `h = delta .+ st.s`.
- 6. Form the raw step `q = w .- eta .* g ./ h`.
- 7. Project `q` onto the set from `wh` in the geometry `DiagonalProjection(h)`, which gives the new allocation.
- 8. Return the state, with the period count raised by one, and the new allocation.
+ 3. Add `g` to the gradient mass `st.s` in place, as the root of the sum of squares of each asset.
+ 4. Form the diagonal `h = delta .+ st.s`.
+ 5. Form the raw step `q = w .- eta .* g ./ h`, with the pseudo-inverse at a zero entry of `h`: there `g` is zero, and the entry of `q` is the entry of `w`.
+ 6. Project `q` onto the set from `wh` in the geometry `DiagonalProjection(h)`, which gives the new allocation.
+ 7. Return the state, with the period count raised by one, and the new allocation.
 
-A zero gradient accrues no mass, and the norm of step 7 has no meaning there. So step 3 takes the zero step of every first-order rule. A [`RiskLoss`](@ref) gives a zero gradient while the head holds fewer than two rows.
+A [`RiskLoss`](@ref) gives a zero gradient while the head holds fewer than two rows. At `delta = 0` the first such step has `h = 0`. On a set with no Objective Penalty it is then the Euclidean projection of `w`, the zero step of every first-order rule.
 
 # Fields
 
@@ -289,16 +325,11 @@ function online_update!(alg::AdaptiveSubgradient, st::AdaptiveSubgradientState,
                         set::AbstractAllocationSet, point::AbstractVector)
     wh = price_adjusted_allocation(w, x)
     g = loss_gradient(factory(alg.obj, wh), point, x, rows)
-    if all(iszero, g)
-        # A zero gradient is a zero step, and no mass accrues: the norm is undefined, so
-        # the iterate is projected in the Euclidean geometry, as a first-order rule's zero
-        # step is.
-        return AdaptiveSubgradientState(st.n + 1, st.s),
-               project(EuclideanProjection(), set, w, wh)
-    end
     st.s .= hypot.(st.s, g)
     h = alg.delta .+ st.s
-    q = w .- alg.eta .* g ./ h
+    # The pseudo-inverse of `H`: an entry of `h` is zero only where every gradient so far is
+    # zero, so dividing that zero by one takes no step there.
+    q = w .- alg.eta .* g ./ ifelse.(iszero.(h), one.(h), h)
     wn = project(DiagonalProjection(h), set, q, wh)
     return AdaptiveSubgradientState(st.n + 1, st.s), wn
 end

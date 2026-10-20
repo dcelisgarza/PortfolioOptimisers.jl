@@ -1030,12 +1030,12 @@ Where:
  1. Read the rows `X` of the current [`ProjectionStep`](@ref).
  2. When [`allocation_set_ready`](@ref) gives a reason, record the Held Step with it and return a copy of `w`. Stop.
  3. Fit the set's prior `pr` on `X` with [`allocation_set_prior`](@ref), and read its Investable Mask `imsk`.
- 4. Reduce `set`, `X` and `pr` to the mask with [`programme_investable_reduction`](@ref). View `q` and `w` at the mask, which gives `q` and `wr`.
+ 4. Reduce `set`, `X` and `pr` to the mask with [`programme_investable_reduction`](@ref). Reduce the geometry and `q` to the mask with [`investable_geometry_view`](@ref), and view `w` at the mask, which gives `wr`.
  5. Make a bare model with the set's two scales and the row count of `X`, zero when there are no rows. Register `k = 1`, and the vector `w` of weight variables.
  6. Add the set's constraints with [`set_allocation_set_constraints!`](@ref), with `wr` as the reference.
  7. Add the set's custom objective terms with [`add_custom_objective_term!`](@ref), with the geometry as the objective and the set as the owner.
  8. Set the objective with [`set_projection_objective!`](@ref).
- 9. Solve on [`projection_solver`](@ref). When the solve succeeds, return the solution with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
+ 9. Solve on [`projection_solver`](@ref) with [`solve_projection_programme!`](@ref), which solves a second stage only under a geometry whose divergence has many minimisers. When the solve succeeds, return the solution with a zero at every asset outside the mask. Otherwise record the Held Step with the solver trials, and return a copy of `w`.
 
 # JuMP formulation
 
@@ -1080,7 +1080,7 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
     pr = allocation_set_prior(set, X)
     imsk = prior_investable_mask(pr)
     set, X, pr = programme_investable_reduction(imsk, set, X, pr)
-    q = investable_weights_view(imsk, q)
+    proj, q = investable_geometry_view(imsk, proj, q)
     wr = investable_weights_view(imsk, w)
     model = JuMP.Model()
     set_model_scales!(model, projection_scale(set, :sc), projection_scale(set, :so))
@@ -1091,7 +1091,7 @@ function projection_programme(proj::AbstractProjectionGeometry, set::AbstractAll
     set_allocation_set_constraints!(model, set, wr, X, pr)
     add_custom_objective_term!(model, proj, allocation_set_cobj(set), set, nothing)
     set_projection_objective!(model, proj, q)
-    res = optimise_JuMP_model!(model, projection_solver(proj, set))
+    res = solve_projection_programme!(model, proj, q, projection_solver(proj, set))
     if res.success
         return expand_investable_weights(imsk, JuMP.value.(wv))
     end
@@ -1137,6 +1137,132 @@ function programme_investable_reduction(imsk::BitVector, set::AbstractAllocation
 end
 function programme_investable_reduction(::BitVector, ::AbstractAllocationSet, ::Any, ::Any)
     return throw(IsNothingError("an Investable Mask is derived from a prior fitted on the rows that the head holds, so a mask with no rows or no prior result cannot be reduced on."))
+end
+"""
+    investable_geometry_view(imsk::Nothing, proj::AbstractProjectionGeometry, q::AbstractVector)
+    investable_geometry_view(imsk::BitVector, proj::AbstractProjectionGeometry, q::AbstractVector)
+    investable_geometry_view(imsk::BitVector, proj::DiagonalProjection, q::AbstractVector)
+    investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+
+Reduces the Projection Geometry and the raw step `q` to the Investable Mask of a projection programme.
+
+[`projection_programme`](@ref) solves over the assets in the mask, and gives a zero weight to every other asset. A `nothing` mask returns both arguments unchanged. A geometry whose divergence is a sum of one term for each asset needs only the view of `q`, because the term of an asset outside the mask is a constant at its zero weight. [`DiagonalProjection`](@ref) is such a sum, and its diagonal is viewed with `q`. The norm of a [`GramProjection`](@ref) couples the assets, so the zero weights move the point that the reduced programme projects.
+
+# Mathematical definition
+
+Let ``P`` be the assets in the mask and ``Z`` the others, with ``\\boldsymbol{w}_Z = \\boldsymbol{0}``. Then
+
+```math
+\\begin{align}
+(\\boldsymbol{w} - \\boldsymbol{q})^\\intercal \\mathbf{A} (\\boldsymbol{w} - \\boldsymbol{q}) &= (\\boldsymbol{w}_P - \\tilde{\\boldsymbol{q}}_P)^\\intercal \\mathbf{A}_{PP} (\\boldsymbol{w}_P - \\tilde{\\boldsymbol{q}}_P) + c\\,, \\\\
+\\tilde{\\boldsymbol{q}}_P &= \\boldsymbol{q}_P + \\mathbf{A}_{PP}^{-1} \\mathbf{A}_{PZ} \\boldsymbol{q}_Z\\,.
+\\end{align}
+```
+
+Where:
+
+  - $(math_dict[:w_port])
+  - $(math_dict[:q_raw])
+  - ``\\mathbf{A}``: Gram matrix of the geometry, positive definite.
+  - ``\\mathbf{A}_{PP}``, ``\\mathbf{A}_{PZ}``: Blocks of ``\\mathbf{A}`` at the rows ``P`` and the columns ``P`` and ``Z``. ``\\mathbf{A}_{PP}`` is positive definite, because ``\\mathbf{A}`` is.
+  - ``\\tilde{\\boldsymbol{q}}_P``: Raw step of the reduced programme.
+  - ``c``: Term that does not depend on ``\\boldsymbol{w}_P``.
+
+So the reduced Gram geometry holds ``\\mathbf{A}_{PP}`` and projects ``\\tilde{\\boldsymbol{q}}_P``. A Gram geometry with no matrix keeps no matrix, and [`set_projection_objective!`](@ref) refuses it.
+
+# Returns
+
+  - `(proj, q)::Tuple`: The geometry and the raw step on the assets in the mask.
+
+# Related
+
+  - [`projection_programme`](@ref)
+  - [`programme_investable_reduction`](@ref)
+  - [`investable_weights_view`](@ref)
+  - [`DiagonalProjection`](@ref)
+  - [`GramProjection`](@ref)
+"""
+function investable_geometry_view(::Nothing, proj::AbstractProjectionGeometry,
+                                  q::AbstractVector)
+    return proj, q
+end
+function investable_geometry_view(imsk::BitVector, proj::AbstractProjectionGeometry,
+                                  q::AbstractVector)
+    return proj, investable_weights_view(imsk, q)
+end
+function investable_geometry_view(imsk::BitVector, proj::DiagonalProjection,
+                                  q::AbstractVector)
+    return DiagonalProjection(proj.h[imsk]), investable_weights_view(imsk, q)
+end
+function investable_geometry_view(imsk::BitVector, proj::GramProjection, q::AbstractVector)
+    A = proj.A
+    if isnothing(A)
+        return proj, investable_weights_view(imsk, q)
+    end
+    zmsk = .!imsk
+    App = A[imsk, imsk]
+    qp = q[imsk] .+ LinearAlgebra.Symmetric(App) \ (A[imsk, zmsk] * q[zmsk])
+    return GramProjection(; slv = proj.slv, A = App), qp
+end
+"""
+    solve_projection_programme!(model::JuMP.Model, proj::AbstractProjectionGeometry, q::AbstractVector, slv::Slv_VecSlv)
+    solve_projection_programme!(model::JuMP.Model, proj::DiagonalProjection, q::AbstractVector, slv::Slv_VecSlv)
+
+Solves a projection programme, and picks one minimiser when the divergence of the geometry has many.
+
+[`projection_programme`](@ref) calls it after it writes the objective. Every geometry except [`DiagonalProjection`](@ref) has one minimiser, and the function solves the model once with [`optimise_JuMP_model!`](@ref). A diagonal with a zero entry is a seminorm, so its minimisers share their weights at the positive entries of the diagonal and differ at the zero entries. After a first solve that succeeds, the diagonal arm then solves a second stage on the same model. Its answer is the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``: the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm.
+
+# JuMP formulation
+
+The second stage of the diagonal arm, when ``Z`` is not empty.
+
+## Variables
+
+  - `w`: read from the model.
+  - `t_sel`: created.
+
+## Constraints
+
+  - `proj_face`: ``s_o \\, (d + \\pi) \\leq v``, when the model holds an Objective Penalty. It keeps the objective of the first stage at its minimum, so the penalty stays at its minimum too. The point of the first stage meets it, so the second stage is feasible to the tolerance of the solver. A slack would let the free weights move along the curve of the penalty by the square root of the slack, so the bound has none.
+  - `proj_fix`: ``s_c (w_i - w_i^{(1)}) = 0`` for each ``i \\in P``.
+  - `proj_sel`: ``(s_c t, s_c (\\boldsymbol{w}_Z - \\boldsymbol{q}_Z)) \\in \\mathcal{K}_{\\mathrm{SOC}}``.
+
+## Objective
+
+  - `Min`: ``s_o t``.
+
+Where:
+
+  - ``P = \\{i : h_i > 0\\}``, ``Z = \\{i : h_i = 0\\}``: Assets at the positive and at the zero entries of the diagonal.
+  - ``w_i^{(1)}``: Weight of asset ``i`` at the first stage, which every minimiser shares.
+  - ``v``: Objective value of the first stage.
+  - ``d + \\pi``: The expression `obj_expr` of the first stage, the divergence and the Objective Penalty.
+  - ``t``: The variable `t_sel`.
+  - $(math_dict[:sc_scale])
+  - $(math_dict[:so_scale])
+  - ``\\mathcal{K}_{\\mathrm{SOC}}``: Second-order cone.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `proj`: The geometry, reduced to the Investable Mask.
+  - `q`: The raw step, reduced to the Investable Mask.
+  - `slv`: The solver of the programme.
+
+# Returns
+
+  - `res::JuMPResult`: The result of the last solve. A first solve that fails is the last one.
+
+# Related
+
+  - [`projection_programme`](@ref)
+  - [`DiagonalProjection`](@ref)
+  - [`set_projection_objective!`](@ref)
+  - [`optimise_JuMP_model!`](@ref)
+"""
+function solve_projection_programme!(model::JuMP.Model, ::AbstractProjectionGeometry,
+                                     ::AbstractVector, slv::Slv_VecSlv)
+    return optimise_JuMP_model!(model, slv)
 end
 """
     projection_scale(set::ProgrammeAllocationSet, f::Symbol)

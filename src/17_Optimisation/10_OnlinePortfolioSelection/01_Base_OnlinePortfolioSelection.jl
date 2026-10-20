@@ -661,7 +661,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Projects a raw step onto a bounded set in the norm of a positive diagonal `h`, at the exact root of the budget.
+Projects a raw step onto a bounded set in the norm of a non-negative diagonal `h`, at the exact root of the budget.
 
 At `h = 1`, the default, it is the Euclidean arm of [`project`](@ref) off the simplex bounds. With the gradient mass of [`AdaptiveSubgradient`](@ref) in `h`, it is the [`DiagonalProjection`](@ref) on every bound.
 
@@ -683,19 +683,31 @@ Where:
   - $(math_dict[:lu_i_aset])
   - $(math_dict[:theta_aset])
 
-The projection is ``\\boldsymbol{w}(\\theta)`` at the root. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``, and it is linear between the kinks at ``h_i (q_i - u_i)`` and ``h_i (q_i - l_i)``, so the line through the two kinks that bracket the root gives the root exactly.
+When every ``h_i`` is positive, the projection is ``\\boldsymbol{w}(\\theta)`` at the root. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``, and it is linear between the kinks at ``h_i (q_i - u_i)`` and ``h_i (q_i - l_i)``, so the line through the two kinks that bracket the root gives the root exactly.
+
+When some ``h_i`` is zero, the norm is a seminorm. Let ``P = \\{i : h_i > 0\\}`` and ``Z = \\{i : h_i = 0\\}``. The objective is strictly convex in ``\\boldsymbol{w}_P``, so every minimiser has the same ``\\boldsymbol{w}_P``, and only ``\\boldsymbol{w}_Z`` is free. The function returns the limit of the projection in ``\\mathrm{diag}(\\boldsymbol{h} + \\delta \\boldsymbol{1})`` as ``\\delta \\to 0^{+}``. That limit is the minimiser nearest ``\\boldsymbol{q}`` in the Euclidean norm. Let ``r = 1 - \\sum_{i \\in P} \\min(\\max(q_i, l_i), u_i)``. Then:
+
+  - If ``\\sum_{i \\in Z} l_i \\leq r \\leq \\sum_{i \\in Z} u_i``, each ``w_i`` with ``i \\in P`` is ``\\min(\\max(q_i, l_i), u_i)``, and ``\\boldsymbol{w}_Z`` is the Euclidean projection of ``\\boldsymbol{q}_Z`` onto its bounds at the budget ``r``.
+  - If ``r > \\sum_{i \\in Z} u_i``, each ``w_i`` with ``i \\in Z`` is ``u_i``, and ``\\boldsymbol{w}_P`` is the projection of ``\\boldsymbol{q}_P`` in ``\\mathrm{diag}(\\boldsymbol{h}_P)`` at the budget ``1 - \\sum_{i \\in Z} u_i``.
+  - If ``r < \\sum_{i \\in Z} l_i``, the same holds with ``l_i`` in place of ``u_i``.
+
+With no positive ``h_i``, ``P`` is empty and the projection is the Euclidean one.
 
 # Algorithm
 
  1. Refuse a non-finite `q` with [`assert_finite_raw_step`](@ref), and bounds that no allocation on the budget satisfies with [`assert_feasible_bounds`](@ref).
- 2. Find `theta`, the root of `sum(clamp.(q .- theta ./ h, lb, ub))` at one, with [`breakpoint_root`](@ref) over the kinks `h .* (q .- ub)` and `h .* (q .- lb)`.
- 3. Return `clamp.(q .- theta ./ h, lb, ub)`.
+ 2. When every entry of `h` is positive, return the projection at the budget one with [`budget_root_projection`](@ref). Stop.
+ 3. When no entry of `h` is positive, return the projection at unit weights and the budget one with [`budget_root_projection`](@ref). Stop.
+ 4. Otherwise, split the assets into `pos`, where `h` is positive, and `zer`, where it is zero. Clip `q[pos]` to its bounds, and form `r`, the budget that the clipped entries leave.
+ 5. When `r` is above the sum of the upper bounds of `zer`, hold `zer` at those bounds, and project `q[pos]` at the budget that they leave with [`budget_root_projection`](@ref). Do the same with the lower bounds when `r` is below their sum.
+ 6. Otherwise, keep the clipped `q[pos]`, and project `q[zer]` at unit weights and the budget `r` with [`budget_root_projection`](@ref).
+ 7. Return the two parts as one vector.
 
 # Arguments
 
   - `q`: The raw step.
   - `wb`: The resolved bounds.
-  - `h`: The diagonal of the norm, positive.
+  - `h`: The diagonal of the norm, non-negative.
 
 # Validation
 
@@ -709,6 +721,7 @@ The projection is ``\\boldsymbol{w}(\\theta)`` at the root. The budget ``\\sum_i
 # Related
 
   - [`project`](@ref)
+  - [`budget_root_projection`](@ref)
   - [`breakpoint_root`](@ref)
   - [`EuclideanProjection`](@ref)
   - [`DiagonalProjection`](@ref)
@@ -717,56 +730,112 @@ function bounded_quadratic_projection(q::AbstractVector, wb::WeightBounds,
                                       h::AbstractVector = fill(one(eltype(q)), length(q)))
     assert_finite_raw_step(q)
     assert_feasible_bounds(wb)
-    # `Σ clip(q − θ / h, lb, ub)` is piecewise linear and non-increasing in `θ`, with its
-    # kinks at `h (q − ub)` and `h (q − lb)`.
-    theta = breakpoint_root(t -> sum(i -> clamp(q[i] - t / h[i], wb.lb[i], wb.ub[i]),
-                                     eachindex(q, h, wb.lb, wb.ub)),
-                            [h .* (q .- wb.ub); h .* (q .- wb.lb)])
-    return clamp.(q .- theta ./ h, wb.lb, wb.ub)
+    lb, ub = wb.lb, wb.ub
+    pos = findall(x -> x > zero(x), h)
+    if length(pos) == length(h)
+        return budget_root_projection(q, lb, ub, h, one(eltype(q)))
+    elseif isempty(pos)
+        return budget_root_projection(q, lb, ub, fill(one(eltype(q)), length(q)),
+                                      one(eltype(q)))
+    end
+    # The limit of the projection in `h + δ` as `δ → 0⁺`: the assets of the norm keep their
+    # clipped step while the others can absorb the rest of the budget, and the others then
+    # take their Euclidean projection. Otherwise the others sit at the bound they reach.
+    zer = findall(iszero, h)
+    wp = clamp.(q[pos], lb[pos], ub[pos])
+    r = one(eltype(wp)) - sum(wp)
+    lz, uz = sum(lb[zer]), sum(ub[zer])
+    wz = if r > uz
+        wp = budget_root_projection(q[pos], lb[pos], ub[pos], h[pos], one(uz) - uz)
+        ub[zer]
+    elseif r < lz
+        wp = budget_root_projection(q[pos], lb[pos], ub[pos], h[pos], one(lz) - lz)
+        lb[zer]
+    else
+        budget_root_projection(q[zer], lb[zer], ub[zer], fill(one(eltype(q)), length(zer)),
+                               r)
+    end
+    wn = Vector{promote_type(eltype(wp), eltype(wz))}(undef, length(q))
+    wn[pos] .= wp
+    wn[zer] .= wz
+    return wn
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Finds, from its kinks `x`, the point at which a non-increasing, piecewise linear budget function `f` crosses one.
+Projects `q` onto its bounds at the budget `c`, in the norm of a positive diagonal `h`.
+
+This is the scalar root of [`bounded_quadratic_projection`](@ref). The function finds the root `θ` of ``\\sum_i \\min(\\max(q_i - \\theta / h_i, l_i), u_i) = c`` with [`breakpoint_root`](@ref), over the kinks ``h_i (q_i - u_i)`` and ``h_i (q_i - l_i)``, and returns the clipped step at that root. It does not check that the bounds reach `c`. The caller passes a budget that they reach.
+
+# Arguments
+
+  - `q`: The raw step.
+  - `lb`, `ub`: The lower and upper bounds, one entry for each entry of `q`.
+  - `h`: The diagonal of the norm, positive.
+  - `c`: The budget.
+
+# Returns
+
+  - `w'::Vector`: The projected vector, a new vector.
+
+# Related
+
+  - [`bounded_quadratic_projection`](@ref)
+  - [`breakpoint_root`](@ref)
+"""
+function budget_root_projection(q::AbstractVector, lb::AbstractVector, ub::AbstractVector,
+                                h::AbstractVector, c::Real)
+    # `Σ clip(q − θ / h, lb, ub)` is piecewise linear and non-increasing in `θ`, with its
+    # kinks at `h (q − ub)` and `h (q − lb)`.
+    theta = breakpoint_root(t -> sum(i -> clamp(q[i] - t / h[i], lb[i], ub[i]),
+                                     eachindex(q, h, lb, ub)),
+                            [h .* (q .- ub); h .* (q .- lb)], c)
+    return clamp.(q .- theta ./ h, lb, ub)
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Finds, from its kinks `x`, the point at which a non-increasing, piecewise linear budget function `f` crosses the budget `c`, one by default.
 
 The Euclidean, diagonal and entropic projections onto a bounded set each clip the raw step at one scalar. The budget is linear in that scalar between the kinks at which an asset reaches a bound, so the line through the two kinks that bracket the root gives the root exactly. The search reads the kinks and not the width of a bracket, so a raw step whose entries span hundreds of binades is as exact as a step near the simplex. A kink at an infinite bound is not a kink, and the budget is linear past the last finite kink.
 
 # Algorithm
 
  1. Drop the non-finite kinks and sort the rest, giving `x`. When no kink is left, use the one kink `0`.
- 2. Search the indices of `x` by bisection for `lo`, the last kink at which `f` is at least one, and `hi = lo + 1`. The index `0` stands for the linear tail below the first kink, and the index `length(x) + 1` for the tail above the last kink.
+ 2. Search the indices of `x` by bisection for `lo`, the last kink at which `f` is at least `c`, and `hi = lo + 1`. The index `0` stands for the linear tail below the first kink, and the index `length(x) + 1` for the tail above the last kink.
  3. Take the segment `(a, b)` that holds the root with [`breakpoint_segment`](@ref).
- 4. When `f(a) == f(b)`, return `a`. Otherwise, return the point at which the line through `(a, f(a))` and `(b, f(b))` crosses one.
+ 4. When `f(a) == f(b)`, return `a`. Otherwise, return the point at which the line through `(a, f(a))` and `(b, f(b))` crosses `c`.
 
 # Arguments
 
   - `f`: The budget as a function of the scalar, non-increasing and linear between kinks.
   - `x`: The kinks. The non-finite ones are dropped.
+  - `c`: The budget that `f` crosses.
 
 # Returns
 
-  - `r`: The scalar at which `f` crosses one.
+  - `r`: The scalar at which `f` crosses `c`.
 
 # Related
 
   - [`project`](@ref)
   - [`bounded_quadratic_projection`](@ref)
 """
-function breakpoint_root(f, x::AbstractVector)
+function breakpoint_root(f, x::AbstractVector, c::Real = one(eltype(x)))
     x = sort!(filter(isfinite, x))
     if isempty(x)
         push!(x, zero(eltype(x)))
     end
-    # The last kink at which the budget is still at least one, `0` and `n + 1` standing for
+    # The last kink at which the budget is still at least `c`, `0` and `n + 1` standing for
     # the linear tails below the first kink and above the last.
     lo, hi = 0, length(x) + 1
     while hi - lo > 1
         mid = (lo + hi) ÷ 2
-        f(x[mid]) >= one(eltype(x)) ? (lo = mid) : (hi = mid)
+        f(x[mid]) >= c ? (lo = mid) : (hi = mid)
     end
     a, b = breakpoint_segment(x, lo, hi)
     fa, fb = f(a), f(b)
-    return fa == fb ? a : a + (fa - one(fa)) * (b - a) / (fa - fb)
+    return fa == fb ? a : a + (fa - c) * (b - a) / (fa - fb)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

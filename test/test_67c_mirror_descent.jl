@@ -788,8 +788,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         # The same two rows on a panel whose fourth asset is inactive (#1772). The book keeps
         # the asset at its weight of the uniform start and reads its gap as a relative of
         # one, so `wh` has four legs, and the loss views the benchmark on the three priced
-        # ones. Measured: 0.0 against the benchmark at `wh`, 0.33 and 0.67 against the
-        # caller's.
+        # ones. Measured: 0.0 against the benchmark at `wh`, 0.33, 0.52 and 0.67 against the
+        # caller's. The adaptive subgradient steps there since #1777, because a zero entry of
+        # its gradient mass is the limit of a positive one.
         Rn2 = copy(R[1:2, :])
         am2 = trues(2, N)
         am2[:, 4] .= false
@@ -799,6 +800,7 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
         xg = [X[2, 1:3]; 1]
         whm = xg ./ sum(xg)
         for mk in (o -> GradientProjection(; eta = 50, obj = o),
+                   o -> AdaptiveSubgradient(; obj = o),
                    o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
                                        predictor = LastGradient(; at_played = false)))
             walk(o) = optimise(OPS(; alg = mk(o)), rdn2).w

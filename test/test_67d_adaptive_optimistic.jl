@@ -88,7 +88,9 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                                                      obj = RiskLoss(;
                                                                                     window = 6)))) ==
               6
-        @test_throws DomainError po.DiagonalProjection([1.0, 0.0])
+        # A zero entry is a seminorm, which the geometry takes at its limit (#1777).
+        @test po.DiagonalProjection([1.0, 0.0]).h == [1.0, 0.0]
+        @test_throws DomainError po.DiagonalProjection([1.0, -0.1])
         @test_throws MethodError po.DiagonalProjection()
         @test po.projection_geometry(ag) == EuclideanProjection()
         os = OptimisticStep()
@@ -172,17 +174,26 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         @test isapprox(w3, q .- theta ./ s2; atol = 1e-12)
         @test round.(w3; digits = 4) == [0.6907, 0.3093]
         @test st.s ≈ s2
-        # A zero gradient is a zero step, no mass accrues, and the projection is Euclidean.
+        # A zero gradient is a zero step and no mass accrues. At delta = 0 the diagonal is
+        # zero, and its projection is the Euclidean one.
         stz = po.rule_state_seed(alg, w)
         stz, wz = po.online_update!(AdaptiveSubgradient(; obj = RiskLoss(; window = 3)),
                                     stz, w, x1,
                                     ReturnsResult(; nx = ["A", "B"], X = zeros(1, 2)),
                                     simplex2)
         @test wz == w && stz.s == [0.0, 0.0] && stz.n == 1
-        # At delta = 0 an asset whose every price relative so far is zero has no mass, and
-        # the projection refuses the zero entry of its diagonal.
-        @test_throws DomainError po.online_update!(alg, po.rule_state_seed(alg, w), w,
-                                                   [1.2, 0.0], nothing, simplex2)
+        # Issue #1777: at delta = 0 an asset whose every price relative so far is zero has
+        # no mass. The pseudo-inverse keeps its raw step at its weight. At η = 0.2 and
+        # x₁ = [1.2, 0], g₁ = [-2, 0] and q = [0.7, 0.5]. The seminorm fixes w₁ = 0.7, and
+        # the limit gives the rest of the budget, 0.3, to the second asset.
+        a2 = AdaptiveSubgradient(; eta = 0.2)
+        s0, w0 = po.online_update!(a2, po.rule_state_seed(a2, w), w, [1.2, 0.0], nothing,
+                                   simplex2)
+        @test isapprox(w0, [0.7, 0.3]; atol = 1e-15) && s0.s == [2.0, 0.0]
+        aδ = AdaptiveSubgradient(; eta = 0.2, delta = 1e-12)
+        _, wδ = po.online_update!(aδ, po.rule_state_seed(aδ, w), w, [1.2, 0.0], nothing,
+                                  simplex2)
+        @test maxerr(w0, wδ) < 1e-10
         # Equal price relatives are the one case the first step holds.
         st0 = po.rule_state_seed(alg, w)
         _, wh = po.online_update!(alg, st0, w, [1.05, 1.05], nothing, simplex2)
@@ -240,6 +251,113 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
                                                                     val = 0.02))),
                      rows(rd, 1:5))
         @test isapprox(sum(r.w), 1; atol = 1e-8)
+    end
+
+    @testset "A zero entry of the diagonal is the limit of a positive one (#1777)" begin
+        # The seminorm projection is the limit of the projection in `h + δ` as `δ → 0⁺`. Each
+        # raw step below reaches one branch on the simplex and on the box [-0.2, 0.6]: the
+        # free assets absorb the budget, sit at their caps, or sit at their floors.
+        h = [1e-3, 2e-3, 5e-4, 0.0, 0.0]
+        cases = ([0.1, 0.2, 0.3, 0.25, 0.1], [0.9, -0.5, 0.3, 0.25, 0.1],
+                 [-0.3, -0.2, 0.1, 0.4, 0.1], [0.6, 0.5, 0.3, 0.25, 0.1])
+        box = WeightBounds(; lb = fill(-0.2, 5), ub = fill(0.6, 5))
+        simplex = WeightBounds(; lb = zeros(5), ub = ones(5))
+        for q in cases, wb in (simplex, box)
+            w = po.bounded_quadratic_projection(q, wb, h)
+            @test isapprox(sum(w), 1; atol = 1e-14)
+            @test maxerr(w, po.bounded_quadratic_projection(q, wb, h .+ 1e-12)) < 1e-8
+            # Every minimiser of the seminorm shares the weights where `h` is positive. A
+            # scale of `h` does not move the projection, and the programme is accurate only
+            # on weights near one.
+            @test isapprox(w[1:3], qp_projection(q, 1e3 .* h .+ 1e-7, wb.lb, wb.ub)[1:3];
+                           atol = 1e-6)
+        end
+        # The branches by hand on the simplex. q = [0.1, 0.2, 0.3, 0.25, 0.1]: the priced
+        # assets keep their step, and the free ones take the rest, 0.4, at an equal shift.
+        @test isapprox(po.bounded_quadratic_projection(cases[1], simplex, h),
+                       [0.1, 0.2, 0.3, 0.275, 0.125]; atol = 1e-15)
+        # q = [0.6, 0.5, 0.3, 0.25, 0.1]: the priced assets overrun the budget, so the free
+        # ones sit at zero.
+        @test po.bounded_quadratic_projection(cases[4], simplex, h)[4:5] == [0.0, 0.0]
+        # With no positive entry the limit is the Euclidean projection.
+        @test isapprox(po.bounded_quadratic_projection(cases[2], box, zeros(5)),
+                       po.bounded_quadratic_projection(cases[2], box); atol = 1e-15)
+        set = resolve(BoundedAllocationSet(; wb = box), 5)
+        @test po.project(po.DiagonalProjection(zeros(5)), set, cases[2], cases[2]) ==
+              po.project(EuclideanProjection(), set, cases[2], cases[2])
+        # The programme arm solves the same limit in two stages.
+        for q in cases, wb in (simplex, box)
+            pset = resolve(ProgrammeAllocationSet(; slv = slv, wb = wb), 5)
+            @test isapprox(po.project(po.DiagonalProjection(h), pset, q, q),
+                           po.bounded_quadratic_projection(q, wb, h); atol = 1e-5)
+        end
+        # Under an L1 penalty the minimisers form a face. With q = [0.9, -0.5, 0.3, 0.25,
+        # 0.1] on the box, the budget multiplier is -0.01, so the priced assets keep their
+        # clipped step [0.6, 0, 0.3]. The free assets need w ≥ 0 and a sum of 0.1, and the
+        # point of that face nearest [0.25, 0.1] is [0.1, 0].
+        pl1 = resolve(ProgrammeAllocationSet(; slv = slv, wb = box, l1 = 0.01), 5)
+        @test isapprox(po.project(po.DiagonalProjection(h), pl1, cases[2], cases[2]),
+                       [0.6, 0.0, 0.3, 0.1, 0.0]; atol = 1e-6)
+        # A strictly convex penalty has one minimiser, which the second stage keeps.
+        pl2 = resolve(ProgrammeAllocationSet(; slv = slv, wb = box,
+                                             l2 = po.L2Regularisation(; val = 0.01)), 5)
+        wl2 = po.project(po.DiagonalProjection(h), pl2, cases[2], cases[2])
+        @test isapprox(wl2[4], wl2[5]; atol = 1e-5)
+
+        # The issue's panel: the window of the Risk Loss does not price D, so its gradient is
+        # zero there. On two rows the first step reads one row and holds the uniform start.
+        # The second has g = 2 Σ u on A, B, C, with g_C < 0 and the others positive, so
+        # q = u - η sign(g) on them and q_D = 1/4. C keeps 1/4 + η, and D takes the rest.
+        R7 = 0.02 .* randn(StableRNG(7), 40, 4)
+        Rn = copy(R7[1:3, :])
+        am = trues(3, 4)
+        am[:, 4] .= false
+        Rn[.!am] .= NaN
+        rdn = ReturnsResult(; nx = nx, X = Rn, ts = ts[1:3],
+                            pnl = AssetPanel(; amsk = am, emsk = copy(am)))
+        risk = RiskLoss(; window = 10)
+        o2 = po.partial_fit!(OPS(; alg = AdaptiveSubgradient(; obj = risk)), rows(rdn, 1:2))
+        eta = 1 / sqrt(2)
+        @test isapprox(o2.cache.w, [0.0, 0.0, 0.25 + eta, 0.75 - eta]; atol = 1e-15)
+        @test o2.cache.st.s[4] == 0
+        lim(d) = optimise(OPS(; alg = AdaptiveSubgradient(; delta = d, obj = risk)), rdn).w
+        @test maxerr(lim(0), lim(1e-12)) < 1e-9
+        # A programme set that fits a prior reduces the geometry to its Investable Mask, the
+        # diagonal and the Gram matrix alike.
+        pce = ProgrammeAllocationSet(; slv = slv,
+                                     r = Variance(;
+                                                  settings = RiskMeasureSettings(;
+                                                                                 ub = 1.0)))
+        for d in (0, 1e-3)
+            wp = optimise(OPS(; alg = AdaptiveSubgradient(; delta = d, obj = risk),
+                              set = pce), rdn).w
+            @test isapprox(sum(wp), 1; atol = 1e-8) && wp[4] == 0
+        end
+        Rg = copy(R7[1:6, :])
+        amg = trues(6, 4)
+        amg[:, 4] .= false
+        Rg[.!amg] .= NaN
+        rdg = ReturnsResult(; nx = nx, X = Rg, ts = ts[1:6],
+                            pnl = AssetPanel(; amsk = amg, emsk = copy(amg)))
+        wg = optimise(OPS(; alg = NewtonStep(; proj = GramProjection(; slv = slv)),
+                          set = pce), rdg).w
+        @test isapprox(sum(wg), 1; atol = 1e-8) && wg[4] == 0
+        # The Gram view: at w_Z = 0 the full norm and the reduced one differ by a constant.
+        B = randn(StableRNG(3), 5, 5)
+        A = B' * B + I
+        qg = randn(StableRNG(4), 5)
+        imk = BitVector([1, 1, 0, 1, 0])
+        gp, qr = po.investable_geometry_view(imk, GramProjection(; slv = slv, A = A), qg)
+        @test gp.A == A[imk, imk]
+        function gap(wp)
+            wf = zeros(5)
+            wf[imk] .= wp
+            return dot(wf - qg, A * (wf - qg)) - dot(wp - qr, gp.A * (wp - qr))
+        end
+        gaps = [gap(randn(StableRNG(k), 3)) for k in 1:4]
+        @test maximum(gaps) - minimum(gaps) < 1e-12
+        dp, qd = po.investable_geometry_view(imk, po.DiagonalProjection(collect(1.0:5)), qg)
+        @test dp.h == [1.0, 2.0, 4.0] && qd == qg[imk]
     end
 
     @testset "The optimistic step by hand: two half-steps" begin

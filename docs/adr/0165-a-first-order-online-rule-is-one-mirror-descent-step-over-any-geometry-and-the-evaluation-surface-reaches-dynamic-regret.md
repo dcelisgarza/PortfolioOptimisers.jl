@@ -454,3 +454,38 @@ with no `B` give `NaN`, as before. The other eight statistics and the turnover d
 Only the prediction method reads `B`. The methods over `ret`, over `(w, X)`, over `(w, rd)` and
 over `(res, rd)` keep the default `nothing`: a matrix `B` on raw returns data is one series only
 once a caller gives the weights, and the maintainer chose to keep these methods as they are.
+
+## Amendment (2026-10-20)
+
+Issue #1777: `AdaptiveSubgradient` at `delta = 0` steps when an asset has no gradient mass, and
+`DiagonalProjection` takes a non-negative diagonal. Before this amendment the geometry refused a
+zero entry with a `DomainError`. The rule refused every step on a panel whose window does not price
+an asset under a `RiskLoss`, and every step after an asset's price relatives were all zero.
+
+An entry `s_i` of the gradient mass is zero only where every gradient `g_{1:t,i}` is zero. Duchi,
+Hazan and Singer (2011) take the pseudo-inverse of `H_t` in the raw step there, so the rule does.
+The raw step of such an asset is its weight. The projection in the seminorm of `H_t` then has many
+minimisers. The objective is strictly convex in the weights at the positive entries, so every
+minimiser shares them, and only the weights at the zero entries are free. The geometry returns the
+limit of the projection in `H_t + δI` as `δ → 0⁺`, which is the minimiser nearest the raw step in
+the Euclidean norm. Three reasons fix this choice:
+
+1. It is unique.
+2. It is continuous in `delta`, so the rule at `delta = 0` is the limit of the rule at a positive
+   `delta`. A diagonal of zeros gives the Euclidean projection, so the zero-gradient step is the
+   general step, and the rule has no special case for it.
+3. It is a minimiser of the projection of the paper, so the regret bound of Corollary 6 holds. A
+   rule that holds the unpriced asset at its Price-Adjusted Allocation is not such a minimiser in
+   general, so the amendment does not take it.
+
+On a `BoundedAllocationSet` the limit has a closed form, which `bounded_quadratic_projection`
+states. On a `ProgrammeAllocationSet` the programme solves two stages on one model: the seminorm
+projection, then the free weights nearest the raw step, with the other weights fixed and the
+objective of the first stage held at its minimum.
+
+The same work found that a programme set that fits a prior reduced the raw step to the prior's
+Investable Mask but not the geometry, so `DiagonalProjection` and `GramProjection` threw a
+`DimensionMismatch` under a time-varying panel. `investable_geometry_view` now reduces both. The
+Gram norm couples the assets, so its reduced programme projects
+`q_P + A_PP⁻¹ A_PZ q_Z` in the norm of `A_PP`, which is exact at the zero weights of the assets
+outside the mask.
