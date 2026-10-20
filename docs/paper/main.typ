@@ -465,7 +465,7 @@ We hope readers will find in #po an interesting, valuable, and trustworthy tool 
 
 = AI use disclosure
 
-AI was used in the validation of the counts provided in @tab1, in ensuring the paper covers a comprehensive and accurate representation of the library's features, capabilities, and development practices, as well as checking for gaps in the literature. It was not used to write any part of this article.
+AI was used in ensuring the paper covers a comprehensive, accurate, and current feature list; mending gaps in the references; and general proofreading and consistency checks throughout the document. It was used solely in an editorial capacity and did not contribute to the substantive content or conclusions of the paper.
 
 #show bibliography: set par(first-line-indent: 0em, spacing: 0.75em, leading: 0.6em)
 #show bibliography: set text(size: 9pt)
