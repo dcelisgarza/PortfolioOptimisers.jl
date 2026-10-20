@@ -643,9 +643,10 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
 
     @testset "PriceGapFill fits on the training window and never refits" begin
         # Map #955, ADR 0130. `missing` is the other spelling of an absent price, and the
-        # fill accepts it through `is_missing_value` exactly as `NaN`; `test_06g` drives the
-        # conventions and the bound on `NaN`, so what is pinned here is the `missing` path
-        # and the fit/apply replay across a train/test split.
+        # fill accepts it through `is_missing_value` exactly as `NaN`; the top-level testsets
+        # of this file from "The fill is bounded by the Listing Span under both conventions"
+        # on drive the conventions and the bound on `NaN`, so what is pinned here is the
+        # `missing` path and the fit/apply replay across a train/test split.
         ts = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 6))
         # `a` is never observed, `b` is observed everywhere, and `c` is observed in the
         # training window alone.
@@ -975,7 +976,7 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         # ADR 0133 removed both keywords rather than the arithmetic -- deleting a row or a
         # column is a Universe Policy, and a stateless conversion cannot fit one -- so the
         # interaction the defect lived in no longer exists. `MissingDataFilter` owns both
-        # axes, and `test_31` covers the split across its fit/apply seam.
+        # axes, and `test_30_pipeline_base.jl` covers the split across its fit/apply seam.
         ts4 = collect(Date(2020, 1, 1):Day(1):Date(2020, 1, 4))
         # Row 1 alone is incomplete. `A` and `B` are missing there, and `C` is complete.
         X = TimeArray(ts4, [NaN NaN 1.0; 2.0 2.0 2.0; 3.0 3.0 3.0; 4.0 4.0 4.0],

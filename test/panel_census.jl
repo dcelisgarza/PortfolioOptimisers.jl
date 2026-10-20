@@ -131,9 +131,10 @@ end
 # The functions of the signature census that no case runs, and why no inactive cell reaches
 # their answer.
 const CENSUS_EXEMPT = Dict{Symbol, String}(
-                                           # The reads that state a policy, which test_06i covers.
+                                           # The reads that state a policy, which
+                                           # test_06b_asset_panel.jl covers.
                                            :panel_field => "a lookup: it returns the Panel Field itself",
-                                           :panel_field_values => "the read at a stated policy, which test_06i pins",
+                                           :panel_field_values => "the read at a stated policy, which test_06b_asset_panel.jl pins",
                                            # Checks, shapes and names: no cell value enters the answer.
                                            :assert_asset_panel_supplied => "a check of presence",
                                            :assert_panel_concat => "a check of axes, names and static fields before a vcat",

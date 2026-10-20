@@ -165,10 +165,11 @@ reach that `return`: the `throw` above it takes no branch and returns to no call
 unreachable by construction rather than merely untested. Julia allocates a counter to it anyway. \
 Measured by the sweep of issue #515 over nine test files: `feature_target!`'s fallback carries 3 on \
 its `function` line and 3 on its `throw`, and 0 on the `return` below them, while the `Pair` method \
-beside it carries 51 and every other line of the file is covered. The four malformed shapes \
-`test_12e_asset_sets_features.jl` drives through the grammar are what raise that 3, so the method \
-itself is reached and only its last line is not. Deleting the line would buy the number by making \
-one of three methods shaped unlike its siblings."""
+beside it carries 51 and every other line of the file is covered. The four malformed shapes that \
+the test of the grammar drove are what raised that 3, so the method itself was reached and only its \
+last line was not. Deleting the line would buy the number by making one of three methods shaped \
+unlike its siblings. Commit ddfc53e851 removed the grammar, `feature_target!` and that test, so no \
+entry cites this Rationale now. It stands for the next fallback of that shape."""
 
 [rationale.a-closure-inside-a-top-level-const]
 text = """

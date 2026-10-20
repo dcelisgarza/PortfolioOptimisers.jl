@@ -794,7 +794,8 @@ end
         # and the variance has no floor, as the oracle's defaults state. Both are set here, so
         # the defaults of the prior, which #1383 measures, do not move these cases. The outputs
         # are the factor returns, the regression weights, the idiosyncratic variance history,
-        # `mu` and `sigma`. The case of `lambda = 0.5` alone is `MasksTwoPass` of `test_12p`.
+        # `mu` and `sigma`. The case of `lambda = 0.5` alone is `MasksTwoPass` of
+        # `test_12o_parity_harness.jl`.
         fx = parity_small_panel()
         mpass(f) = CompositeExposure(; descriptors = [Passthrough(; field = f)],
                                      outlier = nothing, scoring = nothing, family = "style")

@@ -9,6 +9,7 @@ applyTo: "test/test_*.jl"
 - All test files must be named `test_*.jl` and placed in the `test/` directory.
 - Tests are auto-discovered and run by the test harness in `test/runtests.jl`.
 - Each test file should focus on testing a specific module or feature.
+- A comment, a doc or a tool that names a test file names a file that exists, by its full name or by its `test_<number>` prefix. A commit that merges, renames or deletes a test file corrects every live name of it in the same change. A released ADR keeps the old name, because it is history. `test/test_82_test_file_name_census.jl` gates the rule.
 
 ## Test Patterns
 

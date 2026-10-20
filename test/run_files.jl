@@ -2,9 +2,9 @@
 #=
 Run the named test files the way `test/runtests.jl` runs them, without the full suite.
 
-    julia -t 1 --project=test test/run_files.jl test_12k_parity.jl test_26_docs.jl
-    julia -t 1 --project=test test/run_files.jl --done=<path> test_12k_parity.jl
-    julia -t 1 --project=test test/run_files.jl --coverage=<absolute dir> test_12k_parity.jl
+    julia -t 1 --project=test test/run_files.jl test_04_owa.jl test_26_docs.jl
+    julia -t 1 --project=test test/run_files.jl --done=<path> test_04_owa.jl
+    julia -t 1 --project=test test/run_files.jl --coverage=<absolute dir> test_04_owa.jl
     julia -t 1 --project=test test/run_files.jl --testset='^OWA l-moments$' test_04_owa.jl
     julia -t 1 --project=test test/run_files.jl --time-depth=2 --timeout=900 test_04_owa.jl
 
@@ -12,8 +12,8 @@ Each file runs in a module of its own, after the `init_code` preamble that `test
 declares, so a file sees what it sees in the suite. A red file does not stop the run. The driver
 prints one line per file and one line for the run, and it exits 0 only when every file is green:
 
-    RESULT test_12k_parity.jl pass=80 fail=0 error=0 broken=0 seconds=128.4
-    DONE files=1 pass=80 fail=0 error=0 broken=0 status=green
+    RESULT test_82_test_file_name_census.jl pass=10 fail=0 error=0 broken=0 seconds=6.5
+    DONE files=1 pass=10 fail=0 error=0 broken=0 status=green
 
 `--done=<path>` writes the same lines to `<path>` when the run ends, red, green, crashed or timed
 out. A background wait on that file wakes the moment the run ends, where a fixed timer guesses.
@@ -76,7 +76,7 @@ counter files of the child. The other options are passed to the child.
 Each file also records a gate stamp through `code_health/gate_stamp.sh`, which the push guard of
 `.pre-commit-config.yaml` reads. A file run under `--testset` records none: it ran only a part.
 
-From a REPL, `include` this file and call `RunFiles.main(["test_12k_parity.jl"])`. It returns the
+From a REPL, `include` this file and call `RunFiles.main(["test_04_owa.jl"])`. It returns the
 exit code. Pass `--done` there too: a REPL that strips `println` still writes the file.
 
 This file is not a test: `test/runtests.jl` discovers only `test_*.jl`.

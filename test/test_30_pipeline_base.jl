@@ -521,8 +521,9 @@ end
 
     @testset "PriceGapFill" begin
         # Map #955, ADR 0130. The fill role holds one estimator, and it is bounded by the
-        # Listing Span, so the carrier states one — `test_06g` owns the conventions, the
-        # bound and the replay; what is asserted here is the step's place in a pipeline.
+        # Listing Span, so the carrier states one — `test_06_preprocessing.jl` owns the
+        # conventions, the bound and the replay; what is asserted here is the step's place in
+        # a pipeline.
         X, ts = make_prices()
         vals = copy(values(X))
         vals[2, 1] = NaN

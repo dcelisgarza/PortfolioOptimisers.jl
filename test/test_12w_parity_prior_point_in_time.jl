@@ -184,8 +184,9 @@ end
         # 1.124 here: measured 2.4e-15 on the 1303 pairs that both keep, and 4 pairs cross the
         # threshold. The thresholded block is not positive definite, so the repair binds. Ours
         # clips the eigenvalues by default under the field `pdm`, as the oracle does (#1604),
-        # and `test_07c` measures the clip on this block at parity (#1412). `pdm = Posdef()`
-        # takes the nearest correlation by Newton, and it gives the block from before #1604 bit
+        # and `test_07_linear_algebra.jl` measures the clip on this block at parity (#1412).
+        # `pdm = Posdef()` takes the nearest correlation by Newton, and it gives the block from
+        # before #1604 bit
         # for bit. Measured: the clip moves `sigma` by 6.7e-7 from that block.
         pl = prior(est(; th = 0.1), fxl.rd)
         eps = pl.rr.csr.eps

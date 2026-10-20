@@ -1,6 +1,7 @@
-# Shared fixture for test_06c: a synthetic Asset Panel drawn from a known factor model.
+# Shared fixture: a synthetic Asset Panel drawn from a known factor model.
 # Not a test file (no `test_` prefix) so it is excluded from discovery; included by
-# test_06b_asset_panel.jl. See test22_setup.jl for the same pattern.
+# test_06b_asset_panel.jl and the cross-sectional factor tests. See test22_setup.jl for the
+# same pattern.
 #
 # This generator is a toy fixture for one acceptance test, not library functionality, so
 # it lives here rather than under `src/`. It has no Documenter-facing docstrings: nothing
