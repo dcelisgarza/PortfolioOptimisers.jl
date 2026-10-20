@@ -321,6 +321,21 @@ end
 function PortfolioOptimisers.coskewness_expected_returns(::MyFullCoskewness1776)
     return SimpleExpectedReturns()
 end
+# Issue #1779. The fallback of `cokurtosis_processor` refuses a type with no method, so a type
+# that wants no processing states it. `MyBareCokurtosis1779` gives `nothing`, and
+# `MyBadCokurtosis1779` gives a value that is not a matrix processing estimator.
+struct MyBareCokurtosis1779 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis(::MyBareCokurtosis1779,
+                                        X::PortfolioOptimisers.MatNum; kwargs...)
+    return cokurtosis(MyCokurtosis1776(), X; kwargs...)
+end
+function PortfolioOptimisers.cokurtosis_processor(::MyBareCokurtosis1779)
+    return nothing
+end
+struct MyBadCokurtosis1779 <: PortfolioOptimisers.CokurtosisEstimator end
+function PortfolioOptimisers.cokurtosis_processor(::MyBadCokurtosis1779)
+    return 1
+end
 @testset "A high order factor prior reads its co-moment estimators through verbs (#1776)" begin
     PO = PortfolioOptimisers
     kt = MyCokurtosis1776()
@@ -341,23 +356,37 @@ end
         @test PO.cokurtosis_processor(wk) === k.mp
         @test PO.cokurtosis_expected_returns(wk) === k.me
         @test PO.coskewness_expected_returns(ws) === s.me
-        @test isnothing(PO.cokurtosis_processor(kt))
+        @test_throws "`cokurtosis_processor` is not defined for `MyCokurtosis1776`" PO.cokurtosis_processor(kt)
+        @test isnothing(PO.cokurtosis_processor(MyBareCokurtosis1779()))
         @test isnothing(PO.matrix_processing_posdef(nothing))
         @test isnothing(PO.assert_matrix_processing_posdef(nothing))
         @test_throws "`cokurtosis_expected_returns` is not defined for `MyCokurtosis1776`" PO.cokurtosis_expected_returns(kt)
         @test_throws "`coskewness_expected_returns` is not defined for `MyCoskewness1776`" PO.coskewness_expected_returns(sk)
     end
     @testset "A type with no method is refused at construction under rsd = true" begin
-        @test_throws "`cokurtosis_expected_returns` is not defined for `MyCokurtosis1776`" HighOrderFactorPriorEstimator(;
-                                                                                                                         kte = kt)
+        @test_throws "`cokurtosis_expected_returns` is not defined for `MyBareCokurtosis1779`" HighOrderFactorPriorEstimator(;
+                                                                                                                             kte = MyBareCokurtosis1779())
         @test_throws "`coskewness_expected_returns` is not defined for `MyCoskewness1776`" HighOrderFactorPriorEstimator(;
                                                                                                                          ske = sk)
         @test isnothing(PO.assert_factor_comoment_residuals(nothing, nothing))
     end
-    @testset "Under rsd = false the types with no verb fit" begin
+    @testset "A cokurtosis type with no processor is refused at construction under every rsd (#1779)" begin
+        for rsd in (true, false)
+            @test_throws "`cokurtosis_processor` is not defined for `MyCokurtosis1776`" HighOrderFactorPriorEstimator(;
+                                                                                                                      kte = kt,
+                                                                                                                      rsd = rsd)
+            @test_throws "`cokurtosis_processor(::MyBadCokurtosis1779)` must return `nothing` or an `AbstractMatrixProcessingEstimator`" HighOrderFactorPriorEstimator(;
+                                                                                                                                                                       kte = MyBadCokurtosis1779(),
+                                                                                                                                                                       rsd = rsd)
+        end
+        @test isnothing(PO.assert_cokurtosis_processor(nothing))
+        @test isnothing(PO.assert_cokurtosis_processor(MyBareCokurtosis1779()))
+    end
+    @testset "Under rsd = false the types with no verb but the processor fit" begin
         kref = Cokurtosis(; alg = FullMoment(), mp = MatrixProcessing(; pdm = nothing))
         ref = prior(HighOrderFactorPriorEstimator(; kte = kref, rsd = false), rd)
-        pr = prior(HighOrderFactorPriorEstimator(; kte = kt, ske = sk, rsd = false), rd)
+        pr = prior(HighOrderFactorPriorEstimator(; kte = MyBareCokurtosis1779(), ske = sk,
+                                                 rsd = false), rd)
         @test pr.kt == ref.kt
         @test pr.sk == ref.sk
     end

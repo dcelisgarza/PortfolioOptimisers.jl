@@ -569,7 +569,7 @@ The method that Julia selects is the algorithm.
 
  1. A [`MatrixProcessing`](@ref) gives `mp.pdm`.
  2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. The fallback cannot tell whether the type of a caller repairs a matrix. A `nothing` answer would skip the repair, and the covariance could be indefinite.
- 3. `nothing` gives `nothing`. No matrix processing estimator names no repair, as [`matrix_processing!`](@ref) of `nothing` is a no-op. [`cokurtosis_processor`](@ref) gives `nothing` for a cokurtosis estimator that names no processor.
+ 3. `nothing` gives `nothing`. No matrix processing estimator names no repair, as [`matrix_processing!`](@ref) of `nothing` is a no-op. A cokurtosis estimator whose method of [`cokurtosis_processor`](@ref) gives `nothing` names no processor.
 
 # Arguments
 

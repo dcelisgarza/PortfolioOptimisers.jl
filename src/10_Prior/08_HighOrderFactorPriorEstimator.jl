@@ -189,7 +189,7 @@ The prior processes the lifted cokurtosis under this estimator. Under `rsd = tru
 
 # Interfaces
 
-A subtype of [`CokurtosisEstimator`](@ref) that names a matrix processing estimator adds a method of this verb. The fallback gives `nothing`, as [`coskewness_processor`](@ref) does for a [`CoskewnessEstimator`](@ref).
+A subtype of [`CokurtosisEstimator`](@ref) that goes into a [`HighOrderFactorPriorEstimator`](@ref) adds a method of this verb. The method returns `nothing` when the subtype wants no processing, and the prior then does not process the lifted cokurtosis or repair the sum. The constructor of the prior calls `assert_cokurtosis_processor` on `kte`.
 
 # Algorithm
 
@@ -197,25 +197,30 @@ The method that Julia selects is the algorithm.
 
  1. A [`Cokurtosis`](@ref) gives `kte.mp`.
  2. A [`WindowedCokurtosis`](@ref) gives the processor of the estimator that it wraps.
- 3. Every other subtype gives `nothing`. The prior then does not process the lifted cokurtosis, and it does not repair the sum.
+ 3. Every other subtype is refused. A `nothing` answer would skip the repair of the sum under `rsd = true` with no message, and the cokurtosis could be indefinite (#1779).
 
 # Arguments
 
   - `kte`: Cokurtosis estimator.
 
+# Validation
+
+  - The type of `kte` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+
 # Returns
 
-  - `mp::Option{<:AbstractMatrixProcessingEstimator}`: The matrix processing estimator, `nothing` when `kte` names none.
+  - `mp::Option{<:AbstractMatrixProcessingEstimator}`: The matrix processing estimator, `nothing` when the method of `kte` names none.
 
 # Related
 
   - [`CokurtosisEstimator`](@ref)
   - [`coskewness_processor`](@ref)
   - [`matrix_processing_posdef`](@ref)
+  - [`assert_cokurtosis_processor`](@ref)
   - [`HighOrderFactorPriorEstimator`](@ref)
 """
-function cokurtosis_processor(::CokurtosisEstimator)
-    return nothing
+function cokurtosis_processor(kte::CokurtosisEstimator)
+    return throw(ArgumentError("`cokurtosis_processor` is not defined for `$(nameof(typeof(kte)))`. A HighOrderFactorPriorEstimator processes the cokurtosis that it lifts under the matrix processing estimator of `kte`, and under rsd = true it repairs the sum with the residual cokurtosis. Add a method `PortfolioOptimisers.cokurtosis_processor(kte::$(nameof(typeof(kte))))` that returns an `AbstractMatrixProcessingEstimator`, or `nothing` to skip the processing and the repair."))
 end
 function cokurtosis_processor(kte::Cokurtosis)
     return kte.mp
@@ -322,6 +327,49 @@ function coskewness_expected_returns(ske::WindowedCoskewness)
     return coskewness_expected_returns(ske.ske)
 end
 """
+    assert_cokurtosis_processor(kte::Nothing) -> nothing
+    assert_cokurtosis_processor(kte::CokurtosisEstimator) -> nothing
+
+Checks at construction that a [`HighOrderFactorPriorEstimator`](@ref) can read the processor of its cokurtosis estimator `kte`.
+
+The prior processes the lifted cokurtosis under every `rsd`, so the check runs under every `rsd`. It moves the refusal of a type with no method of [`cokurtosis_processor`](@ref) from the fit to the constructor.
+
+# Algorithm
+
+ 1. `nothing` gives `nothing`. The prior lifts no cokurtosis.
+ 2. A [`CokurtosisEstimator`](@ref) gets its processor from [`cokurtosis_processor`](@ref). Its fallback refuses a type with no method of its own.
+ 3. Check that the processor is `nothing` or an [`AbstractMatrixProcessingEstimator`](@ref).
+
+# Arguments
+
+  - `kte`: Cokurtosis estimator, or `nothing`.
+
+# Validation
+
+  - The type of `kte` has a method of [`cokurtosis_processor`](@ref). An `ArgumentError` is thrown otherwise.
+  - The method returns `nothing` or an [`AbstractMatrixProcessingEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`cokurtosis_processor`](@ref)
+  - [`assert_factor_comoment_residuals`](@ref)
+  - [`assert_matrix_processing_posdef`](@ref)
+  - [`HighOrderFactorPriorEstimator`](@ref)
+"""
+function assert_cokurtosis_processor(::Nothing)
+    return nothing
+end
+function assert_cokurtosis_processor(kte::CokurtosisEstimator)
+    mp = cokurtosis_processor(kte)
+    @argcheck(isa(mp, Option{<:AbstractMatrixProcessingEstimator}),
+              ArgumentError("`cokurtosis_processor(::$(nameof(typeof(kte))))` must return `nothing` or an `AbstractMatrixProcessingEstimator`. Got\nmp => $(mp)::$(typeof(mp))."))
+    return nothing
+end
+"""
     assert_factor_comoment_residuals(kte::Option{<:CokurtosisEstimator},
                                      ske::Option{<:CoskewnessEstimator}) -> nothing
 
@@ -401,6 +449,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
+  - `kte` states its processor, see [`assert_cokurtosis_processor`](@ref).
   - When `rsd` is `true`, `kte` and `ske` state what the residual corrections read, see [`assert_factor_comoment_residuals`](@ref).
 
 ## Propagated parameters
@@ -557,6 +606,7 @@ HighOrderFactorPriorEstimator
                                            x_src::Option{<:AbstractReturnsSource})
         assert_returns_source(x_src, DATA_RETURNS_SOURCES, :HighOrderFactorPriorEstimator)
         assert_inner_reader(pe, :pe, :HighOrderFactorPriorEstimator)
+        assert_cokurtosis_processor(kte)
         if rsd
             assert_factor_comoment_residuals(kte, ske)
         end

@@ -55,7 +55,7 @@ In order to implement a new cokurtosis estimator which will work seamlessly with
 
 [`HighOrderFactorPriorEstimator`](@ref) reads two more verbs of its `kte`:
 
-  - `PortfolioOptimisers.cokurtosis_processor(kte::CokurtosisEstimator) -> Option{<:AbstractMatrixProcessingEstimator}`: Optional. The matrix processing estimator of the lifted cokurtosis. The fallback gives `nothing`, and the prior then does not process the lifted cokurtosis. See [`cokurtosis_processor`](@ref).
+  - `PortfolioOptimisers.cokurtosis_processor(kte::CokurtosisEstimator) -> Option{<:AbstractMatrixProcessingEstimator}`: The matrix processing estimator of the lifted cokurtosis, or `nothing` to skip the processing and the repair. The fallback refuses the type by name, and the prior calls it at construction under every `rsd`. See [`cokurtosis_processor`](@ref).
   - `PortfolioOptimisers.cokurtosis_expected_returns(kte::CokurtosisEstimator) -> AbstractExpectedReturnsEstimator`: The expected returns estimator of the residual moments. It is necessary under `rsd = true`. The fallback refuses the type by name, and the prior calls it at construction. See [`cokurtosis_expected_returns`](@ref).
 
 # Examples
