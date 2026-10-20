@@ -197,7 +197,7 @@ The method that Julia selects is the algorithm.
 
  1. A [`Cokurtosis`](@ref) gives `kte.mp`.
  2. A [`WindowedCokurtosis`](@ref) gives the processor of the estimator that it wraps.
- 3. Every other subtype is refused. A `nothing` answer would skip the repair of the sum under `rsd = true` with no message, and the cokurtosis could be indefinite (#1779).
+ 3. Every other subtype is refused. A `nothing` answer would skip the repair of the sum under `rsd = true` with no message, and the cokurtosis could be indefinite.
 
 # Arguments
 
