@@ -1980,7 +1980,7 @@ function Statistics.cor(ce::RegimeAdjustedExpWeightedCovariance; kwargs...)
     state = ce.cache
     @argcheck(!isnothing(state),
               ArgumentError("`ce` holds no partial-fit state, so there is nothing to read. Call `partial_fit!(ce, X)` first, or `cor(ce, X)` for a fit over a whole sample."))
-    return regime_adjusted_correlation(regime_adjusted_covariance(state, ce))
+    return Statistics.cor(ce, state)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

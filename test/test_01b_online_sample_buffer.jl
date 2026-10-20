@@ -887,6 +887,21 @@ using InteractiveUtils: subtypes
         else
             Any[T]
         end
-    @test all(T -> hasfield(Base.unwrap_unionall(T), :cache),
-              filter(T -> parentmodule(T) === po, leaves(po.AbstractCovarianceEstimator)))
+    found = filter(T -> parentmodule(T) === po, leaves(po.AbstractCovarianceEstimator))
+    @test all(T -> hasfield(Base.unwrap_unionall(T), :cache), found)
+    # Every one of them, at its defaults, steps through `Online` to its batch fit, so a new
+    # estimator joins this check with no edit (#1772). `ImpliedVolatility` reads implied
+    # volatilities that a matrix of returns does not carry, and test_12l steps it. Before
+    # #1772 `cor` of a stepped `RegimeAdjustedExpWeightedCovariance` threw a `MethodError`.
+    @testset "$(nameof(T)) at its defaults" for T in
+                                                filter(!=(po.ImpliedVolatility), found)
+        e = T()
+        o = stepped(e)
+        @test isa(o.cache, po.SampleBufferState)
+        if isa(e, po.AbstractVarianceEstimator)
+            @test near(var(o), var(e, X)) && near(std(o), std(e, X))
+        else
+            @test near(cov(o), cov(e, X)) && near(cor(o), cor(e, X))
+        end
+    end
 end

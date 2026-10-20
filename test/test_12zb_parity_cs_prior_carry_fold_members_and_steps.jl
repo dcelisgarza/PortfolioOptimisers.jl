@@ -276,7 +276,16 @@ end
                            (CrossSectionalFactorPrior(; factors = listed(de), th = 0.5,
                                                       ve = partial_fit!(cs.ve, X; dims = 1)), "ve.cache"),
                            (CrossSectionalFactorPrior(; factors = listed(de), th = 0.5,
-                                                      ce = partial_fit!(cs.ce, X; dims = 1)), "ce.cache"))
+                                                      ce = partial_fit!(cs.ce, X; dims = 1)), "ce.cache"),
+                           # A Return Forecast holds no state of its own, so its one state is
+                           # a Descriptor of its scores (#1772).
+                           (CrossSectionalFactorPrior(; factors = listed(de), th = 0.5,
+                                                      rfe = ExpWeightedReturnForecast(;
+                                                                                      scores = DescriptorScores(;
+                                                                                                                descriptors = [partial_fit!(de,
+                                                                                                                                            rows(rd,
+                                                                                                                                                 1:90))]))),
+                            "rfe.scores.descriptors[1].cache"))
             msg = message(() -> partial_fit!(pe, rows(rd, 91:170)))
             @test occursin("ArgumentError", msg) && occursin("`$(path)`", msg)
         end

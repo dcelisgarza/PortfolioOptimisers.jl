@@ -1271,6 +1271,30 @@ end
 function Statistics.var(ve::SimpleVariance)
     return Statistics.var(ve, partial_fit_cache(ve))
 end
+"""
+    Statistics.std(ve::SimpleVariance, state::SimpleVarianceState) -> VecNum
+
+Read the standard deviation of an incremental fit out of a [`SimpleVarianceState`](@ref).
+
+`std(ve)` with no data reads the state that the `cache` field of `ve` carries through this method.
+
+# Arguments
+
+  - $(arg_dict[:ve])
+  - `state`: The state to read.
+
+# Returns
+
+  - `sd::VecNum`: Per-asset standard deviation of the fit, `assets × 1`, or `NaN` where the state holds too few observations.
+
+# Related
+
+  - [`SimpleVarianceState`](@ref)
+  - [`Statistics.var(ve::SimpleVariance, state::SimpleVarianceState)`](@ref)
+"""
+function Statistics.std(ve::SimpleVariance, state::SimpleVarianceState)
+    return sqrt.(Statistics.var(ve, state))
+end
 # Every configuration of this family folds, for the reason [`SimpleExpectedReturns`](@ref)
 # does (see [`supports_partial_fit`](@ref)).
 function supports_partial_fit(::SimpleVariance)

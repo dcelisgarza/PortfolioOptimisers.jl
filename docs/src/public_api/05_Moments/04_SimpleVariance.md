@@ -18,13 +18,14 @@ var(ve::SimpleVariance, X::VecNum; mean = nothing)
 
 ## Incremental fit
 
-Like the sample mean, the sample variance updates with each new block of observations. [`partial_fit!`](@ref) stores the running state in the `cache` field of the estimator it returns, and `var(ve)` computes the estimate from that state, with no data.
+Like the sample mean, the sample variance updates with each new block of observations. [`partial_fit!`](@ref) stores the running state in the `cache` field of the estimator it returns, and `var(ve)` and `std(ve)` compute the estimate from that state, with no data.
 
 ```@docs
 partial_fit!(state::SimpleVarianceState, x::VecNum)
 partial_fit!(ve::SimpleVariance, X::MatNum; dims::Int = 1)
 partial_fit!(ve::SimpleVariance, x::VecNum)
 var(ve::SimpleVariance, state::SimpleVarianceState)
+std(ve::SimpleVariance, state::SimpleVarianceState)
 port_opt_view(x::SimpleVarianceState, i, args...)
 merge_states(a::SimpleVarianceState, b::SimpleVarianceState)
 ```

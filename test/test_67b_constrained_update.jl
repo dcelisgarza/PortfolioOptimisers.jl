@@ -1158,6 +1158,41 @@ end
             wtn_fixed = proj(tnc(true); q = [1.0, 0.0, 0.0], w = wh)
             @test sum(abs, wtn_fixed - [0.6, 0.2, 0.2]) <= 0.1 + 1e-6
             @test sum(abs, wtn_fixed - wh) > 0.1
+            # The same ceiling in a step of a mirror-descent head, on a panel whose fourth
+            # asset is inactive in every row (#1772). From one state, the step under the
+            # ceiling that is not fixed equals the step under a fixed ceiling at the step's
+            # book, the Price-Adjusted Allocation, and not the step under the caller's.
+            # Measured: 0.0 against the book, 0.34 and 0.42 against the caller's.
+            R4 = 0.02 .* randn(StableRNG(23), 8, 4)
+            am4 = trues(8, 4)
+            am4[:, 4] .= false
+            R4[.!am4] .= NaN
+            rd4 = ReturnsResult(; nx = ["A", "B", "C", "D"], X = R4,
+                                ts = Date(2020, 1, 1) .+ Day.(0:7),
+                                pnl = AssetPanel(; amsk = am4, emsk = copy(am4)))
+            rows4(i) = po.port_opt_view(rd4, i, :)
+            trset(w; fixed) = ProgrammeAllocationSet(; slv = slv,
+                                                     r = TrackingRiskMeasure(;
+                                                                             settings = ub_of(0.002),
+                                                                             tr = WeightsTracking(;
+                                                                                                  w = w,
+                                                                                                  fixed = fixed)))
+            bm4 = [0.7, 0.1, 0.1, 0.1]
+            head4(set) = OPS(; alg = GradientProjection(; eta = 50), set = set)
+            for n in (3, 8)
+                o = @test_logs (:warn, r"Held Step") match_mode = :any po.partial_fit!(head4(trset(bm4;
+                                                                                                   fixed = false)),
+                                                                                       rows4(1:(n - 1)))
+                x = [1 .+ R4[n, 1:3]; 1]
+                whn = o.cache.w .* x ./ dot(o.cache.w, x)
+                step_w(set) = po.partial_fit!(po.rebuild_estimator(deepcopy(o),
+                                                                   (; set = set)),
+                                              rows4(n:n)).cache.w
+                wb = po.partial_fit!(deepcopy(o), rows4(n:n)).cache.w
+                @test iszero(wb[4])
+                @test wb == step_w(trset(whn; fixed = true))
+                @test maximum(abs, wb - step_w(trset(bm4; fixed = true))) > 0.1
+            end
         end
         @testset "The ceilings, the budgets, the norm ceilings and the return floor" begin
             # A vector of ceilings: every one binds.

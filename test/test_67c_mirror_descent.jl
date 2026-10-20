@@ -785,6 +785,28 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Statistics, Dates, C
             @test maxerr(w_book, walk(trl(wh2; fixed = true))) < 1e-14
             @test maxerr(w_book, walk(trl(wq; fixed = true))) > 1e-3
         end
+        # The same two rows on a panel whose fourth asset is inactive (#1772). The book keeps
+        # the asset at its weight of the uniform start and reads its gap as a relative of
+        # one, so `wh` has four legs, and the loss views the benchmark on the three priced
+        # ones. Measured: 0.0 against the benchmark at `wh`, 0.33 and 0.67 against the
+        # caller's.
+        Rn2 = copy(R[1:2, :])
+        am2 = trues(2, N)
+        am2[:, 4] .= false
+        Rn2[.!am2] .= NaN
+        rdn2 = ReturnsResult(; nx = nx, X = Rn2, ts = ts[1:2],
+                             pnl = AssetPanel(; amsk = am2, emsk = copy(am2)))
+        xg = [X[2, 1:3]; 1]
+        whm = xg ./ sum(xg)
+        for mk in (o -> GradientProjection(; eta = 50, obj = o),
+                   o -> OptimisticStep(; alg = GradientProjection(; eta = 50, obj = o),
+                                       predictor = LastGradient(; at_played = false)))
+            walk(o) = optimise(OPS(; alg = mk(o)), rdn2).w
+            w_book = walk(trl(wq; fixed = false))
+            @test iszero(w_book[4])
+            @test maxerr(w_book, walk(trl(whm; fixed = true))) < 1e-14
+            @test maxerr(w_book, walk(trl(wq; fixed = true))) > 0.1
+        end
     end
 
     @testset "A Risk Loss tracks the benchmark of its window (#1657)" begin

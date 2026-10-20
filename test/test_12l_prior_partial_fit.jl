@@ -968,6 +968,15 @@ end
             @test isapprox(c.mu, b.mu; rtol = 1e-12, nans = true)
             @test !isapprox(prior(est, r0).sigma, b.sigma; nans = true)
         end
+        # The third and the fourth order under the same mask: `kte` and `ske` hold no state
+        # under `SemiMoment`, so the carry refits them from its buffer (#1772).
+        hb = prior(h, rd(tv))
+        hc = prior(steps(h, rd(tv)))
+        @test isnothing(steps(h, rd(tv)).kte.cache)
+        @test isapprox(hc.kt, hb.kt; rtol = 1e-12, nans = true)
+        @test isapprox(hc.sk, hb.sk; rtol = 1e-12, nans = true)
+        @test isapprox(hc.V, hb.V; rtol = 1e-12, nans = true)
+        @test !isapprox(prior(h, r0).kt, hb.kt; nans = true)
         est = EmpiricalPrior(; me = SimpleExpectedReturns(; cvg = cvg),
                              ce = Covariance(; alg = SemiMoment(), cvg = cvg))
         c = po.forecast_location(steps(est, rd(tv)))
@@ -988,10 +997,20 @@ end
         Ac = trues(T, N)
         # The panel form, the keyword mask through the panel method, and the fold give one
         # Coverage Universe. The keyword form refuses the gap, as it refuses a NaN.
+        # `std`, `cor` and the observations on the second axis too (#1772). Before #1772
+        # `std` of a folded `SimpleVariance` threw a `MethodError`.
         for (est, f) in
             ((SimpleExpectedReturns(), Statistics.mean), (SimpleVariance(), Statistics.var),
-             (Covariance(), Statistics.cov))
+             (Covariance(), Statistics.cov), (SimpleVariance(), Statistics.std),
+             (Covariance(), Statistics.cor))
             b = f(est, X, tv)
+            b2 = f(est, permutedims(X), tv; dims = 2)
+            @test isapprox(vec(b2), vec(b); rtol = 1e-12, nans = true)
+            @test isequal(f(est, permutedims(X), nothing; dims = 2,
+                            active_mask = permutedims(A)), b2)
+            o2 = f(partial_fit!(est, permutedims(X); dims = 2,
+                                active_mask = permutedims(A)))
+            @test isapprox(vec(o2), vec(b); rtol = 1e-12, nans = true)
             @test isnan(vec(b)[3]) && isfinite(vec(b)[1])
             @test isequal(f(est, X, nothing; active_mask = A), b)
             @test_throws IsNonFiniteError f(est, X[:, [1, 3, 4]];
@@ -1000,6 +1019,18 @@ end
             @test_throws DimensionMismatch f(est, Xc; active_mask = Ac)
             o = f(partial_fit!(est, X; active_mask = A))
             @test isapprox(vec(o), vec(b); rtol = 1e-12, nans = true)
+        end
+        # The `SemiMoment` arm has no fold, and the buffer of an `Online` refits through the
+        # keyword form, which refuses the gap. The panel form and the keyword mask agree.
+        sce = Covariance(; alg = SemiMoment())
+        for f in (Statistics.cov, Statistics.cor)
+            b = f(sce, X, tv)
+            @test isnan(b[3, 3]) && isfinite(b[1, 1])
+            @test isequal(f(sce, X, nothing; active_mask = A), b)
+            @test_throws IsNonFiniteError f(sce, X[:, [1, 3, 4]];
+                                            active_mask = A[:, [1, 3, 4]])
+            @test isapprox(f(sce, permutedims(X), tv; dims = 2), b; rtol = 1e-12,
+                           nans = true)
         end
         # The third and the fourth order fold, and the panel form, read the mask too.
         ske = Coskewness()
