@@ -340,17 +340,17 @@ function risk_contribution_constraints(r::Variance, ::ProgrammeAllocationSet, ::
     return r.rc
 end
 """
-    clip_at_zero(w::AbstractVector)
+    clip_at_zero(w::AbstractVector, lb = zero(eltype(w)))
 
-Sets to zero every entry of a projection programme's answer at or below the tolerance of its element type.
+Sets every entry of a projection programme's answer at or below the tolerance of its element type to its floor `lb`, which is zero unless the set states a positive floor.
 
-A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes comes back slightly above or slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds. It would take `log w` of a negative number, and an exact zero of the raw step keeps the weight at zero. So the clip reads every entry within the tolerance as zero, whatever the sign of the rounding, and a weight that the set forces to zero is zero after the clip. The tolerance is [`weights_bound_tolerance`](@ref): ``\\sqrt{\\epsilon}`` for a floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a `Rational`. The clip does not renormalise, so the sum moves by the clipped mass, which is at most ``N \\tau``.
+A geometry whose domain is the non-negative orthant needs this. The solver meets a zero lower bound only to within its tolerance, so a leg that the programme closes comes back slightly above or slightly below zero. The next step forms its raw step multiplicatively from the allocation it holds. It would take `log w` of a negative number, and an exact zero of the raw step keeps the weight at zero. So the clip reads every entry within the tolerance as zero, whatever the sign of the rounding, and a weight that the set forces to zero is zero after the clip. The tolerance is [`weights_bound_tolerance`](@ref): ``\\sqrt{\\epsilon}`` for a floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a `Rational`. The clip does not renormalise, so the sum moves by the clipped mass, which is at most ``N \\tau``. An entry whose floor is positive goes to that floor and not to zero, so the clip keeps a floor at or below ``\\tau`` that the set states.
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-w'_i &= \\begin{cases} 0 & w_i \\leq \\tau\\,, \\\\ w_i & w_i > \\tau\\,. \\end{cases}
+w'_i &= \\begin{cases} l_i & w_i \\leq \\tau\\,, \\\\ w_i & w_i > \\tau\\,. \\end{cases}
 \\end{align}
 ```
 
@@ -358,16 +358,18 @@ Where:
 
   - ``w_i``: Entry ``i`` of the programme's answer.
   - ``w'_i``: Entry ``i`` of the clipped answer.
+  - ``l_i``: Entry ``i`` of the floor `lb`, non-negative.
   - $(math_dict[:tau_wb_tol])
   - $(math_dict[:N])
 
 # Arguments
 
   - `w`: The programme's answer.
+  - `lb`: The floor of the set, a number or a vector, non-negative. A caller's `project` checks the sign.
 
 # Returns
 
-  - `w'::Vector`: `w` with every entry at or below ``\\tau`` set to zero, in the element type of `w`.
+  - `w'::Vector`: `w` with every entry at or below ``\\tau`` set to its floor, in the element type of `w` when `lb` has that type.
 
 # Related
 
@@ -375,7 +377,7 @@ Where:
   - [`projection_programme`](@ref)
   - [`weights_bound_tolerance`](@ref)
 """
-function clip_at_zero(w::AbstractVector)
+function clip_at_zero(w::AbstractVector, lb = zero(eltype(w)))
     tol = weights_bound_tolerance(float_if_integer(eltype(w)))
-    return map(x -> ifelse(x <= tol, zero(x), x), w)
+    return ifelse.(w .<= tol, zero.(w) .+ lb, w)
 end

@@ -695,7 +695,7 @@ With no positive ``h_i``, ``P`` is empty and the projection is the Euclidean one
 
 # Algorithm
 
- 1. Refuse a non-finite `q` with [`assert_finite_raw_step`](@ref), and bounds that no allocation on the budget satisfies with [`assert_feasible_bounds`](@ref).
+ 1. Refuse a non-finite `q` with [`assert_finite_raw_step`](@ref), bounds that no allocation on the budget satisfies with [`assert_feasible_bounds`](@ref), and a negative or `NaN` entry of `h`.
  2. When every entry of `h` is positive, return the projection at the budget one with [`budget_root_projection`](@ref). Stop.
  3. When no entry of `h` is positive, return the projection at unit weights and the budget one with [`budget_root_projection`](@ref). Stop.
  4. Otherwise, split the assets into `pos`, where `h` is positive, and `zer`, where it is zero. Clip `q[pos]` to its bounds, and form `r`, the budget that the clipped entries leave.
@@ -713,6 +713,7 @@ With no positive ``h_i``, ``P`` is empty and the projection is the Euclidean one
 
   - `all(isfinite, q)`. A `DomainError` is thrown otherwise.
   - `Σ lb ≤ 1 ≤ Σ ub` over the resolved bounds. An `ArgumentError` is thrown otherwise.
+  - `all(>= 0, h)`. A `DomainError` is thrown otherwise.
 
 # Returns
 
@@ -730,6 +731,8 @@ function bounded_quadratic_projection(q::AbstractVector, wb::WeightBounds,
                                       h::AbstractVector = fill(one(eltype(q)), length(q)))
     assert_finite_raw_step(q)
     assert_feasible_bounds(wb)
+    # An entry that is negative or `NaN` is in neither `pos` nor `zer` below.
+    @argcheck(all(x -> x >= zero(x), h), DomainError(h, "h must be non-negative"))
     lb, ub = wb.lb, wb.ub
     pos = findall(x -> x > zero(x), h)
     if length(pos) == length(h)

@@ -1258,7 +1258,9 @@ end
 function risk_gradient(rs::VecBaseRM, w::VecNum, X::MatNum, fees::Option{<:Fees} = nothing;
                        delta::Number = 1e-6, sca::Scalariser = SumScalariser(), kwargs...)
     ps = scalariser_element_weights(sca, rs, w, X, fees; kwargs...)
-    g = zeros(eltype(w), length(w))
+    # The gradient of each measure widens the type of the weights, as the step of
+    # `finite_difference_gradient` does, so the sum takes the promoted type.
+    g = zeros(promote_type(eltype(w), eltype(X), typeof(delta)), length(w))
     for (p, r) in zip(ps, rs)
         if iszero(p)
             continue

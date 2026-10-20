@@ -116,7 +116,7 @@ This becomes especially important when:
 - a position temporarily cannot be traded;
 - asset universes change.
 
-OptimalPortfolios also addresses the subtle case where frozen positions drift and cause a group constraint to become infeasible, relaxing that bound for the rebalance with an audit trail. citeturn0search0
+OptimalPortfolios also addresses the subtle case where frozen positions drift and cause a group constraint to become infeasible, relaxing that bound for the rebalance with an audit trail.
 
 That suggests a broader PortfolioOptimisers abstraction:
 
@@ -212,7 +212,7 @@ PortfolioOpt explicitly models:
 - elliptical sets;
 - distributional uncertainty.
 
-PortfolioOptimisers already has several uncertainty-set types, including delta, normal, bootstrap and L1 sets. citeturn5view1turn0search1
+PortfolioOptimisers already has several uncertainty-set types, including delta, normal, bootstrap and L1 sets.
 
 The worthwhile question is therefore:
 
@@ -1149,9 +1149,9 @@ That is the direction most likely to turn the existing breadth of PortfolioOptim
 
 ## OptimalPortfolios
 
-- Repository and current documentation: <https://github.com/ArturSepp/OptimalPortfolios>
+- Repository and current documentation
 
-Its current implementation is particularly relevant for NaN-aware rolling construction, frozen positions, drift-aware turnover and production-oriented portfolio state. citeturn0search0
+Its current implementation is particularly relevant for NaN-aware rolling construction, frozen positions, drift-aware turnover and production-oriented portfolio state.
 
 ## Oracle 2
 
@@ -1159,10 +1159,10 @@ Its current implementation is particularly relevant for NaN-aware rolling constr
 - Changelog
 - Documentation
 
-Its current feature set confirms that factor risk contribution, graph constraints, higher moments, integer constraints, attribution and uncertainty-set tooling are all established capabilities in the competing ecosystem. citeturn1search0turn1search1
+Its current feature set confirms that factor risk contribution, graph constraints, higher moments, integer constraints, attribution and uncertainty-set tooling are all established capabilities in the competing ecosystem.
 
 ## PortfolioOpt.jl
 
-- Repository: <https://github.com/andrewrosemberg/PortfolioOpt.jl>
+- Repository
 
-Its explicit treatment of moment uncertainty, Wasserstein ambiguity and robust uncertainty sets makes it a useful reference for the next generation of PortfolioOptimisers uncertainty machinery. citeturn0search1
+Its explicit treatment of moment uncertainty, Wasserstein ambiguity and robust uncertainty sets makes it a useful reference for the next generation of PortfolioOptimisers uncertainty machinery.

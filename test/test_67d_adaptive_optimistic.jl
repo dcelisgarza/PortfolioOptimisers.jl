@@ -282,6 +282,11 @@ using Test, PortfolioOptimisers, StableRNGs, LinearAlgebra, Dates, Clarabel, JuM
         # With no positive entry the limit is the Euclidean projection.
         @test isapprox(po.bounded_quadratic_projection(cases[2], box, zeros(5)),
                        po.bounded_quadratic_projection(cases[2], box); atol = 1e-15)
+        # A negative or `NaN` entry is neither priced nor free, so the helper, which a user
+        # geometry calls with no `DiagonalProjection` in front, refuses it.
+        for hb in ([-1.0, 1.0, 1.0, 0.0, 0.0], [NaN, 1.0, 1.0, 0.0, 0.0])
+            @test_throws DomainError po.bounded_quadratic_projection(cases[1], simplex, hb)
+        end
         set = resolve(BoundedAllocationSet(; wb = box), 5)
         @test po.project(po.DiagonalProjection(zeros(5)), set, cases[2], cases[2]) ==
               po.project(EuclideanProjection(), set, cases[2], cases[2])

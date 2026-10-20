@@ -845,6 +845,22 @@ end
               [0.4, 0.0, 0.2, 0.0, 0.0, 0.4]
         @test po.clip_at_zero([1.4e-8, 1.6e-8, 1.0]) == [0.0, 1.6e-8, 1.0]
         @test po.clip_at_zero([1 // 10^12, 1 // 1]) == [1 // 10^12, 1 // 1]
+        # An entry with a positive floor goes to its floor, not below it. The programme
+        # answers 1.58e-9 for the first asset, inside the tolerance, and the clip once set it
+        # to zero, under its floor of 1e-9.
+        @test po.clip_at_zero([1.4e-8, 1.6e-8, 1.0], [1e-9, 0.0, 0.0]) ==
+              [1e-9, 1.6e-8, 1.0]
+        let slv0 = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                          settings = Dict("verbose" => false)),
+            fset = resolve(ProgrammeAllocationSet(; slv = slv0,
+                                                  wb = WeightBounds(;
+                                                                    lb = [1e-9, 0, 0, 0, 0],
+                                                                    ub = 1)), 5)
+
+            wf = po.project(EntropicProjection(), fset, [1e-12, 0.3, 0.3, 0.2, 0.2],
+                            fill(0.2, 5))
+            @test wf[1] == 1e-9
+        end
         # The measure's `rke` is cleared and its expression joins no objective: the model
         # holds the bound and no risk vector, whichever the measure states.
         rke = ConditionalValueatRisk(;

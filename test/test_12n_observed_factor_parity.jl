@@ -85,7 +85,7 @@ end
                                              ve = PARITY_VE), fx.rd)
         # Measured cell by cell, Plain and Family: maxrel 9.9e-15 and 2.3e-14 (factor mean),
         # 6.1e-15 and 2.5e-14 (factor covariance), 1.1e-13 and 1.4e-14 (`mu`), 6.8e-16 and
-        # 1.1e-15 (idiosyncratic variance). The files of an older oracle gave 2.7e-13 to
+        # 1.1e-15 (idiosyncratic variance). The files of an older oracle gave 7.4e-15 to
         # 3.9e-13, the rounding of that oracle (#1762).
         @test parity_compare(pr.fpr.mu, vec(ccy_asset("$(nm)DefaultFactorMu"));
                              name = "$(nm) default factor mean").ok

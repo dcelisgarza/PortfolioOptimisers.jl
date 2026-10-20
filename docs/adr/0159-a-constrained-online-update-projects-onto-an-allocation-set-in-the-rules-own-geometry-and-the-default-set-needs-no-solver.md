@@ -365,7 +365,8 @@ differed under `--check-bounds=yes`.
 Issue #1760 settles it in favour of the exact rule. `clip_at_zero` sets to zero every entry of the
 answer at or below `weights_bound_tolerance` of its element type: `sqrt(eps(T))` for a
 floating-point type, which is above the default feasibility tolerance of Clarabel, and zero for a
-`Rational`. A weight that the set forces to zero is then zero on every host, and it stays zero at
+`Rational`. An entry whose floor in the set is positive goes to that floor and not to zero, so the
+clip keeps every bound that the set states. A weight that the set forces to zero is then zero on every host, and it stays zero at
 every later step, as it does in exact arithmetic. When the set later needs that asset, each
 projection is infeasible and the step is a Held Step.
 

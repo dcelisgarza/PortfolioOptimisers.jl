@@ -41,10 +41,10 @@ genuine out-of-sample validation machinery — this is not a request to add that
 missing on top of a completed walk-forward run is a rebalancing schedule and slippage of its own,
 plus a report export.
 
-For reference, the shape of this layer in the Python ecosystem: [cvxgrp/cvxportfolio](https://github.com/cvxgrp/cvxportfolio)
+For reference, the shape of this layer in the Python ecosystem: cvxportfolio
 (multi-period trading with transaction costs, from the Stanford Boyd group), and the general
-event-driven backtest architecture of [stefan-jansen/zipline-reloaded](https://github.com/stefan-jansen/zipline-reloaded)
-and [mementum/backtrader](https://github.com/mementum/backtrader) — a rebalance calendar, order
+event-driven backtest architecture of zipline-reloaded
+and backtrader — a rebalance calendar, order
 execution against next-bar prices, slippage/impact model, and a results object independent of the
 optimisation loop itself.
 
@@ -53,7 +53,7 @@ Concretely:
 - Slippage per rebalance, and a fixed or calendar-based rebalancing schedule independent of the
   CV fold boundaries.
 - A tearsheet export: a drawdown table, and the existing summary and plots assembled into a
-  single HTML report. [ranaroussi/quantstats](https://github.com/ranaroussi/quantstats) is the
+  single HTML report. quantstats is the
   reference point — `quantstats.reports` generates exactly this kind of one-call HTML tear sheet
   from a returns series.
 
@@ -100,7 +100,7 @@ suited as a separate thin package, not a core-repo change.
 
 Most examples in the docs run at ~20–25 assets. For institutional-scale universes (thousands of
 names), sparse covariance handling and a GPU-accelerated conic solver path (e.g. via
-[exanauts/CUDSS.jl](https://github.com/exanauts/CUDSS.jl), a Julia interface to NVIDIA's cuDSS
+CUDSS.jl, a Julia interface to NVIDIA's cuDSS
 sparse direct solver, through the existing `Solver`/JuMP abstraction) would matter. This is an area
 where Julia has a structural advantage over the Python competition if exploited, since the JuMP
 layer already abstracts over solver choice — this would mainly be about validating/documenting
@@ -126,23 +126,22 @@ themselves.
 ### Comparison libraries
 
 - oracle 2
-- oracle 2's in-development Julia port — same author's port of oracle 2; listed on his GitHub
-  profile as "now in development." Worth being aware of as either prior art or a potential point
+- oracle 2's in-development Julia port. Worth being aware of as either prior art or a potential point
   of overlap/collaboration in the Julia ecosystem.
 
 ### Multi-period optimisation / backtesting
 
-- [cvxgrp/cvxportfolio](https://github.com/cvxgrp/cvxportfolio)
-- [stefan-jansen/zipline-reloaded](https://github.com/stefan-jansen/zipline-reloaded)
-- [mementum/backtrader](https://github.com/mementum/backtrader)
+- cvxportfolio
+- zipline-reloaded
+- backtrader
 
 ### Reporting
 
-- [ranaroussi/quantstats](https://github.com/ranaroussi/quantstats)
+- quantstats
 
 ### GPU / sparse solvers
 
-- [exanauts/CUDSS.jl](https://github.com/exanauts/CUDSS.jl)
+- CUDSS.jl
 
 ### Wasserstein DRO — papers and reference implementations
 

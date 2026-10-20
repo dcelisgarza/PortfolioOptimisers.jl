@@ -834,7 +834,7 @@ A rule that adds a method of `orthogonal_forecast_result` adds the same change t
 
 ### Returns
 
-  - `(; hist, fs)::NamedTuple`: The answer of `return_forecast_step` for the member.
+  - `(; hist, fs)::NamedTuple`: `hist`, the Return Forecast history of the rows of the step, `observations × assets`, and `fs`, the fold state of the member after those rows.
 
 ## The scale of the orthogonal part
 

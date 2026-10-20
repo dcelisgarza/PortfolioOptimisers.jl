@@ -483,6 +483,14 @@ end
     @test isapprox(risk_gradient(r, Float32.(w), pr), risk_gradient(r, w, pr); rtol = 1e-6)
     @test isapprox(risk_contribution(r, [1; zeros(Int, N - 1)], pr),
                    risk_contribution(r, [1.0; zeros(N - 1)], pr))
+    # A vector of measures sums the gradients in the promoted type. Before, the sum took the
+    # type of the weights: integer weights raised `InexactError`, and `Float16` weights
+    # rounded each term to `Float16`.
+    rs = [StandardDeviation(), ConditionalValueatRisk()]
+    @test isapprox(risk_gradient(rs, [1; zeros(Int, N - 1)], pr),
+                   risk_gradient(rs, [1.0; zeros(N - 1)], pr))
+    @test isapprox(risk_gradient(rs, Float16.(w), pr), risk_gradient(rs, w, pr);
+                   rtol = 1e-8)
 end
 
 @testset "Weighted risk expressions" begin

@@ -73,7 +73,7 @@ libraries are deliberately narrow.
 | Cross-validation, walk-forward | Yes | Yes | No | No | No | No |
 | Combinatorial purged CV | Yes | Yes | No | No | No | No |
 | Hyperparameter search | Yes | Yes | No | No | No | No |
-| Pipeline as a reified object | Yes | Yes (sklearn) | No | No | No | No |
+| Pipeline as a reified object | Yes | Yes | No | No | No | No |
 | **Multi-period optimisation** | **No** | No | No | No | **Yes** | No |
 | **Transaction-cost simulation** | Partial | No | No | No | **Yes** | Partial |
 | **Scenario generation** | **No** | Partial | No | No | No | Yes |
@@ -101,7 +101,7 @@ because it carries almost no estimation machinery. **I do not recommend competin
 the core**, for the reason in section 7.
 
 **The oracle** is the closest peer in shape, because it also reifies a pipeline and also treats
-estimators as configuration. Its paper is Nicolini and co-authors (2025). It ships vine copulas and
+estimators as configuration. It ships vine copulas and
 synthetic data, which is precisely recommendation 1 of this report. It does **not** ship entropy
 pooling, distributionally robust CVaR, or graph constraints. The two libraries are converging from
 opposite ends.
@@ -481,10 +481,8 @@ that exist. Five of the six recommendations in this report are seams. That is de
 
 Named in prose, per the repository convention. Versions are those documented in August 2026.
 
-- **The oracle**, Python, built on scikit-learn. Nicolini, C. and co-authors (2025).
-  arXiv:2507.04176.
-- **Oracle 2**, Python, version 7.3. Documents 37 risk measures for hierarchical optimisation
-  and an OWA portfolio module.
+- **The oracle**, Python.
+- **Oracle 2**, Python.
 - **PyPortfolioOpt**, Python.
 - **cvxportfolio**, Python, version 1.5. The reference implementation of Boyd and co-authors (2017).
 - **PortfolioAnalytics**, R.

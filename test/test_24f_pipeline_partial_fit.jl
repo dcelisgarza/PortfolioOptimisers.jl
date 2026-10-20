@@ -478,6 +478,16 @@ what keeps the JuMP families cheap.
         @test size(ba.ctx.prior.X, 1) == length(keep)
         on = fit(stepped(Pipeline(; steps = (pex,)), rdb, blocks))
         @test on.ctx.prior.mu ≈ ba.ctx.prior.mu
+        # A Pipeline of one optimiser step is a head alone, so it drops by the group of the
+        # head online as in batch. With `nothing` the fold kept the `NaN` rows of `X - B`.
+        mrx = MeanRisk(;
+                       opt = JuMPOptimiser(; pe = EmpiricalPrior(; x_src = ExcessSource()),
+                                           slv = slv))
+        @test po.pipeline_gap_sources((mrx,)) == [ExcessSource()]
+        ba = fit(Pipeline(; steps = (mrx,)), rows(rdb, 1:80))
+        @test isapprox(ba.w, optimise(mrx, rows(rdb, 1:80)).w; atol = 1e-10)
+        @test isapprox(fit(stepped(Pipeline(; steps = (mrx,)), rdb, blocks)).w, ba.w;
+                       atol = 1e-10)
         # A raw prior step in an excess group keeps its frame, so a data benchmark subtracts
         # the benchmark once and builds. A prior step in the Excess Frame is still refused.
         dbt = TrackingRiskMeasure(; tr = DataBenchmarkTracking())

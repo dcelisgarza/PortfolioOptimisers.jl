@@ -927,7 +927,7 @@ Internal machinery — not part of the user-facing API.
 
 # Algorithm
 
- 1. Read the optimiser `opt` of the last step with [`pipe_terminal_optimiser`](@ref). Answer `nothing` for every step when there is none.
+ 1. Read the optimiser `opt` of the last step with [`pipe_terminal_optimiser`](@ref). When there is none, answer `nothing` for every step, except for a Pipeline of one optimiser step: that step is a head alone, so it gets [`group_source`](@ref) of its optimiser.
  2. Find the source of the group with [`group_source`](@ref) of [`pipeline_frames`](@ref), giving `gsrc`.
  3. Answer `gsrc` for each step that `opt` receives ([`pipeline_received`](@ref)) and for the last step, and `nothing` for every other step.
 
@@ -950,6 +950,12 @@ function pipeline_gap_sources(ests)::Vector{Option{ExcessSource}}
     gsrcs = Vector{Option{ExcessSource}}(nothing, n)
     opt = pipe_terminal_optimiser(ests)
     if isnothing(opt)
+        # A Pipeline of one optimiser step routes no value, so the step is a head alone and
+        # drops by the group of that head, as the head's own `partial_fit!` does.
+        est = step_estimator(ests[n])
+        if n == 1 && isa(est, OptimisationEstimator)
+            gsrcs[n] = group_source(est)
+        end
         return gsrcs
     end
     gsrc = group_source(pipeline_frames(ests))

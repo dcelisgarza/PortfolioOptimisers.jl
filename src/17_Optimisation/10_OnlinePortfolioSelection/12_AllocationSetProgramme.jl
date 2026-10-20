@@ -1338,7 +1338,7 @@ function project(proj::EntropicProjection, set::ProgrammeAllocationSet, q::Abstr
     @argcheck(all(x -> x >= zero(x), set.wb.lb),
               DomainError(set.wb.lb,
                           "the entropic projection admits no negative lower bound: `log w` is undefined below zero"))
-    return clip_at_zero(projection_programme(proj, set, q, w))
+    return clip_at_zero(projection_programme(proj, set, q, w), set.wb.lb)
 end
 function project(proj::GramProjection, set::ProgrammeAllocationSet, q::AbstractVector,
                  w::AbstractVector)
@@ -1349,7 +1349,7 @@ function project(proj::Union{<:TsallisProjection, <:LogBarrierProjection},
     @argcheck(all(x -> x >= zero(x), set.wb.lb),
               DomainError(set.wb.lb,
                           "a barrier projection admits no negative lower bound: the potential is undefined below zero"))
-    return clip_at_zero(projection_programme(proj, set, q, w))
+    return clip_at_zero(projection_programme(proj, set, q, w), set.wb.lb)
 end
 """
     blend_projection(proj::EuclideanProjection, set::BoundedAllocationSet, q::AbstractVector, w::AbstractVector)

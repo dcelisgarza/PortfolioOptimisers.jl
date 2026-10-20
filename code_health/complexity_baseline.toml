@@ -411,7 +411,7 @@ commit = "ec0805d376"
 "src/19_FactorAttribution/03_FactorAttributionRealisedMethods.jl" = { cyc = 5, cog = 5, arg = 8, cyc_sum = 82, cog_sum = 34, arg_sum = 140, macros = [] }
 "src/20_AssetSelection.jl" = { cyc = 7, cog = 12, arg = 4, cyc_sum = 78, cog_sum = 77, arg_sum = 31, macros = [] }
 "src/21_Pipeline/01_Base_Pipeline.jl" = { cyc = 3, cog = 2, arg = 7, cyc_sum = 46, cog_sum = 8, arg_sum = 51, macros = [] }
-"src/21_Pipeline/02_StepExecution.jl" = { cyc = 5, cog = 9, arg = 4, cyc_sum = 107, cog_sum = 79, arg_sum = 85, macros = [] }
+"src/21_Pipeline/02_StepExecution.jl" = { cyc = 6, cog = 9, arg = 4, cyc_sum = 118, cog_sum = 86, arg_sum = 95, macros = [] }
 "src/21_Pipeline/03_Pipeline.jl" = { cyc = 10, cog = 16, arg = 11, cyc_sum = 127, cog_sum = 111, arg_sum = 123, macros = ["@forward_properties"] }
 "src/21_Pipeline/04_PredictionCV.jl" = { cyc = 4, cog = 5, arg = 12, cyc_sum = 51, cog_sum = 25, arg_sum = 75, macros = [] }
 "src/21_Pipeline/05_SearchCrossValidation.jl" = { cyc = 6, cog = 12, arg = 3, cyc_sum = 33, cog_sum = 25, arg_sum = 38, macros = [] }

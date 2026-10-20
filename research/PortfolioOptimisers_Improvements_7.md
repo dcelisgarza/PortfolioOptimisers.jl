@@ -497,7 +497,7 @@ The main opportunity is to turn the library's capabilities into a portfolio tool
 ### Suggested sources
 
 1. PyPortfolioOpt documentation and source — <https://pyportfolioopt.readthedocs.io/>
-2. CVXPortfolio: A convex optimization approach to portfolio construction — <https://github.com/cvxgrp/cvxportfolio>
+2. CVXPortfolio: A convex optimization approach to portfolio construction.
 3. Meucci, A. (2005), Risk and Asset Allocation.
 4. Black, F. and Litterman, B. (1992), Global Asset Allocation.
 5. Delage, E. and Ye, Y. (2010), Distributionally Robust Optimization Under Moment Uncertainty.
