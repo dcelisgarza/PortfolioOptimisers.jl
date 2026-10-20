@@ -115,7 +115,7 @@
   link-color: rgb("#008002"),
   // Insert your abstract after the colon, wrapped in brackets.
   // Example: `abstract: [This is my abstract...]`
-  abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. PortfolioOptimisers.jl is an attempt at providing as many of these as possible under a single banner and making it accessible to all: 57 risk measures, 18 covariance estimators, 12 prior estimators and 16 optimisers, which compose with each other rather than sit in separate silos, and which a single cross-validation framework can tune as one object. We make extensive use of Julia's type system, module extensions, and multiple dispatch to simplify development and maintenance, while keeping robustness, testability, and usability high.],
+  abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. PortfolioOptimisers.jl is an attempt at providing as many of these as possible under a single banner and making it accessible to all: 57 risk measures, 22 covariance estimators, 13 prior estimators, 19 optimisers and 22 online portfolio selection rules, which compose with each other rather than sit in separate silos, and which a single cross-validation framework can tune as one object. The library reads a point-in-time universe, in which assets list, delist and are suspended, and its estimators can be updated one observation at a time rather than refitted. We make extensive use of Julia's type system, module extensions, and multiple dispatch to simplify development and maintenance, while keeping robustness, testability, and usability high.],
   keywords: ("Portfolio Optimisation", "Quantitative Investment", "Conic Optimisation", "Parameter Estimation"),
 )
 #show heading: set block(above: 1em, below: 1em)
@@ -140,7 +140,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
 
 #figure(
   placement: auto,
-  caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 16 optimisers are 3 naïve, 5 #jump based, 4 clustering, 2 ensemble, and 2 finite allocators. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
+  caption: [Concrete estimator and algorithm types per family, counted from the library's own type tree; the Result types they return are not counted. The 19 optimisers are 5 naïve, 5 #jump based, 4 clustering, 2 ensemble, 2 finite allocators, and 1 hindsight comparator. One of the naïve optimisers holds any of the 22 online portfolio selection rules, and 24 named constructors fix a rule to its published form. Composition multiplies them: any covariance estimator feeds any distance, any distance feeds any clustering or network algorithm, and any of those feeds any optimiser that asks for one.],
   table(
     columns: (auto, auto, 1fr),
     align: (left + top, center + top, left + top),
@@ -150,24 +150,30 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     table.hline(stroke: 0.5pt),
     [Risk measures], [57],
     [Variance, CVaR, EVaR, RLVaR, their range and drawdown twins, ordered weights, high order moments],
-    [Covariance and correlation], [18],
-    [Gerber, Smyth-Broby, Kendall, Spearman, mutual information, distance covariance, lower tail dependence],
-    [Expected returns], [9],
-    [Equilibrium, excess, median, windowed, and shrunk towards three targets],
-    [Prior statistics], [12],
-    [Empirical, factor, high order, four Black-Litterman variants, entropy pooling, opinion pooling],
+    [Covariance and correlation], [22],
+    [Gerber, Smyth-Broby, Kendall, Spearman, mutual information, distance covariance, lower tail dependence, geodesic shrinkage, regime adjusted exponential weighting],
+    [Expected returns], [12],
+    [Equilibrium, excess, median, windowed, exponentially weighted, price level forecasts, and shrunk towards three targets],
+    [Prior statistics], [13],
+    [Empirical, time series and cross-sectional factor, high order, four Black-Litterman variants, entropy pooling, opinion pooling],
+    [Cross-sectional factor model], [27],
+    [Descriptor estimators behind 37 named descriptors, such as book to price or momentum, factor exposures including observed and currency factors, and return forecasts],
     [Phylogeny algorithms], [14],
     [Three minimum spanning trees, DBHT, hierarchical clustering, k-means, eight centrality measures],
-    [Uncertainty sets], [4],
-    [Normal, ARCH bootstrapped, delta and characteristic, in box or ellipsoidal form],
-    [Constraints, costs, and penalties], [16],
-    [Weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
-    [Optimisers], [16],
-    [Equal weighted, inverse volatility, mean risk, near optimal centering, risk budgeting, HRP, HERC, Schur, nested clustering, stacking, discrete allocation],
-    [Cross-validation and tuning], [7],
-    [K-fold, combinatorial, walk-forward by index or by date, multiple randomised, grid and randomised search],
-    [Preprocessing and pipeline], [8],
-    [Prices to returns, missing data filter, imputer, three asset selectors, train and test split, pipelines that bundle end-to-end workflows and can be cross-validated and tuned as a single unit],
+    [Uncertainty sets], [5],
+    [Normal, ARCH bootstrapped, delta, characteristic, and orthogonal to a factor model, in box, ellipsoidal, norm ball or compact form],
+    [Calibration rules], [14],
+    [Rules that compute a significance level, a deformation parameter, an ambiguity radius, a norm ceiling, or a factor mean blend from the data in place of a number],
+    [Constraints, costs, and penalties], [17],
+    [Weight bounds, three budget forms, linear equations, thresholds, risk budgets, factor exposure, two phylogeny forms, centrality, fees, turnover, the allocation set of an online rule, and L2 or Lp weight penalties. Custom constraints and objectives are an abstract type to subtype, so they are not counted],
+    [Optimisers], [19],
+    [Equal weighted, inverse volatility, online portfolio selection, best constant rebalanced portfolio, mean risk, near optimal centering, risk budgeting, HRP, HERC, Schur, nested clustering, stacking, discrete allocation],
+    [Online portfolio selection rules], [22],
+    [Buy and hold, constant rebalancing, mirror descent, Newton step, passive aggressive and confidence weighted mean reversion, pattern matching, expert mixtures],
+    [Cross-validation and tuning], [8],
+    [K-fold, combinatorial, walk-forward by index or by date, hindsight split, multiple randomised, grid and randomised search. Every sequential scheme can also step online],
+    [Preprocessing and pipeline], [9],
+    [Price ingestion, prices to returns, missing data filter, price gap fill, three asset selectors, train and test split, pipelines that bundle end-to-end workflows and can be cross-validated and tuned as a single unit],
     table.hline(),
   ),
 )<tab1>
@@ -259,18 +265,27 @@ Pkg.activate(joinpath(@__DIR__, ".."))
 The library is configured to allow for different workflows. There is no rigid structure to the data flow. It is possible to use the library as simply as shown above or to build extremely complex workflows either manually, or using a pipeline. The functionality is grouped into three main stages, which break down into a hierarchy of standalone processes that can be used in isolation or as part of a larger workflow.
 
 + Preprocessing: data cleanup, filtering, and transformation.
-  + Transformation: fills out pathological data with something tractable.
+  + Ingestion: joins the asset, factor and benchmark tables, collapses the frequency, and records the listing span of every asset. It runs once over the whole history, because the folds of a cross-validation are cut on the dates it produces.
+  + Gap treatment: fills a missing price with something tractable, or drops the assets and observations with too many gaps.
   + Preselection: uses various non-optimisation methods to preselect assets. Can operate at the price or returns stage.
-  + Returns computation: computes returns, and can impute, drop, or fill missing data.
+  + Returns computation: computes returns, and records which assets are listed and which can be estimated at every observation.
 + Processing: these can be provided precomputed, which is valid for certain optimisers and standalone optimisations, or computed inside an optimisation, which is required for certain meta optimisers and for cross-validation. The only requirement to perform an optimisation is a prior, and for certain optimisers, a clustering.
   + Prior statistics: standalone moment estimation, integrative returns distribution estimation, and adjustments to the moment estimations.
   + Phylogeny: uncovers the relational structure of the asset universe through clustering and network analysis.
   + Constraint generation: lets users define constraints, some of which consume prior and phylogeny statistics.
   + Uncertainty sets: used for robust optimisation, they ameliorate the sensitivity to estimation errors.
   + Optimisation: consumes or internally carries out all the aforementioned steps and produces a result carrying every computed quantity.
-+ Postprocessing: reporting and visualisation, which is by far the least mature aspect of the library.
++ Postprocessing: performance reporting, attribution, forecast evaluation, regret, and visualisation.
 
 The preprocessing and processing steps can be bundled into a single pipeline object, which is itself an estimator. That pipeline can be cross-validated and tuned as a unit, so the preprocessing and processing stacks are tuned together rather than one at a time.
+
+== Point-in-time data
+
+Real universes change. Assets list late, delist, and are suspended, and a backtest that drops them from the whole sample, or holds them after they are gone, suffers from survivorship and look-ahead bias. #po never deletes a gap. The position of a gap in a price column says whether the asset was in the universe: a leading run means it had not yet listed, a trailing run that it delisted, and an interior run that it was suspended. The returns then carry an asset panel whose two masks say which assets are listed at each observation, and which of those have a finite return.
+
+The estimators downstream read those masks. A moment estimator fits on the assets it can estimate over its window, and an optional coverage policy replaces that rule with available-case estimation, in which each entry of a covariance is fitted on the observations its two assets share. Every optimiser fits on the assets it can trade and gives every other asset a weight of exactly zero, so each fold of a walk-forward runs on the universe of that fold. The fees follow the same calendar: proportional and turnover fees are charged on every observation, fixed fees once per holding period, and a liquidation charge on a position whose asset leaves the universe.
+
+The same panel holds the features of the assets, such as a market capitalisation, a sector, or a graded classification, as named numeric, categorical or tensor fields. Feature distances and the cross-sectional factor model below read them from there. Each reader of the returns, such as a prior, a clustering, or an online rule, states whether it fits on the returns themselves, on their excess over a benchmark, or on the returns of the prior.
 
 == Moments
 
@@ -278,20 +293,23 @@ The preprocessing and processing steps can be bundled into a single pipeline obj
 
 - Full or downside co-moments.
 - Weighted, unweighted.
-- Shrinkage @ledoit2004.
+- Shrinkage @ledoit2004, and geodesic shrinkage, which moves along the affine-invariant geodesic between the sample estimate and a target, and so stays positive definite at every intensity @musolas2021.
+- Exponentially weighted, and regime adjusted with an exact correction of the bias of the regime statistic.
 - Probability-theoretic, including the Gerber statistic and its descendants @gerber @smyth2022enhanced @gerber2025squeezing.
 - Denoising and detoning against the Marchenko-Pastur spectrum @mpdist @lopezdepradobook.
 - J-sparse, through information filtering networks @J_LoGo.
 - Regression-based.
 - Rank based.
 - Coskewness and cokurtosis.
+- Expected returns forecast from the price levels, such as moving averages, spatial medians, and trend switches, as the online portfolio selection literature uses them @lihoi2014.
 
 == Distance and phylogeny statistics
 
 These bundle clustering and network analysis pipelines to explore the relational structure of the asset universe, and to derive insights that constraints and optimisers can consume. Clustering and network analysis are different, but they tackle similar issues from complementary angles, and the same analysis techniques exploit the structure that each uncovers. As such we choose to categorise them under the same umbrella. The distance matrices include the first and second order distances defined in @lopezdepradobook, and are compatible with every single covariance estimator that follows the #statsbase API. The clustering and network analysis methods include:
 
 - Distance, distance-of-distance and similarity matrices.
-- Hierarchical agglomerative clustering.
+- Feature distances, which measure the assets by their exposures, memberships, factor loadings or graph neighbourhoods rather than by their returns.
+- Hierarchical agglomerative clustering, with an exact optimal leaf order @barjoseph2001.
 - Direct bubble hierarchy trees @DBHTs @NHPG.
 - K-means clustering.
 - Minimum spanning trees.
@@ -302,9 +320,20 @@ These bundle clustering and network analysis pipelines to explore the relational
 
 A prior is the returns distribution the optimisation actually sees, and it is the one component every optimiser requires. They fall under three categories:
 
-- Frequentist: empirical and timeseries factor models, for low and high moments.
+- Frequentist: empirical, timeseries factor, and cross-sectional factor models, for low and high moments.
 - Bayesian: Black-Litterman @blacklitterman1992, in vanilla, factor, Bayesian and augmented forms.
 - Information-theoretic: entropy pooling @meucci2008, including views on CVaR and EVaR @EPTail, and linear or logarithmic opinion pooling @genest1986.
+
+== Cross-sectional factor models
+
+The cross-sectional factor prior is the fundamental counterpart of the timeseries factor model @grinoldkahn1999. It reads no series of factor returns. Instead, it builds the exposure of every asset to every factor from the asset panel, and at each observation it regresses the returns of the assets on their lagged exposures, so the factor returns are estimated rather than given. The model is assembled from parts that can be used on their own:
+
+- Descriptors: values per asset and observation, computed from the panel fields, such as a book to price ratio, a momentum, or a downside beta. 37 are named, and each is a configuration of one of 17 general estimators.
+- Exposures: composites of standardised descriptors, one-hot memberships such as sectors, and observed factors whose returns are read rather than estimated, such as a currency. Each family of one-hot factors is collinear with a global factor, so the fit drops one member per family and expands the factor returns back afterwards.
+- Return forecasts: predictions of the idiosyncratic return of each asset, fitted on the descriptor scores, whose spanned part is blended with the factor mean by precision.
+- Diagnostics: the correlation, stability, dispersion and coverage of the exposures, the fit of each regression, and the standardised idiosyncratic returns. The first two groups are gathered into a single summary table, one row per factor.
+
+The prior steps online. Each new observation is folded into the carried state of every part that has an exact update, and every other part is refitted over its rows, so a step reproduces the batch fit to round-off.
 
 == Risk measures
 
@@ -313,11 +342,13 @@ A risk measure is an object, not a hard-coded branch. Any optimiser that takes o
 - Dispersion: variance, standard deviation, low order moments, range, Brownian distance variance, and a variance taken over an uncertainty set.
 - Tail: value at risk, conditional value at risk @rockafellar2000, entropic value at risk @ahmadijavid2012, power norm and relativistic value at risk @cajasbook, and worst realisation. Most have a range twin, and the conditional ones have distributionally robust variants @drcvar.
 - Drawdown: the same tail family applied to the drawdown series @chekhlov2005, plus average drawdown, maximum drawdown, and the ulcer index.
-- Ordered weights: Gini mean difference, tail Gini, and L-moments of arbitrary order, as disciplined convex programmes @owa1 @owa2 @owa3.
+- Ordered weights: Gini mean difference, tail Gini, and L-moments of arbitrary order, as disciplined convex programmes @owa1 @owa2 @owa3, including an exact formulation through a sorting network whose number of constraints grows as $T log^2 T$ in the number of observations @batcher1968.
 - High order: coskewness and cokurtosis, full or semi, standardised or not.
 - Relative: tracking error, risk tracking error and turnover, which measure deviation from a reference portfolio rather than from zero.
 
 Twelve further measures are exclusive to the hierarchical optimisers, which can use measures that are not convex in the weights because they never place them in a solver.
+
+The scalar parameters need not be numbers either. The tail probability or deformation parameter of a measure, the ambiguity radius of a measure or of a weight penalty, and a ceiling on the norm of the weights may each be a rule that the optimisation evaluates on its own prior, so it is recalibrated in every fold. The rules compute a significance level from the length of the sample, a deformation parameter from an estimate of the tail index, an ambiguity radius from the sampling error of the empirical measure @drcvar, and a norm ceiling from a floor on the effective number of assets.
 
 == Uncertainty sets
 
@@ -326,18 +357,28 @@ Uncertainty sets are used for robust optimisation, where the parameters are only
 - Box: the simplest set, defined by a lower and upper bound for each parameter @tutuncu2004.
 - Ellipsoidal: defined by a radius and a covariance matrix, forming an ellipsoid in the parameter space @goldfarb2003.
 - Characteristic: applies an L1 uncertainty set to the expected returns, which recovers the quintile portfolio as a special case @quintile. This will eventually be generalised to any characteristic vector.
+- Norm ball: the image of a norm ball under a map of any rank, so a set that is flat in the directions a factor model does not span needs no full rank shape matrix.
+- Compact: holds the worst-case variance of a covariance set as a quadratic penalty on the weights, so the problem stays a second order cone programme with no semidefinite constraint.
 
-The bounds themselves come from a normal approximation, from a delta method, or from an ARCH bootstrap of the estimator.
+The bounds themselves come from a normal approximation, from a delta method, or from an ARCH bootstrap of the estimator. A further estimator reads no returns at all: it takes the factor model of the optimisation's prior, and limits both sets to the directions that the factors do not span.
 
 == Optimisers
 
-#po provides a large number of optimisers, in five families.
+#po provides a large number of optimisers, in six families.
 
-+ Naïve: equal weighted, inverse volatility, and random weighted. Speed and robustness, but not necessarily optimality. Interesting as sub-optimisers to more complex optimisers, as fallbacks, and as the benchmark that is hardest to beat out of sample @demiguel2009naive.
++ Naïve: equal weighted, inverse volatility, and random weighted. Speed and robustness, but not necessarily optimality. Interesting as sub-optimisers to more complex optimisers, as fallbacks, and as the benchmark that is hardest to beat out of sample @demiguel2009naive. The family also holds the best constant rebalanced portfolio in hindsight, computed from Cover's fixed point without a solver @cover1991.
++ Online portfolio selection: rules that move the weights after every new price relative, most of them without a solver @lihoi2014. A batch fit makes one causal pass over its window, and an online fit continues from the state the last one reached, so both give one path. The rules cover:
+  + Benchmarks: buy and hold, and constant rebalancing.
+  + Follow the winner: mirror descent in a Euclidean, entropic, Tsallis or log-barrier geometry @helmbold1998, the Newton step @agarwal2006, and the universal portfolio @cover1991, with learning-rate schedules, optimistic gradient predictions, and any risk measure as the loss.
+  + Follow the loser: passive aggressive @li2012pamr, moving average @li2015olmar, robust median @huang2016 and confidence weighted @li2013cwmr mean reversion, anticorrelation @borodin2004, and transaction cost optimisation @li2018tco.
+  + Pattern matching: solves for the leader over the past rows that resemble the present ones @gyorfi2006, through a solver free fixed point or any #jump based optimiser.
+  + Meta-learning: mixes any of the above as experts, including mixtures built for changing environments @zhang2018ader.
+
+  The optimiser charges a turnover fee, and keeps the weights of every rule inside an allocation set, either weight bounds that project in closed form or the constraints of a #jump based optimiser. A missing return is read as cash, so a rule never trades on a return that did not happen.
 + #jump based @JuMP: the most flexible and powerful, but they require a solver, such as Clarabel @clarabel, and are typically slower than first-order optimisers. They support a wide range of constraints and objectives, and they use conic reformulations throughout. The family covers mean risk, near optimal centering, risk budgeting @maillard2010 and its relaxed form, and factor risk contribution.
 + Hierarchical: these use the relational structure of the universe to compute the risk of each group and sub-group, producing a diversified portfolio that encodes the relational structure as well as the risk characteristics of each group. They are typically faster than #jump based optimisers and support fewer constraints, but they are very good for large universes. The family covers hierarchical risk parity @hrp2016, hierarchical equal risk contribution @raffinot2017, and Schur complementary allocation @cotton2024, which interpolates between hierarchical risk parity and minimum variance.
 + Meta-optimisers: these consume other optimisers and combine their results. They are typically slower, but can be very effective. The family covers nested clustering @lopezdepradobook, stacking @wolpert1992, and subset resampling @shen2017.
-+ Finite allocators: these do not optimise portfolios in the traditional sense. The user provides a finite cash amount and the asset prices, and the allocator computes the best portfolio attainable with that cash. They run after the others have produced a result.
++ Finite allocators: these do not optimise portfolios in the traditional sense. The user provides a finite cash amount and the asset prices, and the allocator computes the best portfolio attainable with that cash. They run after the others have produced a result. A long-short book either spends the proceeds of its short sales, or caps its gross exposure at a collateral amount.
 
 == Constraints, objectives, and penalties
 
@@ -346,7 +387,7 @@ There is a huge variety of constraints. Every optimiser supports weight bounds, 
 + Weight bounds and budgets: the maximum and minimum weights, and the total value of the weights. Together they express leveraged, dollar-neutral, and long-short portfolios, and they integrate with the finite allocators, which adjust the available cash to the budget.
 + Linear constraints: used for relative weights, group exposures, risk contributions, and relational structure.
 + Cardinality constraints: sparsity, buy-in thresholds, and inclusion or exclusion rules, at the level of assets or of sets of assets. They are implemented as mixed integer linear constraints.
-+ Fees and turnover: long and short proportional fees, fixed fees, and turnover fees, which penalise the returns and therefore, indirectly, the risk measures and the objective.
++ Fees and turnover: long and short proportional fees, fixed fees, and turnover fees, which penalise the returns and therefore, indirectly, the risk measures and the objective. The fixed fees are charged once per holding period, or amortised over it.
 + Weight penalties: L-norm penalties on the objective, or hard limits on the norm of the weights, which regulate sparsity and robustness.
 + Tracking: limits on how far a portfolio may drift from a reference, in weights or in risk.
 + Objectives: minimum risk, maximum return, maximum risk-adjusted return, and maximum utility, where the risk term may itself be a scalarised vector of risk measures.
@@ -354,11 +395,26 @@ There is a huge variety of constraints. Every optimiser supports weight bounds, 
 + Custom constraints and objectives: user-defined terms that receive the optimiser's own context, and enter the objective as penalty contributions.
 + Time dependent: every constraint and every non-finite optimiser can be wrapped so that it varies across cross-validation folds. The wrapper takes a predefined list, or a function of the fold's context and the previous portfolio's weights, which allows a strategy to change its own constraints as it walks forward.
 
+== Incremental estimation
+
+Some statistics have an exact update, in which the new value follows from a running state and one new observation. The sample mean, the variance, the full covariance, the coskewness and the cokurtosis are among them, and their estimators fold each new observation into that state rather than read the sample again. Every other estimator keeps the observations it has seen, optionally capped to a rolling window, and runs its batch computation over them. Both forms answer the same call, and every optimiser updates through its prior, so a whole strategy can step forward one observation at a time.
+
 == Cross-validation, hyperparameter tuning, and pipelines
 
 The library comes equipped with a pipeline framework that can run an entire strategy end to end, and with a cross-validation framework that evaluates the out of sample performance of an optimisation or of a whole pipeline. The schemes include k-fold, index and date based walk-forward with purging, multiple randomised splits, and combinatorial splits that produce many backtest paths rather than one @lopezdepradoml. The same machinery drives the nested clustering and stacking meta-optimisers, which need out of sample predictions from their inner estimators before the outer optimisation can run.
 
+Every sequential scheme also has an online form, in which each fold updates one estimator with its new observations instead of refitting it, and a finished run can be resumed over a longer history. A hindsight split trains each fold on the row it tests, which yields the per-row comparators of dynamic regret. A fold can also be scored on the weights a fund actually holds, which drift with the returns of their assets between trades, and those held weights can be passed on to the next fold.
+
 The hyperparameter tuning framework is built on top of the cross-validation framework. Users address the steps of a pipeline by index or by name, and the fields to tune by name. Grid search takes grids of values, and random search takes grids, distributions from #link("https://github.com/JuliaStats/Distributions.jl")[Distributions.jl] @distributionsjl, or both.
+
+== Evaluation and attribution
+
+The postprocessing stage scores what the processing stage produced. The forecast evaluations also accept bare arrays, so they score a forecast from outside the library in the same way as one the library made.
+
+- Performance: annualised return and volatility, the Sharpe, Sortino and Calmar ratios, the maximum drawdown and the CVaR, and, against a benchmark, the excess return, tracking error, information ratio and turnover. The probabilistic and deflated Sharpe ratios ask whether a Sharpe ratio shows skill, or the luck of a search over many trials @sharpe_stderr @bailey2014deflated.
+- Attribution: the predicted or realised volatility and mean return of a portfolio, split into systematic, idiosyncratic and unexplained parts, by factor, by factor family and by asset, as well as Brinson attribution.
+- Forecast evaluation: the information coefficient, coverage, quantile spread, decay and calibration of a return forecast out of sample, with a test of the mean information coefficient that pairs a fixed-bandwidth long-run variance with a wild bootstrap, so the overlap of the forward windows does not inflate its significance. Covariance forecasts are scored against the returns realised after them, step by step through a walk-forward.
+- Regret: the log-wealth regret of a strategy against any comparator, with a Newey-West test of equal expected log growth @neweywest1987. A comparator fitted in hindsight on each row gives the dynamic regret, and the best sequence of allocations under a budget on its path length gives the regret against the budgeted comparator of @zinkevich2003.
 
 == Design philosophy
 
