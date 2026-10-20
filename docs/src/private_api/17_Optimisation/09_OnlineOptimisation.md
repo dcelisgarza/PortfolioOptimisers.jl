@@ -1,5 +1,5 @@
 ```@meta
-Description = "Online optimisation, private API of PortfolioOptimisers.jl: step_active_mask, prior_step_returns, fold_prior, fold_context, fold_returns, online_state_seed, …"
+Description = "Online optimisation, private API of PortfolioOptimisers.jl: step_active_mask, prior_step_returns, fold_prior, fold_context, fold_returns, fold_optimiser, …"
 ```
 
 # Online optimisation: private API

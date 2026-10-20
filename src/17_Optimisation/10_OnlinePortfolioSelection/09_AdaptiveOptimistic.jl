@@ -143,7 +143,7 @@ function solve_projection_programme!(model::JuMP.Model, proj::DiagonalProjection
     v = JuMP.objective_value(model)
     wp = JuMP.value.(w[pos])
     if shared_has(model, :op)
-        JuMP.@constraint(model, proj_face, so * model[:obj_expr] <= v)
+        JuMP.@constraint(model, proj_face, JuMP.objective_function(model) <= v)
     end
     JuMP.@constraint(model, proj_fix, sc * (w[pos] - wp) .== 0)
     JuMP.@variable(model, t_sel)
