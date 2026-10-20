@@ -125,7 +125,7 @@
   date: date,
   heading-color: rgb("#0000ff"),
   link-color: rgb("#008002"),
-  abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing algorithms, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. #po is an attempt at providing as many of these as possible under a single banner and making it accessible to all. The library is highly composable, so the many different components can be mixed and matched in arbitrary ways as long as they are compatible, providing users with the ability to create complex portfolio optimisation workflows in accordance to their needs and creativity. We make extensive use of Julia's type system, module extensions, and multiple dispatch to achieve excellent performance, robustness, correctness and testability, without sacrificing maintainability or usability.],
+  abstract: [Portfolio optimisation is the science of either: _1)_ Minimising risk whilst keeping returns to acceptable levels. _2)_ Maximising returns whilst keeping risk to acceptable levels. To some definition of acceptable, and with any number of additional constraints available to the optimisation type. There exist myriad statistical, pre- and post-processing algorithms, optimisations, and constraints that allow one to explore an extensive landscape of "optimal" portfolios. #po is an attempt at providing as many of these as possible under a single banner and making it accessible to all. The library is highly composable, so the many different components can be mixed and matched in arbitrary ways as long as they are compatible, providing users with the ability to create complex portfolio optimisation workflows in accordance with their needs and creativity. We make extensive use of Julia's type system, module extensions, and multiple dispatch to achieve excellent performance, robustness, correctness and testability, without sacrificing maintainability or usability.],
   keywords: ("Portfolio Optimisation", "Quantitative Investment", "Conic Optimisation", "Parameter Estimation"),
 )
 #show heading: set block(above: 1em, below: 1em)
@@ -168,7 +168,7 @@ There also exist myriad optimisation methods, pre-filtering, distribution and mo
     [Empirical, time series and cross-sectional factor, high order, four Black-Litterman variants, entropy pooling, opinion pooling],
     [Cross-sectional factor model], [27],
     [Descriptor estimators behind 37 named descriptors, such as book to price or momentum, factor exposures including observed and currency factors, and return forecasts],
-    [Phylogeny algorithms], [14],
+    [Phylogeny algorithms], [16],
     [Distances and distances of distances, minimum spanning trees, Direct Bubble Hierarchical Trees, hierarchical clustering, k-means, eight centrality measures],
     [Uncertainty sets], [5],
     [Normal distribution, ARCH bootstrapped, delta, characteristic, and orthogonal to a factor model, in box, ellipsoidal, norm ball or compact form],
@@ -361,7 +361,7 @@ Uncertainty sets are used for robust optimisation, where the parameters are only
 
 - Box: the simplest set, defined by a lower and upper bound for each parameter @tutuncu2004.
 - Ellipsoidal: defined by a radius and a covariance matrix, forming an ellipsoid in the parameter space @goldfarb2003.
-- Characteristic: applies a specially callibrated L1 uncertainty set to the expected returns, which recovers the quintile portfolio as a special case @quintile. This supports any characteristics vector, as long as there exists an overload for `Statistics.mean` for that vector.
+- Characteristic: applies a specially calibrated L1 uncertainty set to the expected returns, which recovers the quintile portfolio as a special case @quintile. The characteristic need not be an expected return: any vector that an expected returns estimator produces through its `Statistics.mean` method can be used.
 - Norm ball: the image of a norm ball under a map of any rank, so a set that is flat in the directions a factor model does not span needs no full rank shape matrix.
 - Compact: holds the worst-case variance of a covariance set as a quadratic penalty on the weights, so the problem stays a second order cone programme with no semidefinite constraint.
 
@@ -443,7 +443,7 @@ The strict adherence to a well-defined type hierarchy lets developers and users 
 
 == Future developments
 
-There are several planned features that have not yet been implemented these include:
+There are several planned features that have not yet been implemented. These include:
 
 + Vine copula based synthetic data prior. This would allow the generation of realistic synthetic datasets that preserve complex dependency structures observed in historical data whilst letting users perform robust stress testing and scenario analysis without relying solely on historical samples.
 + Fixed income and derivative risk models. This would enable the library to handle a broader range of financial instruments, allowing for more comprehensive portfolio optimisation and risk management strategies.
@@ -455,11 +455,11 @@ The library has an extensive and growing test suite that as of now has 98% #cove
 
 Even before AI tools became as prevalent and---for frontier models---unambiguously beneficial as they are today, the library defined high standards of quality. These have been greatly expanded and reinforced with automated checks and continuous integration, ensuring that both human and AI contributions maintain the library's high standards. There are also entire workflows that use AI tools to assist in code review; improve testing and documentation; add new features; find and fix bugs; improve the user experience by simplifying interfaces, improving logging and error messages; and overall doing the menial and boring maintenance refactors that unlock new possibilities and fix latent issues before they manifest.
 
-By being so thorough with our standards and automatic checks, we have found great success at integrating AI tools into our development workflow, allowing the library to integrate previously out of scope features, and improving the quality of existing ones. These workflows are continuously refined and expanded to maximize the benefits of AI assistance without losing our unwavering commitment to the highest standards of quality. A cursory glance at the issue tracker will reveal the lengths to which we go to ensure additions meet our quality standards, but also how much effort is put into maintaining and improving the existing codebase over time.
+By being so thorough with our standards and automatic checks, we have found great success at integrating AI tools into our development workflow, allowing the library to integrate previously out of scope features, and improving the quality of existing ones. These workflows are continuously refined and expanded to maximise the benefits of AI assistance without losing our unwavering commitment to the highest standards of quality. A cursory glance at the issue tracker will reveal the lengths to which we go to ensure additions meet our quality standards, but also how much effort is put into maintaining and improving the existing codebase over time.
 
 = Availability
 
-#po is registered under an MIT license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, etc. contributions are very much appreciated and welcome.
+#po is registered under an MIT license in the Julia General registry, so `Pkg.add("PortfolioOptimisers")` is all that is needed. The listings in this paper are executed when it is built, so the paper is checked by the same standard as the rest of the project. The library is under active development, the issue tracker keeps ideas and roadmaps for new features, maintenance tasks, bug reports, and more. Contributions are very much appreciated and welcome.
 
 We hope readers will find in #po an interesting, valuable, and trustworthy tool for their needs.
 
