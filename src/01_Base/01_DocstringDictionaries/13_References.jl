@@ -73,6 +73,9 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :benidis2018 => "[benidis2018](@cite) K. Benidis, Y. Feng and D. P. Palomar. *Optimization Methods for Financial Index Tracking: From Theory to Practice*. Foundations and Trends in Optimization 3, 171–279 (2018).",#
                  :beasley2003 => "[beasley2003](@cite) J. E. Beasley, N. Meade and T.-J. Chang. *An evolutionary heuristic for the index tracking problem*. European Journal of Operational Research 148, 621–643 (2003).",#
                  :rudolf1999 => "[rudolf1999](@cite) M. Rudolf, H.-J. Wolter and H. Zimmermann. *A linear model for tracking error minimization*. Journal of Banking & Finance 23, 85–103 (1999).",#
+                 :roll1992 => "[roll1992](@cite) R. Roll. *A mean/variance analysis of tracking error*. The Journal of Portfolio Management 18, 13–22 (1992).",#
+                 :pogue1969 => "[pogue1969](@cite) G. A. Pogue. *An extension of the Markowitz portfolio selection model to include variable transactions' costs, short sales, leverage policies and taxes*. Working paper 388-69B, Sloan School of Management, Massachusetts Institute of Technology (1969).",#
+                 :mertens2002 => "[mertens2002](@cite) E. Mertens. *Comments on variance of the IID estimator in Lo (2002)*. Working paper, University of Basel (2002).",#
                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                  :goldfarbiyengar2003 => "[goldfarbiyengar2003](@cite) D. Goldfarb and G. Iyengar. *Robust Portfolio Selection Problems*. Mathematics of Operations Research 28, 1–38 (2003).",#
                  :bentalnemirovski1998 => "[bentalnemirovski1998](@cite) A. Ben-Tal and A. Nemirovski. *Robust Convex Optimization*. Mathematics of Operations Research 23, 769–805 (1998).",#

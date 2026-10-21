@@ -320,7 +320,7 @@ Turnover
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.10 and 9.11.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.10 and 9.11. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct Turnover <: AbstractResult
     """

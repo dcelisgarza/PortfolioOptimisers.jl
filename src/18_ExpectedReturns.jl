@@ -1197,7 +1197,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:brinson_attribution])
+  - $(ref_dict[:brinson_attribution]) Pages 73-76. $(ref_dict[:no_original_source])
 """
 function brinson_attribution(X::TimeSeries.TimeArray, w::VecNum, wb::VecNum,
                              asset_classes::DataFrames.DataFrame, col, date0 = nothing,
@@ -1400,7 +1400,7 @@ The three excess statistics against a benchmark, and the turnover of the held pa
 \\end{align}
 ```
 
-The standard error of the Sharpe ratio is the Bailey and Lopez de Prado [sharpe_stderr](@cite) expression, which corrects for the skewness and the excess kurtosis of the returns:
+The standard error of the Sharpe ratio corrects for the skewness and the excess kurtosis of the returns. Its variance is the asymptotic variance of Equation 2 of [mertens2002](@cite), divided by ``T - 1`` as in Section 2.5 of [sharpe_stderr](@cite), and annualised:
 
 ```math
 \\begin{align}
@@ -1426,7 +1426,7 @@ Every weight vector of the turnover is embedded by asset name on the union of th
 
 The downside deviation of the Sortino ratio divides by ``T`` rather than by the count of losing periods, which is the Sortino and Price convention and the one that keeps the ratio comparable across series with different loss frequencies.
 
-The kurtosis term is ``(g_{2} + 2)/4`` because the source states it as ``(\\gamma_{2} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{2}``, and `StatsBase.kurtosis` returns the **excess** moment ``g_{2} = \\gamma_{2} - 3``. The two forms agree, and only this one reduces to the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series: over 200,000 samples of 250 normal returns at a per-period Sharpe ratio of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**, against **0.06721661** from this expression evaluated at the population moments and **0.06337243** from the same expression without the ``+2``.
+The kurtosis term is ``(g_{2} + 2)/4`` because Section 2.5 of [sharpe_stderr](@cite) states it as ``(\\gamma_{4} - 1)/4`` on the **raw** fourth standardised moment ``\\gamma_{4}``, and `StatsBase.kurtosis` returns the **excess** moment ``g_{2} = \\gamma_{4} - 3``. The two forms agree, and only this one reduces to the naive ``\\sqrt{(1 + \\mathrm{SR}^{2}/2)/T}`` on a normal series: over 200,000 samples of 250 normal returns at a per-period Sharpe ratio of 0.5, the sample standard deviation of the Sharpe ratio is **0.06728323**, against **0.06721661** from this expression evaluated at the population moments and **0.06337243** from the same expression without the ``+2``.
 
 A non-normal return series makes a Sharpe ratio less precise than the naive expression suggests, and negative skew makes it worse. That is the case that matters for a real portfolio, which is why the standard error ships beside the ratio.
 
@@ -1484,7 +1484,8 @@ Every method reduces to [`summarise_returns`](@ref), which runs the steps. A met
 
 # References
 
-  - $(ref_dict[:sharpe_stderr])
+  - $(ref_dict[:mertens2002]) Section 1, Equation 2.
+  - $(ref_dict[:sharpe_stderr]) Section 2.5.
 """
 function performance_summary(ret::VecNum; kwargs...)::PerformanceSummaryResult
     return summarise_returns(ret, nothing; kwargs...)
@@ -1685,7 +1686,7 @@ end
 
 Return the factor by which the skewness and the kurtosis of a return series scale the asymptotic variance of its Sharpe ratio.
 
-The factor is the numerator of the variance of the sample Sharpe ratio of [sharpe_stderr](@cite), and the variance is the factor divided by ``T - 1``. [`performance_summary`](@ref) reads it for the standard error of the Sharpe ratio, and [`sharpe_ratio_moments`](@ref) reads it for the Probabilistic Sharpe Ratio.
+The factor is the asymptotic variance of the sample Sharpe ratio for independent returns of any distribution, Equation 2 of [mertens2002](@cite). Equation 8 of [sharpe_stderr](@cite) restates it, and Section 2.5 of [sharpe_stderr](@cite) divides it by ``T - 1`` for the variance of the sample Sharpe ratio. [`performance_summary`](@ref) reads it for the standard error of the Sharpe ratio, and [`sharpe_ratio_moments`](@ref) reads it for the Probabilistic Sharpe Ratio.
 
 # Mathematical definition
 
@@ -1722,7 +1723,8 @@ The factor is ``1 + \\widehat{\\mathrm{SR}}^{2} / 2`` for a normal distribution.
 
 # References
 
-  - $(ref_dict[:sharpe_stderr]) Equation 11.
+  - $(ref_dict[:mertens2002]) Section 1, Equation 2.
+  - $(ref_dict[:sharpe_stderr]) Equation 8 and Section 2.5.
 """
 function sharpe_ratio_variance_factor(sr::Number, g1::Number, g2::Number)
     # `g2` is the EXCESS kurtosis, and the coefficient is `(gamma_4 - 1) / 4` on the raw

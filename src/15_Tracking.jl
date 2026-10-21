@@ -144,7 +144,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Applies the risk measure to the difference between the portfolio weights and the benchmark weights.
 
-The weights are the independent variable of a risk measure, so this formulation compares the two portfolios before the measure is evaluated: it reports ``R(\\boldsymbol{w} - \\boldsymbol{w}_{b})``.
+The weights are the independent variable of a risk measure, so this formulation compares the two portfolios before the measure is evaluated: it reports ``R(\\boldsymbol{w} - \\boldsymbol{w}_{b})``. Under a [`Variance`](@ref) it is the variance of the tracking error of page 15 of [roll1992](@cite), ``(\\boldsymbol{w} - \\boldsymbol{w}_{b})^{\\intercal} \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_{b})``. Any other risk measure generalises it.
 
 # Constructors
 
@@ -161,10 +161,11 @@ IndependentVariableTracking()
 
   - [`VariableTracking`](@ref)
   - [`DependentVariableTracking`](@ref)
+  - [`Variance`](@ref)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.2.
+  - $(ref_dict[:roll1992]) Page 15.
 """
 struct IndependentVariableTracking <: VariableTracking end
 """
@@ -203,7 +204,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Builds the benchmark return series by holding a fixed weight vector, net of its own fees.
 
-The benchmark is stated as a portfolio rather than as a return series, so [`tracking_benchmark`](@ref) computes ``\\mathbf{X}\\boldsymbol{w}_{b}`` on whichever return matrix the caller supplies. Use it when the benchmark is a known allocation. Use [`ReturnsTracking`](@ref) when only its realised returns are known.
+The benchmark is stated as a portfolio rather than as a return series, so [`tracking_benchmark`](@ref) computes ``\\mathbf{X}\\boldsymbol{w}_{b}`` on whichever return matrix the caller supplies. Page 15 of [roll1992](@cite) states the benchmark as such a portfolio, and Equation 1 of [rudolf1999](@cite) states the deviation of the portfolio returns from the benchmark returns. Use it when the benchmark is a known allocation. Use [`ReturnsTracking`](@ref) when only its realised returns are known.
 
 Under a prior that states `x_src = ExcessSource()` with a vector benchmark `B`, the measure tracks `X * (w - w_b) - B * (sum(w) - sum(w_b))`. It equals the tracking error on the raw returns only when the two budgets are equal. Under a matrix benchmark it tracks `(X - B) * (w - w_b)`. No check can see a difference of budgets, so the table of combinations of [`AbstractTrackingAlgorithm`](@ref) states the meaning of each pair.
 
@@ -272,7 +273,8 @@ WeightsTracking
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.18.
+  - $(ref_dict[:roll1992]) Page 15.
+  - $(ref_dict[:rudolf1999]) Section 2, Equation 1.
 """
 @propagatable @concrete struct WeightsTracking <: AbstractTrackingAlgorithm
     """
@@ -454,7 +456,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the benchmark return series itself, for a benchmark whose weights are unknown.
 
-[`tracking_benchmark`](@ref) returns the `w` field unchanged, so no return matrix is read and no fee is applied. This is the case the book states first: an index whose published series is all the caller has. Use [`WeightsTracking`](@ref) when the benchmark allocation is known.
+[`tracking_benchmark`](@ref) returns the `w` field unchanged, so no return matrix is read and no fee is applied. This is the case of Equation 1 of [rudolf1999](@cite), whose benchmark is the return series of an index: the published series is all the caller has. Use [`WeightsTracking`](@ref) when the benchmark allocation is known.
 
 The `w` field holds `T` returns, one per observation, not `N` weights. Its length must match the number of rows of the return matrix the model is built on, and [`tracking_benchmark`](@ref) refuses a mismatch. The series is fixed, so it cannot follow rows that change: the online step of an optimiser refuses it, and so do the risk ceiling of a [`ProgrammeAllocationSet`](@ref) and a [`RiskLoss`](@ref). A batch cross-validation with more than one fold refuses it too, through [`assert_folds_track_no_series`](@ref), because each fold refits on rows of its own. Use [`DataBenchmarkTracking`](@ref) to track the benchmark that the returns data carries, which follows the rows.
 
@@ -494,7 +496,7 @@ ReturnsTracking
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
+  - $(ref_dict[:rudolf1999]) Section 2, Equation 1.
 """
 @concrete struct ReturnsTracking <: AbstractTrackingAlgorithm
     """
@@ -641,7 +643,7 @@ DataBenchmarkTracking
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
+  - $(ref_dict[:rudolf1999]) Section 2, Equation 1.
 """
 @concrete struct DataBenchmarkTracking <: AbstractTrackingAlgorithm
     """
@@ -829,6 +831,8 @@ Bounds how far the portfolio return series may drift from a benchmark return ser
 
 `err` is an upper bound, not a computed value: [`set_tracking_error_constraints!`](@ref) writes one cone per `alg` and holds the scaled deviation below `err`. `tr` supplies the benchmark and `alg` names the norm that measures the deviation.
 
+The norms are those of [rudolf1999](@cite) and [beasley2003](@cite), and the docstring of each [`NormError`](@ref) gives its locator. Those works minimise the tracking error. The bound on it inside another problem follows Section 9.2 of [cajas2025](@cite).
+
 # Mathematical definition
 
 ```math
@@ -929,7 +933,9 @@ TrackingError
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.19 to 9.21.
+  - $(ref_dict[:rudolf1999]) Section 2, Equation 2. Section 3, Equations 5, 6, 7a and 7c.
+  - $(ref_dict[:beasley2003]) Section 3.5.1, Equation 9.
+  - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.19 and 9.20. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct TrackingError <: AbstractTracking
     """

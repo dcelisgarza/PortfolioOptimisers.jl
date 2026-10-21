@@ -359,6 +359,8 @@ Where:
   - ``\\boldsymbol{w} \\neq 0``: Evaluated as `!isapprox(w, 0; kwargs...)`, so `kwargs` decides how near zero counts as zero. Only the fixed terms use this test, ``\\boldsymbol{w}_{\\text{flq}} \\neq 0`` included, because a proportional fee on a zero weight is zero anyway.
   - ``\\odot``: Elementwise (Hadamard) product.
 
+The turnover term is the linear transaction cost of Equations 1 and 2 of [pogue1969](@cite), with one rate on the two sides of the trade. The proportional and the fixed fees key on the sign of the **position** rather than of the trade, so they price a holding and not a trade.
+
 The definition subtracts the short proportional term. ``\\boldsymbol{w}`` is negative wherever its indicator is one, so the minus sign makes the fee a positive charge when ``\\boldsymbol{f}_{\\text{p}}^{-}`` is non-negative.
 
 ## A negative short rate is a credit
@@ -506,7 +508,7 @@ Fees
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.14. The book states the linear variable transaction cost, which is the turnover term with equal rates on the two sides of the trade. The long/short proportional and fixed fees here key on the sign of the **position** rather than of the trade, and are a generalisation of it.
+  - $(ref_dict[:pogue1969]) Pages 8 and 12, Equations 1 and 2.
 """
 @propagatable @concrete struct Fees <: AbstractResult
     """
