@@ -22,7 +22,8 @@ Each session wrote its own driver for one test file, and one of those drivers le
   - `test/run_files.jl` runs named test files after the preamble and counts each one. It prunes
     a file to the test sets `--testset` selects, times the sets, bounds a file with a watchdog,
     and names a red that `test/known_red.toml` lists. It takes a file by a unique prefix, a case
-    regex, a resume log, and the flags of CI.
+    regex, a resume log, and the flags of CI. `test/known_red.jl` holds the rows for it and for
+    `test/runtests.jl`, whose filter passes a CI run when a row covers every failure (#1781).
   - `code_health/sweep_check.jl` names `code_health/census_preview.jl` when a branch adds a
     declaration that the two package-level censuses read. The test checks which diff lines name one.
   - `code_health/sweep_check.jl` and `code_health/sweep_triage.jl` refuse an open sweep issue whose
@@ -583,6 +584,54 @@ end
         @test isempty(stale)
         @test length(last(RF.known_red_notes(fixture_set(; failed = String[],
                                                          ran = String[]), whole))) == 1
+    end
+
+    @testset "runtests passes a run whose every failure a known_red row covers (#1781)" begin
+        KR = DriverSeam.RunFiles.KnownRedRows
+        rows = [KR.KnownRed("test_x.jl", "slow solve", 7, "a tolerance", "Linux"),
+                KR.KnownRed("test_y.jl", nothing, 8, "other file", nothing)]
+        # `Test` prints the head of a block in bold when the log has colour.
+        bold(s) = "\e[1m" * s * "\e[22m"
+        function block(name, head, site)
+            return "Error in testset $name:\n$(bold(head)) at $(bold(site))\n  Expression: a == b\n"
+        end
+        summary = "Test Summary: | Pass  Fail  Total\n  Overall     |    9     1     10\n"
+        # A block that a test file prints comes before the summary, and is not a site.
+        early = block("slow solve", "Test Failed", "/r/test/test_x.jl:1")
+        text(blocks...) = early * summary * join(blocks)
+        known = block("slow solve", "Test Failed", "/r/test/test_x.jl:12")
+        whole = block("any set", "Error During Test", "/r/test/test_y.jl:4")
+        @test KR.failure_sites(text(known, whole)) ==
+              [KR.FailureSite("slow solve", "/r/test/test_x.jl", 12),
+               KR.FailureSite("any set", "/r/test/test_y.jl", 4)]
+        @test isempty(KR.failure_sites(text())) && isempty(KR.failure_sites(early))
+        # Every failure is covered: the run passes, and each failure is named.
+        lines, green = KR.verdict(text(known, whole), rows)
+        @test green
+        @test lines[1] ==
+              "KNOWN RED /r/test/test_x.jl:12 in \"slow solve\": #7: a tolerance (Linux)"
+        @test lines[2] == "KNOWN RED /r/test/test_y.jl:4 in \"any set\": #8: other file"
+        @test startswith(lines[3], "KNOWN RED only")
+        # A new red behind a known one keeps the run red, and is named.
+        lines, green = KR.verdict(text(known,
+                                       block("fast", "Test Failed", "/r/test/test_x.jl:30")),
+                                  rows)
+        @test !(green)
+        @test lines[2] ==
+              "RED /r/test/test_x.jl:30 in \"fast\": no row of test/known_red.toml covers it"
+        # An interrupted file, the `none:1` of a crashed worker, and a run with no block to read
+        # are red.
+        @test !(last(KR.verdict(text("Error in testset test_x:\nInterrupted\n"), rows)))
+        @test !(last(KR.verdict(text(block("slow solve", "Error During Test", "none:1")),
+                                rows)))
+        lines, green = KR.verdict(text(), rows)
+        @test !(green) && startswith(only(lines), "RED the run failed")
+        # The tee writes every byte to the stream and to the buffer.
+        out, buffer = IOBuffer(), IOBuffer()
+        t = IOContext(KR.Tee(out, buffer), :color => true)
+        print(t, "ab", 'c')
+        write(t, 0x64)
+        @test String(take!(out)) == "abcd" && String(take!(buffer)) == "abcd"
     end
 
     @testset "run_files parses its options and its watchdog kills on time" begin

@@ -1,18 +1,26 @@
 # The test files, or test sets, that are red on `dev` for a reason an OPEN issue records.
 #
-# `test/run_files.jl` reads this file. When a listed file is red, its `RESULT` line ends with
-# `known red, #<issue>: <reason>`, so a session sees at once that the red is not its own, and does
-# not spend a cold run to prove it. A failure that no row covers is still named, after the rows.
-# The verdict does not change: a known red is still red.
+# Two programs read this file, through `test/known_red.jl`:
 #
-# When a row's file or test set runs and passes, the driver prints a `STALE` line. Delete the row
-# in the commit that fixes its issue, and delete a row whose issue is closed.
+#   - `test/run_files.jl`. When a listed file is red, its `RESULT` line ends with
+#     `known red, #<issue>: <reason>`, so a session sees at once that the red is not its own, and
+#     does not spend a cold run to prove it. A failure that no row covers is still named, after the
+#     rows. The verdict does not change: a known red is still red.
+#   - `test/runtests.jl`, the suite that CI runs (#1781). It prints one `KNOWN RED` or `RED` line
+#     per failure, and the run passes when every failure is covered by a row. So a known red does
+#     not hide a new one behind a red that is always there.
+#
+# When a row's file or test set runs and passes, `run_files.jl` prints a `STALE` line. Delete the
+# row in the commit that fixes its issue, and delete a row whose issue is closed.
 #
 # One `[[red]]` table per row:
 #
 #   file    = "test_X.jl"        the file, as `run_files.jl` names it (required)
 #   testset = "name"             a substring of the path of the red test set, whose names
-#                                `run_files.jl` joins with " > " (optional: the whole file)
+#                                `run_files.jl` joins with " > " (optional: the whole file).
+#                                The log of CI names only the innermost test set, so on CI the
+#                                row covers a failure only when `name` is a substring of the
+#                                innermost test set. Name the innermost set.
 #   issue   = 1234               the open issue that records the red (required)
 #   reason  = "..."              one clause: what is red, and why (required)
 #   host    = "..."              where it is red, when that is not every host (optional)

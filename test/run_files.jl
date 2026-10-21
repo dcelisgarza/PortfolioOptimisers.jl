@@ -70,7 +70,9 @@ own:
     RESULT test_04_owa.jl pass=50 fail=1 error=0 broken=0 seconds=315.6 known red, #1709: ...
 
 A failure that no row covers is named after the rows, as `red outside known_red.toml: <path>`. The
-verdict does not change: a known red is still red. When a row's file or test set runs and passes,
+verdict does not change: a known red is still red. (CI is different: `test/runtests.jl` passes a run
+whose every failure a row covers. `test/known_red.jl` holds the rows for both.) When a row's file
+or test set runs and passes,
 the driver prints a `STALE` line that asks for the row to be deleted. Under `--testset`, only the
 rows whose test set ran are judged.
 
@@ -105,13 +107,15 @@ This file is not a test: `test/runtests.jl` discovers only `test_*.jl`.
 =#
 module RunFiles
 
-using Test, LinearAlgebra, TOML
+using Test, LinearAlgebra
 
 const TEST_DIR = @__DIR__
 const REPO_ROOT = dirname(TEST_DIR)
-const KNOWN_RED = joinpath(TEST_DIR, "known_red.toml")
 
 include(joinpath(REPO_ROOT, "code_health", "julia_slot.jl"))
+# `test/runtests.jl` reads the same rows, to filter the failures of CI (#1781).
+include(joinpath(TEST_DIR, "known_red.jl"))
+using .KnownRedRows: KNOWN_RED, KnownRed, known_red, covers, row_name
 
 """
 Where [`Collect`](@ref) prints a failure and a `TIME` line. A test of the driver points it at
@@ -476,56 +480,6 @@ end
 # ---------------------------------------------------------------------------------------------
 # `test/known_red.toml`: the reds that are known and open as issues.
 # ---------------------------------------------------------------------------------------------
-
-"""
-    KnownRed
-
-One row of `test/known_red.toml`: a test file, or one of its test sets, that is red for a reason
-an open issue records.
-"""
-struct KnownRed
-    file::String
-    testset::Union{Nothing, String}
-    issue::Int
-    reason::String
-    host::Union{Nothing, String}
-end
-
-const KNOWN_RED_KEYS = ("file", "testset", "issue", "reason", "host")
-
-"""
-    known_red(path = KNOWN_RED) -> Vector{KnownRed}
-
-The rows of `path`, each a `[[red]]` table. A row with a key the driver does not read, or without
-`file`, `issue` or `reason`, is an error, so a typo does not silently disable a row.
-"""
-function known_red(path::AbstractString = KNOWN_RED)
-    if !(isfile(path))
-        return KnownRed[]
-    end
-    rows = get(TOML.parsefile(path), "red", Any[])
-    return map(rows) do r
-        extra = setdiff(keys(r), KNOWN_RED_KEYS)
-        if !(isempty(extra))
-            error("`$path`: a row has the unknown key(s) $(join(sort(collect(extra)), ", ")).")
-        end
-        for k in ("file", "issue", "reason")
-            if !(haskey(r, k))
-                error("`$path`: a row has no `$k`.")
-            end
-        end
-        return KnownRed(r["file"], get(r, "testset", nothing), r["issue"], r["reason"],
-                        get(r, "host", nothing))
-    end
-end
-
-function covers(r::KnownRed, path::AbstractString)
-    return r.testset === nothing || occursin(r.testset, path)
-end
-
-function row_name(r::KnownRed)
-    return r.testset === nothing ? r.file : "$(r.file) \"$(r.testset)\""
-end
 
 """
     known_red_notes(ts, rows; filtered = false) -> (note, stale)
