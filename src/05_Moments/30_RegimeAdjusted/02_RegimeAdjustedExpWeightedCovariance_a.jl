@@ -815,17 +815,27 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the first-moment normalisation of the regime statistic for the Mahalanobis target.
+Computes the first-moment normalisation of the regime statistic for a target that reads the
+whole active block.
 
-The statistic is a ``\\chi^2(n)`` variate, so the root has expectation
+[`MahalanobisTarget`](@ref) and [`DiagonalTarget`](@ref) both sum `n` standardised squares. The
+Mahalanobis statistic is a ``\\chi^2(n)`` variate, so the root has expectation
 ``\\sqrt{2}\\,\\Gamma((n+1)/2)/\\Gamma(n/2)``. The expression is evaluated through the log
 gamma function, which stays finite for a wide universe. At `n = 1` it is ``\\sqrt{2/\\pi}``,
 which is the constant the scalar case of [`RegimeAdjustedExpWeightedVariance`](@ref) carries.
 
+The squares of the diagonal target are correlated, so its sum is a ``\\chi^2(n)`` variate only
+at independent returns. There the constant is exact, where the root of `n`, the root of the
+mean of the statistic, is too large at every correlation. The raw statistic of
+`debias = RawStatistic()` divides by this constant. The debiased statistic is first divided by
+[`diagonal_law_factor`](@ref), which makes this constant hold at the correlation of the assets
+and the noise of each estimate, to the second order in that noise. That factor reads the
+constant, so the debiased statistic does not depend on it.
+
 # Arguments
 
   - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method (unused).
-  - `::MahalanobisTarget`: Mahalanobis regime-adjustment target.
+  - `::Union{MahalanobisTarget, DiagonalTarget}`: Regime-adjustment target.
   - `n::Integer`: Count of assets that contribute to the statistic.
 
 # Returns
@@ -838,39 +848,10 @@ which is the constant the scalar case of [`RegimeAdjustedExpWeightedVariance`](@
   - [`get_regime_state`](@ref)
   - [`RegimeAdjustedExpWeightedCovariance`](@ref)
 """
-function regime_denom(::FirstMomentRegimeAdjusted, ::MahalanobisTarget, n::Integer)
+function regime_denom(::FirstMomentRegimeAdjusted,
+                      ::Union{<:MahalanobisTarget, <:DiagonalTarget}, n::Integer)
     return sqrt(2.0) * exp(SpecialFunctions.loggamma(0.5 * (n + 1)) -
                            SpecialFunctions.loggamma(0.5 * n))
-end
-"""
-$(DocStringExtensions.TYPEDSIGNATURES)
-
-Computes the first-moment normalisation of the regime statistic for the diagonal target.
-
-The root of `n` is the root of the mean of the statistic, not the mean of its root, so it is not
-the expectation of the root at any correlation. The raw statistic of `debias = RawStatistic()` divides by
-it. The debiased statistic is first divided by [`diagonal_law_factor`](@ref), which makes this
-constant hold at the correlation of the assets and the noise of each estimate, to the second order
-in that noise.
-
-# Arguments
-
-  - `::FirstMomentRegimeAdjusted`: First-moment regime adjustment method (unused).
-  - `::DiagonalTarget`: Diagonal regime-adjustment target.
-  - `n::Integer`: Count of assets that contribute to the statistic.
-
-# Returns
-
-  - `denom::Number`: `sqrt(n)`.
-
-# Related
-
-  - [`FirstMomentRegimeAdjusted`](@ref)
-  - [`get_regime_state`](@ref)
-  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
-"""
-function regime_denom(::FirstMomentRegimeAdjusted, ::DiagonalTarget, n::Integer)
-    return sqrt(n)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

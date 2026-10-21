@@ -830,6 +830,26 @@ end
         end
         # The positive factor the bad ones were derived from still answers.
         @test all(isfinite, cov(cep, X; iv = iv, ivpa = ivpav))
+        #=
+        An implied volatility that is negative is not a volatility either. On the premium
+        path a negative last entry divided into a negative volatility, and `cor2cov!` hid its
+        sign exactly as it hides a negative factor, so the fit answered. A gap is refused by
+        the same check, with a `DomainError` that names `iv`.
+        =#
+        ivneg = copy(iv)
+        ivneg[end, 2] = -ivneg[end, 2]
+        ivgap = copy(iv)
+        ivgap[3, 2] = NaN
+        cer = ImpliedVolatility(; ppy = 252)
+        for bad in (ivneg, ivgap), f in (cov, cor)
+            @test_throws DomainError f(cep, X; iv = bad, ivpa = ivpav)
+            @test_throws DomainError f(cer, X; iv = bad)
+            @test_throws "iv" f(cep, X; iv = bad, ivpa = ivpav)
+        end
+        # A zero implied volatility is a volatility, and the premium path still answers.
+        ivzero = copy(iv)
+        ivzero[end, 2] = 0
+        @test all(isfinite, cov(cep, X; iv = ivzero, ivpa = ivpav))
         # The implied volatility series itself is mandatory. Every method refuses a missing
         # `iv` and an `iv = nothing` by name, and so does a prior fitted on returns that
         # carry none, since `prior(pe, rd)` passes `iv = rd.iv`.

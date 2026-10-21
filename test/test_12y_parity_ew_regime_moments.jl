@@ -32,6 +32,7 @@ THE MEASURE. Every case below agreed on the `NaN` pattern.
 | the same on a late listing | Better, amendment of 2026-09-29 to ADR 0181 | the raw state is the oracle's to 1.9e-16; the separate path's report is the oracle's; the multiplier moves by up to 1.9% |
 | both regime estimators in small units | Defect found and fixed: the floor | parity at the new default floor |
 | the clamp of a warm-up multiplier | Defect found and fixed | parity |
+| the first moment of the diagonal target on the raw statistic | Defect found and fixed: the constant `√n` became the expected root of a χ²(n) variate, which is exact at independent returns | 4.2e-16 by cell on "Full" |
 | the separate path on a constant asset | Better: the variance 0, where the report floored it at `min_val` | `test_08y` |
 | the separate path in the warm-up | Better: each product divides by the bias-corrected variance, `cor_vol = RawVolatility()` is the oracle's rule (#1729) | `test_08y` |
 | the portfolio target on a young block with a negative eigenvalue | Better: `indefinite = RefuseIndefiniteWarmUp()` refuses it, `ScoreIndefiniteBlock()` is the oracle's rule (#1736) | `test_08y` |
@@ -147,7 +148,7 @@ const P1383_RC = ["RCDefault" => (n) -> p1383_rc(; hl = 40, min_obs = 40),
 const P1383_RC_SERIES = ["RCDefault", "RCDiagonalLog", "RCMahalanobisFirstFull",
                          "RCCorrHL5", "RCClipAboveOne"]
 # The library's multipliers on "Small", in the order of `P1383_RC` (Better, see below).
-const P1383_SMALL_MULT = [0.7562660923140582, 0.8388726265938486, 0.8211425463273536,
+const P1383_SMALL_MULT = [0.7562660923140582, 0.8580233539546605, 0.8211425463273536,
                           0.8970151341030335, 0.7728297271335702, 0.7, 0.8437780453120634,
                           1.1643502876725171, 1.1697258124619465, 1.1611765971360257,
                           0.7605405673104944, 0.9212423935074233, 0.7208906150115325,

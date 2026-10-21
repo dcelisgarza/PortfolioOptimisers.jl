@@ -123,8 +123,8 @@ Each term of the diagonal statistic ``S = \\sum_{i} a_{i} z_{i}^{2}`` is the squ
 with the correlation ``R``, times the noise ``a_{i}`` of its estimated variance. Without the noise,
 the law of the sum is ``\\sum_{k} \\mu_{k} \\chi^{2}_{k}(1)`` on the eigenvalues ``\\mu_{k}`` of
 ``R``, which the constants of [`regime_denom`](@ref) and [`regime_kappa`](@ref) do not read. At 12
-assets and a half-life of 10 the squared multiplier on iid Normal returns is 0.93 for the first
-moment and 0.94 for the log at a correlation of 0.3, and 0.72 and 0.54 at 0.9.
+assets without the noise, the squared multiplier on Normal returns is 0.97 for the first moment
+and 0.95 for the log at a correlation of 0.3, and 0.76 and 0.55 at 0.9.
 
 The noise has the mean one, but the root and the log see it through their own moment, and the
 correlation of the assets correlates the noise of their estimates, so the mean's factor of each

@@ -155,7 +155,7 @@ end
 #=
 Issue #1432. The diagonal sum `S = Σ_i z_i²` of returns with the correlation `R` has the law
 `Σ_k μ_k χ²_k(1)` on the eigenvalues of `R`, so its root and its log read the correlation. The
-constants `√n` and `ψ(x n) + ln y` do not, so `DiagonalTarget` divides the sum by the factor of its
+constants `E[χ(n)]` and `ψ(x n) + ln y` do not, so `DiagonalTarget` divides the sum by the factor of its
 law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190).
 =#
 @testset "the diagonal statistic divides by the factor of its law" begin
@@ -163,12 +163,17 @@ law, on the estimated spectrum shrunk until its dispersion is unbiased (ADR 0190
     FM, LG = PO.FirstMomentRegimeAdjusted(), PO.LogRegimeAdjusted()
     chi_root(n) = sqrt(2) * exp(SF.loggamma((n + 1) / 2) - SF.loggamma(n / 2))
     # The law is known at independent squares, a χ²(n) variate, and at one eigenvalue n, n times
-    # a χ²(1) variate. The Log factor is one at μ = 1 whatever its parameters, because it takes each
-    # square as the Gamma(x, y) variate that its constant assumes. Measured: 1e-13 or less.
+    # a χ²(1) variate. Both factors are one at μ = 1, because each constant is the expectation at
+    # independent squares: the root of a χ²(n) variate for the first moment, and the Log's
+    # whatever its parameters, because it takes each square as the Gamma(x, y) variate that its
+    # constant assumes. Measured: 1e-13 or less.
     for n in (1, 2, 12, 200)
         spike = [n; zeros(n - 1)]
-        @test isapprox(PO.regime_law_factor(FM, ones(n)), chi_root(n)^2 / n; rtol = 1e-12)
-        @test isapprox(PO.regime_law_factor(FM, spike), 2 / pi; rtol = 1e-12)
+        @test isapprox(PO.regime_denom(FM, PO.DiagonalTarget(), n), chi_root(n);
+                       rtol = 1e-14)
+        @test isapprox(PO.regime_law_factor(FM, ones(n)), 1; rtol = 1e-12)
+        @test isapprox(PO.regime_law_factor(FM, spike), 2n / (pi * chi_root(n)^2);
+                       rtol = 1e-12)
         @test isapprox(PO.regime_law_factor(LG, ones(n)), 1; rtol = 1e-12)
         @test isapprox(PO.regime_law_factor(PO.LogRegimeAdjusted(; x = 1.3, y = 0.7),
                                             ones(n)), 1; rtol = 1e-12)
@@ -264,7 +269,7 @@ every term carries the same noise (ADR 0190).
     # the scalar method's, and at a correlation of one it is the law of one eigenvalue at the scale
     # b. Measured: 2e-15 or less.
     b, v = 0.93, 0.07
-    @test isapprox(PO.regime_law_factor(FM, [b], ones(1, 1), fill(v, 1, 1)), 2b / pi;
+    @test isapprox(PO.regime_law_factor(FM, [b], ones(1, 1), fill(v, 1, 1)), b;
                    rtol = 1e-12)
     @test isapprox(PO.regime_law_factor(LG, [b], ones(1, 1), fill(v, 1, 1)), b;
                    rtol = 1e-12)

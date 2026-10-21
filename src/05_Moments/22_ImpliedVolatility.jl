@@ -766,7 +766,7 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
 # Algorithm
 
  1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
- 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` or in `iv` with [`assert_finite_sample`](@ref).
+ 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref), and a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `sigma`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it. Every other shipped estimator absorbs it into its own `kwargs...` and ignores it.
  4. Divide `iv` by `sqrt(ce.ppy)`, converting the annualised implied volatility to the frequency of `X`.
  5. Call [`predict_realised_vols`](@ref) with `ce.alg`, giving `iv`, one predicted realised volatility per asset. The implied volatilities are the second argument and the returns the third.
@@ -788,7 +788,8 @@ The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the pred
   - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
-  - Every entry of `X` and of `iv` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
+  - Every entry of `X` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
+  - Every entry of `iv` is finite and non-negative. A `DomainError` is thrown otherwise. A gap is refused for the reason of `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, whose sign `StatsBase.cor2cov!` hides, and [`ImpliedVolatilityRegression`](@ref) takes its logarithm.
   - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
 
 # Returns
@@ -808,7 +809,7 @@ function Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     assert_finite_sample(X)
-    assert_finite_sample(iv, "iv")
+    assert_nonempty_nonneg_finite_val(iv, :iv)
     sigma = Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean,
                            iv = iv, kwargs...)
     iv = iv / sqrt(ce.ppy)
@@ -832,7 +833,7 @@ That round trip was the identity in exact arithmetic alone. In floating point th
 # Algorithm
 
  1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
- 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` or in `iv` with [`assert_finite_sample`](@ref).
+ 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref), and a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
  3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `rho`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it.
  4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.ppy)` for it exactly as it is in `cov`.
  5. Normalise `rho` in place with `StatsBase.cov2cor!`, which divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. The call also mirrors the lower triangle into the upper one, clamps every off-diagonal entry into `[-1, 1]`, and sets the diagonal to exactly one. The exact diagonal is what step 6 needs: [`matrix_processing!`](@ref) reads the value of the diagonal to decide whether it holds a correlation matrix or a covariance matrix.
@@ -853,7 +854,8 @@ That round trip was the identity in exact arithmetic alone. In floating point th
   - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
   - `dims in (1, 2)`, by [`dims_oriented`](@ref).
   - `size(X) == size(iv)`, one implied volatility per return.
-  - Every entry of `X` and of `iv` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
+  - Every entry of `X` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
+  - Every entry of `iv` is finite and non-negative. A `DomainError` is thrown otherwise. A gap is refused for the reason of `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, whose sign `StatsBase.cor2cov!` hides, and [`ImpliedVolatilityRegression`](@ref) takes its logarithm.
   - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
 
 # Returns
@@ -873,7 +875,7 @@ function Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = 
     X, iv = dims_oriented(dims, X, iv)
     @argcheck(size(X) == size(iv), DimensionMismatch)
     assert_finite_sample(X)
-    assert_finite_sample(iv, "iv")
+    assert_nonempty_nonneg_finite_val(iv, :iv)
     rho = Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean,
                          iv = iv, kwargs...)
     # The prediction is discarded. It runs so that `cor` refuses what `cov` refuses.
