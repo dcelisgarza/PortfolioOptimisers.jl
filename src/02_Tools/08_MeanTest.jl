@@ -568,7 +568,7 @@ julia> round(nd; digits = 3), round(nu; digits = 3)
 
 # References
 
-  - $(ref_dict[:satterthwaite1946])
+  - $(ref_dict[:satterthwaite1946]) Section 2, Equation 6, page 111.
 """
 struct NullMomentLaw <: AbstractOverlapStudentLaw end
 """
@@ -948,7 +948,7 @@ julia> PortfolioOptimisers.mean_test(OverlapMeanTest(), [0.1, -0.2, 0.3, 0.2, Na
 
 # References
 
-  - $(ref_dict[:satterthwaite1946])
+  - $(ref_dict[:satterthwaite1946]) Section 2, Equation 6, page 111.
 """
 @concrete struct OverlapMeanTest <: AbstractMeanTestEstimator
     """

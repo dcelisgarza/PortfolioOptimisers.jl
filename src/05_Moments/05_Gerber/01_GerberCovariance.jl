@@ -31,7 +31,7 @@ Abstract supertype for all Gerber covariance algorithm types.
 
 All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`. These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator. A subtype selects the denominator that [`comovement_ratio`](@ref) puts under the net co-movement vote, so a new subtype is a new method of that function.
 
-The three denominators are those of [`Gerber0`](@ref) (Equation 4 of [gerber](@cite)), [`Gerber1`](@ref) (Equation 11) and [`Gerber2`](@ref) (footnote 3). Section 2 of [gerber_analysis](@cite) states all three side by side, and says which version of the work introduced each.
+The three denominators are those of [`Gerber0`](@ref) (Equation 4 of [gerber](@cite)), [`Gerber1`](@ref) (Equation 11) and [`Gerber2`](@ref) (footnote 3). [gerber](@cite) is the final version of two earlier preprints (its footnote 1), and states the denominators of all three. Section 2 of [gerber_analysis](@cite) states them side by side, and attributes the first to the first preprint, the third to the 2019 preprint and the second to the final version.
 
 # Interfaces
 
@@ -48,7 +48,7 @@ If moving away from the already established Gerber covariance algorithms, you mu
 
 # References
 
-  - $(ref_dict[:gerber]) Section 2.2, Equations 4 and 11, and footnote 3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber]) Footnote 1, Section 2.1, Equation 4, Section 2.2, Equation 11, and footnote 3.
   - $(ref_dict[:gerber_analysis]) Section 2.
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
@@ -73,7 +73,7 @@ Where:
 
 An observation votes only when both assets cross, so an observation on which exactly one asset crossed leaves the statistic unchanged. The denominator vanishes when no observation moved both assets, and the statistic is zero there.
 
-This is Equation 4 of [gerber](@cite), and the raw statistic of Section 2 of [gerber_analysis](@cite), which dates it to the earliest version of the work. [gerber_analysis](@cite) adds that attribution. The library does not have that version, so the formula is checked against Equation 4 of the later one, which restates it.
+This is Equation 4 of [gerber](@cite), which it identifies with Kendall's tau when the thresholds are zero. [gerber_analysis](@cite) dates it to the first preprint of the work in its Section 2, and [gerber](@cite) is the final version of that preprint (its footnote 1). A check against Equation 4 on a random sample of four assets gives the entries of the library to the last digit.
 
 # Algorithm
 
@@ -104,7 +104,7 @@ Gerber0()
 
 # References
 
-  - $(ref_dict[:gerber]) Section 2.1, Equations 3 and 4. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber]) Section 2.1, Equations 3 and 4, and footnote 1.
   - $(ref_dict[:gerber_analysis]) Section 2.
 """
 struct Gerber0 <: GerberCovarianceAlgorithm end
@@ -188,7 +188,7 @@ Where:
 
 The normalisation is a property of the whole matrix and not of one pair, so the diagonal is unit by construction rather than by a per-pair denominator as in [`Gerber0`](@ref) and [`Gerber1`](@ref). An asset crosses concordantly with itself at every crossing, so ``h_{i,\\,i}`` counts the crossings of asset ``i``.
 
-The denominator is therefore the geometric mean of the number of observations on which asset ``i`` crossed and the number on which asset ``j`` crossed. That is the denominator of Equation 1 of [gerber_analysis](@cite), which dates the variant to the 2019 version of the work. Footnote 3 of [gerber](@cite) states the same denominator and misprints one count of its second factor. [gerber_analysis](@cite) adds the attribution and the correct count. The library does not have the 2019 version, so the formula is checked against these two restatements.
+The denominator is therefore the geometric mean of the number of observations on which asset ``i`` crossed and the number on which asset ``j`` crossed. That is the denominator of footnote 3 of [gerber](@cite), which records it as the alternative of the 2019 preprint and states that the covariance is positive semidefinite. The footnote misprints one count of its second factor, and [gerber_analysis](@cite) states the correct count in its Equation 1 and gives the same attribution. [gerber](@cite) is the final version of that preprint (its footnote 1). A check of the footnote with the correct count on a random sample of four assets gives the entries of the library to within `2.3e-16`.
 
 # Algorithm
 
@@ -219,7 +219,7 @@ Gerber2()
 
 # References
 
-  - $(ref_dict[:gerber]) Section 2.2, footnote 3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber]) Section 2.2, footnote 3, and footnote 1.
   - $(ref_dict[:gerber_analysis]) Section 2, Equation 1.
 """
 struct Gerber2 <: GerberCovarianceAlgorithm end
@@ -536,7 +536,7 @@ The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the
 
 # References
 
-  - $(ref_dict[:gerber]) Section 2.2, Equations 5 to 8. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber]) Section 2.2, Equations 5 to 8.
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
                 sd::ArrNum)
@@ -701,7 +701,7 @@ The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the norma
 
 # References
 
-  - $(ref_dict[:gerber]) Section 2.2, footnote 3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber]) Section 2.2, footnote 3.
   - $(ref_dict[:gerber_analysis]) Section 2, Equation 1.
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,

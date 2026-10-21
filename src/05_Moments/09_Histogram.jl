@@ -232,7 +232,7 @@ Scott()
 
 # References
 
-  - $(ref_dict[:scott1979])
+  - $(ref_dict[:scott1979]) Section 5, Equation 6.
 """
 struct Scott <: BinWidthBins end
 """
@@ -252,7 +252,7 @@ M &= \\left[\\frac{1}{\\sqrt{2}} \\sqrt{1 + \\sqrt{1 + \\frac{24 T}{1 - \\rho^2}
 \\end{align}
 ```
 
-The form is singular at ``\\rho^2 = 1``, at both ends of the correlation range. There the pair is deterministic and carries no joint information beyond one marginal, so the univariate formula applies, which is the limit of the bi-histogram one:
+The form is singular at ``\\rho^2 = 1``, at both ends of the correlation range, and it grows without bound as ``\\rho^2`` approaches 1. There the pair is deterministic and carries no joint information beyond one marginal, so the library applies the univariate formula, which is the one for the marginal entropy:
 
 ```math
 \\begin{align}
@@ -268,7 +268,7 @@ Where:
   - ``\\rho``: Pearson correlation between the two series.
   - ``[\\cdot]``: Rounding to the nearest integer.
 
-Section 3.9 of [mlp1](@cite) states both closed forms, credits [hacinegharbi2012](@cite) for the univariate one and [hacinegharbi2018](@cite) for the bi-histogram one, and gives the same code as this method (Snippet 3.3). No copy of either credited work was found, so the formulas follow the book. The guard at ``\\rho^2 = 1`` is the library's: Snippet 3.3 of the book applies the bi-histogram form at every correlation.
+Equation 13 of [hacinegharbi2012](@cite) states the univariate form, and its Section 3.1 says that approach had not been explored before for histogram-based estimation. [hacinegharbi2013](@cite) states it again in Equations 36 and 37, as the result of minimising the mean square error. Equation 19 of [hacinegharbi2018](@cite) states the bi-histogram form, and its Equation 20 restates the univariate one from [hacinegharbi2012](@cite). Section 3.9 of [mlp1](@cite) gives both closed forms as code (Snippet 3.3), and this method is that code. A check at sample sizes of 50, 250 and 1000 gives the bin counts of the formulas for the correlations of the pairs. The guard at ``\\rho^2 = 1`` is the library's: no equation of the cited works covers it, and Snippet 3.3 of the book applies the bi-histogram form at every correlation. The bi-histogram form of [hacinegharbi2018](@cite) differs from the form that Equation 16 of [hacinegharbi2012](@cite) and Equation 26 of [hacinegharbi2013](@cite) give for the mutual information, which the library does not use.
 
 # Constructors
 
@@ -292,9 +292,10 @@ HacineGharbiRavier()
 
 # References
 
-  - $(ref_dict[:hacinegharbi2012])
-  - $(ref_dict[:hacinegharbi2018])
-  - $(ref_dict[:mlp1]) Section 3.9, Snippet 3.3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:hacinegharbi2012]) Section 3.1, Equation 13.
+  - $(ref_dict[:hacinegharbi2013]) Section 3.2, Equations 36 and 37.
+  - $(ref_dict[:hacinegharbi2018]) Section 2.2, Equation 19, and Section 3.1, Equation 20.
+  - $(ref_dict[:mlp1]) Section 3.9, Snippet 3.3.
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
@@ -316,7 +317,7 @@ Where:
   - ``\\sigma_x``: Uncorrected standard deviation of the data.
   - ``n``: Number of observations.
 
-Theorem 1.6 of [freedman1981](@cite) gives the width that minimises the integrated squared error of a histogram as ``(6 / \\gamma)^{1/3} n^{-1/3}``, with ``\\gamma = \\int f'(x)^{2}\\,\\mathrm{d}x``. A normal density has ``\\gamma = 1 / (4\\sqrt{\\pi}\\,\\sigma^{3})``, which gives the formula above and the constant ``(24\\sqrt{\\pi})^{1/3} \\approx 3.4908``. Section 1 of that work names [scott1979](@cite) as a formal computation of the same result. No copy of [scott1979](@cite) was found, so the constant is checked against this theorem and not against that work.
+Theorem 1.6 of [freedman1981](@cite) gives the width that minimises the integrated squared error of a histogram as ``(6 / \\gamma)^{1/3} n^{-1/3}``, with ``\\gamma = \\int f'(x)^{2}\\,\\mathrm{d}x``. A normal density has ``\\gamma = 1 / (4\\sqrt{\\pi}\\,\\sigma^{3})``, which gives the formula above and the constant ``(24\\sqrt{\\pi})^{1/3} \\approx 3.4908``. Section 1 of that work names [scott1979](@cite) as a formal computation of the same result. Equation 5 of [scott1979](@cite) states the optimal width, and its Section 3 gives ``2 \\cdot 3^{1/3} \\pi^{1/6} \\sigma n^{-1/3}`` for Gaussian data, which equals ``(24\\sqrt{\\pi})^{1/3} \\sigma n^{-1/3}``. Equation 6 states the rule with the constant rounded to ``3.49`` and the standard deviation replaced by an estimate. The library keeps the exact constant, and the work does not say which estimate of the standard deviation to use.
 
 # Arguments
 
@@ -334,7 +335,7 @@ Theorem 1.6 of [freedman1981](@cite) gives the width that minimises the integrat
 
 # References
 
-  - $(ref_dict[:scott1979])
+  - $(ref_dict[:scott1979]) Section 3, Equation 5, and Section 5, Equation 6.
   - $(ref_dict[:freedman1981]) Section 1, Theorem 1.6.
 """
 function bin_width(::Scott, x::VecNum)
@@ -541,8 +542,9 @@ function calc_num_bins(::HacineGharbiRavier, xj::VecNum, xi::VecNum, j::Integer,
     #=
     The bi-histogram formula divides by `1 - corr^2`, so it is singular at BOTH ends of the
     correlation range. `isone(abs(corr))` catches them together: a perfectly anti-correlated
-    pair is as deterministic as a perfectly correlated one, and the univariate formula is the
-    limit of the bi-histogram one in either case. Testing `isone(corr)` alone sent `corr = -1`
+    pair is as deterministic as a perfectly correlated one. The bi-histogram count grows without
+    bound as `corr^2` tends to one, so it has no limit there, and the fallback to the univariate
+    formula is the library's own guard. Testing `isone(corr)` alone sent `corr = -1`
     into the singular branch, where `24T/0` is `Inf` and `round(Int, Inf)` raises an
     `InexactError`.
     =#

@@ -66,7 +66,7 @@ Where:
 
 The sample covariance matrix does not enter the form, so this target is the only one of the three that a singular covariance matrix leaves untouched.
 
-Section 3.3.1 of [fengpalomar2016](@cite) lists this target as the scenario-dependent grand mean and credits another work with it. No earlier work that states it as a shrinkage target was found, so the target follows [fengpalomar2016](@cite). It is computed from the same sample as the mean it shrinks.
+Equation 4.141 of [meucci2005](@cite) states this target as the scenario-dependent grand mean, and Section 3.3.1 of [fengpalomar2016](@cite) lists it and credits [meucci2005](@cite) with it. It is computed from the same sample as the mean it shrinks.
 
 # Algorithm
 
@@ -94,7 +94,7 @@ GrandMean()
 
 # References
 
-  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, the targets after Equation 3.31. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucci2005]) Section 4.4, Equation 4.141.
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 """
@@ -129,7 +129,7 @@ The branch of [`target_mean`](@ref) that this tag selects runs these steps.
  3. Divide the sum of `isigma * mu` by the sum of `isigma`, giving `val`. Summing a matrix-vector product is the numerator ``\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``, and summing the matrix is the denominator ``\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}``.
  4. Return the constant range that repeats `val` `length(mu)` times.
 
-Section 3.3.1 of [fengpalomar2016](@cite) states this target as the volatility-weighted grand mean, with the same quotient, and credits another work with it. No copy of that work was found, so the target follows [fengpalomar2016](@cite). It is computed from the same sample as the mean it shrinks.
+Equation 14 of [jorion1986](@cite) defines this quotient as the grand mean ``Y_0``, and notes that it is the average return of the minimum variance portfolio. Equation 4.142 of [meucci2005](@cite) states it as the volatility-weighted grand mean and credits [jorion1986](@cite) with it. It is computed from the same sample as the mean it shrinks.
 
 # Constructors
 
@@ -150,7 +150,8 @@ VolatilityWeighted()
 
 # References
 
-  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, the targets after Equation 3.31. $(ref_dict[:no_original_source])
+  - $(ref_dict[:jorion1986]) Section IV, Equation 14.
+  - $(ref_dict[:meucci2005]) Section 4.4, Equation 4.142.
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 """
@@ -183,7 +184,7 @@ The branch of [`target_mean`](@ref) that this tag selects runs these steps.
  1. Divide the trace of `sigma` by `T`, giving `val`. `T` is a required keyword of this branch alone.
  2. Return the constant range that repeats `val` `length(mu)` times.
 
-Equation 3.29 of [fengpalomar2016](@cite) states that ``\\mathrm{tr}(\\mathbf{\\Sigma}) / T`` is the mean squared error ``\\mathbb{E}\\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{\\mu} \\rVert_2^2`` of the sample mean. Equation 3.43 of [cajas2025](@cite) uses that value as a shrinkage target. No earlier work that does so was found, so the target follows [cajas2025](@cite).
+Equation 4.136 of [meucci2005](@cite) states that ``\\mathrm{tr}(\\mathbf{\\Sigma}) / T`` is the error ``\\mathbb{E}\\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{\\mu} \\rVert_2^2`` of the sample mean, and Equation 3.29 of [fengpalomar2016](@cite) restates it. Equation 3.43 of [cajas2025](@cite) uses that value as a shrinkage target. No earlier work that does so was found, so the target follows [cajas2025](@cite).
 
 # Constructors
 
@@ -204,6 +205,7 @@ MeanSquaredError()
 
 # References
 
+  - $(ref_dict[:meucci2005]) Section 4.4, Equation 4.136.
   - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.29.
   - $(ref_dict[:cajas2025]) Equation 3.43. $(ref_dict[:no_original_source])
 """
@@ -247,7 +249,8 @@ JamesStein
 
   - $(ref_dict[:james1961]) Section 2, Equation 6.
   - $(ref_dict[:bock1975]) Theorems 1 and 2.
-  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.31. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucci2005]) Section 4.4, Equations 4.138 and 4.139.
+  - $(ref_dict[:lehmanncasella1998]) Section 5.5, Theorem 5.7.
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -298,8 +301,7 @@ BayesStein
 
 # References
 
-  - $(ref_dict[:jorion1986])
-  - $(ref_dict[:cajas2025]) Section 3.4.1.2, Equation 3.44. $(ref_dict[:no_original_source])
+  - $(ref_dict[:jorion1986]) Section IV, Equations 14, 17 and 18.
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -542,7 +544,8 @@ Each branch takes the arguments the other two do not need through `args...` and 
 
 # References
 
-  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.29 and the targets after Equation 3.31. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucci2005]) Section 4.4, Equations 4.136, 4.141 and 4.142.
+  - $(ref_dict[:jorion1986]) Section IV, Equation 14.
   - $(ref_dict[:cajas2025]) Equation 3.43. $(ref_dict[:no_original_source])
 """
 function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum, args...; kwargs...)
@@ -601,7 +604,9 @@ Two consequences of the form bound where it is usable.
 
 Equation 6 of [james1961](@cite) shrinks a normal mean with an identity covariance matrix toward the origin by the factor ``1 - (N - 2) / \\lVert \\boldsymbol{x} \\rVert_2^2``. It does not clamp the factor. Theorem 2 of [bock1975](@cite) extends the minimax property to a known covariance matrix ``\\mathbf{D}`` that is not the identity, for the factor ``1 - c / (\\boldsymbol{x}^\\intercal \\mathbf{D}^{-1} \\boldsymbol{x})`` with ``0 \\leq c \\leq 2 (\\mathrm{tr}(\\mathbf{D}) / d_L - 2)``, where ``d_L`` is the largest eigenvalue of ``\\mathbf{D}``.
 
-The intensity above divides by the Euclidean norm and not by the ``\\mathbf{D}^{-1}`` quadratic form, so it is not the form of [bock1975](@cite). It is Equation 3.31 of [fengpalomar2016](@cite), whose numerator ``N \\bar{\\lambda} - 2 \\lambda_{\\max}`` is ``\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}}) - 2 \\lambda_{\\max}``. No earlier work that states this exact form was found, so the form follows [fengpalomar2016](@cite). That work sets a negative intensity to zero, and this method does not. The library plugs the sample covariance matrix in for the known matrix, and it lets [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) read the target off the same sample.
+The intensity above divides by the Euclidean norm and not by the ``\\mathbf{D}^{-1}`` quadratic form, so it is not the form of [bock1975](@cite). It is Equation 4.139 of [meucci2005](@cite), which sets the weight of Equation 4.138 and writes ``N \\bar{\\lambda} - 2 \\lambda_{\\max}`` for ``\\mathrm{tr}(\\mathbf{\\Sigma}) - 2 \\lambda_{\\max}``. Equation 3.31 of [fengpalomar2016](@cite) restates it. [meucci2005](@cite) constrains the weight to the interval ``(0, 1)``, and [fengpalomar2016](@cite) sets a negative intensity to zero. This method does neither. [meucci2005](@cite) replaces the covariance matrix by an estimate, and so does this method, which plugs the sample covariance matrix in for the known matrix and lets [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) read the target off the same sample.
+
+Theorem 5.7 of [lehmanncasella1998](@cite) states the Euclidean form ``(1 - c(\\lVert \\boldsymbol{x} \\rVert_2^2) / \\lVert \\boldsymbol{x} \\rVert_2^2) \\boldsymbol{x}`` for a known covariance matrix. It requires ``c \\geq 0`` and ``c`` nondecreasing, and it notes that the estimator differs from ``\\boldsymbol{x}`` only when ``\\mathrm{tr}(\\mathbf{\\Sigma}) > 2 \\lambda_{\\max}``. The covariance matrix of the sample mean is ``\\hat{\\mathbf{\\Sigma}} / T``, so this method has the constant ``c = (\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}}) - 2 \\lambda_{\\max}) / T``. The theorem prints the upper bound ``2 \\mathrm{tr}(\\mathbf{\\Sigma}) / \\lambda_{\\max} - 4``, which does not scale with ``\\mathbf{\\Sigma}`` as ``c`` does. Its Equation 5.15 writes the factor ``(c + 4) \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x} / \\lVert \\boldsymbol{x} \\rVert_2^2``, where Stein's identity gives ``c + 4 \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x} / \\lVert \\boldsymbol{x} \\rVert_2^2``. With that term, Equation 5.16 gives the bound ``0 \\leq c \\leq 2 (\\mathrm{tr}(\\mathbf{\\Sigma}) - 2 \\lambda_{\\max})``. The constant of this method is the midpoint of that interval, which minimises the bound on the risk.
 
 # Algorithm
 
@@ -649,7 +654,9 @@ The intensity above divides by the Euclidean norm and not by the ``\\mathbf{D}^{
 
   - $(ref_dict[:james1961]) Section 2, Equation 6.
   - $(ref_dict[:bock1975]) Theorems 1 and 2.
-  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.31. $(ref_dict[:no_original_source])
+  - $(ref_dict[:meucci2005]) Section 4.4, Equations 4.138 and 4.139.
+  - $(ref_dict[:lehmanncasella1998]) Section 5.5, Theorem 5.7.
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.31.
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -702,7 +709,9 @@ Where:
 Two consequences of the form separate this intensity from the James-Stein one.
 
   - The quadratic form is non-negative whenever ``\\hat{\\mathbf{\\Sigma}}`` is positive semidefinite, so ``\\alpha`` then lies in ``(0, 1]``. This is the only one of the three algorithms whose coefficient is a convex weight without a clamp, and it returns the target exactly when the quadratic form is zero. A covariance estimator that returns an indefinite matrix breaks the bound.
-  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``; this method uses ``\\hat{\\mathbf{\\Sigma}}``. The correction raises ``\\alpha``. Equation 3.44 credits this estimator to [jorion1986](@cite). No copy of that work was found, so the intensity follows [cajas2025](@cite).
+  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 18 of [jorion1986](@cite) puts the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-2} \\mathbf{S}`` in the quadratic form, where ``\\mathbf{S}`` is the sample covariance matrix that divides by ``T - 1``. Equation 3.44 of [cajas2025](@cite) writes the factor ``\\frac{T-1}{T-N-1}`` instead. This method uses ``\\hat{\\mathbf{\\Sigma}}`` and applies neither factor. Both factors exceed one and each raises ``\\alpha``.
+
+Equation 17 of [jorion1986](@cite) is this intensity, and Equation 14 of that work gives its target, the minimum variance grand mean of [`VolatilityWeighted`](@ref). Equation 3.44 of [cajas2025](@cite) lets the target take the values that [`JamesStein`](@ref) takes, and that use of [`GrandMean`](@ref) and [`MeanSquaredError`](@ref) follows [cajas2025](@cite) alone.
 
 # Algorithm
 
@@ -723,7 +732,7 @@ Two consequences of the form separate this intensity from the James-Stein one.
 
 # References
 
-  - $(ref_dict[:jorion1986])
+  - $(ref_dict[:jorion1986]) Section IV, Equations 14, 17 and 18.
   - $(ref_dict[:cajas2025]) Section 3.4.1.2, Equation 3.44. $(ref_dict[:no_original_source])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;

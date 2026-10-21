@@ -5,7 +5,7 @@ Abstract supertype for all coskewness estimators.
 
 All concrete and/or abstract types implementing coskewness estimation algorithms should be subtypes of `CoskewnessEstimator`.
 
-The tensor is the ``N \\times N^{2}`` matrix of third comoments that Section 2.3 of [jondeau2004](@cite) defines, and `V` is the negative spectral skewness matrix that Section 2 of [nskew](@cite) defines.
+The tensor is the ``N \\times N^{2}`` matrix of third comoments that Section 2.1 of [de2004finding](@cite) defines, by slicing each ``N \\times N`` layer of the third comoment tensor and pasting the layers side by side. Section 2.3 of [jondeau2004](@cite) restates it. `V` is the negative spectral skewness matrix that Section 2 of [nskew](@cite) defines.
 
 # Interfaces
 
@@ -122,6 +122,7 @@ MyCoskewnessEstimator
 
 # References
 
+  - $(ref_dict[:de2004finding]) Section 2.1, page 1338.
   - $(ref_dict[:jondeau2004]) Section 2.3.
   - $(ref_dict[:nskew]) Section 2.
 """
@@ -133,7 +134,7 @@ Estimates the coskewness tensor of a returns matrix, together with its negative 
 
 `Coskewness` composes a mean estimator, a matrix processing estimator and a moment algorithm. [`coskewness`](@ref) returns both matrices as a pair: the `assets × assets²` tensor first, and the `assets × assets` matrix that [`negative_spectral_coskewness`](@ref) reduces it to second. The second is not a processed copy of the first.
 
-The tensor is the one of Section 2.3 of [jondeau2004](@cite), computed with the matrix formula of Appendix A of [pkurt](@cite). The matrix is the negative spectral skewness matrix of Section 2 of [nskew](@cite). The observation weights and the matrix processing of `mp` are this library's additions.
+The tensor is the one of Section 2.1 of [de2004finding](@cite) and Section 2.3 of [jondeau2004](@cite), computed with the matrix formula of Appendix A of [pkurt](@cite). The matrix is the negative spectral skewness matrix of Section 2 of [nskew](@cite). The observation weights and the matrix processing of `mp` are this library's additions.
 
 # Fields
 
@@ -212,6 +213,7 @@ Coskewness
 
 # References
 
+  - $(ref_dict[:de2004finding]) Section 2.1, page 1338.
   - $(ref_dict[:jondeau2004]) Section 2.3.
   - $(ref_dict[:pkurt]) Appendix A.
   - $(ref_dict[:nskew]) Section 2.
@@ -475,7 +477,7 @@ Where:
   - ``\\otimes``: Kronecker product.
   - ``\\odot``: Element-wise product. Where the operands differ in shape, it broadcasts along the row axis.
 
-The unweighted tensor is the matrix formula for ``\\mathbf{M}_3`` in Appendix A of [pkurt](@cite), and its entries are the third comoments of Section 2.3 of [jondeau2004](@cite). The weighted form is this library's own.
+The unweighted tensor is the matrix formula for ``\\mathbf{M}_3`` in Appendix A of [pkurt](@cite), and its entries are the third comoments of Section 2.1 of [de2004finding](@cite) and Section 2.3 of [jondeau2004](@cite), in the layout where the entry of row ``j`` and column ``(i-1)N+k`` is the third comoment of the assets ``i``, ``j`` and ``k``. The weighted form is this library's own.
 
 # Algorithm
 
@@ -506,6 +508,7 @@ The unweighted tensor is the matrix formula for ``\\mathbf{M}_3`` in Appendix A 
 
 # References
 
+  - $(ref_dict[:de2004finding]) Section 2.1, page 1338.
   - $(ref_dict[:jondeau2004]) Section 2.3.
   - $(ref_dict[:pkurt]) Appendix A.
 """

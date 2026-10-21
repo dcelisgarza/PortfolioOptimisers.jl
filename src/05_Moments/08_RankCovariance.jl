@@ -19,7 +19,7 @@ Measures monotonic association with Kendall's tau, counting concordant against d
 
 The rank statistic is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`: entry ``(i, j)`` is ``\\hat{\\tau}^b_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j``, and the diagonal is the variance.
 
-Section 6.1.3 of [cajas2025](@cite) states the coefficient as the difference of the counts of concordant and discordant pairs over the number of pairs. The library computes the tie-corrected form, which differs from that one when the data hold ties.
+Equation 1 of [kendall1938](@cite) states the coefficient as the difference of the counts of concordant and discordant pairs over the number of pairs, and Section 6.1.3 of [cajas2025](@cite) restates it. The library computes the tie-corrected form of Equations 10 and 12 of [kendall1945](@cite), which differs from that one when the data hold ties.
 
 # Fields
 
@@ -71,7 +71,9 @@ KendallCovariance
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 6.1.3, Equation 6.3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:kendall1938]) Section 2, Equation 1.
+  - $(ref_dict[:kendall1945]) Sections 10 to 11, Equations 10 and 12.
+  - $(ref_dict[:cajas2025]) Section 6.1.3, Equation 6.3.
 """
 @propagatable @concrete struct KendallCovariance <: RankCovarianceEstimator
     """
@@ -118,7 +120,7 @@ Where:
   - ``t_g``, ``u_h``: Sizes of the ``g``-th group of tied ``x`` values and the ``h``-th group of tied ``y`` values.
   - $(math_dict[:T])
 
-Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is equation 6.3 of the source. **The two differ when ties are present**, because the tie counts shrink the denominator.
+Without ties, ``n_x = n_y = 0`` and ``\\hat{\\tau}^b`` reduces to ``\\tau_a = (C - D) / \\binom{T}{2}``, which is Equation 1 of [kendall1938](@cite). **The two differ when ties are present**, because the tie counts shrink the denominator. [kendall1945](@cite) scores a tied pair zero in Equation 10, which gives the denominator of the formula above through Equation 12. On the ten ranks of its Example 3 the library returns ``33 / \\sqrt{41 \\cdot 36} \\approx 0.8590``, the value that the work gives.
 
 # Algorithm
 
