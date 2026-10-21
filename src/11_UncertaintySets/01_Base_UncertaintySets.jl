@@ -930,7 +930,7 @@ Its sibling [`EllipsoidalUncertaintySetAlgorithm`](@ref) selects the ellipsoid i
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.1.
+  - $(ref_dict[:sousalobo2000]) Sections 3.1 and 4.
 """
 struct BoxUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm end
 """
@@ -938,9 +938,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the element-wise lower and upper bounds of a box uncertainty set on a mean vector or on a covariance matrix.
 
-A box is a convex polytope, so it reads as a polyhedral confidence interval on the entries it bounds. Its worst case is Equation 11.19 on the mean axis and Equation 11.20 on the covariance axis of the source.
+A box is a convex polytope, so it reads as a polyhedral confidence interval on the entries it bounds. Section 3.1 of [sousalobo2000](@cite) states the worst case on the mean axis, ``\\hat{\\boldsymbol{\\mu}}^{\\intercal} \\boldsymbol{w} - \\delta^{\\intercal} \\lvert \\boldsymbol{w} \\rvert`` for a box symmetric about ``\\hat{\\boldsymbol{\\mu}}``. Section 5.2.6 of the same work states the worst case on the covariance axis, as Equation 7, the dual of the semidefinite programme of Equation 6.
 
-**The two axes read the bounds differently, so a set fitted for one axis is not a set for the other.** On the mean axis [`set_ucs_return_constraints!`](@ref) reads the bounds only through their half-width ``(\\boldsymbol{u} - \\boldsymbol{\\ell}) / 2``, the ``\\delta_{\\boldsymbol{\\mu}}`` of Equation 11.14, and centres that width on `val`. Neither `lb` nor `ub` is a bound on the mean on its own, which is why two estimators write one set two ways and agree: [`ARCHUncertaintySet`](@ref) stores the two quantiles of the bootstrap mean, while [`DeltaUncertaintySet`](@ref) and the normal box write ``\\boldsymbol{\\ell} = \\boldsymbol{0}`` and put the whole width in ``\\boldsymbol{u}``. On the covariance axis [`set_ucs_variance_risk!`](@ref) reads ``\\operatorname{tr}(\\mathbf{A}_{u} \\mathbf{\\Sigma}_{u}) - \\operatorname{tr}(\\mathbf{A}_{l} \\mathbf{\\Sigma}_{l})`` under ``\\mathbf{A}_{u} - \\mathbf{A}_{l} = \\mathbf{W}``, so both bounds bind on their own and the covariance box is absolute. That route names no centre, so it never reads `val`.
+**The two axes read the bounds differently, so a set fitted for one axis is not a set for the other.** On the mean axis [`set_ucs_return_constraints!`](@ref) reads the bounds only through their half-width ``(\\boldsymbol{u} - \\boldsymbol{\\ell}) / 2``, the ``\\delta`` of the definition below, and centres that width on `val`. Neither `lb` nor `ub` is a bound on the mean on its own, which is why two estimators write one set two ways and agree: [`ARCHUncertaintySet`](@ref) stores the two quantiles of the bootstrap mean, while [`DeltaUncertaintySet`](@ref) and the normal box write ``\\boldsymbol{\\ell} = \\boldsymbol{0}`` and put the whole width in ``\\boldsymbol{u}``. On the covariance axis [`set_ucs_variance_risk!`](@ref) reads ``\\operatorname{tr}(\\mathbf{A}_{u} \\mathbf{\\Sigma}_{u}) - \\operatorname{tr}(\\mathbf{A}_{l} \\mathbf{\\Sigma}_{l})`` under ``\\mathbf{A}_{u} - \\mathbf{A}_{l} = \\mathbf{W}``, so both bounds bind on their own and the covariance box is absolute. That route names no centre, so it never reads `val`.
 
 # Mathematical definition
 
@@ -1000,8 +1000,7 @@ BoxUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.14.
-  - $(ref_dict[:sousalobo2000])
+  - $(ref_dict[:sousalobo2000]) Sections 3.1, 4 and 5.2.6, Equations 6 and 7.
 """
 @concrete struct BoxUncertaintySet <: AbstractUncertaintySetResult
     """
@@ -1226,7 +1225,7 @@ NormalKUncertaintyAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.2.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Listings 11.10 and 11.11. $(ref_dict[:no_original_source])
 """
 @concrete struct NormalKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
     """
@@ -1246,7 +1245,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the ellipsoid radius `k` as `sqrt((1 - q) / q)`, the closed form that holds for any distribution of the estimation errors.
 
-It is the second branch of Equation 11.23 of the source, and it reads neither the data nor the shape matrix. The radius comes from Cantelli's one-sided Chebyshev inequality, so it holds for any law of the estimation errors that has the stated second moment. Use [`ChiSqKUncertaintyAlgorithm`](@ref) instead when the errors are normal, because the chi-squared radius is the tighter one there.
+It is the factor ``\\kappa(\\epsilon)`` of Theorem 1 of [elghaoui2003](@cite), Equation 8, at ``\\epsilon = q``, and it reads neither the data nor the shape matrix. The theorem bounds the worst-case value-at-risk over every law with a given mean and covariance. The radius comes from Cantelli's one-sided Chebyshev inequality, so it holds for any law of the estimation errors that has the stated second moment. Use [`ChiSqKUncertaintyAlgorithm`](@ref) instead when the errors are normal, because the chi-squared radius is the tighter one there.
 
 The guarantee is a bound in one direction and not a simultaneous region for the whole vector. It covers the scalar a robust row bounds — the worst-case value of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\mu}`` along the weights the model picks — with probability at least ``1 - q``, whereas the chi-squared radius is a joint confidence region for every entry at once.
 
@@ -1271,8 +1270,7 @@ Inverting the form gives ``\\left(1 + k^{2}\\right)^{-1} = q``, which is Cantell
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.23.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equations 7 and 8.
 """
 struct GeneralKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm end
 """
@@ -1280,11 +1278,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the ellipsoid radius `k` as the square root of the `1 - q` chi-squared quantile, the closed form that holds when the estimation errors are normal.
 
-The degrees of freedom are the dimension of the set, the number of free coordinates the estimation error spans. That is ``N`` on the mean axis. On the covariance axis the error is a vectorised **symmetric** ``N \\times N`` matrix: the entries ``(i, j)`` and ``(j, i)`` are one number, so the error spans ``N(N+1)/2`` coordinates of the ``N^{2}``, and the shape of the normal method, ``\\left(\\mathbf{I} + \\mathbf{K}\\right) \\left(\\mathbf{\\Sigma} \\otimes \\mathbf{\\Sigma}\\right) / T``, has exactly that rank. The squared Mahalanobis distance of a normal error is chi-squared at the rank of its shape, so a full covariance shape reads ``N(N+1)/2``. A diagonal shape reads ``N^{2}``, because its statistic sums ``N^{2}`` terms of unit mean. [`ucs_dimension`](@ref) states the rule, and the set builders pass its value to [`k_ucs`](@ref) and [`k_norm_ball`](@ref).
+The degrees of freedom are the dimension of the set, the number of free coordinates the estimation error spans. That is ``N`` on the mean axis. On the covariance axis the error is a vectorised **symmetric** ``N \\times N`` matrix: the entries ``(i, j)`` and ``(j, i)`` are one number, so the error spans ``N(N+1)/2`` coordinates of the ``N^{2}``, and the shape of the normal method, ``\\left(\\mathbf{I} + \\mathbf{K}\\right) \\left(\\mathbf{\\Sigma} \\otimes \\mathbf{\\Sigma}\\right) / T``, has exactly that rank, because Theorem 3.1 (vi) of [magnus1979](@cite) gives ``\\mathbf{K}`` the eigenvalue ``+1`` with multiplicity ``N(N+1)/2``. The squared Mahalanobis distance of a normal error is chi-squared at the rank of its shape, so a full covariance shape reads ``N(N+1)/2``. A diagonal shape reads ``N^{2}``, because its statistic sums ``N^{2}`` terms of unit mean. [`ucs_dimension`](@ref) states the rule, and the set builders pass its value to [`k_ucs`](@ref) and [`k_norm_ball`](@ref).
 
 **`ambient = true` reads the dimension of the ambient space instead**, the first dimension of the shape matrix or of the geometry map: ``N^{2}`` on every covariance shape. That radius is too large for its level. At ``N = 5`` and ``q = 0.05`` it is ``6.136`` where the set dimension gives ``5.000``, and the set covers ``0.999`` of the errors, not ``0.95``. The ratio of the two radii falls to ``1 / \\sqrt{2}`` as ``N`` increases. The field keeps that rule one keyword away, for a comparison with a caller that counts every entry of the vectorised matrix.
 
-**The source states this closed form for the mean axis only.** Equation 11.23 defines ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` with ``n`` degrees of freedom, ``n`` being the number of assets, and obtains ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` by simulation rather than in closed form. The form on the covariance axis is this library's extension of it. [`NormalKUncertaintyAlgorithm`](@ref) on the same errors gives the empirical counterpart, and the two agree up to the noise of the simulation.
+**The sources state this closed form for the mean axis only.** Equation 50 of [goldfarbiyengar2003](@cite) states that the Mahalanobis distance of a normal estimation error is chi-squared at the dimension of the estimate. That work sizes its sets with an F quantile, because it estimates the variance. Equation 11.23 of [cajas2025](@cite) takes ``\\kappa^{2}_{\\boldsymbol{\\mu}}`` as the chi-squared quantile at ``n`` degrees of freedom, ``n`` being the number of assets, and obtains ``\\kappa^{2}_{\\mathbf{\\Sigma}}`` by simulation rather than in closed form. The form on the covariance axis is this library's extension of it. Section 4.1 of [sousalobo2000](@cite) bounds the ``N(N+1)/2`` distinct entries of the covariance with its ellipsoid, which is the count the set dimension reads. [`NormalKUncertaintyAlgorithm`](@ref) on the same errors gives the empirical counterpart, and the two agree up to the noise of the simulation.
 
 # Mathematical definition
 
@@ -1331,8 +1329,10 @@ ChiSqKUncertaintyAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.23.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equations 50 and 54.
+  - $(ref_dict[:sousalobo2000]) Section 4.1.
+  - $(ref_dict[:magnus1979]) Theorem 3.1 (vi).
+  - $(ref_dict[:cajas2025]) Equation 11.23. $(ref_dict[:no_original_source])
 """
 @concrete struct ChiSqKUncertaintyAlgorithm <: AbstractUncertaintyKAlgorithm
     """
@@ -1356,7 +1356,7 @@ end
 
 Compute the radius `k` of an ellipsoidal uncertainty set at significance level `q`.
 
-The two closed forms are the two branches of Equation 11.23 of the source, and the simulated route is its empirical counterpart. A plain `Number` in place of an algorithm is the radius itself.
+The two closed forms are the two branches of Equation 11.23 of [cajas2025](@cite). The distribution-free branch is the factor of Theorem 1 of [elghaoui2003](@cite), and the chi-squared branch rests on Equation 50 of [goldfarbiyengar2003](@cite). The simulated route is the empirical counterpart that Section 11.3.2 of [cajas2025](@cite) describes. A plain `Number` in place of an algorithm is the radius itself.
 
 # Algorithm
 
@@ -1400,8 +1400,9 @@ The first three methods each run one procedure. The fourth, `k_ucs(type::Number,
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.2.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equations 7 and 8.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Equation 11.23 and Listings 11.10 and 11.11. $(ref_dict[:no_original_source])
 """
 function k_ucs(km::NormalKUncertaintyAlgorithm, q::Number, X::MatNum, sigma_X::MatNum,
                ::Integer = size(sigma_X, 1))
@@ -1426,7 +1427,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects an ellipsoidal uncertainty set, and carries the radius algorithm and the diagonal switch it needs.
 
-Its sibling [`BoxUncertaintySetAlgorithm`](@ref) selects the box instead. The ellipsoid reads the correlation between the entries it bounds through its shape matrix, which `diagonal = true` discards to remove the noise in the off-diagonal estimation errors.
+Its sibling [`BoxUncertaintySetAlgorithm`](@ref) selects the box instead. The ellipsoid reads the correlation between the entries it bounds through its shape matrix, which `diagonal = true` discards to remove the noise in the off-diagonal estimation errors. Section 11.3.2 of [cajas2025](@cite) states that practice, and Sections 3.2 and 4.1 of [sousalobo2000](@cite) state the two ellipsoids.
 
 # Fields
 
@@ -1461,7 +1462,8 @@ EllipsoidalUncertaintySetAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 11.3.2.
+  - $(ref_dict[:sousalobo2000]) Sections 3.2 and 4.1.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Equation 11.24. $(ref_dict[:no_original_source])
 """
 @concrete struct EllipsoidalUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -1487,6 +1489,8 @@ $(DocStringExtensions.TYPEDEF)
 Selects a norm-ball uncertainty set, and carries the radius algorithm, the diagonal switch and the norm order it needs.
 
 Its siblings [`BoxUncertaintySetAlgorithm`](@ref) and [`EllipsoidalUncertaintySetAlgorithm`](@ref) select the two older shapes. The set it selects is a [`NormBallUncertaintySet`](@ref), which holds a geometry map rather than a shape matrix, so an estimator that emits it factorises the shape once at fit time, or skips the shape entirely and stores its own deviations. `diagonal = true` discards the correlation between the estimation errors of different entries, exactly as it does on the ellipsoid.
+
+Theorem 2 of [bertsimas2011](@cite) states the worst case over a norm ball, which reads the dual norm, and credits [bertsimas2004](@cite) with it. Equation 14 of [bentalnemirovski1998](@cite) defines the Euclidean case, an ellipsoid that can be flat.
 
 # Fields
 
@@ -1531,8 +1535,9 @@ NormBallUncertaintySetAlgorithm
 
 # References
 
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
   - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
 """
 @concrete struct NormBallUncertaintySetAlgorithm <: AbstractUncertaintySetAlgorithm
     """
@@ -1615,7 +1620,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the shape matrix, the radius, and the axis tag of an ellipsoidal uncertainty set on a mean vector or on a covariance matrix.
 
-An ellipsoid is a Mahalanobis ball, so it reads as a confidence region that carries the correlation between the entries it bounds. Its worst case is Equation 11.25 on the mean axis and Equation 11.26 on the covariance axis of the source, and both are second-order cones.
+An ellipsoid is a Mahalanobis ball, so it reads as a confidence region that carries the correlation between the entries it bounds. Section 3.2 of [sousalobo2000](@cite) states the set and its worst case on the mean axis. Section 4.1 of the same work bounds the distinct entries of the covariance with an ellipsoid, and Equation 6.12 of [fengpalomar2016](@cite) restates that set on ``\\text{vec}(\\mathbf{\\Sigma})``. Equations 6.13 to 6.15 of [fengpalomar2016](@cite) state its worst case, and both worst cases are second-order cones.
 
 **`class` names the axis, and the axis fixes both the size of `sigma` and the index a view applies.** A [`MuUncertaintySetClass`](@ref) carries an ``N \\times N`` shape matrix and takes the plain asset index. A [`SigmaUncertaintySetClass`](@ref) carries an ``N^{2} \\times N^{2}`` one, because it bounds a vectorised covariance, so [`port_opt_view`](@ref) recovers ``N`` from the shape matrix and maps the asset index through [`fourth_moment_index_generator`](@ref) before it slices. The two consumers dispatch on the tag too, and the robust-return builder refuses a set that carries the covariance tag.
 
@@ -1685,8 +1690,8 @@ EllipsoidalUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.22.
-  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:sousalobo2000]) Sections 3.2 and 4.1.
+  - $(ref_dict[:fengpalomar2016]) Section 6.1, Equations 6.6, 6.7 and 6.12 to 6.15.
 """
 @concrete struct EllipsoidalUncertaintySet <: AbstractUncertaintySetResult
     """

@@ -302,6 +302,8 @@ One fit serves both axes. [`ucs`](@ref) takes the weighted factor span once and 
 
 The point estimates stay as the prior states them. The mean set is centred on `pr.mu` and the covariance set carries `pr.sigma`, so the prior is not shrunk. The correction is a worst case that grows with the exposure of the portfolio to the Orthogonal Subspace, and it counters an optimiser that over-allocates to the directions the factors do not span.
 
+The pair of sets is this library's construction. Section 3 of [saxena2010](@cite) shows that an optimiser over-weights the component of the characteristic that the factors do not span. Section 5 of that work adds one factor along that component to the risk model, the Alpha Alignment Factor of [saxena2013](@cite). The covariance set extends that penalty to every direction the factors do not span. The mean set is a flat ellipsoid in the sense of Equation 14 of [bentalnemirovski1998](@cite), confined to the same subspace.
+
 Inside a cluster of a hierarchical optimiser, the two routes give different sets on purpose. The estimator refits on the viewed prior, so it takes the factor span of the cluster's own loadings and sizes its radius on that span. A pair of sets fitted before is viewed instead, and each view is the projection of its set: the worst case of a cluster portfolio as a portfolio of the full universe, with the radius of the full set. The two views still spare the same portfolios.
 
 # Mathematical definition
@@ -395,9 +397,10 @@ OrthogonalUncertaintySet
 
 # References
 
-  - $(ref_dict[:palomar2025]) Chapter 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3.
+  - $(ref_dict[:saxena2010]) Sections 3 and 5. $(ref_dict[:no_original_source])
+  - $(ref_dict[:saxena2013])
+  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
 """
 @concrete struct OrthogonalUncertaintySet <: AbstractPriorUncertaintySetEstimator
     """

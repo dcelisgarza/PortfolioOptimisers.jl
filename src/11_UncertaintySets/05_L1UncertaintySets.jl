@@ -224,7 +224,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Signed ``\\ell_1`` uncertainty set on the characteristic vector, with a separate error budget per sign.
 
-The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a *mean/characteristic* vector alone, and has no covariance analogue. [quintile](@cite) introduces it in order to *decouple* the long-short problem into two independent problems, Equations 27 and 28 of [quintile](@cite). Remark 12 of [quintile](@cite) then recombines them only when the two legs happen to have complementary support. The worst case below models the coupled problem directly, so that caveat does not arise.
+The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a *mean/characteristic* vector alone, and has no covariance analogue. [quintile](@cite) introduces it in order to *decouple* the long-short problem into two independent problems, Equations 27 and 28 of [quintile](@cite). Remark 12 of [quintile](@cite) then recombines them only when the two legs happen to have disjoint support. The worst case below models the coupled problem directly, so that caveat does not arise.
 
 # Mathematical definition
 
@@ -594,7 +594,7 @@ L1UncertaintySet
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
   - [`mu_ucs`](@ref): the only fitting verb this estimator answers.
-  - [`StandardDeviationExpectedReturns`](@ref): the characteristic need not be an expected return. A prior built on this estimator ranks on volatility, the Low Volatility factor, and reproduces Table III of [quintile](@cite).
+  - [`StandardDeviationExpectedReturns`](@ref): the characteristic need not be an expected return. A prior built on this estimator ranks on volatility, with the highest volatility first. Section VI-C of [quintile](@cite) ranks the lowest volatility first, the Low Volatility factor of its Table III, so that ranking needs the negated volatility as the characteristic.
   - [`AbstractUncertaintySetEstimator`](@ref)
 
 # References
@@ -647,7 +647,7 @@ Where:
 
 This is the threshold of Lemma 2 (``\\sigma_i = 1``) and of Lemma 9 (scaled) of [quintile](@cite). Both lemmas state that the number of active assets is the largest ``k`` with ``L_k < \\epsilon``, so a radius in the open interval ``(L_q,\\, L_{q+1})`` activates exactly ``q`` assets, and the active weights are equal (Lemma 2) or inverse-volatility (Lemma 9). Corollaries 4 and 11 of [quintile](@cite) read this off at the quintile.
 
-Two consequences bound the sequence. Every summand of ``L_1`` is zero, so ``L_1 = 0``: a strictly positive radius always activates at least one asset. And ``L_{k+1} - L_k = \\sum_{i=1}^{k+1} (\\hat{\\mu}_k - \\hat{\\mu}_{k+1}) / \\sigma_i \\geq 0`` because the ranking is non-increasing, so the sequence is non-decreasing and its rungs bracket. Equality holds exactly when ``\\hat{\\mu}_k = \\hat{\\mu}_{k+1}``, which is the tie that Assumption 1 of [quintile](@cite) excludes.
+Two consequences bound the sequence. Every summand of ``L_1`` is zero, so ``L_1 = 0``: a strictly positive radius always activates at least one asset. And ``L_{k+1} - L_k = \\sum_{i=1}^{k} (\\hat{\\mu}_k - \\hat{\\mu}_{k+1}) / \\sigma_i \\geq 0`` because the ranking is non-increasing, so the sequence is non-decreasing and its rungs bracket. The summand ``i = k+1`` of ``L_{k+1}`` is zero, which is why the sum stops at ``k``. Equality holds exactly when ``\\hat{\\mu}_k = \\hat{\\mu}_{k+1}``. [quintile](@cite) admits such a tie, and its Assumption 1 excludes only a radius equal to a rung, so that the count of active assets is unique.
 
 # Algorithm
 
@@ -769,7 +769,7 @@ Above the last rung any radius activates every entry, so the top of the ladder h
 # Validation
 
   - `length(ladder) >= 1`, otherwise an `IsEmptyError` is thrown.
-  - `ladder[q+1] > ladder[q]` when `q < L`, otherwise a `DomainError` is thrown. The rungs coincide when the characteristic has ties across the cut, the interval the closed form needs is empty, and no radius delivers the requested count. Assumption 1 of [quintile](@cite) excludes the case, so the message names the two fixes: break the tie, or pass an explicit radius.
+  - `ladder[q+1] > ladder[q]` when `q < L`, otherwise a `DomainError` is thrown. The rungs coincide when the characteristic has ties across the cut, the interval the closed form needs is empty, and no radius delivers the requested count. [quintile](@cite) admits ties, and its Assumption 1 excludes only a radius equal to a rung. The midpoint needs a strict ladder, so the message names the two fixes: break the tie, or pass an explicit radius.
 
 # Returns
 
@@ -830,7 +830,7 @@ Resolve a radius from a [`Num_UcSEps`](@ref) against the characteristic vector.
 
 # Mathematical definition
 
-The paired ladder adds the ladder of the ranking to the ladder of the reversed, negated ranking, which is Lemma 6 of [quintile](@cite):
+The paired ladder adds the ladder of the ranking to the ladder of the reversed, negated ranking. With ``\\sigma_i = 1`` it is the threshold of Lemma 6 of [quintile](@cite). The scaled form adds the two scaled ladders of Corollary 13 of [quintile](@cite), which that work states for two radii on ``\\mathcal{A}_2``. That work states no lemma for one radius on the scaled set, so the scaled form is this library's extension, and it serves as a calibration aid:
 
 ```math
 \\begin{align}
@@ -847,7 +847,7 @@ Where:
   - $(math_dict[:sigma_i_ucs])
   - $(math_dict[:N])
 
-A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom ``q`` short, so it activates ``2q`` assets (Corollary 7). Lemma 5 gives the reason the ladder stops at ``\\lfloor N/2 \\rfloor``: an optimal dollar-neutral solution satisfies ``w_i = -w_{N+1-i}``, so with an odd ``N`` the middle asset pairs with itself, its weight solves ``w = -w``, and it is never active. The largest count the paired branch can reach is therefore ``2 \\lfloor N/2 \\rfloor``, which is ``N-1`` when ``N`` is odd.
+A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom ``q`` short, so it activates ``2q`` assets (Corollary 7, which states it with ``\\sigma_i = 1``). Lemma 5 gives the reason the ladder stops at ``\\lfloor N/2 \\rfloor``, and it too is stated with ``\\sigma_i = 1``: an optimal dollar-neutral solution satisfies ``w_i = -w_{N+1-i}``, so with an odd ``N`` the middle asset pairs with itself, its weight solves ``w = -w``, and it is never active. The largest count the paired branch can reach is therefore ``2 \\lfloor N/2 \\rfloor``, which is ``N-1`` when ``N`` is odd.
 
 # Algorithm
 

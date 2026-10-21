@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits a box uncertainty set by widening the prior statistics by a fixed fraction of their own absolute value.
 
-It is the delta method of Equation 11.15 of the source, the one route in the family that draws no sample: `dmu` and `dsigma` are the two fractions. Its sampling counterparts are [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref). The two axes do not write the same kind of bound, so read [`mu_delta_box_set`](@ref) and [`sigma_delta_box_set`](@ref) before you read a fitted set entry by entry. A fraction of zero is admitted on either axis and collapses that axis to a degenerate box, which leaves the model with its nominal expression on that axis and no worst case at all.
+It is the delta method of Equation 11.15 of [cajas2025](@cite), the one route in the family that draws no sample: `dmu` and `dsigma` are the two fractions. Its sampling counterparts are [`NormalUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref). The two axes do not write the same kind of bound, so read [`mu_delta_box_set`](@ref) and [`sigma_delta_box_set`](@ref) before you read a fitted set entry by entry. A fraction of zero is admitted on either axis and collapses that axis to a degenerate box, which leaves the model with its nominal expression on that axis and no worst case at all.
 
 # Fields
 
@@ -66,7 +66,7 @@ DeltaUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.15.
+  - $(ref_dict[:cajas2025]) Equation 11.15. $(ref_dict[:no_original_source])
 """
 @concrete struct DeltaUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -140,7 +140,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.15.
+  - $(ref_dict[:cajas2025]) Equation 11.15. $(ref_dict[:no_original_source])
 """
 function mu_delta_box_set(pr, dmu::Number)
     return BoxUncertaintySet(;
@@ -198,7 +198,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.15.
+  - $(ref_dict[:cajas2025]) Equation 11.15. $(ref_dict[:no_original_source])
 """
 function sigma_delta_box_set(pr, dsigma::Number)
     d_sigma = dsigma * abs.(pr.sigma)

@@ -14,7 +14,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :gerber2025squeezing => "[gerber2025squeezing](@cite) S. Gerber, W. Smyth, H. Markowitz, Y. Miao, P. Ernst and P. Sargen. *Squeezing financial noise: A novel approach to covariance matrix estimation*. Available at SSRN 4986939 (2025).",#
                  :J_LoGo => "[J_LoGo](@cite) W. Barfuss, G. P. Massara, T. Di Matteo and T. Aste. *Parsimonious modeling with information filtering networks*. Phys. Rev. E 94, 062306 (2016).",#
                  :fengpalomar2016 => "[fengpalomar2016](@cite) Y. Feng and D. P. Palomar. *A signal processing perspective of financial engineering*. Foundations and Trends in Signal Processing 9, 1–231 (2016).",#
-                 :fabozzi2007 => "[fabozzi2007](@cite) F. J. Fabozzi, P. N. Kolm, D. A. Pachamanova and S. M. Focardi. *Robust Portfolio Optimization and Management* (John Wiley & Sons, Hoboken, NJ, 2007).",#
                  :sousalobo2000 => "[sousalobo2000](@cite) M. Sousa Lobo and S. Boyd. *The worst-case risk of a portfolio*. Technical report, Stanford University (2000).",#
                  :higham2002 => "[higham2002](@cite) N. J. Higham. *Computing the nearest correlation matrix—a problem from finance*. IMA Journal of Numerical Analysis 22, 329–343 (2002).",#
                  :rebonato2000 => "[rebonato2000](@cite) R. Rebonato and P. Jäckel. *The most general methodology for creating a valid correlation matrix for risk management and option pricing purposes*. Journal of Risk 2, 17–27 (2000).",#
@@ -77,6 +76,15 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :cajas2025 => "[cajas2025](@cite) D. Cajas. *Advanced Portfolio Optimization: A Cutting-edge Quantitative Approach* (Springer Nature Switzerland, 2025).",#
                  :goldfarbiyengar2003 => "[goldfarbiyengar2003](@cite) D. Goldfarb and G. Iyengar. *Robust Portfolio Selection Problems*. Mathematics of Operations Research 28, 1–38 (2003).",#
                  :bentalnemirovski1998 => "[bentalnemirovski1998](@cite) A. Ben-Tal and A. Nemirovski. *Robust Convex Optimization*. Mathematics of Operations Research 23, 769–805 (1998).",#
+                 :elghaoui2003 => "[elghaoui2003](@cite) L. El Ghaoui, M. Oks and F. Oustry. *Worst-Case Value-At-Risk and Robust Portfolio Optimization: A Conic Programming Approach*. Operations Research 51, 543–556 (2003).",#
+                 :tutuncu2004 => "[tutuncu2004](@cite) R. H. Tütüncü and M. Koenig. *Robust Asset Allocation*. Annals of Operations Research 132, 157–187 (2004).",#
+                 :bertsimas2004 => "[bertsimas2004](@cite) D. Bertsimas, D. Pachamanova and M. Sim. *Robust linear optimization under general norms*. Operations Research Letters 32, 510–516 (2004).",#
+                 :bertsimas2011 => "[bertsimas2011](@cite) D. Bertsimas, D. B. Brown and C. Caramanis. *Theory and Applications of Robust Optimization*. SIAM Review 53, 464–501 (2011).",#
+                 :saxena2010 => "[saxena2010](@cite) A. Saxena and R. A. Stubbs. *Finance, Statistics, Accounting, Optimization and some Alignment Problems*. Axioma Research Paper No. 28, Axioma, Inc. (2010).",#
+                 :magnus1979 => "[magnus1979](@cite) J. R. Magnus and H. Neudecker. *The Commutation Matrix: Some Properties and Applications*. The Annals of Statistics 7, 381–394 (1979).",#
+                 :tracy1969 => "[tracy1969](@cite) D. S. Tracy and P. S. Dwyer. *Multivariate Maxima and Minima with Matrix Derivatives*. Journal of the American Statistical Association 64, 1576–1594 (1969).",#
+                 :wishart1928 => "[wishart1928](@cite) J. Wishart. *The Generalised Product Moment Distribution in Samples from a Normal Multivariate Population*. Biometrika 20A, 32–52 (1928).",#
+                 :saxena2013 => "[saxena2013](@cite) A. Saxena and R. A. Stubbs. *Alpha alignment factor: A solution to the underestimation of risk for optimized active portfolios*. Journal of Risk 15 (2013).",#
                  :cover1991 => "[cover1991](@cite) T. M. Cover. *Universal portfolios*. Mathematical Finance 1, 1–29 (1991).",#
                  :coverordentlich1996 => "[coverordentlich1996](@cite) T. M. Cover and E. Ordentlich. *Universal portfolios with side information*. IEEE Transactions on Information Theory 42, 348–363 (1996).",#
                  :helmbold1998 => "[helmbold1998](@cite) D. P. Helmbold, R. E. Schapire, Y. Singer and M. K. Warmuth. *On-line portfolio selection using multiplicative updates*. Mathematical Finance 8, 325–347 (1998).",#

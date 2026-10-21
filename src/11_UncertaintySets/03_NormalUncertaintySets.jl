@@ -116,7 +116,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits a box or an ellipsoidal uncertainty set from the sampling laws that normal returns imply: the mean is normal and the covariance is Wishart.
 
-The two laws are Equation 11.16 of the source. `alg` picks the shape, and `n_sim` sets the number of Wishart draws the covariance bounds are read from. Its sampling-free counterpart is [`DeltaUncertaintySet`](@ref), and its distribution-free counterpart is [`ARCHUncertaintySet`](@ref).
+The two laws are Equation 11.16 of [cajas2025](@cite). The law of the covariance is the distribution of Equation 9 of [wishart1928](@cite), and Corollary 4.2 of [magnus1979](@cite) gives its covariance, the shape of the ellipsoid on the covariance axis. Equation 11.17 of [cajas2025](@cite) reads the box from the quantiles of the two laws. `alg` picks the shape, and `n_sim` sets the number of Wishart draws the covariance bounds are read from. Its sampling-free counterpart is [`DeltaUncertaintySet`](@ref), and its distribution-free counterpart is [`ARCHUncertaintySet`](@ref).
 
 # Fields
 
@@ -196,9 +196,9 @@ NormalUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
-  - $(ref_dict[:fabozzi2007])
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:wishart1928]) Section 3, Equation 9.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:cajas2025]) Equations 11.16 and 11.17. $(ref_dict[:no_original_source])
 """
 @concrete struct NormalUncertaintySet <: AbstractUncertaintySetEstimator
     """
@@ -347,8 +347,8 @@ julia> PortfolioOptimisers.commutation_matrix(rand(3, 2))
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.17.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:magnus1979]) Section 3, Definition 3.1 and Theorem 3.1 (vii). $(ref_dict[:no_original_source])
+  - $(ref_dict[:tracy1969])
 """
 function commutation_matrix(X::MatNum)
     m, n = size(X)
@@ -437,8 +437,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.16.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:cajas2025]) Equations 11.16 and 11.24. $(ref_dict[:no_original_source])
 """
 function mu_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma::MatNum, T::Number)
     sigma_mu = sigma / T
@@ -468,7 +467,7 @@ Where:
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:T])
 
-The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})`` for a normal sample. Its ``(i,j)`` diagonal entry is ``\\left(\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj} + \\hat{\\Sigma}_{ij}^{2}\\right) / T``, which is the variance of the ``(i,j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw. The sample that [`ucs`](@ref) builds from those draws and the shape matrix it measures that sample against are therefore on one scale. A `diagonal = true` set keeps this diagonal under [`DiagonalOfShape`](@ref), the default. [`ShapeOfDiagonal`](@ref) builds the diagonal from the variances alone, and [`diagonal_sigma_shape`](@ref) states both rules.
+The left-hand form is Corollary 4.2 of [magnus1979](@cite), ``\\operatorname{Var}(\\operatorname{vec} \\mathbf{S}) = k (\\mathbf{I} + \\mathbf{K})(\\mathbf{V} \\otimes \\mathbf{V})`` for ``\\mathbf{S} \\sim \\mathrm{Wishart}(k, \\mathbf{V})``, at ``k = T`` and ``\\mathbf{V} = \\mathbf{\\Sigma}_{\\boldsymbol{\\mu}}``. The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{\\mathbf{\\Sigma}})`` for a normal sample. Its ``(i,j)`` diagonal entry is ``\\left(\\hat{\\Sigma}_{ii} \\hat{\\Sigma}_{jj} + \\hat{\\Sigma}_{ij}^{2}\\right) / T``, which is the variance of the ``(i,j)`` entry of a ``\\mathrm{Wishart}(T, \\hat{\\mathbf{\\Sigma}}/T)`` draw. The sample that [`ucs`](@ref) builds from those draws and the shape matrix it measures that sample against are therefore on one scale. A `diagonal = true` set keeps this diagonal under [`DiagonalOfShape`](@ref), the default. [`ShapeOfDiagonal`](@ref) builds the diagonal from the variances alone, and [`diagonal_sigma_shape`](@ref) states both rules.
 
 # Algorithm
 
@@ -497,8 +496,7 @@ The right-hand form is the asymptotic covariance of ``\\operatorname{vec}(\\hat{
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
 """
 function sigma_asymptotic_cov(pdm::Option{<:AbstractPosdefEstimator}, sigma_mu::MatNum,
                               sigma::MatNum, T::Number)
@@ -614,6 +612,8 @@ Where:
 
 Each entry of the resulting interval covers ``1 - 2q`` of the sampling law of that entry, because the two tails carry ``q`` each. The interval is one entry at a time, so it is not a joint region for the whole vector.
 
+The half-width is the ``\\delta_{\\boldsymbol{\\mu},i}`` of Equation 11.17 of [cajas2025](@cite). The text of that equation calls ``\\sigma_i`` the standard deviation of the asset, but its Listing 11.7 and this method take the standard error of the mean, ``\\sqrt{(\\hat{\\mathbf{\\Sigma}} / T)_{ii}}``.
+
 # Algorithm
 
  1. Take the ``1 - q`` standard normal quantile with `Distributions.cquantile`, giving the multiplier ``z_{q}``.
@@ -641,8 +641,7 @@ Each entry of the resulting interval covers ``1 - 2q`` of the sampling law of th
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.14 and 11.19.
-  - $(ref_dict[:fabozzi2007])
+  - $(ref_dict[:cajas2025]) Equation 11.17 and Listing 11.7. $(ref_dict[:no_original_source])
 """
 function mu_normal_box_set(mu::VecNum, sigma_mu::MatNum, q::Number)
     mu_u = Distributions.cquantile(Distributions.Normal(), q) *
@@ -1346,7 +1345,7 @@ Constructs an ellipsoidal uncertainty set for expected returns under the assumpt
 
 This is the prior-result arm of the verb, defined for a set whose `pe` is `nothing`. Inside an optimiser `pr` is the prior the optimiser is solving on, so the set is centred on the objective's own `mu` and folds with it under the online step; standalone it takes `prior(pe, X)` spelled out. The returns-data arm of the same verb fits the set's own prior through [`ucs_prior`](@ref) and forwards here, so the two routes share this one body.
 
-The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T`` of Equation 11.24. This method runs no simulation, so it serves every radius algorithm that reads none, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same shape.
+The shape matrix is ``\\hat{\\mathbf{\\Sigma}} / T``, the asymptotic covariance of the mean that [`mu_asymptotic_cov`](@ref) builds. This method runs no simulation, so it serves every radius algorithm that reads none, which is [`ChiSqKUncertaintyAlgorithm`](@ref), [`GeneralKUncertaintyAlgorithm`](@ref) and a plain number. Its sibling on [`NormalKUncertaintyAlgorithm`](@ref) draws the sample that the empirical radius needs, and builds the same shape.
 
 # Mathematical definition
 
@@ -1603,8 +1602,10 @@ The two sets are the two ellipsoids of the sibling route with their shape matric
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:cajas2025]) Section 11.3.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
@@ -1670,8 +1671,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.16, 11.17 and 11.24.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function ucs(ue::NormalUncertaintySet{Nothing,
                                       <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
@@ -1732,8 +1736,9 @@ The map is the factor of ``\\hat{\\mathbf{\\Sigma}} / T``, so the set is the mea
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.24.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:cajas2025]) Section 11.3.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
@@ -1789,8 +1794,10 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.24.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function mu_ucs(ue::NormalUncertaintySet{Nothing,
                                          <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,
@@ -1847,8 +1854,10 @@ The map is the factor of the vectorised covariance's asymptotic covariance, so t
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:cajas2025]) Section 11.3.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:NormBallUncertaintySetAlgorithm{<:NormalKUncertaintyAlgorithm,
@@ -1908,8 +1917,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equations 11.17 and 11.24.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:magnus1979]) Section 4, Corollary 4.2.
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function sigma_ucs(ue::NormalUncertaintySet{Nothing,
                                             <:NormBallUncertaintySetAlgorithm{<:Any, <:Any,

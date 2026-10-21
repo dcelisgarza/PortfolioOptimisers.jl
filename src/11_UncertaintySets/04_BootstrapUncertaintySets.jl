@@ -75,7 +75,7 @@ Because a block wraps, every observation is drawn equally often. `block_size` is
 
 # References
 
-  - $(ref_dict[:politis1994stationary])
+  - $(ref_dict[:politis1994stationary]) Section 2.
 """
 struct StationaryBootstrap <: ARCHBootstrapSet end
 """
@@ -95,7 +95,7 @@ A block starts anywhere in `1:T` and runs `block_size` indices forward, each tak
 
 # References
 
-  - $(ref_dict[:politis1992circular])
+  - $(ref_dict[:politis1992circular]) Section 2.
 """
 struct CircularBootstrap <: ARCHBootstrapSet end
 """
@@ -107,6 +107,8 @@ A block starts in `1:(T - block_size + 1)` and runs `block_size` indices forward
 
 **The price of the missing wrap is uneven coverage.** Observation `j` of the first `block_size` observations lies inside only `j` of the start positions, so it is drawn about `j / block_size` as often as an observation of the middle, and the last `block_size` observations mirror the ramp. So the first and the last observations carry about `1 / block_size` of the weight of a middle one. Prefer [`CircularBootstrap`](@ref) when that asymmetry is not wanted.
 
+Section 2.3 of [kunsch1989](@cite) assumes that `block_size` divides `T`. This scheme does not, and it cuts the last block short instead.
+
 # Related
 
   - [`ARCHBootstrapSet`](@ref)
@@ -115,7 +117,7 @@ A block starts in `1:(T - block_size + 1)` and runs `block_size` indices forward
 
 # References
 
-  - $(ref_dict[:kunsch1989])
+  - $(ref_dict[:kunsch1989]) Section 2.3, Equation 2.7.
 """
 struct MovingBootstrap <: ARCHBootstrapSet end
 """
@@ -178,9 +180,9 @@ The method Julia selects on the type of `alg` is the algorithm, so the three pro
 
 # References
 
-  - $(ref_dict[:politis1994stationary])
-  - $(ref_dict[:politis1992circular])
-  - $(ref_dict[:kunsch1989])
+  - $(ref_dict[:politis1994stationary]) Section 2.
+  - $(ref_dict[:politis1992circular]) Section 2.
+  - $(ref_dict[:kunsch1989]) Section 2.3, Equation 2.7.
 """
 function bootstrap_indices(::StationaryBootstrap, rng::Random.AbstractRNG, T::Integer,
                            block_size::Integer)
@@ -226,7 +228,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits a box or an ellipsoidal uncertainty set from the spread of the statistics over a block bootstrap of the return series.
 
-It is the bootstrapping method of Equation 11.18 of [cajas2025](@cite), and it assumes no law for the returns. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref). The docstring of each bootstrap type cites the work that defines it.
+It is the bootstrapping method of Equation 11.18 of [cajas2025](@cite), and it assumes no law for the returns. Section 4 of [tutuncu2004](@cite) first reads the bounds of a box from the percentiles of bootstrapped means and covariances. That work resamples single observations and keeps the interval of the mean as it falls. Equation 11.18 of [cajas2025](@cite) resamples blocks and centres the half-width of the interval on the point estimate, and its Listing 11.11 builds the ellipsoid from the same resamples. The `bootstrap` field picks one of the three block bootstraps, each of which the library implements itself in [`bootstrap_indices`](@ref). The docstring of each bootstrap type cites the work that defines it.
 
 **The name carries no volatility model.** It is inherited from the block-bootstrap routines of a volatility-modelling package, and this type fits no such model: it refits `me` and `ce` on each resample and reads the spread of the refits, so no docstring in this file states a conditional variance recursion.
 
@@ -332,7 +334,8 @@ ARCHUncertaintySet
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 11.18.
+  - $(ref_dict[:tutuncu2004]) Sections 2.1 and 4, Equations 4 and 5.
+  - $(ref_dict[:cajas2025]) Equation 11.18 and Listing 11.11. $(ref_dict[:no_original_source])
 """
 @concrete struct ARCHUncertaintySet <: BootstrapUncertaintySetEstimator
     """
@@ -1171,8 +1174,11 @@ Where:
 
 # References
 
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Listing 11.11. $(ref_dict[:no_original_source])
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                     <:NormBallUncertaintySetAlgorithm, <:Any, <:Any, <:Any,
@@ -1236,8 +1242,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Listing 11.11. $(ref_dict[:no_original_source])
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function mu_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                        <:NormBallUncertaintySetAlgorithm, <:Any, <:Any,
@@ -1296,8 +1305,11 @@ This is the prior-result arm of the verb, defined for a set whose `pe` is `nothi
 
 # References
 
-  - $(ref_dict[:bentalnemirovski1998]) Section 3, Equation 14.
-  - $(ref_dict[:goldfarbiyengar2003]) Section 5.
+  - $(ref_dict[:cajas2025]) Section 11.3.2, Listing 11.11. $(ref_dict[:no_original_source])
+  - $(ref_dict[:goldfarbiyengar2003]) Section 5, Equation 50.
+  - $(ref_dict[:elghaoui2003]) Theorem 1, Equation 8.
+  - $(ref_dict[:bertsimas2011]) Section 2.2, Theorem 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:bertsimas2004])
 """
 function sigma_ucs(ue::ARCHUncertaintySet{Nothing, <:Any, <:Any,
                                           <:NormBallUncertaintySetAlgorithm, <:Any, <:Any,
