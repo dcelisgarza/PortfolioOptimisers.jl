@@ -285,7 +285,7 @@ of a constraint on that norm.
 
 # References
 
-  - $(ref_dict[:demiguel2009])
+  - $(ref_dict[:demiguel2009]) Pages 798-812. $(ref_dict[:no_original_source])
 """
 abstract type AbstractRegularisationEstimator <: AbstractEstimator end
 """
@@ -406,7 +406,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:demiguel2009])
+  - $(ref_dict[:demiguel2009]) Pages 798-812. $(ref_dict[:no_original_source])
 """
 @concrete struct L2Regularisation <: AbstractRegularisationEstimator
     """
@@ -760,7 +760,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:demiguel2009])
+  - $(ref_dict[:demiguel2009]) Pages 798-812. $(ref_dict[:no_original_source])
 """
 @concrete struct LpRegularisation <: AbstractRegularisationEstimator
     """

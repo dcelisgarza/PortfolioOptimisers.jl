@@ -21,7 +21,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :gmd => "[gmd](@cite) S. Yitzhaki. *Stochastic dominance, mean variance, and Gini's mean difference*. The American Economic Review 72, 178–185 (1982).",#
                  :knuth2019 => "[knuth2019](@cite) K. H. Knuth. *Optimal data-based binning for histograms and histogram-based probability density models*. Digital Signal Processing 95, 102581 (2019).",#
                  :kunsch1989 => "[kunsch1989](@cite) H. R. Künsch. *The jackknife and the bootstrap for general stationary observations*. The Annals of Statistics 17, 1217–1241 (1989).",#
-                 :markowitz1952 => "[markowitz1952](@cite) H. Markowitz. *Modern portfolio theory*. Journal of Finance 7, 77–91 (1952).",#
+                 :markowitz1952 => "[markowitz1952](@cite) H. Markowitz. *Portfolio selection*. The Journal of Finance 7, 77–91 (1952).",#
                  :mlp1 => "[mlp1](@cite) M. M. De Prado. *Machine learning for asset managers* (Cambridge University Press, 2020).",#
                  :lopezdeprado2018 => "[lopezdeprado2018](@cite) M. López de Prado. *Advances in Financial Machine Learning* (John Wiley & Sons, Hoboken, NJ, 2018).",#
                  :laloux1999 => "[laloux1999](@cite) L. Laloux, P. Cizeau, J.-P. Bouchaud and M. Potters. *Noise dressing of financial correlation matrices*. Phys. Rev. Lett. 83, 1467–1470 (1999).",#
@@ -222,8 +222,9 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :cotton2024 => "[cotton2024](@cite) P. Cotton. *Schur Complementary Allocation: A Unification of Hierarchical Risk Parity and Minimum Variance Portfolios*. arXiv preprint arXiv:2411.05807 (2024).",#
                  :kelly1956 => "[kelly1956](@cite) J. L. Kelly. *A new interpretation of information rate*. Bell System Technical Journal 35, 917–926 (1956).",#
                  :thorp2008 => "[thorp2008](@cite) E. O. Thorp. *The Kelly criterion in blackjack, sports betting, and the stock market*. In: *Handbook of Asset and Liability Management*, Vol. 1 (North-Holland, 2008); pp. 385–428.",#
-                 :chares2009 => "[chares2009](@cite) R. Chares. *Cones and interior-point algorithms for structured convex optimization involving powers and exponentials*. Ph.D. Thesis, Université catholique de Louvain, Louvain-la-Neuve, Belgium (2009).",#
+                 :chares2009 => "[chares2009](@cite) P. R. Chares. *Cones and interior-point algorithms for structured convex optimization involving powers and exponentials*. Ph.D. Thesis, Université catholique de Louvain, Louvain-la-Neuve, Belgium (2009).",#
                  :sharpe1964 => "[sharpe1964](@cite) W. F. Sharpe. *Capital asset prices: a theory of market equilibrium under conditions of risk*. The Journal of Finance 19, 425–442 (1964).",#
+                 :sharpe1966 => "[sharpe1966](@cite) W. F. Sharpe. *Mutual fund performance*. The Journal of Business 39, 119–138 (1966).",#
                  :schaibleibaraki1983 => "[schaibleibaraki1983](@cite) S. Schaible and T. Ibaraki. *Fractional programming*. European Journal of Operational Research 12, 325–338 (1983).",#
                  :charnescooper1962 => "[charnescooper1962](@cite) A. Charnes and W. W. Cooper. *Programming with linear fractional functionals*. Naval Research Logistics Quarterly 9, 181–186 (1962).",#
                  :grinoldkahn1999 => "[grinoldkahn1999](@cite) R. C. Grinold and R. N. Kahn. *Active Portfolio Management: A Quantitative Approach for Producing Superior Returns and Controlling Risk*. 2 Edition (McGraw-Hill, New York, 1999).",#
@@ -238,7 +239,7 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :roncalliweisang2012 => "[roncalliweisang2012](@cite) T. Roncalli and G. Weisang. *Risk parity portfolios with risk factors*. Available at SSRN 2155159 (2012).",#
                  :meucci2007 => "[meucci2007](@cite) A. Meucci. *Risk contributions from generic user-defined factors*. Available at SSRN 930034 (2007).",#
                  :mosek2023c => "[mosek2023c](@cite) MOSEK ApS. *MOSEK Portfolio Optimization Cookbook* (2023).",#
-                 :jump2026cones => "[jump2026cones](@cite) The JuMP Developers. *Modeling with cones*, a conic programming tutorial of the JuMP documentation (2026).",#
+                 :lobo1998 => "[lobo1998](@cite) M. S. Lobo, L. Vandenberghe, S. Boyd and H. Lebret. *Applications of second-order cone programming*. Linear Algebra and its Applications 284, 193–228 (1998).",#
                  :cajas2019noc => "[cajas2019noc](@cite) D. Cajas. *Robust portfolio selection with near optimal centering*. Available at SSRN 3572435 (2019).",#
                  :degraaf2016 => "[degraaf2016](@cite) T. de Graaf. *Robust Mean-Variance Optimization*. Master's Thesis, Leiden University (2016).",#
                  :gambetakwon2020 => "[gambetakwon2020](@cite) V. Gambeta and R. Kwon. *Risk return trade-off in relaxed risk parity portfolio optimization*. Journal of Risk and Financial Management 13, 237 (2020).",#
