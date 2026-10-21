@@ -46,7 +46,8 @@ julia> asset_sets_matrix(est, sets)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2-9.4.
+  - $(ref_dict[:chang2000]) Section 2.6, Equation 15.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2 to 9.4. It adds the row of indicator coefficients and the equality over a group.
 """
 @concrete struct AssetSetsMatrixEstimator <: AbstractConstraintEstimator
     """

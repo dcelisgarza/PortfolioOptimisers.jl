@@ -679,6 +679,28 @@ end
     @test_throws DimensionMismatch solve_p(; ple = IntegerPhylogeny(; A = zeros(Int, 5, 5)))
 end
 
+@testset "Integer phylogeny holds one asset of each closed neighbourhood (#1539)" begin
+    # The graph of Figure 13 of graphpo1. Equation 9 there is `(A + I) z <= 1`, and the
+    # Ricca and Scozzari slides state the same rows: held assets are at distance at least 3.
+    # So two assets that share a neighbour are forbidden too, not only two neighbours.
+    A = zeros(Int, 7, 7)
+    for (i, j) in ((1, 2), (1, 3), (1, 4), (2, 5), (2, 6), (3, 6), (4, 6), (6, 7))
+        A[i, j] = A[j, i] = 1
+    end
+    pl = IntegerPhylogeny(; A = A, B = 1)
+    zs = [digits(k; base = 2, pad = 7) for k in 0:127]
+    held = Set(findall(isone, z) for z in zs if all(pl.A * z .<= pl.B))
+    eq9 = Set(findall(isone, z) for z in zs if all((A + I) * z .<= 1))
+    apart = Set(findall(isone, z)
+                for z in zs if all(A[i, j] * z[i] * z[j] == 0 for i in 1:7, j in 1:7))
+    @test held == eq9
+    @test length(held) == 12
+    @test length(apart) == 32
+    # Assets 2 and 3 are not neighbours, but both are neighbours of asset 1.
+    @test [2, 3] in apart
+    @test !([2, 3] in held)
+end
+
 @testset "Tracking" begin
     rdb = prices_to_returns(TimeArray(CSV.File(joinpath(@__DIR__,
                                                         "./assets/SP500_idx.csv.gz"));

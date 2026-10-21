@@ -36,7 +36,9 @@ Where:
   - ``\\phi``: Risk measure of the optimiser.
   - ``\\lambda``: Multiplier of the barrier constraint.
 
-Only the **relative** entries of ``\\boldsymbol{b}`` reach the solution. The barrier is positively homogeneous of degree one in ``\\boldsymbol{b}``, so ``c\\, \\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` and ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` cut the same set for every ``c > 0``, and the multiplier ``\\lambda`` of the risk-contribution identity absorbs the scale.
+The original states the barrier as ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq c`` with an arbitrary constant ``c``, and rescales ``\\boldsymbol{y}`` to sum to one after the solve. This library writes ``c = 0``.
+
+Only the **relative** entries of ``\\boldsymbol{b}`` reach the solution. With ``c = 0`` the barrier is positively homogeneous of degree one in ``\\boldsymbol{b}``, so ``s\\, \\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` and ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` cut the same set for every ``s > 0``, and the multiplier ``\\lambda`` of the risk-contribution identity absorbs the scale.
 
 # Fields
 
@@ -87,7 +89,9 @@ RiskBudget
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 10.1.3.
+  - $(ref_dict[:bruderroncalli2012]) Section 2.3.3, Equation 9, Section 2.4, and Appendix A.2.
+  - $(ref_dict[:maillard2008]) Section 3.3, Equation 7, and Appendix A.2. It states the barrier first, for equal budgets.
+  - $(ref_dict[:cajas2025]) Section 10.1.3, Equation 10.8. It adds the budget variable ``k``.
 """
 @propagatable @concrete struct RiskBudget <: AbstractConstraintResult
     """
@@ -183,7 +187,8 @@ RiskBudget
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 10.1.3.
+  - $(ref_dict[:bruderroncalli2012]) Section 2.3.3, Equation 9, and Section 2.4.
+  - $(ref_dict[:cajas2025]) Section 10.1.3, Equation 10.8. It adds the budget variable ``k``.
 """
 @concrete struct RiskBudgetEstimator <: AbstractConstraintEstimator
     """

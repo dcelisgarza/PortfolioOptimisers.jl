@@ -829,7 +829,8 @@ LinearConstraint
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1.
+  - $(ref_dict[:markowitz1955]) Section 0.1, Equations 1 and 2.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equations 9.2 to 9.5. It adds the rows written over groups of assets and the relative rows between two assets or groups.
 """
 @concrete struct LinearConstraintEstimator <: AbstractConstraintEstimator
     """

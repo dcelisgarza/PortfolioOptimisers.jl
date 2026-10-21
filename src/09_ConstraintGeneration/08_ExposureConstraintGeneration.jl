@@ -117,7 +117,7 @@ Keywords correspond to the struct's fields.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.6.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.6. $(ref_dict[:no_original_source])
 """
 @concrete struct FactorSpace <: AbstractConstraintSpace
     """
@@ -196,7 +196,7 @@ julia> lcr.ineq.B
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.6.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.6. $(ref_dict[:no_original_source])
 """
 @concrete struct ExposureConstraintEstimator <: AbstractConstraintEstimator
     """

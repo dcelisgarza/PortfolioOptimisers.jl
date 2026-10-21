@@ -103,6 +103,8 @@ The estimator holds the source that builds the relatedness matrix and the penalt
 
 Which pairs a network source relates — and therefore how strong the constraint is — comes from its [`AbstractSeparationAlgorithm`](@ref), not from anything set here. The constraint is **weight-inert**: `A ⊙ W == 0` is the same constraint at any magnitude, so the separation changes the *cardinality* of the forbidden set and nothing else.
 
+[graphpo1](@cite) states the constraint over a network. Section 13.2.4.2 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the same constraint over clusters. No copy of that work was found.
+
 !!! warning
 
     `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs — and this estimator then forbids all pairwise co-movement. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
@@ -119,7 +121,7 @@ $(DocStringExtensions.FIELDS)
         x_src::Option{<:AbstractReturnsSource} = nothing
     ) -> SemiDefinitePhylogenyEstimator
 
-Keywords correspond to the struct's fields. The default `p = 0.05` is the value the source's own worked example uses.
+Keywords correspond to the struct's fields. The default `p = 0.05` is the penalty of the worked example in Section 6.2 of [graphpo1](@cite).
 
 ## Validation
 
@@ -173,9 +175,9 @@ SemiDefinitePhylogenyEstimator
 
 # References
 
-  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo1]) Section 5.2, Equations 10 and 11.
   - $(ref_dict[:graphpo2])
-  - $(ref_dict[:cajas2025]) Sections 13.1.7.2 and 13.2.4.2.
+  - $(ref_dict[:cajas2025]) Section 13.2.4.2, Equation 13.15. $(ref_dict[:no_original_source])
 """
 @concrete struct SemiDefinitePhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
@@ -221,7 +223,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Drives the product of weights of every related pair of assets to zero through a semidefinite relaxation.
 
-Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster.
+Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster. [graphpo1](@cite) states the constraint over a network. Section 13.2.4.2 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the same constraint over clusters. No copy of that work was found.
 
 `p` sets the size of the **relaxation gap** and not the strength of the constraint. `A ⊙ W == 0` is written whether or not `p` is read, so a larger `p` forbids no more pairs. It only makes `W` track the outer product it stands for more closely. A wider gap lets a pair of related assets both hold weight while their entry of `W` absorbs the product.
 
@@ -276,7 +278,7 @@ $(DocStringExtensions.FIELDS)
         p::Number = 0.05
     ) -> SemiDefinitePhylogeny
 
-Keywords correspond to the struct's fields. The default `p = 0.05` is the value the source's own worked example uses.
+Keywords correspond to the struct's fields. The default `p = 0.05` is the penalty of the worked example in Section 6.2 of [graphpo1](@cite).
 
 ## Validation
 
@@ -303,9 +305,9 @@ SemiDefinitePhylogeny
 
 # References
 
-  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo1]) Section 5.2, Equations 10 and 11.
   - $(ref_dict[:graphpo2])
-  - $(ref_dict[:cajas2025]) Sections 13.1.7.2 and 13.2.4.2.
+  - $(ref_dict[:cajas2025]) Section 13.2.4.2, Equation 13.15. $(ref_dict[:no_original_source])
 """
 @concrete struct SemiDefinitePhylogeny <: AbstractPhylogenyConstraintResult
     """
@@ -498,9 +500,9 @@ IntegerPhylogenyEstimator
 # References
 
   - $(ref_dict[:riccascozzari2024])
-  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo1]) Section 5.1, Equation 9.
   - $(ref_dict[:graphpo2])
-  - $(ref_dict[:cajas2025]) Sections 13.1.7.1 and 13.2.4.1.
+  - $(ref_dict[:cajas2025]) Section 13.2.4.1, Equation 13.14. $(ref_dict[:no_original_source])
 """
 @concrete struct IntegerPhylogenyEstimator <: AbstractPhylogenyConstraintEstimator
     """
@@ -543,7 +545,11 @@ $(DocStringExtensions.TYPEDEF)
 
 Caps at `B` the number of related assets a mixed-integer model may hold at once.
 
-Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster. A network source with `B = 1` forbids holding two assets that are neighbours. A clustering source with `B = 1` holds at most one asset per cluster.
+Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster. A clustering source with `B = 1` holds at most one asset per cluster.
+
+A network source with `B = 1` holds at most one asset of each closed neighbourhood, which is an asset together with its neighbours. So it forbids two neighbours, and it also forbids two assets that share a neighbour: the held assets are at a distance of at least three in the network. On the seven-asset graph of Figure 13 of [graphpo1](@cite), 32 selections hold no two neighbours, but only 12 satisfy this constraint. The semidefinite form, [`SemiDefinitePhylogeny`](@ref), forbids only the pairs that `A` relates.
+
+[riccascozzari2024](@cite) state the constraint for the neighbours of a network, and [graphpo1](@cite) extends it to the assets that a walk of a given length links. Section 13.2.4.1 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the constraint over clusters and of a cap per cluster. No copy of that work was found.
 
 # Mathematical definition
 
@@ -624,9 +630,9 @@ IntegerPhylogeny
 # References
 
   - $(ref_dict[:riccascozzari2024])
-  - $(ref_dict[:graphpo1])
+  - $(ref_dict[:graphpo1]) Section 5.1, Equation 9.
   - $(ref_dict[:graphpo2])
-  - $(ref_dict[:cajas2025]) Sections 13.1.7.1 and 13.2.4.1.
+  - $(ref_dict[:cajas2025]) Section 13.2.4.1, Equation 13.14. $(ref_dict[:no_original_source])
 """
 @concrete struct IntegerPhylogeny <: AbstractPhylogenyConstraintResult
     """
@@ -752,7 +758,7 @@ Where:
   - ``\\phi``: Objective function of the optimiser.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-The source states this constraint as an equality against a desired average centrality. Either sense of the inequality is admitted here as well.
+The original states this constraint as an equality against a desired average centrality. Either sense of the inequality is admitted here as well.
 
 When `B` is a [`VectorToScalarMeasure`](@ref), ``\\bar{c}`` is that measure of ``\\boldsymbol{c}``, so the threshold moves with the graph and the constraint always has a feasible point.
 
@@ -830,8 +836,7 @@ CentralityConstraint
 
 # References
 
-  - $(ref_dict[:graphpo1])
-  - $(ref_dict[:cajas2025]) Section 13.1.6.
+  - $(ref_dict[:graphpo1]) Section 4, Equation 8.
 """
 @concrete struct CentralityConstraint <: AbstractCentralityConstraint
     """

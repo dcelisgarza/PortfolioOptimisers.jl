@@ -80,7 +80,7 @@ ThresholdEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.4.
+  - $(ref_dict[:chang2000]) Section 2.4, Equation 12.
 """
 @propagatable @concrete struct ThresholdEstimator <: AbstractConstraintEstimator
     """
@@ -116,7 +116,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Forces every held position to reach a minimum size, and drives anything smaller to zero.
 
-The threshold is a scalar shared by every asset or a vector of one value per asset. It exists to keep a mixed-integer model from answering with a long tail of positions too small to trade. The source writes the same constraint over positive and negative trades against a reference portfolio; this library writes it over the position, so no reference portfolio enters it.
+The threshold is a scalar shared by every asset or a vector of one value per asset. It exists to keep a mixed-integer model from answering with a long tail of positions too small to trade. The original writes the bound over the position, as this library does, so no reference portfolio enters it. [cajas2025](@cite) also writes a buy-in threshold over the positive and negative trades against a reference portfolio, which this library does not build.
 
 **There is no upper bound on a threshold**, and a threshold above the largest weight the budget admits makes the asset unholdable. On a three-asset long-only variance model with a cardinality cap of three, `Threshold(0.15)` held all three and `Threshold(0.5)` held two at exactly `0.5` each, while `Threshold(1.5)` returned an [`OptimisationFailure`](@ref) whose solver status is `INFEASIBLE` — the budget row forces the weights to sum to one, and no held weight can reach `1.5`. Use a threshold above one to state that an asset must not be held only when the model has some other way to satisfy its budget.
 
@@ -198,7 +198,8 @@ Threshold
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.4.
+  - $(ref_dict[:chang2000]) Section 2.4, Equation 12.
+  - $(ref_dict[:cajas2025]) Section 9.4, Equation 9.31. It adds the threshold over trades.
 """
 @propagatable @concrete struct Threshold <: AbstractConstraintResult
     """

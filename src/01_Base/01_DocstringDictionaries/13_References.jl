@@ -158,6 +158,8 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :graphpo1 => "[graphpo1](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization*. Available at SSRN 4602019 (2023).",#
                  :graphpo2 => "[graphpo2](@cite) D. Cajas. *A Graph Theory Approach to Portfolio Optimization Part II*. Available at SSRN 4667426 (2023).",#
                  :riccascozzari2024 => "[riccascozzari2024](@cite) F. Ricca and A. Scozzari. *Portfolio optimization through a network approach: network assortative mixing and portfolio diversification*. European Journal of Operational Research 312, 700–717 (2024).",#
+                 :markowitz1955 => "[markowitz1955](@cite) H. Markowitz. *The optimization of quadratic functions subject to linear constraints*. Research Memorandum RM-1438, RAND Corporation (1955).",#
+                 :chang2000 => "[chang2000](@cite) T.-J. Chang, N. Meade, J. E. Beasley and Y. M. Sharaiha. *Heuristics for cardinality constrained portfolio optimisation*. Computers & Operations Research 27, 1271–1302 (2000).",#
                  :efroymson1960 => "[efroymson1960](@cite) M. A. Efroymson. *Multiple regression analysis*. In: *Mathematical Methods for Digital Computers*, edited by A. Ralston and H. S. Wilf (John Wiley & Sons, 1960); pp. 191–203.",#
                  :hocking1976 => "[hocking1976](@cite) R. R. Hocking. *The analysis and selection of variables in linear regression*. Biometrics 32, 1–49 (1976).",#
                  :akaike1974 => "[akaike1974](@cite) H. Akaike. *A new look at the statistical model identification*. IEEE Transactions on Automatic Control 19, 716–723 (1974).",#

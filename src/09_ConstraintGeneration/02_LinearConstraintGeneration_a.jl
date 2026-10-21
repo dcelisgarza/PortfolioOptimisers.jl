@@ -40,7 +40,7 @@ PartialLinearConstraint
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1.
+  - $(ref_dict[:markowitz1955]) Section 0.1, Equations 1 and 2.
 """
 @concrete struct PartialLinearConstraint <: AbstractConstraintResult
     """
@@ -142,7 +142,8 @@ LinearConstraint
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1.
+  - $(ref_dict[:markowitz1955]) Section 0.1, Equations 1 and 2. It writes the inequality rows in the ``\\geq`` sense.
+  - $(ref_dict[:cajas2025]) Section 9.1, Equation 9.1. It writes the inequality rows in the ``\\leq`` sense, as this library does.
 """
 @concrete struct LinearConstraint <: AbstractConstraintResult
     """
