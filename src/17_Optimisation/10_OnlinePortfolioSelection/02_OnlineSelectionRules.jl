@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Lets the allocation drift with the market and never trades it, the buy-and-hold benchmark (BAH).
 
-It is the benchmark of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) use as the market index. The rule keeps no state and reads no rows.
+It is the benchmark of Section 3.1.1 of the online selection survey [lihoi2014](@cite). From the uniform Start Allocation it is the uniform buy-and-hold portfolio, which [lihoi2014](@citet) call the usual market index. The rule keeps no state and reads no rows.
 
 # Mathematical definition
 
@@ -27,7 +27,7 @@ Where:
 
 The entries of ``\\hat{\\boldsymbol{w}}_t`` are non-negative and sum to one. So on the simplex the projection returns ``\\hat{\\boldsymbol{w}}_t`` unchanged, and the rule never trades. The weight of asset ``i`` after period ``t`` is then ``w_{1,i} \\prod_{s \\leq t} x_{s,i}``, divided by the sum of that product over the assets.
 
-As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return vector ``\\boldsymbol{r}_t`` in place of ``\\boldsymbol{x}_t``. Its step is then ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``, the wealth-weighted mixture. It is a buy and hold over the experts, the combination that Section 3.5.2 of [lihoi2014](@cite) describes. It is the default weighting of the mixture.
+As the weighting of an [`ExpertMixture`](@ref), the rule reads the expert-return vector ``\\boldsymbol{r}_t`` in place of ``\\boldsymbol{x}_t``. Its step is then ``\\boldsymbol{p}_{t+1} \\propto \\boldsymbol{p}_t \\odot \\boldsymbol{r}_t``, the wealth-weighted mixture. It is a buy and hold over the experts. Equation 1.3 of [cover1991](@cite) states it for constant rebalanced portfolios, and Section 3.5.2 of [lihoi2014](@cite) describes it for any experts. It is the default weighting of the mixture.
 
 # Algorithm
 
@@ -61,7 +61,8 @@ BuyAndHold
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:lihoi2014]) Sections 3.1.1 and 3.5.2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cover1991]) Section 1, Equations 1.3 and 1.6.
 """
 @concrete struct BuyAndHold <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -158,7 +159,7 @@ ConstantRebalancedPortfolio
 
 # References
 
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:cover1991]) Section 1, Equation 1.1.
 """
 @concrete struct ConstantRebalancedPortfolio <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -272,7 +273,7 @@ Where:
 
 At ``M = A_t`` and ``\\eta = 0`` this is the update of Figure 1 of [agarwal2006](@cite). [agarwal2006](@citet) mix the uniform allocation into the projected point, ``(1 - \\eta) \\boldsymbol{p}_t + \\eta \\boldsymbol{1} / N``. The rule mixes before the projection instead, so the answer stays in an Allocation Set whose bounds the uniform allocation breaks. On the simplex at ``\\eta = 0`` the two norms give one answer whenever ``\\delta A_t^{-1} \\boldsymbol{b}_t`` lies in the simplex.
 
-Theorem 1 of [agarwal2006](@cite) bounds the regret against the best constant rebalanced portfolio in hindsight. If the market variability is ``\\alpha > 0``, then ``\\eta = 0``, ``\\beta = \\alpha / (8 \\sqrt{N})`` and ``\\delta = 1`` give a regret of at most ``(10 N^{1.5} / \\alpha) \\log(N T / \\alpha^2)``. The rule at these values under the Gram norm is the algorithm of [agarwal2006](@cite), so the bound holds for it. With no assumption on the market, [agarwal2006](@citet) choose ``\\eta`` and ``\\beta`` from ``T`` and bound the regret by ``22 N^{1.25} \\sqrt{T \\log(N T)}``. That bound needs the mix after the projection of [agarwal2006](@cite), so the rule does not carry it. The package claims neither bound under the Euclidean default.
+Theorem 1 of [agarwal2006](@cite) bounds the regret against the best constant rebalanced portfolio in hindsight. If the market variability is ``\\alpha > 0``, then ``\\eta = 0``, ``\\beta = \\alpha / (8 \\sqrt{N})`` and ``\\delta = 1`` give a regret of at most ``(10 N^{1.5} / \\alpha) \\log(N T / \\alpha^2)``. The rule at these values under the Gram norm is the algorithm of [agarwal2006](@cite), so the bound holds for it. With no assumption on the market, [agarwal2006](@citet) choose ``\\eta`` and ``\\beta`` from ``T`` and bound the regret by ``22 N^{1.25} \\sqrt{T \\log(N T)}``. That bound needs the mix after the projection of [agarwal2006](@cite), so the rule does not carry it. For ``\\eta > 0`` the gradient of [agarwal2006](@cite) is taken at the point before the mix, and the rule takes it at the allocation that it played. The package claims neither bound under the Euclidean default.
 
 # Algorithm
 
@@ -325,7 +326,7 @@ NewtonStep
 
 # References
 
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 3, Figure 1 and Theorem 1, Section 4 and Section 4.7.
 """
 @concrete struct NewtonStep <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -431,7 +432,7 @@ HalfSlack()
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 abstract type AbstractPassiveAggressiveSlack <: AbstractAlgorithm end
 """
@@ -457,7 +458,7 @@ Where:
   - $(math_dict[:eps_cw])
   - $(math_dict[:t_period])
 
-It is the limit of the steps of [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref) as ``C \\to \\infty``.
+It is the limit of the steps of [`LinearSlack`](@ref) and [`QuadraticSlack`](@ref) as ``C \\to \\infty``. Section 3.3.2 of [lihoi2014](@cite) restates the problem of this step as Equation 7, with the closed form of ``\\tau_t``.
 
 # Examples
 
@@ -474,6 +475,7 @@ NoSlack()
 # References
 
   - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:lihoi2014]) Section 3.3.2, Equation 7. $(ref_dict[:no_original_source])
 """
 struct NoSlack <: AbstractPassiveAggressiveSlack end
 """
@@ -532,7 +534,7 @@ LinearSlack
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 @concrete struct LinearSlack <: AbstractPassiveAggressiveSlack
     """
@@ -603,7 +605,7 @@ QuadraticSlack
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 @concrete struct QuadraticSlack <: AbstractPassiveAggressiveSlack
     """
@@ -663,7 +665,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:li2012pamr]) Pages 221–258. $(ref_dict[:no_original_source])
 """
 function passive_aggressive_step(::NoSlack, loss::Real, denom::Real)
     return loss / denom
@@ -709,7 +711,7 @@ The step length ``\\tau_t`` is the step of the step-length rule. It is zero when
 
 The entries of ``\\boldsymbol{x}_t - \\bar{x}_t \\boldsymbol{1}`` sum to zero, so ``\\boldsymbol{q}`` keeps the budget of one. Under [`NoSlack`](@ref) with ``\\ell_t > 0``, the gross return of ``\\boldsymbol{q}`` over period ``t`` is exactly ``\\epsilon``. So, by Proposition 1 of [li2012pamr](@cite), ``\\boldsymbol{q}`` solves the first problem of [li2012pamr](@cite) without the non-negativity constraint. The projection onto the simplex is the normalisation step of Algorithm 1 of [li2012pamr](@cite).
 
-[li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
+Section 3.3.2 of [lihoi2014](@cite) restates the problem of [`NoSlack`](@ref) as Equation 7, with ``0 \\leq \\epsilon \\leq 1``. [li2012pamr](@citet) take ``\\epsilon \\geq 0``. The experiments of [li2012pamr](@cite) choose ``\\epsilon \\leq 1`` because the gross return of a period is near one. With a threshold above one, the rule moves only after a period whose gross return is above the threshold.
 
 # Algorithm
 
@@ -759,6 +761,7 @@ PassiveAggressiveMeanReversion
 # References
 
   - $(ref_dict[:li2012pamr])
+  - $(ref_dict[:lihoi2014]) Section 3.3.2, Equation 7. $(ref_dict[:no_original_source])
 """
 @concrete struct PassiveAggressiveMeanReversion <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -884,7 +887,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Makes every first-order expert of a mixture read its gradient at the blend that the mixture played, while it steps from its own iterate.
 
-This is the shared gradient of Algorithm 4 of [zhang2018ader](@cite) and of Algorithm 2 of [zhao2020sword](@cite). [zhang2018ader](@citet) and [zhao2020sword](@citet) state their dynamic-regret bounds on it. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read it, and the hint of `OptimisticStep` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
+This is the shared gradient of the improved Ader of Section 3.4 of [zhang2018ader](@cite): the meta-algorithm sends the gradient at the blend to every expert (Algorithm 3, Step 9, and Algorithm 4, Step 4). The experts of [zhao2020sword](@citet) read the gradient at their own iterates (Algorithms 2 and 4), and that work reads the gradient at the blend only for the linearised loss of its meta-algorithm (Equations 10 and 13). So the choice of this point for [`Sword`](@ref) is a choice of the library. [`Ader`](@ref) and [`Sword`](@ref) build the mixture on it. The mixture passes the blend through the seven-argument [`online_update!`](@ref). [`MirrorDescent`](@ref), [`OptimisticStep`](@ref) and [`AdaptiveSubgradient`](@ref) read it, and the hint of `OptimisticStep` stays the hint of its predictor. A rule with no gradient takes its six-argument update and ignores the point.
 
 # Mathematical definition
 
@@ -919,8 +922,8 @@ BlendPoint()
 
 # References
 
-  - $(ref_dict[:zhang2018ader])
-  - $(ref_dict[:zhao2020sword])
+  - $(ref_dict[:zhang2018ader]) Section 3.4, Algorithms 3 and 4.
+  - $(ref_dict[:zhao2020sword]) Algorithms 2 and 4, Equations 10 and 13.
 """
 struct BlendPoint <: AbstractAlgorithm end
 """
@@ -1047,11 +1050,11 @@ ExpertMixture
 
 # References
 
-  - $(ref_dict[:lihoi2014])
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:lihoi2014]) Section 3.5.2.
+  - $(ref_dict[:cover1991]) Section 1, Equations 1.3 and 1.6.
   - $(ref_dict[:coverordentlich1996])
-  - $(ref_dict[:zhang2018ader])
-  - $(ref_dict[:zhao2020sword])
+  - $(ref_dict[:zhang2018ader]) Section 3.4, Equation 12 and Algorithms 3 and 4.
+  - $(ref_dict[:zhao2020sword]) Algorithms 1 and 2, Equations 10 and 13.
 """
 @concrete struct ExpertMixture <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -1383,9 +1386,9 @@ julia> length(up.experts)
 
 # References
 
-  - $(ref_dict[:cover1991])
+  - $(ref_dict[:cover1991]) Section 1, Equations 1.3 and 1.7, and Section 8.
   - $(ref_dict[:coverordentlich1996])
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 4 and Section 4.7.
 """
 function UniversalPortfolio(; N::Integer, n_experts::Integer = 2000, alpha::Num_VecNum = 1,
                             rng::Random.AbstractRNG = Random.default_rng(),

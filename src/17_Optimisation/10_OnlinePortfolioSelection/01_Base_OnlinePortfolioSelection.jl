@@ -189,7 +189,7 @@ EuclideanProjection()
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 struct EuclideanProjection <: AbstractProjectionGeometry end
 """
@@ -235,7 +235,7 @@ EntropicProjection()
 
 # References
 
-  - $(ref_dict[:helmbold1998])
+  - $(ref_dict[:helmbold1998]) Section 3, Equations 3.2 and 3.3.
 """
 struct EntropicProjection <: AbstractProjectionGeometry end
 """
@@ -305,7 +305,7 @@ GramProjection
 
 # References
 
-  - $(ref_dict[:agarwal2006])
+  - $(ref_dict[:agarwal2006]) Section 3, Figure 1 and Theorem 1.
 """
 @concrete struct GramProjection <: AbstractProjectionGeometry
     """
@@ -414,7 +414,7 @@ BoundedAllocationSet
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Figure 1.
 """
 @propagatable @concrete struct BoundedAllocationSet <: AbstractAllocationSet
     """
@@ -1014,7 +1014,7 @@ The exact projection of such a vector lifts every zero entry by ``(1 - s) / N`` 
 
 # References
 
-  - $(ref_dict[:duchi2008])
+  - $(ref_dict[:duchi2008]) Section 3, Equations 3 to 6 and Figure 1.
 """
 function project_simplex(v::AbstractVector)
     s = sum(v)

@@ -59,7 +59,7 @@ PortfolioOptimisers.DiagonalProjection
 
 # References
 
-  - $(ref_dict[:duchi2011])
+  - $(ref_dict[:duchi2011]) Equation 1 and Algorithm 1.
 """
 @concrete struct DiagonalProjection <: AbstractProjectionGeometry
     """
@@ -288,7 +288,7 @@ AdaptiveSubgradient
 
 # References
 
-  - $(ref_dict[:duchi2011])
+  - $(ref_dict[:duchi2011]) Section 3, Algorithm 1, Equation 4, Theorem 5 and Corollary 6.
 """
 @concrete struct AdaptiveSubgradient <: AbstractOnlinePortfolioSelectionAlgorithm
     """
@@ -428,9 +428,9 @@ LastGradient
 
 # References
 
-  - $(ref_dict[:chiang2012])
-  - $(ref_dict[:rakhlin2013nips])
-  - $(ref_dict[:nemirovski2004])
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3, with Section 4.1 for the Euclidean geometry and Section 4.2 for the entropic one.
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Equation 1.
+  - $(ref_dict[:nemirovski2004]) Section 3, Equations 3.2 and 3.3.
 """
 struct LastGradient <: AbstractGradientPredictor
     """
@@ -479,7 +479,7 @@ MeanGradient()
 
 # References
 
-  - $(ref_dict[:rakhlin2013colt])
+  - $(ref_dict[:rakhlin2013colt]) Section 1 after Equation 2, Section 2.2 and Section 5.2.
 """
 struct MeanGradient <: AbstractGradientPredictor end
 """
@@ -489,7 +489,7 @@ Forms the hint of the optimistic step from a Price Relative Forecast.
 
 The hint is the gradient that the log-wealth loss of the next period would have at the secondary iterate, if the forecast were the outcome. The forecaster is any expected-returns estimator. The state of the predictor folds the forecaster where it has an exact fold, and the predictor fits it again from the head's rows otherwise, as the `me` slot of [`ForecastReversion`](@ref) does. A flat forecast gives a hint with equal entries, and the projection onto the budget undoes the uniform shift of such a hint.
 
-The optimistic steps of [chiang2012](@cite), [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite) take their hints from the past gradients. This hint is an addition of the library. It is the natural hint of the portfolio problem, where every reversion rule and every tracking rule already holds a forecast.
+The optimistic step of [chiang2012](@cite) takes the last gradient as its hint. [rakhlin2013colt](@citet) and [rakhlin2013nips](@citet) allow any hint that the learner computes from the past or from side information, so the forecast is a hint of their framework. Neither work proposes it, and it is an addition of the library. It is the natural hint of the portfolio problem, where every reversion rule and every tracking rule already holds a forecast.
 
 # Mathematical definition
 
@@ -540,9 +540,9 @@ ForecastGradient
 
 # References
 
-  - $(ref_dict[:chiang2012])
-  - $(ref_dict[:rakhlin2013colt])
-  - $(ref_dict[:rakhlin2013nips])
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3.
+  - $(ref_dict[:rakhlin2013colt]) Section 1, Equation 3.
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Equation 1.
 """
 @concrete struct ForecastGradient <: AbstractGradientPredictor
     """
@@ -732,7 +732,7 @@ HintResidualRate
 
 # References
 
-  - $(ref_dict[:rakhlin2013nips])
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Corollary 2.
 """
 @concrete struct HintResidualRate <: AbstractLearningRateSchedule
     """
@@ -861,7 +861,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Plays two half-steps of a first-order rule each period, the second along a hint for the gradient of the next period (OMD).
 
-This is the optimistic mirror descent of [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite), as a wrapper over a [`MirrorDescent`](@ref) rule. The state of the rule holds two iterates. The secondary iterate is where the step of the next period starts, and the played allocation is one hint step ahead of it.
+This is the optimistic mirror descent of [rakhlin2013colt](@cite) and [rakhlin2013nips](@cite), as a wrapper over a [`MirrorDescent`](@ref) rule. With a fixed rate and the last gradient as the hint, it is the algorithm of [chiang2012](@citet). The state of the rule holds two iterates. The secondary iterate is where the step of the next period starts, and the played allocation is one hint step ahead of it.
 
 `eta`, `proj`, `alpha` and `obj` are those of the wrapped rule. Both half-steps are its mirror step in its geometry, and the gradient is that of its objective, through [`loss_gradient`](@ref). A [`RiskLoss`](@ref) reads the head's rows, and the wrapper needs as many rows as the larger of the objective and the predictor. A schedule on `eta` counts the periods of the wrapper and reads its state. The wrapper reads the uniform mix `alpha` as the wrapped rule does.
 
@@ -953,9 +953,9 @@ OptimisticStep
 
 # References
 
-  - $(ref_dict[:rakhlin2013colt])
-  - $(ref_dict[:rakhlin2013nips])
-  - $(ref_dict[:chiang2012])
+  - $(ref_dict[:rakhlin2013colt]) Section 2.2, Lemma 3.
+  - $(ref_dict[:rakhlin2013nips]) Section 2, Equation 1, Lemma 1 and Corollary 2.
+  - $(ref_dict[:chiang2012]) Algorithm 1 in Section 3.
 """
 @concrete struct OptimisticStep <: AbstractOnlinePortfolioSelectionAlgorithm
     """

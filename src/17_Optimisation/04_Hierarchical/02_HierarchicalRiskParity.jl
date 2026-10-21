@@ -19,7 +19,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Allocates weights by recursively bisecting the dendrogram's leaf order and splitting each part's weight in inverse proportion to the risk of its two halves.
 
-This is the Hierarchical Risk Parity algorithm. It clusters the assets, orders the leaves, then splits that order until every part holds one asset. It solves no optimisation problem, so it accepts a risk measure that is not convex. The resolved weight bounds clamp the split factor at every split, and the weight finaliser of `opt` acts on the result. [`_optimise`](@ref) states the steps.
+This is the Hierarchical Risk Parity algorithm. It clusters the assets, orders the leaves, then splits that order until every part holds one asset. The split is stage 3 of [lopezdeprado2016](@cite), recursive bisection, which measures the risk of a half as a variance. Section 12.1.3 of [cajas2025](@cite) extends it to any risk measure, and so does this type. It solves no optimisation problem, so it accepts a risk measure that is not convex. The resolved weight bounds clamp the split factor at every split, and the weight finaliser of `opt` acts on the result. [`_optimise`](@ref) states the steps.
 
 # Mathematical definition
 
@@ -192,8 +192,8 @@ HierarchicalRiskParity
 
 # References
 
-  - $(ref_dict[:lopezdeprado2016])
-  - $(ref_dict[:cajas2025]) Section 12.1.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Stage 3 and Appendix A.2.
+  - $(ref_dict[:cajas2025]) Section 12.1.3.
 """
 @propagatable @concrete struct HierarchicalRiskParity <: ClusteringOptimisationEstimator
     """

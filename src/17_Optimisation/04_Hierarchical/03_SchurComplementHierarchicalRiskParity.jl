@@ -340,6 +340,8 @@ Collects the risk measure, the interpolation parameter ``\\gamma`` and the two a
 
 [`SchurComplementHierarchicalRiskParity`](@ref) holds one bundle or a vector of bundles. A vector runs one allocation per bundle, and blends the portfolios of the bundles in proportion to the `r.settings.scale` of each bundle.
 
+The parameter ``\\gamma`` in ``[0, 1]`` sets how much of the cross-cluster covariance the augmentation uses. It is the parameter of Section 5 of [cotton2024](@cite), where ``\\gamma = 0`` is the hierarchical recursion, as in Table 2 of that work.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -371,7 +373,7 @@ Keywords correspond to the struct's fields. [`Sd_Var`](@ref) bounds `r`, because
 
 # References
 
-  - $(ref_dict[:cotton2024])
+  - $(ref_dict[:cotton2024]) Section 5, Table 2.
 """
 @concrete struct SchurComplementParams <: AbstractAlgorithm
     """
@@ -526,6 +528,8 @@ Where:
   - $(math_dict[:w_naive_sch])
   - $(math_dict[:rho_naive_sch])
   - $(math_dict[:alpha_split_hier])
+
+``\\mathbf{A}`` is the Schur complement with the parameter ``\\gamma`` of Equation 5.2 of [cotton2024](@cite), and ``\\gamma = 0`` is the hierarchical recursion, as in Table 2 of that work. Equation 4.2 of that work divides ``\\mathbf{A}`` entry by entry by ``\\boldsymbol{b} \\boldsymbol{b}^\\intercal``, where ``\\boldsymbol{b} = \\boldsymbol{1} - \\gamma \\, \\mathbf{\\Sigma}_{12} \\mathbf{\\Sigma}_{22}^{-1} \\boldsymbol{1}`` is Equation 5.3. This type does not. It builds ``\\hat{\\mathbf{\\Sigma}}_{11}`` from ``\\mathbf{R}`` and ``\\mathbf{M}``, and that work states neither. The closing remark of Appendix A of that work says that the code that accompanies it provides an alternative. That code is not a published work, and this construction is not checked against it. The two blocks differ for ``\\gamma > 0``. The risk of a half is the variance of its naive risk parity portfolio, so the allocation at ``\\gamma = 1`` is not the minimum variance portfolio of Table 2 of that work.
 
 The weights are the inverse variances of the augmented block for both measures. So at ``\\gamma = 0`` a [`Variance`](@ref) measure gives the allocation of [`HierarchicalRiskParity`](@ref) under a [`Variance`](@ref) measure. A [`StandardDeviation`](@ref) measure gives a different allocation from [`HierarchicalRiskParity`](@ref) under a [`StandardDeviation`](@ref) measure, because that optimiser takes inverse volatility weights.
 
@@ -697,7 +701,7 @@ SchurComplementHierarchicalRiskParity
 
 # References
 
-  - $(ref_dict[:cotton2024])
+  - $(ref_dict[:cotton2024]) Sections 4 and 5, Equations 4.2, 5.2 and 5.3, and Appendix A.
 """
 @propagatable @concrete struct SchurComplementHierarchicalRiskParity <:
                                ClusteringOptimisationEstimator

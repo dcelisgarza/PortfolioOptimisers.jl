@@ -52,7 +52,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
+The wealth ``S_T`` is the wealth of Equation 1.1 of [cover1991](@cite), earned in the protocol of Section 2 of [lihoi2014](@cite). The Next-Period Allocation after ``T`` rows is ``\\boldsymbol{w}_{T+1}``. Both projections are one call of [`project`](@ref), so a [`ProgrammeAllocationSet`](@ref) adds its Objective Penalty to both objectives.
 
 Under `x_src = ExcessSource()`, ``r_{tj}`` is the return of asset ``j`` in excess of the benchmark, ``r_{tj} - b_{tj}``, where ``b_{tj}`` is the benchmark return of period ``t`` for asset ``j``. A vector benchmark gives every asset the same ``b_{tj}``.
 
@@ -133,7 +133,8 @@ OnlinePortfolioSelection
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:lihoi2014]) Section 2, Algorithm 1.
+  - $(ref_dict[:cover1991]) Section 1, Equation 1.1.
 """
 @concrete struct OnlinePortfolioSelection <: NaiveOptimisationEstimator
     """

@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Holds the clustering, the intra-cluster results and the inter-cluster result of a Nested Clustered Optimisation.
 
-[`optimise`](@ref) returns it for a [`NestedClustered`](@ref). `clr` holds the clustering that the algorithm found. `resi` holds one intra-cluster optimisation for each cluster, in cluster order. `reso` is the inter-cluster optimisation over the synthetic assets that the clusters define, so `reso.w` has one entry for each cluster. `w` is the product of the two weights, after the weight finaliser and the weight bounds.
+[`optimise`](@ref) returns it for a [`NestedClustered`](@ref). `clr` holds the clustering that the algorithm found. `resi` holds one intra-cluster optimisation for each cluster, in cluster order. `reso` is the inter-cluster optimisation over the synthetic assets that the clusters define, so `reso.w` has one entry for each cluster. `w` is the product of the two weights, after the weight finaliser and the weight bounds. The product is the fourth step of Section 4.3 of [lopezdeprado2019robust](@cite).
 
 # Fields
 
@@ -39,9 +39,9 @@ The keyword constructor expands `w` from the investable universe to the full ass
 
 # References
 
-  - $(ref_dict[:lopezdeprado2019robust])
-  - $(ref_dict[:mlp1]) Chapter 7.
-  - $(ref_dict[:cajas2025]) Section 12.3.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.3, Snippet 4.
+  - $(ref_dict[:mlp1]) Section 7.6.
+  - $(ref_dict[:cajas2025]) Sections 12.3.1 and 12.3.2.
 """
 @concrete struct NestedClusteredResult <: NonJuMPOptimisationResult
     """
@@ -478,7 +478,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Clusters the assets, optimises each cluster, and then optimises across the cluster portfolios.
 
-Nested Clustered Optimisation (NCO) of [lopezdeprado2019robust](@cite) solves one intra-cluster problem for each cluster with the inner optimiser. It then solves one inter-cluster problem with the outer optimiser, over the synthetic assets that the cluster portfolios define. [mlp1](@cite) Chapter 7 states the inter-cluster problem through the reduced moments of the clusters. Section 12.3 of [cajas2025](@cite) lets each of the two problems take its own objective and its own constraints, and so does this type.
+Nested Clustered Optimisation (NCO), stated in Section 4.3 of [lopezdeprado2019robust](@cite), solves one intra-cluster problem for each cluster with the inner optimiser. It then solves one inter-cluster problem with the outer optimiser, over the synthetic assets that the cluster portfolios define. Snippet 4 of that work states the inter-cluster problem through the reduced moments of the clusters. It names k-means clustering and notes that a hierarchical method also serves, and this type takes any clustering estimator. [mlp1](@cite) Section 7.6 restates the algorithm. Sections 12.3.1 and 12.3.2 of [cajas2025](@cite) let each of the two problems take its own objective and its own constraints, and so does this type.
 
 # Mathematical definition
 
@@ -503,7 +503,7 @@ Where:
   - $(math_dict[:N])
   - $(math_dict[:T])
 
-The outer optimiser solves for ``\\boldsymbol{v}`` over ``\\mathbf{X}^{o}``. The weight of asset ``i`` in ``C_k`` is ``w_i = v_k w^{(k)}_{i}``. The sample mean of ``\\mathbf{X}^{o}`` is ``\\mathbf{W}^\\intercal \\hat{\\boldsymbol{\\mu}}`` and its sample covariance is ``\\mathbf{W}^\\intercal \\hat{\\mathbf{\\Sigma}} \\mathbf{W}``, where ``\\hat{\\boldsymbol{\\mu}}`` and ``\\hat{\\mathbf{\\Sigma}}`` are the sample moments of ``\\mathbf{X}``. These are the reduced moments of [mlp1](@cite) Chapter 7, so an outer optimiser that estimates sample moments solves the inter-cluster problem of that chapter.
+The outer optimiser solves for ``\\boldsymbol{v}`` over ``\\mathbf{X}^{o}``. The weight of asset ``i`` in ``C_k`` is ``w_i = v_k w^{(k)}_{i}``. The sample mean of ``\\mathbf{X}^{o}`` is ``\\mathbf{W}^\\intercal \\hat{\\boldsymbol{\\mu}}`` and its sample covariance is ``\\mathbf{W}^\\intercal \\hat{\\mathbf{\\Sigma}} \\mathbf{W}``, where ``\\hat{\\boldsymbol{\\mu}}`` and ``\\hat{\\mathbf{\\Sigma}}`` are the sample moments of ``\\mathbf{X}``. These are the reduced moments of Snippet 4 of [lopezdeprado2019robust](@cite), so an outer optimiser that estimates sample moments solves its inter-cluster problem.
 
 # Fields
 
@@ -578,9 +578,9 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # References
 
-  - $(ref_dict[:lopezdeprado2019robust])
-  - $(ref_dict[:mlp1]) Chapter 7.
-  - $(ref_dict[:cajas2025]) Section 12.3.
+  - $(ref_dict[:lopezdeprado2019robust]) Section 4.3, Snippet 4.
+  - $(ref_dict[:mlp1]) Section 7.6.
+  - $(ref_dict[:cajas2025]) Sections 12.3.1 and 12.3.2.
 """
 @propagatable @concrete struct NestedClustered <: ClusteringOptimisationEstimator
     """

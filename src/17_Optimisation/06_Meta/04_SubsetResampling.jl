@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the estimators that average one optimiser over random subsets of the assets.
 
-A subtype draws random subsets of the assets, solves one base optimiser on each subset, and averages the subset weights into weights over all the assets. The average has less estimation error than one solve over all the assets [shen2017](@cite).
+A subtype draws random subsets of the assets, solves one base optimiser on each subset, and averages the subset weights into weights over all the assets. Each subset portfolio rests on parameters that are estimated more accurately than those of one solve over all the assets, and the average of the subset portfolios is diversified over all the assets, as in the abstract of [shen2017](@cite).
 
 # Related
 
@@ -13,7 +13,7 @@ A subtype draws random subsets of the assets, solves one base optimiser on each 
 
 # References
 
-  - $(ref_dict[:shen2017])
+  - $(ref_dict[:shen2017]) Abstract.
 """
 abstract type BaseSubsetResamplingOptimisationEstimator <:
               NonFiniteAllocationOptimisationEstimator end
@@ -22,7 +22,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Result of a [`SubsetResampling`](@ref) optimisation.
 
-`ress[m]` is the result of the subset whose asset indices are `idx[:, m]`. `w` is the average of the subset weights over all the assets, after the weight finaliser.
+`ress[m]` is the result of the subset whose asset indices are `idx[:, m]`. `w` is the average of the subset weights over all the assets, after the weight finaliser. The average is the last step of Algorithm 1 of [shen2017](@cite).
 
 `idx`, `pr`, `wb` and `fees` are on the universe that the subsets come from. When `imsk` is not `nothing`, this universe is the investable universe. `w` is on the full asset universe.
 
@@ -55,7 +55,7 @@ Keywords correspond to the struct's fields. The keyword constructor expands `w` 
 
 # References
 
-  - $(ref_dict[:shen2017])
+  - $(ref_dict[:shen2017]) Algorithm 1.
 """
 @concrete struct SubsetResamplingResult <: NonJuMPOptimisationResult
     """
@@ -169,7 +169,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Averages the weights of one base optimiser over random subsets of the assets.
 
-The estimator draws `n_subsets` distinct subsets of `subset_size` assets, solves `opt` on each subset, and averages the subset weights. The average then goes through the weight finaliser `wf` under the bounds `wb`. [shen2017](@cite) states the method. When the number of possible subsets is larger than `max_comb`, the draw is approximate, and two subsets can be equal.
+The estimator draws `n_subsets` distinct subsets of `subset_size` assets, solves `opt` on each subset, and averages the subset weights. The average then goes through the weight finaliser `wf` under the bounds `wb`. Algorithm 1 of [shen2017](@cite) states the method. It solves the mean-variance problem on each subset, and this type takes any base optimiser. It samples the assets of each subset without replacement, and it does not require the subsets to differ. This type draws distinct subsets. When the number of possible subsets is larger than `max_comb`, the draw is approximate, and two subsets can be equal.
 
 # Mathematical definition
 
@@ -282,7 +282,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 # References
 
-  - $(ref_dict[:shen2017])
+  - $(ref_dict[:shen2017]) Algorithm 1.
 """
 @propagatable @concrete struct SubsetResampling <: BaseSubsetResamplingOptimisationEstimator
     """

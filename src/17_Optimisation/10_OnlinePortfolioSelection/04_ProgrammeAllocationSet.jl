@@ -756,7 +756,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Projects the raw step onto the Allocation Set in the Bregman divergence of the Tsallis potential of power `alpha`.
 
-This is the geometry of the Tsallis-entropy steps of [abernethy2015](@citet) and of the Tsallis-INF algorithm of [zimmertseldin2021](@citet). The potential of [abernethy2015](@citet) is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of [zimmertseldin2021](@citet) is ``\\Psi_\\alpha`` plus an affine term. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. [abernethy2015](@citet) and [zimmertseldin2021](@citet) both bound the regret of the multi-armed bandit with bounded losses. At the tuned rate, Corollary 3.2 of [abernethy2015](@cite) bounds the expected regret by ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}``. The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
+This is the geometry of the Tsallis-entropy steps of Section 3 of [abernethy2015](@cite) and of the Tsallis-INF algorithm of Section 3.2 of [zimmertseldin2021](@cite). The potential of [abernethy2015](@citet) is ``\\alpha \\Psi_\\alpha`` plus a constant, and the potential of [zimmertseldin2021](@citet) is ``\\Psi_\\alpha`` plus an affine term, which is constant on the simplex. So each divergence is ``D_{\\Psi_\\alpha}`` times a constant factor, which a learning rate absorbs. [abernethy2015](@citet) and [zimmertseldin2021](@citet) both bound the regret of the multi-armed bandit with bounded losses. At the tuned rate, Corollary 3.2 of [abernethy2015](@cite) bounds the expected regret by ``\\sqrt{2 T N / (\\alpha (1 - \\alpha))}``. The log-wealth loss of a portfolio has no bounded gradient, so that bound does not apply to it as it stands. The geometry cannot set a positive entry to zero, and a zero entry stays zero. The geometry refuses a negative lower bound, because the potential is undefined below zero.
 
 # Mathematical definition
 
@@ -782,7 +782,7 @@ Where:
   - $(math_dict[:eta_t_lr])
   - $(math_dict[:g_t_loss])
 
-The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref). On a [`ProgrammeAllocationSet`](@ref) a weight that the set forces to zero stays zero, as under [`EntropicProjection`](@ref).
+The mirror image is ``\\nabla \\Psi_\\alpha(\\boldsymbol{w})_i = w_i^{\\alpha - 1} / (\\alpha - 1)``, so the projection sets ``\\nabla \\Psi_\\alpha(\\boldsymbol{w}) - \\nabla \\Psi_\\alpha(\\boldsymbol{q})`` to one constant over the free entries. On a [`BoundedAllocationSet`](@ref) the projection is ``\\boldsymbol{w}(\\theta)`` at the root. A base ``q_i^{\\alpha - 1} + \\theta`` at or below zero puts its asset at ``u_i``. The budget ``\\sum_i w_i(\\theta)`` does not increase in ``\\theta``. The last line is a first-order step from ``\\boldsymbol{w}_t`` and its projection onto the simplex together, one scalar root. As ``\\alpha \\to 1``, ``D_{\\Psi_\\alpha}`` tends to the relative entropy of [`EntropicProjection`](@ref). As ``\\alpha \\to 0``, it tends to the Itakura–Saito divergence of [`LogBarrierProjection`](@ref), as Section 3.2 of [zimmertseldin2021](@cite) shows for the potentials. On a [`ProgrammeAllocationSet`](@ref) a weight that the set forces to zero stays zero, as under [`EntropicProjection`](@ref).
 
 # Fields
 
@@ -792,7 +792,7 @@ $(DocStringExtensions.FIELDS)
 
     TsallisProjection(; alpha::Real = 0.5) -> TsallisProjection
 
-Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of [zimmertseldin2021](@cite).
+Keywords correspond to the struct's fields. The default is the ``\\alpha = 1/2`` of Section 4.1 of [zimmertseldin2021](@cite).
 
 ## Validation
 
@@ -816,8 +816,8 @@ TsallisProjection
 
 # References
 
-  - $(ref_dict[:abernethy2015])
-  - $(ref_dict[:zimmertseldin2021])
+  - $(ref_dict[:abernethy2015]) Section 3, Theorem 3.1, Corollary 3.2.
+  - $(ref_dict[:zimmertseldin2021]) Section 3.2. Section 4.1, Theorem 1.
 """
 @concrete struct TsallisProjection <: AbstractProjectionGeometry
     """
@@ -883,7 +883,7 @@ LogBarrierProjection()
 
 # References
 
-  - $(ref_dict[:orseau2017])
+  - $(ref_dict[:orseau2017]) Section 7, Alternative approaches.
 """
 struct LogBarrierProjection <: AbstractProjectionGeometry end
 """

@@ -257,7 +257,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Allocates each asset a weight inversely proportional to its volatility, or to its variance when `sq = true`.
 
-The variances are the diagonal of the covariance matrix that the prior estimator `pe` gives, so every choice inside `pe` reaches the weights. The inverse-variance weights, `sq = true`, are the naive risk parity allocation. [`HierarchicalRiskParity`](@ref) gives the assets of each half these weights under [`Variance`](@ref), and the inverse-volatility weights under [`StandardDeviation`](@ref), when it measures the risk of the half.
+The variances are the diagonal of the covariance matrix that the prior estimator `pe` gives, so every choice inside `pe` reaches the weights. The inverse-variance weights, `sq = true`, are the naive risk parity allocation of Section 12.1.3 of [cajas2025](@cite). The inverse-volatility weights are the equal risk contribution weights when every pair of assets has the same correlation, Equation 3 of [maillard2008](@cite). The inverse-variance weights are the minimum variance weights when the covariance matrix is diagonal, Appendix A.2 of the online supplementary materials of [lopezdeprado2016](@cite). [`HierarchicalRiskParity`](@ref) gives the assets of each half these weights under [`Variance`](@ref), and the inverse-volatility weights under [`StandardDeviation`](@ref), when it measures the risk of the half.
 
 The weight finaliser `wf` then imposes the weight bounds, so the weights of the result equal the closed form below only when no bound binds.
 
@@ -372,7 +372,9 @@ InverseVolatility
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 12.1.3, footnote 5.
+  - $(ref_dict[:cajas2025]) Section 12.1.3, footnote 5. $(ref_dict[:no_original_source])
+  - $(ref_dict[:maillard2008]) Section 3.2, Equation 3.
+  - $(ref_dict[:lopezdeprado2016]) Online supplementary materials, Appendix A.2.
 """
 @propagatable @concrete struct InverseVolatility <: NaiveOptimisationEstimator
     """
@@ -1098,7 +1100,7 @@ Where:
   - ``g_i(\\boldsymbol{b})``: Multiplier of asset ``i`` at ``\\boldsymbol{b}``, the mean over the periods of the price relative of asset ``i`` divided by the gross return of ``\\boldsymbol{b}``.
   - ``\\boldsymbol{b}^{(k)}``: Iterate ``k`` of Cover's map.
 
-The objective is concave on the simplex, so its maximum is global. The multipliers satisfy ``\\sum_i b_i g_i(\\boldsymbol{b}) = 1``, so Cover's map keeps an iterate on the simplex. The map is a minorise-maximise step, so ``\\log S_T`` does not fall from one iterate to the next. An entry at zero stays at zero. At ``\\boldsymbol{b}^{\\star}`` every held asset has ``g_i = 1`` and every other asset has ``g_i \\leq 1``, which is the first-order condition. The last line holds at every ``\\boldsymbol{b}`` in the simplex, by concavity and Jensen's inequality, and its right side is zero at ``\\boldsymbol{b}^{\\star}``, a corner included.
+The objective is concave on the simplex, so its maximum is global. The update is Equation 1.3 of [cover1984](@cite), with the expectation over the periods taken as the mean over the ``T`` rows. The multipliers satisfy ``\\sum_i b_i g_i(\\boldsymbol{b}) = 1``, so the map keeps an iterate on the simplex. By Theorem 1 of [cover1984](@cite), ``\\log S_T`` does not fall from one iterate to the next. An entry at zero stays at zero. At ``\\boldsymbol{b}^{\\star}`` every held asset has ``g_i = 1`` and every other asset has ``g_i \\leq 1``, which are Equations 3.1 and 3.2 of [cover1984](@cite). The last line is Theorem 4 of [cover1984](@cite), scaled by ``T``. It holds at every ``\\boldsymbol{b}`` in the simplex, by concavity and Jensen's inequality, and its right side is zero at ``\\boldsymbol{b}^{\\star}``, a corner included.
 
 # Fields
 
@@ -1177,7 +1179,7 @@ BestConstantRebalancedPortfolio
 
 # References
 
-  - $(ref_dict[:cover1984])
+  - $(ref_dict[:cover1984]) Equation 1.3, Theorems 1 and 4, Equations 3.1 and 3.2.
 """
 @propagatable @concrete struct BestConstantRebalancedPortfolio <: NaiveOptimisationEstimator
     """
