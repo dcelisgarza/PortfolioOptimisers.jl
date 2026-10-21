@@ -33,8 +33,8 @@ A subtype states whether every view is enforced in one optimisation or in stages
 
 # References
 
-  - $(ref_dict[:meucci2008])
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithms 1 and 2.
 """
 abstract type AbstractEntropyPoolingAlgorithm <: AbstractAlgorithm end
 """
@@ -42,7 +42,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Enforces every view in a single entropy pooling optimisation.
 
-This is the original formulation. It solves once, so it is the cheapest of the three algorithms, and it pins nothing: a higher moment view is free to move a lower moment of the same asset.
+This is the original formulation. It solves once, so it is the cheapest of the three algorithms, and it pins nothing: a higher moment view is free to move a lower moment of the same asset. A variance view reads the prior mean, as [meucci2008](@cite) does. The name `H0` is the library's. [vorobets2021](@citet) defines only H1 and H2.
 
 # Related
 
@@ -52,7 +52,8 @@ This is the original formulation. It solves once, so it is the cheapest of the t
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
+  - $(ref_dict[:vorobets2021]) Section 3.
 """
 struct H0_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
@@ -60,7 +61,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Enforces the views in stages, and starts every stage from the prior probabilities.
 
-Each stage carries the constraints of the stages before it, so the posterior is the projection of the *prior* onto the whole view set. This is the first of the two sequential heuristics.
+Each stage carries the constraints of the stages before it, so the posterior is the projection of the *prior* onto the whole view set. This is the first of the two sequential heuristics. [vorobets2021](@citet) takes one stage per class of parameter: means, variances, skewness and kurtosis, correlations, and then the rest. The library takes three stages: the mean and value at risk views, the variance and covariance views, and then the correlation, skewness and kurtosis views.
 
 # Related
 
@@ -71,7 +72,7 @@ Each stage carries the constraints of the stages before it, so the posterior is 
 
 # References
 
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithm 1.
 """
 struct H1_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
@@ -79,7 +80,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Enforces the views in stages, and starts every stage from the previous stage's probabilities.
 
-Each stage carries the constraints of the stages before it, so the view set is the same as [`H1_EntropyPooling`](@ref)'s. What differs is the reference distribution: each stage projects the stage before it rather than the prior. This is the second of the two sequential heuristics.
+Each stage carries the constraints of the stages before it, so the view set is the same as [`H1_EntropyPooling`](@ref)'s. What differs is the reference distribution: each stage projects the stage before it rather than the prior. This is the second of the two sequential heuristics. The library stages the views as [`H1_EntropyPooling`](@ref) does.
 
 # Related
 
@@ -90,7 +91,7 @@ Each stage carries the constraints of the stages before it, so the view set is t
 
 # References
 
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithm 2.
 """
 struct H2_EntropyPooling <: AbstractEntropyPoolingAlgorithm end
 """
@@ -121,7 +122,7 @@ Every subtype minimises the same Kullback-Leibler divergence of the posterior pr
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
 """
 abstract type AbstractEntropyPoolingOptAlgorithm <: AbstractAlgorithm end
 """
@@ -140,7 +141,7 @@ It carries the logarithms of the probabilities throughout, so it never exponenti
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 and 93.
 """
 struct LogEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
@@ -159,7 +160,7 @@ It recovers each posterior probability from the prior one and the dual variables
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 and 93.
 """
 struct ExpEntropyPooling <: AbstractEntropyPoolingOptAlgorithm end
 """
@@ -201,7 +202,7 @@ ConditionalValueatRiskEntropyPooling
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011])
+  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
 """
 @concrete struct ConditionalValueatRiskEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -225,7 +226,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the dual of the entropy pooling problem with Optim.jl.
 
-The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) and takes either optimisation algorithm.
+The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) and takes either optimisation algorithm. [meucci2008](@citet) maximises the dual function. The library minimises the negative of it, and it adds the box on the dual variables of the fixed equality rows, which [meucci2008](@citet) does not have.
 
 This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) states the mechanism and the three signs that name that answer.
 
@@ -296,7 +297,7 @@ OptimEntropyPooling
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 91 to 93.
 """
 @concrete struct OptimEntropyPooling <: AbstractEntropyPoolingOptimiser
     """
@@ -343,7 +344,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the primal of the entropy pooling problem with JuMP.jl.
 
-The primal carries one variable per observation and writes the divergence as a relative entropy cone. It is the only route that expresses a tail view, because a tail view needs auxiliary variables that the dual has no room for. It drives [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) and takes either optimisation algorithm.
+The primal carries one variable per observation and writes the divergence as a relative entropy cone. It is the only route that expresses a tail view, because a tail view needs auxiliary variables that the dual has no room for. It drives [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) and takes either optimisation algorithm. [meucci2008](@citet) states this primal and solves its dual. The library solves the primal with a conic solver, and it adds the slack that relaxes the fixed equality rows.
 
 # Fields
 
@@ -398,7 +399,7 @@ JuMPEntropyPooling
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
 """
 @concrete struct JuMPEntropyPooling <: AbstractEntropyPoolingOptimiser
     """

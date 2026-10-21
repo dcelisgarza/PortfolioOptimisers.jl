@@ -20,6 +20,8 @@ A group of **value at risk** views, with the significance level they are read un
 
 Unlike a conditional or entropic value at risk view, a value at risk view is linear in the posterior probabilities: it reduces to rows of the constraint set through [`add_ep_constraint!`](@ref), so it needs no auxiliary variable, admits no choice of formulation, and reaches [`OptimEntropyPooling`](@ref) as readily as [`JuMPEntropyPooling`](@ref). That is why this estimator carries a level and nothing else.
 
+[meucci2008](@cite) has no value at risk view. It states a view on a quantile in Equation 11, and it writes a view on the median as a constraint on a posterior mass in Equation 66. The library applies the same mass constraint at the level `alpha`.
+
 The views this estimator holds accept `==` and `>=` alone, one asset per view, with a unit coefficient and a non-negative target. A `prior(...)` reference inside `views` is replaced by the prior value at risk at this group's `alpha`, so a view stated against the prior moves with the level.
 
 # Fields
@@ -59,7 +61,7 @@ ValueatRiskView
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 2, Equation 11, and Appendix A.2, Equations 62 to 64 and 66.
 """
 @concrete struct ValueatRiskView <: AbstractEntropyPoolingViewEstimator
     """
@@ -105,7 +107,8 @@ A tail view constrains a quantile-based risk measure of the posterior distributi
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Sections 2.2 and 2.3.
+  - $(ref_dict[:EPRLVaR]) Section 3.2.
 """
 abstract type AbstractEntropyPoolingViewFormulation <: AbstractAlgorithm end
 """
@@ -122,7 +125,7 @@ Abstract supertype for the formulations of a conditional value-at-risk view.
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6.
 """
 abstract type AbstractConditionalValueatRiskViewFormulation <:
               AbstractEntropyPoolingViewFormulation end
@@ -140,7 +143,8 @@ Abstract supertype for the formulations of an entropic value-at-risk view.
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equation 1.
 """
 abstract type AbstractEntropicValueatRiskViewFormulation <:
               AbstractEntropyPoolingViewFormulation end
@@ -158,7 +162,7 @@ Abstract supertype for the formulations of a relativistic value-at-risk view.
 
 # References
 
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPRLVaR]) Section 3.2, Equation 7.
 """
 abstract type AbstractRelativisticValueatRiskViewFormulation <:
               AbstractEntropyPoolingViewFormulation end
@@ -196,7 +200,7 @@ Where:
 
 The box and the simplex describe every reweighting of the sample that no observation gives more than ``1/\\alpha`` times its posterior probability, and the largest loss such a reweighting attains is the CVaR. So the constraint set is feasible if and only if ``\\mathrm{CVaR}_{\\alpha}(X) \\geq \\bar{c}``, and a lower-bound view is exact.
 
-A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{CVaR}_{\\alpha}(X_{i}) \\geq \\bar{c}`` with every ``\\gamma_{i} > 0``, takes one block of the first three rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{c}``. The CVaR is concave in the probabilities, so a positive combination of CVaRs is concave and its lower level set is convex. Each block attains its asset's CVaR on its own, so the encoding stays exact. A view with coefficients of both signs has no convex lower level set, and this formulation refuses it.
+A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{CVaR}_{\\alpha}(X_{i}) \\geq \\bar{c}`` with every ``\\gamma_{i} > 0``, takes one block of the first three rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{c}``. The CVaR is concave in the probabilities, so a positive combination of CVaRs is concave and its lower level set is convex. Each block attains its asset's CVaR on its own, so the encoding stays exact. A view with coefficients of both signs has no convex lower level set, and this formulation refuses it. [EPTail](@cite) states the rows for a view on one asset. The view over several assets is the library's own extension.
 
 # Examples
 
@@ -214,7 +218,7 @@ LinearConditionalValueatRiskView()
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.2, Equation 6.
 """
 struct LinearConditionalValueatRiskView <: AbstractConditionalValueatRiskViewFormulation end
 """
@@ -258,6 +262,8 @@ Where:
 
 The monotonicity constraint makes the marked set a suffix of the ascending order, which is what makes the expression the CVaR rather than the mean of an arbitrary subset of probability ``\\alpha``. An observation enters the tail in full when the observation below it is also marked, so every marked observation except the lowest one carries ``q_{j} = w_{[j]}``. The lowest one carries a part of its probability, and the sum condition fixes that part at ``\\alpha`` less the mass above it. That is the value at risk observation of the posterior, so the expression is the posterior CVaR exactly.
 
+[EPTail](@citet) writes the bound on ``q_{j}`` through ``y_{j}``, which forces ``q_{j} = w_{[j]}`` for every marked observation, so the marked mass equals ``\\alpha`` only where whole observations sum to it. The library sorts the losses in ascending order and writes the bound through ``y_{j-1}``, so the lowest marked observation carries a part of its probability.
+
 The window is the one restriction. A posterior whose tail of mass ``\\alpha`` reaches below the ``\\bar{s}`` largest losses is outside the feasible set, so the posterior is the one of least divergence among those whose tail stays inside the window. An upper-bound view moves mass down the order and needs a wider window than a lower-bound view. [`entropy_pooling`](@ref) warns when the window binds, which it does where the window holds no more than the tail mass ``\\alpha``. Raise `sbar` there. An `sbar` equal to the number of observations restricts nothing, at the cost of one binary variable per observation.
 
 # Constructors
@@ -289,7 +295,7 @@ IntegerConditionalValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 5.
 """
 @concrete struct IntegerConditionalValueatRiskView <:
                  AbstractConditionalValueatRiskViewFormulation
@@ -314,6 +320,8 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Sequential convex formulation of a conditional value-at-risk view.
+
+[EPTail](@cite) states no sequential formulation. It is the library's own, and its dual representation rows are the ones of Equation 6 of [EPTail](@cite).
 
 `SequentialConditionalValueatRiskView` writes every view [`LinearConditionalValueatRiskView`](@ref) cannot, with no integer variable: an upper bound, an equality below the prior CVaR, and a relative view whose coefficients carry both signs. It replaces the CVaR of every asset on the wrong side of the inequality by a linear upper bound, solves the convex problem that results, and re-solves with the bound re-read at the posterior until the bound is tight. The view holds on every posterior of that sequence, and the divergence of each is at most that of the one before it.
 
@@ -382,7 +390,7 @@ SequentialConditionalValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.2, Equation 6.
 """
 @concrete struct SequentialConditionalValueatRiskView <:
                  AbstractConditionalValueatRiskViewFormulation
@@ -407,7 +415,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exponential cone formulation of an entropic value-at-risk view [EPTail](@cite).
+Exponential cone formulation of an entropic value-at-risk view [EPRLVaR](@cite).
+
+[EPRLVaR](@cite) states the dual of the entropic value at risk for non uniform probabilities in Equation 1, and says in Section 3.1 that a view of the form `>=` or `==` reduces to linear and exponential cone constraints. It credits that reduction to [EPTail](@cite), but the version of that work on file does not state it.
 
 `ConicEntropicValueatRiskView` writes the view through the dual representation of EVaR. It adds ``T`` continuous variables and one relative entropy cone, and it is exact.
 
@@ -456,6 +466,7 @@ ConicEntropicValueatRiskView()
 
 # References
 
+  - $(ref_dict[:EPRLVaR]) Section 2, Equation 1, and Section 3.1. $(ref_dict[:no_original_source])
   - $(ref_dict[:EPTail])
 """
 struct ConicEntropicValueatRiskView <: AbstractEntropicValueatRiskViewFormulation end
@@ -520,7 +531,7 @@ Where:
   - ``M_{k}``: Smallest big-M constant that releases the row of the ``k``-th grid point. The weights sum to one, so the left hand side of the row never exceeds its largest coefficient.
   - ``M``: Big-M multiplier.
 
-An equality view carries both blocks.
+An equality view carries both blocks. The rows are those of Equations 9 to 11 of [EPTail](@cite). [EPTail](@citet) bounds the upper-bound row at ``\\alpha + M (1 - y_{k})`` with one constant ``M``. The library divides each row by its bound and gives each row its own smallest constant ``M_{k}``, which ``M`` multiplies.
 
 # Constructors
 
@@ -567,7 +578,7 @@ GridEntropicValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.3, Equations 7 to 11.
 """
 @concrete struct GridEntropicValueatRiskView <: AbstractEntropicValueatRiskViewFormulation
     """
@@ -616,6 +627,8 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Sequential convex formulation of an entropic value-at-risk view.
+
+[EPTail](@cite) and [EPRLVaR](@cite) state no sequential formulation. It is the library's own. It takes the sample EVaR of Equation 7 of [EPTail](@cite) and the dual representation of Equation 1 of [EPRLVaR](@cite).
 
 `SequentialEntropicValueatRiskView` writes every view [`ConicEntropicValueatRiskView`](@ref) cannot, with no integer variable and no grid: an upper bound, an equality below the prior EVaR, and a relative view whose coefficients carry both signs. It replaces the EVaR of every asset on the wrong side of the inequality by a linear upper bound, solves the convex problem that results, and re-solves with the bound re-read at the posterior until the bound is tight. The view holds on every posterior of that sequence, and the divergence of each is at most that of the one before it.
 
@@ -686,7 +699,8 @@ SequentialEntropicValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.3, Equation 7.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equation 1.
 """
 @concrete struct SequentialEntropicValueatRiskView <:
                  AbstractEntropicValueatRiskViewFormulation
@@ -770,13 +784,15 @@ ConicRelativisticValueatRiskView()
 
 # References
 
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPRLVaR]) Section 3.2, Equation 7, and Section 2, Equation 4.
 """
 struct ConicRelativisticValueatRiskView <: AbstractRelativisticValueatRiskViewFormulation end
 """
 $(DocStringExtensions.TYPEDEF)
 
 Grid formulation of a relativistic value-at-risk view.
+
+[EPRLVaR](@cite) states no grid for the relativistic value at risk. The grid is the library's own, and it takes the primal programme of Equation 5 of [EPRLVaR](@cite).
 
 `GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR, centred on the point a posterior that meets the view attains. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
 
@@ -902,7 +918,7 @@ GridRelativisticValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPRLVaR]) Section 2, Equation 5.
 """
 @concrete struct GridRelativisticValueatRiskView <:
                  AbstractRelativisticValueatRiskViewFormulation
@@ -954,6 +970,8 @@ end
 $(DocStringExtensions.TYPEDEF)
 
 Sequential convex formulation of a relativistic value-at-risk view.
+
+[EPRLVaR](@cite) states no sequential formulation. It is the library's own. It takes the dual representation of Equation 7 and the primal programme of Equation 5 of [EPRLVaR](@cite).
 
 `SequentialRelativisticValueatRiskView` writes every view [`ConicRelativisticValueatRiskView`](@ref) cannot, with no integer variable and no grid: an upper bound, an equality below the prior RLVaR, and a relative view whose coefficients carry both signs. It replaces the RLVaR of every asset on the wrong side of the inequality by a linear upper bound, solves the convex problem that results, and re-solves with the bound re-read at the posterior until the bound is tight. The view holds on every posterior of that sequence, and the divergence of each is at most that of the one before it.
 
@@ -1029,7 +1047,7 @@ SequentialRelativisticValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPRLVaR]) Section 3.2, Equation 7, and Section 2, Equation 5.
 """
 @concrete struct SequentialRelativisticValueatRiskView <:
                  AbstractRelativisticValueatRiskViewFormulation
@@ -1092,7 +1110,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Spans of the two searches that read a relativistic value at risk.
 
-[`ep_rlvar_shift`](@ref) minimises over the shift of the primal programme, and [`ep_rlvar`](@ref) minimises over the logarithm of the dual variable. Neither bracket is a proof: each is a margin wide enough for the data this library was measured on. Widen one where the minimiser lands on an end of it. `Optim` reports an end as converged, so read the minimiser rather than trust the flag.
+[`ep_rlvar_shift`](@ref) minimises over the shift of the primal programme, and [`ep_rlvar`](@ref) minimises over the logarithm of the dual variable. Neither bracket is a proof: each is a margin wide enough for the data this library was measured on. Widen one where the minimiser lands on an end of it. `Optim` reports an end as converged, so read the minimiser rather than trust the flag. [EPRLVaR](@cite) states the primal programme in Equation 5 and states no span for a search. The spans are the library's own.
 
 # Fields
 
@@ -1131,7 +1149,7 @@ RelativisticValueatRiskViewBracket
 
 # References
 
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPRLVaR]) Section 2, Equation 5.
 """
 @concrete struct RelativisticValueatRiskViewBracket <: AbstractAlgorithm
     """
@@ -1174,7 +1192,8 @@ A significance level is a property of a view, not of the estimator that holds it
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Sections 2.2 and 2.3.
+  - $(ref_dict[:EPRLVaR]) Section 3.2.
 """
 abstract type AbstractEntropyPoolingTailViewEstimator <: AbstractEntropyPoolingViewEstimator end
 """
@@ -1225,7 +1244,7 @@ ConditionalValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6.
 """
 @concrete struct ConditionalValueatRiskView <: AbstractEntropyPoolingTailViewEstimator
     """
@@ -1319,7 +1338,8 @@ EntropicValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equation 1.
 """
 @concrete struct EntropicValueatRiskView <: AbstractEntropyPoolingTailViewEstimator
     """
@@ -1427,7 +1447,7 @@ RelativisticValueatRiskView
 
 # References
 
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPRLVaR]) Section 3.2, Equation 7.
 """
 @concrete struct RelativisticValueatRiskView <: AbstractEntropyPoolingTailViewEstimator
     """

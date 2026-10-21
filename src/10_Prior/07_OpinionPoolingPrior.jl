@@ -56,8 +56,9 @@ This prior has no exact incremental recursion, so it takes the online step by **
 
 # References
 
-  - $(ref_dict[:dietrichlist2017])
-  - $(ref_dict[:martinisprenger2017])
+  - $(ref_dict[:dietrichlist2017]) Section 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:dietrichlist2016]) Section 6. $(ref_dict[:no_original_source])
+  - $(ref_dict[:martinisprenger2017]) Section 3, Theorem 2.
 """
 abstract type OpinionPoolingAlgorithm <: AbstractAlgorithm end
 """
@@ -93,7 +94,7 @@ A sum of non-negative terms vanishes only when every term does, so ``p_t^{*} = 0
 
 # References
 
-  - $(ref_dict[:dietrichlist2017])
+  - $(ref_dict[:dietrichlist2017]) Section 2. $(ref_dict[:no_original_source])
 """
 struct LinearOpinionPooling <: OpinionPoolingAlgorithm end
 """
@@ -101,7 +102,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Pools the opinions as a weighted geometric mean of their scenario weights, renormalised.
 
-The result is the distribution that minimises the opinion-weighted Kullback-Leibler divergence to the individual opinions, which makes it the information-theoretic consensus. It is robust to extremes, because it down-weights a scenario that any one opinion doubts.
+The result is the distribution ``\\boldsymbol{q}`` that minimises ``\\sum_{k} \\alpha_k \\mathrm{KL}(\\boldsymbol{q} \\,\\|\\, \\boldsymbol{p}_k)``, the opinion-weighted Kullback-Leibler divergence from the pool to each opinion. The first-order condition of that problem gives the formula below. It is robust to extremes, because it down-weights a scenario that any one opinion doubts.
 
 # Mathematical definition
 
@@ -119,7 +120,7 @@ Where:
   - ``K``: Number of opinions.
   - $(math_dict[:T])
 
-A single ``\\log 0`` sends the exponent to ``-\\infty``, so ``p_t^{*} = 0`` as soon as **one** opinion assigns scenario ``t`` zero probability. The product ``\\alpha_k \\log p_{tk}`` is undefined when both factors vanish, which is the one case the form above does not cover.
+A single ``\\log 0`` sends the exponent to ``-\\infty``, so ``p_t^{*} = 0`` as soon as **one** opinion assigns scenario ``t`` zero probability. The product ``\\alpha_k \\log p_{tk}`` is undefined when both factors vanish, which is the one case the form above does not cover. The source defines the pool only for opinions that give every scenario a positive probability. The library also takes a zero, with the result above.
 
 # Related
 
@@ -130,8 +131,8 @@ A single ``\\log 0`` sends the exponent to ``-\\infty``, so ``p_t^{*} = 0`` as s
 
 # References
 
+  - $(ref_dict[:dietrichlist2016]) Section 6. $(ref_dict[:no_original_source])
   - $(ref_dict[:good1952])
-  - $(ref_dict[:dietrichlist2017])
 """
 struct LogarithmicOpinionPooling <: OpinionPoolingAlgorithm end
 """
@@ -250,8 +251,9 @@ OpinionPoolingPrior
 
 # References
 
-  - $(ref_dict[:dietrichlist2017])
-  - $(ref_dict[:martinisprenger2017])
+  - $(ref_dict[:dietrichlist2017]) Section 2. $(ref_dict[:no_original_source])
+  - $(ref_dict[:dietrichlist2016]) Section 6. $(ref_dict[:no_original_source])
+  - $(ref_dict[:martinisprenger2017]) Section 3, Theorem 2.
 """
 @propagatable @concrete struct OpinionPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """

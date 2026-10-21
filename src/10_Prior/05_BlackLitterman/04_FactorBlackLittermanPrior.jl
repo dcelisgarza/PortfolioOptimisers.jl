@@ -5,6 +5,8 @@ Factor Black-Litterman prior estimator for asset returns.
 
 `FactorBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using a factor-based Black-Litterman model. It combines an asset prior estimator, matrix post-processing for factors and assets, regression and variance estimators, user or algorithmic views, asset sets, view confidences, weights, risk-free rate, leverage, blending parameter `tau`, and a residual variance flag. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates factor regression and residual adjustment for posterior inference.
 
+[black1991](@citet) state the update on the asset axis. The library applies the same update to the factor moments. It then lifts the posterior factor moments onto the assets with the factor model of [cajas2025](@citet), which states the update and the lift as two separate results and does not state their composition.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -181,8 +183,8 @@ This prior has no exact incremental recursion, so it takes the online step by **
 
 # References
 
-  - $(ref_dict[:black1992])
-  - $(ref_dict[:cajas2025]) Section 5.1, Equations 5.13 to 5.15, over the factor axis, and Section 4.1, Equations 4.2 and 4.3, for the lift onto the assets.
+  - $(ref_dict[:black1991]) Appendix, items 7 and 8. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Section 5.1.5, Equations 5.13 to 5.15, and Section 4.1, Equations 4.4 and 4.5.
 """
 @propagatable @concrete struct FactorBlackLittermanPrior <: AbstractLowOrderPriorEstimator_F
     """

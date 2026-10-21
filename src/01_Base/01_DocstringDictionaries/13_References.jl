@@ -140,7 +140,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :boudt2015 => "[boudt2015](@cite) K. Boudt, W. Lu and B. Peeters. *Higher order comoments of multifactor models and asset allocation*. Finance Research Letters 13, 225–233 (2015).",#
                  :jorion1986 => "[jorion1986](@cite) P. Jorion. *Bayes-Stein estimation for portfolio analysis*. The Journal of Financial and Quantitative Analysis 21, 279–292 (1986).",#
                  :bodnar2019 => "[bodnar2019](@cite) T. Bodnar, O. Okhrin and N. Parolya. *Optimal shrinkage estimator for high-dimensional mean vector*. Journal of Multivariate Analysis 170, 63–79 (2019).",#
-                 :black1992 => "[black1992](@cite) F. Black and R. Litterman. *Global portfolio optimization*. Financial Analysts Journal 48, 28–43 (1992).",#
                  :shannon1948 => "[shannon1948](@cite) C. E. Shannon. *A mathematical theory of communication*. The Bell System Technical Journal 27, 379–423 (1948).",#
                  :schmidt2006 => "[schmidt2006](@cite) R. Schmidt and U. Stadtmüller. *Non-parametric estimation of tail dependence*. Scandinavian Journal of Statistics 33, 307–335 (2006).",#
                  :spearman1904 => "[spearman1904](@cite) C. Spearman. *The proof and measurement of association between two things*. The American Journal of Psychology 15, 72–101 (1904).",#
@@ -207,6 +206,10 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :cheung2007 => "[cheung2007](@cite) W. Cheung. *The augmented Black-Litterman model: a ranking-free approach to factor-based portfolio construction and beyond*. Quantitative Finance 13, 301–316 (2013).",#
                  :kolmritter2016 => "[kolmritter2016](@cite) P. N. Kolm and G. Ritter. *On the Bayesian interpretation of Black-Litterman*. European Journal of Operational Research 258, 564–572 (2017).",#
                  :dietrichlist2017 => "[dietrichlist2017](@cite) F. Dietrich and C. List. *Probabilistic opinion pooling generalized. Part one: general agendas*. Social Choice and Welfare 48, 747–786 (2017).",#
+                 :black1992 => "[black1992](@cite) F. Black and R. Litterman. *Global portfolio optimization*. Financial Analysts Journal 48, 28–43 (1992).",#
+                 :dietrichlist2016 => "[dietrichlist2016](@cite) F. Dietrich and C. List. *Probabilistic Opinion Pooling*. In: *The Oxford Handbook of Probability and Philosophy*, edited by A. Hájek and C. Hitchcock (Oxford University Press, 2016).",#
+                 :magnusneudecker1980 => "[magnusneudecker1980](@cite) J. R. Magnus and H. Neudecker. *The elimination matrix: some lemmas and applications*. SIAM Journal on Algebraic Discrete Methods 1, 422–449 (1980).",#
+                 :helitterman1999 => "[helitterman1999](@cite) G. He and R. Litterman. *The Intuition Behind Black-Litterman Model Portfolios*. Technical Report (Goldman Sachs Investment Management Research, 1999).",#
                  :martinisprenger2017 => "[martinisprenger2017](@cite) C. Martini and J. Sprenger. *Opinion Aggregation and Individual Expertise*. In: *Scientific Collaboration and Collective Knowledge* (Oxford University Press, 2017).",#
                  :good1952 => "[good1952](@cite) I. J. Good. *Rational decisions*. Journal of the Royal Statistical Society: Series B (Methodological) 14, 107–114 (1952).",#
                  :idzorek2007 => "[idzorek2007](@cite) T. Idzorek. *A step-by-step guide to the Black-Litterman model: incorporating user-specified confidence levels*. In: *Forecasting Expected Returns in the Financial Markets* (Academic Press, 2007); pp. 17–38.",#

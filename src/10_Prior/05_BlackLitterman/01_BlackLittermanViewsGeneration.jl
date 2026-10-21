@@ -22,6 +22,8 @@ Where:
   - ``\\boldsymbol{q}``: ``K \\times 1`` vector of view expected returns.
   - ``\\boldsymbol{\\nu}``: ``K \\times 1`` estimation error of the views.
 
+[black1991](@citet) write the estimation error of the views as ``\\boldsymbol{\\varepsilon}``. The name view creation model and the symbol ``\\boldsymbol{\\nu}`` are those of [cajas2025](@citet).
+
 The view uncertainty matrix ``\\boldsymbol{\\Omega}`` is **not** stored here. It is derived from ``\\mathbf{P}`` and the covariance of the distribution the views update, by [`calc_omega`](@ref) and [`bl_preroll`](@ref).
 
 # Fields
@@ -61,8 +63,8 @@ BlackLittermanViews
 
 # References
 
-  - $(ref_dict[:black1992])
-  - $(ref_dict[:cajas2025]) Section 5.1.3, Equations 5.5 and 5.7.
+  - $(ref_dict[:black1991]) Appendix, item 7. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Section 5.1.3, Equation 5.5.
 """
 @concrete struct BlackLittermanViews <: AbstractResult
     """

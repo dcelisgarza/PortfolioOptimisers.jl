@@ -104,8 +104,7 @@ EmpiricalPrior
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.
-  - $(ref_dict[:meucci2005]) Chapter 3.
+  - $(ref_dict[:meucci2005]) Section 2.6.5, Equations 2.219 and 2.220, Section 3.2, Equation 3.64, and Section 3.3.1, Equation 3.80.
 """
 @propagatable @concrete struct EmpiricalPrior <: AbstractLowOrderPriorEstimator_A
     """

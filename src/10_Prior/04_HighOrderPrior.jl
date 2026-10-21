@@ -70,7 +70,7 @@ julia> PortfolioOptimisers.block_vec_pq(A, 2, 2)
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.1, Equation A.14.
+  - $(ref_dict[:cajas2025]) Appendix A.1, Equation A.14. $(ref_dict[:no_original_source])
 """
 function block_vec_pq(A::MatNum, p::Integer, q::Integer)
     mp, nq = size(A)
@@ -108,7 +108,7 @@ The duplication matrix `D` maps the vech (half-vectorisation) of a symmetric mat
 \\mathbf{D}_n \\mathrm{vech}(\\mathbf{A}) = \\mathrm{vec}(\\mathbf{A})\\,.
 ```
 
-With `diag = false` the half-vectorisation drops the diagonal, and the identity restores the hollow matrix:
+With `diag = false` the half-vectorisation drops the diagonal, and the identity restores the hollow matrix. The source defines the matrix with the diagonal. The form without it is the library's.
 
 ```math
 \\mathbf{D}_n^{-} \\mathrm{vech}^{-}(\\mathbf{A}) = \\mathrm{vec}(\\mathbf{A} - \\mathrm{diag}(\\mathbf{A}))\\,.
@@ -150,7 +150,7 @@ Each row of ``\\mathbf{D}_n`` carries exactly one entry, so the matrix selects r
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equation A.25.
+  - $(ref_dict[:magnusneudecker1980]) Section 3, Definition 3.2a.
 """
 function duplication_matrix(n::Int, diag::Bool = true)
     m = div(n * (n + 1), 2)
@@ -223,7 +223,7 @@ The elimination matrix `L` extracts the unique (lower triangular) elements of a 
 \\mathbf{L}_n \\mathrm{vec}(\\mathbf{A}) = \\mathrm{vech}(\\mathbf{A})\\,.
 ```
 
-With `diag = false` it drops the diagonal as well:
+With `diag = false` it drops the diagonal as well. The source defines the matrix with the diagonal. The form without it is the library's.
 
 ```math
 \\mathbf{L}_n^{-} \\mathrm{vec}(\\mathbf{A}) = \\mathrm{vech}^{-}(\\mathbf{A})\\,.
@@ -261,7 +261,7 @@ The identity holds for any square ``\\mathbf{A}``, symmetric or not, because ``\
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equation A.26.
+  - $(ref_dict[:magnusneudecker1980]) Section 3, Definition 3.1a.
 """
 function elimination_matrix(n::Int, diag::Bool = true)
     nsq = n^2
@@ -305,7 +305,7 @@ The summation matrix `S` adds up contributions from both triangular halves of a 
 \\mathbf{S}_n = \\mathbf{D}_n^\\intercal \\mathbf{D}_n \\mathbf{L}_n\\,,
 ```
 
-so that, for every ``\\mathbf{A}`` of size ``n \\times n``,
+so that, for every symmetric ``\\mathbf{A}`` of size ``n \\times n``,
 
 ```math
 \\boldsymbol{1}^\\intercal \\mathbf{S}_n \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A})\\,.
@@ -317,9 +317,9 @@ Where:
   - ``\\mathbf{L}_n``: the elimination matrix of [`elimination_matrix`](@ref).
   - ``\\boldsymbol{1}``: vector of ones of the length its neighbour needs.
 
-``\\mathbf{S}_n`` reads the lower triangle and weights each entry by the number of places it occupies in ``\\mathrm{vec}(\\mathbf{A})``: one for a diagonal entry and two for an off-diagonal one. The sum identity above follows, and it holds for any square ``\\mathbf{A}``, symmetric or not.
+``\\mathbf{S}_n`` reads the lower triangle and weights each entry by the number of places it occupies in ``\\mathrm{vec}(\\mathbf{A})``: one for a diagonal entry and two for an off-diagonal one. The sum identity above follows. It needs a symmetric ``\\mathbf{A}``, because ``\\mathbf{S}_n`` counts each lower entry in the place of its upper mirror.
 
-The same construction with `diag = false` gives ``\\mathbf{S}_n^{-} = (\\mathbf{D}_n^{-})^\\intercal \\mathbf{D}_n^{-} \\mathbf{L}_n^{-}``, which weights every one of its ``n(n-1)/2`` rows by two. Its sum identity therefore reaches the off-diagonal entries alone, ``\\boldsymbol{1}^\\intercal \\mathbf{S}_n^{-} \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A} - \\mathrm{diag}(\\mathbf{A}))``.
+The same construction with `diag = false` gives ``\\mathbf{S}_n^{-} = (\\mathbf{D}_n^{-})^\\intercal \\mathbf{D}_n^{-} \\mathbf{L}_n^{-}``, which weights every one of its ``n(n-1)/2`` rows by two. For a symmetric ``\\mathbf{A}``, its sum identity therefore reaches the off-diagonal entries alone, ``\\boldsymbol{1}^\\intercal \\mathbf{S}_n^{-} \\mathrm{vec}(\\mathbf{A}) = \\boldsymbol{1}^\\intercal \\mathrm{vec}(\\mathbf{A} - \\mathrm{diag}(\\mathbf{A}))``. The source defines the matrix with the diagonal. The form without it is the library's.
 
 # Algorithm
 
@@ -348,8 +348,7 @@ The body builds the product of the definition directly, without forming ``\\math
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equation A.27.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, footnote 5.
 """
 function summation_matrix(n::Int, diag::Bool = true)
     nsq = n^2
@@ -406,7 +405,7 @@ The three are the `diag = true` matrices of [`duplication_matrix`](@ref), [`elim
 
 # Mathematical definition
 
-For every ``\\mathbf{A}`` of size ``n \\times n``:
+For every symmetric ``\\mathbf{A}`` of size ``n \\times n``:
 
 ```math
 \\begin{align}
@@ -491,7 +490,8 @@ julia> S
 
 # References
 
-  - $(ref_dict[:cajas2025]) Appendix A.2, Equations A.25 to A.27.
+  - $(ref_dict[:magnusneudecker1980]) Section 3, Definitions 3.1a and 3.2a.
+  - $(ref_dict[:pkurt]) Section 2, footnote 5.
 """
 function dup_elim_sum_matrices(n::Int)
     assert_gt0(n, :n)
@@ -710,8 +710,8 @@ HighOrderPriorEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equations 3.6 and 3.7.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:jondeau2004]) Section 2.3.
+  - $(ref_dict[:pkurt]) Appendix A.
 """
 @propagatable @concrete struct HighOrderPriorEstimator <: AbstractHighOrderPriorEstimator
     """

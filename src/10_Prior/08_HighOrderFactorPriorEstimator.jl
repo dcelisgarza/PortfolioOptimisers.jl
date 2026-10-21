@@ -565,7 +565,7 @@ HighOrderFactorPriorEstimator
 
 # References
 
-  - $(ref_dict[:boudt2015])
+  - $(ref_dict[:boudt2015]) Pages 225–233. $(ref_dict[:no_original_source])
   - $(ref_dict[:martelliniziemann2010])
 """
 @propagatable @concrete struct HighOrderFactorPriorEstimator <:

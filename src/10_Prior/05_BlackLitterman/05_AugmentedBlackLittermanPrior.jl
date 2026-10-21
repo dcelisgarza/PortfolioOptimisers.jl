@@ -80,6 +80,8 @@ Where:
   - ``\\lambda``, ``\\boldsymbol{w}``: The risk-aversion coefficient `pe.l` and the equilibrium weights `pe.w`, read by [`equilibrium_mu`](@ref) and only where `pe.l` is set.
   - ``r_{f}``: Risk-free rate, added once by [`apply_rf`](@ref) to the equilibrium mean. It is absent where `pe.l` is `nothing`, because the wrapped means are total returns already.
 
+The stacked inputs and the master equations follow [cajas2025](@citet), who follows [cheung2007](@citet). [cajas2025](@citet) builds the equilibrium mean as ``\\delta\\,(\\boldsymbol{\\Sigma};\\ \\boldsymbol{\\Sigma}_f\\mathbf{M}^{\\intercal})\\,\\boldsymbol{w}`` with no intercept, and adds ``r_f`` to the posterior. The library adds the intercept and ``r_f`` to the equilibrium mean before the update, as stated above. [cajas2025](@citet) leaves the diagonal blocks of ``\\boldsymbol{\\Omega}_{aug}`` open. The library sets each one to ``\\tau\\,\\mathrm{Diag}(\\mathbf{P}\\mathbf{\\Sigma}\\mathbf{P}^\\intercal)`` over the covariance of its own axis.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -286,7 +288,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
 # References
 
   - $(ref_dict[:cheung2007])
-  - $(ref_dict[:cajas2025]) Section 5.2, Equations 5.17 to 5.19.
+  - $(ref_dict[:cajas2025]) Section 5.2, Equations 5.17 to 5.19. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct AugmentedBlackLittermanPrior <:
                                AbstractLowOrderPriorEstimator_F

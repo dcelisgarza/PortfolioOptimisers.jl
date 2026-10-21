@@ -293,7 +293,9 @@ Resolve the number of largest losses the integer conditional value-at-risk formu
  1. An `Integer` `sbar` is a count. Return it, capped at `T`.
  2. Any other number is a fraction of `T`. Return `ceil(Int, sbar * T)`, never below one and capped at `T`.
  3. `nothing` takes the rule of thumb of [EPTail](@cite). Walk the losses from the largest down, accumulating the prior probabilities, and stop at the position `s` at which they first reach `alpha`.
- 4. Return twice `s`, never below `ceil(Int, 2 * alpha * T)`, never below one and capped at `T`. A view above the prior CVaR moves mass into the tail and needs about the position `s`; a view below it moves mass out and needs more.
+ 4. Return twice `s`, never below `ceil(Int, 2 * alpha * T)`, never below one and capped at `T`.
+
+[EPTail](@citet) takes a count at most `s` for a view at or above the prior CVaR, and a count above `s` and far below `T` for a view below it. Its examples use `int(alpha * T)` for the first and `int(2 * alpha * T)` for the others. The library takes the larger count for every view, and the factor of two is its own.
 
 # Arguments
 
@@ -314,7 +316,7 @@ Resolve the number of largest losses the integer conditional value-at-risk formu
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Section 2.2, Equation 4, and Section 4.
 """
 function ep_sbar(sbar::Nothing, T::Integer, alpha::Number, w::VecNum, ord::VecInt)
     cw = zero(eltype(w))
@@ -1129,8 +1131,8 @@ Every measure admits a view over several assets. Normalise it with [`ep_normalis
 
 # References
 
-  - $(ref_dict[:EPTail])
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6, and Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
 """
 function ep_add_tail_view!(epc::AbstractDict, tvs::AbstractVector,
                            tail_views::ConditionalValueatRiskView, alg, X::MatNum,
@@ -1285,8 +1287,8 @@ The two kernels below carry everything that differs between the conditional, the
 
 # References
 
-  - $(ref_dict[:EPTail])
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 2 to 6, and Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
 """
 function ep_tail_views!(tail_views::AbstractEntropyPoolingTailViewEstimator,
                         epc::AbstractDict, tvs::AbstractVector, pr::AbstractPriorResult,

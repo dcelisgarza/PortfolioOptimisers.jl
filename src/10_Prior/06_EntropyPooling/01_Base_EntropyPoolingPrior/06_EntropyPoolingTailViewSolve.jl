@@ -13,7 +13,8 @@ A tail view constraint is the parsed, resolved form of a conditional or entropic
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:EPTail]) Sections 2.2 and 2.3.
+  - $(ref_dict[:EPRLVaR]) Section 3.2.
 """
 abstract type AbstractEntropyPoolingTailView <: AbstractResult end
 """
@@ -32,7 +33,7 @@ const VecEPTV = AbstractVector{<:AbstractEntropyPoolingTailView}
 
 Solve an entropy pooling problem that carries tail view constraints.
 
-`entropy_pooling` extends the three-argument form with the conditional and entropic value-at-risk views of [EPTail](@cite). A tail view needs auxiliary variables, so it is built into the model by [`add_ep_tail_view!`](@ref) rather than reduced to rows of `epc`.
+`entropy_pooling` extends the three-argument form with the conditional and entropic value-at-risk views of [EPTail](@cite) and the relativistic value-at-risk views of [EPRLVaR](@cite). A tail view needs auxiliary variables, so it is built into the model by [`add_ep_tail_view!`](@ref) rather than reduced to rows of `epc`.
 
 These methods carry the body of the [`JuMPEntropyPooling`](@ref) route. The [`OptimEntropyPooling`](@ref) method solves the dual, which has no room for an auxiliary variable, so it accepts an empty `tvs` alone and forwards to the three-argument form.
 
@@ -72,6 +73,8 @@ Where:
  7. Check every tail view constraint at `w1` with [`ep_check_tail_window`](@ref), which warns where the window of an integer tail view constraint can bind.
  8. Return `w1`, which [`ep_jump_entropy_pooling`](@ref) answers in the kind of `w`.
 
+[EPTail](@citet) and [EPRLVaR](@citet) state no re-solve. The loop of steps 4 to 6 is the library's own.
+
 The re-solves are the sequential convex formulations' half of the work. Each re-read row is tight at the posterior it was read at and still holds there, so that posterior stays feasible and the divergence of the next one is at most its own.
 
 A stop on tight rows means that the sequence reached a fixed point, not that the posterior is the one of least divergence. The feasible set of a sequential view is not convex, so the fixed point can be a local minimiser. More re-solves or a smaller `tol` do not move it. On a sample of sixty observations, a view that bounds a CVaR at 0.7 times its prior value stopped with tight rows at a divergence 7.5% above the least one. No flag of the result marks this case.
@@ -110,7 +113,9 @@ A stop on tight rows means that the sequence reached a fixed point, not that the
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 25 to 27.
+  - $(ref_dict[:EPTail]) Section 2.1, Equation 1, and Sections 2.2 and 2.3.
+  - $(ref_dict[:EPRLVaR]) Section 3.2.
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                          opt::OptimEntropyPooling)
@@ -310,7 +315,8 @@ Where:
 
 # References
 
-  - $(ref_dict[:EPTail])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
+  - $(ref_dict[:EPTail]) Section 2.1, Equation 1.
 """
 function ep_jump_entropy_pooling(w::VecNum, epc::AbstractDict, tvs::VecEPTV,
                                  opt::JuMPEntropyPooling{<:Any, <:Any, <:Any, <:Any,

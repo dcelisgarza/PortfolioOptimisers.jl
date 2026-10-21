@@ -5,6 +5,8 @@ Factor-based prior estimator for asset returns.
 
 `FactorPrior` is a low order prior estimator that computes the mean and covariance of asset returns using a factor model. It combines a factor prior estimator, matrix post-processing, regression, and variance estimation to produce posterior moments. Optionally, it can add residual variance to the posterior covariance for robust estimation.
 
+The covariance is the plug-in estimator of the factor model that [fan2008](@citet) state: the loadings times the factor covariance times the transposed loadings, plus the diagonal matrix of the residual variances. The library differs from the source in three ways. The mean adds the regression intercepts, where the model of the source has none. The default `re` is stepwise, so an asset can drop a factor, where the source fits every factor by least squares. `ve` sizes the residual variances, which the default [`SimpleVariance`](@ref) divides by `T - 1`, where the source divides by `T`.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -131,8 +133,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.4 and 4.5.
-  - $(ref_dict[:fan2008])
+  - $(ref_dict[:fan2008]) Section 1.2, Equations 1.3 and 1.4. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct FactorPrior <: AbstractLowOrderPriorEstimator_F
     """

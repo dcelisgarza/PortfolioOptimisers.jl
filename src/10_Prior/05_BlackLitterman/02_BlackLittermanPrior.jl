@@ -5,6 +5,8 @@ Black-Litterman prior estimator for asset returns.
 
 `BlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using the Black-Litterman model. It combines a prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and a blending parameter `tau`. The estimator supports both direct and constraint-based views, and allows for flexible confidence specification and matrix processing.
 
+[black1991](@citet) state the posterior mean as the precision-weighted blend of the prior and the views. The library computes the equivalent update form of [walters2011](@citet). [black1991](@citet) give no posterior covariance. The library returns the prior covariance plus the posterior covariance of the mean, which is the convention of [walters2011](@citet). [helitterman1999](@citet) set the view uncertainty to ``\\tau\\,\\mathrm{Diag}(\\mathbf{P}\\mathbf{\\Sigma}\\mathbf{P}^\\intercal)``. The library does the same when `views_conf` is `nothing`. [cajas2025](@citet) sets `tau` to `1/T`, which is the library default. A confidence `v` in `views_conf` scales that uncertainty by `1/v - 1`. This is the closed form of [walters2011](@citet) for the method of [idzorek2007](@citet), which finds the uncertainty of each view by a numerical search for the weight tilt that the confidence asks for. [idzorek2007](@citet) adds the reading of the confidence as the share of the full tilt towards the view.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -150,10 +152,11 @@ BlackLittermanPrior
 
 # References
 
-  - $(ref_dict[:black1992])
-  - $(ref_dict[:cajas2025]) Section 5.1, Equations 5.13 to 5.15.
-  - $(ref_dict[:walters2011])
-  - $(ref_dict[:idzorek2007]) For the `views_conf` branch of [`calc_omega`](@ref).
+  - $(ref_dict[:black1991]) Appendix, items 7 and 8. $(ref_dict[:no_original_source])
+  - $(ref_dict[:helitterman1999]) Footnote 6.
+  - $(ref_dict[:walters2011]) Equations 25 to 27, 41 and 44. $(ref_dict[:no_original_source])
+  - $(ref_dict[:idzorek2007]) Section 3.2.
+  - $(ref_dict[:cajas2025]) Section 5.1.3, Equation 5.6, and Section 5.1.2, footnote 1.
 """
 @propagatable @concrete struct BlackLittermanPrior <: AbstractLowOrderPriorEstimator_AF
     """

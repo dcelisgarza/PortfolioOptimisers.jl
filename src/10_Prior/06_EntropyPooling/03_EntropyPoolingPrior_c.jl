@@ -5,7 +5,9 @@ Reweights the observations of a prior so that its moments and its tails meet a s
 
 `EntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the variance, the covariance, the correlation, the skewness and the kurtosis, views on the value at risk, the conditional and entropic value at risk views of [EPTail](@cite), and the relativistic value at risk views of [EPRLVaR](@cite).
 
-The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). There, a CVaR view is a target the recursive algorithm of Meucci et al. hunts by re-solving the whole entropy pooling problem for each candidate value at risk level, which supports equalities alone. Here each tail view is written as constraints of the single entropy pooling problem, so one solve answers every view, and the operators `==`, `>=` and `<=` are all available, along with views on the entropic and the relativistic value at risk, and views over several assets of every measure: a positive combination is convex and exact, and a relative view with coefficients of both signs takes the integer formulation or a sequential convex one.
+The tail views are the difference with [`MeucciEntropyPoolingPrior`](@ref). There, a CVaR view is a target the recursive algorithm of [meucciardiakeel2011](@citet) hunts by re-solving the whole entropy pooling problem for each candidate value at risk level, which supports equalities alone. Here each tail view is written as constraints of the single entropy pooling problem, so one solve answers every view, and the operators `==`, `>=` and `<=` are all available, along with views on the entropic and the relativistic value at risk, and views over several assets of every measure: a positive combination is convex and exact, and a relative view with coefficients of both signs takes the integer formulation or a sequential convex one. [EPTail](@cite) states the views on one asset, and the relative CVaR view on two. The views on several assets of the other measures, the upper-bound and equality views of the relativistic value at risk, and the sequential convex formulation are the library's own.
+
+The posterior is the entropy pooling of [meucci2008](@cite). [`H1_EntropyPooling`](@ref) and [`H2_EntropyPooling`](@ref) are the two sequential heuristics of [vorobets2021](@cite). [`H0_EntropyPooling`](@ref), a single solve, is the library's name for the original formulation. [vorobets2021](@citet) defines no H0.
 
 !!! warning
 
@@ -199,10 +201,11 @@ EntropyPoolingPrior
 
 # References
 
-  - $(ref_dict[:meucci2008])
-  - $(ref_dict[:vorobets2021])
-  - $(ref_dict[:EPTail])
-  - $(ref_dict[:EPRLVaR])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 25 to 28, and Appendix A.2 and A.3.
+  - $(ref_dict[:vorobets2021]) Section 3, Algorithms 1 and 2.
+  - $(ref_dict[:EPTail]) Section 2.2, Equations 3 to 6, and Section 2.3, Equations 7 to 11.
+  - $(ref_dict[:EPRLVaR]) Section 2, Equations 1 to 5, and Section 3.2, Equation 7.
+  - $(ref_dict[:meucciardiakeel2011])
 """
 @propagatable @concrete struct EntropyPoolingPrior <: AbstractLowOrderPriorEstimator_AF
     """

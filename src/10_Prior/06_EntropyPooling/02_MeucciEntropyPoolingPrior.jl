@@ -5,7 +5,7 @@ Reweights the observations of a prior so that its moments meet a set of views, a
 
 `MeucciEntropyPoolingPrior` is a low order prior estimator that computes the mean and covariance of asset returns using entropy pooling. It supports views on the mean, the value at risk, the conditional value at risk, the variance, the covariance, the correlation, the skewness and the kurtosis, and it takes custom prior weights and solver configuration.
 
-This is the earlier of the library's two entropy pooling estimators, and it is kept because its CVaR route is a different *algorithm*, not a different formulation of the same problem: a CVaR view is a target hunted by the recursive algorithm of Meucci, Ardia and Keel, where [`ConditionalValueatRiskEntropyPooling`](@ref) root-finds the value at risk level and re-solves the whole entropy pooling problem at each candidate. That route takes equality CVaR views alone, one asset per view.
+This is the earlier of the library's two entropy pooling estimators, and it is kept because its CVaR route is a different *algorithm*, not a different formulation of the same problem: a CVaR view is a target hunted by the recursive algorithm of [meucciardiakeel2011](@citet), where [`ConditionalValueatRiskEntropyPooling`](@ref) root-finds the value at risk level and re-solves the whole entropy pooling problem at each candidate. That route takes equality CVaR views alone, one asset per view. [EPTail](@cite) states that the recursive algorithm takes equality views alone. The staged algorithms come from [vorobets2021](@cite), which places skewness and kurtosis in the class of parameters that need the mean and the variance fixed.
 
 Reach for [`EntropyPoolingPrior`](@ref) instead where a tail view has to be an inequality, name two assets, or land on the entropic value at risk: there each tail view is a constraint of the single entropy pooling problem, so one solve answers every view.
 
@@ -182,9 +182,10 @@ This prior has no exact incremental recursion, so it takes the online step by **
 
 # References
 
-  - $(ref_dict[:meucci2008])
-  - $(ref_dict[:meucciardiakeel2011])
-  - $(ref_dict[:vorobets2021])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 25 to 27, and Appendix A.2, Equations 65 to 73.
+  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
+  - $(ref_dict[:EPTail]) Section 2.2.
+  - $(ref_dict[:vorobets2021]) Section 3.
 """
 @propagatable @concrete struct MeucciEntropyPoolingPrior <:
                                AbstractLowOrderPriorEstimator_AF
@@ -446,7 +447,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once per stag
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011])
+  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
 """
 function ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
                              sets::UniverseSets, w::ScenarioProbabilities,
@@ -635,7 +636,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:meucciardiakeel2011])
+  - $(ref_dict[:meucciardiakeel2011]) Pages 39–49. $(ref_dict[:no_original_source])
 """
 function ep_cvar_views_solve!(cvv::NamedTuple, epc::AbstractDict, w::ScenarioProbabilities,
                               opt::AbstractEntropyPoolingOptimiser)

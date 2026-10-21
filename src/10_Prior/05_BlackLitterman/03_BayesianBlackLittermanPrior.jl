@@ -5,6 +5,8 @@ Bayesian Black-Litterman prior estimator for asset returns.
 
 `BayesianBlackLittermanPrior` is a low order prior estimator that computes the mean and covariance of asset returns using a Bayesian Black-Litterman model. It combines a factor prior estimator, matrix post-processing, user or algorithmic views, asset sets, view confidences, risk-free rate, and a blending parameter `tau`. This estimator supports both direct and constraint-based views, flexible confidence specification, and matrix processing, and incorporates Bayesian updating for posterior inference.
 
+The model and the posterior equations follow [cajas2025](@citet), who follows [kolmritter2016](@citet). [cajas2025](@citet) writes the view error covariance as ``\\tau\\mathbf{\\Sigma}_f``. The library uses ``\\tau\\,\\mathrm{Diag}(\\mathbf{P}\\mathbf{\\Sigma}_f\\mathbf{P}^\\intercal)``, which has one row per view. [cajas2025](@citet) has no regression intercept. The library adds the intercept ``\\boldsymbol{b}`` to the posterior asset mean.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -211,7 +213,7 @@ This prior has no exact incremental recursion, so it takes the online step by **
 # References
 
   - $(ref_dict[:kolmritter2016])
-  - $(ref_dict[:cajas2025]) Section 5.3, Equations 5.23, 5.34 and 5.35.
+  - $(ref_dict[:cajas2025]) Section 5.3, Equations 5.23, 5.34 and 5.35. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct BayesianBlackLittermanPrior <:
                                AbstractLowOrderPriorEstimator_F

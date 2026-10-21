@@ -284,7 +284,7 @@ The primal minimises the Kullback-Leibler divergence of the posterior from the p
 \\end{align}
 ```
 
-The optimal posterior probabilities recover from the minimiser as:
+The objective is the negative of the dual function of Equation 91 of [meucci2008](@cite), so the library minimises where [meucci2008](@citet) maximises. The optimal posterior probabilities recover from the minimiser as:
 
 ```math
 \\begin{align}
@@ -347,7 +347,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Appendix A.3, Equations 90 to 93.
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict,
                          opt::OptimEntropyPooling{<:Any, <:Any, <:Any, <:Any,
@@ -573,7 +573,7 @@ This method registers no model entry of its own. It is the three-argument shape 
 
 # References
 
-  - $(ref_dict[:meucci2008])
+  - $(ref_dict[:meucci2008]) Section 4, Equations 26 and 27.
 """
 function entropy_pooling(w::VecNum, epc::AbstractDict, opt::JuMPEntropyPooling)
     return entropy_pooling(w, epc, AbstractEntropyPoolingTailView[], opt)
