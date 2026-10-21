@@ -12,11 +12,8 @@ domain vocabulary is normative — read `GLOSSARY.md` before touching anything y
 - **`GLOSSARY.md` is the glossary.** It defines the domain language (Prior, Constraint Space,
   Universe Sets, Feature Matrix, Objective Penalty, …) and is hand-written. When you introduce or
   rename a concept, update it in the same change.
-- **`docs/adr/` records decisions.** An ADR whose decision reached `main` is **amended, never
-  rewritten**: append a `## Amendment (YYYY-MM-DD)` section. Such an ADR describes released
-  behaviour, so an ADR describing superseded behaviour is correct history, not a bug. An ADR whose
-  decision has **not** reached `main` is still a draft — rewrite it in place, because no reader
-  outside the branch ever saw the text you would be amending.
+- **`docs/adr/` records decisions.** Its `README.md` states when an ADR is amended and when it is
+  rewritten in place.
 
 ## Parallel sessions
 
@@ -65,10 +62,8 @@ before you merge so you lower the number that is current.
 - Run **targeted** `test_*.jl` files for the area you changed with
   `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl …`, as a background Bash
   command. It runs each file after the `init_code` preamble of `test/runtests.jl`,
-  prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
-  Narrow it with `--testset=<regex>`, `--time-depth=<N>`, `--timeout=<seconds>`; rerun a red that
-  only CI shows with `--ci`. A red listed in `test/known_red.toml` is named on its `RESULT` line
-  (the header of `test/run_files.jl` explains every option).
+  prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends. The header of
+  `test/run_files.jl` explains every option. Rerun a red that only CI shows with `--ci`.
 - **A targeted test is one whose result the change can alter.** Trace from the changed code to the
   test files that assert a value passing through it, add the file of the new test, and add the
   censuses that read what the commit touched. A file that only names a changed type is not
@@ -96,9 +91,6 @@ before you merge so you lower the number that is current.
 - **Edit a `.jl` file with the Edit tool.** A change at many sites goes through the kaimon edit
   tool with an absolute file path, which parses each file before it writes. A Python replace from
   a Bash heredoc halves a backslash and has corrupted docstrings.
-- **The prose of `docs/paper/main.typ` is the author's.** Correct a count, a citation or a typo
-  there. Give a new sentence to the author in your report, as a proposal, and keep it out of the
-  file.
 
 ## Doctests
 
@@ -106,49 +98,8 @@ before you merge so you lower the number that is current.
 
 ## Design rules
 
-- **Estimators never hold Results internally.** Enforce it with the field's *type bound*, not a
-  runtime check; precomputed structure belongs on the Result type. The rule has one exception, and
-  [ADR 0106](docs/adr/0106-a-partial-fit-state-is-the-one-result-an-estimator-holds.md) states it:
-  a partial-fit state is a Result that no consumer reads, so an estimator may hold one in a field
-  bound to `Union{Nothing, <:AbstractPartialFitState}`. That bound is the enforcement, and it still
-  refuses every other Result.
-- **A numeric type is derived, never coerced.** Read it off the arguments with `eltype`, `typeof`,
-  `real` and `promote_type`, or off the operation that widens it, and take an index with the
-  in-function conversion `ceil(Int, x)` rather than `Int(ceil(x))`. Never wrap a derived type in
-  `float`, and never read it off a division such as `typeof(one(T) / one(T))`: both clobber a
-  `Rational` and every type that needed no repair. When integer data must hold a fraction or a
-  `NaN`, pass the type of the data to `float_if_integer`, which floats an `Integer` and keeps every
-  other type. The library must stay open to number types it has never seen — an AD dual, a unit-carrying
-  quantity, a `Rational`, a number type another package defines — and every forced type closes it to
-  one of them. [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md)
-  § *Numeric types come from the data* owns the rule, and
-  `test/test_55_numeric_coercion_census.jl` gates it.
-- **Prefer a per-type method over a new dependency** for reflection-style work. Derive the field
-  list, write the constructor name once per type, and use the ordinary keyword constructor.
-- Docstring field text is centralised in `field_dict` / `arg_dict` in
-  `src/01_Base/01_DocstringDictionaries/`, and an entry
-  that loses its last user is deleted. When a description must interpolate a key and when prose is
-  permitted is stated by
-  [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md),
-  which owns that rule.
-- **A user-facing name is declared without approval (#1489).** A name that users are meant to
-  extend is `public`: an abstract type they subtype, and a verb that a subtype implements. A name
-  that users are meant to use directly is exported: a type they construct, a function they call.
-  When a name is unambiguously one of the two, declare it in the change that adds it. Ask the
-  maintainer only when it is ambiguous whether users extend or use the name at all.
-  - An `# Interfaces` section marks an extension point (ADR 0154), so its type and the verbs it
-    names are `public`. A family whose concrete members are exported is an extension point.
-  - A helper that the section tells an implementer to call is `public` too, and a caller or a
-    check that the library runs is named in plain code, with no link. ADR 0154 states the rule,
-    and `test/test_66_public_declaration_census.jl` gates it.
-  - An abstract type is extended, not used, so it is `public`, not exported. Export one only when
-    users plainly write it by name in their own code, and ask when that is not plain.
-  - Internal machinery stays undeclared. A name that only the library calls is neither.
-
-  `test/test_43_exported_abstract_type_census.jl` holds every exported and every `public` abstract
-  type on an allow-list, so a declared abstract type is an edit to that list in the same change.
-  **Do not restate the count here or anywhere else.** It has moved four times, and each written
-  copy went stale where it stood.
+The design rules for library code live in `src/CLAUDE.md`. Read them before you change or plan a
+change to a file under `src/` or `ext/`.
 
 ## Defects you find
 

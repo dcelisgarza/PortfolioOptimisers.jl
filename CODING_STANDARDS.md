@@ -31,7 +31,8 @@ picking a side — a contradiction between standards files is itself a defect.
     on it.
  2. **`GLOSSARY.md`** — the domain glossary. It fixes the words; nothing else may rename a concept.
  3. **`CLAUDE.md`** — the working agreements for this checkout, including the rules an agent must
-    not break.
+    not break. `src/CLAUDE.md` and `docs/paper/CLAUDE.md` hold the agreements for their own
+    directories, at the same rank.
  4. **`.github/instructions/*.instructions.md`** — the per-scope coding standards.
  5. **`.github/copilot-instructions.md`** and **`.github/prompts/*.prompt.md`** — orientation and
     step-by-step workflows.
@@ -81,7 +82,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | A citation or a bibliography entry | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md), `ref_dict` in [`src/01_Base/01_DocstringDictionaries/13_References.jl`](src/01_Base/01_DocstringDictionaries/13_References.jl) | `test/test_26_docs.jl` |
 | The source a formulation of a docstring is checked against, a citation of a secondary source, and the standard note for a formulation whose original source was not found | [`.github/instructions/julia-docstrings.instructions.md`](.github/instructions/julia-docstrings.instructions.md) § *The original source* and § *The `# References` Section* | `test/test_26_docs.jl` — the note `ref_dict[:no_original_source]` closes a `# References` bullet after a locator and appears nowhere else; the check of a formulation against its original source holds by review |
 | A new name for a concept | [`GLOSSARY.md`](GLOSSARY.md) | none — unenforced |
-| An `export` line | [`CLAUDE.md`](CLAUDE.md) § Design rules | `test/test_43_exported_abstract_type_census.jl` |
+| An `export` line | [`src/CLAUDE.md`](src/CLAUDE.md) | `test/test_43_exported_abstract_type_census.jl` |
 | A constructor signature | [`.github/instructions/julia-source-code.instructions.md`](.github/instructions/julia-source-code.instructions.md) | `test/test_41_constructor_docstring_drift.jl` |
 | An optimiser fallback shortcut | `test/test_40_fallback_shortcut_census.jl` — the census comment is the only written statement of this Rule | the same file |
 | JuMP model state | ADR 0037, amending ADR 0004 | `test/test_28_model_state_lock.jl` |
@@ -97,7 +98,7 @@ picking a side — a contradiction between standards files is itself a defect.
 | A link from a docs page, hand-written or Literate, to another page | ADR 0151 § *Amendment (2026-09-26)* | `test/test_64_docs_page_metadata_census.jl` — no relative `.md` link; the target H1 carries an `(@id label)` and the link reads `(@ref label)`, which the Docs build resolves |
 | An `@docs` entry's placement in the mirrored public/private API trees ADR 0128 decides, or the classification a name earns | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md), and [`docs/api_classification.jl`](docs/api_classification.jl) for the classifier | `test/test_65_docs_public_private_placement_census.jl` |
 | A docs page's `<title>` or its description — the `Description` line of a hand-written page's `@meta` block, the derived line of a mirror page, the landing page's label in `docs/make.jl`, or the site-wide fallback | [ADR 0128](docs/adr/0128-the-docs-split-into-mirrored-public-and-private-api-trees-and-a-census-gates-placement.md) § *Amendment (2026-09-17)*, and [`docs/page_metadata.jl`](docs/page_metadata.jl) for the derivation | `test/test_64_docs_page_metadata_census.jl` |
-| A private name's promotion to `public` | [`CLAUDE.md`](CLAUDE.md) § Design rules — a name that users extend is `public` without approval — and [ADR 0154](docs/adr/0154-a-private-abstract-type-earns-a-public-declaration-when-its-interfaces-section-names-the-seam.md) § *Amendment (2026-10-05)*, by which an `# Interfaces` section forces the declaration | `test/test_66_public_declaration_census.jl`, and `test/test_43_exported_abstract_type_census.jl` for an abstract type |
+| A private name's promotion to `public` | [`src/CLAUDE.md`](src/CLAUDE.md) — a name that users extend is `public` without approval — and [ADR 0154](docs/adr/0154-a-private-abstract-type-earns-a-public-declaration-when-its-interfaces-section-names-the-seam.md) § *Amendment (2026-10-05)*, by which an `# Interfaces` section forces the declaration | `test/test_66_public_declaration_census.jl`, and `test/test_43_exported_abstract_type_census.jl` for an abstract type |
 | The paper's code listing | the recipe comment at the top of [`docs/paper/main.typ`](docs/paper/main.typ) | `.github/workflows/Paper.yml` |
 | A decision worth recording | [`docs/adr/README.md`](docs/adr/README.md) | none — unenforced |
 | A dependency | `Project.toml` | `.github/workflows/Aqua.yml` |
@@ -116,6 +117,8 @@ picking a side — a contradiction between standards files is itself a defect.
 | `CODING_STANDARDS.md` | this map | the repository |
 | `GLOSSARY.md` | the domain glossary — terms and one or two sentences each | the repository |
 | `CLAUDE.md` | working agreements for an agent in this checkout | the repository |
+| `src/CLAUDE.md` | the design rules for library code: Results, numeric types, docstring text, `public` and `export` | `src/` and `ext/` |
+| `docs/paper/CLAUDE.md` | who owns the prose of the paper | `docs/paper/` |
 | `docs/adr/` | decisions and their reasoning, one file per decision | named per ADR |
 | `.github/copilot-instructions.md` | architecture orientation and the before-you-commit checklist | the repository |
 | `.github/instructions/julia-source-code.instructions.md` | type roles, constructors, aliases, validation, dispatch, exports | `src/**/*.jl` |

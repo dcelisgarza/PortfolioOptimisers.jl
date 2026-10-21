@@ -20,7 +20,7 @@
     accident. An export is public API: adding an entry was the maintainer's call, not a
     decision made in passing while landing a feature.
 
-    Issue #1489 (2026-10-05) changed who makes that call. `CLAUDE.md` § *Design rules* now
+    Issue #1489 (2026-10-05) changed who makes that call. `src/CLAUDE.md` now
     declares a name without approval when it is unambiguously user-facing: `public` when
     users extend it, exported when users use it directly. An abstract type is extended, so
     it is `public` and goes on `allowed_public` below. The census still names every entry,
