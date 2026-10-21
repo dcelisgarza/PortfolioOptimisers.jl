@@ -195,16 +195,19 @@ include(joinpath(@__DIR__, "test22_setup.jl"))
             NestedClustered(;
                             cle = ClustersEstimator(;
                                                     onc = OptimalNumberClusters(; alg = 3)),
-                            opti = SubsetResampling(; rng = StableRNG(100), seed = 42,
+                            opti = SubsetResampling(; subset_size = 0.8,
+                                                    rng = StableRNG(100), seed = 42,
                                                     pe = pr, opt = MeanRisk(; opt = jopti)),
-                            opto = SubsetResampling(; rng = StableRNG(100), seed = 42,
+                            opto = SubsetResampling(; subset_size = 0.8,
+                                                    rng = StableRNG(100), seed = 42,
                                                     opt = MeanRisk(; opt = jopto))),
             Stacking(;
-                     opti = [SubsetResampling(; rng = StableRNG(100), seed = 42, pe = pr,
+                     opti = [SubsetResampling(; subset_size = 0.8, rng = StableRNG(100),
+                                              seed = 42, pe = pr,
                                               opt = MeanRisk(; opt = jopti)),
                              MeanRisk(; opt = jopti), InverseVolatility()],
-                     opto = SubsetResampling(; rng = StableRNG(100), seed = 42,
-                                             opt = MeanRisk(; opt = jopto)))]
+                     opto = SubsetResampling(; subset_size = 0.8, rng = StableRNG(100),
+                                             seed = 42, opt = MeanRisk(; opt = jopto)))]
     df = CSV.read(joinpath(@__DIR__, "./assets/NestedClustered.csv.gz"), DataFrame)
     # The loop is split by index over two files, so that each file of the suite runs in
     # about the same time. This file checks one half of `opts`.

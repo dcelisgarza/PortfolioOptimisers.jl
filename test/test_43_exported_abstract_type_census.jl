@@ -267,6 +267,7 @@
         :Scalariser,
         :SchurComplementAlgorithm,
         :SubPortfolioUniverse,
+        :SubsetSizeEstimator,
         :TimeDependentCallable,
         :TimeDependentConstraintCallable,
         :TimeDependentOptimiserCallable,

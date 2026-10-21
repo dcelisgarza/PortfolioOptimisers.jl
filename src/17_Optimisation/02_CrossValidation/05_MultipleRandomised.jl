@@ -3,12 +3,47 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for estimators that determine the size of each asset subset.
 
-A subtype reaches a [`MultipleRandomised`](@ref) through its `subset_size` field, and is called on the
-returns data to give the value.
+A subtype reaches a [`MultipleRandomised`](@ref) or a [`SubsetResampling`](@ref) through its `subset_size` field, and is called on the
+returns data to give the value. [`PowerSubsetSize`](@ref) is the default `subset_size` of `SubsetResampling`.
+
+# Interfaces
+
+To implement a new subset size, subtype `SubsetSizeEstimator` and make an instance callable as below.
+
+## Call
+
+  - `(s::MySubsetSize)(rd::Union{<:Pr_RR, <:AbstractPricesResult}) -> Integer`: The number of assets in each subset, from `1` to the number of assets of `rd`.
+
+### Arguments
+
+  - `s`: The subset size estimator.
+  - `rd`: The prior result or the returns result of the assets to draw from. Its `X` holds one column for each asset.
+
+### Returns
+
+  - `k::Integer`: The number of assets in each subset. The caller throws when `k < 1` or when `k` is larger than the number of assets.
+
+# Examples
+
+A subset size that takes half the assets, rounded up.
+
+```jldoctest
+julia> struct HalfSubsetSize <: PortfolioOptimisers.SubsetSizeEstimator end
+
+julia> (::HalfSubsetSize)(rd) = cld(size(rd.X, 2), 2)
+
+julia> HalfSubsetSize()(ReturnsResult(; nx = [\"A\", \"B\", \"C\", \"D\", \"E\"], X = rand(10, 5)))
+3
+
+julia> SubsetResampling(; opt = InverseVolatility(), subset_size = HalfSubsetSize()).subset_size
+HalfSubsetSize()
+```
 
 # Related
 
   - [`MultipleRandomised`](@ref)
+  - [`SubsetResampling`](@ref)
+  - [`PowerSubsetSize`](@ref)
   - [`SubsetSizeEC`](@ref)
 """
 abstract type SubsetSizeEstimator <: AbstractEstimator end
@@ -740,3 +775,4 @@ function folds_are_stepped(cv::MultipleRandomised)
     return folds_are_stepped(cv.cv)
 end
 export MultipleRandomised, MultipleRandomisedResult
+public SubsetSizeEstimator

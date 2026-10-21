@@ -835,7 +835,7 @@ end
                                                                                sets = sets)),
              NestedClustered(; pe = prk, sets = sets, opti = mrk, opto = mrk),
              Stacking(; pe = prk, sets = sets, opti = [mrk], opto = mrk),
-             SubsetResampling(; pe = prk, sets = sets, opt = mrk),
+             SubsetResampling(; subset_size = 0.8, pe = prk, sets = sets, opt = mrk),
              InverseVolatility(; pe = prk, sets = sets), EqualWeighted(; sets = sets),
              RandomWeighted(; sets = sets),
              RiskBudgeting(; opt = JuMPOptimiser(; pe = prk, slv = slv),

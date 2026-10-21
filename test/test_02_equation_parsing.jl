@@ -1372,7 +1372,7 @@ end
         @test_throws ArgumentError Stacking(; opti = [jopt(oece)], opto = jopt(pinned))
         # `SubsetResampling` asserts the *internal* contract, because it slices. A stated
         # basis is therefore legal under it, and correct: the view follows the subset.
-        @test SubsetResampling(; opt = jopt(pinned)) isa SubsetResampling
+        @test SubsetResampling(; subset_size = 0.8, opt = jopt(pinned)) isa SubsetResampling
     end
 end
 

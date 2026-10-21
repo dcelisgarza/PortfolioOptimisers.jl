@@ -3664,7 +3664,7 @@ end
               () -> HierarchicalOptimiser(; brt = true), () -> InverseVolatility(; brt = true),
               () -> NestedClustered(; opti = mr, opto = mr, brt = true),
               () -> Stacking(; opti = [mr], opto = mr, brt = true),
-              () -> SubsetResampling(; opt = mr, brt = true),
+              () -> SubsetResampling(; subset_size = 0.8, opt = mr, brt = true),
               () -> OnlinePortfolioSelection(; brt = true), () -> PO.RiskLoss(; brt = true),
               () -> ProgrammeAllocationSet(; slv = s1, brt = true),
               () -> ShortTermLossControlPortfolio(; slv = s1, brt = true),

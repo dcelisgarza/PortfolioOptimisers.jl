@@ -227,5 +227,6 @@ unique_key_dict!(math_dict, :math_dict,
                  :gamma4_hat => "``\\hat{\\gamma}_{4}``: Sample kurtosis of ``\\boldsymbol{x}``, its fourth central moment divided by the square of its biased sample variance. It is ``3`` for a normal distribution.",#
                  :Phi_normal => "``\\Phi``: Distribution function of the standard normal distribution, and ``\\Phi^{-1}`` its quantile function.",#
                  :n_trials => "``N``: Number of independent trials of the search.",#
+                 :k_subset => "``k``: Number of assets in each subset.",#
                  :sigma_sr_trials => "``\\sigma``: Dispersion of the Sharpe ratios of the trials, their standard deviation.",#
                  :gamma_em => "``\\gamma``: Euler-Mascheroni constant, about ``0.5772``.")

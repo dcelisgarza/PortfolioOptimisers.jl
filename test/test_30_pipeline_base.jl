@@ -2481,7 +2481,8 @@ end
                         NestedClustered(; opti = EqualWeighted(), opto = EqualWeighted()),
                     "Stacking" =>
                         Stacking(; opti = [EqualWeighted()], opto = EqualWeighted()),
-                    "SubsetResampling" => SubsetResampling(; opt = EqualWeighted()),
+                    "SubsetResampling" =>
+                        SubsetResampling(; subset_size = 0.8, opt = EqualWeighted()),
                     "EqualWeighted" => EqualWeighted(),
                     "InverseVolatility" => InverseVolatility(),
                     "RandomWeighted" => RandomWeighted())
@@ -2540,7 +2541,7 @@ end
         rather than a configuration. Declaring rather than probing for `:opt` is what keeps
         that name collision from being mistaken for a configuration to route through.
         =#
-        sr = SubsetResampling(; opt = EqualWeighted())
+        sr = SubsetResampling(; subset_size = 0.8, opt = EqualWeighted())
         @test hasfield(typeof(sr), :opt)
         @test PO.pipe_config_field(sr) === nothing
     end
