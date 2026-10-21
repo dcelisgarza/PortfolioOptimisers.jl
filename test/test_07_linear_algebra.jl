@@ -247,6 +247,22 @@ end
         end
         @test_throws DomainError detone(Detone(; n = 11), C)
     end
+    @testset "Ticket 447: a detoned matrix is singular, never indefinite" begin
+        # The subtraction sets the `n` removed eigenvalues to zero and keeps the others, and the
+        # rescale to a unit diagonal is a congruence. So with no repair the result is positive
+        # semidefinite with `n` zero eigenvalues, as Section 2.6 of `mlp1` states.
+        rng = StableRNG(11223344)
+        f = randn(rng, 200)
+        Y = hcat([0.8 .* f .+ 0.6 .* randn(rng, 200) for _ in 1:10]...)
+        C = cor(Y)
+        for n in 1:3
+            Xt = detone(Detone(; pdm = nothing, n = n), C)
+            l = LinearAlgebra.eigvals(LinearAlgebra.Symmetric(Xt))
+            tol = 10 * length(l) * eps(eltype(l)) * maximum(abs, l)
+            @test count(x -> abs(x) <= tol, l) == n
+            @test minimum(l) >= -tol
+        end
+    end
     @testset "Ticket 447: find_max_eval and its fallback" begin
         #=
         On data drawn from an identity covariance the fitted edge sits at the theoretical

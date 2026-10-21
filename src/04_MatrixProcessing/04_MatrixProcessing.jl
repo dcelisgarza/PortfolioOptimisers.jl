@@ -3,23 +3,23 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all matrix processing estimator types.
 
-All concrete and/or abstract types that implement matrix processing routines---such as covariance matrix cleaning, denoising, or detoning---should be subtypes of `AbstractMatrixProcessingEstimator`.
+A type that processes a covariance or correlation matrix, for example by denoising or detoning, is a subtype of `AbstractMatrixProcessingEstimator`.
 
 # Interfaces
 
-In order to implement a new matrix processing estimator which will work seamlessly with the library, subtype `AbstractMatrixProcessingEstimator` with all necessary parameters as part of the struct, and implement the following methods:
+To add a matrix processing estimator, subtype `AbstractMatrixProcessingEstimator`, keep its parameters in the fields of the struct, and add these methods:
 
-  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: In-place processing of a covariance or correlation matrix.
-  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place processing of a covariance or correlation matrix. A fallback method copies `sigma` and calls `matrix_processing!`, so it is only needed if the copy can be avoided.
-  - `matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}`: The positive definite matrix estimator with which a factor prior repairs its covariance after the matrix processing. It is necessary when the estimator goes into a factor prior that adds a residual block. The fallback refuses the type by name, and the factor prior calls it at construction. Return `nothing` to skip the repair.
+  - `matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Processes `sigma` in place.
+  - `matrix_processing(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, X::MatNum, args...; kwargs...) -> MatNum`: Optional. Returns the processed `sigma` in a new matrix. A fallback method copies `sigma` and calls `matrix_processing!`, so add this method only when it avoids the copy.
+  - `matrix_processing_posdef(mp::AbstractMatrixProcessingEstimator) -> Option{<:AbstractPosdefEstimator}`: Returns the positive definite matrix estimator with which a factor prior repairs its covariance after the matrix processing. Add this method when the estimator goes into a factor prior that adds a residual block. The fallback refuses the type by name, and the factor prior calls it at construction. Return `nothing` to skip the repair.
 
 ## Arguments
 
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
-  - `args...`: Additional positional arguments passed to custom algorithms.
-  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+  - `args...`: The positional arguments for a custom algorithm.
+  - `kwargs...`: The keyword arguments for a custom algorithm.
 
 ## Returns
 
@@ -27,7 +27,7 @@ In order to implement a new matrix processing estimator which will work seamless
 
 # Examples
 
-We can create a dummy matrix processing estimator as follows:
+The example below defines a minimal matrix processing estimator.
 
 ```jldoctest
 julia> struct MyMatrixProcessingEstimator <: PortfolioOptimisers.AbstractMatrixProcessingEstimator end
@@ -82,28 +82,28 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all matrix processing algorithm types.
 
-All concrete and/or abstract types that implement a specific matrix processing algorithm should be subtypes of `AbstractMatrixProcessingAlgorithm`.
+A type that implements one matrix processing algorithm is a subtype of `AbstractMatrixProcessingAlgorithm`.
 
 # Interfaces
 
-In order to implement a new matrix processing algorithm that works with the current matrix processing estimator, subtype `AbstractMatrixProcessingAlgorithm`, with all necessary parameters as part of the struct, and implement the following methods:
+To add a matrix processing algorithm that `MatrixProcessing` can use, subtype `AbstractMatrixProcessingAlgorithm`, keep its parameters in the fields of the struct, and add these methods:
 
-  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: In-place application of a custom matrix processing algorithm.
-  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional out-of-place application of a custom matrix processing algorithm.
+  - `matrix_processing_algorithm!(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Applies the algorithm to `sigma` in place.
+  - `matrix_processing_algorithm(mpa::AbstractMatrixProcessingAlgorithm, sigma::MatNum, args...; kwargs...) -> MatNum`: Optional. Applies the algorithm to a copy of `sigma`, and returns the copy.
 
 ## Arguments
 
   - $(arg_dict[:mpa])
-  - `args...`: Additional positional arguments.
-  - `kwargs...`: Additional keyword arguments.
+  - `args...`: The positional arguments for the algorithm.
+  - `kwargs...`: The keyword arguments for the algorithm.
 
 ## Returns
 
-  - `sigma::MatNum`: The input matrix `sigma` after applying the algorithm.
+  - `sigma::MatNum`: The input matrix `sigma` after the algorithm runs.
 
 # Examples
 
-We can create a dummy matrix processing algorithm as follows:
+The example below defines a minimal matrix processing algorithm.
 
 ```jldoctest
 julia> struct MyMatrixProcessingAlgorithm <: PortfolioOptimisers.AbstractMatrixProcessingAlgorithm end
@@ -153,19 +153,19 @@ abstract type AbstractMatrixProcessingAlgorithm <: AbstractAlgorithm end
 """
     matrix_processing_algorithm!(::Nothing, sigma::MatNum, args...; kwargs...)
 
-No-op fallback for matrix processing algorithm routines.
+Returns `sigma` unchanged when no matrix processing algorithm is set.
 
-These methods are called internally when no matrix processing algorithm is specified (i.e., when the algorithm argument is `nothing`). They perform no operation and return `sigma` unchanged, so the matrix processing pipeline can safely skip optional algorithmic steps.
+The `:alg` step of [`matrix_processing!`](@ref) calls this method when `mp.alg` is `nothing`. The method does nothing and returns `sigma`, so the pipeline skips the step.
 
 # Arguments
 
-  - `::Nothing`: Indicates that no matrix processing algorithm is specified.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `::Nothing`: No matrix processing algorithm is set.
+  - `args...`: The positional arguments, which the method ignores.
+  - `kwargs...`: The keyword arguments, which the method ignores.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix `sigma` is returned unchanged.
+  - `sigma::MatNum`: The input matrix `sigma`, unchanged.
 
 # Related
 
@@ -178,7 +178,7 @@ end
 """
     matrix_processing_algorithm(::Nothing, sigma::MatNum, args...; kwargs...)
 
-Same as [`matrix_processing_algorithm!`](@ref), but meant for returning a new matrix instead of modifying it in-place.
+The out-of-place form of [`matrix_processing_algorithm!`](@ref). The `nothing` method returns `sigma` unchanged.
 
 # Related
 
@@ -191,9 +191,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Configures and applies matrix processing routines.
+Runs a positive definite repair, a denoising, a detoning and a custom algorithm on a matrix, in a set order.
 
-`MatrixProcessing` encapsulates all steps required for processing covariance or correlation matrices, including positive definiteness enforcement, denoising, detoning, and optional custom matrix processing algorithms via [`matrix_processing!`](@ref) and [`matrix_processing`](@ref). This estimator allows users to build complex matrix processing pipelines tailored to their specific needs.
+`MatrixProcessing` holds one estimator for each step. The field `order` sets the order in which [`matrix_processing!`](@ref) and [`matrix_processing`](@ref) run the steps. A step whose estimator is `nothing` does nothing.
 
 # Fields
 
@@ -214,7 +214,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - Every symbol in `order` names a field of `MatrixProcessing` other than `order` itself, so it is one of `:pdm`, `:dn`, `:dt` and `:alg`. An unrecognised symbol throws at construction.
+  - Every symbol in `order` names a field of `MatrixProcessing` other than `order` itself, so it is one of `:pdm`, `:dn`, `:dt` and `:alg`. The constructor raises an `ArgumentError` for any other symbol.
 
 # Examples
 
@@ -279,11 +279,11 @@ MatrixProcessing
     """
     dt
     """
-    Optional custom matrix processing algorithm.
+    An optional custom matrix processing algorithm.
     """
     alg
     """
-    A tuple or vector of symbols naming the processing steps in the order they are applied. Recognised steps are `:pdm`, `:dn`, `:dt`, and `:alg`; an unrecognised symbol errors at construction.
+    A tuple or vector of symbols that names the processing steps in the order that they run. The steps are `:pdm`, `:dn`, `:dt` and `:alg`. The constructor refuses any other symbol.
     """
     order
     function MatrixProcessing(pdm::Option{<:AbstractPosdefEstimator},
@@ -318,31 +318,31 @@ end
         kwargs...
     ) -> MatNum
 
-In-place matrix processing pipeline.
+Runs the steps of a matrix processing estimator on the covariance or correlation matrix `sigma` in place.
 
-This method applies a sequence of matrix processing steps to the input covariance or correlation matrix `sigma`, modifying it in-place. The steps and their order are given by `mp.order`---a tuple or vector of symbols (`:pdm`, `:dn`, `:dt`, `:alg`)---and each step is dispatched through [`matrix_processing_step!`](@ref).
+`mp.order` is a tuple or vector of the symbols `:pdm`, `:dn`, `:dt` and `:alg`, and it sets the steps and their order. [`matrix_processing_step!`](@ref) dispatches each step.
 
 # Algorithm
 
  1. Take the next symbol of `mp.order`. The default order is `(:pdm, :dn, :dt, :alg)`.
- 2. Wrap the symbol in a `Val` and apply [`matrix_processing_step!`](@ref) to `sigma`. Each step reads the estimator that the symbol names: `:pdm` reads `mp.pdm`, `:dn` reads `mp.dn` and the effective sample ratio `T / N` taken from the shape of `X`, `:dt` reads `mp.dt`, and `:alg` reads `mp.alg`. A step whose estimator is `nothing` is a no-op, so a `nothing` field skips its step rather than removing it from the order.
- 3. Repeat from step 1 until `mp.order` is exhausted, then return `sigma`.
+ 2. Wrap the symbol in a `Val` and apply [`matrix_processing_step!`](@ref) to `sigma`. Each step reads the estimator that the symbol names: `:pdm` reads `mp.pdm`, `:dn` reads `mp.dn` and the effective sample ratio `T / N` taken from the shape of `X`, `:dt` reads `mp.dt`, and `:alg` reads `mp.alg`. A step whose estimator is `nothing` does nothing, so a `nothing` field skips its step and does not remove it from the order.
+ 3. Repeat from step 1 until no symbol of `mp.order` is left. Then return `sigma`.
 
-`mp.order` is validated at construction, so no step of this loop can name a field that `MatrixProcessing` does not carry. A repeated symbol applies its step twice, which is the order's own business and not an error.
+The constructor checks `mp.order`, so no step of this loop names a field that `MatrixProcessing` does not have. A repeated symbol runs its step twice, and that is not an error.
 
 # Arguments
 
   - $(arg_dict[:omp])
-      + `::MatrixProcessing`: The specified matrix processing estimator is applied to `X` in-place.
-      + `::Nothing`: No-op.
+      + `::MatrixProcessing`: Runs the steps of `mp` on `sigma` in place.
+      + `::Nothing`: Returns `sigma` unchanged.
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
-  - `args...`: Additional positional arguments passed to custom algorithms.
-  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+  - `args...`: The positional arguments for a custom algorithm.
+  - `kwargs...`: The keyword arguments for a custom algorithm.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma`, modified in place.
 
 # Examples
 
@@ -411,42 +411,42 @@ end
 """
     matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum, X::MatNum; kwargs...) -> MatNum
 
-Apply a single named matrix processing step to `sigma` in-place, dispatching on the step symbol `step`.
+Applies one named matrix processing step to `sigma` in place. The symbol `step` selects the method.
 
-This is the per-step worker that [`matrix_processing!`](@ref) calls while iterating over `mp.order`. Each recognised symbol maps to one of the estimator fields of `mp`; the override-or-skip behaviour is inherited from the underlying primitives (a `nothing` estimator is a no-op).
+[`matrix_processing!`](@ref) calls this function once for each symbol of `mp.order`. Each symbol names one estimator field of `mp`. A `nothing` estimator does nothing, because the function that its step calls has a `nothing` method that returns the matrix.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each step is one method, and each one delegates to the primitive that its field names.
+The method that Julia selects is the algorithm. Each step is one method, and each method calls the function of its field.
 
  1. `Val{:pdm}`: apply [`posdef!`](@ref) to `sigma`, under `mp.pdm`. `X` is not read.
  2. `Val{:dn}`: read `T, N = size(X)`, then apply [`denoise!`](@ref) to `sigma`, under `mp.dn` and the effective sample ratio `T / N`. This is the one step that reads `X`, and it reads only its shape.
  3. `Val{:dt}`: apply [`detone!`](@ref) to `sigma`, under `mp.dt`. `X` is not read.
- 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, forwarding `X` and `kwargs`. This is the step that a caller extends.
+ 4. `Val{:alg}`: apply [`matrix_processing_algorithm!`](@ref) to `sigma`, under `mp.alg`, and pass `X` and `kwargs` to it. This is the step that a caller extends.
 
-No method is defined for any other symbol, so an unrecognised step raises a `MethodError`. The constructor of [`MatrixProcessing`](@ref) rejects such a symbol first, so the `MethodError` is reachable only through a hand-built `Val`.
+No method exists for any other symbol, so another symbol raises a `MethodError`. The constructor of [`MatrixProcessing`](@ref) refuses such a symbol first, so only a hand-built `Val` gets to the `MethodError`.
 
 # Arguments
 
   - `::Val{step}`: The processing step to apply, named by a symbol:
 
-      + `:pdm`: positive definiteness enforcement using `mp.pdm`.
-      + `:dn`: denoising using `mp.dn` and the ratio `T / N` derived from `X`.
-      + `:dt`: detoning using `mp.dt`.
-      + `:alg`: optional custom algorithm using `mp.alg`.
-      + Any other symbol: MethodError.
+      + `:pdm`: The positive definite repair under `mp.pdm`.
+      + `:dn`: The denoising under `mp.dn` and the ratio `T / N` of the shape of `X`.
+      + `:dt`: The detoning under `mp.dt`.
+      + `:alg`: The optional custom algorithm `mp.alg`.
+      + Any other symbol: A `MethodError`.
 
-  - `mp`: Matrix processing estimator holding the per-step estimators.
+  - `mp`: The matrix processing estimator that holds the estimator of each step.
 
   - $(arg_dict[:sigrho])
 
   - $(arg_dict[:X])
 
-  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+  - `kwargs...`: The keyword arguments for a custom algorithm.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix `sigma`, modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma`, modified in place.
 
 # Related
 
@@ -474,26 +474,26 @@ end
     assert_shape_only_matrix_processing(mp::MatrixProcessing) -> nothing
     assert_shape_only_matrix_processing(mp::AbstractMatrixProcessingEstimator) -> nothing
 
-Refuses a matrix processing estimator whose steps cannot be run from the shape of the sample alone.
+Refuses a matrix processing estimator whose steps need more than the shape of the sample.
 
-Three of the four steps of [`MatrixProcessing`](@ref) never read the sample: `pdm` and `dt` read `sigma` alone, and `dn` reads `size(X)` and nothing else. The fourth, `alg`, is a step that a caller extends, and it is handed `X` whole, so nothing here can say what it reads. An incremental fit keeps a moment and a count rather than the observations, so it can answer the first three and cannot answer the fourth.
+Three of the four steps of [`MatrixProcessing`](@ref) never read the sample. The steps `pdm` and `dt` read `sigma` alone, and `dn` reads only `size(X)`. The fourth step, `alg`, is a step that a caller extends. It gets the whole of `X`, so this function cannot know what it reads. An incremental fit keeps a moment and a count, and not the observations. So it can run the first three steps and cannot run the fourth.
 
-The refusal is an `ArgumentError` that names the type of `alg`, and it names the two routes that do carry the observations: [`Online`](@ref), which buffers them for the estimator itself, and a prior that carries them for a member of its own.
+The refusal is an `ArgumentError` that names the type of `alg`. It also names the two ways that keep the observations. [`Online`](@ref) buffers them for the estimator itself, and a prior keeps them for one of its members.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. A [`MatrixProcessing`](@ref) passes when `mp.alg` is `nothing`.
- 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. Its interface states only [`matrix_processing!`](@ref) on the whole sample, so the shape of the sample cannot stand in for it.
+ 2. The function refuses every other subtype of [`AbstractMatrixProcessingEstimator`](@ref). Its interface states only [`matrix_processing!`](@ref) on the whole sample, so the shape of the sample cannot replace the sample.
 
 # Arguments
 
-  - `mp`: The matrix processing estimator whose steps are checked.
+  - `mp`: The matrix processing estimator whose steps the function checks.
 
 # Validation
 
-  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. Otherwise, the function raises an `ArgumentError`.
 
 # Returns
 
@@ -568,8 +568,8 @@ A subtype of [`AbstractMatrixProcessingEstimator`](@ref) that goes into a factor
 The method that Julia selects is the algorithm.
 
  1. A [`MatrixProcessing`](@ref) gives `mp.pdm`.
- 2. Every other subtype of [`AbstractMatrixProcessingEstimator`](@ref) is refused. The fallback cannot tell whether the type of a caller repairs a matrix. A `nothing` answer would skip the repair, and the covariance could be indefinite.
- 3. `nothing` gives `nothing`. No matrix processing estimator names no repair, as [`matrix_processing!`](@ref) of `nothing` is a no-op. A cokurtosis estimator whose method of [`cokurtosis_processor`](@ref) gives `nothing` names no processor.
+ 2. The fallback refuses every other subtype of [`AbstractMatrixProcessingEstimator`](@ref), because it cannot tell whether the type of a caller repairs a matrix. An answer of `nothing` skips the repair, and the covariance can then be indefinite.
+ 3. `nothing` gives `nothing`. With no matrix processing estimator there is no repair, as [`matrix_processing!`](@ref) of `nothing` does nothing. A cokurtosis estimator whose method of [`cokurtosis_processor`](@ref) gives `nothing` has no processor.
 
 # Arguments
 
@@ -577,11 +577,11 @@ The method that Julia selects is the algorithm.
 
 # Validation
 
-  - The type of `mp` has a method of its own. An `ArgumentError` that names the type is thrown otherwise.
+  - The type of `mp` has a method of its own. Otherwise, the fallback raises an `ArgumentError` that names the type.
 
 # Returns
 
-  - `pdm::Option{<:AbstractPosdefEstimator}`: The estimator of the repair, `nothing` to skip it.
+  - `pdm::Option{<:AbstractPosdefEstimator}`: The estimator of the repair, or `nothing` to skip the repair.
 
 # Related
 
@@ -621,8 +621,8 @@ A factor prior calls this check when its fit repairs a covariance under [`matrix
 
 # Validation
 
-  - The type of `mp` has a method of [`matrix_processing_posdef`](@ref). An `ArgumentError` is thrown otherwise.
-  - The method returns `nothing` or an [`AbstractPosdefEstimator`](@ref). An `ArgumentError` is thrown otherwise.
+  - The type of `mp` has a method of [`matrix_processing_posdef`](@ref). Otherwise, the fallback raises an `ArgumentError`.
+  - The method returns `nothing` or an [`AbstractPosdefEstimator`](@ref). Otherwise, the function raises an `ArgumentError`.
 
 # Returns
 
@@ -649,32 +649,32 @@ end
     matrix_processing!(mp::AbstractMatrixProcessingEstimator, sigma::MatNum, T::Integer,
                        N::Integer; kwargs...) -> MatNum
 
-Applies matrix processing to `sigma` in-place, from the **shape** of the sample rather than from the sample.
+Applies matrix processing to `sigma` in place, from the shape of the sample and not from the sample.
 
-The arm of the pipeline that an incremental fit reaches when the estimate is made from the state: a fold keeps a moment and a count, so the observations the matrix arm reads no longer exist, while the one number that arm takes off them — the effective sample ratio `T / N` of the denoising step — is exactly the count the state carries. The substitution is therefore not an approximation, and [`observation_count`](@ref) is where `T` comes from.
+An incremental fit calls this method when it makes the estimate from its state. A fold keeps a moment and a count, so the observations that the matrix method reads no longer exist. The matrix method reads one number from them, the effective sample ratio `T / N` of the denoising step, and the state keeps that count. So the substitution is exact, and `T` comes from [`observation_count`](@ref).
 
-`alg` is the one step with no shape substitute, and [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type before any step runs. It also refuses a matrix processing estimator of a caller, whose interface states no shape method.
+`alg` is the one step that the shape cannot replace. Before any step runs, [`assert_shape_only_matrix_processing`](@ref) refuses it with an `ArgumentError` that names its type. It also refuses a matrix processing estimator that a caller defines, because that interface states no shape method.
 
 # Algorithm
 
- 1. Refuse an `mp` that is not a [`MatrixProcessing`](@ref), and an `mp` carrying a sample-reading `alg`.
+ 1. Refuse an `mp` that is not a [`MatrixProcessing`](@ref), and an `mp` whose `alg` is not `nothing`.
  2. Run each step of `mp.order` in turn, through the shape methods of [`matrix_processing_step!`](@ref).
 
 # Arguments
 
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
-  - `T`: Number of observations the estimate was fitted over, `NaN` rows included.
-  - `N`: Number of assets.
-  - `kwargs...`: Additional keyword arguments passed to the steps.
+  - `T`: The number of observations of the fit, with the `NaN` rows.
+  - `N`: The number of assets.
+  - `kwargs...`: The keyword arguments for the steps.
 
 # Validation
 
-  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. An `ArgumentError` is thrown otherwise.
+  - `mp` is a [`MatrixProcessing`](@ref), and `mp.alg` is `nothing`. Otherwise, the method raises an `ArgumentError`.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma`, modified in place.
 
 # Related
 
@@ -700,22 +700,22 @@ end
     matrix_processing_step!(::Val{step}, mp::MatrixProcessing, sigma::MatNum, T::Integer,
                             N::Integer; kwargs...) -> MatNum
 
-Applies a single named matrix processing step to `sigma` in-place, from the shape of the sample.
+Applies one named matrix processing step to `sigma` in place, from the shape of the sample.
 
-The shape twin of the matrix methods of [`matrix_processing_step!`](@ref), one method per step, reached only through the shape arm of [`matrix_processing!`](@ref). `pdm` and `dt` read `sigma` alone, so they are the matrix methods verbatim; `dn` takes the ratio `T / N` it would otherwise read off `size(X)`; and `alg` is a no-op, because the arm refuses a non-`nothing` one before the loop starts.
+These methods are the shape forms of the matrix methods of [`matrix_processing_step!`](@ref), one method for each step. Only the shape method of [`matrix_processing!`](@ref) calls them. The steps `pdm` and `dt` read `sigma` alone, so they are the same as the matrix methods. The step `dn` takes the ratio `T / N` from the arguments and not from `size(X)`. The step `alg` does nothing, because the caller refuses an `alg` that is not `nothing` before the loop starts.
 
 # Arguments
 
   - `::Val{step}`: The processing step to apply, named by a symbol, as in the matrix methods.
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
-  - `T`: Number of observations the estimate was fitted over.
-  - `N`: Number of assets.
-  - `kwargs...`: Additional keyword arguments.
+  - `T`: The number of observations of the fit.
+  - `N`: The number of assets.
+  - `kwargs...`: The keyword arguments, which these methods ignore.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma`, modified in place.
 
 # Related
 
@@ -742,31 +742,31 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Applies matrix processing to the finite block of `sigma`, from the shape of the sample rather than from the sample.
+Applies matrix processing to the finite block of `sigma`, from the shape of the sample and not from the sample.
 
-The shape twin of [`matrix_processing_block!`](@ref), and the arm an incremental fit takes when the estimate is made from the state. It is the matrix method's body with one substitution: where that one cuts the columns of `X` to the block, this one cuts the **count** of them, because the only thing the steps read off those columns is how many there are.
+This is the shape form of [`matrix_processing_block!`](@ref). An incremental fit calls it when it makes the estimate from its state. Its body is the body of the matrix method with one change. The matrix method cuts the columns of `X` to the block, and this method passes the size of the block in their place, because the steps read only the number of those columns.
 
-An estimate made from the state reaches this arm rather than the plain one for the reason the [`AssetPanel`](@ref) methods do: an estimator fitted over a changing universe answers `NaN` for an asset outside the Coverage Universe, and a positive-definite repair over a frame carrying one meets a LAPACK refusal rather than a named error. A complete matrix has no frame, and the body then runs the plain arm over the whole of it after the refusal, which names a non-finite off-diagonal entry that LAPACK would refuse without a name.
+An estimate from the state calls this method, and not the plain one, for the same reason as the [`AssetPanel`](@ref) methods. An estimator fitted over a changing universe gives `NaN` for an asset outside the Coverage Universe. A positive definite repair of a frame that holds such an entry gets a LAPACK error that does not name the cause. A complete matrix has no frame. For it, the body first refuses a non-finite off-diagonal entry with an error that names it, and then runs the plain method on the whole matrix.
 
 # Algorithm
 
- 1. Read the finite rows off the diagonal of `sigma`, and run the plain arm where no asset is finite.
+ 1. Read the finite rows from the diagonal of `sigma`. When no asset is finite, run the plain method and return.
  2. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`, as the matrix method does.
  3. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block as the finite rows whose variance is not zero. A zero variance has no correlation, so no step reads it.
- 4. Run the plain arm where every asset is in the block, and return where no asset is.
- 5. Otherwise process the block with the block's own asset count, and write it back.
+ 4. When every asset is in the block, run the plain method and return. When no asset is in the block, return `sigma`.
+ 5. Otherwise, process the block with the number of assets of the block, and write it back.
 
 # Arguments
 
   - $(arg_dict[:omp])
   - $(arg_dict[:sigrho])
-  - `T`: Number of observations the estimate was fitted over.
-  - `N`: Number of assets the matrix describes.
-  - `kwargs...`: Additional keyword arguments passed to the steps.
+  - `T`: The number of observations of the fit.
+  - `N`: The number of assets of the matrix.
+  - `kwargs...`: The keyword arguments for the steps.
 
 # Returns
 
-  - `sigma::MatNum`: The input matrix `sigma` is modified in-place.
+  - `sigma::MatNum`: The input matrix `sigma`, modified in place.
 
 # Related
 
@@ -810,17 +810,17 @@ Out-of-place version of [`matrix_processing!`](@ref).
 # Algorithm
 
  1. Copy `sigma`.
- 2. Apply [`matrix_processing!`](@ref) to the copy, and return it. The input is never modified, and `X` is never modified by either form.
+ 2. Apply [`matrix_processing!`](@ref) to the copy, and return it. The function never changes the input, and neither form changes `X`.
 
 # Arguments
 
   - $(arg_dict[:omp])
-      + `::AbstractMatrixProcessingEstimator`: The specified processing pipeline is applied to a copy of `sigma`.
-      + `::Nothing`: No-op, returns `sigma` unchanged.
+      + `::AbstractMatrixProcessingEstimator`: Runs the steps of `mp` on a copy of `sigma`.
+      + `::Nothing`: Returns `sigma` unchanged.
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
-  - `args...`: Additional positional arguments passed to custom algorithms.
-  - `kwargs...`: Additional keyword arguments passed to custom algorithms.
+  - `args...`: The positional arguments for a custom algorithm.
+  - `kwargs...`: The keyword arguments for a custom algorithm.
 
 # Returns
 
@@ -870,35 +870,37 @@ end
 
 Repair the finite block of a covariance-like frame in place, and leave the frame around it alone.
 
-A composite estimator that forwards an Asset Panel to the estimator it wraps can get a **frame** back: a matrix whose rows and columns outside the Coverage Universe are `NaN`. The repair has no answer for a `NaN`, so it runs on the finite block alone, and the frame around the block is written back unchanged.
+A composite estimator that forwards an Asset Panel to the estimator it wraps can get a frame back. A frame is a matrix whose rows and columns outside the Coverage Universe are `NaN`. The repair has no answer for a `NaN`, so it runs on the finite block alone, and the frame around the block stays unchanged.
 
-The block is derived from the diagonal, exactly as [`investable_mask`](@ref) derives the Investable Mask from it, and it holds the variances that are finite and not zero. A zero variance belongs to a constant variable: it has no correlation, and a positive semidefinite matrix gives it a zero row and column. So its row and column are set to zero and kept out of the block, and no step, the denoising and the detoning included, reads them. The result is then positive semidefinite and not positive definite. An off-diagonal `NaN` **inside** the finite block is refused with an `IsNonFiniteError`, and is not peeled away here. A [`CoveragePolicy`](@ref) peels the assets of such a pair at admission, with the rule in its `peel` field, so its covariance reaches this step with no such cell. Under [`NoPeel`](@ref) the cell stays, and this refusal is the one the caller meets. A peel here would remove an asset from the covariance and leave it in the Coverage Universe, so two consumers would read two universes.
+The function reads the block from the diagonal, as [`investable_mask`](@ref) reads the Investable Mask from it. The block holds the variances that are finite and not zero. A zero variance belongs to a constant variable. It has no correlation, and a positive semidefinite matrix gives it a zero row and column. So the function sets its row and column to zero and keeps them out of the block, and no step reads them, the denoising and the detoning included. The result is then positive semidefinite and not positive definite.
 
-The block is the whole matrix when every diagonal entry is finite, and **the refusal covers that case too**: a complete diagonal is what an available-case pair with an empty intersection has, so a short-circuit past the refusal would send exactly the case the message was written for to LAPACK. A matrix with no finite diagonal is the one case that still goes straight to the plain repair, because it has no block to refuse anything inside.
+The function refuses an off-diagonal `NaN` inside the finite block with an `IsNonFiniteError`, and does not peel it at this step. A [`CoveragePolicy`](@ref) peels the assets of such a pair at admission, with the rule in its `peel` field, so its covariance gets to this step with no such cell. Under [`NoPeel`](@ref) the cell stays, and the caller gets this refusal. A peel at this step removes an asset from the covariance and keeps it in the Coverage Universe. Then a consumer of the covariance reads a universe without that asset, and a consumer of the Coverage Universe reads one with it.
 
-The bare [`matrix_processing!`](@ref) and [`posdef!`](@ref) are unchanged, so a `NaN` that reaches a plain path is still refused there.
+When every diagonal entry is finite, the block is the whole matrix, and the refusal also applies. An available-case pair with an empty intersection has a complete diagonal. So a shortcut past the refusal sends to LAPACK the case that the message is for. A matrix with no finite diagonal is the one case that goes directly to the plain repair, because it has no block to check.
+
+The plain [`matrix_processing!`](@ref) and [`posdef!`](@ref) do not change, so they still refuse a `NaN` that gets to them.
 
 # Algorithm
 
  1. Take the finite rows `fin` as `isfinite.(diag(sigma))`.
- 2. Run the ordinary repair and return where `fin` holds no `true`. A matrix with no finite diagonal has no block to repair, so it belongs to the plain repair and meets its refusal.
+ 2. When `fin` holds no `true`, run the plain repair and return. A matrix with no finite diagonal has no block to repair, so the plain repair refuses it.
  3. Refuse a non-finite entry inside the finite rows with an `IsNonFiniteError`.
  4. Set the rows and columns of the zero variances to zero with [`zero_variance_rows!`](@ref), and take the block `blk` as the rows of `fin` whose variance is not zero.
- 5. Run the ordinary repair on `sigma` itself and return where `blk` holds no `false`. A complete matrix has no frame to leave alone.
- 6. Return `sigma` where `blk` holds no `true`. Every finite variance is zero, so nothing is left to repair.
- 7. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. `X` is cut only where the axis of `sigma` is the asset axis: a cokurtosis matrix is indexed by asset pairs, so its block names no column of `X` and the whole returns matrix is handed over, which is what the plain path does at that order.
+ 5. When `blk` holds no `false`, run the plain repair on `sigma` itself and return. A complete matrix has no frame to keep.
+ 6. When `blk` holds no `true`, return `sigma`. Every finite variance is zero, so nothing is left to repair.
+ 7. Copy the block out, repair the copy with [`matrix_processing!`](@ref) under the columns of `X` that the block names, write it back into `sigma`, and return `sigma`. The function cuts `X` only when the axis of `sigma` is the asset axis. A cokurtosis matrix has an axis of asset pairs, so its block names no column of `X`. The function then passes the whole returns matrix, as the plain path does for that matrix.
 
 # Arguments
 
   - $(arg_dict[:mp])
   - $(arg_dict[:sigrho])
   - $(arg_dict[:X])
-  - `args...`: Additional positional arguments passed to [`matrix_processing!`](@ref).
-  - `kwargs...`: Additional keyword arguments passed to [`matrix_processing!`](@ref).
+  - `args...`: The positional arguments for [`matrix_processing!`](@ref).
+  - `kwargs...`: The keyword arguments for [`matrix_processing!`](@ref).
 
 # Validation
 
-  - The block of `sigma` must be finite.
+  - Every entry of the block of `sigma` is finite. Otherwise, the function raises an `IsNonFiniteError`.
 
 # Returns
 
@@ -944,9 +946,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Refuses a co-moment block that carries a non-finite entry, naming the count and the first cell.
+Refuses a co-moment block that has a non-finite entry. The error names the count and the first cell.
 
-The one refusal of the block rule, shared by [`matrix_processing_block!`](@ref) and [`negative_spectral_coskewness`](@ref). A block is the set of cells among assets a fit answered for, so a non-finite cell inside it is a pair or a triple whose assets were each estimated and whose intersection was empty. The repair has no answer for it, and neither has the spectral step: Julia's LAPACK wrappers check first, so `eigen` and `nearest_cor!` both throw `ArgumentError: matrix contains Infs or NaNs`, which names neither coverage nor the cell that caused it.
+[`matrix_processing_block!`](@ref) and [`negative_spectral_coskewness`](@ref) share this refusal of the block rule. A block is the set of cells of the assets that a fit gave an answer for. So a non-finite cell inside it is a pair or a triple of assets that the fit estimated one at a time, with an empty intersection of observations. The repair has no answer for that cell, and the spectral step has none. The LAPACK wrappers of Julia check first, so `eigen` and `nearest_cor!` both throw `ArgumentError: matrix contains Infs or NaNs`. That message does not name the coverage or the cell.
 
 # Arguments
 
@@ -954,7 +956,7 @@ The one refusal of the block rule, shared by [`matrix_processing_block!`](@ref) 
 
 # Validation
 
-  - Every entry of `block` is finite. An `IsNonFiniteError` is thrown otherwise.
+  - Every entry of `block` is finite. Otherwise, the function raises an `IsNonFiniteError`.
 
 # Returns
 
