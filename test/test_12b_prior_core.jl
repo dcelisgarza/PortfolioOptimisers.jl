@@ -1930,7 +1930,9 @@ end
     ivc[1:(T - n), :] .= NaN
     rdc = ReturnsResult(; nx = rdi.nx, X = Xi, iv = ivc, ivpa = 1.1)
     @test clusterise(clp, pr; rd = rdc, iv = rdc.iv, ivpa = 1.1).res.order == clt.res.order
-    @test_throws IsNonFiniteError clusterise(cle, Xi[1:n, :]; iv = ivc[1:n, :], ivpa = 1.1)
+    # A gap in `iv` raises a `DomainError` since `58bf93a4b1`, through
+    # `assert_nonempty_nonneg_finite_val`, which refuses a negative entry with the gap.
+    @test_throws DomainError clusterise(cle, Xi[1:n, :]; iv = ivc[1:n, :], ivpa = 1.1)
     @test phylogeny_matrix(clp, pr; rd = rdi, iv = rdi.iv, ivpa = rdi.ivpa).X ==
           phylogeny_matrix(cle, tail.X; iv = tail.iv, ivpa = tail.ivpa).X
     ct = CentralityEstimator(; pl = NetworkEstimator(; ce = ImpliedVolatility(; ppy = 252)),

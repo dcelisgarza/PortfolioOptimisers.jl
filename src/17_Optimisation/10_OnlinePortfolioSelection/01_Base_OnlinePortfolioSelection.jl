@@ -1430,7 +1430,8 @@ Records a Held Step on the current [`ProjectionStep`](@ref). Outside a step, it 
 function record_held_step!(reason::AbstractString, trials)
     step = PROJECTION_STEP[]
     if isnothing(step)
-        @warn("Held Step outside an Online Update: $reason")
+        @warn("Held Step outside an Online Update: $reason", maxlog = log_limit(:warn),
+              _id = @log_id())
         return nothing
     end
     push!(step.held, HeldStep(step.ts, reason, trials))

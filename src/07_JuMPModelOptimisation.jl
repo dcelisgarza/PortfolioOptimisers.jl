@@ -235,7 +235,7 @@ JuMPResult
         if !success
             # Summarised via the shared builder: one bounded line per failed stage, never
             # the whole trials dict, the solver settings, or full exception payloads.
-            @warn(failed_solve_msg(trials))
+            @warn(failed_solve_msg(trials), maxlog = log_limit(:warn), _id = @log_id())
         end
         return new{typeof(trials), typeof(success)}(trials, success)
     end

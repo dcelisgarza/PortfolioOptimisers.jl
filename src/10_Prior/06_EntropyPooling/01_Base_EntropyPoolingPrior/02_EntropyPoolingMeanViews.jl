@@ -193,7 +193,7 @@ function replace_prior_views(res::ParsingResult, pr::AbstractPriorResult,
                 return ParsingResult(vars, copy(coeffs), res.op, res.rhs, res.eqn)
             end
             msg = unknown_variable_msg(m.captures[1], nx, sets.xkey)
-            strict_diagnostic(msg, strict)
+            strict_diagnostic(msg, strict; id = @log_id(m.captures[1], sets.xkey))
             push!(idx_rm, i)
             continue
         end

@@ -412,7 +412,8 @@ function sample_unique_assets(N::Integer, k::Integer, n_subsets::Integer;
             subsets[:, i] .= combination_by_index(rank, N, k)
         end
     else
-        @warn("The number of combinations for `subset_size = $k` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.")
+        @warn("The number of combinations for `subset_size = $k` and `N = $N` is `binomial(assets, subset_size) = n_comb => binomial($N, $k) = $n_comb`, which may be computationally expensive. We will use an approximate alternate approach. If you want the exact approach consider increasing `max_comb` or moving `subset_size` closer to `div(assets, 2) = $(div(N, 2))`.",
+              maxlog = log_limit(:warn), _id = @log_id())
         for i in axes(subsets, 2)
             subsets[:, i] .= sort!(StatsBase.sample(rng, 1:N, k; replace = false))
         end

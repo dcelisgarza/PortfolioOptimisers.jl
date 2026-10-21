@@ -102,12 +102,12 @@ The warning is logged once for each source.
 """
 function warn_source_fallback(x_src::Union{<:DataSource, <:ExcessSource})::Nothing
     msg = "a graph reader states `x_src = $(source_label(x_src))`, which reads the returns data, and the call gives no returns data, so the reader reads the `X` of the prior result. Pass the returns data as `rd` to read them, or state `x_src = nothing` to read the prior result with no warning."
-    @warn(msg, maxlog = 1, _id = hash(msg))
+    @warn(msg, maxlog = log_limit(:warn, 1), _id = hash(msg))
     return nothing
 end
 function warn_source_fallback(::PriorSource)::Nothing
     msg = "a graph reader states `x_src = PriorSource()`, which reads the prior result, and the call gives returns data and no prior result, so the reader reads the `X` of the returns data. Pass a prior result to read it, or state `x_src = nothing` to read the returns data with no warning."
-    @warn(msg, maxlog = 1, _id = hash(msg))
+    @warn(msg, maxlog = log_limit(:warn, 1), _id = hash(msg))
     return nothing
 end
 """
@@ -389,7 +389,8 @@ function graph_reader_mask(x, imsk::Option{<:BitVector}, pr::AbstractPriorResult
     msg = "a graph reader of this optimiser reads the returns data with a plain moment estimator, and the rows that it reads hold a gap for $(count(gap)) asset(s) that the prior kept: $(assets). A plain moment estimator has no correct answer for a gapped sample"
     @argcheck(!strict,
               IsNonFiniteError("$(msg), and `strict = true` refuses the gap. $(graph_gap_remedy)"))
-    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(graph_gap_remedy) Pass `strict = true` to refuse the gap.")
+    @warn("$(msg), so the fit leaves these assets out of the Investable Mask and gives each a zero weight. $(graph_gap_remedy) Pass `strict = true` to refuse the gap.",
+          maxlog = log_limit(:warn), _id = @log_id())
     keep = isnothing(imsk) ? .!gap : imsk .& .!gap
     @argcheck(any(keep),
               IsEmptyError("every asset that the prior kept holds a gap in the rows that a plain graph reader of this optimiser reads, so the fit has no asset left. $(graph_gap_remedy)"))

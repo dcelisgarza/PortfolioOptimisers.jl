@@ -416,7 +416,7 @@ function assert_join_padding(lines::AbstractVector, strict::Bool)::Nothing
     strict_diagnostic("the ingestion layer padded the series the join and the alignment found silent on the emitted clock, and a padded observation is an absence carried as `NaN`, which a fit drops without a message: the observation of a padded factor or one-column benchmark, and the asset of a padded implied volatility or per-asset benchmark: " *
                       join(kept, "; ") *
                       ". Under `join_method = :left` the asset table states the clock; `:outer` takes the union and `:inner` the intersection, and a caller who wants no padding aligns the series before the call.",
-                      strict)
+                      strict; id = @log_id())
     return nothing
 end
 """

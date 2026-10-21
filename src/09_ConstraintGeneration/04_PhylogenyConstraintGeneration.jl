@@ -982,7 +982,8 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1,
         if lhs_flag
             # A zero centrality vector is a fact about the graph, not a mistyped name, so the
             # message is its own. The row it would build, `0' w <= B`, holds for every `w`.
-            strict_diagnostic(zero_centrality_msg(cc.A.ct, length(A)), strict)
+            strict_diagnostic(zero_centrality_msg(cc.A.ct, length(A)), strict;
+                              id = @log_id(typeof(cc.A.ct)))
             continue
         end
         d, flag_ineq = comparison_sign_ineq_flag(cc.comp)

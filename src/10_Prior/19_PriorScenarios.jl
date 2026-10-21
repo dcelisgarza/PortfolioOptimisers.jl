@@ -1223,7 +1223,7 @@ function scenario_fill(X::MatNum, mu::VecNum, sigma::MatNum, strict::Bool,
         frac = length(filled) / length(X)
         if strict || isnothing(fill_limit) || worst > fill_limit
             strict_diagnostic(scenario_fill_msg(report, wi, worst, frac, fill_limit),
-                              strict)
+                              strict; id = @log_id())
             scenario_fill_remember!(named, report)
         end
     end

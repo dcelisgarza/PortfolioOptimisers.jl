@@ -261,7 +261,8 @@ function apply_gap_return(alg::AbstractGapReturnAlgorithm, R::DataFrames.DataFra
         r[w] .= out[w]
     end
     if !wrote
-        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.")
+        @info("`gap_return_alg` is a $(typeof(alg)) and no cell is writable, so the returns are the ones the default rule computed. A Gap Return writes only a return that reads a gapped price, inside an asset's Listing Span, after the first observed price of its column. The table that reaches the conversion holds no such return.",
+              maxlog = log_limit(:info), _id = @log_id(typeof(alg)))
     end
     return R
 end

@@ -692,10 +692,12 @@ function _optimise(da::DiscreteAllocation, fai::FiniteAllocationInput;
     res[sidx, 3] = -sw
     retcode = if isa(sretcode, OptimisationFailure) || isa(lretcode, OptimisationFailure)
         if isa(sretcode, OptimisationFailure)
-            @warn("Failed to solve sub optimisation problem. Check `s_retcode.res` for details.")
+            @warn("Failed to solve sub optimisation problem. Check `s_retcode.res` for details.",
+                  maxlog = log_limit(:warn), _id = @log_id())
         end
         if isa(lretcode, OptimisationFailure)
-            @warn("Failed to solve sub optimisation problem. Check `l_retcode.res` for details.")
+            @warn("Failed to solve sub optimisation problem. Check `l_retcode.res` for details.",
+                  maxlog = log_limit(:warn), _id = @log_id())
         end
         OptimisationFailure()
     else

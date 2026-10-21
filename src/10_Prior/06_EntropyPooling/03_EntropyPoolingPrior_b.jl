@@ -31,7 +31,8 @@ function ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w
         # The window binds when it holds no more than `alpha`, since the model asks it to hold
         # at least that. A window of the whole sample restricts nothing.
         if length(o) < length(w) && sum(view(w, o)) - alpha <= alpha * cbrt(eps(eltype(w)))
-            @warn("The integer CVaR view reads the $(length(o)) largest losses, and the posterior puts only the tail mass $(alpha) on them, so the window binds and a posterior of smaller divergence can lie outside it. Raise `sbar` in `IntegerConditionalValueatRiskView`.")
+            @warn("The integer CVaR view reads the $(length(o)) largest losses, and the posterior puts only the tail mass $(alpha) on them, so the window binds and a posterior of smaller divergence can lie outside it. Raise `sbar` in `IntegerConditionalValueatRiskView`.",
+                  maxlog = log_limit(:warn), _id = @log_id())
         end
     end
     return nothing

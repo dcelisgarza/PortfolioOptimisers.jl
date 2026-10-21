@@ -1,5 +1,5 @@
 ```@meta
-Description = "Preferences, private API of PortfolioOptimisers.jl: PREFERENCE_KEYS, PREFERENCE_DISTANCES, apply_preferences!, apply_show_preferences!, __init__, …"
+Description = "Preferences, private API of PortfolioOptimisers.jl: PREFERENCE_KEYS, PREFERENCE_DISTANCES, apply_preferences!, apply_show_preferences!, …"
 ```
 
 # [Preferences: private API](@id private-api-preferences)
@@ -9,6 +9,7 @@ PREFERENCE_KEYS
 PREFERENCE_DISTANCES
 apply_preferences!
 apply_show_preferences!
+apply_log_preferences!
 PortfolioOptimisers.__init__
 relaxed_preferences_msg
 ```

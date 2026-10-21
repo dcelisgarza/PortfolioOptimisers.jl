@@ -725,7 +725,8 @@ function find_max_eval(vals::VecNum, q::Number,
     x = if Optim.converged(res)
         Optim.minimizer(res)
     else
-        @warn("Marčenko-Pastur fit did not converge, using a unit noise variance.")
+        @warn("Marčenko-Pastur fit did not converge, using a unit noise variance.",
+              maxlog = log_limit(:warn), _id = @log_id())
         1.0
     end
     return x * op_sqrt_iq_sq

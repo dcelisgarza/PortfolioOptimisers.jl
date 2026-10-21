@@ -1094,7 +1094,8 @@ function assert_matched_coverage(pr::HighOrderPrior)::Nothing
     lo = isfinite.(pr.mu) .& isfinite.(LinearAlgebra.diag(pr.sigma))
     dropped = findall(lo .& .!comoment_investable(pr.sk, pr.kt, length(pr.mu)))
     if !isempty(dropped)
-        @warn("the low order block of this high order prior holds $(length(dropped)) asset(s) that its higher orders do not, so the Investable Mask narrows back to the assets the higher orders could estimate. Assets $(dropped) carry a finite `mu` and a finite diagonal of `sigma`, and a non-finite per-asset diagonal of `sk` or `kt`. A `CoveragePolicy` is a field of one estimator, so set the same one on `ske` and `kte` as on the low order estimators — `HighOrderPriorEstimator(; ske = Coskewness(; cvg = ...), kte = Cokurtosis(; cvg = ...))` — or clear it everywhere to fit the whole prior on the Coverage Universe.")
+        @warn("the low order block of this high order prior holds $(length(dropped)) asset(s) that its higher orders do not, so the Investable Mask narrows back to the assets the higher orders could estimate. Assets $(dropped) carry a finite `mu` and a finite diagonal of `sigma`, and a non-finite per-asset diagonal of `sk` or `kt`. A `CoveragePolicy` is a field of one estimator, so set the same one on `ske` and `kte` as on the low order estimators — `HighOrderPriorEstimator(; ske = Coskewness(; cvg = ...), kte = Cokurtosis(; cvg = ...))` — or clear it everywhere to fit the whole prior on the Coverage Universe.",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end

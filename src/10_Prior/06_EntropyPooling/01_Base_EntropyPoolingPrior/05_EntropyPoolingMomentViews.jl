@@ -472,11 +472,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
                 k = findfirst(x -> x == asset2, nx)
                 if isnothing(j)
                     msg = unknown_variable_msg(asset1, nx, sets.xkey)
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(asset1, sets.xkey))
                 end
                 if isnothing(k)
                     msg = unknown_variable_msg(asset2, nx, sets.xkey)
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(asset2, sets.xkey))
                 end
                 if isnothing(j) || isnothing(k)
                     push!(idx_rm, i)
@@ -517,11 +517,11 @@ function replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult,
             end
             if isnothing(j)
                 msg = unknown_variable_msg(asset1, nx, sets.xkey)
-                strict_diagnostic(msg, strict)
+                strict_diagnostic(msg, strict; id = @log_id(asset1, sets.xkey))
             end
             if isnothing(k)
                 msg = unknown_variable_msg(asset2, nx, sets.xkey)
-                strict_diagnostic(msg, strict)
+                strict_diagnostic(msg, strict; id = @log_id(asset2, sets.xkey))
             end
             if isnothing(j) || isnothing(k)
                 push!(idx_rm, i)

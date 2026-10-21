@@ -502,6 +502,99 @@ end
     pe.set_equation_limits!(max_length = 4096, max_depth = 256)
     pe.set_string_distance!(dist = pe.StringDistances.Levenshtein(), min_score = 0.7)
 end
+@testset "Log limits cap the repeats of one log site (#1690)" begin
+    using PortfolioOptimisers, Test
+    pe = PortfolioOptimisers
+    # The shipped default sets no cap, so each site keeps the limit it states.
+    @test pe.LOG_LIMITS[] == pe.LogLimits(nothing, nothing, nothing)
+    @test pe.LogLimits() == pe.LogLimits(nothing, nothing, nothing)
+    @test pe.LogLimits(; max_info = 3).max_info == 3
+    @test pe.log_limit(:warn) === nothing
+    @test pe.log_limit(:warn, 1) == 1
+    # A cap is at least one, so it never hides the first message of a site.
+    @test_throws ArgumentError pe.LogLimits(; max_warn = 0)
+    @test_throws ArgumentError pe.LogLimits(; max_debug = -1)
+    @test_throws ArgumentError pe.LogLimits(; max_info = true)
+    @test_throws ArgumentError pe.set_log_limits!(max_warn = 0)
+    @test_throws ArgumentError pe.with_log_limits(() -> nothing; max_info = 0)
+    @test_throws ArgumentError pe.log_limit(:error)
+    # A set cap replaces the limit of every site of its level, a site limit included.
+    pe.with_log_limits(; max_warn = 2, max_info = 3, max_debug = 4) do
+        @test pe.log_limit(:warn) == 2
+        @test pe.log_limit(:warn, 1) == 2
+        @test pe.log_limit(:info) == 3
+        @test pe.log_limit(:debug, 1) == 4
+        # Nested overrides inherit the keywords they omit.
+        pe.with_log_limits(; max_warn = nothing) do
+            @test pe.log_limit(:warn, 1) == 1
+            @test pe.log_limit(:info) == 3
+        end
+    end
+    @test pe.LOG_LIMITS[] == pe.LogLimits()  # the scoped override is restored
+    pe.set_log_limits!(max_info = 5)
+    @test pe.LOG_LIMITS[] == pe.LogLimits(; max_info = 5)
+    pe.set_log_limits!(max_info = nothing)
+    @test pe.LOG_LIMITS[] == pe.LogLimits()
+    # The `_id` of `@log_id` keys on the site and on the parts, so a different part or a
+    # different site counts on its own, and the same part at the same site repeats.
+    # A macro resolves its module when the testset expands, before `pe` is bound.
+    id(k) = PortfolioOptimisers.@log_id(k)
+    @test id("a") == id("a")
+    @test id("a") != id("b")
+    @test PortfolioOptimisers.@log_id("a") != id("a")
+    # A site under the cap logs the cap and no more, once per `_id`.
+    diag(k) = pe.strict_diagnostic("unknown name `$k` at $(rand())", false; id = id(k))
+    logs, = Test.collect_test_logs() do
+        return pe.with_log_limits(; max_warn = 2) do
+            for _ in 1:4, k in ("a", "b")
+                diag(k)
+            end
+        end
+    end
+    @test length(logs) == 4
+    @test count(r -> occursin("`a`", r.message), logs) == 2
+    logs, = Test.collect_test_logs() do
+        for _ in 1:4
+            diag("a")
+        end
+    end
+    @test length(logs) == 4  # no cap, no limit
+    # The preferences seed the global default. A valid value is silent: a cap widens no
+    # guard, so it records nothing for the announcement.
+    logs, = Test.collect_test_logs() do
+        return pe.apply_preferences!(Dict{String, Any}("max_warn" => 1, "max_debug" => 7))
+    end
+    @test isempty(logs)
+    @test pe.LOG_LIMITS[] == pe.LogLimits(; max_warn = 1, max_debug = 7)
+    pe.apply_preferences!(Dict{String, Any}("max_info" => 2))
+    @test pe.LOG_LIMITS[] == pe.LogLimits(1, 2, 7)  # an unset key keeps its value
+    # The announcement of a widened guard runs under the cap the same load set. Each pass
+    # restores the shipped cap first, so each pass widens the guard again.
+    logs, = Test.collect_test_logs() do
+        for _ in 1:3
+            pe.set_resource_limits!(max_bins = 10_000)
+            pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000))
+        end
+    end
+    @test length(logs) == 1
+    pe.with_log_limits(; max_warn = nothing) do
+        logs, = Test.collect_test_logs() do
+            for _ in 1:3
+                pe.set_resource_limits!(max_bins = 10_000)
+                pe.apply_preferences!(Dict{String, Any}("max_bins" => 50_000))
+            end
+        end
+        @test length(logs) == 3
+    end
+    for (key, val) in
+        (("max_warn", 0), ("max_info", -1), ("max_debug", true), ("max_warn", "1"),
+         ("max_info", 1.5))
+        @test_throws ArgumentError pe.apply_preferences!(Dict{String, Any}(key => val))
+    end
+    pe.set_log_limits!(max_warn = nothing, max_info = nothing, max_debug = nothing)
+    pe.set_resource_limits!(max_bins = 10_000)  # restore
+    @test pe.LOG_LIMITS[] == pe.LogLimits()
+end
 @testset "Canonicalisation invariants (issue #513)" begin
     using PortfolioOptimisers, Test, Logging
     with_logger(SimpleLogger(stderr, Logging.Error)) do

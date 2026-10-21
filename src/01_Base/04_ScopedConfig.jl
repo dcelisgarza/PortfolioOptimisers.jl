@@ -7,7 +7,7 @@ Reads go through `cfg[]`, which returns the innermost active scoped override whe
 
 Configs held this way store *immutable* structs (or bits values); changing any knob builds a new value and swaps it in, never mutates in place.
 
-Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE`](@ref), [`EQUATION_LIMITS`](@ref) and [`RESOURCE_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
+Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE`](@ref), [`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref) and [`LOG_LIMITS`](@ref); their global defaults are set via the `set_*!` setters, scoped overrides via the `with_*` helpers, and load-time per-project defaults via Preferences.jl (see [`apply_preferences!`](@ref)).
 
 # Related
 
@@ -16,6 +16,7 @@ Used by [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`STRING_DISTANCE
   - [`set_string_distance!`](@ref) / [`with_string_distance`](@ref)
   - [`set_equation_limits!`](@ref) / [`with_equation_limits`](@ref)
   - [`set_resource_limits!`](@ref) / [`with_resource_limits`](@ref)
+  - [`set_log_limits!`](@ref) / [`with_log_limits`](@ref)
   - [`apply_preferences!`](@ref)
 """
 mutable struct ScopedConfig{T}
@@ -868,4 +869,241 @@ function with_resource_limits(f; max_n_sim::Integer = RESOURCE_LIMITS[].max_n_si
     return with_config(f, RESOURCE_LIMITS,
                        ResourceLimits(; max_n_sim, max_n_subsets, max_frontier, max_bins,
                                       max_hop_count, max_search_grid, max_ep_grid))
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Global caps on how many times one log site of the library repeats one message, one cap per log level.
+
+A cross-validation, a walk-forward, an online selection and a meta-optimiser call the same verb many times, and each call that meets the same condition logs the same message again. So every log site of the library passes `maxlog` and `_id` to its log macro. `maxlog` comes from [`log_limit`](@ref), which reads the cap of the level here. `_id` comes from [`@log_id`](@ref), which keys the count on the site and on the stable parts of the configuration. A logger counts each `_id` on its own, so a different configuration at the same site logs again.
+
+A cap of `nothing` sets no cap: each site then keeps the limit that it states, and most sites state none. An integer cap replaces the limit of every site of its level. A cap is at least `1`, so a cap never hides the first message of a site.
+
+Immutable; held in the [`LOG_LIMITS`](@ref) [`ScopedConfig`](@ref). Set the global default via [`set_log_limits!`](@ref), override per scope via [`with_log_limits`](@ref).
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    LogLimits(max_warn::Union{Nothing, Integer}, max_info::Union{Nothing, Integer},
+              max_debug::Union{Nothing, Integer}) -> LogLimits
+
+    LogLimits(;
+        max_warn::Union{Nothing, Integer} = nothing,
+        max_info::Union{Nothing, Integer} = nothing,
+        max_debug::Union{Nothing, Integer} = nothing
+    ) -> LogLimits
+
+Keywords correspond to the struct's fields.
+
+## Validation
+
+  - Each cap is `nothing` or a positive integer that is not a `Bool`.
+
+# Related
+
+  - [`LOG_LIMITS`](@ref)
+  - [`set_log_limits!`](@ref)
+  - [`with_log_limits`](@ref)
+  - [`log_limit`](@ref)
+  - [`@log_id`](@ref)
+"""
+struct LogLimits
+    """
+    Maximum number of times one `@warn` site logs one `_id`. The default is `nothing`, so each site keeps its own limit.
+    """
+    max_warn::Union{Nothing, Int}
+    """
+    Maximum number of times one `@info` site logs one `_id`. The default is `nothing`, so each site keeps its own limit.
+    """
+    max_info::Union{Nothing, Int}
+    """
+    Maximum number of times one `@debug` site logs one `_id`. The default is `nothing`, so each site keeps its own limit.
+    """
+    max_debug::Union{Nothing, Int}
+    function LogLimits(max_warn::Union{Nothing, Integer}, max_info::Union{Nothing, Integer},
+                       max_debug::Union{Nothing, Integer})
+        @argcheck(all(x -> isnothing(x) || !(x isa Bool) && x > 0,
+                      (max_warn, max_info, max_debug)),
+                  ArgumentError("max_warn, max_info and max_debug must each be nothing or a positive integer."))
+        return new(max_warn, max_info, max_debug)
+    end
+end
+function LogLimits(; max_warn::Union{Nothing, Integer} = nothing,
+                   max_info::Union{Nothing, Integer} = nothing,
+                   max_debug::Union{Nothing, Integer} = nothing)
+    return LogLimits(max_warn, max_info, max_debug)
+end
+"""
+    LOG_LIMITS = ScopedConfig(LogLimits())
+
+Default global caps on the repeats of one log site, one per log level. Read as `LOG_LIMITS[]`, and through [`log_limit`](@ref) at a log site. The defaults may be seeded per project at load time via the `"max_warn"` / `"max_info"` / `"max_debug"` preferences (see [`apply_preferences!`](@ref)).
+
+# Related
+
+  - [`LogLimits`](@ref)
+  - [`set_log_limits!`](@ref)
+  - [`with_log_limits`](@ref)
+  - [`log_limit`](@ref)
+"""
+const LOG_LIMITS = ScopedConfig(LogLimits())
+"""
+    set_log_limits!(; max_warn::Union{Nothing, Integer}, max_info::Union{Nothing, Integer},
+                    max_debug::Union{Nothing, Integer})
+
+Configure the global default caps on the repeats of one log site (see [`LOG_LIMITS`](@ref)).
+
+Set a cap to limit how many times each site of that level logs one `_id`, or set it to `nothing` to let each site keep its own limit. Unspecified keywords keep their current default. The store is atomic (see [`ScopedConfig`](@ref)); for a temporary, task-scoped override use [`with_log_limits`](@ref).
+
+# Algorithm
+
+ 1. Default each keyword the caller omits to the field of the current global default, read atomically. A scoped override is not read, so the call configures the global default alone.
+ 2. Build a [`LogLimits`](@ref) from the three keywords, which is where the validation below runs.
+ 3. Store it as the global default of [`LOG_LIMITS`](@ref) through [`set_default!`](@ref).
+
+# Arguments
+
+  - `max_warn`: Maximum repeats of one `_id` at one `@warn` site, or `nothing`.
+  - `max_info`: Maximum repeats of one `_id` at one `@info` site, or `nothing`.
+  - `max_debug`: Maximum repeats of one `_id` at one `@debug` site, or `nothing`.
+
+# Validation
+
+  - Each cap is `nothing` or a positive integer, enforced by [`LogLimits`](@ref).
+
+# Returns
+
+  - `lims::LogLimits`: The new global default.
+
+# Related
+
+  - [`LOG_LIMITS`](@ref)
+  - [`with_log_limits`](@ref)
+  - [`set_resource_limits!`](@ref)
+"""
+function set_log_limits!(;
+                         max_warn::Union{Nothing, Integer} = (@atomic LOG_LIMITS.default).max_warn,
+                         max_info::Union{Nothing, Integer} = (@atomic LOG_LIMITS.default).max_info,
+                         max_debug::Union{Nothing, Integer} = (@atomic LOG_LIMITS.default).max_debug)
+    return set_default!(LOG_LIMITS, LogLimits(; max_warn, max_info, max_debug))
+end
+"""
+    with_log_limits(f; max_warn::Union{Nothing, Integer} = LOG_LIMITS[].max_warn,
+                    max_info::Union{Nothing, Integer} = LOG_LIMITS[].max_info,
+                    max_debug::Union{Nothing, Integer} = LOG_LIMITS[].max_debug)
+
+Run `f()` with the caps on the repeats of one log site (see [`LOG_LIMITS`](@ref)) overridden for the dynamic extent of the call, restoring the previous caps on exit. Task-scoped and thread-safe (see [`ScopedConfig`](@ref)); the global default is untouched. Unspecified keywords inherit from the currently active value, so nested overrides compose.
+
+Useful to quiet one long cross-validation without changing the log of other concurrent work. A logger counts the repeats of an `_id` for its whole life, so a site that already logged its limit inside the block stays silent after the block under the same logger.
+
+# Algorithm
+
+ 1. Default each keyword the caller omits to the field of the currently active value, so that a nested override inherits from the enclosing one instead of from the global default.
+ 2. Build a [`LogLimits`](@ref) from the three keywords, which is where the validation below runs.
+ 3. Run `f()` with [`LOG_LIMITS`](@ref) bound to that value through [`with_config`](@ref).
+
+# Arguments
+
+  - `f`: Zero-argument function to run under the override.
+  - `max_warn`: Maximum repeats of one `_id` at one `@warn` site, or `nothing`.
+  - `max_info`: Maximum repeats of one `_id` at one `@info` site, or `nothing`.
+  - `max_debug`: Maximum repeats of one `_id` at one `@debug` site, or `nothing`.
+
+# Validation
+
+  - Each cap is `nothing` or a positive integer, enforced by [`LogLimits`](@ref).
+
+# Returns
+
+  - The value that `f()` returns.
+
+# Related
+
+  - [`set_log_limits!`](@ref)
+  - [`LOG_LIMITS`](@ref)
+  - [`LogLimits`](@ref)
+  - [`with_config`](@ref)
+"""
+function with_log_limits(f; max_warn::Union{Nothing, Integer} = LOG_LIMITS[].max_warn,
+                         max_info::Union{Nothing, Integer} = LOG_LIMITS[].max_info,
+                         max_debug::Union{Nothing, Integer} = LOG_LIMITS[].max_debug)
+    return with_config(f, LOG_LIMITS, LogLimits(; max_warn, max_info, max_debug))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Give the `maxlog` of one log site: the cap of its level in [`LOG_LIMITS`](@ref) when the cap is set, otherwise the limit that the site states.
+
+Every log site of the library passes `maxlog = log_limit(level)`, or `maxlog = log_limit(level, n)` when the site limits itself to `n` repeats. A `maxlog` of `nothing` sets no limit, because a logger limits a record only when its `maxlog` is an integer.
+
+# Algorithm
+
+ 1. Read the active value of [`LOG_LIMITS`](@ref), and take the cap of `level` from it.
+ 2. Return the cap when it is an integer, and `site` when it is `nothing`.
+
+# Arguments
+
+  - `level`: The level of the log macro: `:warn`, `:info` or `:debug`.
+  - `site`: The limit that the site states, or `nothing` for no limit of its own.
+
+# Validation
+
+  - `level` is `:warn`, `:info` or `:debug`. Any other symbol raises an `ArgumentError`.
+
+# Returns
+
+  - `maxlog::Union{Nothing, Integer}`: The value to pass as the `maxlog` of the log macro.
+
+# Related
+
+  - [`LOG_LIMITS`](@ref)
+  - [`LogLimits`](@ref)
+  - [`@log_id`](@ref)
+"""
+function log_limit(level::Symbol, site::Union{Nothing, Integer} = nothing)
+    lims = LOG_LIMITS[]
+    cap = if level === :warn
+        lims.max_warn
+    elseif level === :info
+        lims.max_info
+    elseif level === :debug
+        lims.max_debug
+    else
+        throw(ArgumentError("level must be :warn, :info or :debug; got $(repr(level))."))
+    end
+    return isnothing(cap) ? site : cap
+end
+"""
+    @log_id(parts...)
+
+Give the `_id` of one log site: a hash of the site and of the stable parts of its message.
+
+A logger counts the `maxlog` of each `_id` on its own. The default `_id` of a log macro is one id per source line, so a limit on a line that logs different messages hides every later message, and a limit inside a shared helper such as [`strict_diagnostic`](@ref) hides the messages of every caller. An `_id` made from the full message never limits a message that holds a value that changes on each call. So `@log_id` keys the count on the module, the file and the line of its call, and on `parts`.
+
+`parts` are the stable parts of the configuration that the message reports: the types of the estimators, and the keys and names that the caller wrote. The values that the data gives, such as an asset list, a count, an index, a float or a timestamp, stay in the message text and out of `parts`. So the same condition at the same site under the same configuration counts as one message, and a different configuration logs again.
+
+# Algorithm
+
+ 1. At expansion, build a `Symbol` from the module, the file and the line of the call.
+ 2. At run time, return the hash of the tuple of that symbol and the values of `parts`.
+
+# Arguments
+
+  - `parts`: The stable parts of the message, each evaluated in the scope of the call.
+
+# Returns
+
+  - `id::UInt`: The value to pass as the `_id` of the log macro, or as the `id` of [`strict_diagnostic`](@ref).
+
+# Related
+
+  - [`log_limit`](@ref)
+  - [`LOG_LIMITS`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+macro log_id(parts...)
+    site = Symbol(__module__, ".", something(__source__.file, :none), ":", __source__.line)
+    return :(hash(($(QuoteNode(site)), $(map(esc, parts)...))))
 end

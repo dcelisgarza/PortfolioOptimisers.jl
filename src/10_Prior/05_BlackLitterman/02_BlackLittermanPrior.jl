@@ -410,7 +410,8 @@ function announce_bl_departures(ni::VecStr, ledger::VecStr, viewless::Bool)::Not
         # silent when nobody departed, which is exactly the sub-universe case. Handing back
         # an unconditioned answer where the caller asked for views changes the answer rather
         # than trimming it, and this is the caller's only way to learn it.
-        @warn("No Black-Litterman view resolved against the universe this fit was handed, so it proceeds with no view at all and its posterior is the unconditioned one. A view row is dropped whole when a name in it does not resolve, so a universe narrowed to a sub-problem — a cluster, a resampled subset — can empty a view set that is correct over the universe the caller stated it against.")
+        @warn("No Black-Litterman view resolved against the universe this fit was handed, so it proceeds with no view at all and its posterior is the unconditioned one. A view row is dropped whole when a name in it does not resolve, so a universe narrowed to a sub-problem — a cluster, a resampled subset — can empty a view set that is correct over the universe the caller stated it against.",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return nothing
 end

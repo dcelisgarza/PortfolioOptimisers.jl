@@ -288,7 +288,8 @@ function add_best_factor_after_pval_failure!(tgt::AbstractRegressionTarget,
             new_factor = i
         end
     end
-    @warn("No factor with p-value lower than threshold. Best we can do is factor $new_factor, with p-value $best_pval.")
+    @warn("No factor with p-value lower than threshold. Best we can do is factor $new_factor, with p-value $best_pval.",
+          maxlog = log_limit(:warn), _id = @log_id())
     push!(included, new_factor)
     return nothing
 end
@@ -732,7 +733,8 @@ function stepwise_factor_set(re::StepwiseRegression, x::VecNum, F::MatNum, i::In
     end
     included = _regression(re, x, F)
     if isempty(included)
-        @warn("Asset $i: the stepwise search selected no factor. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.")
+        @warn("Asset $i: the stepwise search selected no factor. The asset gets an intercept-only model, and its row of the loadings matrix is all zeros.",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return included
 end

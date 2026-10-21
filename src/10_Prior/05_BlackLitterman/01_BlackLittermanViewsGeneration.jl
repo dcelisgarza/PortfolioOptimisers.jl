@@ -212,7 +212,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
                 if v ∉ other
                     msg = unknown_variable_msg(v, nx, k; axis = axis,
                                                consequence = "row dropped")
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(v, k))
                 elseif !dropped
                     # Once per row, not once per departed name in it: the row is the unit
                     # that went, and `ni` already names every asset that left.
@@ -234,7 +234,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
             # — so this row resolved and still summed to zero, by its own cancelling
             # coefficients or by holding no name at all. It is not a typo.
             msg = empty_row_msg(lc.eqn, nx, k; noun = "view", axis = axis)
-            strict_diagnostic(msg, strict)
+            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k))
             push!(excl, i)
             continue
         end

@@ -546,7 +546,8 @@ function set_risk_upper_bound!(::JuMP.Model, ::RiskConstraintOwner, r_expr, ::No
 end
 function set_risk_upper_bound!(::JuMP.Model, opt::JuMPOptimisationEstimator, r_expr, ub,
                                key, flag::Bool = true)
-    return @warn("Risk upper bound `settings.ub = $ub` ($key) is not supported by `$(typeof(opt).name.name)` and would be silently ignored. Remove `ub` from the risk measure settings, or use an optimiser that supports risk upper bounds (`MeanRisk`, `NearOptimalCentering`, `RiskBudgeting`).")
+    return @warn("Risk upper bound `settings.ub = $ub` ($key) is not supported by `$(typeof(opt).name.name)` and would be silently ignored. Remove `ub` from the risk measure settings, or use an optimiser that supports risk upper bounds (`MeanRisk`, `NearOptimalCentering`, `RiskBudgeting`).",
+                 maxlog = log_limit(:warn), _id = @log_id(key, typeof(opt)))
 end
 function set_risk_upper_bound!(::JuMP.Model, set::AbstractProgrammeAllocationSet, r_expr,
                                ub::Front_NumVec, key, flag::Bool = true)

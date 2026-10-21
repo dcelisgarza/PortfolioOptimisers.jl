@@ -229,21 +229,24 @@ function gross_budget_bounds_msg(lb, ub)
     return "gross budget (gbgt) requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and the net budget (bgt) already constrains it. Got $(scope) with no negative element in lb or ub."
 end
 """
-    strict_diagnostic(msg::AbstractString, strict::Bool) -> Nothing
+    strict_diagnostic(msg::AbstractString, strict::Bool; id) -> Nothing
 
 Report a **term that cannot contribute a row**: throw an `ArgumentError` under `strict`, warn otherwise, and in both cases the offending term is dropped.
 
 `strict` governs what is droppable: a name that resolves against nothing, a row whose coefficients carry no information, as with a zero centrality vector, and a holding a factor attribution cannot attribute, in an asset the prior could not estimate or at an observation with no return. Nothing else is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every such diagnostic in the library routes through here, so the strictness policy is one edit.
 
+The warning passes `maxlog = log_limit(:warn)` and `_id = id`. The caller gives `id` through [`@log_id`](@ref), because only the caller knows its site and the stable parts of its message. The default `_id` would be the line of this function, which every caller shares.
+
 # Algorithm
 
  1. Throw an `ArgumentError` carrying `msg` when `strict` is `true`, which ends the call.
- 2. Otherwise emit `msg` as a warning and return.
+ 2. Otherwise emit `msg` as a warning, under the cap of [`log_limit`](@ref) and the `_id` of the caller, and return.
 
 # Arguments
 
   - `msg`: The diagnostic text, built by [`unknown_variable_msg`](@ref) or one of its siblings.
   - `strict`: If `true`, throws an `ArgumentError`; if `false`, issues a warning.
+  - `id`: The `_id` of the warning, made by [`@log_id`](@ref) at the site of the caller.
 
 # Validation
 
@@ -259,12 +262,13 @@ Report a **term that cannot contribute a row**: throw an `ArgumentError` under `
   - [`missing_group_assets_msg`](@ref)
   - [`empty_row_msg`](@ref)
   - [`zero_centrality_msg`](@ref)
+  - [`@log_id`](@ref)
 """
-function strict_diagnostic(msg::AbstractString, strict::Bool)::Nothing
+function strict_diagnostic(msg::AbstractString, strict::Bool; id)::Nothing
     if strict
         throw(ArgumentError(msg))
     end
-    @warn(msg)
+    @warn(msg, maxlog = log_limit(:warn), _id = id)
     return nothing
 end
 """

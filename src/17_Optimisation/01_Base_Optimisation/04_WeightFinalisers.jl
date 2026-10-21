@@ -603,7 +603,8 @@ function opt_weight_bounds(wf::JuMPWeightFinaliser, wb::WeightBounds, wi::VecNum
     return if optimise_JuMP_model!(model, wf.slv).success
         JuMP.value.(get_w(model))
     else
-        @warn("The weight finalisation model of $(wf.alg) could not be solved, so the weights are finalised with IterativeWeightFinaliser() instead.")
+        @warn("The weight finalisation model of $(wf.alg) could not be solved, so the weights are finalised with IterativeWeightFinaliser() instead.",
+              maxlog = log_limit(:warn), _id = @log_id(typeof(wf.alg)))
         opt_weight_bounds(IterativeWeightFinaliser(), wb, wi)
     end
 end

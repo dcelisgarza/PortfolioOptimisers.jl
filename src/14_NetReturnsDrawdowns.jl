@@ -367,7 +367,7 @@ function investable_reduction(imsk::BitVector, pr::AbstractPriorResult,
     held = held_non_investable(imsk, w)
     if !isempty(held)
         strict_diagnostic("a value-level verb cannot score a holding the prior could not estimate. Assets $(held) are not investable, and the weights hold them. Their weights are dropped, so the figure describes the portfolio without them. Pass `strict = true` to refuse instead, reduce the weights to the investable universe, or refit the prior over a history that covers these assets.",
-                          strict)
+                          strict; id = @log_id())
     end
     # The fee is viewed at `pr.X`, the prior's **unreduced** returns matrix, because its two
     # liquidation charges live on the complement of the mask and the view derives that
@@ -490,7 +490,7 @@ function filter_held_gaps(w::Union{<:VecNum, <:VecVecNum, <:MatNum}, X::MatNum,
     end
     held = held_gap_pairs(w, X)
     if !isempty(held)
-        strict_diagnostic(held_gap_msg(held, nx), strict)
+        strict_diagnostic(held_gap_msg(held, nx), strict; id = @log_id())
     end
     return map(x -> isfinite(x) ? x : zero(x), X)
 end
@@ -1425,7 +1425,8 @@ function calc_net_returns(w::VecVecNum, X::MatNum, fees, wd::AbstractWeightDrift
         assert_positive_wealth(drift_wealth(drift_position_values(wd, first(w), X),
                                             first(w)), obs, 1)
     elseif !isempty(ruined)
-        @warn "the drifted wealth of $(length(ruined)) of $(length(w)) population member(s) is not positive, so their series are `NaN` and their members are dropped: $(ruined)"
+        @warn("the drifted wealth of $(length(ruined)) of $(length(w)) population member(s) is not positive, so their series are `NaN` and their members are dropped: $(ruined)",
+              maxlog = log_limit(:warn), _id = @log_id())
     end
     return ret
 end

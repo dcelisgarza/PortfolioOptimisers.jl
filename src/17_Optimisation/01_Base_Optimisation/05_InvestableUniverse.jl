@@ -457,7 +457,8 @@ function optimise(opt::OptimisationEstimator, args...; kwargs...)
           !isnothing(current_opt.fb)
         push!(fb, (current_opt, res))
         current_opt = current_opt.fb
-        @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+        @warn("Using fallback method. Please ignore previous optimisation failure warnings.",
+              maxlog = log_limit(:warn), _id = @log_id(typeof(current_opt)))
         res = shared_series_solve(current_opt, args...; kwargs...)
     end
     return isempty(fb) ? res : factory(res, fb)

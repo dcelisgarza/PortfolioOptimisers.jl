@@ -726,7 +726,8 @@ function report_held_steps(held::AbstractVector{<:HeldStep}, ts)
     if isempty(held)
         return nothing
     end
-    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).")
+    @warn("Held Step at $(ts): $(join([h.reason for h in held], "; ")).",
+          maxlog = log_limit(:warn), _id = @log_id())
     return first(held)
 end
 """
@@ -770,7 +771,7 @@ function report_row_gaps(r::AbstractVector, w::AbstractVector,
         push!(held, (obs, i))
     end
     if !isempty(held)
-        strict_diagnostic(held_gap_msg(held, nx), strict)
+        strict_diagnostic(held_gap_msg(held, nx), strict; id = @log_id())
     end
     return nothing
 end

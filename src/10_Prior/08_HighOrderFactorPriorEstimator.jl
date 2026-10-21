@@ -867,7 +867,8 @@ function prior(pe::HighOrderFactorPriorEstimator, X::MatNum, F::MatNum,
                 err_sigma = idiosyncratic_variances(rpr.rr)
                 sigma = if any(map((x, y) -> x > y, err_sigma,
                                    LinearAlgebra.diag(rpr.sigma)))
-                    @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.")
+                    @warn("Some residual variances are larger than prior variances; using the prior variances to error correct the posterior kurtosis.",
+                          maxlog = log_limit(:warn), _id = @log_id())
                     rpr.sigma
                 else
                     rpr.sigma - LinearAlgebra.diagm(err_sigma)

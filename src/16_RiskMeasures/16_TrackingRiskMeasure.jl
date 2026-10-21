@@ -544,7 +544,8 @@ RiskTrackingRiskMeasure
     function RiskTrackingRiskMeasure(settings::RiskMeasureSettings, tr::WeightsTracking,
                                      r::AbstractBaseRiskMeasure, alg::VariableTracking)
         if isa(alg, DependentVariableTracking) && isa(r, QuadExpressionRiskMeasures)
-            @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.")
+            @warn("Risk measures that produce JuMP.QuadExpr risk expressions are not guaranteed to work. The variance with SDP constraints works because the risk measure is the trace of a matrix, an affine expression.",
+                  maxlog = log_limit(:warn), _id = @log_id(typeof(r)))
         end
         r = no_bounds_no_risk_expr_risk_measure(r)
         return new{typeof(settings), typeof(tr), typeof(r), typeof(alg)}(settings, tr, r,

@@ -380,7 +380,7 @@ no executor, and its sibling [`parallel_folds`](@ref) runs every other case. `El
 """
 function run_folds(fit_fold, n::Integer, ::Type{ElT} = PredictionResult;
                    pws = nothing) where {ElT}
-    @info(cv_sequential_info())
+    @info(cv_sequential_info(), maxlog = log_limit(:info), _id = @log_id())
     predictions = Vector{ElT}(undef, n)
     prev = nothing
     for i in 1:n

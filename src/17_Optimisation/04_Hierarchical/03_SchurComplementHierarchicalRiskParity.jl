@@ -1157,7 +1157,7 @@ function schur_complement_binary_search(objective::Function, lgamma::Number, hga
     end
     if hgamma - lgamma > tol
         msg = "Binary search did not converge within the specified tolerance: tol => $tol"
-        strict_diagnostic(msg, strict)
+        strict_diagnostic(msg, strict; id = @log_id())
     end
     return lw, lgamma
 end

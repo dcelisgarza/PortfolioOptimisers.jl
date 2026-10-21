@@ -320,7 +320,7 @@ end
 function gap_fill_span(::Nothing, X::AbstractMatrix, strict::Bool)
     if any(is_missing_value, X)
         strict_diagnostic("`PriceGapFill` is bounded by the Listing Span, and the price data states none, so nothing was filled. The window cannot supply one: a suspension straddling its edge reads there as an inception or a delisting, so a window-local derivation fills the wrong cells rather than fewer of them. Build the PricesResult through the ingestion layer, which states a span.",
-                          strict)
+                          strict; id = @log_id())
     end
     return falses(size(X))
 end

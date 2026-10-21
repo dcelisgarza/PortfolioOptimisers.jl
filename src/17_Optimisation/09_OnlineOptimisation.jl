@@ -721,7 +721,8 @@ function read_out_fallback(opt::OptimisationEstimator, res::OptimisationResult; 
         return res
     end
     fb = Tuple{OptimisationEstimator, OptimisationResult}[(opt, res)]
-    @warn("Using fallback method. Please ignore previous optimisation failure warnings.")
+    @warn("Using fallback method. Please ignore previous optimisation failure warnings.",
+          maxlog = log_limit(:warn), _id = @log_id(typeof(opt)))
     fbres = optimise(opt.fb; kwargs...)
     if isa(opt.fb, OptimisationEstimator) && isa(fbres.fb, FbChain)
         append!(fb, fbres.fb)

@@ -773,7 +773,8 @@ function owa_model_solve(model::JuMP.Model, method::OWAJuMP, weights::MatNum)
     return if optimise_JuMP_model!(model, slv).success
         w = JuMP.value.(model[:theta])
     else
-        @warn("Type: $method\nReverting to ncrra_weights.")
+        @warn("Type: $method\nReverting to ncrra_weights.", maxlog = log_limit(:warn),
+              _id = @log_id(typeof(method)))
         w = ncrra_weights(weights, 0.5)
     end
 end

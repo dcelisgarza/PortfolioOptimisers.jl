@@ -229,7 +229,8 @@ function panel_key_column!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::Int
     keys::VecStr = panel_field_keys(f)
     l = findfirst(==(key), keys)
     if isnothing(l)
-        strict_diagnostic(panel_selector_msg(f, key, keys), strict)
+        strict_diagnostic(panel_selector_msg(f, key, keys), strict;
+                          id = @log_id(f.name, key))
     else
         push!(cols, (Int(k), Int(l), :vals))
     end
@@ -272,14 +273,15 @@ function panel_group_columns!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, k::
     groups = isa(f, TensorPanelField) ? f.groups : nothing
     if isnothing(groups)
         strict_diagnostic("`sel` pairs the Panel Field \"$(f.name)\" with the group `$(lg.group)`, but the field carries no groups. Only a tensor Panel Field built with `groups` has them. Under `strict = false` the entry is dropped.",
-                          strict)
+                          strict; id = @log_id(f.name, lg.group))
         return nothing
     end
     ls = findall(==(lg.group), groups)
     if isempty(ls)
         pool = unique(groups)
         strict_diagnostic("`sel` pairs the Panel Field \"$(f.name)\" with the group `$(lg.group)`, which is not one of its $(length(pool)) group(s): $(join(pool, ", ")). Under `strict = false` the entry is dropped." *
-                          did_you_mean(lg.group, pool), strict)
+                          did_you_mean(lg.group, pool), strict;
+                          id = @log_id(f.name, lg.group))
     end
     for l in ls
         push!(cols, (Int(k), Int(l), :vals))
@@ -464,7 +466,7 @@ function select_fields_push!(cols::AbstractVector{Tuple{Int, Int, Symbol}}, pnl:
     name = isa(entry, Pair) ? first(entry) : entry
     k = findfirst(f -> f.name == name, pnl.pf)
     if isnothing(k)
-        strict_diagnostic(panel_selector_msg(name, pool), strict)
+        strict_diagnostic(panel_selector_msg(name, pool), strict; id = @log_id(name))
         return nothing
     end
     f = pnl.pf[k]

@@ -32,6 +32,7 @@ The Preferences.jl keys read at package load to seed the global config defaults 
   - `"compact_show"`: boolean or integer for [`COMPACT_SHOW`](@ref).
   - `"show_nothing_fields"`: boolean for the global switch of [`SHOW_NOTHING_FIELDS`](@ref).
   - `"show_nothing_fields_by_type"`: a table of booleans, one per type name, for the per-name entries of [`SHOW_NOTHING_FIELDS`](@ref).
+  - `"max_warn"` / `"max_info"` / `"max_debug"`: positive integers for [`LOG_LIMITS`](@ref).
 
 Preferences.jl offers no way to enumerate the keys a project has set, so a misspelled *key* cannot be detected and is silently ignored (the shipped default applies) — misspelled or invalid *values* under these keys fail closed at load. A name inside the `"show_nothing_fields_by_type"` table that matches no type is a value the package cannot refuse either: a type outside the package can render through [`@define_pretty_show`](@ref), so an unknown name is accepted and does nothing.
 
@@ -46,7 +47,7 @@ const PREFERENCE_KEYS = ("equation_max_length", "equation_max_depth", "max_n_sim
                          "max_n_subsets", "max_frontier", "max_bins", "max_hop_count",
                          "max_search_grid", "max_ep_grid", "suggestion_min_score",
                          "suggestion_distance", "compact_show", "show_nothing_fields",
-                         "show_nothing_fields_by_type")
+                         "show_nothing_fields_by_type", "max_warn", "max_info", "max_debug")
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
@@ -139,7 +140,55 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
+Apply the three load-time preferences of [`LOG_LIMITS`](@ref): `"max_warn"`, `"max_info"` and `"max_debug"`. Called by [`apply_preferences!`](@ref), which owns the contract of the preference channel; `nothing` values (unset preferences) keep the shipped default.
+
+Fails closed on an *invalid* value, as [`apply_preferences!`](@ref) does: a typed `ArgumentError` names the key and the value. A valid value is silent. A cap only limits the repeats of a message, it never hides the first one, so it widens no guard and records no triple for [`relaxed_preferences_msg`](@ref). The TOML channel carries no `nothing`, so a project restores the shipped default by deleting the key.
+
+# Algorithm
+
+ 1. Read the three keys. When none is set, return.
+ 2. Check that every set value is a positive integer that is not a `Bool`.
+ 3. Apply the three values through [`set_log_limits!`](@ref). A key the project left unset keeps the value it already has.
+
+# Arguments
+
+  - `prefs`: The dictionary that [`apply_preferences!`](@ref) receives. Only the three keys above are read.
+
+# Validation
+
+  - Each of `"max_warn"`, `"max_info"` and `"max_debug"` is a positive integer that is not a `Bool`.
+  - A breach raises an `ArgumentError` that names the key and the value.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`apply_preferences!`](@ref)
+  - [`PREFERENCE_KEYS`](@ref)
+  - [`set_log_limits!`](@ref)
+  - [`LOG_LIMITS`](@ref)
+"""
+function apply_log_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
+    vals = map(key -> get(prefs, key, nothing), ("max_warn", "max_info", "max_debug"))
+    if all(isnothing, vals)
+        return nothing
+    end
+    for (key, val) in zip(("max_warn", "max_info", "max_debug"), vals)
+        @argcheck(isnothing(val) || val isa Integer && !(val isa Bool) && val > 0,
+                  ArgumentError("preference `$(key) = $(repr(val))` must be a positive integer."))
+    end
+    lim = @atomic LOG_LIMITS.default
+    set_log_limits!(; max_warn = something(vals[1], Some(lim.max_warn)),
+                    max_info = something(vals[2], Some(lim.max_info)),
+                    max_debug = something(vals[3], Some(lim.max_debug)))
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Apply load-time preference values to the global config defaults ([`EQUATION_LIMITS`](@ref), [`RESOURCE_LIMITS`](@ref), [`STRING_DISTANCE`](@ref), [`COMPACT_SHOW`](@ref), [`SHOW_NOTHING_FIELDS`](@ref), [`LOG_LIMITS`](@ref)). Called by the package `__init__` with the [`PREFERENCE_KEYS`](@ref) values read via `Preferences.load_preference`; `nothing` values (unset preferences) are skipped and keep the shipped default.
 
 Fails closed on an *invalid* value: it throws a typed `ArgumentError` naming the key and value, so the package refuses to load rather than silently running with a value the project got wrong. Values are applied through the `set_*!` setters, so they receive the same validation as runtime calls.
 
@@ -162,6 +211,9 @@ suggestion_min_score = 0.8
 suggestion_distance = "damerau_levenshtein"
 compact_show = 4
 show_nothing_fields = true
+max_warn = 1
+max_info = 1
+max_debug = 10
 
 [PortfolioOptimisers.show_nothing_fields_by_type]
 SimpleVariance = false
@@ -176,7 +228,8 @@ SimpleVariance = false
  5. Read `"suggestion_distance"`. When it is set, check that it is a string, and look it up in [`PREFERENCE_DISTANCES`](@ref). An unknown name raises, and the message carries a [`did_you_mean`](@ref) suggestion. Apply the resolved distance through [`set_string_distance!`](@ref).
  6. Read `"compact_show"`. When it is set, check that it is a boolean or an integer, and apply it through [`set_compact_show!`](@ref). This key guards nothing, so it records no triple.
  7. Hand `prefs` to [`apply_show_preferences!`](@ref), which reads `"show_nothing_fields"` and `"show_nothing_fields_by_type"`. Neither key guards anything, so neither records a triple.
- 8. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning.
+ 8. Hand `prefs` to [`apply_log_preferences!`](@ref), which reads `"max_warn"`, `"max_info"` and `"max_debug"`. A cap never hides the first message of a site, so none of the three records a triple.
+ 9. When `relaxations` is not empty, emit the text of [`relaxed_preferences_msg`](@ref) as a warning, under the cap that step 8 set.
 
 # Arguments
 
@@ -189,6 +242,7 @@ SimpleVariance = false
   - `"suggestion_distance"` is a string, and it names an entry of [`PREFERENCE_DISTANCES`](@ref).
   - `"compact_show"` is a `Bool` or an `Integer`.
   - `"show_nothing_fields"` is a `Bool`, and `"show_nothing_fields_by_type"` is a table of `Bool` values, both checked by [`apply_show_preferences!`](@ref).
+  - Each of `"max_warn"`, `"max_info"` and `"max_debug"` is a positive integer that is not a `Bool`, checked by [`apply_log_preferences!`](@ref).
   - A breach of any rule above raises an `ArgumentError` that names the key and the value, so the package refuses to load.
 
 # Returns
@@ -204,6 +258,7 @@ SimpleVariance = false
   - [`set_string_distance!`](@ref)
   - [`set_compact_show!`](@ref)
   - [`apply_show_preferences!`](@ref)
+  - [`apply_log_preferences!`](@ref)
   - [`relaxed_preferences_msg`](@ref)
 """
 function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
@@ -286,8 +341,10 @@ function apply_preferences!(prefs::AbstractDict{<:AbstractString, <:Any})
         set_compact_show!(cs)
     end
     apply_show_preferences!(prefs)
+    apply_log_preferences!(prefs)
     if !isempty(relaxations)
-        @warn relaxed_preferences_msg(relaxations)
+        @warn(relaxed_preferences_msg(relaxations), maxlog = log_limit(:warn),
+              _id = @log_id(first.(relaxations)))
     end
     return nothing
 end

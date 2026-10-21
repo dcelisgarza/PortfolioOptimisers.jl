@@ -722,7 +722,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
                 if v ∉ other
                     msg = unknown_variable_msg(v, nx, k; axis = axis,
                                                consequence = "row dropped")
-                    strict_diagnostic(msg, strict)
+                    strict_diagnostic(msg, strict; id = @log_id(v, k))
                 elseif !dropped
                     # Once per row, not once per departed name in it: the row is the unit
                     # that went, and `ni` already names every asset that left.
@@ -746,7 +746,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)
             end
-            strict_diagnostic(msg, strict)
+            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k))
             continue
         end
         d, flag = comparison_sign_ineq_flag(lc.op)
