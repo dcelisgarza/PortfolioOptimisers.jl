@@ -1,60 +1,68 @@
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add Relativistic Value-at-Risk, RLVaR range, or Relativistic Drawdown-at-Risk constraints to
-`model`.
+Adds the Relativistic Value-at-Risk of the net portfolio returns to `model`, and returns its risk expression.
 
-Each overload uses power cone constraints (`PowerCone`) to encode the Kaniadakis entropy-based
-risk measure parameterised by `kappa`. Auxiliary variables `t`, `z`, `omega`, `psi`,
-`theta`, and `epsilon` are introduced. The range variant encodes both a lower-tail and
-upper-tail relativistic expression.
+[`set_relativistic_risk_constraints!`](@ref) builds the power cones, and this method gives it the series of the net portfolio returns. A range measure calls this method once for each tail, and `loss = false` gives the gain tail.
 
 # Mathematical definition
 
-The primal representation of the Relativistic Value-at-Risk of [rlvar](@cite) is:
+Equation 15 of [rlvar](@cite) states the Relativistic Value-at-Risk of the portfolio as a power cone programme:
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) = \\min_{t,\\, z,\\, \\boldsymbol{\\psi},\\, \\boldsymbol{\\theta},\\, \\boldsymbol{\\varepsilon},\\, \\boldsymbol{\\omega}} \\quad & t + \\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right) z + \\sum_{j=1}^T (\\psi_j + \\theta_j) \\\\
-\\text{s.t.} \\quad & -\\hat{r}_j - t + \\varepsilon_j + \\omega_j \\leq 0 \\quad \\forall\\, j\\,, \\\\
-& \\left(\\frac{1+\\kappa}{2\\kappa} z,\\; \\frac{1+\\kappa}{\\kappa} \\psi_j,\\; \\varepsilon_j\\right) \\in \\mathcal{P}_{3}^{1/(1+\\kappa),\\, \\kappa/(1+\\kappa)} \\quad \\forall\\, j\\,, \\\\
-& \\left(\\frac{\\omega_j}{1-\\kappa},\\; \\frac{\\theta_j}{\\kappa},\\; -\\frac{z}{2\\kappa}\\right) \\in \\mathcal{P}_{3}^{1-\\kappa,\\, \\kappa} \\quad \\forall\\, j\\,, \\\\
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) = \\underset{t,\\, z,\\, \\boldsymbol{\\psi},\\, \\boldsymbol{\\theta},\\, \\boldsymbol{\\epsilon},\\, \\boldsymbol{\\omega}}{\\min} \\quad & t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i=1}^{T} p_i (\\psi_i + \\theta_i) \\\\
+\\mathrm{s.t.} \\quad & -\\hat{r}_i - t + \\epsilon_i + \\omega_i \\leq 0 \\quad \\forall i\\,, \\\\
+& \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right) \\quad \\forall i\\,, \\\\
+& \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa) \\quad \\forall i\\,, \\\\
 & z \\geq 0\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w})``: Relativistic Value-at-Risk.
-  - ``\\hat{r}_j``: Portfolio return at observation ``j``, so ``-\\hat{r}_j`` is its loss.
-  - ``t``, ``z``, ``\\psi_j``, ``\\theta_j``, ``\\varepsilon_j``, ``\\omega_j``: Variables of the primal representation.
-  - ``\\mathcal{P}_{3}^{\\alpha,\\, 1-\\alpha} = \\{\\boldsymbol{u} \\in \\mathbb{R}^{3} : u_{1}^{\\alpha} u_{2}^{1-\\alpha} \\geq \\lvert u_{3} \\rvert,\\, u_{1},\\, u_{2} \\geq 0\\}``: Three-dimensional power cone.
+  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w})``: Relativistic Value-at-Risk of the portfolio.
+  - ``\\hat{r}_i``: Net portfolio return at observation ``i``, so ``-\\hat{r}_i`` is its loss.
+  - $(math_dict[:p_i_obs])
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z_ge])
+  - $(math_dict[:rlvar_aux])
+  - $(math_dict[:K_pow])
   - $(math_dict[:ln_kappa])
   - $(math_dict[:alpha_rm])
+  - $(math_dict[:kappa_rm])
   - $(math_dict[:T])
-  - ``\\kappa``: Relativistic parameter.
 
-Equation 15 of [rlvar](@cite) prints the first row as ``-X - t + \\varepsilon + \\omega \\leq 0``, where ``X`` is the loss. The sign is a misprint. Equation 18 of that work writes the loss ``-\\hat{r}_j``, as the row above does. With this row the minimum equals the dual form of Equation 12: 0.0068504374 against 0.0068504424 for six assets, 200 observations, ``\\alpha = 0.05`` and ``\\kappa = 0.3``.
+Equation 15 of [rlvar](@cite) prints the first row as ``-X - t + \\epsilon + \\omega \\leq 0``, where ``X`` is the loss. The sign is a misprint. Equation 18 of that work writes the loss ``-\\hat{r}_i``, as the row above does. With this row the minimum equals the dual form of Equation 12: 0.0068504374 against 0.0068504424 for six assets, 200 observations, ``\\alpha = 0.05`` and ``\\kappa = 0.3``.
 
-For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with
-``\\sum_{j=1}^T w_j = 1``. The Kaniadakis logarithm keeps the argument
-``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{j=1}^T (\\psi_j + \\theta_j)`` becomes
-``T \\sum_{j=1}^T w_j (\\psi_j + \\theta_j)``.
+[rlvar](@cite) states the programme for equal observation weights, ``p_i = 1/T``. The weights ``p_i`` are the library's extension, and [`RelativisticValueatRisk`](@ref) states them.
+
+# Algorithm
+
+ 1. Read `series`, the net portfolio returns, and `T`, its length, with [`risk_series`](@ref). When `loss` is `false`, `series` is their negation.
+ 2. Build the programme of `series` with [`set_relativistic_risk_constraints!`](@ref), giving `risk`. Each key names `rlvar`, for example `t_rlvar_` and `crlvar_pcone_a_`.
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r`: Risk measure instance with fields `alpha` and `kappa`.
+  - `r::RelativisticValueatRisk`: The RLVaR risk measure, read for `alpha`, `kappa`, `w` and `settings`.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `loss::Bool`: `true` reads the net portfolio returns, and `false` reads their negation, the series of a gain tail (default: `true`).
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `risk`: The RLVaR risk expression added to the model, registered under the key `rlvar_risk_`.
 
 # Related
 
+  - [`RelativisticValueatRisk`](@ref)
+  - [`set_relativistic_risk_constraints!`](@ref)
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
 
@@ -79,12 +87,64 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Encode the relativistic tail programme of `series` and register it under the names in
-`keys`.
+Builds the relativistic tail programme of `series` in `model`, and returns its risk expression.
 
-This is the shared body of `RelativisticValueatRisk` and `RelativisticDrawdownatRisk`. The
-two are one pair of power cones over different series, so [`risk_series`](@ref) chooses the
-series and this function writes the cones once.
+The RLVaR and the RLDaR are one programme over two series. [`risk_series`](@ref) gives the series of each measure, and the keys in `keys` keep the entries of the two measures apart.
+
+# Algorithm
+
+ 1. Read `sc`, the constraint scale.
+ 2. Compute `opk`, `omk`, `ik`, `ik2`, `iopk` and `iomk`, the constants of the cones, from `kappa`.
+ 3. Create `t`, `z`, `omega`, `psi`, `theta` and `epsilon`, and register each under its key.
+ 4. Read `wi`, the observation weights of `r`, else those of `pr`. Check them against `pr.X`.
+ 5. Compute `lnk`, the Kaniadakis logarithm of ``1/(\\alpha T)``, with [`kappa_log`](@ref).
+ 6. Build `risk`, and register it under `keys.risk`. When `wi` is stated, divide it by its sum first.
+ 7. Register the three rows below under their keys.
+ 8. Bound `risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
+ 9. Return `risk`.
+
+# JuMP formulation
+
+## Variables
+
+  - `keys.t`: created, the free scalar ``t``. The RLVaR key is `t_rlvar_`, and the RLDaR key is `t_rldar_`.
+  - `keys.z`: created, the scalar ``z``, bounded below by zero. The keys are `z_rlvar_` and `z_rldar_`.
+  - `keys.psi`, `keys.theta`, `keys.epsilon`, `keys.omega`: created, the free ``T \\times 1`` vectors ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\theta}``, ``\\boldsymbol{\\epsilon}`` and ``\\boldsymbol{\\omega}``. The keys are `psi_rlvar_`, `theta_rlvar_`, `epsilon_rlvar_` and `omega_rlvar_`, or the same names with `rldar_`.
+
+The rows read `series`, an expression of the weights that [`risk_series`](@ref) returns.
+
+## Expressions
+
+  - `keys.risk`: ``t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i=1}^{T} p_i (\\psi_i + \\theta_i)``. The keys are `rlvar_risk_` and `rldar_risk_`.
+
+## Constraints
+
+  - `keys.pcone_a`: ``s_c \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, ``\\forall\\, i = 1,\\ldots,T``. The keys are `crlvar_pcone_a_` and `crldar_pcone_a_`.
+  - `keys.pcone_b`: ``s_c \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, ``\\forall\\, i = 1,\\ldots,T``. The keys are `crlvar_pcone_b_` and `crldar_pcone_b_`.
+  - `keys.exceedance`: ``s_c \\left(\\epsilon_i + \\omega_i - s_i - t\\right) \\leq 0``, ``\\forall\\, i = 1,\\ldots,T``. The keys are `crlvar_` and `crldar_`.
+
+Each key is a Model State key. A caller reads the entry back under `prefix`, the key and `i`, for example `rlvar_risk_1`.
+
+Where:
+
+  - $(math_dict[:sc_scale])
+  - ``s_i``: Entry ``i`` of `series`. It carries the sign of a return, so ``-s_i`` is the loss at observation ``i``.
+  - $(math_dict[:p_i_obs])
+  - $(math_dict[:rlvar_t])
+  - $(math_dict[:rlvar_z_ge])
+  - $(math_dict[:rlvar_aux])
+  - $(math_dict[:K_pow])
+  - $(math_dict[:ln_kappa])
+  - $(math_dict[:alpha_rm])
+  - $(math_dict[:kappa_rm])
+  - $(math_dict[:T])
+
+## Relaxation
+
+$(val_dict[:relax])
+
+  - `keys.risk` lies at or above the RLVaR of `series`, because the RLVaR is the minimum of the expression over the variables. It is tight when the objective minimises the risk.
+  - A bound on `keys.risk` is exact, because the weights satisfy it when the RLVaR of `series` is at most the bound.
 
 # Arguments
 
@@ -102,15 +162,26 @@ series and this function writes the cones once.
 
   - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
 
+# Validation
+
+  - The observation weights pass [`checked_observation_weights`](@ref) against `pr.X`. Otherwise that function raises its error.
+
 # Returns
 
   - `risk`: The relativistic risk expression added to the model.
 
 # Related
 
+  - [`RelativisticValueatRisk`](@ref)
+  - [`RelativisticDrawdownatRisk`](@ref)
   - [`risk_series`](@ref)
   - [`set_risk_bounds_and_expression!`](@ref)
   - [`kappa_log`](@ref)
+  - [`checked_observation_weights`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar]) Section 4.1, Equation 15, and Section 4.4, Equation 25.
 """
 function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasure,
                                             opt::RiskConstraintOwner,
@@ -175,12 +246,32 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add JuMP risk constraints for `RelativisticValueatRiskRange` (RLVaR range) to `model`.
+Adds the Relativistic Value-at-Risk range of the net portfolio returns to `model`, and returns its risk expression.
 
-Delegates to [`set_range_risk_constraints!`](@ref), which builds the loss tail from `alpha`
-and `kappa_a` on the net portfolio returns, and the gain tail from `beta` and `kappa_b` on
-their negation, then sums the two RLVaR expressions. Each tail brings its own pair of power
-cones, shaped by *its own* deformation parameter.
+[`range_tails`](@ref) pairs `alpha` with `kappa_a` for the loss tail, and `beta` with `kappa_b` for the gain tail. The RLVaR method of this function builds a pair of power cones for each tail. The tail keys carry `loss_` or `gain_` before `i`, for example `rlvar_risk_loss_1`.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{w}) &= \\mathrm{RLVaR}_{\\alpha,\\kappa_a}(\\hat{\\boldsymbol{r}}) + \\mathrm{RLVaR}_{\\beta,\\kappa_b}(-\\hat{\\boldsymbol{r}})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{RVaRRange}_{\\alpha,\\kappa_a,\\beta,\\kappa_b}(\\boldsymbol{w})``: Relativistic VaR range of the portfolio.
+  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{s})``: The programme of the RLVaR method of this function, with the series ``\\boldsymbol{s}`` in place of the net portfolio returns.
+  - $(math_dict[:rhat_net_vec])
+  - $(math_dict[:rhat_t_net])
+  - ``\\alpha``, ``\\kappa_a``: Significance level and Kaniadakis deformation parameter of the loss tail.
+  - ``\\beta``, ``\\kappa_b``: Significance level and Kaniadakis deformation parameter of the gain tail.
+
+Section 7.2.3.5 of [cajas2025](@cite) defines this range. [`RelativisticValueatRiskRange`](@ref) states its sources.
+
+# Algorithm
+
+ 1. Build the two tails and their sum with [`set_range_risk_constraints!`](@ref), under the key `rlvar_range_risk_`, giving `range_risk`.
 
 # Arguments
 
@@ -190,15 +281,25 @@ cones, shaped by *its own* deformation parameter.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `rlvar_range_risk`: The combined `loss + gain` risk expression added to the model.
+  - `range_risk`: The combined `loss + gain` risk expression added to the model, registered under the key `rlvar_range_risk_`.
 
 # Related
 
   - [`RelativisticValueatRiskRange`](@ref)
   - [`range_tails`](@ref)
   - [`set_range_risk_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 and 15.
+  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equations 7.84 and 7.85. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRiskRange,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
@@ -209,28 +310,62 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Add JuMP risk constraints for `RelativisticDrawdownatRisk` (RLDaR) to `model`.
+Adds the Relativistic Drawdown-at-Risk of the portfolio to `model`, and returns its risk expression.
 
-Uses power cone constraints applied to the drawdown series to encode the relativistic
-drawdown-at-risk parameterised by `kappa` at confidence level `r.alpha`.
+[`set_relativistic_risk_constraints!`](@ref) builds the power cones, and this method gives it the negated drawdown path, ``-dd_t``. The drawdown rows hold ``dd_t`` at or above the drawdown, and the RLVaR does not fall when a loss rises. So `rldar_risk_` lies at or above the RLDaR. It is tight when the objective minimises the risk, and a bound on it is exact.
+
+# Mathematical definition
+
+```math
+\\begin{align}
+c_t &= \\sum_{s=1}^{t} \\hat{r}_s\\,, \\quad c_0 = 0\\,, \\\\
+d_t &= c_t - \\max_{0 \\leq s \\leq t} c_s \\leq 0\\,, \\\\
+\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) &= \\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{d})\\,.
+\\end{align}
+```
+
+Where:
+
+  - ``\\mathrm{RLDaR}_{\\alpha,\\kappa}(\\boldsymbol{w})``: Relativistic Drawdown-at-Risk of the portfolio.
+  - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{d})``: The programme of the RLVaR method of this function, with ``d_t`` in place of the net portfolio return ``\\hat{r}_t``.
+  - ``\\boldsymbol{d}``: The drawdown series, ``T \\times 1``, with entries ``d_t``.
+  - $(math_dict[:rhat_t_net])
+  - $(math_dict[:ct])
+  - $(math_dict[:dtdd])
+
+Equation 23 of [rlvar](@cite) defines the RLDaR, and Equation 25 states its programme. Its exceedance row reads the drawdown with the sign of a loss, ``-d_t``. Its drawdown rows are the rows of [`set_drawdown_constraints!`](@ref).
+
+# Algorithm
+
+ 1. Read `series`, the negated drawdown path, and `T` with [`risk_series`](@ref). The first call builds the drawdown rows.
+ 2. Build the programme of `series` with [`set_relativistic_risk_constraints!`](@ref), giving `risk`. Each key names `rldar`, for example `t_rldar_` and `crldar_pcone_a_`.
 
 # Arguments
 
   - $(arg_dict[:model])
   - $(arg_dict[:ci])
-  - `r::RelativisticDrawdownatRisk`: The RLDaR risk measure.
+  - `r::RelativisticDrawdownatRisk`: The RLDaR risk measure, read for `alpha`, `kappa`, `w` and `settings`.
   - $(arg_dict[:opt_rjumpe])
   - $(arg_dict[:pr_X])
 
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace (default: empty, i.e. the bare key).
+
 # Returns
 
-  - `nothing`.
+  - `risk`: The RLDaR risk expression added to the model, registered under the key `rldar_risk_`.
 
 # Related
 
   - [`RelativisticDrawdownatRisk`](@ref)
+  - [`set_relativistic_risk_constraints!`](@ref)
   - [`risk_series`](@ref)
-  - [`set_risk_constraints!`](@ref)
+  - [`set_drawdown_constraints!`](@ref)
+
+# References
+
+  - $(ref_dict[:rlvar]) Section 4.3, Equation 23, and Section 4.4, Equation 25.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticDrawdownatRisk,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;

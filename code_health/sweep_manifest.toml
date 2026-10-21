@@ -417,7 +417,7 @@
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/01_XatRiskConstraints.jl" = { map = 11, units = 9, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/02_ConditionalXatRiskConstraints.jl" = { map = 11, units = 9, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/03_EntropicXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
-"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/04_RelativisticXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
+"src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/04_RelativisticXatRiskConstraints.jl" = { map = 11, units = 4, algorithm = 4, swept = true, bindings = ["set_relativistic_risk_constraints!", "set_risk_constraints!", "set_risk_constraints!", "set_risk_constraints!"] }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/06_XatRisk/05_PowerNormXatRiskConstraints.jl" = { map = 11, units = 4, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/07_OWARiskMeasuresConstraints.jl" = { map = 11, units = 8, swept = false }
 "src/17_Optimisation/05_JuMP/09_RiskMeasureConstraints/08_AverageDrawdownConstraints.jl" = { map = 11, units = 1, swept = false }

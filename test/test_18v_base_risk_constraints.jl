@@ -766,3 +766,108 @@ end
     @test isapprox(diag(sW), f[1:3]; rtol = 1e-3, atol = 1e-9)
     @test isapprox(f[1] / sum(f), 0.3; rtol = 1e-3)
 end
+
+# The builders of the Relativistic Value-at-Risk, its range and the Relativistic
+# Drawdown-at-Risk. The oracle is the dual programme of Equation 12 of `rlvar`, the
+# supremum of the expected loss over the Kaniadakis ball, written here as its own power
+# cone model. It shares no code with the library's primal or dual programme.
+
+X_rl = 0.01 * randn(StableRNG(1791), 150, 8) .+ 0.001 * (1:8)'
+rd_rl = ReturnsResult(; X = X_rl, nx = string.("A", 1:8))
+pr_rl = prior(EmpiricalPrior(), rd_rl)
+# `allow_almost = false`: an almost-solved point can break a power cone row by 1 %, so a
+# bound looks breached that the formulation holds.
+slv_rl = [Solver(; name = Symbol(:clarabel, j), solver = Clarabel.Optimizer,
+                 settings = ["verbose" => false, "max_step_fraction" => f],
+                 check_sol = (; allow_local = true, allow_almost = false))
+          for (j, f) in enumerate((0.99, 0.95, 0.9, 0.8, 0.7))]
+opt_rl = JuMPOptimiser(; pe = pr_rl, slv = slv_rl)
+function solve_rl(r, obj = MinimumRisk())
+    return optimise(MeanRisk(; r = r, obj = obj, opt = opt_rl), rd_rl)
+end
+value_rl(res, name, i = 1) = JuMP.value(res.model[PO.state_key(Symbol(""), name, i)])
+function rlvar_dual_rl(x, alpha, kappa, p = fill(inv(length(x)), length(x)))
+    T = length(x)
+    c = p * T
+    u = inv(alpha * T)
+    lnk = (u^kappa - u^(-kappa)) / (2 * kappa)
+    m = JuMP.Model(Clarabel.Optimizer)
+    JuMP.set_silent(m)
+    JuMP.@variable(m, q[1:T] >= 0)
+    JuMP.@variable(m, nu[1:T])
+    JuMP.@variable(m, tau[1:T])
+    JuMP.@constraint(m, sum(q) == 1)
+    # q ln_k(q / c) = (q^(1 + k) c^(-k) - q^(1 - k) c^k) / (2k), one cone for each term.
+    JuMP.@constraint(m, [i = 1:T], [nu[i], c[i], q[i]] in MOI.PowerCone(inv(1 + kappa)))
+    JuMP.@constraint(m, [i = 1:T], [q[i], c[i], tau[i]] in MOI.PowerCone(1 - kappa))
+    JuMP.@constraint(m, sum(nu - tau) / (2 * kappa) <= lnk)
+    JuMP.@objective(m, Max, -dot(q, x))
+    JuMP.optimize!(m)
+    return JuMP.objective_value(m)
+end
+function drawdown_rl(x)
+    return (c = [zero(eltype(x)); cumsum(x)];
+            [c[t] - maximum(view(c, 1:t)) for t in 2:length(c)])
+end
+
+@testset "The relativistic programme states the RLVaR of the net returns" begin
+    res = solve_rl(RelativisticValueatRisk())
+    @test isa(res.retcode, OptimisationSuccess)
+    entries = Set(keys(JuMP.object_dictionary(res.model)))
+    for k in (:t_rlvar_1, :z_rlvar_1, :omega_rlvar_1, :psi_rlvar_1, :theta_rlvar_1,
+              :epsilon_rlvar_1, :rlvar_risk_1, :crlvar_pcone_a_1, :crlvar_pcone_b_1, :crlvar_1)
+        @test k in entries
+    end
+    @test isapprox(value_rl(res, :rlvar_risk_), rlvar_dual_rl(X_rl * res.w, 0.05, 0.3);
+                   rtol = 1e-5)
+    # Observation weights enter the sum and the cones as `T p_i`, and the radius keeps
+    # `1 / (alpha T)`.
+    ow = eweights(150, 0.02)
+    res = solve_rl(RelativisticValueatRisk(; w = ow, alpha = 0.1, kappa = 0.6))
+    @test isapprox(value_rl(res, :rlvar_risk_),
+                   rlvar_dual_rl(X_rl * res.w, 0.1, 0.6, ow / sum(ow)); rtol = 1e-4)
+end
+
+@testset "The RLDaR is the RLVaR of the drawdown series" begin
+    res = solve_rl(RelativisticDrawdownatRisk())
+    @test isa(res.retcode, OptimisationSuccess)
+    @test isapprox(value_rl(res, :rldar_risk_),
+                   rlvar_dual_rl(drawdown_rl(X_rl * res.w), 0.05, 0.3); rtol = 1e-5)
+end
+
+@testset "The RLVaR range pairs each tail with its own kappa" begin
+    r = RelativisticValueatRiskRange(; alpha = 0.05, kappa_a = 0.3, beta = 0.1,
+                                     kappa_b = 0.7)
+    res = solve_rl(r)
+    @test isa(res.retcode, OptimisationSuccess)
+    x = X_rl * res.w
+    risk = value_rl(res, :rlvar_range_risk_)
+    @test isapprox(risk, rlvar_dual_rl(x, 0.05, 0.3) + rlvar_dual_rl(-x, 0.1, 0.7);
+                   rtol = 1e-5)
+    # The swapped pairing is 0.9 % away, so the check above reads the pairing.
+    @test !isapprox(risk, rlvar_dual_rl(x, 0.05, 0.7) + rlvar_dual_rl(-x, 0.1, 0.3);
+                    rtol = 1e-3)
+    @test isapprox(value_rl(res, :rlvar_risk_, PO.nested_index(:loss_, 1)),
+                   rlvar_dual_rl(x, 0.05, 0.3); rtol = 1e-5)
+end
+
+@testset "A relativistic bound is exact, and the risk expression lies above the measure" begin
+    for (rm, key) in ((RelativisticValueatRisk, :rlvar_risk_),
+                      (RelativisticDrawdownatRisk, :rldar_risk_))
+        f = rm(; slv = slv_rl)
+        lo = value_rl(solve_rl(rm()), key)
+        hi = f(X_rl * solve_rl(rm(), MaximumRatio()).w)
+        ub = (lo + hi) / 2
+        ws = Vector{Float64}[]
+        for obj in (MaximumReturn(), MaximumRatio(), MaximumRatio(; ohf = 10.0))
+            res = solve_rl(rm(; settings = RiskMeasureSettings(; ub = ub)), obj)
+            @test isa(res.retcode, OptimisationSuccess)
+            @test isapprox(f(X_rl * res.w), ub; rtol = 1e-4)
+            push!(ws, res.w)
+        end
+        @test isapprox(ws[2], ws[3]; rtol = 1e-3)
+        # With no bound and a return objective nothing pulls the expression down.
+        res = solve_rl(rm(), MaximumReturn())
+        @test value_rl(res, key) >= f(X_rl * res.w) * (1 - 1e-6)
+    end
+end

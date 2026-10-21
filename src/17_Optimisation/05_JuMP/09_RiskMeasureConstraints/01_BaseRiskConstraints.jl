@@ -805,7 +805,7 @@ Where:
 
   - ``\\mathcal{R}_{\\mathrm{range}}(\\boldsymbol{w})``: The range risk of the portfolio.
   - ``\\mathcal{R}_{\\mathrm{loss}}``, ``\\mathcal{R}_{\\mathrm{gain}}``: The loss tail and the gain tail of the range measure, each a risk measure of a return series.
-  - ``\\hat{\\boldsymbol{r}}``: The net portfolio returns, ``T \\times 1``, with entries ``\\hat{r}_t``.
+  - $(math_dict[:rhat_net_vec])
   - $(math_dict[:rhat_t_net])
 
 # Algorithm

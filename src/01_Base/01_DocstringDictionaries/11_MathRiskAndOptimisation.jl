@@ -100,6 +100,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # The risk measure layer of a JuMP model.
                  :R_i_riskvec => "``\\mathcal{R}_i``: Entry ``i`` of `risk_vec`, the risk expression of the ``i``-th risk measure times the `scale` of the measure.",#
                  :rhat_t_net => "``\\hat{r}_t``: Net portfolio return at observation ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fees charged at ``t``.",#
+                 :rhat_net_vec => "``\\hat{\\boldsymbol{r}}``: The net portfolio returns, ``T \\times 1``, with entries ``\\hat{r}_t``.",#
                  # The two fee expressions of a JuMP model, and the clock of the second.
                  :f_r_fee => "``f_r``: Per period fee, the model's `:fees` expression. Each observation of the net return series pays it in full.",#
                  :f_o_fee => "``f_o``: One-off fee, the model's `:one_time_fees` expression. The holding period pays it one time.",#
