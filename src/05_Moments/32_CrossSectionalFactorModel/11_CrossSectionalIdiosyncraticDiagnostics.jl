@@ -432,7 +432,7 @@ Where:
   - $(math_dict[:F_t_idio])
   - $(math_dict[:z_ti_idio])
 
-It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joanes and Gill. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
+It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of [joanesgill1998](@cite). It equals ``k_{4} / k_{2}^{2}``, the fourth k-statistic over the square of the second, and the sample moment ``m_{4t} / m_{2t}^{2} - 3`` is the estimator ``g_{2}`` of the same work. It is not defined for ``n_{t} < 4``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -462,7 +462,7 @@ It is the bias-corrected sample excess kurtosis, the estimator ``G_{2}`` of Joan
 
 # References
 
-  - $(ref_dict[:joanesgill1998])
+  - $(ref_dict[:joanesgill1998]) Pages 183 to 189. $(ref_dict[:no_original_source])
 """
 function idio_kurtosis(z::MatNum)
     Tf = float_if_integer(real(eltype(z)))
@@ -513,7 +513,7 @@ Where:
   - $(math_dict[:F_t_idio])
   - $(math_dict[:z_ti_idio])
 
-It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and Gill. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
+It is the bias-corrected sample skewness, the estimator ``G_{1}`` of [joanesgill1998](@cite). It equals ``k_{3} / k_{2}^{3/2}``, the third k-statistic over the second to the power ``3/2``, and the sample moment ratio ``m_{3t} / m_{2t}^{3/2}`` is the estimator ``g_{1}`` of the same work. It is not defined for ``n_{t} < 3``, or for a constant cross-section, where ``m_{2t} = 0``.
 
 # Arguments
 
@@ -543,7 +543,7 @@ It is the bias-corrected sample skewness, the estimator ``G_{1}`` of Joanes and 
 
 # References
 
-  - $(ref_dict[:joanesgill1998])
+  - $(ref_dict[:joanesgill1998]) Pages 183 to 189. $(ref_dict[:no_original_source])
 """
 function idio_skewness(z::MatNum)
     Tf = typeof(sqrt(one(float_if_integer(real(eltype(z))))))

@@ -19,7 +19,7 @@ If moving away from the already established Gerber Information Quality covarianc
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.
 """
 abstract type BaseGerberIQCovariance <: BaseGerberCovariance end
 """
@@ -88,7 +88,7 @@ In order to implement a new squeezing template that works seamlessly with the li
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Sections 3.3.3 to 3.3.5.
 """
 abstract type GerberIQCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
@@ -153,7 +153,7 @@ In order to implement a new delay estimator that works seamlessly with the libra
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.2.
 """
 abstract type GerberIQEpsEstimator <: AbstractEstimator end
 """
@@ -172,7 +172,7 @@ The three arms are the three ways to supply the delay. A `Number` is the delay i
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.2.
 """
 const GerberIQEps = Union{<:Number, <:Function, <:GerberIQEpsEstimator}
 """
@@ -198,7 +198,7 @@ Where:
   - $(math_dict[:T])
   - $(math_dict[:N])
 
-An observation is therefore discounted only when its index satisfies ``k < T - \\varepsilon``, so this default discounts about the oldest ``T/N`` observations and leaves the rest at full weight. **The formula is the library's, not the source's.** The source states only that the delay is a whole number of periods no larger than the lookback duration, and leaves its value to expert judgement or to an outer optimisation.
+An observation is therefore discounted only when its index satisfies ``k < T - \\varepsilon``, so this default discounts about the oldest ``T/N`` observations and leaves the rest at full weight. **The formula is the library's, not the source's.** The source states only that the delay is a whole number of periods no larger than the lookback duration, and leaves its value to expert judgement or to an outer optimisation. Table 2 of [gerber2025squeezing](@cite) fixes it to zero in the source's own study.
 
 # Algorithm
 
@@ -228,7 +228,7 @@ An observation is therefore discounted only when its index satisfies ``k < T - \
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.2, Equation 5.
 """
 function gerber_iq_eps(e::Number, ::MatNum)
     return e
@@ -275,7 +275,7 @@ In order to implement a new decay rate estimator that works seamlessly with the 
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.3.
 """
 abstract type GerberIQGammaEstimator <: AbstractEstimator end
 """
@@ -294,7 +294,7 @@ The three arms are the three ways to supply the decay rate. A `Number` is the ra
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.3.
 """
 const GerberIQGamma = Union{<:Number, Function, <:GerberIQGammaEstimator}
 """
@@ -319,7 +319,7 @@ Where:
   - ``\\gamma``: Decay rate. A larger value discounts an old co-movement harder.
   - $(math_dict[:N])
 
-This is a half-life of ``N`` periods: beyond the delay, the weight of a co-movement halves every ``N`` observations, because ``\\exp(-\\gamma N) = 1/2``. **The formula is the library's, not the source's.** The source requires only ``\\gamma > 0`` and leaves its value to expert judgement or to an outer optimisation.
+This is a half-life of ``N`` periods: beyond the delay, the weight of a co-movement halves every ``N`` observations, because ``\\exp(-\\gamma N) = 1/2``. **The formula is the library's, not the source's.** The source requires only ``\\gamma > 0`` and leaves its value to expert judgement or to an outer optimisation. Table 2 of [gerber2025squeezing](@cite) relates the rate to the half-life by ``T_{1/2} = \\ln 2 / \\gamma``, which is the relation this default uses with ``T_{1/2} = N``.
 
 # Algorithm
 
@@ -349,7 +349,7 @@ This is a half-life of ``N`` periods: beyond the delay, the weight of a co-movem
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.3, Equation 5, and Table 2.
 """
 function gerber_iq_gamma(y::Number, ::MatNum)
     return y
@@ -395,7 +395,7 @@ In order to implement a new scaler that works seamlessly with the library, subty
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.1, Section 4 and Table 2.
 """
 abstract type GerberIQScalerEstimator <: AbstractEstimator end
 """
@@ -414,7 +414,7 @@ The alias has no `Number` arm, because a scaler is a rule over the pair's two st
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.1, Section 4 and Table 2.
 """
 const GerberIQScaler = Union{Function, <:GerberIQScalerEstimator}
 """
@@ -457,7 +457,7 @@ AssetVolatilityGerberIQScaler()
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.1 and Section 4.
 """
 struct AssetVolatilityGerberIQScaler <: GerberIQScalerEstimator end
 """
@@ -522,7 +522,7 @@ The fall-through gives both assets the same units, so a volatile asset and a qui
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.1, Section 4 and Table 2.
 """
 function gerber_iq_scaling(::AssetVolatilityGerberIQScaler, sdi::Number, sdj::Number)
     return sdi, sdj
@@ -628,7 +628,7 @@ julia> cov(GerberIQCovariance(; decay = GaussianDecay()), [1.0 2.0; 0.3 0.7; 0.5
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.3.
 """
 abstract type GerberIQDecayEstimator <: AbstractEstimator end
 """
@@ -636,7 +636,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponential Gerber IQ temporal decay.
 
-This is the source's own age penalty. A co-movement no older than `e` periods carries its full weight, and one older than that is discounted at the rate `y` for every further period. Either field may be left as `nothing`; [`regenerate_decay`](@ref) then fills it from the returns matrix before the statistic runs.
+This is the source's own age penalty, Equation 5 of [gerber2025squeezing](@cite), with the age ``m = T - k`` counted from the most recent observation. A co-movement no older than `e` periods carries its full weight, and one older than that is discounted at the rate `y` for every further period. Either field may be left as `nothing`; [`regenerate_decay`](@ref) then fills it from the returns matrix before the statistic runs.
 
 # Fields
 
@@ -708,7 +708,7 @@ ExpGerberIQDecay
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5, Equation 5.
 """
 @concrete struct ExpGerberIQDecay <: GerberIQDecayEstimator
     """
@@ -782,7 +782,7 @@ julia> ExpGerberIQDecay(; e = 0.0, y = 0.1)(10, 5)
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5, Equation 5.
 """
 function (decay::ExpGerberIQDecay)(T::Number, k::Number)
     return exp(-decay.y * max(0, T - k - decay.e))
@@ -825,7 +825,7 @@ Step 2 is why the fall-through discards the subtype: it has no field the two res
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.4.
 """
 function regenerate_decay(decay::ExpGerberIQDecay{<:Number, <:Number}, ::AbstractMatrix)
     return decay
@@ -867,7 +867,7 @@ Where:
   - ``d``: Significance threshold.
   - ``n``: Compression weight.
 
-The three cases are the source's tail, body and wing. Both returns are large in the tail, both are small in the body, and one of each in the wing. Because ``0 \\leq n \\leq 1`` the weights obey ``n^2 \\leq n \\leq 1``, so a co-movement of two similar magnitudes counts for more than one of two dissimilar magnitudes. That ordering is the source's own judgement, and it is what the single weight `n` buys in exchange for its lost degrees of freedom.
+The three cases are the source's tail, body and wing. Both returns are large in the tail, both are small in the body, and one of each in the wing. Because ``0 \\leq n \\leq 1`` the weights obey ``n^2 \\leq n \\leq 1``, so a co-movement of two similar magnitudes counts for more than one of two dissimilar magnitudes. That ordering is the source's own judgement, and it is what the single weight `n` buys in exchange for its lost degrees of freedom. Section 3.3.5 of [gerber2025squeezing](@cite) gives the three weights as `1`, `η` and `η²` for the tail, the body and the wing, with `0 ≤ η ≤ 1`, and Table 2 gives 2 to 3 as the typical range of the boundary. The defaults `d = 2` and `n = 0.5` are the library's choice inside those ranges. The source's figures label no weight on the branches of the noise zone, where one asset is inside the noise threshold, and Section 2 says only that such data may or may not be used. The library gives a co-movement there the weight of the channel that the same rule selects, as the diagram shows.
 
 The body case is reachable only when ``c < d``. A co-movement with both returns inside the noise threshold never reaches the template, so at ``c = d`` the band that carries `n` is empty and only ``1`` and ``n^2`` occur.
 
@@ -937,7 +937,7 @@ BasicGerberIQ
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.5, Figure 3.
 """
 @concrete struct BasicGerberIQ <: GerberIQCovarianceAlgorithm
     """
@@ -962,7 +962,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Asserts that `c <= kind.d`, where `c` is the small movement threshold and `d` the significance threshold parameter of [`BasicGerberIQ`](@ref).
 
-The two parameters cut the same axis and are measured in the same scaled units. `c` closes the noise zone from above and `d` opens the significant zone from below, so the body of the template is the band `c <= |x| < d`. A `d` below `c` inverts that band, and the template then has no body at all: every co-movement that survives the noise zone is already beyond `d`, and the weight `n` can never be selected.
+The two parameters cut the same axis and are measured in the same scaled units. `c` closes the noise zone from above and `d` opens the significant zone from below, so the body of the template is the band `c <= |x| < d`. Section 3.3.2 of [gerber2025squeezing](@cite) defines the body of a quadrant by `c < r* ≤ δ`, which is the same band. A `d` below `c` inverts that band, and the template then has no body at all: every co-movement that survives the noise zone is already beyond `d`, and the weight `n` can never be selected.
 
 # Arguments
 
@@ -985,7 +985,7 @@ The two parameters cut the same axis and are measured in the same scaled units. 
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.2.
 """
 function gerber_iq_assert_c_d(c::Number, kind::BasicGerberIQ)
     @argcheck(c <= kind.d,
@@ -1029,7 +1029,7 @@ Computes the weight for a co-movement according to the region it falls into from
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.5, Figure 3.
 """
 function gerber_iq_weight(::Number, ::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::BasicGerberIQ)
@@ -1068,6 +1068,8 @@ Where:
   - ``s_i``: Threshold scaling factor of asset ``i``.
 
 The four boundaries cut the plane into sixteen channels, and `n1` to `n10` are the distinct weights those channels take once the plane's symmetry about the line ``x_i = x_j`` is imposed. The template reads the **signed** return, not its magnitude, so it separates a pair by sign as well as by size: a concordant pair is measured against `dcp` when both returns are positive and against `dcn` when both are negative, and a discordant pair is measured against `ddp` and `ddn`. A co-movement in no named channel carries weight zero.
+
+The boundaries `dcp`, `dcn`, `ddp` and `ddn` are the four components of the boundary vector of Figure 1(b) of [gerber2025squeezing](@cite), and `n1` to `n10` carry the numbers of its ten weights, channel for channel. The source leaves every value to expert judgement or to an outer optimisation, so the defaults, and the geometric-mean defaults of the mixed weights, are the library's.
 
 The diagram shows a visual representation of the regions defined by `PartialGerberIQ`. In this case `c = 1`, `dcp = 2`, `ddn = 2`, `ddp = 3`, and `dcn = 3`.
 
@@ -1157,7 +1159,7 @@ PartialGerberIQ
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 2, Figure 1(b), and Section 3.3.2.
 """
 @concrete struct PartialGerberIQ <: GerberIQCovarianceAlgorithm
     """
@@ -1169,11 +1171,11 @@ PartialGerberIQ
     """
     dcn
     """
-    Discordant movement threshold parameter, positive in `r_i`, negative in `r_j`.
+    Discordant movement threshold parameter for the positive return of a discordant pair, whichever asset carries it.
     """
     ddp
     """
-    Discordant movement threshold parameter, negative in `r_i`, positive in `r_j`.
+    Discordant movement threshold parameter for the negative return of a discordant pair, whichever asset carries it.
     """
     ddn
     """
@@ -1252,7 +1254,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Lowers the mixed-magnitude weights of a [`PartialGerberIQ`](@ref) template so that the [`Gerber2`](@ref) statistic stays inside `[-1, 1]`. It does not make the matrix positive definite; that is `pdm`'s work.
 
-Under [`Gerber2`](@ref) the pairwise entry is the net `pos - neg`, divided by the geometric mean of the pair's two diagonal projections. A projection compares an asset with itself, so it is always concordant and it names a same-magnitude weight. The source proves that the ratio is bounded by one **if and only if** every weight that joins two distinct magnitude classes is at most the geometric mean of the two same-magnitude weights of those classes. Six of the ten weights join two classes, and this method lowers each onto its bound. With `n1 = n4 = 0.2` an unclamped `n7 = 1.0` returns `5.0`, and the clamp brings it to `1.0`.
+Under [`Gerber2`](@ref) the pairwise entry is the net `pos - neg`, divided by the geometric mean of the pair's two diagonal projections. A projection compares an asset with itself, so it is always concordant and it names a same-magnitude weight. The Internet Appendix of [gerber2025squeezing](@cite) states that a bound of one holds **if and only if** every weight that joins two distinct magnitude classes is at most the geometric mean of the two same-magnitude weights of those classes, and proves it for its own alternative statistic (Equations A1 to A9). That statistic sums its diagonal projections over the observations on which both assets crossed. The library's [`Gerber2`](@ref) sums them over the observations on which the one asset crossed, a larger set, so for the library the condition is sufficient by the Cauchy-Schwarz inequality. It stays necessary for the template as a whole, because a sample in which the two assets always cross together gives the library the source's denominator. Six of the ten weights join two classes, and this method lowers each onto its bound. With `n1 = n4 = 0.2` an unclamped `n7 = 1.0` returns `5.0`, and the clamp brings it to `1.0`.
 
 The four discordant weights need a case split. A concordant pair is judged against `dcp` and `dcn`, and a discordant pair against `ddp` and `ddn`, so a return beyond a discordant boundary need not be beyond the concordant one that fixes its diagonal class. When the two boundaries disagree the method takes the smaller of the two candidate weights, which is the bound that holds for either class.
 
@@ -1314,7 +1316,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Internet Appendix, Equations A1 to A9.
 """
 function clamp_gerber_iq_n(alg::PartialGerberIQ, ::Gerber2)
     (; dcp, dcn, ddp, ddn, n1, n2, n4, n5) = alg
@@ -1371,7 +1373,7 @@ The tests are ordered from the largest channel inwards, so the first match wins 
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 2, Figure 1(b).
 """
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::PartialGerberIQ)
@@ -1433,6 +1435,8 @@ Where:
   - ``s_i``: Threshold scaling factor of asset ``i``.
 
 A return of asset ``i`` is **large positive** at or beyond ``dp1_i``, **moderate positive** in ``[dp2_i, dp1_i)``, **small positive** in ``(0, dp2_i)``, and the three negative classes mirror them about zero against ``dn2_i`` and ``dn1_i``. The channel of a co-movement is the pair of classes its two returns fall in, and its weight is the field named for that pair. A co-movement in no named channel carries weight zero, which happens only when a return is exactly zero.
+
+Figure 2 of [gerber2025squeezing](@cite) draws the same thirty-six channels, and `n1` to `n21` carry the numbers of its twenty-one weights, channel for channel. Its four boundaries sit at `dp2` (``\\delta_{C^{+}}``, inner positive), `dp1` (``\\delta_{D^{+}}``, outer positive), `dn2` (``\\delta_{D^{-}}``, inner negative) and `dn1` (``\\delta_{C^{-}}``, outer negative). The source leaves every value to expert judgement or to an outer optimisation, so the defaults, and the geometric-mean defaults of the mixed weights, are the library's.
 
 The diagram shows a visual representation of the regions defined by `FullGerberIQ`. In this case `c = 1`, `dp2 = 2`, `dn2 = 2`, `dp1 = 3`, and `dn1 = 3`. In this version, the limits are allowed to cross over the zero line. Thus, the constructor ensures `dp1 >= dp2` and `dn1 >= dn2` by swapping values if necessary to ensure consistency.
 
@@ -1540,7 +1544,7 @@ FullGerberIQ
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.4, Figure 2.
 """
 @concrete struct FullGerberIQ <: GerberIQCovarianceAlgorithm
     """
@@ -1731,7 +1735,7 @@ Asserts that all `c <= kind.d**`, where `c` is the small movement threshold and 
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.2.
 """
 function gerber_iq_assert_c_d(c::Number, kind::PartialGerberIQ)
     @argcheck(c <= kind.dcp,
@@ -1770,7 +1774,7 @@ Lowers the mixed-magnitude weights of a [`FullGerberIQ`](@ref) template so that 
 
 Under [`Gerber2`](@ref) the pairwise entry is the net `pos - neg`, divided by the geometric mean of the pair's two diagonal projections. A projection compares an asset with itself, so both returns fall in the same magnitude class and the co-movement is always concordant. Exactly six of the twenty-one weights therefore sit on the diagonal, one per class: `n11`, `n4`, `n1`, `n2`, `n5` and `n12`. The other fifteen each join two distinct classes, one weight per unordered pair, **discordant channels included**, and `C(6, 2) = 15`.
 
-The source proves that the ratio is bounded by one **if and only if** each of those fifteen is at most the geometric mean of the two diagonal weights of the classes it joins. This method lowers all fifteen onto that bound. A discordant channel obeys the rule like any other, because both of the classes it joins carry a diagonal weight. A [`FullGerberIQ`](@ref) with `n1 = n11 = 0.1` and `n15 = 1.0` returns `10.0` unclamped, and `1.0` clamped.
+The Internet Appendix of [gerber2025squeezing](@cite) states that a bound of one holds **if and only if** each of those fifteen is at most the geometric mean of the two diagonal weights of the classes it joins, and proves it for its own alternative statistic (Equations A1 to A9). The library's [`Gerber2`](@ref) sums its projections over a larger set of observations, so the condition is sufficient for it by the Cauchy-Schwarz inequality, and it stays necessary for the template as a whole. This method lowers all fifteen onto that bound. A discordant channel obeys the rule like any other, because both of the classes it joins carry a diagonal weight. A [`FullGerberIQ`](@ref) with `n1 = n11 = 0.1` and `n15 = 1.0` returns `10.0` unclamped, and `1.0` clamped.
 
 !!! note
 
@@ -1826,7 +1830,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Internet Appendix, Equations A1 to A9.
 """
 function clamp_gerber_iq_n(alg::FullGerberIQ, ::Gerber2)
     (; n1, n2, n4, n5, n11, n12) = alg
@@ -1893,7 +1897,7 @@ Every test names both orderings of the pair, so the result is symmetric in its t
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.3.4, Figure 2.
 """
 function gerber_iq_weight(xi::Number, xj::Number, axi::Number, axj::Number, sci::Number,
                           scj::Number, kind::FullGerberIQ)
@@ -1965,6 +1969,8 @@ Configures and applies Gerber Information Quality covariance estimators.
 Four knobs carry the source's own parameters. `c` is the noise threshold, `kind` is the squeezing template that supplies the weight of a co-movement, `sc` fixes the units the thresholds are measured in, and `decay` discounts a co-movement by its age. `alg` is the one knob the source does not carry: its canonical statistic is the [`Gerber1`](@ref) branch alone, and this estimator also offers [`Gerber0`](@ref) and [`Gerber2`](@ref) from the classic Gerber family. [`gerber_IQ`](@ref) states the three branches and the reduction that ties them to that family.
 
 The source's lookback duration ``\\tau`` has no field. The estimator always reads every row of `X` and lets `decay` discount the oldest ones, which is the ``\\tau = T - 1`` case of the source.
+
+[`Gerber1`](@ref) is Equation 4 of [gerber2025squeezing](@cite): the numerator sums the signed, weighted and discounted contributions over the observations on which both assets leave the noise zone, and the denominator sums the weights over those on which at least one does. Equation 5 is the discount. A direct evaluation of Equations 4 and 5 for [`BasicGerberIQ`](@ref) agrees with this estimator to machine precision. [`Gerber0`](@ref) and [`Gerber2`](@ref) are the library's own, and the Internet Appendix states a third form that the library does not ship. Equation 1 of the source drops a return with ``\\lvert r^{*} \\rvert \\leq c``, so a return exactly at the threshold is noise there. The library lets it cross, which is the closed rule of the Gerber statistic. The source centres on a location ``r_0`` of the user's choice, and the library centres on the mean that `me` computes.
 
 # Fields
 
@@ -2053,7 +2059,7 @@ GerberIQCovariance
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5, Equations 1 to 5, and the Internet Appendix.
 """
 @propagatable @concrete struct GerberIQCovariance <: BaseGerberIQCovariance
     """

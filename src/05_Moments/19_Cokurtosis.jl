@@ -114,8 +114,8 @@ MyCokurtosisEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.7.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, Equation 4, and Appendix A.
+  - $(ref_dict[:jondeau2004]) Section 2.3.
 """
 abstract type CokurtosisEstimator <: AbstractEstimator end
 """
@@ -123,7 +123,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates the square cokurtosis matrix of a returns matrix.
 
-`Cokurtosis` composes a mean estimator, a matrix processing estimator and a moment algorithm. [`cokurtosis`](@ref) returns one `assets² × assets²` matrix, which is the source's stacked fourth comoment and not the `assets × assets³` tensor of the same name.
+`Cokurtosis` composes a mean estimator, a matrix processing estimator and a moment algorithm. [`cokurtosis`](@ref) returns one `assets² × assets²` matrix, which is the stacked fourth comoment ``\\mathbf{\\Sigma}_{4}`` of Section 2 of [pkurt](@cite) and not the `assets × assets³` tensor ``\\mathbf{M}_{4}`` of Section 2.3 of [jondeau2004](@cite).
 
 # Fields
 
@@ -201,8 +201,8 @@ Cokurtosis
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.7.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, Equation 4, and Appendix A.
+  - $(ref_dict[:jondeau2004]) Section 2.3.
 """
 @propagatable @concrete struct Cokurtosis <: CokurtosisEstimator
     """
@@ -311,7 +311,7 @@ Weighted:
 
 Where:
 
-  - ``\\hat{\\mathbf{K}}``: ``N^{2} \\times N^{2}`` square cokurtosis matrix. Its entry ``\\hat{\\mathbf{K}}_{(i-1)N+j,\\,(k-1)N+l}`` is the fourth comoment of the deviations of the assets ``i``, ``j``, ``k`` and ``l``, so the matrix is symmetric. This is the source's ``\\mathbf{\\Sigma}_{4}``, not its ``\\mathbf{M}_{4}``. The latter is ``N \\times N^{3}`` and the library never builds it.
+  - ``\\hat{\\mathbf{K}}``: ``N^{2} \\times N^{2}`` square cokurtosis matrix. Its entry ``\\hat{\\mathbf{K}}_{(i-1)N+j,\\,(k-1)N+l}`` is the fourth comoment of the deviations of the assets ``i``, ``j``, ``k`` and ``l``, so the matrix is symmetric. This is ``\\mathbf{\\Sigma}_{4}`` of Section 2 of [pkurt](@cite), which Appendix A of that work computes with the formula above, and not ``\\mathbf{M}_{4}`` of Section 2.3 of [jondeau2004](@cite). The latter is ``N \\times N^{3}`` and the library never builds it. The weighted form is this library's own.
   - $(math_dict[:Y_dev])
   - $(math_dict[:y_t_dev])
   - $(math_dict[:Z_pairprod])
@@ -349,8 +349,8 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.7.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:pkurt]) Section 2, Equation 4, and Appendix A.
+  - $(ref_dict[:jondeau2004]) Section 2.3.
 """
 function _cokurtosis(X::MatNum, mp::AbstractMatrixProcessingEstimator, args...)
     T, N = size(X)

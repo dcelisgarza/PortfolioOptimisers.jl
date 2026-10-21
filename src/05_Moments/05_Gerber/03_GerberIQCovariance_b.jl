@@ -75,7 +75,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5, Equations 4 and 5.
 """
 function gerber_IQ_delta(xi::Number, xj::Number, axi::Number, axj::Number,
                          decay::GerberIQDecayEstimator, T::Integer, k::Number, sci::Number,
@@ -329,7 +329,7 @@ The Gerber1 branch is the source's own statistic. Its numerator runs over the ob
 
 The Gerber statistic is the special case of this one that switches the squeezing and the decay off. With every weight set to one, ``\\gamma = 0``, the per-asset volatility scaling of [`AssetVolatilityGerberIQScaler`](@ref), and ``c`` equal to a Gerber threshold, all three branches reproduce [`GerberCovariance`](@ref) to the last bit. The reduction holds at ``c = 0`` as it does at every positive threshold, because [`iq_crossed`](@ref) gives this family the same rule as that one: a return of exactly zero never leaves the noise zone.
 
-All three branches are bounded by ``|\\rho_{ij}| \\leq 1``. Gerber0 and Gerber1 are bounded by construction, because each divides by a sum of the same weights it subtracts. Gerber2 is bounded by the source's own condition on the template: every weight that joins two distinct magnitude classes is at most the geometric mean of the two diagonal weights of those classes. [`clamp_gerber_iq_n`](@ref) enforces that condition on every such weight, and the source proves it necessary and sufficient. Cauchy-Schwarz then bounds the ratio, because ``D_{ij}`` reads asset ``i``'s class in the same units the numerator reads it in, whatever `sc` does. The diagonal is exactly one, because the pair ``(i, i)`` makes the numerator and both projections the same sum.
+All three branches are bounded by ``|\\rho_{ij}| \\leq 1``. Gerber0 and Gerber1 are bounded by construction, because each divides by a sum of the same weights it subtracts. Gerber2 is bounded by the source's own condition on the template: every weight that joins two distinct magnitude classes is at most the geometric mean of the two diagonal weights of those classes. [`clamp_gerber_iq_n`](@ref) enforces that condition on every such weight. The Internet Appendix of [gerber2025squeezing](@cite) proves it necessary and sufficient for its own diagonal projection (Equations A1 to A9), and for the library's larger observation set it is sufficient. Cauchy-Schwarz then bounds the ratio, because ``D_{ij}`` reads asset ``i``'s class in the same units the numerator reads it in, whatever `sc` does. The diagonal is exactly one, because the pair ``(i, i)`` makes the numerator and both projections the same sum.
 
 # Algorithm
 
@@ -368,7 +368,7 @@ Step 4 is where the three [`GerberCovarianceAlgorithm`](@ref) branches differ. [
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5, Equations 1 to 5, and the Internet Appendix, Equation A1.
 """
 function gerber_IQ(ce::GerberIQCovariance, X::MatNum, sd::ArrNum)
     N = size(X, 2)
@@ -431,7 +431,7 @@ The standard deviations serve two purposes at once. They scale the thresholds th
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5.
 """
 function Statistics.cor(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
@@ -500,7 +500,7 @@ The covariance is the correlation of [`cor`](@ref) rescaled by the same standard
 
 # References
 
-  - $(ref_dict[:gerber2025squeezing])
+  - $(ref_dict[:gerber2025squeezing]) Section 3.5.
 """
 function Statistics.cov(ce::GerberIQCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)

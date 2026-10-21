@@ -17,7 +17,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures monotonic association with Kendall's tau, counting concordant against discordant pairs.
 
-The rank statistic is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`.
+The rank statistic is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`: entry ``(i, j)`` is ``\\hat{\\tau}^b_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j``, and the diagonal is the variance.
+
+Section 6.1.3 of [cajas2025](@cite) states the coefficient as the difference of the counts of concordant and discordant pairs over the number of pairs. The library computes the tie-corrected form, which differs from that one when the data hold ties.
 
 # Fields
 
@@ -69,7 +71,7 @@ KendallCovariance
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 6.1.3, equation 6.3.
+  - $(ref_dict[:cajas2025]) Section 6.1.3, Equation 6.3. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct KendallCovariance <: RankCovarianceEstimator
     """
@@ -164,7 +166,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures monotonic association with Spearman's rho, the Pearson correlation of the rank-transformed returns.
 
-The rank transform is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`.
+The rank transform is robust to outliers and to non-Gaussian data. The covariance follows from the generic fallback, which rescales the correlation matrix by the marginal standard deviations of `ve`: entry ``(i, j)`` is ``\\hat{\\rho}^S_{ij}\\,\\hat{\\sigma}_i\\,\\hat{\\sigma}_j``, and the diagonal is the variance.
+
+Part I, Section 3 of [spearman1904](@cite) computes the correlation of the ranks by the method of product moments, and gives its reason: the rank is robust to the form of the marginal distributions and to extreme values. Section 4(d) of that part gives a different statistic, ``R = 1 - 3 S_d / (n^{2} - 1)`` from the sum of absolute rank differences ``S_d``, which this estimator does not compute.
 
 # Fields
 
@@ -216,7 +220,7 @@ SpearmanCovariance
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 6.1.2, equation 6.2.
+  - $(ref_dict[:spearman1904]) Part I, Sections 3 and 4(d), pages 79 to 87.
 """
 @propagatable @concrete struct SpearmanCovariance <: RankCovarianceEstimator
     """

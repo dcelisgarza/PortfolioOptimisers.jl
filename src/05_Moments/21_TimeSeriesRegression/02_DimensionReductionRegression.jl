@@ -49,6 +49,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Replaces the factors with the principal components of their standardised covariance.
 
+The principal components are those of [pearson1901](@cite) and [hotelling1933](@cite). No copy of either work was found, so the components of the standardised factors follow Equation 34 of [fekedulegn2002](@cite).
+
 The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PCA, X; kwargs...)`, and it is the only place the retained width is set: `pratio` caps the share of variance the retained components must explain and `maxoutdim` caps their number. The default `kwargs = (;)` takes that library's own defaults, which on a factor matrix of full rank retain every component and reduce nothing: on five factors of full rank `PCA()` retained five components, while `PCA(; kwargs = (; pratio = 0.8))` retained four and `PCA(; kwargs = (; maxoutdim = 2))` retained two.
 
 # Fields
@@ -81,6 +83,7 @@ PCA
 
   - $(ref_dict[:pearson1901])
   - $(ref_dict[:hotelling1933])
+  - $(ref_dict[:fekedulegn2002]) Equation 34. $(ref_dict[:no_original_source])
 """
 @concrete struct PCA <: DimensionReductionTarget
     """
@@ -130,7 +133,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Replaces the factors with the latent components of a Gaussian latent-variable model.
 
-The model is the maximum-likelihood factor analyser with an isotropic noise variance; its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they coincide with them in the zero-noise limit. The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. Its default width is one fewer than [`PCA`](@ref)'s, because that library caps a latent-variable model at one less than the number of input dimensions: on five factors of full rank `PCA()` retained five components and `PPCA()` retained four. `maxoutdim` lowers that width and **must not raise it to the factor count**: at the full width the third-party fit succeeds and `MultivariateStats.projection` then raises an `ArgumentError` out of its singular value decomposition, so the failure would surface inside [`prep_dim_red_reg`](@ref) rather than at construction. The latent components are the posterior means that `StatsAPI.predict` gives, so the regression maps its coefficients back through the matrix that [`dimension_reduction_map`](@ref) reads off that prediction, not through `MultivariateStats.projection`. [`StatsAPI.fit(::PPCA, ::MatNum)`](@ref) checks the cap before it calls that library, and raises a `DomainError` naming `maxoutdim` instead. The constructor cannot hold the check, because it never sees the factor matrix.
+The model is the maximum-likelihood factor analyser with an isotropic noise variance; its latent directions span the same subspace as the principal components of [`PCA`](@ref), and they coincide with them in the zero-noise limit. The fit is the maximum-likelihood estimate of Section 3.2 of [tipping1999](@cite): the weights of Equation 7 with the rotation set to the identity, and the noise variance of Equation 8, the mean of the discarded eigenvalues. `MultivariateStats` takes the eigenvalues from the sample covariance with divisor ``N - 1``, where Equation 5 divides by ``N``. The subspace is the same, and the eigenvalues, the weights and the noise variance carry that divisor. The `kwargs` field is forwarded to `MultivariateStats.fit(MultivariateStats.PPCA, X; kwargs...)`. Its default width is one fewer than [`PCA`](@ref)'s, because that library caps a latent-variable model at one less than the number of input dimensions: on five factors of full rank `PCA()` retained five components and `PPCA()` retained four. `maxoutdim` lowers that width and **must not raise it to the factor count**: at the full width the third-party fit succeeds and `MultivariateStats.projection` then raises an `ArgumentError` out of its singular value decomposition, so the failure would surface inside [`prep_dim_red_reg`](@ref) rather than at construction. The latent components are the posterior means that `StatsAPI.predict` gives, so the regression maps its coefficients back through the matrix that [`dimension_reduction_map`](@ref) reads off that prediction, not through `MultivariateStats.projection`. [`StatsAPI.fit(::PPCA, ::MatNum)`](@ref) checks the cap before it calls that library, and raises a `DomainError` naming `maxoutdim` instead. The constructor cannot hold the check, because it never sees the factor matrix.
 
 # Fields
 
@@ -160,7 +163,7 @@ PPCA
 
 # References
 
-  - $(ref_dict[:tipping1999])
+  - $(ref_dict[:tipping1999]) Section 3.2, Equations 7-8.
 """
 @concrete struct PPCA <: DimensionReductionTarget
     """
@@ -221,7 +224,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Estimates a loadings matrix by regressing each asset on the leading components of the factors.
 
-`drtgt` reduces the standardised factors to a smaller orthogonal basis, `retgt` fits each asset in that basis, and the coefficients are then mapped back to the original factors. `ve` supplies the mean and the standard deviation that mapping divides by; the expected returns estimator it reads is `ve.me`, and a `nothing` there falls back to `SimpleExpectedReturns()`. Unlike [`StepwiseRegression`](@ref), every asset keeps every factor. **The standardisation and the recovery read the same statistics**: [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair it returned, so a weighted `ve` — the one [`factory`](@ref) builds from the incoming observation weights — is honoured end to end, as Equations 4.13, 4.15 and 4.20 of $(ref_dict[:cajas2025]) require.
+`drtgt` reduces the standardised factors to a smaller orthogonal basis, `retgt` fits each asset in that basis, and the coefficients are then mapped back to the original factors. `ve` supplies the mean and the standard deviation that mapping divides by; the expected returns estimator it reads is `ve.me`, and a `nothing` there falls back to `SimpleExpectedReturns()`. Unlike [`StepwiseRegression`](@ref), every asset keeps every factor. **The standardisation and the recovery read the same statistics**: [`prep_dim_red_reg`](@ref) computes them from `ve`, and `_regression` recovers the coefficients with the pair it returned, so a weighted `ve` — the one [`factory`](@ref) builds from the incoming observation weights — is honoured end to end, as Equations 8, 11, 12, 35 and 36 of [fekedulegn2002](@cite) require. That work fits the regression on the principal components of the standardised factors, with the eigenvectors of their correlation matrix. A probabilistic target puts the matrix of Equation 9 of [tipping1999](@cite) in place of the eigenvectors, which is the library's own composition.
 
 The reduction reads every observation, so a fit over more observations can reduce to other components. `proj` fixes the components as linear combinations of the original factors, and the fit then makes no reduction. `choice` states whether the online step of a prior that fits this regression writes the components of the first fit into `proj`. A batch fit gives the same answer under both rules.
 
@@ -299,8 +302,8 @@ DimensionReductionRegression
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.20.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 4-7 and 21-22, Equations 8, 11-12, 20-23 and 34-36.
+  - $(ref_dict[:tipping1999]) Section 3.4, Equation 9.
 """
 @propagatable @concrete struct DimensionReductionRegression <:
                                AbstractTimeSeriesRegressionEstimator
@@ -364,7 +367,7 @@ end
 
 Standardises the factors, fits the dimension reduction model, and projects the factors into the reduced basis.
 
-It returns the two statistics that did the standardisation along with the projection, because the caller must undo that same scale. Equations 4.13, 4.15 and 4.20 of $(ref_dict[:cajas2025]) hold only when the two are the same statistic.
+It returns the two statistics that did the standardisation along with the projection, because the caller must undo that same scale. Equations 11 and 12 of [fekedulegn2002](@cite) hold only when the two are the same statistic.
 
 When `re.proj` holds the components, the method makes no reduction. It centres the factors at their mean and multiplies them by `re.proj`. It returns `re.proj` as the projection and a scale of ones, so the caller recovers the coefficients with the same formula. A constant shift of the components changes only the intercept of the fit in the reduced basis, which `_regression` discards, so the components need no centre of their own.
 
@@ -412,8 +415,7 @@ The method that Julia selects is the algorithm.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.13, 4.16-4.17.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 4-5 and 21, Equations 8, 13-17 and 34.
 """
 function prep_dim_red_reg(re::DimensionReductionRegression{<:Any, <:Any, <:Any, <:Any,
                                                            Nothing}, X::MatNum)
@@ -449,12 +451,12 @@ Returns the matrix whose transpose maps one centred, standardised observation of
 
 # Mathematical definition
 
-The prediction of a probabilistic PCA is the posterior mean of its latent components:
+The prediction of a probabilistic PCA is the posterior mean of its latent components, Equation 9 of [tipping1999](@cite):
 
 ```math
 \\begin{align}
-\\mathbb{E}[\\mathbf{z} \\mid \\mathbf{x}] &= \\mathbf{C}^{-1} \\mathbf{W}^{\\intercal} (\\mathbf{x} - \\boldsymbol{\\mu}_{\\mathrm{pp}})\\,, \\\\
-\\mathbf{C} &= \\mathbf{W}^{\\intercal} \\mathbf{W} + \\sigma^2 \\mathbf{I}\\,.
+\\mathbb{E}[\\mathbf{z} \\mid \\mathbf{x}] &= \\mathbf{M}^{-1} \\mathbf{W}^{\\intercal} (\\mathbf{x} - \\boldsymbol{\\mu}_{\\mathrm{pp}})\\,, \\\\
+\\mathbf{M} &= \\mathbf{W}^{\\intercal} \\mathbf{W} + \\sigma^2 \\mathbf{I}\\,.
 \\end{align}
 ```
 
@@ -465,17 +467,17 @@ Where:
   - ``\\mathbf{W}``: Weights of the model, `factors × components`.
   - ``\\sigma^2``: Noise variance of the model.
   - ``\\boldsymbol{\\mu}_{\\mathrm{pp}}``: Mean of the model.
-  - ``\\mathbf{C}``: The matrix that `Statistics.cov` of the model gives.
+  - ``\\mathbf{M}``: The ``q \\times q`` matrix that `Statistics.cov` of the model gives, with ``q`` the number of components.
   - $(math_dict[:I_identity])
 
-So the matrix is ``\\mathbf{W} \\mathbf{C}^{-1}``, which differs from `MultivariateStats.projection`, the left singular vectors of ``\\mathbf{W}``.
+So the matrix is ``\\mathbf{W} \\mathbf{M}^{-1}``, which differs from `MultivariateStats.projection`, the left singular vectors of ``\\mathbf{W}``.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Any model: return `MultivariateStats.projection(model)`. For a PCA this is the matrix that the prediction applies.
- 2. A probabilistic PCA: return ``\\mathbf{W} \\mathbf{C}^{-1}``, computed as `model.W / Statistics.cov(model)`.
+ 2. A probabilistic PCA: return ``\\mathbf{W} \\mathbf{M}^{-1}``, computed as `model.W / Statistics.cov(model)`.
 
 # Arguments
 
@@ -494,7 +496,7 @@ The method that Julia selects is the algorithm.
 
 # References
 
-  - $(ref_dict[:tipping1999])
+  - $(ref_dict[:tipping1999]) Section 3.4, Equation 9.
 """
 function dimension_reduction_map(model)
     return MultivariateStats.projection(model)
@@ -563,8 +565,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.18-4.20.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 7 and 21-22, Equations 20-23 and 34-36.
 """
 function _regression(re::DimensionReductionRegression, y::VecNum, mu::VecNum, sigma::VecNum,
                      x1::MatNum, Vp::MatNum)
@@ -622,8 +623,7 @@ The reduction is fitted on `F` alone, so it does not depend on the assets and on
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.3.1, Equations 4.12-4.22.
-  - $(ref_dict[:fekedulegn2002])
+  - $(ref_dict[:fekedulegn2002]) Pages 4-7 and 21-22, Equations 8, 11-12, 20-23 and 34-36.
 """
 function regression(re::DimensionReductionRegression, X::MatNum, F::MatNum)
     assert_finite_factor_rows(F)

@@ -731,7 +731,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Exponentially weighted beta of the returns against the market return, at every observation.
 
-This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
+This is the archetype of every market beta Descriptor. The beta is the exponentially weighted covariance of an asset with the market, divided by the exponentially weighted variance of the market. [sharpe1964](@citet) defines the beta of an asset as the slope of the regression of its return on the return of the market, which is the covariance over the variance (pages 438 and 439). The exponential weights and the recursion below are this library's own, and no source for them was found. [`market_return_series`](@ref) builds the market return from the Asset Panel. Where the estimator names a categorical Panel Field in `group`, [`ew_beta_shrink`](@ref) shrinks each raw beta toward the capitalisation-weighted mean beta of its group.
 
 # Mathematical definition
 
@@ -808,7 +808,7 @@ EWBeta
 
 # References
 
-  - $(ref_dict[:sharpe1964])
+  - $(ref_dict[:sharpe1964]) Pages 438 and 439.
 """
 @concrete struct EWBeta <: AbstractDescriptorEstimator
     """

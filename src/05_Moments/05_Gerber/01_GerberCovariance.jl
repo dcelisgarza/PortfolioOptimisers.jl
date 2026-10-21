@@ -5,6 +5,8 @@ Abstract supertype for all Gerber covariance estimators.
 
 All concrete and/or abstract types implementing Gerber covariance estimation algorithms should be subtypes of `BaseGerberCovariance`.
 
+Section 2 of [gerber](@cite) defines the statistic. Section 2 of [gerber_analysis](@cite) sets its three denominators side by side, which is the comparison that the three [`GerberCovarianceAlgorithm`](@ref) subtypes follow.
+
 # Interfaces
 
 If moving away from the already established Gerber covariance algorithms, you must follow [`AbstractCovarianceEstimator`](@ref) to implement the entire chain.
@@ -18,8 +20,8 @@ If moving away from the already established Gerber covariance algorithms, you mu
 
 # References
 
-  - $(ref_dict[:gerber])
-  - $(ref_dict[:gerber_analysis])
+  - $(ref_dict[:gerber]) Section 2.
+  - $(ref_dict[:gerber_analysis]) Section 2.
 """
 abstract type BaseGerberCovariance <: AbstractCovarianceEstimator end
 """
@@ -28,6 +30,8 @@ $(DocStringExtensions.TYPEDEF)
 Abstract supertype for all Gerber covariance algorithm types.
 
 All concrete and/or abstract types implementing specific Gerber covariance algorithms should be subtypes of `GerberCovarianceAlgorithm`. These types are used to specify the algorithm when constructing a [`GerberCovariance`](@ref) estimator. A subtype selects the denominator that [`comovement_ratio`](@ref) puts under the net co-movement vote, so a new subtype is a new method of that function.
+
+The three denominators are those of [`Gerber0`](@ref) (Equation 4 of [gerber](@cite)), [`Gerber1`](@ref) (Equation 11) and [`Gerber2`](@ref) (footnote 3). Section 2 of [gerber_analysis](@cite) states all three side by side, and says which version of the work introduced each.
 
 # Interfaces
 
@@ -44,7 +48,8 @@ If moving away from the already established Gerber covariance algorithms, you mu
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, Equations 4 and 11, and footnote 3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber_analysis]) Section 2.
 """
 abstract type GerberCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
@@ -67,6 +72,8 @@ Where:
   - $(math_dict[:nd_gerber])
 
 An observation votes only when both assets cross, so an observation on which exactly one asset crossed leaves the statistic unchanged. The denominator vanishes when no observation moved both assets, and the statistic is zero there.
+
+This is Equation 4 of [gerber](@cite), and the raw statistic of Section 2 of [gerber_analysis](@cite), which dates it to the earliest version of the work. [gerber_analysis](@cite) adds that attribution. The library does not have that version, so the formula is checked against Equation 4 of the later one, which restates it.
 
 # Algorithm
 
@@ -97,7 +104,8 @@ Gerber0()
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.1, Equations 3 and 4. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber_analysis]) Section 2.
 """
 struct Gerber0 <: GerberCovarianceAlgorithm end
 """
@@ -121,6 +129,8 @@ Where:
   - $(math_dict[:nn_gerber])
 
 The denominator carries ``n_{n}`` on top of [`Gerber0`](@ref)'s, so it is never smaller and the statistic is never larger in magnitude. The two agree when every crossing is shared.
+
+The sum ``n_{c} + n_{d} + n_{n}`` is the number of observations on which at least one asset crossed, which is ``T - n^{NN}`` for ``n^{NN}`` the number of observations on which neither crossed. Equation 11 of [gerber](@cite) states the denominator in that form, and Equation 2 of [gerber_analysis](@cite) repeats it. Both identify it as the statistic of the final version of the work.
 
 # Algorithm
 
@@ -151,7 +161,8 @@ Gerber1()
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, Equation 11.
+  - $(ref_dict[:gerber_analysis]) Section 2, Equation 2.
 """
 struct Gerber1 <: GerberCovarianceAlgorithm end
 """
@@ -176,6 +187,8 @@ Where:
   - $(math_dict[:nd_gerber])
 
 The normalisation is a property of the whole matrix and not of one pair, so the diagonal is unit by construction rather than by a per-pair denominator as in [`Gerber0`](@ref) and [`Gerber1`](@ref). An asset crosses concordantly with itself at every crossing, so ``h_{i,\\,i}`` counts the crossings of asset ``i``.
+
+The denominator is therefore the geometric mean of the number of observations on which asset ``i`` crossed and the number on which asset ``j`` crossed. That is the denominator of Equation 1 of [gerber_analysis](@cite), which dates the variant to the 2019 version of the work. Footnote 3 of [gerber](@cite) states the same denominator and misprints one count of its second factor. [gerber_analysis](@cite) adds the attribution and the correct count. The library does not have the 2019 version, so the formula is checked against these two restatements.
 
 # Algorithm
 
@@ -206,7 +219,8 @@ Gerber2()
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, footnote 3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber_analysis]) Section 2, Equation 1.
 """
 struct Gerber2 <: GerberCovarianceAlgorithm end
 """
@@ -215,6 +229,10 @@ $(DocStringExtensions.TYPEDEF)
 Configures and applies Gerber covariance estimators.
 
 `GerberCovariance` encapsulates all components required for Gerber-based covariance or correlation estimation, including the variance estimator, positive definite matrix estimator, t parameter, and the specific Gerber algorithm variant. A Gerber matrix is a matrix of pairwise votes and is not positive definite in general, so `pdm` projects the result onto the nearest positive definite matrix; `pdm = nothing` returns the raw statistic instead.
+
+The threshold `t` is the fraction ``c`` of Equation 2 of [gerber](@cite). An asset crosses when its return is `t` standard deviations from zero. Section 2.1 of [gerber](@cite) calls 1/2 typical and names 7/10 and 9/10 as alternatives, and the default `t = 0.5` follows it. The covariance is the correlation scaled by the standard deviations, as in Equation 9.
+
+**The library thresholds the centred return.** Equation 1 of [gerber](@cite) compares the return itself with the threshold, so the statistic is centred on zero, and footnote 4 of [gerber_analysis](@cite) states that the threshold is centred about zero, not about each asset's mean. This estimator subtracts the mean that `me` computes before it compares. On a 200-observation sample of five assets with unit standard deviation and a mean of 0.1, the entries differ from the uncentred statistic by up to 0.06 under [`Gerber0`](@ref), 0.03 under [`Gerber1`](@ref) and 0.04 under [`Gerber2`](@ref). `me = CustomValueExpectedReturns(; val = 0.0)` gives the statistic of the source. `pdm` is the library's own repair, because Equation 4 of [gerber](@cite) can give a matrix that is not positive semidefinite.
 
 # Fields
 
@@ -288,7 +306,8 @@ GerberCovariance
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2, Equations 1, 2 and 9.
+  - $(ref_dict[:gerber_analysis]) Footnote 4.
 """
 @propagatable @concrete struct GerberCovariance <: BaseGerberCovariance
     """
@@ -484,7 +503,7 @@ Where:
   - $(math_dict[:N])
   - $(math_dict[:oslash])
 
-The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the entry of ``\\mathbf{V}^\\intercal \\mathbf{V}`` is ``n_{c} + n_{d}``, so this is the pairwise statistic of [`Gerber0`](@ref) written over the whole matrix.
+The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the entry of ``\\mathbf{V}^\\intercal \\mathbf{V}`` is ``n_{c} + n_{d}``, so this is the pairwise statistic of [`Gerber0`](@ref) written over the whole matrix. Equations 5 to 8 of [gerber](@cite) give the same matrix form.
 
 # Algorithm
 
@@ -517,7 +536,7 @@ The entry of ``\\mathbf{H}^\\intercal \\mathbf{H}`` is ``n_{c} - n_{d}`` and the
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, Equations 5 to 8. $(ref_dict[:no_original_source])
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber0}, X::MatNum,
                 sd::ArrNum)
@@ -561,7 +580,7 @@ Where:
   - $(math_dict[:oslash])
   - ``\\boldsymbol{1}``: Vector of ones.
 
-The entry of ``\\mathbf{N}^\\intercal \\mathbf{N}`` counts the observations on which neither asset crossed, so the denominator counts the observations on which at least one of them did. That is ``n_{c} + n_{d} + n_{n}``, the pairwise denominator of [`Gerber1`](@ref).
+The entry of ``\\mathbf{N}^\\intercal \\mathbf{N}`` counts the observations on which neither asset crossed, so the denominator counts the observations on which at least one of them did. That is ``n_{c} + n_{d} + n_{n}``, the pairwise denominator of [`Gerber1`](@ref), and ``T - n^{NN}`` of Equation 11 of [gerber](@cite). The source states no matrix form of this denominator, so the product ``\\mathbf{N}^\\intercal \\mathbf{N}`` is the library's.
 
 # Algorithm
 
@@ -597,7 +616,7 @@ The entry of ``\\mathbf{N}^\\intercal \\mathbf{N}`` counts the observations on w
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, Equation 11.
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber1}, X::MatNum,
                 sd::ArrNum)
@@ -650,7 +669,7 @@ Where:
   - $(math_dict[:sigma_i_asset])
   - $(math_dict[:oslash])
 
-The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the normalisation is a property of the whole matrix and the diagonal of ``\\hat{\\boldsymbol{\\rho}}`` is unit by construction.
+The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the normalisation is a property of the whole matrix and the diagonal of ``\\hat{\\boldsymbol{\\rho}}`` is unit by construction. Entry ``(i, j)`` equals the net vote over the geometric mean of the crossing counts of the two assets, which is Equation 1 of [gerber_analysis](@cite) and footnote 3 of [gerber](@cite). The matrix form is the library's.
 
 # Algorithm
 
@@ -682,7 +701,8 @@ The diagonal of ``\\mathbf{G}`` counts the crossings of each asset, so the norma
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, footnote 3. $(ref_dict[:no_original_source])
+  - $(ref_dict[:gerber_analysis]) Section 2, Equation 1.
 """
 function gerber(ce::GerberCovariance{<:Any, <:Any, <:Any, <:Any, <:Gerber2}, X::MatNum,
                 sd::ArrNum)
@@ -737,7 +757,7 @@ Compute the Gerber correlation matrix using the algorithm specified in `ce.alg`.
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.
 """
 function Statistics.cor(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)
@@ -771,7 +791,7 @@ Where:
   - ``\\hat{\\boldsymbol{\\rho}}``: Gerber correlation matrix of the same estimator.
   - ``\\boldsymbol{\\sigma}``: Standard deviation vector of the assets.
 
-The Gerber statistic sets the correlations alone, so the variances come from `ce.ve` and the diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is ``\\boldsymbol{\\sigma}^2``.
+The Gerber statistic sets the correlations alone, so the variances come from `ce.ve` and the diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is ``\\boldsymbol{\\sigma}^2``. This is Equation 9 of [gerber](@cite), with the sample standard deviation replaced by the estimator `ce.ve`.
 
 # Algorithm
 
@@ -807,7 +827,7 @@ The Gerber statistic sets the correlations alone, so the variances come from `ce
 
 # References
 
-  - $(ref_dict[:gerber])
+  - $(ref_dict[:gerber]) Section 2.2, Equation 9.
 """
 function Statistics.cov(ce::GerberCovariance, X::MatNum; dims::Int = 1, kwargs...)
     X = dims_oriented(dims, X)

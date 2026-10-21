@@ -26,10 +26,6 @@ All concrete and/or abstract types implementing specific shrinkage algorithms (e
   - [`BayesStein`](@ref)
   - [`BodnarOkhrinParolya`](@ref)
   - [`AbstractExpectedReturnsAlgorithm`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Section 3.4.1.
 """
 abstract type AbstractShrunkExpectedReturnsAlgorithm <: AbstractExpectedReturnsAlgorithm end
 """
@@ -45,12 +41,6 @@ Concrete types implementing specific shrinkage targets (e.g., grand mean, volati
   - [`VolatilityWeighted`](@ref)
   - [`MeanSquaredError`](@ref)
   - [`target_mean`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Equation 3.43.
-  - $(ref_dict[:meucci2005])
-  - $(ref_dict[:fengpalomar2016])
 """
 abstract type AbstractShrunkExpectedReturnsTarget <: AbstractExpectedReturnsAlgorithm end
 """
@@ -75,6 +65,8 @@ Where:
   - $(math_dict[:N])
 
 The sample covariance matrix does not enter the form, so this target is the only one of the three that a singular covariance matrix leaves untouched.
+
+Section 3.3.1 of [fengpalomar2016](@cite) lists this target as the scenario-dependent grand mean and credits another work with it. No earlier work that states it as a shrinkage target was found, so the target follows [fengpalomar2016](@cite). It is computed from the same sample as the mean it shrinks.
 
 # Algorithm
 
@@ -102,9 +94,7 @@ GrandMean()
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 3.43.
-  - $(ref_dict[:meucci2005])
-  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, the targets after Equation 3.31. $(ref_dict[:no_original_source])
 """
 struct GrandMean <: AbstractShrunkExpectedReturnsTarget end
 """
@@ -139,6 +129,8 @@ The branch of [`target_mean`](@ref) that this tag selects runs these steps.
  3. Divide the sum of `isigma * mu` by the sum of `isigma`, giving `val`. Summing a matrix-vector product is the numerator ``\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\hat{\\boldsymbol{\\mu}}``, and summing the matrix is the denominator ``\\boldsymbol{1}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{1}``.
  4. Return the constant range that repeats `val` `length(mu)` times.
 
+Section 3.3.1 of [fengpalomar2016](@cite) states this target as the volatility-weighted grand mean, with the same quotient, and credits another work with it. No copy of that work was found, so the target follows [fengpalomar2016](@cite). It is computed from the same sample as the mean it shrinks.
+
 # Constructors
 
     VolatilityWeighted() -> VolatilityWeighted
@@ -158,9 +150,7 @@ VolatilityWeighted()
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 3.43.
-  - $(ref_dict[:meucci2005])
-  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, the targets after Equation 3.31. $(ref_dict[:no_original_source])
 """
 struct VolatilityWeighted <: AbstractShrunkExpectedReturnsTarget end
 """
@@ -193,6 +183,8 @@ The branch of [`target_mean`](@ref) that this tag selects runs these steps.
  1. Divide the trace of `sigma` by `T`, giving `val`. `T` is a required keyword of this branch alone.
  2. Return the constant range that repeats `val` `length(mu)` times.
 
+Equation 3.29 of [fengpalomar2016](@cite) states that ``\\mathrm{tr}(\\mathbf{\\Sigma}) / T`` is the mean squared error ``\\mathbb{E}\\lVert \\hat{\\boldsymbol{\\mu}} - \\boldsymbol{\\mu} \\rVert_2^2`` of the sample mean. Equation 3.43 of [cajas2025](@cite) uses that value as a shrinkage target. No earlier work that does so was found, so the target follows [cajas2025](@cite).
+
 # Constructors
 
     MeanSquaredError() -> MeanSquaredError
@@ -212,9 +204,8 @@ MeanSquaredError()
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 3.43.
-  - $(ref_dict[:meucci2005])
-  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.29.
+  - $(ref_dict[:cajas2025]) Equation 3.43. $(ref_dict[:no_original_source])
 """
 struct MeanSquaredError <: AbstractShrunkExpectedReturnsTarget end
 """
@@ -254,8 +245,9 @@ JamesStein
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.4.1.1.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:james1961]) Section 2, Equation 6.
+  - $(ref_dict[:bock1975]) Theorems 1 and 2.
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.31. $(ref_dict[:no_original_source])
 """
 @concrete struct JamesStein <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -306,8 +298,8 @@ BayesStein
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.4.1.2.
   - $(ref_dict[:jorion1986])
+  - $(ref_dict[:cajas2025]) Section 3.4.1.2, Equation 3.44. $(ref_dict[:no_original_source])
 """
 @concrete struct BayesStein <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -358,8 +350,7 @@ BodnarOkhrinParolya
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.4.1.3.
-  - $(ref_dict[:bodnar2019])
+  - $(ref_dict[:bodnar2019]) Section 3, Theorem 3, Equations 6 and 7.
 """
 @concrete struct BodnarOkhrinParolya <: AbstractShrunkExpectedReturnsAlgorithm
     """
@@ -447,10 +438,6 @@ ShrunkExpectedReturns
   - [`target_mean`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Section 3.4.1.
 """
 @propagatable @concrete struct ShrunkExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator
@@ -555,9 +542,8 @@ Each branch takes the arguments the other two do not need through `args...` and 
 
 # References
 
-  - $(ref_dict[:cajas2025]) Equation 3.43.
-  - $(ref_dict[:meucci2005])
-  - $(ref_dict[:fengpalomar2016])
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.29 and the targets after Equation 3.31. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Equation 3.43. $(ref_dict[:no_original_source])
 """
 function target_mean(::GrandMean, mu::ArrNum, sigma::MatNum, args...; kwargs...)
     val = Statistics.mean(mu)
@@ -610,8 +596,12 @@ Where:
 
 Two consequences of the form bound where it is usable.
 
-  - ``N \\bar{\\lambda}`` is the trace of the covariance matrix, so ``N \\bar{\\lambda} \\leq 2 \\lambda_{\\max}`` whenever ``N \\leq 2``. The intensity is then negative and the blend extrapolates away from the target rather than toward it.
+  - ``N \\bar{\\lambda}`` is the trace of the covariance matrix, so ``N \\bar{\\lambda} \\leq 2 \\lambda_{\\max}`` whenever ``N \\leq 2``, and for any ``N`` when the largest eigenvalue holds at least half of the trace, as one dominant factor does. The intensity is then negative and the blend extrapolates away from the target rather than toward it. Theorem 1 of [bock1975](@cite) gives the same condition, ``\\mathrm{tr}(\\mathbf{D}) \\leq 2 d_L``, as the one under which no estimator of its class is minimax.
   - The denominator is zero when the target equals the sample mean. [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) both reduce to the sample mean at ``N = 1``, so a one-asset sample raises a `DomainError` under either of them. [`MeanSquaredError`](@ref) does not read the sample mean, so it stays finite there.
+
+Equation 6 of [james1961](@cite) shrinks a normal mean with an identity covariance matrix toward the origin by the factor ``1 - (N - 2) / \\lVert \\boldsymbol{x} \\rVert_2^2``. It does not clamp the factor. Theorem 2 of [bock1975](@cite) extends the minimax property to a known covariance matrix ``\\mathbf{D}`` that is not the identity, for the factor ``1 - c / (\\boldsymbol{x}^\\intercal \\mathbf{D}^{-1} \\boldsymbol{x})`` with ``0 \\leq c \\leq 2 (\\mathrm{tr}(\\mathbf{D}) / d_L - 2)``, where ``d_L`` is the largest eigenvalue of ``\\mathbf{D}``.
+
+The intensity above divides by the Euclidean norm and not by the ``\\mathbf{D}^{-1}`` quadratic form, so it is not the form of [bock1975](@cite). It is Equation 3.31 of [fengpalomar2016](@cite), whose numerator ``N \\bar{\\lambda} - 2 \\lambda_{\\max}`` is ``\\mathrm{tr}(\\hat{\\mathbf{\\Sigma}}) - 2 \\lambda_{\\max}``. No earlier work that states this exact form was found, so the form follows [fengpalomar2016](@cite). That work sets a negative intensity to zero, and this method does not. The library plugs the sample covariance matrix in for the known matrix, and it lets [`GrandMean`](@ref) and [`VolatilityWeighted`](@ref) read the target off the same sample.
 
 # Algorithm
 
@@ -657,8 +647,9 @@ Two consequences of the form bound where it is usable.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.4.1.1.
-  - $(ref_dict[:meucci2005])
+  - $(ref_dict[:james1961]) Section 2, Equation 6.
+  - $(ref_dict[:bock1975]) Theorems 1 and 2.
+  - $(ref_dict[:fengpalomar2016]) Section 3.3.1, Equation 3.31. $(ref_dict[:no_original_source])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:JamesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -711,7 +702,7 @@ Where:
 Two consequences of the form separate this intensity from the James-Stein one.
 
   - The quadratic form is non-negative whenever ``\\hat{\\mathbf{\\Sigma}}`` is positive semidefinite, so ``\\alpha`` then lies in ``(0, 1]``. This is the only one of the three algorithms whose coefficient is a convex weight without a clamp, and it returns the target exactly when the quadratic form is zero. A covariance estimator that returns an indefinite matrix breaks the bound.
-  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``; this method uses ``\\hat{\\mathbf{\\Sigma}}``. The correction raises ``\\alpha``.
+  - The quadratic form uses the inverse of the covariance matrix that `me.ce` returns. Equation 3.44 of [cajas2025](@cite) states the same intensity over the bias-corrected matrix ``\\bar{\\mathbf{\\Sigma}} = \\frac{T-1}{T-N-1} \\hat{\\mathbf{\\Sigma}}``; this method uses ``\\hat{\\mathbf{\\Sigma}}``. The correction raises ``\\alpha``. Equation 3.44 credits this estimator to [jorion1986](@cite). No copy of that work was found, so the intensity follows [cajas2025](@cite).
 
 # Algorithm
 
@@ -732,8 +723,8 @@ Two consequences of the form separate this intensity from the James-Stein one.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.4.1.2, Equation 3.44.
   - $(ref_dict[:jorion1986])
+  - $(ref_dict[:cajas2025]) Section 3.4.1.2, Equation 3.44. $(ref_dict[:no_original_source])
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BayesStein}, X::MatNum;
                          dims::Int = 1, kwargs...)
@@ -797,7 +788,9 @@ Three consequences of the form separate this algorithm from the other two.
   - ``uv - w^2`` is a Cauchy-Schwarz gap in the inner product ``\\langle \\boldsymbol{x}, \\boldsymbol{y} \\rangle = \\boldsymbol{x}^\\intercal \\hat{\\mathbf{\\Sigma}}^{-1} \\boldsymbol{y}``, so it vanishes exactly when the target is a multiple of the sample mean. At ``N = 1`` every vector is such a multiple, so a one-asset sample raises a `DomainError` under all three targets.
   - ``\\beta \\boldsymbol{b}`` is the projection of ``(1-\\alpha) \\hat{\\boldsymbol{\\mu}}`` onto the line through ``\\boldsymbol{b}`` in the same inner product, so it reads the direction of the target and not its scale. Every target of this file is a multiple of the vector of ones, ``\\boldsymbol{b} = c \\boldsymbol{1}``, so ``v`` and ``w`` scale with ``c^2`` and ``c``. The factor cancels in ``\\alpha`` and in ``\\beta \\boldsymbol{b}``, and the three targets return the same estimate on one sample.
 
-The coefficient ``\\beta`` is equation 7 of [bodnar2019](@cite), which divides by the quadratic form ``v`` of the target. Equation 3.45 of [cajas2025](@cite) divides by ``u`` instead. That quotient does not minimise the quadratic loss from which [bodnar2019](@cite) derives both coefficients, so this method follows [bodnar2019](@cite).
+The coefficient ``\\alpha`` is Equation 6 of [bodnar2019](@cite) and the coefficient ``\\beta`` is Equation 7, which divides by the quadratic form ``v`` of the target. Equation 3.45 of [cajas2025](@cite) divides by ``u`` instead. That quotient does not minimise the quadratic loss from which [bodnar2019](@cite) derives both coefficients, so this method follows [bodnar2019](@cite).
+
+Three choices of this library differ from Section 3 of [bodnar2019](@cite). That section builds the coefficients from the sample covariance matrix that divides by the number of observations, and this method uses the matrix that `me.ce` returns, which divides by ``T - 1`` under the default estimator. That section takes a target that does not depend on the sample, and the three targets of this file are read off the same sample. It also gives a suboptimal rule that uses a generalised inverse for ``N / T > 1``, and this method does not implement it.
 
 # Algorithm
 
@@ -825,8 +818,8 @@ The coefficient ``\\beta`` is equation 7 of [bodnar2019](@cite), which divides b
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.4.1.3.
-  - $(ref_dict[:bodnar2019])
+  - $(ref_dict[:bodnar2019]) Section 3, Theorem 3, Equations 6 and 7.
+  - $(ref_dict[:cajas2025]) Equation 3.45.
 """
 function Statistics.mean(me::ShrunkExpectedReturns{<:Any, <:Any, <:BodnarOkhrinParolya},
                          X::MatNum; dims::Int = 1, kwargs...)

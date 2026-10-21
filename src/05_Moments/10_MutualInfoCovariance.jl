@@ -7,6 +7,8 @@ The mutual information matrix is optionally normalised by the smaller of the two
 
 Mutual information is non-negative, so every entry of the matrix is non-negative and no pair is ever reported as opposed. A negative linear relationship reads as a strong one, not as a negative one. When `normalise` is `false` the correlation matrix is unbounded above and its diagonal carries the marginal entropy in nats rather than one, so it is a codependence matrix rather than a correlation matrix in the usual sense.
 
+Section 12 of [shannon1948](@cite) defines the rate of transmission ``R = H(x) + H(y) - H(x,\\,y)``, which is the mutual information, with the entropies of Section 6. The estimate here replaces those entropies with histogram plug-in values. The division by the smaller marginal entropy is Equation 6.19 of [cajas2025](@cite). Section 3 of [meila2007](@cite) proves ``I \\leq \\min(H(C),\\, H(C'))`` for clusterings (Equation 18), which is the bound that makes the quotient lie in ``[0,\\, 1]``. No work that first states this normalisation was found.
+
 # Mathematical definition
 
 ```math
@@ -82,8 +84,9 @@ MutualInfoCovariance
 
 # References
 
-  - $(ref_dict[:shannon1948])
-  - $(ref_dict[:cajas2025]) Section 6.1.6, equations 6.18 and 6.19.
+  - $(ref_dict[:shannon1948]) Section 12.
+  - $(ref_dict[:meila2007]) Section 3, Equation 18.
+  - $(ref_dict[:cajas2025]) Section 6.1.6, Equation 6.19. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct MutualInfoCovariance <: AbstractCovarianceEstimator
     """

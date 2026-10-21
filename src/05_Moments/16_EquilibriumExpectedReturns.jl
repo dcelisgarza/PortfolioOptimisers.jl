@@ -5,7 +5,9 @@ Computes the expected excess returns that a set of equilibrium weights implies, 
 
 It holds a covariance estimator, the equilibrium weights and the risk aversion parameter. The Black-Litterman members use the same expression to build their prior mean.
 
-`l` is the risk aversion of the representative investor. It is the ``\\lambda`` of the equation below, which Black and Litterman write ``\\delta``. It is a caller-supplied number and it is not estimated from the data. A larger `l` scales every equilibrium return up, and a `l` of zero gives a zero mean.
+The equilibrium risk premium vector ``\\mathbf{\\Pi} = \\delta \\mathbf{\\Sigma} \\mathbf{W}`` is step 6 of the Appendix of [black1991](@cite), with the market weights ``\\mathbf{W}``. Equations 5.1 and 5.2 of [cajas2025](@cite) derive it by setting the gradient of the quadratic utility ``\\boldsymbol{x}^\\intercal \\boldsymbol{\\Pi} - \\frac{\\delta}{2} \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}`` to zero. Reverse optimisation of this kind may predate [black1991](@cite), and no copy of an earlier work was found.
+
+`l` is the risk aversion of the representative investor. It is the ``\\lambda`` of the equation below, which [black1991](@cite) writes ``\\delta``. There ``\\delta`` is a proportionality constant that the work takes from an earlier one. This library takes `l` from the caller. It is a caller-supplied number and it is not estimated from the data. A larger `l` scales every equilibrium return up, and a `l` of zero gives a zero mean.
 
 `w` is the weight vector the market is assumed to hold, which is a market-capitalisation vector or a benchmark vector. It is caller-supplied for the same reason: the data hold returns, not holdings. If `w` is `nothing`, the equal-weight vector of the right length is used, and the length is read from the covariance matrix rather than from `X`.
 
@@ -77,8 +79,8 @@ EquilibriumExpectedReturns
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 5.1.1, Equation 5.2.
-  - $(ref_dict[:black1992])
+  - $(ref_dict[:black1991]) Appendix, step 6. $(ref_dict[:no_original_source])
+  - $(ref_dict[:cajas2025]) Section 5.1.1, Equations 5.1 and 5.2.
 """
 @propagatable @concrete struct EquilibriumExpectedReturns <:
                                AbstractShrunkExpectedReturnsEstimator

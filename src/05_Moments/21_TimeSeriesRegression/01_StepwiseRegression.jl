@@ -37,7 +37,7 @@ PValue
 
 # References
 
-  - $(ref_dict[:efroymson1960])
+  - $(ref_dict[:efroymson1960]) Pages 191-203. $(ref_dict[:no_original_source])
 """
 @concrete struct PValue <: AbstractStepwiseRegressionCriterion
     """
@@ -68,7 +68,7 @@ At each step the algorithm fits one model per excluded factor, keeps the best of
 
 # References
 
-  - $(ref_dict[:efroymson1960])
+  - $(ref_dict[:efroymson1960]) Pages 191-203. $(ref_dict[:no_original_source])
 """
 struct ForwardSelection <: AbstractStepwiseRegressionAlgorithm end
 """
@@ -86,7 +86,7 @@ At each step the algorithm fits one model per included factor, each with that fa
 
 # References
 
-  - $(ref_dict[:efroymson1960])
+  - $(ref_dict[:efroymson1960]) Pages 191-203. $(ref_dict[:no_original_source])
 """
 struct BackwardElimination <: AbstractStepwiseRegressionAlgorithm end
 """
@@ -165,8 +165,7 @@ StepwiseRegression
 
 # References
 
-  - $(ref_dict[:efroymson1960])
-  - $(ref_dict[:hocking1976])
+  - $(ref_dict[:efroymson1960]) Pages 191-203. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct StepwiseRegression <: AbstractTimeSeriesRegressionEstimator
     """
@@ -781,7 +780,7 @@ Each asset takes its own search, so the searches see one another only through th
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
+  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3. $(ref_dict[:no_original_source])
 """
 function regression(re::StepwiseRegression, X::MatNum, F::MatNum)
     assert_finite_factor_rows(F)

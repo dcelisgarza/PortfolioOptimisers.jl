@@ -155,7 +155,7 @@ Knuth
 
 # References
 
-  - $(ref_dict[:knuth2019])
+  - $(ref_dict[:knuth2019]) Section 2.3, Equations 31 and 32.
 """
 @concrete struct Knuth <: BinWidthBins
     """
@@ -201,7 +201,7 @@ FreedmanDiaconis()
 
 # References
 
-  - $(ref_dict[:freedman1981])
+  - $(ref_dict[:freedman1981]) Section 1, Rule 1.8.
 """
 struct FreedmanDiaconis <: BinWidthBins end
 """
@@ -268,6 +268,8 @@ Where:
   - ``\\rho``: Pearson correlation between the two series.
   - ``[\\cdot]``: Rounding to the nearest integer.
 
+Section 3.9 of [mlp1](@cite) states both closed forms, credits [hacinegharbi2012](@cite) for the univariate one and [hacinegharbi2018](@cite) for the bi-histogram one, and gives the same code as this method (Snippet 3.3). No copy of either credited work was found, so the formulas follow the book. The guard at ``\\rho^2 = 1`` is the library's: Snippet 3.3 of the book applies the bi-histogram form at every correlation.
+
 # Constructors
 
     HacineGharbiRavier() -> HacineGharbiRavier
@@ -292,7 +294,7 @@ HacineGharbiRavier()
 
   - $(ref_dict[:hacinegharbi2012])
   - $(ref_dict[:hacinegharbi2018])
-  - $(ref_dict[:mlp1]) Chapter 3.
+  - $(ref_dict[:mlp1]) Section 3.9, Snippet 3.3. $(ref_dict[:no_original_source])
 """
 struct HacineGharbiRavier <: AbstractBins end
 """
@@ -314,6 +316,8 @@ Where:
   - ``\\sigma_x``: Uncorrected standard deviation of the data.
   - ``n``: Number of observations.
 
+Theorem 1.6 of [freedman1981](@cite) gives the width that minimises the integrated squared error of a histogram as ``(6 / \\gamma)^{1/3} n^{-1/3}``, with ``\\gamma = \\int f'(x)^{2}\\,\\mathrm{d}x``. A normal density has ``\\gamma = 1 / (4\\sqrt{\\pi}\\,\\sigma^{3})``, which gives the formula above and the constant ``(24\\sqrt{\\pi})^{1/3} \\approx 3.4908``. Section 1 of that work names [scott1979](@cite) as a formal computation of the same result. No copy of [scott1979](@cite) was found, so the constant is checked against this theorem and not against that work.
+
 # Arguments
 
   - `x`: Data vector.
@@ -331,6 +335,7 @@ Where:
 # References
 
   - $(ref_dict[:scott1979])
+  - $(ref_dict[:freedman1981]) Section 1, Theorem 1.6.
 """
 function bin_width(::Scott, x::VecNum)
     return Statistics.std(x; corrected = false) * cbrt(24 * sqrt(pi) / length(x))
@@ -372,7 +377,7 @@ A zero interquartile range gives a zero width, and so an infinite bin count. Dat
 
 # References
 
-  - $(ref_dict[:freedman1981])
+  - $(ref_dict[:freedman1981]) Section 1, Rule 1.8.
 """
 function bin_width(::FreedmanDiaconis, x::VecNum)
     q25, q75 = Statistics.quantile(x, [0.25, 0.75])
@@ -435,7 +440,7 @@ The maximiser is an integer, so no closed form gives it. The method searches for
 
 # References
 
-  - $(ref_dict[:knuth2019])
+  - $(ref_dict[:knuth2019]) Section 2.3, Equations 31 and 32.
 """
 function bin_width(bins::Knuth, x::VecNum)
     n = length(x)
@@ -638,6 +643,8 @@ Where:
   - ``n = \\sum_{i,j} X_{ij}``: Total count.
   - ``p_i = \\sum_j X_{ij} / n``, ``p_j = \\sum_i X_{ij} / n``: Marginal probabilities.
 
+The sum equals ``H(X) + H(Y) - H(X, Y)``, the third form of the rate of transmission in Section 12 of [shannon1948](@cite), with the entropies of Section 6 evaluated on the histogram frequencies. This is a plug-in estimate, and the library applies no bias correction.
+
 A bin the pair never visits contributes nothing, because ``p \\log p`` tends to zero as ``p`` does. The sum therefore runs over the non-empty bins alone. When either axis has a single bin the two variables are indistinguishable under the binning, and the estimate is zero.
 
 # Algorithm
@@ -667,7 +674,7 @@ A bin the pair never visits contributes nothing, because ``p \\log p`` tends to 
 
 # References
 
-  - $(ref_dict[:shannon1948])
+  - $(ref_dict[:shannon1948]) Section 6 and Section 12.
 """
 function intrinsic_mutual_info(X::MatNum)
     p_i = vec(sum(X; dims = 2))
@@ -729,7 +736,7 @@ Where:
   - ``\\widetilde{\\mathrm{VI}}(X, Y)``: Normalised variation of information.
   - ``H(X,Y) = H(X) + H(Y) - I(X;Y)``: Joint entropy.
 
-The divisor is the joint entropy, which keeps the normalised form a metric on ``[0, 1]``. Equation 6.25 of the source divides by ``\\max(H(X), H(Y))`` instead, which is bounded by the same interval but is not a metric.
+Equation 19 of Section 3 of [meila2007](@cite) states the unnormalised form and proves that it is a metric. The divisor of the normalised form is the joint entropy, and Equation 1 of [rajski1961](@cite) states that quotient as a distance on discrete distributions. Equation 6.25 of [cajas2025](@cite) is ``1 - I(X;Y) / \\max(H(X), H(Y))`` instead. It lies in the same interval and is also a metric, which is the second metric of Theorem 2 of [kraskov2005](@cite), and this function does not compute it.
 
 # Algorithm
 
@@ -763,8 +770,11 @@ The divisor is the joint entropy, which keeps the normalised form a metric on ``
 
 # References
 
-  - $(ref_dict[:shannon1948])
-  - $(ref_dict[:cajas2025]) Section 6.2.2, equation 6.24.
+  - $(ref_dict[:meila2007]) Section 3, Equation 19.
+  - $(ref_dict[:rajski1961]) Theorem, Equation 1.
+  - $(ref_dict[:kraskov2005]) Section 2.3, Theorem 2.
+  - $(ref_dict[:shannon1948]) Section 6 and Section 12.
+  - $(ref_dict[:cajas2025]) Section 6.2.2, Equations 6.24 and 6.25.
 """
 function variation_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                         normalise::Bool = true)
@@ -833,6 +843,8 @@ Where:
   - ``\\tilde{I}(X_i; X_j)``: Normalised mutual information.
   - ``\\widetilde{\\mathrm{VI}}(X_i, X_j)``: Normalised variation of information.
 
+The two unnormalised forms are the rate of transmission of Section 12 of [shannon1948](@cite) and Equation 19 of [meila2007](@cite). The quotient by the joint entropy is Equation 1 of [rajski1961](@cite). The quotient of the mutual information by the smaller marginal entropy is Equation 6.19 of [cajas2025](@cite), and no work that first states it was found.
+
 # Algorithm
 
  1. Read the shape of `X` into `T`, the number of observations, and `N`, the number of variables.
@@ -867,8 +879,10 @@ Where:
 
 # References
 
-  - $(ref_dict[:shannon1948])
-  - $(ref_dict[:cajas2025]) Sections 6.1.6 and 6.2.2, equations 6.18, 6.19 and 6.24.
+  - $(ref_dict[:shannon1948]) Section 6 and Section 12.
+  - $(ref_dict[:meila2007]) Section 3, Equations 18 and 19.
+  - $(ref_dict[:rajski1961]) Theorem, Equation 1.
+  - $(ref_dict[:cajas2025]) Section 6.1.6, Equation 6.19. $(ref_dict[:no_original_source])
 """
 function mutual_variation_info(X::MatNum, bins::Int_Bin = Knuth(), normalise::Bool = true)
     T, N = size(X)
@@ -949,7 +963,7 @@ Where:
 
   - ``\\tilde{I}(X_i; X_j)``: Normalised mutual information.
 
-The smaller marginal entropy is the largest value the mutual information of the pair can take, so the normalised form is bounded by ``[0, 1]`` and reaches one exactly when one variable determines the other.
+The smaller marginal entropy is the largest value the mutual information of the pair can take (Equation 18 of [meila2007](@cite)), so the normalised form is bounded by ``[0, 1]`` and reaches one exactly when one variable determines the other. Equation 6.19 of [cajas2025](@cite) states this quotient, and no work that first states it was found.
 
 # Algorithm
 
@@ -983,8 +997,9 @@ The smaller marginal entropy is the largest value the mutual information of the 
 
 # References
 
-  - $(ref_dict[:shannon1948])
-  - $(ref_dict[:cajas2025]) Section 6.1.6, equations 6.18 and 6.19.
+  - $(ref_dict[:shannon1948]) Section 6 and Section 12.
+  - $(ref_dict[:meila2007]) Section 3, Equation 18.
+  - $(ref_dict[:cajas2025]) Section 6.1.6, Equation 6.19. $(ref_dict[:no_original_source])
 """
 function mutual_info(X::MatNum, bins::Int_Bin = HacineGharbiRavier(),
                      normalise::Bool = true)

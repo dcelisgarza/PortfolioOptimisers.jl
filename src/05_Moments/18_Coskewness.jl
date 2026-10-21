@@ -5,6 +5,8 @@ Abstract supertype for all coskewness estimators.
 
 All concrete and/or abstract types implementing coskewness estimation algorithms should be subtypes of `CoskewnessEstimator`.
 
+The tensor is the ``N \\times N^{2}`` matrix of third comoments that Section 2.3 of [jondeau2004](@cite) defines, and `V` is the negative spectral skewness matrix that Section 2 of [nskew](@cite) defines.
+
 # Interfaces
 
 In order to implement a new coskewness estimator which will work seamlessly with the library, subtype `CoskewnessEstimator` with all necessary parameters---including observation weights---as part of the struct, and implement the following methods:
@@ -120,8 +122,8 @@ MyCoskewnessEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.6.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:jondeau2004]) Section 2.3.
+  - $(ref_dict[:nskew]) Section 2.
 """
 abstract type CoskewnessEstimator <: AbstractEstimator end
 """
@@ -130,6 +132,8 @@ $(DocStringExtensions.TYPEDEF)
 Estimates the coskewness tensor of a returns matrix, together with its negative spectral skewness matrix.
 
 `Coskewness` composes a mean estimator, a matrix processing estimator and a moment algorithm. [`coskewness`](@ref) returns both matrices as a pair: the `assets × assets²` tensor first, and the `assets × assets` matrix that [`negative_spectral_coskewness`](@ref) reduces it to second. The second is not a processed copy of the first.
+
+The tensor is the one of Section 2.3 of [jondeau2004](@cite), computed with the matrix formula of Appendix A of [pkurt](@cite). The matrix is the negative spectral skewness matrix of Section 2 of [nskew](@cite). The observation weights and the matrix processing of `mp` are this library's additions.
 
 # Fields
 
@@ -208,9 +212,9 @@ Coskewness
 
 # References
 
-  - $(ref_dict[:cajas2025]) Sections 3.1.4 and 7.2.5.1, Equations 3.6, 7.104 and 7.105.
-  - $(ref_dict[:pkurt])
-  - $(ref_dict[:nskew])
+  - $(ref_dict[:jondeau2004]) Section 2.3.
+  - $(ref_dict[:pkurt]) Appendix A.
+  - $(ref_dict[:nskew]) Section 2.
 """
 @propagatable @concrete struct Coskewness <: CoskewnessEstimator
     """
@@ -352,6 +356,8 @@ Where:
 
 The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of the assets ``a``, ``i`` and ``j``. That comoment does not depend on the order of its three assets, which is why the block is symmetric.
 
+Section 2 of [nskew](@cite) splits each block as ``\\mathbf{S}_{i} = \\mathbf{S}_{i}^{+} + \\mathbf{S}_{i}^{-}`` and writes the negative quadratic skewness as ``\\boldsymbol{x}^\\intercal \\mathbf{V}^{-} \\boldsymbol{x}`` with ``\\mathbf{V}^{-} = -\\sum_{i} \\mathbf{S}_{i}^{-}``. That is the ``\\mathbf{V}`` above. The work reaches it by replacing each weight ``x_i`` of the skewness with ``1/N``. The matrix processing of the last step is this library's addition.
+
 # Algorithm
 
  1. Read `N` from the row count of `cskew`, and take the block `blk` as `isfinite.(cskew[i, (i - 1) * N + i])` over `i`.
@@ -393,8 +399,7 @@ The entry ``\\mathbf{S}_{i,\\,aj}`` is the third comoment of the deviations of t
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.5.1, Equations 7.104 and 7.105.
-  - $(ref_dict[:nskew])
+  - $(ref_dict[:nskew]) Section 2.
 """
 function negative_spectral_coskewness(cskew::MatNum, X::MatNum,
                                       mp::Option{<:AbstractMatrixProcessingEstimator})
@@ -470,6 +475,8 @@ Where:
   - ``\\otimes``: Kronecker product.
   - ``\\odot``: Element-wise product. Where the operands differ in shape, it broadcasts along the row axis.
 
+The unweighted tensor is the matrix formula for ``\\mathbf{M}_3`` in Appendix A of [pkurt](@cite), and its entries are the third comoments of Section 2.3 of [jondeau2004](@cite). The weighted form is this library's own.
+
 # Algorithm
 
  1. Build `o`, the ``1 \\times N`` row of ones.
@@ -499,8 +506,8 @@ Where:
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 3.1.4, Equation 3.6.
-  - $(ref_dict[:pkurt])
+  - $(ref_dict[:jondeau2004]) Section 2.3.
+  - $(ref_dict[:pkurt]) Appendix A.
 """
 function _coskewness(Y::MatNum, X::MatNum, mp::AbstractMatrixProcessingEstimator, args...)
     o = transpose(range(one(eltype(Y)), one(eltype(Y)); length = size(Y, 2)))

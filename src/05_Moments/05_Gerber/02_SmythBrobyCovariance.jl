@@ -14,7 +14,7 @@ All concrete and/or abstract types implementing Smyth-Broby covariance estimatio
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2.
 """
 abstract type BaseSmythBrobyCovariance <: BaseGerberCovariance end
 """
@@ -39,7 +39,7 @@ These types are used to specify the algorithm when constructing a [`SmythBrobyCo
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equation 5.
 """
 abstract type SmythBrobyCovarianceAlgorithm <: AbstractMomentAlgorithm end
 """
@@ -91,7 +91,7 @@ SmythBroby0()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equation 5.
 """
 struct SmythBroby0 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -114,7 +114,7 @@ Where:
   - $(math_dict[:possum_sb])
   - $(math_dict[:rho_ij])
 
-**This is the statistic the source defines**, and it is the only one the source defines. The neutral sum keeps the matrix positive semidefinite, which is the purpose the Gerber neutral count already served.
+**This is the statistic the source defines**, and it is the only one the source defines. It is Equation 5 of [smyth2022enhanced](@cite): the contributions of the concordant, discordant and neutral co-movements of the lookback window, with the discordant sum subtracted in the numerator. The neutral zone is the four regions DN, NU, UN and ND of Section 2, the observations on which exactly one asset left the indecision zone. The neutral sum keeps the matrix positive semidefinite, which is the purpose the Gerber neutral count already served.
 
 # Algorithm
 
@@ -143,7 +143,7 @@ SmythBroby1()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equation 5.
 """
 struct SmythBroby1 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -197,7 +197,7 @@ SmythBroby2()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equations 1 to 4.
 """
 struct SmythBroby2 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -221,7 +221,7 @@ Where:
   - $(math_dict[:poscount_sb])
   - $(math_dict[:rho_ij])
 
-The weighting reintroduces the Gerber vote count that [`SmythBroby0`](@ref) discards, so a pair that co-moves often scores above one that co-moves rarely but sharply. The source's conclusion suggests keeping a count beside the sum in one sentence and states no formula for it, so the product above is the library's reading of that sentence. The neutral term is dropped here, as in [`SmythBroby0`](@ref).
+The weighting reintroduces the Gerber vote count that [`SmythBroby0`](@ref) discards, so a pair that co-moves often scores above one that co-moves rarely but sharply. Section 5 of [smyth2022enhanced](@cite) suggests keeping a count in parallel with the sum, and scaling the total contribution to match the total count so that the split between concordant, discordant and neutral contributions is preserved. It states no formula. One factor that rescales all three sums leaves the ratio of Equation 5 unchanged, so weighting each sum by its own count, as above, is the library's reading and does not follow from that sentence. The neutral term is dropped here, as in [`SmythBroby0`](@ref).
 
 # Algorithm
 
@@ -250,7 +250,7 @@ SmythBrobyGerber0()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equations 4 and 5, and Section 5.
 """
 struct SmythBrobyGerber0 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -303,7 +303,7 @@ SmythBrobyGerber1()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equations 4 and 5, and Section 5.
 """
 struct SmythBrobyGerber1 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -358,7 +358,7 @@ SmythBrobyGerber2()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equations 4 and 5, and Section 5.
 """
 struct SmythBrobyGerber2 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -410,7 +410,7 @@ SmythBrobyCount0()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2.
 """
 struct SmythBrobyCount0 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -462,7 +462,7 @@ SmythBrobyCount1()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2.
 """
 struct SmythBrobyCount1 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -516,7 +516,7 @@ SmythBrobyCount2()
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2.
 """
 struct SmythBrobyCount2 <: SmythBrobyCovarianceAlgorithm end
 """
@@ -622,7 +622,7 @@ SmythBrobyCovariance
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equations 1 to 5, and Section 3.
 """
 @propagatable @concrete struct SmythBrobyCovariance <: BaseSmythBrobyCovariance
     """
@@ -743,6 +743,8 @@ Where:
 
 ``\\kappa`` rewards magnitude and ``\\gamma^{n}`` penalises a pair whose two magnitudes disagree, so the contribution is largest when both assets move far and move by the same amount. ``\\gamma`` is the absolute difference of the two **magnitudes**, not of the two signed returns; the sign has already been read by the caller, which is what put the observation in the concordant or the discordant set.
 
+Equations 1 to 3 of [smyth2022enhanced](@cite) define the contribution for a general severity ``n``, and Equation 4 writes it out for ``n = 2``, the value that Section 2 of the source adopts without tuning. The formula above agrees with a direct evaluation of Equation 1 to machine precision, and the default `n = 2` is the source's.
+
 # Algorithm
 
  1. Multiply the two gross magnitudes `1 + ri` and `1 + rj` and take the square root, giving the amplitude `kappa`.
@@ -769,7 +771,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equations 1 to 4.
 """
 function sb_delta(ri::Number, rj::Number, n::Number)
     kappa = sqrt((one(ri) + ri) * (one(rj) + rj))
@@ -1020,6 +1022,8 @@ Co-movement policy for [`gerber_comovement!`](@ref) implementing the Smyth-Broby
 
 The confusion zone thresholds the raw, uncentred return by `c1 * sigma`. Observations that pass it are centred and standardised per asset, restricted to the significance zone by `c2` through [`sb_crossed`](@ref) and by `c3`, and classified by the sign of the product of the standardised returns. The `alg` marker selects the accumulation family ([`sb_add_pos`](@ref)) and the denominator policy ([`comovement_ratio`](@ref)). This type is configuration handed to [`gerber_comovement!`](@ref); it holds no result and it is never mutated.
 
+The three zones are those of Section 2 of [smyth2022enhanced](@cite): the confusion zone of half-width ``c_1`` standard deviations, the indecision zone of half-width ``c_2``, and the outer cut-off at ``c_3``, which the source sets to 4. Section 3 of the source uses ``c_1 = c_2 = 0.5``, and those are the defaults. The source keeps a magnitude strictly below the cut-off. The library rejects only a magnitude above `c3`, so a magnitude equal to it stays.
+
 # Fields
 
   - $(arg_dict[:sbalg])
@@ -1041,7 +1045,7 @@ The confusion zone thresholds the raw, uncentred return by `c1 * sigma`. Observa
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2 and Section 3.
 """
 @concrete struct SmythBrobyKernel
     alg
@@ -1554,7 +1558,7 @@ Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides 
 
 # References
 
-  - $(ref_dict[:smyth2022enhanced])
+  - $(ref_dict[:smyth2022enhanced]) Section 2, Equation 5.
 """
 function smythbroby(ce::SmythBrobyCovariance, X::MatNum, mu::ArrNum, sd::ArrNum)
     N = size(X, 2)

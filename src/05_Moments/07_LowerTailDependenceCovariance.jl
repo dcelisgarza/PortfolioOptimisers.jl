@@ -5,6 +5,8 @@ Measures co-movement in the lower tail: the share of an asset's worst returns th
 
 The statistic is the empirical lower tail dependence coefficient at level `alpha`. It captures the dependence that matters for joint drawdowns and for stress scenarios, which a full-sample correlation averages away.
 
+The coefficient is the limit ``\\lambda_L = \\lim_{v \\to 0^{+}} \\Pr[U_1 \\leq v \\mid U_2 \\leq v]`` of the conditional probability that one series is in its lower tail given the other is. Section 2 and Equation 1 of [luca2011](@cite) state it, and in terms of the copula ``C`` as ``\\lim_{v \\to 0^{+}} C(v,\\, v) / v``. In the dependence function ``\\Omega`` of Definition 1 of [sibuya1960](@cite), ``\\Pr(X < x,\\, Y < y) = \\Omega(G, H)\\,G\\,H``, so ``\\lambda_L`` is the limit of ``v\\,\\Omega(v,\\, v)``. That work does not name the coefficient, and it does not state an estimator of it. The estimator the library computes is the count of joint exceedances over ``k = \\lceil T \\alpha \\rceil``, which is the rank form of the empirical lower tail copula at ``(1,\\, 1)`` in Equations 12 and 16 of Section 4 of [schmidt2006](@cite). [luca2011](@cite) estimates the coefficient from a fitted Archimedean copula instead, so it does not state this estimator. `alpha` sets the tail fraction ``k / T`` and so is the library's name for the threshold of that estimator.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -64,9 +66,9 @@ LowerTailDependenceCovariance
 
 # References
 
-  - $(ref_dict[:sibuya1960])
-  - $(ref_dict[:luca2011])
-  - $(ref_dict[:cajas2025]) Section 6.1.7, equation 6.20.
+  - $(ref_dict[:sibuya1960]) Section 1, Definition 1, Equations 1.3 and 1.4.
+  - $(ref_dict[:luca2011]) Section 2, Equation 1.
+  - $(ref_dict[:schmidt2006]) Section 4, Equations 12 and 16.
 """
 @propagatable @concrete struct LowerTailDependenceCovariance <: AbstractCovarianceEstimator
     """

@@ -5,6 +5,8 @@ Measures linear and non-linear codependence from doubly-centred pairwise distanc
 
 The statistic is the distance covariance, which is zero if and only if the two series are independent. `metric`, `args` and `kwargs` configure the pairwise distance; `w` weights the observations and `ex` selects the parallel execution strategy.
 
+Section 2.2 of [szekely2007](@cite) defines the sample statistics: the doubly centred distance matrices (Definition 4), the squared distance covariance as their mean element-wise product with divisor ``n^{2}``, a V-statistic (Equation 2.8), and the distance correlation as the square root of ``\\mathcal{V}_n^2(X, Y) / \\sqrt{\\mathcal{V}_n^2(X)\\,\\mathcal{V}_n^2(Y)}`` (Definition 5, Equations 2.9 and 2.10). Without weights the library computes these values. The observation weights `w` and the choice of `metric` are the library's extension.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -66,8 +68,7 @@ DistanceCovariance
 
 # References
 
-  - $(ref_dict[:szekely2007])
-  - $(ref_dict[:cajas2025]) Section 6.1.5, equations 6.9 to 6.13.
+  - $(ref_dict[:szekely2007]) Section 2.2, Definitions 4 and 5, Equations 2.8 to 2.10.
 """
 @propagatable @concrete struct DistanceCovariance <: AbstractCovarianceEstimator
     """

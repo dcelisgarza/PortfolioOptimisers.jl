@@ -402,7 +402,7 @@ All concrete and/or abstract types implementing stepwise regression algorithms s
 
 # References
 
-  - $(ref_dict[:efroymson1960])
+  - $(ref_dict[:efroymson1960]) Pages 191-203. $(ref_dict[:no_original_source])
 """
 abstract type AbstractStepwiseRegressionAlgorithm <: AbstractRegressionAlgorithm end
 """
@@ -418,10 +418,6 @@ All concrete and/or abstract types representing criteria for stepwise regression
   - [`AbstractRegressionTarget`](@ref)
   - [`MinMaxValStepwiseRegressionCriterion`](@ref)
   - [`PValue`](@ref)
-
-# References
-
-  - $(ref_dict[:hocking1976])
 """
 abstract type AbstractStepwiseRegressionCriterion <: AbstractRegressionAlgorithm end
 """
@@ -819,10 +815,10 @@ Three consequences follow for the Normal family, which is the default of [`Gener
 
 # References
 
-  - $(ref_dict[:mcfadden1974])
-  - $(ref_dict[:coxsnell1989])
-  - $(ref_dict[:nagelkerke1991])
-  - $(ref_dict[:nelder1972])
+  - $(ref_dict[:mcfadden1974]) Equation 30, page 121.
+  - $(ref_dict[:coxsnell1989]) Pages 208-209. $(ref_dict[:no_original_source])
+  - $(ref_dict[:nagelkerke1991]) Pages 691-692. $(ref_dict[:no_original_source])
+  - $(ref_dict[:nelder1972]) Pages 370-384. $(ref_dict[:no_original_source])
 """
 const PSEUDO_R2_VARIANTS = (:McFadden, :CoxSnell, :Nagelkerke, :devianceratio)
 """
@@ -834,7 +830,7 @@ The members are `:McFadden` and `:devianceratio`, a strict subset of [`PSEUDO_R2
 
 # Mathematical definition
 
-Each member discounts its unadjusted form of [`PSEUDO_R2_VARIANTS`](@ref) by the parameters the model consumes.
+Each member discounts its unadjusted form of [`PSEUDO_R2_VARIANTS`](@ref) by the parameters the model consumes. [mcfadden1974](@cite) states the unadjusted form alone, so the discount of each member is the convention of the `GLM` package and carries no original source here.
 
 ```math
 \\begin{align}
@@ -851,7 +847,7 @@ Where:
   - ``\\hat{L}_{0}``: Maximum likelihood of the intercept-only model of the same family.
   - ``D``: Deviance of the fitted model.
   - ``D_{0}``: Deviance of the intercept-only model of the same family.
-  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the dispersion.
+  - ``k``: Number of estimated parameters, which is `StatsAPI.dof` of the fitted model: the regression coefficients, the intercept, and the dispersion when the family estimates one. The normal family estimates it, and the binomial and Poisson families do not.
   - $(math_dict[:T])
 
 The ``k`` here is the one `:aic`, `:aicc` and `:bic` read, not the predictor count `:adjr2` reads on a fitted [`LinearModel`](@ref). See [`STEPWISE_REGRESSION_CRITERIA`](@ref), which states both.
@@ -865,8 +861,8 @@ The ``k`` here is the one `:aic`, `:aicc` and `:bic` read, not the predictor cou
 
 # References
 
-  - $(ref_dict[:mcfadden1974])
-  - $(ref_dict[:nelder1972])
+  - $(ref_dict[:mcfadden1974]) Equation 30, page 121.
+  - $(ref_dict[:nelder1972]) Pages 370-384. $(ref_dict[:no_original_source])
 """
 const ADJUSTED_PSEUDO_R2_VARIANTS = (:McFadden, :devianceratio)
 """
@@ -921,7 +917,7 @@ GeneralisedLinearModel
 
 # References
 
-  - $(ref_dict[:nelder1972])
+  - $(ref_dict[:nelder1972]) Pages 370-384. $(ref_dict[:no_original_source])
 """
 @concrete struct GeneralisedLinearModel <: AbstractRegressionTarget
     """
@@ -1180,7 +1176,7 @@ The correction term divides by ``T - k - 1``. The criterion is undefined when ``
 
 ## `:bic` — Bayesian Information Criterion
 
-The penalty is ``k \\ln T`` rather than ``2k``, which is heavier than the penalty of `:aic` for ``T \\geq 8``, so the search usually stops with fewer factors.
+The penalty is ``k \\ln T`` rather than ``2k``, which is heavier than the penalty of `:aic` for ``T \\geq 8``, so the search usually stops with fewer factors. [schwarz1978](@cite) maximises the log-likelihood less ``\\tfrac{1}{2} k \\ln T``. The form below is that score negated and doubled, so it ranks models the same way and a lower value is better.
 
 ```math
 \\begin{align}
@@ -1242,11 +1238,10 @@ Where:
 
 # References
 
-  - $(ref_dict[:akaike1974])
-  - $(ref_dict[:hurvich1989])
-  - $(ref_dict[:schwarz1978])
-  - $(ref_dict[:hocking1976])
-  - $(ref_dict[:theil1961])
+  - $(ref_dict[:akaike1974]) Section V, page 719.
+  - $(ref_dict[:hurvich1989]) Pages 297-307. $(ref_dict[:no_original_source])
+  - $(ref_dict[:schwarz1978]) Section 1, page 461, and the Proposition of Section 3, page 462.
+  - $(ref_dict[:theil1961]) Page 213. $(ref_dict[:no_original_source])
 """
 const STEPWISE_REGRESSION_CRITERIA = (MIN_VAL_STEPWISE_REGRESSION_CRITERIA...,
                                       MAX_VAL_STEPWISE_REGRESSION_CRITERIA...)
@@ -1538,7 +1533,7 @@ Regression
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3.
+  - $(ref_dict[:cajas2025]) Section 4.1, Equations 4.2-4.3. $(ref_dict[:no_original_source])
 """
 @concrete struct Regression <: AbstractLoadingsRegressionResult
     """

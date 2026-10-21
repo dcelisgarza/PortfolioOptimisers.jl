@@ -656,7 +656,7 @@ CompositeTrend
 
 # References
 
-  - $(ref_dict[:lai2018aictr]) Equations (9) to (12) and (15).
+  - $(ref_dict[:lai2018aictr]) Equations (5) to (7) and (9) to (12), and (15).
 """
 @concrete struct CompositeTrend <: AbstractPriceLevelStatistic
     """
@@ -724,7 +724,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Reads the elastic-net regularisation path at its middle point, which gives the regression of the initial state of [`KernelTrendPattern`](@ref) on the levels of its window.
 
-The path is that of [friedman2010](@citet). The objective is Equation (15) of [lai2018ktpt](@cite), the elastic net of [zouhastie2005](@citet). [lai2018ktpt](@citet) take "the middle one in the regularization path" and state no grid. Section 2.5 of [friedman2010](@cite) runs the path over 100 strengths on a log scale, down to a floor of ``10^{-3}`` times the largest strength. Such a grid has no single middle point. The library takes the geometric middle of the path, which lies between the 50th and the 51st point of that grid. The model of [lai2018ktpt](@cite) has no intercept, so the regression fits none and does not standardise the columns. The glmnet package does both by default, and its objective is the one below divided by twice the number of observations, so it holds the same path. `theta = 0.99` is the value of [lai2018ktpt](@cite). It is almost the lasso, and it keeps the objective strictly convex.
+The path is that of [friedman2010](@citet). The objective is Equation (15) of [lai2018ktpt](@cite), the elastic net of [zouhastie2005](@citet). It is Equation (3) of [zouhastie2005](@cite) with ``\\lambda_1 = 2 \\vartheta \\gamma`` and ``\\lambda_2 = (1 - \\vartheta) \\gamma``, so ``\\vartheta`` is the mixing weight of Equation (2) of [friedman2010](@cite), not the ratio ``\\lambda_2 / (\\lambda_1 + \\lambda_2)`` of [zouhastie2005](@cite). Equation (10) of [friedman2010](@cite) is the coordinate update. [lai2018ktpt](@citet) take "the middle one in the regularization path" and state no grid. Section 2.5 of [friedman2010](@cite) runs the path over 100 strengths on a log scale, down to a floor of ``10^{-3}`` times the largest strength. Such a grid has no single middle point. The library takes the geometric middle of the path, which lies between the 50th and the 51st point of that grid. The model of [lai2018ktpt](@cite) has no intercept, so the regression fits none and does not standardise the columns. The glmnet package does both by default, and its objective is the one below divided by twice the number of observations, so it holds the same path. `theta = 0.99` is the value of [lai2018ktpt](@cite). It is almost the lasso, and it keeps the objective strictly convex.
 
 The columns are the levels of consecutive periods, so they are almost collinear, and the coordinate sweeps converge slowly. Each sweep therefore ends with an exact solve on the sign pattern that it leaves, see [`elastic_net_path`](@ref). The sweeps must still find the sign pattern of the optimum. On the 4 × 5 window of the test fixture they find it after between 2000 and 5000 sweeps, and a cap of 1000 stops more than 0.5 from the optimum in one coefficient. When the sweeps stop at `tol` or at `iters` before that, the result is the last sweep, which is not the optimum.
 
@@ -786,8 +786,8 @@ ElasticNetPath
 
 # References
 
-  - $(ref_dict[:friedman2010]) Section 2.5.
-  - $(ref_dict[:zouhastie2005])
+  - $(ref_dict[:friedman2010]) Section 2.5, Equations (1), (2) and (10).
+  - $(ref_dict[:zouhastie2005]) Equation (3).
   - $(ref_dict[:lai2018ktpt]) Equation (15).
 """
 @concrete struct ElasticNetPath <: AbstractAlgorithm

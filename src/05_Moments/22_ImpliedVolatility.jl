@@ -51,10 +51,6 @@ julia> cov(ImpliedVolatility(; alg = MyImpliedVolatilityAlgorithm(), ppy = 1),
   - [`ImpliedVolatilityPremium`](@ref)
   - [`ImpliedVolatility`](@ref)
   - [`predict_realised_vols`](@ref)
-
-# References
-
-  - $(ref_dict[:andersen2006])
 """
 abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
 """
@@ -62,7 +58,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Implied volatility algorithm that predicts realised volatility via regression on implied volatility.
 
-`ImpliedVolatilityRegression` fits a regression model relating implied and realised volatility over rolling windows, then uses the fitted model to predict the next period's realised volatility from the most recent implied volatility observation. The model, the steps that fit it and the number of windows it needs are stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
+`ImpliedVolatilityRegression` fits a regression model relating implied and realised volatility over rolling windows, then uses the fitted model to predict the next period's realised volatility from the most recent implied volatility observation. The regression is Equation 5 of [christensenprabhala1998](@cite), which regresses the realised volatility of a period on the implied volatility at its start and on the realised volatility of the period before, both as logarithms. The model, the steps that fit it and the number of windows it needs are stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
 
 # Fields
 
@@ -115,9 +111,7 @@ ImpliedVolatilityRegression
 
 # References
 
-  - $(ref_dict[:christensenprabhala1998])
-  - $(ref_dict[:christensenhansen2002])
-  - $(ref_dict[:andersen2006])
+  - $(ref_dict[:christensenprabhala1998]) Section 3.1, Equation 5.
 """
 @propagatable @concrete struct ImpliedVolatilityRegression <: ImpliedVolatilityAlgorithm
     """
@@ -153,6 +147,8 @@ $(DocStringExtensions.TYPEDEF)
 
 Implied volatility algorithm that divides the latest implied volatility by a volatility risk premium adjustment.
 
+The method follows [egbersswinkels2015](@cite). No copy of that work was found, so the division is not checked against it.
+
 The adjustment factor is not a field of this type. The caller passes it as the `ivpa` keyword of the `cov` and `cor` methods of [`ImpliedVolatility`](@ref), as a scalar or as one value per asset. The factor is mandatory: `ivpa = nothing` raises an `ArgumentError`. Every entry of it must be finite and strictly positive, and one that is not raises a `DomainError`, because a non-positive factor makes a negative volatility whose sign `StatsBase.cor2cov!` then hides. The closed form of the branch, and the rules it enforces, are stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
 
 # Constructors
@@ -175,7 +171,7 @@ ImpliedVolatilityPremium()
 
 # References
 
-  - $(ref_dict[:egbersswinkels2015])
+  - $(ref_dict[:egbersswinkels2015]) Pages 14 to 26. $(ref_dict[:no_original_source])
 """
 struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 """
@@ -262,10 +258,6 @@ ImpliedVolatility
   - [`AbstractMatrixProcessingEstimator`](@ref)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
-
-# References
-
-  - $(ref_dict[:andersen2006])
 """
 @propagatable @concrete struct ImpliedVolatility <: AbstractCovarianceEstimator
     """
@@ -539,7 +531,7 @@ end
 
 Predict realised volatilities by scaling the latest implied volatility row by the premium adjustment factor.
 
-The row read is the last row of `iv` itself, not the last row of a window, so this method needs no window size and no returns.
+The row read is the last row of `iv` itself, not the last row of a window, so this method needs no window size and no returns. The division follows [egbersswinkels2015](@cite). No copy of that work was found, so the formula is not checked against it.
 
 # Mathematical definition
 
@@ -592,7 +584,7 @@ julia> PortfolioOptimisers.predict_realised_vols(ImpliedVolatilityPremium(),
 
 # References
 
-  - $(ref_dict[:egbersswinkels2015])
+  - $(ref_dict[:egbersswinkels2015]) Pages 14 to 26. $(ref_dict[:no_original_source])
 """
 function predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,
                                ivpa::Num_VecNum)
@@ -637,6 +629,8 @@ Where:
 
 The fit takes ``C - 1`` rows, so ``C`` must exceed two for the model to have more rows than coefficients.
 
+This is Equation 5 of [christensenprabhala1998](@cite), which regresses the log realised volatility of period ``t`` on the log implied volatility at the start of ``t`` and the log realised volatility of period ``t - 1``. Section 2.2 of that work defines both as natural logarithms, and the realised volatility as the sample standard deviation of the returns of the period. Section 3.3 of that work forecasts one period ahead from the fitted equation and states no back-transformation. Taking the exponential of the fitted logarithm is this library's choice.
+
 # Algorithm
 
  1. Read `T` and `N` from `size(X)`, and set `chunk` to `div(T, alg.ws)`.
@@ -677,9 +671,7 @@ The implied volatilities are the **second** positional argument and the returns 
 
 # References
 
-  - $(ref_dict[:christensenprabhala1998])
-  - $(ref_dict[:christensenhansen2002])
-  - $(ref_dict[:andersen2006])
+  - $(ref_dict[:christensenprabhala1998]) Section 2.2, Equation 2, and Section 3.1, Equation 5.
 """
 function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::MatNum,
                                ::Any)
