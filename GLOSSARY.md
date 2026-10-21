@@ -236,6 +236,7 @@ Computes a per-asset mean-return vector. Variants:
 
 - **SimpleExpectedReturns**: sample mean, with optional observation weights.
 - **ShrunkExpectedReturns**: shrinks the sample mean toward a target. Targets: `GrandMean`, `VolatilityWeighted`, `MeanSquaredError`. Algorithms: `JamesStein`, `BayesStein`, `BodnarOkhrinParolya`. The target and the algorithm are independent choices, so the estimator has nine combinations. Under `BodnarOkhrinParolya` the three targets return the same estimate, because that algorithm reads only the direction of its target and all three point along the vector of ones.
+  `JamesStein` and `BayesStein` blend the sample mean and the target by an intensity, and their field `intensity` holds the rule that clamps it: `UnitIntervalIntensity` (the default, into `[0, 1]`, so the blend stays between the two), `NonNegativeIntensity` (at zero, so the sample mean replaces a negative intensity), or `UnclampedIntensity` (the raw formula). `SteinShrinkage` ignores the field and clips into `[0, 1]`.
 - **EquilibriumExpectedReturns**: implied (equilibrium) returns via reverse optimisation, Π = λ·Σ·w_eq. The Black-Litterman equilibrium anchor.
 - **ExcessExpectedReturns**: returns net of a reference/risk-free rate.
 - **MedianExpectedReturns**: (weighted) per-asset median.

@@ -225,7 +225,12 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         Fm = randn(StableRNG(1327), T, 2) ./ 100 .+ 0.0002
         rdf = ReturnsResult(; nx = nx, X = X, nf = ["F1", "F2"], F = Fm, ts = ts)
         rdfv = po.port_opt_view(rdf, 1:60, :)
-        fp = FactorPrior(; pe = pe)
+        # Two factors give a James-Stein intensity that is not positive, and the default
+        # clamp then returns the sample mean (#1784). Bayes-Stein shrinks two factors.
+        fp = FactorPrior(;
+                         pe = EmpiricalPrior(;
+                                             me = ShrunkExpectedReturns(;
+                                                                        alg = BayesStein())))
         fpr = prior(fp, rdfv)
         cf = fpr.rr.M * vec(mean(Fm[1:60, :]; dims = 1)) + fpr.rr.b
         @test po.forecast_location(fp, rdfv) ≈ cf

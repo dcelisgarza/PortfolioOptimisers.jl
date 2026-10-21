@@ -3084,8 +3084,8 @@ end
                 r = vec(mean(ShrunkExpectedReturns(; alg = BayesStein(; tgt = tgt)), X460))
                 @test all(min.(vm, b) .- sqrt(eps()) .<= r .<= max.(vm, b) .+ sqrt(eps()))
             end
-            # The other two are not convex on this sample, which is why the docstrings warn
-            # that nothing clamps them.
+            # The raw James-Stein intensity is convex on this sample, and the
+            # Bodnar-Okhrin-Parolya coefficient is not. Nothing clamps the second one.
             evals460 = eigvals(sigma460)
             b_gm = vec(collect(PortfolioOptimisers.target_mean(GrandMean(), mu460,
                                                                sigma460)))
@@ -3148,6 +3148,80 @@ end
                 en = eigvals(sn)
                 @test n * mean(en) - 2 * maximum(en) <= 0
             end
+        end
+
+        @testset "the intensity rule clamps the James-Stein intensity (#1784)" begin
+            # The raw intensity of the formula, and the blend that each rule gives.
+            function js_raw(X)
+                m_raw = vec(mean(me460.me, X; dims = 1))
+                ev_raw = eigvals(cov(me460.ce, X; dims = 1))
+                b_raw = fill(mean(m_raw), length(m_raw))
+                d_raw = m_raw - b_raw
+                a_raw = (sum(ev_raw) - 2 * maximum(ev_raw)) /
+                        (size(X, 1) * dot(d_raw, d_raw))
+                return m_raw, b_raw, a_raw
+            end
+            js_mean(X, rule) = vec(mean(ShrunkExpectedReturns(;
+                                                              alg = JamesStein(;
+                                                                               intensity = rule)),
+                                        X))
+            @test JamesStein().intensity isa UnitIntervalIntensity
+            @test BayesStein().intensity isa UnitIntervalIntensity
+            # The reproduction of #1784: one strong common factor makes the largest
+            # eigenvalue hold more than half of the trace, so the raw intensity is a large
+            # negative number. The two clamps return the sample mean, and the raw
+            # intensity moves the estimate far outside the range of the sample means.
+            rngf = StableRNG(3)
+            f = randn(rngf, 200) / 100
+            Xf = f .* ones(1, 5) .+ randn(rngf, 200, 5) / 10000
+            mu, b, a = js_raw(Xf)
+            @test a < -1000
+            @test isapprox(js_mean(Xf, UnitIntervalIntensity()), mu)
+            @test isapprox(js_mean(Xf, NonNegativeIntensity()), mu)
+            @test isapprox(js_mean(Xf, UnclampedIntensity()), (1 - a) * mu + a * b)
+            @test maximum(js_mean(Xf, UnclampedIntensity())) > 100 * maximum(abs, mu)
+            # Two assets: the raw intensity is negative, as the testset above states.
+            mu, b, a = js_raw(X460[:, 1:2])
+            @test a < 0
+            @test isapprox(js_mean(X460[:, 1:2], UnitIntervalIntensity()), mu)
+            # Sample means close to the grand mean make the raw intensity exceed one. The
+            # unit interval returns the target, the non-negative clamp keeps the overshoot,
+            # and so does the raw intensity.
+            Xb = X460 .- mean(X460; dims = 1) .+ 1e-4 .* transpose(1:5)
+            mu, b, a = js_raw(Xb)
+            @test a > 1
+            @test isapprox(js_mean(Xb, UnitIntervalIntensity()), b)
+            @test isapprox(js_mean(Xb, NonNegativeIntensity()), (1 - a) * mu + a * b)
+            @test isapprox(js_mean(Xb, UnclampedIntensity()), (1 - a) * mu + a * b)
+            # Inside the interval the three rules agree.
+            mu, b, a = js_raw(X460)
+            @test 0 < a < 1
+            @test isapprox(js_mean(X460, UnitIntervalIntensity()),
+                           js_mean(X460, UnclampedIntensity()))
+            @test isapprox(js_mean(X460, NonNegativeIntensity()),
+                           js_mean(X460, UnclampedIntensity()))
+            # The Bayes-Stein intensity lies in `(0, 1]` under a positive semidefinite
+            # covariance, so no rule moves it.
+            for rule in (UnitIntervalIntensity(), NonNegativeIntensity())
+                @test vec(mean(ShrunkExpectedReturns(;
+                                                     alg = BayesStein(; intensity = rule)),
+                               X460)) == vec(mean(ShrunkExpectedReturns(;
+                                                                        alg = BayesStein(;
+                                                                                         intensity = UnclampedIntensity())),
+                                                  X460))
+            end
+            # Each rule on a scalar, and a `NaN` that stays a `NaN`.
+            for (rule, lo, hi) in
+                ((UnitIntervalIntensity(), 0.0, 1.0), (NonNegativeIntensity(), 0.0, 2.5),
+                 (UnclampedIntensity(), -2.5, 2.5))
+                @test PortfolioOptimisers.shrinkage_intensity(rule, -2.5) == lo
+                @test PortfolioOptimisers.shrinkage_intensity(rule, 2.5) == hi
+                @test PortfolioOptimisers.shrinkage_intensity(rule, 0.5) == 0.5
+                @test isnan(PortfolioOptimisers.shrinkage_intensity(rule, NaN))
+            end
+            # A `Rational` intensity keeps its type.
+            @test PortfolioOptimisers.shrinkage_intensity(UnitIntervalIntensity(),
+                                                          3 // 2) === 1 // 1
         end
 
         @testset "the degenerate samples the docstrings name" begin

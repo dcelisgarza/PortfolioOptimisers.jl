@@ -37,6 +37,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pf_cvg => "`cvg`: Optional [`CoverageCounts`](@ref), the per-cell denominators and per-asset bookkeeping of an available-case fold. It is `nothing` when the estimator carries no [`CoveragePolicy`](@ref), so the plain state costs nothing.",
                  :corrected => "`corrected`: Whether to apply Bessel's correction. `Statistics` or `StatsBase` applies it, with the divisor that each weight type defines.",#
                  :mutgt => "`tgt`: Shrinkage target.",#
+                 :mu_intensity => "`intensity`: Rule that sets the interval of the shrinkage intensity, a member of [`AbstractShrunkExpectedReturnsIntensity`](@ref).",#
                  :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
                  :me_cval => "`val`: Custom expected returns value.\n\n  - If a scalar, every asset is assigned this value.\n  - If a vector, each element is one asset's value.\n  - If a callable, it is called as `val(X; dims = dims, kwargs...)` and must return one value per asset.",#
                  :metric => "`metric`: Distance metric used for pairwise computations.",#

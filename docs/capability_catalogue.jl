@@ -457,7 +457,14 @@ const CATALOGUE = [Section("Core abstractions",
                                                    Cap(:VolatilityWeighted;
                                                        label = "Volatility weighted"),
                                                    Cap(:MeanSquaredError;
-                                                       label = "Mean squared error")])]),
+                                                       label = "Mean squared error")]),
+                                            Group("Intensity rules of James-Stein and Bayes-Stein",
+                                                  [Cap(:UnitIntervalIntensity;
+                                                       label = "Clamp into [0, 1]"),
+                                                   Cap(:NonNegativeIntensity;
+                                                       label = "Clamp at zero"),
+                                                   Cap(:UnclampedIntensity;
+                                                       label = "No clamp")])]),
                                      Cap(:StandardDeviationExpectedReturns),
                                      Cap(:VarianceExpectedReturns),
                                      Cap(:MedianExpectedReturns),

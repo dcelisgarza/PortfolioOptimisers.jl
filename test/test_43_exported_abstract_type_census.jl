@@ -97,7 +97,9 @@
     `# Interfaces` section the same day under the rule of #1489, after #1676 exported its two
     members. `AbstractLeverageOneMask`, the family of the Leverage-One Mask of the
     Cross-Sectional Factor Prior, joined with its `# Interfaces` section and its two members the
-    same day (issue #1720).
+    same day (issue #1720). `AbstractShrunkExpectedReturnsIntensity`, the family of the rule
+    that clamps the intensity of `JamesStein` and `BayesStein`, joined with its `# Interfaces`
+    section and its three members on 2026-10-21 (issue #1784, the maintainer's ruling).
     They are held to their own list for the same reason — public is API too.
     =#
     #! format: off
@@ -210,6 +212,7 @@
         :AbstractSampleSelector,
         :AbstractSearchCrossValidationResult,
         :AbstractSelectionRule,
+        :AbstractShrunkExpectedReturnsIntensity,
         :AbstractSignificanceCalibrationAlgorithm,
         :AbstractSortingNetworkMerge,
         :AbstractSortingNetworkOrdering,
