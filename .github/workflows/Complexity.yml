@@ -15,7 +15,7 @@ on:
     branches:
       - main
       - dev*
-      - agents/*
+      - agents/**
     tags: ["*"]
   workflow_dispatch:
   pull_request:
@@ -32,25 +32,23 @@ concurrency:
   cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 jobs:
-  build:
+  # Citing an approved Rationale is bookkeeping that any contributor may do. Adding one is a
+  # claim that some code is correct, and it needs the maintainer, so CI flags the diff that
+  # adds a block. The flag lives here rather than in JET.yml because this workflow carries no
+  # `paths:` filter, so it also fires on a pull request that JET.yml skips. ADR 0071.
+  #
+  # The flag is a job of its own because it runs on EVERY pull request, also one from `dev*` or
+  # `agents/**` that skips the `build` job below. A push run has no base to diff. ADR 0220.
+  rationale:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      # Checkout comes BEFORE setup-julia, which inverts Aqua.yml's order, because the Julia
-      # version is read out of the checkout. ADR 0077.
-      #
-      # The bare checkout measures the MERGE commit, which is what every other check here does and
-      # what a gate should gate. ADR 0075.
       - uses: actions/checkout@v7
         with:
           # Two commits are enough to diff a pull request's merge commit against its base, which is
           # the merge commit's first parent. The step below needs nothing more.
           fetch-depth: 2
-      # Citing an approved Rationale is bookkeeping that any contributor may do. Adding one is a
-      # claim that some code is correct, and it needs the maintainer, so CI flags the diff that
-      # adds a block. The flag lives here rather than in JET.yml because this workflow carries no
-      # `paths:` filter, so it also fires on a pull request that JET.yml skips. ADR 0071.
       - name: Flag a new Rationale
-        if: github.event_name == 'pull_request'
         run: |
           added=$(git diff HEAD^1 HEAD -- code_health/rulings.toml |
                   grep -E '^\+\[rationale\.' || true)
@@ -60,6 +58,19 @@ jobs:
               echo "::warning::$line - a new Rationale needs the maintainer's approval."
             done
           fi
+  build:
+    # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
+    # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.
+    if: >-
+      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || !((startsWith(github.head_ref, 'dev') && !contains(github.head_ref, '/')) || startsWith(github.head_ref, 'agents/'))
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout comes BEFORE setup-julia, which inverts Aqua.yml's order, because the Julia
+      # version is read out of the checkout. ADR 0077.
+      #
+      # The bare checkout measures the MERGE commit, which is what every other check here does and
+      # what a gate should gate. ADR 0075.
+      - uses: actions/checkout@v7
       - name: Read the Julia pin from the Manifest
         id: pin
         run: |

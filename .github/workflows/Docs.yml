@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - dev*
-      - agents/*
+      - agents/**
     tags: ["*"]
   pull_request:
     branches:
@@ -30,7 +30,11 @@ concurrency:
 jobs:
   docs:
     name: Documentation
-    if: github.event.action != 'labeled' || github.event.label.name == 'docs-preview'
+    # A pull request from `dev*` or `agents/**` in this repository skips this job unless it carries
+    # the label `docs-preview`. The push to that branch builds the docs, but `docs/make.jl` deploys
+    # only from `main`, so the pull-request run alone deploys the preview. ADR 0220.
+    if: >-
+      (github.event.action != 'labeled' || github.event.label.name == 'docs-preview') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || contains(github.event.pull_request.labels.*.name, 'docs-preview') || !((startsWith(github.head_ref, 'dev') && !contains(github.head_ref, '/')) || startsWith(github.head_ref, 'agents/')))
     runs-on: ubuntu-latest
     # The two jobs need different scopes, so each declares its own. This one deploys: it pushes
     # `gh-pages`, reads the pull request it previews, and reports the preview as a status. These
@@ -63,7 +67,10 @@ jobs:
   doctest:
     name: Doctests
     # The `docs-preview` label cancels the run of the same commit, doctests included, so run them again.
-    if: github.event.action != 'labeled' || github.event.label.name == 'docs-preview'
+    # A pull request from `dev*` or `agents/**` in this repository skips this job. The push to that
+    # branch runs it, and its check shows on the head commit of the pull request. ADR 0220.
+    if: >-
+      (github.event.action != 'labeled' || github.event.label.name == 'docs-preview') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository || !((startsWith(github.head_ref, 'dev') && !contains(github.head_ref, '/')) || startsWith(github.head_ref, 'agents/')))
     runs-on: ubuntu-latest
     # This job runs `doctest` and deploys nothing.
     permissions:
