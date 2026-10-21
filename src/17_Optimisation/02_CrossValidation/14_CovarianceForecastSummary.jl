@@ -644,7 +644,7 @@ Arguments correspond to the struct's fields, in the order they are declared. [`c
     """
     variance
     """
-    Diebold–Mariano–West statistic, asymptotically standard normal under equal expected loss. One entry per loss.
+    Diebold–Mariano–West statistic, asymptotically standard normal under equal expected loss and the conditions that [`covariance_forecast_compare`](@ref) states. One entry per loss.
     """
     z
     """
@@ -694,13 +694,15 @@ Where:
   - ``p``: Two-sided p-value of the statistic.
   - ``\\Phi``: Distribution function of the standard normal.
 
-Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. A positive value says that forecast ``A`` lost more than forecast ``B``. Two identical forecasts have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so their statistic is not a number.
+Section 1.1 of [dieboldmariano1995](@cite) states the statistic with the uniform window, which gives each autocovariance up to the truncation lag the weight one. The Bartlett weights of Equation 5 of [neweywest1987](@cite) make ``\\hat{\\omega}^2`` non-negative, and Section 1.1 of [dieboldmariano1995](@cite) names them for that use, with a truncation lag that grows with ``M``.
+
+Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal when the estimates that the forecasts read do not move its variance. Theorem 4.1(a) of [west1996](@cite) states two such cases: the steps are few next to the rows of the first training window, or the expected gradient of the loss difference in the estimates is zero. Otherwise Theorem 4.1(b) of [west1996](@cite) adds terms to the variance, and ``\\hat{\\omega}^2`` omits them. [west1996](@cite) states the theorem for a training window that grows, and Footnote 3 sends the rolling window to an earlier version of that work. A positive value says that forecast ``A`` lost more than forecast ``B``. Two identical forecasts have ``\\bar{\\delta} = 0`` and ``\\hat{\\omega}^2 = 0``, so their statistic is not a number.
 
 # Arguments
 
   - `a`: The first evaluation.
   - `b`: The second evaluation.
-  - `lags`: Number of lags of the Bartlett kernel. The default is the largest horizon less one, the rule of Diebold and Mariano for a forecast over ``h`` steps, capped at ``M - 1``.
+  - `lags`: Number of lags of the Bartlett kernel. The default is the largest horizon less one, capped at ``M - 1``. Section 1.1 of [dieboldmariano1995](@cite) takes ``k - 1`` lags for a forecast ``k`` entries of the loss series ahead, under the uniform window. A step of a walk-forward is one entry of the loss series, and the test windows do not overlap, so that rule gives zero lags.
 
 # Validation
 
@@ -723,8 +725,9 @@ Under equal expected loss, ``\\mathrm{DMW}`` is asymptotically standard normal. 
 
 # References
 
-  - $(ref_dict[:dieboldmariano1995])
-  - $(ref_dict[:west1996])
+  - $(ref_dict[:dieboldmariano1995]) Section 1.1.
+  - $(ref_dict[:west1996]) Section 2, Theorem 4.1.
+  - $(ref_dict[:neweywest1987]) Equation 5.
 """
 function covariance_forecast_compare(a::CovarianceForecastEvaluationResult,
                                      b::CovarianceForecastEvaluationResult;
@@ -772,7 +775,7 @@ Where:
   - ``\\ell``: Number of lags.
   - ``\\hat{\\omega}^2``: Long-run variance of the series.
 
-The Bartlett weights make ``\\hat{\\omega}^2`` non-negative for every series and every ``\\ell``. At ``\\ell = 0`` it is the sample variance with the divisor ``M``.
+The Bartlett weights make ``\\hat{\\omega}^2`` non-negative for every series and every ``\\ell`` (Theorem 1 of [neweywest1987](@cite)). The estimate is consistent when ``\\ell`` grows with ``M`` and ``\\ell / M^{1/4}`` goes to zero (Theorem 2 of [neweywest1987](@cite)). At ``\\ell = 0`` it is the sample variance with the divisor ``M``.
 
 # Arguments
 
@@ -789,7 +792,7 @@ The Bartlett weights make ``\\hat{\\omega}^2`` non-negative for every series and
 
 # References
 
-  - $(ref_dict[:neweywest1987])
+  - $(ref_dict[:neweywest1987]) Equation 5, Theorems 1 and 2.
 """
 function newey_west_variance(d::VecNum, lags::Integer)
     M = length(d)

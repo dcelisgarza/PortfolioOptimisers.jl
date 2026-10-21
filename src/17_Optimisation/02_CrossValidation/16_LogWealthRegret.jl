@@ -357,12 +357,14 @@ Where:
   - ``T``: Number of periods.
   - ``\\hat{\\omega}^2``: Long-run variance of ``\\delta_t``, the Bartlett-kernel estimate with ``\\ell`` lags.
   - ``\\hat{\\gamma}_k``: Sample autocovariance of ``\\delta_t`` at lag ``k``, about ``\\bar{\\delta}`` and divided by ``T``.
-  - ``\\ell``: Number of lags, ``0`` by default because the rows of a walk-forward at `test_size = 1` do not overlap.
+  - ``\\ell``: Number of lags, ``0`` by default because the rows of a walk-forward at `test_size = 1` do not overlap. This is the rule of Section 1.1 of [dieboldmariano1995](@cite) for a forecast one row ahead.
   - ``z``: Diebold–Mariano–West statistic.
   - $(math_dict[:P_T_path])
   - ``\\boldsymbol{u}_t``: Comparator's target on fold ``t``, embedded by asset name on the union of the folds' universes.
 
-Under equal expected log growth, ``z`` is asymptotically standard normal, and the two-sided `p` reads it against that law. The test is exact only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p` overstates the evidence that the comparator is better.
+``R`` is the logarithm of the ratio of the two wealths. Equation 1.7 of [cover1991](@cite) states it against the best constant rebalanced portfolio in hindsight, divided by the number of periods, and Equation 2 of [lihoi2014](@cite) names it the regret. ``z`` is the statistic of Section 1.1 of [dieboldmariano1995](@cite) with the Bartlett weights of Equation 5 of [neweywest1987](@cite).
+
+Under equal expected log growth, ``z`` is asymptotically standard normal when the estimates that the strategy reads do not move its variance, and the two-sided `p` reads it against that law. Theorem 4.1(a) of [west1996](@cite) states two such cases: the periods are few next to the rows of the first training window, or the expected gradient of the difference in the estimates is zero. Otherwise Theorem 4.1(b) of [west1996](@cite) adds terms to the variance, and ``\\hat{\\omega}^2`` omits them. The test is valid only for a comparator that did not read the rows it is scored on. Against a Hindsight Comparator it is optimistic by construction: the comparator was chosen on the sequence that the difference is tested over, so `p` overstates the evidence that the comparator is better.
 
 Three degenerate series have a stated answer:
 
@@ -370,7 +372,7 @@ Three degenerate series have a stated answer:
   - A difference that is a non-zero constant has ``\\hat{\\omega}^2 = 0``, so ``z`` is infinite and `p` is zero. In floating point ``\\hat{\\omega}^2`` is round-off of about ``10^{-33}``, so ``z`` is a very large finite number.
   - A return of ``-1`` is a total loss. Its log growth is ``-\\infty``, so ``R`` is infinite, and ``z`` and `p` are `NaN`.
 
-Dynamic regret is regret against a comparator that moves. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path, or the benchmark, which holds no weights. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
+Dynamic regret is regret against a comparator that moves. Definition 7 of [zinkevich2003](@cite) states it, and Theorem 2 of [zinkevich2003](@cite) bounds it in the path length of Definition 6. Its bounds are stated in ``P_T``, so ``R`` and ``P_T`` are read together: a static comparator has ``P_T = 0`` and its regret is the static regret, and a moving comparator buys its lower regret with a path that the bound charges for. ``P_T`` is `NaN` when the comparator is one prediction result, which holds one target and no path, or the benchmark, which holds no weights. The literature states dynamic regret against three comparators, and each is the same estimator through its own scheme. On the three-row example ``\\boldsymbol{x}_1 = (1.2, 0.98)``, ``\\boldsymbol{x}_2 = (0.9, 1.1)``, ``\\boldsymbol{x}_3 = (1.3, 0.7)`` of price relatives:
 
   - **Static**: the best constant rebalanced portfolio over all three rows, `predict(optimise(est, rd), rd)`, is all-in on the first asset. Its wealth is ``1.2 \\cdot 0.9 \\cdot 1.3 = 1.404``, and ``P_T = 0``. `est` is [`BestConstantRebalancedPortfolio`](@ref), or [`MeanRisk`](@ref) under [`LogarithmicReturn`](@ref) and [`MaximumReturn`](@ref).
   - **Be-the-leader**: `cross_val_predict(est, rd, HindsightSplit())` plays on row ``t`` the best constant rebalanced portfolio over the rows through ``t``. The targets are ``\\boldsymbol{u}_1 = (1, 0)``, ``\\boldsymbol{u}_2 = (23/44, 21/44) \\approx (0.523, 0.477)`` and ``\\boldsymbol{u}_3 = (1, 0)``. The wealth is ``1.2 \\cdot 0.995 \\cdot 1.3 \\approx 1.553``, and ``P_T = 2 \\sqrt{2} \\cdot 21/44 \\approx 1.350``. The first fold trains on one row, so [`MeanRisk`](@ref) needs a prior that fits one row, which [`HindsightSplit`](@ref) states.
@@ -415,7 +417,12 @@ The bound also reads the other way. The regret at a given budget ``L`` is the ga
 
 # References
 
-  - $(ref_dict[:lihoi2014])
+  - $(ref_dict[:cover1991]) Equations 1.2 and 1.7.
+  - $(ref_dict[:lihoi2014]) Section 3.1.3, Equation 2.
+  - $(ref_dict[:dieboldmariano1995]) Section 1.1.
+  - $(ref_dict[:west1996]) Section 2, Theorem 4.1.
+  - $(ref_dict[:neweywest1987]) Equation 5.
+  - $(ref_dict[:zinkevich2003]) Definitions 6 and 7, Theorem 2.
 """
 function log_wealth_regret(a::PredRes_MultiPredRes, b::PredRes_MultiPredRes;
                            lags::Integer = 0)
@@ -719,7 +726,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Fits the path of per-row allocations with the largest log wealth whose summed step length is at most `L`.
 
-Dynamic regret at a budget is the gap to this path. This path is the comparator of Definition 7 of [zinkevich2003](@cite). Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
+Dynamic regret at a budget is the gap to this path. At `p = 2` this path is the comparator of Definition 7 of [zinkevich2003](@cite), at the cost ``c_t(\\boldsymbol{u}) = -\\log(\\boldsymbol{u} \\cdot \\boldsymbol{x}_t)``. Definition 6 of [zinkevich2003](@cite) measures the path in the Euclidean distance, so at any other `p` the budget bounds a different length. Neither per-row comparator that a [`HindsightSplit`](@ref) builds is this path: be-the-leader is one point at its own path length, and the per-period minimiser is the limit with no budget. The fit is one concave programme over the whole panel. The Lagrangian form, which puts a penalty on the path length in place of the budget, is the same programme with one term moved, and the library does not build it.
 
 The estimator follows the Hindsight Comparator rule of [`log_wealth_regret`](@ref), as every other comparator does. [`optimise`](@ref) returns a [`BudgetedHindsightPathResult`](@ref), which holds the path. [`predict`](@ref) over the same rows returns one fold per row, and it refuses any other rows. So `predict(optimise(est, rd_test), rd_test)` is a prediction result that the regret verb reads unchanged, and the verb reports its Euclidean path length beside the regret.
 
@@ -820,7 +827,7 @@ BudgetedHindsightPath
 
 # References
 
-  - $(ref_dict[:zinkevich2003])
+  - $(ref_dict[:zinkevich2003]) Definitions 6 and 7.
 """
 @propagatable @concrete struct BudgetedHindsightPath <: OptimisationEstimator
     """
