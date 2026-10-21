@@ -445,7 +445,7 @@ The derivation needs the weights in units of the budget, so it holds only when a
   - The fees keep the spread, as [`mip_fees_keep_spread`](@ref) states.
   - ``g\\, d`` is finite, which a `NaN` in `X` makes false.
 
-When one is false, the constant is `1000`, the value that Cajas recommends.
+When one is false, the constant is `1000`, the value that footnote 26 of [cajas2025](@cite) recommends. The bound ``b = g\\, d`` is the library's own. That work gives only the fixed value.
 
 # Arguments
 
@@ -476,7 +476,7 @@ When one is false, the constant is `1000`, the value that Cajas recommends.
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51.
+  - $(ref_dict[:cajas2025]) Section 7.2.2.3, Equation 7.51 and footnote 26. $(ref_dict[:no_original_source])
 """
 function mip_big_m(::JuMP.Model, b::Number, s::Number, args...; kwargs...)
     @argcheck(b > s,

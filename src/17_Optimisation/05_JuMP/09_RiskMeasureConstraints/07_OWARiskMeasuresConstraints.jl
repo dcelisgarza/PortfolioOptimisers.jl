@@ -227,10 +227,12 @@ the length of `r.alg.p`.
 
 Every permutation of the weight vector satisfies those properties, so the feasible set is a
 superset of the exact one and the risk is an upper bound on the exact OWA risk. The gap
-closes as the weight vector approaches a line. [owa3](@citet) studies that linear case. For
-the Gini mean difference and the tail Gini over samples of 500 to 10,000 observations,
-[owa3](@cite) reports the same objective value as the exact formulation, to the printed
-precision.
+closes as the weight vector approaches a line. [owa3](@citet) studies that linear case.
+Tables 1 and 3 of [owa3](@cite) compare the objective value with the exact formulations for
+the Gini mean difference and the tail Gini over samples of 500 to 1,500 observations. The
+values agree to the printed precision in every cell but one, 12.94 % against 12.93 % in
+Table 3. At 10,000 observations the exact formulations do not solve, so those rows hold no
+comparison.
 
 The gap was measured here against the functor at `T = 100`, `N = 8` with the default `p`. The
 Gini mean difference is 0.06 % high, the tail Gini is 1.7e-5 % high, and the tail Gini range
@@ -299,7 +301,7 @@ Where:
 
 # References
 
-  - $(ref_dict[:owa3])
+  - $(ref_dict[:owa3]) Sections 2.3 and 2.4, Equations 4 and 5; Section 3, Equation 7; Section 4, Tables 1 and 3.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any,
                                r::OrderedWeightsArray{<:Any, <:Any,

@@ -11,29 +11,35 @@ upper-tail relativistic expression.
 
 # Mathematical definition
 
-The Relativistic Value-at-Risk of [rlvar](@cite) is:
+The primal representation of the Relativistic Value-at-Risk of [rlvar](@cite) is:
 
 ```math
 \\begin{align}
-\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) &= t + \\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right) z + \\sum_{t=1}^T (\\psi_t + \\theta_t)\\,.
+\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w}) = \\min_{t,\\, z,\\, \\boldsymbol{\\psi},\\, \\boldsymbol{\\theta},\\, \\boldsymbol{\\varepsilon},\\, \\boldsymbol{\\omega}} \\quad & t + \\ln_{\\kappa}\\!\\left(\\frac{1}{\\alpha T}\\right) z + \\sum_{j=1}^T (\\psi_j + \\theta_j) \\\\
+\\text{s.t.} \\quad & -\\hat{r}_j - t + \\varepsilon_j + \\omega_j \\leq 0 \\quad \\forall\\, j\\,, \\\\
+& \\left(\\frac{1+\\kappa}{2\\kappa} z,\\; \\frac{1+\\kappa}{\\kappa} \\psi_j,\\; \\varepsilon_j\\right) \\in \\mathcal{P}_{3}^{1/(1+\\kappa),\\, \\kappa/(1+\\kappa)} \\quad \\forall\\, j\\,, \\\\
+& \\left(\\frac{\\omega_j}{1-\\kappa},\\; \\frac{\\theta_j}{\\kappa},\\; -\\frac{z}{2\\kappa}\\right) \\in \\mathcal{P}_{3}^{1-\\kappa,\\, \\kappa} \\quad \\forall\\, j\\,, \\\\
+& z \\geq 0\\,.
 \\end{align}
 ```
 
 Where:
 
   - ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(\\boldsymbol{w})``: Relativistic Value-at-Risk.
-  - ``t``, ``z``, ``\\psi_t``, ``\\theta_t``: Dual variables for the power cone programme.
+  - ``\\hat{r}_j``: Portfolio return at observation ``j``, so ``-\\hat{r}_j`` is its loss.
+  - ``t``, ``z``, ``\\psi_j``, ``\\theta_j``, ``\\varepsilon_j``, ``\\omega_j``: Variables of the primal representation.
+  - ``\\mathcal{P}_{3}^{\\alpha,\\, 1-\\alpha} = \\{\\boldsymbol{u} \\in \\mathbb{R}^{3} : u_{1}^{\\alpha} u_{2}^{1-\\alpha} \\geq \\lvert u_{3} \\rvert,\\, u_{1},\\, u_{2} \\geq 0\\}``: Three-dimensional power cone.
   - $(math_dict[:ln_kappa])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
   - ``\\kappa``: Relativistic parameter.
 
-encoded via power cones ``\\mathcal{K}_{1/(1+\\kappa)}`` and ``\\mathcal{K}_{1/(1-\\kappa)}``.
+Equation 15 of [rlvar](@cite) prints the first row as ``-X - t + \\varepsilon + \\omega \\leq 0``, where ``X`` is the loss. The sign is a misprint. Equation 18 of that work writes the loss ``-\\hat{r}_j``, as the row above does. With this row the minimum equals the dual form of Equation 12: 0.0068504374 against 0.0068504424 for six assets, 200 observations, ``\\alpha = 0.05`` and ``\\kappa = 0.3``.
 
 For observation-weighted samples the weight vector is normalised to ``\\boldsymbol{w}`` with
-``\\sum_{t=1}^T w_t = 1``. The Kaniadakis logarithm keeps the argument
-``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{t=1}^T (\\psi_t + \\theta_t)`` becomes
-``T \\sum_{t=1}^T w_t (\\psi_t + \\theta_t)``.
+``\\sum_{j=1}^T w_j = 1``. The Kaniadakis logarithm keeps the argument
+``\\frac{1}{\\alpha T}``, and the sum ``\\sum_{j=1}^T (\\psi_j + \\theta_j)`` becomes
+``T \\sum_{j=1}^T w_j (\\psi_j + \\theta_j)``.
 
 # Arguments
 
@@ -54,7 +60,7 @@ For observation-weighted samples the weight vector is normalised to ``\\boldsymb
 
 # References
 
-  - $(ref_dict[:rlvar])
+  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 and 15, and Section 4.2, Equation 18.
 """
 function set_risk_constraints!(model::JuMP.Model, i::Any, r::RelativisticValueatRisk,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
