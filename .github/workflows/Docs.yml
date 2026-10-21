@@ -88,7 +88,8 @@ jobs:
             PortfolioOptimisers.set_compact_show!(false)
             PortfolioOptimisers.set_show_nothing_fields!(true)
             DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup, :(using PortfolioOptimisers, StatsBase, Statistics, LinearAlgebra, Dates, Distributions, StableRNGs, TimeSeries; PortfolioOptimisers.set_compact_show!(false); PortfolioOptimisers.set_show_nothing_fields!(true)); recursive=true)
-            doctest(PortfolioOptimisers)'
+            const DOCTEST_FILTERS = [r"(\d\.\d{10})\d+" => s"\1"]
+            doctest(PortfolioOptimisers; doctestfilters = DOCTEST_FILTERS)'
         env:
           JULIA_PKG_SERVER: ""
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

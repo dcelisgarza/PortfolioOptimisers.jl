@@ -331,6 +331,12 @@ two cases, and each case is a method. Split it by dispatch on that type:
   function set_sdp_variance_risk!(model, i, r, pr, ratio_alg::RatioFormulation) ... end
   ```
 
+Prefer the third form, a method that forwards the field as an argument, to a method that bounds a
+type parameter of the struct by its position, such as `Variance{<:Any, <:DeferredQuantity}`. The
+position of a parameter moves when a field is added, and two such bounds can intersect at
+`Union{}`, which JET reports (#1759). Run the JET gate, `code_health/jet.jl`, scoped to the branch
+after a split.
+
 When the type that the condition tests is an extension point, the method for the general case
 takes the abstract type, and the method for the known case takes the concrete type. A user's
 own subtype then reaches the general case, as it did through the branch. Above, a user's own
@@ -437,6 +443,15 @@ reason.
 
 - See `.github/instructions/julia-return-types.instructions.md` for full guidelines.
 - Key rule: annotate functions whose return type is always the same concrete type (e.g., `-> Nothing` for assertion helpers, `-> ConcreteEstimatorType` for factory methods).
+
+## A problem is built in a fixed order
+
+Build a solver problem, a stacked matrix, or a sum whose rounding the order can move from a sorted
+key list, `sort!(collect(keys(d)))`, or from an ordered container. Do not take the iteration order
+of a `Dict` or a `Set`: it follows the insertion history and the rehashes of the container, so one
+view set can stack its blocks in two orders, and two orders give two problems whose solutions
+differ in the last digits. A test that compares such a solution then passes alone and fails beside
+other test sets. The entropy pooling solve stacks its view blocks by sorted key since #1751.
 
 ## Code Organization
 

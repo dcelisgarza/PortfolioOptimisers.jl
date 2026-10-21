@@ -108,32 +108,51 @@ enters at zero misses. Write the tests, or write the Coverage Exemption with its
 ## Land the branch
 
 Sibling tickets land on `dev` while your gates run, and a rebase invalidates every gate that
-measured the old tree. Pay the cheap work first and the slow gates once, on the tree you will push:
+measured the old tree. A fast gate that goes red makes you edit `src/`, and an edit makes every
+slow run stale. So run the gates in order of cost, the fast ones first, and the slow ones once, on
+the tree you will push:
 
-1. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when it
-   ends, and `--done` leaves the verdict in a file:
+1. Format the files you changed: `pre-commit run julia-formatter --files <changed .jl>`. A
+   reformat moves the line counts that the size gate reads.
+2. Run `sweep_check.jl --fetch`. Then run the fast gates scoped to your files, one call for each
+   gate: `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
+   complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
+   A foreign row that is red on `dev` is a defect: file it once.
+3. **A new file enters JET at 0** (`code_health/rulings.toml`), and the fix of a report edits
+   `src/`. So run `julia --project=code_health code_health/jet.jl refresh --files <new file>` as
+   soon as the new file compiles. Do not keep JET for the end when a file is new.
+4. Run the census files that read the text of the source, in the foreground. They take seconds
+   after the one-minute package load:
+   `julia -t 1 --project=test test/run_files.jl --done=<path> test_43_exported_abstract_type_census.jl test_45_sweep_census.jl test_47_alias_and_module_census.jl test_64_docs_page_metadata_census.jl test_66_public_declaration_census.jl test_71_process_citation_census.jl test_75_concrete_struct_census.jl`.
+   `test_45` holds the manifest row and `test_47` the `include` line. `test_43` and `test_66` hold
+   the `public` and `export` declarations, which `sweep_check.jl` does not read. `test_64` holds
+   the `Description` line of a mirror page under `docs/src/`, `test_71` refuses an issue number in
+   a docstring, and `test_75` holds a new concrete struct. Run them even when your targeted tests
+   leave them out. Each one once reached `dev` red because a branch did not run it.
+5. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when
+   it ends, and `--done` leaves the verdict in a file:
    `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl test_Y.jl`.
    Check the doctests of your files the same way:
    `julia -t 1 --project=docs docs/doctest_files.jl --against origin/dev`.
-2. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now.
-3. Format the files you changed: `pre-commit run julia-formatter --files <changed .jl>`. The hook
-   runs it at commit time anyway, and a reformat moves the line counts the size gate reads.
-4. Run `sweep_check.jl --fetch`, then the fast gates scoped to your files:
-   `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
-   complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
-5. Run the four census files that catch a missing declaration or row, in the foreground:
-   `julia -t 1 --project=test test/run_files.jl --done=<path> test_43_exported_abstract_type_census.jl test_45_sweep_census.jl test_47_alias_and_module_census.jl test_66_public_declaration_census.jl`.
-   They take seconds after the one-minute package load. `test_45` holds the manifest row,
-   `test_47` the `include` line, and `test_43` and `test_66` the `public` and `export`
-   declarations, which `sweep_check.jl` does not read. Run them even when your targeted tests
-   leave them out: a build piece once closed with `test_66` red.
-6. Run `test_26` and the doctests (the `run-doctests` skill), then JET last, scoped the same way.
-7. Commit, fetch, and rebase again if `dev` moved. Push with `git push origin HEAD:dev`.
+6. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now, then
+   run `bash code_health/gate_stamp.sh check`. It names the stamps that the rebase made stale.
+7. Run `test_26` and the full doctests (the `run-doctests` skill), then JET on a changed file,
+   scoped the same way.
+8. Commit, fetch, and rebase again if `dev` moved. Run `gate_stamp.sh check` again, then push with
+   `git push origin HEAD:dev`.
 
 Each gate and each test file records a stamp of the tree it measured. The pre-push hook refuses
-the push when `dev` moved, after a gate ran, in a file or a `src/` directory your branch changes,
-and it names each such gate. Re-run only those. `code_health/gate_stamp.sh list` shows the stamps,
-and `drop <gate>` forgets one the change cannot reach.
+the push in two cases, and the refusal names what to do:
+
+- `dev` moved, after a gate ran, in a file or a `src/` directory your branch changes. Re-run only
+  the gates your change can reach, and paste the `drop` line that the refusal prints for the rest.
+  Your own pushed commits and a sibling's edit to a ledger file that a gate does not read do not
+  count.
+- The push changes `src/` or `ext/`, and no stamp records `jet`, `size`, `complexity`, `perf` or
+  `doctest`. Run the gate. If it cannot apply, record why:
+  `code_health/gate_stamp.sh waive <gate> <reason>`.
+
+`code_health/gate_stamp.sh list` shows the stamps and the waivers.
 
 ## Where the rules live
 

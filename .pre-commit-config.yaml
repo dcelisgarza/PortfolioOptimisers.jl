@@ -1,6 +1,7 @@
 # Every hook runs at commit time unless it names its stages. The pre-push type is installed for the
-# gate-stamps guard alone, and without this line every hook below would run again on each push. A
-# hook whose own manifest names its stages ignores this line, so such a hook names them here too.
+# gate-stamps guard and the ExplicitImports check, and without this line every hook below would run
+# again on each push. A hook whose own manifest names its stages ignores this line, so such a hook
+# names them here too.
 default_stages: [pre-commit]
 default_install_hook_types: [pre-commit, pre-push]
 repos:
@@ -21,6 +22,21 @@ repos:
         stages: [pre-push]
         pass_filenames: false
         always_run: true
+      # Refuse a commit that moves an analyser in code_health/Manifest.toml without the refresh of
+      # the baselines it measures. See code_health/manifest_provenance.jl.
+      - id: code-health-provenance
+        name: code-health baselines match the analyser versions of the Manifest
+        entry: julia --startup-file=no code_health/manifest_provenance.jl
+        language: system
+        files: ^code_health/(Manifest\.toml|.*_baseline\.toml|expansion_bound\.toml)$
+        pass_filenames: false
+      # Rewrite the derived `Description` line of a staged mirror page, which test_64 holds. A
+      # page whose `@docs` entries changed otherwise reached dev red. See docs/page_metadata.jl.
+      - id: mirror-page-description
+        name: mirror pages carry their derived Description line
+        entry: julia --startup-file=no docs/page_metadata.jl --fix
+        language: system
+        files: ^docs/src/(public|private)_api/.*\.md$
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -64,9 +80,20 @@ repos:
   - repo: https://github.com/ericphanson/ExplicitImports.jl
     rev: v1.15.0
     hooks:
+      # It loads the whole package, about three minutes, so it runs once per push rather than at
+      # every commit. It checks and fixes nothing, so a refusal at push time costs no fix.
       - id: explicit-imports
         name: ExplicitImports checks
+        stages: [pre-push]
         args: [--print, --checklist, exclude_all_qualified_accesses_via_owners, --checklist, exclude_all_qualified_accesses_are_public]
+  # The spell check of the paper, in British English (`_typos.toml`). Five misspellings and an
+  # American spelling reached the release PR of v0.33.0 with no check to catch them.
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.51.1
+    hooks:
+      - id: typos
+        files: ^docs/paper/.*\.typ$
+        args: [--force-exclude]
   - repo: https://github.com/domluna/JuliaFormatter.jl
     rev: v2.14.0
     hooks:

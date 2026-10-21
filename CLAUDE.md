@@ -57,17 +57,23 @@ before you merge so you lower the number that is current.
   a fresh bare process instead.
 - **Single-threaded**: `julia -t 1`, `BLAS.set_num_threads(1)`. Never kick off the full test suite
   or a docs build — those are the maintainer's to run.
+- **A run that loads the package queues for a machine slot.** The test, doctest, JET and
+  Expansion Bound drivers wait for a free slot and free memory (`code_health/julia_slot.jl`), and a
+  `SLOT wait` line names the holders. Shut down your own kaimon REPL before a full doctest run or a
+  JET run. A probe that needs the test dependencies starts its REPL in the test folder of the
+  worktree.
 - Run **targeted** `test_*.jl` files for the area you changed with
   `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl …`, as a background Bash
   command. It runs each file after the `init_code` preamble of `test/runtests.jl`,
   prints one `RESULT` line per file, and writes the verdict to `<path>` when it ends.
-  Narrow it with `--testset=<regex>`, `--time-depth=<N>`, `--timeout=<seconds>`; a red listed in
-  `test/known_red.toml` is named on its `RESULT` line (the header of `test/run_files.jl` explains).
+  Narrow it with `--testset=<regex>`, `--time-depth=<N>`, `--timeout=<seconds>`; rerun a red that
+  only CI shows with `--ci`. A red listed in `test/known_red.toml` is named on its `RESULT` line
+  (the header of `test/run_files.jl` explains every option).
 - **A targeted test is one whose result the change can alter.** Trace from the changed code to the
   test files that assert a value passing through it, add the file of the new test, and add the
   censuses that read what the commit touched. A file that only names a changed type is not
-  targeted. After a rebase, rerun the files that both your change and the new commits of `dev`
-  reach, and `code_health/gate_stamp.sh drop` every other stale stamp.
+  targeted. After a rebase, run `bash code_health/gate_stamp.sh check`. Rerun the files it names
+  that your change reaches, and paste the `drop` line it prints for the rest.
 - On a Revise world-age warning, **restart the session and cold-load**. If a session wedges, shut it
   down and start a new one rather than fighting it.
 
@@ -87,6 +93,12 @@ before you merge so you lower the number that is current.
   `"""` docstring `\"` renders as `"`, and the doctests pass. **Do not revert the escaping.**
 - Long string literals and docstring prose are exempt from the margin in practice; code lines are
   not.
+- **Edit a `.jl` file with the Edit tool.** A change at many sites goes through the kaimon edit
+  tool with an absolute file path, which parses each file before it writes. A Python replace from
+  a Bash heredoc halves a backslash and has corrupted docstrings.
+- **The prose of `docs/paper/main.typ` is the author's.** Correct a count, a citation or a typo
+  there. Give a new sentence to the author in your report, as a proposal, and keep it out of the
+  file.
 
 ## Doctests
 
@@ -147,6 +159,9 @@ before you merge so you lower the number that is current.
   piece of context you hold into the issue: the reproduction, the file and the line, the cause you
   found, the fix you would make, and the reason you did not make it. Someone else must be able to
   work from the issue alone.
+- **A name or an interface that a library precedent settles is not the maintainer's decision.**
+  Follow the precedent. A case that the same mechanism reaches belongs to the fix in hand: list
+  every such case in the plan, before the first test run.
 - **Link the issue to the work that found it.** Name the issue in the pull request, the commit, or
   the report for that work, and name that work in the issue.
 
@@ -171,8 +186,9 @@ Wire your addition into the audit in the same change:
 
 `julia --project=code_health code_health/sweep_check.jl --fetch` reports all four steps for the
 files your branch touches, and prints the line to paste for step 1. It measures and writes nothing.
-The `sweep-conform` skill runs it before the commit, and the `sweep-file-issues` skill does steps 3
-and 4.
+Before the first commit that changes `src/` or `ext/`, load the `sweep-conform` skill and follow
+its § *Land the branch*: it runs the check, and it orders the gates whose stamps the push guard
+requires. The `sweep-file-issues` skill does steps 3 and 4.
 
 Defer a feature whose design is not settled. Leave its row at `swept = false`, record it in the
 child map's *Not yet specified* section, and take steps 3 and 4 when the design settles.

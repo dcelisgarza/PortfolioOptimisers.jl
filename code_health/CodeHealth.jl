@@ -13,6 +13,10 @@ module CodeHealth
 
 using TOML
 
+# The machine-wide slot that a gate which loads the package (JET, the Expansion Bound) and the
+# doctest driver hold for their run.
+include("julia_slot.jl")
+
 export Definition, Reviewed, Finding, Rise, RefreshRefused, run_script
 
 # --- what one measurement says about one definition -------------------------
@@ -1053,7 +1057,11 @@ function provenance_message(bad)
         println(io, line)
     end
     print(io,
-          "Refresh the baseline in the SAME commit that moves code_health/Manifest.toml.")
+          "Refresh the baseline in the SAME commit that moves code_health/Manifest.toml. Keep ",
+          "the new Manifest: do not restore the old one. In a commit that changes nothing under ",
+          "src/ or ext/, run `julia -t 1 --project=code_health code_health/<gate>.jl refresh ",
+          "--accept-rise` for each gate named above. Each rise then belongs to the analyser, ",
+          "not to the code.")
     return String(take!(io))
 end
 
@@ -1173,11 +1181,13 @@ end
     annotate(path, message)
 
 One `::error` annotation per offending file, per ADR 0077. Outside CI the annotation syntax is
-dropped and the same text is printed plainly.
+dropped and the same text is printed plainly. The message repeats the path: GitHub moves `file=`
+into the metadata of the annotation, so the log of a failed run (`gh run view --log-failed`)
+would show the message with no file.
 """
 function annotate(path::AbstractString, message::AbstractString)
     if is_ci()
-        println("::error file=", path, "::", message)
+        println("::error file=", path, "::", path, ": ", message)
     else
         println("  ", path, ": ", message)
     end
