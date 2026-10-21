@@ -290,3 +290,36 @@ field `centring`, which takes a singleton type of `AbstractCentring`. `forecast_
 location through `centring_report_location`: zero for every asset under `PreCentred()`, and
 `state.location` under `EstimatedCentring()`, the default, or under `ZeroStartCentring()`. So the
 rule of this ADR holds, and `PreCentred()` is the case that `centred = true` named.
+
+## Amendment (2026-10-21)
+
+[#1787](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1787) replaced the test of
+`covariance_forecast_compare(a, b; lags = h − 1)`. The decision "a Newey–West variance at `h − 1`
+lags" was wrong for two reasons:
+
+1. The rule of Section 1.1 of Diebold and Mariano (1995) takes `k − 1` lags for a forecast `k`
+   entries of the loss series ahead. One step is one entry, and the test windows of a
+   walk-forward do not overlap, so the rule takes zero lags, not `h − 1`.
+2. The rule holds under the uniform window. A Bartlett window at a fixed number of lags gives the
+   autocovariance at lag `j` the weight `1 − j / (ℓ + 1)`, so it does not converge to the
+   long-run variance. On a 1-dependent series with the long-run variance 4, one Bartlett lag
+   converges to 3.
+
+Zero lags is not the answer either, because two steps can share training rows and the losses
+cluster with the volatility. The verb is now
+`covariance_forecast_compare(a, b; mt::AbstractMeanTestEstimator = WildBootstrapMeanTest())`. It
+tests the mean of each loss difference with `mean_test` at a window of one step, through the
+helper `loss_difference_test`, which `log_wealth_regret` shares (ADR 0161, amendment of
+2026-10-21). The default reads the dependence up to a bandwidth that is a fixed fraction of the
+span, and reads the p-value off a wild bootstrap, as the IC summaries do. `OverlapMeanTest()` is
+the rule of zero lags of Diebold and Mariano. On a null loss difference with MA(1) dependence and
+a volatility break, at the level 5 % over 2,000 draws, the old test at one lag rejected 11.0 % at
+60 steps and 7.5 % at 240, the rule of zero lags 16.5 % and 14.5 %, and the default 5.6 % and
+5.0 %.
+
+The Result replaces `variance`, `z`, `p` and `lags` with `t_stat`, `p_value`, `mean_ci_lower` and
+`mean_ci_upper`, the fields of the IC summaries. A step that one side did not score is missing at
+its position, so the lag between two steps is their distance in the walk-forward. The verb used
+to read the scored steps as adjacent. A scored step whose loss is not finite gives `NaN` for that
+loss. Two evaluations that share no scored step raise an `IsEmptyError`. `newey_west_variance` is
+removed.

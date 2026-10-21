@@ -18,18 +18,15 @@ form compares a prediction result against the benchmark of its own rows (#1664).
                                 rd = po.PredictionReturnsResult(; nx = ["P"], X = r,
                                                                 ts = ts))
     end
-    function newey_west(d, lags)
-        M = length(d)
-        e = d .- mean(d)
-        g(k) = dot(e[(k + 1):M], e[1:(M - k)]) / M
-        return g(0) + 2 * sum((1 - k / (lags + 1)) * g(k) for k in 1:lags; init = 0.0)
-    end
+    # A seeded Mean Test, so two calls draw the same law draw for draw.
+    mt = WildBootstrapMeanTest(; seed = 1787)
+    test_fields(r) = (r.t_stat, r.p_value, r.mean_ci_lower, r.mean_ci_upper)
 
     @testset "The hand example" begin
         a = [0.02, -0.01, 0.03]
         b = [0.025, 0.0, 0.03]
         ts = Date(2024, 1, 1) .+ Day.(0:2)
-        reg = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts))
+        reg = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts); mt = mt)
         @test isa(reg, LogWealthRegretResult)
         @test isapprox(reg.regret, 0.01494; atol = 1e-5)
         @test isapprox(reg.regret_per_period, 0.00498; atol = 1e-5)
@@ -40,24 +37,25 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         @test reg.cumulative[end] == reg.regret
         @test reg.regret_per_period == reg.regret / reg.n_periods
         @test reg.n_periods == 3
-        @test reg.lags == 0
         @test reg.wealth_a ≈ prod(1 .+ a)
         @test reg.wealth_b ≈ prod(1 .+ b)
         @test reg.regret ≈ log(reg.wealth_b) - log(reg.wealth_a)
-        # The test statistic against a hand Newey–West at zero lags, and at one lag.
-        v0 = newey_west(reg.difference, 0)
-        @test reg.variance ≈ v0
-        @test reg.z ≈ sqrt(3) * mean(reg.difference) / sqrt(v0)
-        @test reg.p ≈ 2 * ccdf(Normal(), abs(reg.z))
-        reg1 = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts); lags = 1)
-        @test reg1.variance ≈ newey_west(reg.difference, 1)
-        @test reg1.lags == 1
-        @test reg1.regret == reg.regret
-        # The sign: swapping the two negates the regret.
-        swap = log_wealth_regret(bare_prediction(b, ts), bare_prediction(a, ts))
+        # The test is the Mean Test of the difference at a window of one row (#1787).
+        @test test_fields(reg) ==
+              values(po.mean_test(mt, reg.difference, 1, po.mean_test_rng(mt)))
+        @test reg.mean_ci_lower < reg.regret_per_period < reg.mean_ci_upper
+        # The rule of zero lags of Diebold and Mariano: the mean over its standard error,
+        # against a Student law.
+        rego = log_wealth_regret(bare_prediction(a, ts), bare_prediction(b, ts);
+                                 mt = OverlapMeanTest())
+        @test rego.t_stat ≈ mean(reg.difference) / (std(reg.difference) / sqrt(3))
+        @test rego.p_value ≈ 2 * ccdf(TDist(2), abs(rego.t_stat))
+        @test rego.regret == reg.regret
+        # The sign: swapping the two negates the regret and the statistic.
+        swap = log_wealth_regret(bare_prediction(b, ts), bare_prediction(a, ts); mt = mt)
         @test swap.regret ≈ -reg.regret
-        @test swap.z ≈ -reg.z
-        @test swap.p ≈ reg.p
+        @test swap.t_stat ≈ -reg.t_stat
+        @test swap.p_value ≈ reg.p_value
     end
 
     @testset "A series against itself, and the refusals" begin
@@ -65,19 +63,13 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         ts = Date(2024, 1, 1) .+ Day.(0:2)
         self = log_wealth_regret(bare_prediction(a, ts), bare_prediction(a, ts))
         @test self.regret == 0
-        @test self.variance == 0
-        @test isnan(self.z) && isnan(self.p)
+        @test all(isnan, test_fields(self))
         # Different timestamps compare nothing.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, ts),
                                                      bare_prediction(a, ts .+ Day(1)))
         # Different lengths with no timestamps compare nothing either.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, nothing),
                                                      bare_prediction(a[1:2], nothing))
-        # The lag budget is bounded by the rows.
-        @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
-                                                   bare_prediction(a, ts); lags = 3)
-        @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
-                                                   bare_prediction(a, ts); lags = -1)
         # A return below -1 leaves a negative wealth, so it is refused with the return as
         # the value, in either series; a `NaN` return passes and reaches the regret.
         err = try
@@ -89,18 +81,22 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         @test isa(err, DomainError) && err.val == -1.5
         @test_throws DomainError log_wealth_regret(bare_prediction(a, ts),
                                                    bare_prediction([NaN, -2.0, 0.0], ts))
-        @test isnan(log_wealth_regret(bare_prediction([NaN, 0.0, 0.0], ts),
-                                      bare_prediction(a, ts)).regret)
-        # A return of -1 is a total loss: the regret is infinite and the test undefined.
+        nanr = log_wealth_regret(bare_prediction([NaN, 0.0, 0.0], ts),
+                                 bare_prediction(a, ts))
+        @test isnan(nanr.regret) && all(isnan, test_fields(nanr))
+        # A return of -1 is a total loss: the regret is infinite and the test undefined. The
+        # infinite row is a defect of the series, not a missing row, so the test does not
+        # read the other two rows alone.
         ruin = log_wealth_regret(bare_prediction([0.0, -1.0, 0.0], ts),
                                  bare_prediction(a, ts))
-        @test ruin.regret == Inf && isnan(ruin.z) && isnan(ruin.p)
-        # A difference that is a non-zero constant has no variance in exact arithmetic, so
-        # the statistic is infinite; in floating point it is very large and `p` is zero.
+        @test ruin.regret == Inf && all(isnan, test_fields(ruin))
+        # A difference that is a non-zero constant has no variance in exact arithmetic. In
+        # floating point its round-off spread passes the bound of a constant series, so the
+        # statistic is very large and the p-value is the least that the test gives.
         c = log_wealth_regret(bare_prediction(a, ts),
-                              bare_prediction((1 .+ a) .* exp(0.001) .- 1, ts))
+                              bare_prediction((1 .+ a) .* exp(0.001) .- 1, ts); mt = mt)
         @test isapprox(c.regret, 0.003; atol = 1e-12)
-        @test c.variance < 1e-25 && abs(c.z) > 1e10 && c.p == 0
+        @test abs(c.t_stat) > 1e10 && c.p_value == 1 / (mt.n_sim + 1)
         # A population of paths reads its first path, as the summary does.
         b = [0.025, 0.0, 0.03]
         pop = bare_prediction([b, a], ts)
@@ -210,24 +206,26 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         a = [0.02, -0.01, 0.03]
         b = [0.025, 0.0, 0.03]
         tsh = Date(2024, 1, 1) .+ Day.(0:2)
-        reg = log_wealth_regret(bench_prediction(a, b, tsh))
+        reg = log_wealth_regret(bench_prediction(a, b, tsh); mt = mt)
         @test same_fields(reg,
                           log_wealth_regret(bare_prediction(a, tsh),
-                                            bare_prediction(b, tsh)))
+                                            bare_prediction(b, tsh); mt = mt))
         @test isnan(reg.path_length)
-        @test same_fields(log_wealth_regret(bench_prediction(a, b, tsh); lags = 1),
+        @test same_fields(log_wealth_regret(bench_prediction(a, b, tsh);
+                                            mt = OverlapMeanTest()),
                           log_wealth_regret(bare_prediction(a, tsh),
-                                            bare_prediction(b, tsh); lags = 1))
+                                            bare_prediction(b, tsh);
+                                            mt = OverlapMeanTest()))
         # A population reads its first path and its first benchmark series.
-        @test same_fields(log_wealth_regret(bench_prediction([a, b], [b, a], tsh)), reg)
+        @test same_fields(log_wealth_regret(bench_prediction([a, b], [b, a], tsh); mt = mt),
+                          reg)
         # A multi-period result stacks the benchmark series of its folds.
         mp = MultiPeriodPredictionResult(;
                                          pred = [bench_prediction(a[1:2], b[1:2], tsh[1:2]),
                                                  bench_prediction(a[3:3], b[3:3], tsh[3:3])])
-        @test same_fields(log_wealth_regret(mp), reg)
-        # No benchmark, no comparator; the checks on the lags and the returns still hold.
+        @test same_fields(log_wealth_regret(mp; mt = mt), reg)
+        # No benchmark, no comparator; the check on the returns still holds.
         @test_throws ArgumentError log_wealth_regret(bare_prediction(a, tsh))
-        @test_throws DomainError log_wealth_regret(bench_prediction(a, b, tsh); lags = 3)
         @test_throws DomainError log_wealth_regret(bench_prediction(a, [0.0, -1.5, 0.0],
                                                                     tsh))
 
@@ -240,23 +238,23 @@ form compares a prediction result against the benchmark of its own rows (#1664).
         tst = ts[21:T]
         cv = IndexWalkForward(20, 1)
         ewv = cross_val_predict(EqualWeighted(), rdv, cv)
-        @test same_fields(log_wealth_regret(ewv),
-                          log_wealth_regret(ewv, hand_comparator(Bv[21:T], tst)))
+        @test same_fields(log_wealth_regret(ewv; mt = mt),
+                          log_wealth_regret(ewv, hand_comparator(Bv[21:T], tst); mt = mt))
         ewm = cross_val_predict(EqualWeighted(), rdm, cv)
-        @test same_fields(log_wealth_regret(ewm),
+        @test same_fields(log_wealth_regret(ewm; mt = mt),
                           log_wealth_regret(ewm,
                                             hand_comparator(Bm[21:T, :] * fill(1 / N, N),
-                                                            tst)))
+                                                            tst); mt = mt))
         ocv = OnlineIndexWalkForward(20, 1)
         ops = po.OnlinePortfolioSelection(; alg = ExponentiatedGradient())
         ov = cross_val_predict(ops, rdv, ocv)
-        @test same_fields(log_wealth_regret(ov),
-                          log_wealth_regret(ov, hand_comparator(Bv[21:T], tst)))
+        @test same_fields(log_wealth_regret(ov; mt = mt),
+                          log_wealth_regret(ov, hand_comparator(Bv[21:T], tst); mt = mt))
         om = cross_val_predict(ops, rdm, ocv)
         # The head moves its weights at every fold, so the series is collapsed fold by fold.
         bom = [dot(Bm[20 + i, :], p.res.w) for (i, p) in enumerate(om.pred)]
-        @test same_fields(log_wealth_regret(om),
-                          log_wealth_regret(om, hand_comparator(bom, tst)))
+        @test same_fields(log_wealth_regret(om; mt = mt),
+                          log_wealth_regret(om, hand_comparator(bom, tst); mt = mt))
 
         # The summary of a prediction reads the same benchmark when no keyword is given,
         # and `benchmark = nothing` turns the three excess statistics off.

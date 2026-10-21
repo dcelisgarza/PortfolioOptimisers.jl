@@ -199,3 +199,21 @@ The decision "No scorer and no summary column ship" holds. The maintainer chose 
 against the benchmark (the excess log wealth, the information ratio and the tracking error out of
 sample) to a later enhancement, #1686. The summary of a prediction now reads the same benchmark
 by default (ADR 0165, amendment of 2026-10-13).
+
+## Amendment (2026-10-21)
+
+[#1787](https://github.com/dcelisgarza/PortfolioOptimisers.jl/issues/1787) replaced the
+Newey–West test of the per-row difference, as it replaced the test of the covariance comparison
+(ADR 0143, amendment of 2026-10-21). A Bartlett window at a fixed number of lags does not converge
+to the long-run variance, and the default of zero lags assumes that the log growths of two
+strategies have uncorrelated differences, which volatility clustering breaks. Both methods now
+take `mt::AbstractMeanTestEstimator = WildBootstrapMeanTest()` in place of `lags`, and
+`series_regret` tests the mean of `difference` through `loss_difference_test`, the helper that the
+covariance comparison calls, at a window of one row. `OverlapMeanTest()` is the rule of zero lags
+of Diebold and Mariano.
+
+`LogWealthRegretResult` replaces `variance`, `z`, `p` and `lags` with `t_stat`, `p_value`,
+`mean_ci_lower` and `mean_ci_upper`. The interval is that of the regret per period. A row that is
+not finite, a total loss or a `NaN` return, gives a `NaN` test, as it gave before. A difference
+that is a non-zero constant gives the least p-value of the test, `1 / (n_sim + 1)`, in place of
+zero. The `lags` refusal is gone with the keyword.

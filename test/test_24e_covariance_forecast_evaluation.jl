@@ -651,41 +651,43 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         end
     end
 
-    @testset "The comparison: Diebold–Mariano–West on the loss difference" begin
+    @testset "The comparison: a Mean Test on the loss difference (#1787)" begin
         bcv3 = IndexWalkForward(w, 3; expand_train = true)
         a = cfe(Covariance(), rd, bcv3; store_forecasts = true)
         b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, bcv3)
-        cmp = covariance_forecast_compare(a, b)
+        mt = WildBootstrapMeanTest(; seed = 1787)
+        cmp = covariance_forecast_compare(a, b; mt = mt)
         @test cmp.names == ["qlike", "frobenius", "portfolio_qlike_1"]
-        @test cmp.lags == 2
         @test cmp.n_steps == length(a.dates)
         # On an i.i.d. panel the sample covariance is close to the truth and a fast decay
         # is noisy, so the first loses less: a negative mean difference, and a small `p`.
         @test all(cmp.mean_difference .< 0)
-        @test all(cmp.z .< 0)
-        @test all(cmp.p .< 0.05)
-        @test cmp.p ≈ 2 .* po.Distributions.ccdf.(po.Distributions.Normal(), abs.(cmp.z))
+        @test all(cmp.t_stat .< 0)
+        @test all(cmp.p_value .< 0.05)
+        @test all(cmp.mean_ci_upper .< 0)
+        # Each loss is the Mean Test of its difference at a window of one step, and the
+        # generator is resolved once for the call, so the losses take different draws.
+        ds = [a.qlike .- b.qlike, a.frobenius .- b.frobenius,
+              a.portfolio_qlike[:, 1] .- b.portfolio_qlike[:, 1]]
+        rng = po.mean_test_rng(mt)
+        for (i, d) in enumerate(ds)
+            @test (cmp.t_stat[i], cmp.p_value[i], cmp.mean_ci_lower[i],
+                   cmp.mean_ci_upper[i]) == values(po.mean_test(mt, d, 1, rng))
+        end
+        @test covariance_forecast_compare(a, b; mt = mt).p_value == cmp.p_value
+        # The rule of zero lags of Diebold and Mariano: the mean over its standard error.
+        ov = covariance_forecast_compare(a, b; mt = OverlapMeanTest())
+        @test ov.t_stat ≈ [mean(d) / (std(d) / sqrt(length(d))) for d in ds]
+        @test ov.mean_difference == cmp.mean_difference
         # The same forecast twice: no difference, and no statistic.
         same = covariance_forecast_compare(a, a)
         @test all(iszero, same.mean_difference)
-        @test all(iszero, same.variance)
-        @test all(isnan, same.z)
-        # The Newey–West variance at zero lags is the plain sample variance about the
-        # mean, and a lag adds Bartlett-weighted autocovariances.
-        d = a.qlike .- b.qlike
-        M = length(d)
-        @test po.newey_west_variance(d, 0) ≈ var(d; corrected = false)
-        e = d .- mean(d)
-        g1 = dot(e[2:end], e[1:(end - 1)]) / M
-        @test po.newey_west_variance(d, 1) ≈
-              var(d; corrected = false) + 2 * (1 - 1 / 2) * g1
-        @test covariance_forecast_compare(a, b; lags = 0).variance ≈
-              [var(a.qlike .- b.qlike; corrected = false),
-               var(a.frobenius .- b.frobenius; corrected = false),
-               var(a.portfolio_qlike[:, 1] .- b.portfolio_qlike[:, 1]; corrected = false)]
-        # The sign: swapping the arguments negates the statistic.
-        rev = covariance_forecast_compare(b, a)
-        @test rev.z ≈ -cmp.z
+        @test all(isnan, same.t_stat) && all(isnan, same.p_value)
+        @test all(isnan, same.mean_ci_lower) && all(isnan, same.mean_ci_upper)
+        # The sign: swapping the arguments negates the statistic, and keeps the p-value.
+        rev = covariance_forecast_compare(b, a; mt = mt)
+        @test rev.t_stat ≈ -cmp.t_stat
+        @test rev.p_value ≈ cmp.p_value
     end
 
     @testset "The re-projection equals a rerun with that portfolio" begin
@@ -756,17 +758,40 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test !isapprox(sg.mahalanobis_mean[1], mean(g.mahalanobis_ratio); rtol = 1e-4)
         dbar = [mean(filter(isfinite, r)) for r in eachrow(g.diagonal_ratio)]
         @test sg.diagonal_mean[1] ≈ mean(dbar)
-        # The default lags are the largest horizon less one, capped at M - 1.
+        # One step has no long-run variance, so its test is `NaN`; two steps answer.
+        one_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - h, h))
+        c1 = covariance_forecast_compare(one, one_b)
+        @test c1.n_steps == 1 && all(isnan, c1.p_value) && all(isfinite, c1.mean_difference)
         two = cfe(Covariance(), rd, IndexWalkForward(T - 2h, h))
         two_b = cfe(ExpWeightedCovariance(; decay = 0.8), rd, IndexWalkForward(T - 2h, h))
         @test length(two.dates) == 2
-        c2 = covariance_forecast_compare(two, two_b)
-        @test c2.lags == 1
-        @test c2.variance ≈ covariance_forecast_compare(two, two_b; lags = 1).variance
-        # The Bartlett weights keep the long-run variance non-negative, even on an
-        # alternating series whose autocovariances are all of the largest size.
-        alt = [(-1.0)^t for t in 1:9]
-        @test all(l -> po.newey_west_variance(alt, l) >= 0, 0:8)
+        @test all(isfinite, covariance_forecast_compare(two, two_b).t_stat)
+        # A scored loss that is not finite is a defect of the data, so its test is `NaN`,
+        # not a test of the other steps; the other losses keep their tests.
+        bad = deepcopy(two)
+        bad.qlike[1] = Inf
+        cb = covariance_forecast_compare(bad, two_b)
+        @test isinf(cb.mean_difference[1]) && isnan(cb.t_stat[1]) && isnan(cb.p_value[1])
+        @test all(isfinite, cb.t_stat[2:end])
+        # A step that a side did not score is missing at its position: the test reads the
+        # series with a `NaN` there, and a `NaN` outside the scored steps is no defect.
+        mt = WildBootstrapMeanTest(; seed = 3)
+        d = [0.3, -0.1, NaN, 0.5, -0.4, 0.1, 0.2]
+        k = .!isnan.(d)
+        @test po.loss_difference_test(mt, d, k, po.mean_test_rng(mt)) ==
+              po.mean_test(mt, d, 1, po.mean_test_rng(mt))
+        @test po.loss_difference_test(mt, d, k, po.mean_test_rng(mt)) !=
+              po.mean_test(mt, d[k], 1, po.mean_test_rng(mt))
+        @test all(isnan,
+                  values(po.loss_difference_test(mt, [0.1, Inf, 0.2], trues(3),
+                                                 po.mean_test_rng(mt))))
+        # The number type of the losses is kept, on the answer and on the `NaN` path.
+        d32 = Float32[0.3, -0.1, 0.2, 0.5, -0.4]
+        @test po.loss_difference_test(OverlapMeanTest(), d32, trues(5), nothing).t_stat isa
+              Float32
+        d32[2] = Inf32
+        @test po.loss_difference_test(OverlapMeanTest(), d32, trues(5), nothing).t_stat isa
+              Float32
     end
 
     @testset "The step weighting: the plain mean is one keyword away (#1513)" begin
@@ -909,8 +934,11 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
         @test occursin("do not share their steps", e.value.msg)
         r3 = cfe(Covariance(), rd, batch_cv; w = [fill(1 / N, N), fill(1 / N, N)])
         @test_throws DimensionMismatch covariance_forecast_compare(r, r3)
-        @test_throws DomainError covariance_forecast_compare(r, r; lags = length(r.dates))
-        @test_throws DomainError covariance_forecast_compare(r, r; lags = -1)
+        # Two evaluations that share no scored step have no difference to test.
+        r0 = deepcopy(r)
+        r0.n_valid .= 0
+        e = @test_throws po.IsEmptyError covariance_forecast_compare(r0, r)
+        @test occursin("share no scored step", e.value.msg)
         # The re-projection.
         e = @test_throws ArgumentError covariance_forecast_portfolio(r, rd, nothing)
         @test occursin("store_forecasts", e.value.msg)

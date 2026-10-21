@@ -163,8 +163,8 @@ The best stock in hindsight is a weaker comparator than the best constant rebala
 the `Best stock` column never stands above the `Best CRP` column. On the trending market the two columns are equal,
 because the best constant portfolio there holds one asset.
 
-`log_wealth_regret` also returns a per-row difference series and a Newey-West test of it. The comparator
-saw those rows and was chosen to win on this one sequence, so its `p` is optimistic. Read it as a
+`log_wealth_regret` also returns a per-row difference series and a test of its mean. The comparator
+saw those rows and was chosen to win on this one sequence, so its `p_value` is optimistic. Read it as a
 rank, and not as a probability.
 
 The literature bounds the row of the universal portfolio. The [`UniversalPortfolio`](@ref)
