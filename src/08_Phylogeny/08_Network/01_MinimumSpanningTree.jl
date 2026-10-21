@@ -13,8 +13,7 @@ All concrete and/or abstract types implementing specific MST algorithms (e.g., K
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.4.1.
-  - $(ref_dict[:mantegna1999])
+  - $(ref_dict[:mantegna1999]) Page 194, for the minimum spanning tree of the distances of Equation 2.
 """
 abstract type AbstractTreeType <: AbstractPhylogenyAlgorithm end
 """
@@ -76,7 +75,7 @@ KruskalTree
 
 # References
 
-  - $(ref_dict[:kruskal1956])
+  - $(ref_dict[:kruskal1956]) Page 49, Construction A.
 """
 @concrete struct KruskalTree <: AbstractTreeType
     """
@@ -136,6 +135,7 @@ BoruvkaTree
 # References
 
   - $(ref_dict[:boruvka1926])
+  - $(ref_dict[:nesetril2001]) Section 2, for an English translation, and Section 4, for the step that joins each vertex to its nearest neighbour.
 """
 @concrete struct BoruvkaTree <: AbstractTreeType
     """
@@ -160,6 +160,8 @@ $(DocStringExtensions.TYPEDEF)
 Grows the minimum spanning tree outward from a single starting vertex.
 
 `PrimTree` specifies the use of [Prim's algorithm](https://juliagraphs.org/Graphs.jl/stable/algorithms/spanningtrees/#Graphs.prim_mst) for constructing a minimum spanning tree from a graph.
+
+Construction B of [kruskal1956](@cite), a year before [prim1957](@cite), grows the tree from a fixed set of vertices. With a single vertex in that set it is the same algorithm.
 
 # Fields
 
@@ -194,7 +196,8 @@ PrimTree
 
 # References
 
-  - $(ref_dict[:prim1957])
+  - $(ref_dict[:prim1957]) Pages 1391-1392, Principles 1 and 2, and the variant that grows a single fragment.
+  - $(ref_dict[:kruskal1956]) Page 49, Construction B.
 """
 @concrete struct PrimTree <: AbstractTreeType
     """

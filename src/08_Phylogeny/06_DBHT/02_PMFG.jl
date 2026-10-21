@@ -1,7 +1,7 @@
 """
     PMFG_T2s(W::MatNum, nargout::Integer = 3)
 
-Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate a Maximal Planar Graph with the largest total weight, also known as the Planar Maximally Filtered Graph (PMFG). All weights must be non-negative.
+Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate the maximal planar graph with the largest total weight. The Planar Maximally Filtered Graph (PMFG) is an earlier approximation to the same graph. All weights must be non-negative.
 
 This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and LoGo algorithms, providing the planar graph structure and clique information required for hierarchical clustering and sparse inverse covariance estimation.
 
@@ -9,7 +9,9 @@ This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and L
 
 # The TMFG approximates the PMFG, and is not it
 
-The planar maximally filtered graph is the exact solution of the weighted maximal planar graph problem, which is costly. The triangulation this function builds is the cheap greedy approximation to it, so the name of the function is the problem and the algorithm is the approximation. Both are maximal planar graphs, so both carry exactly ``3N - 6`` edges against the ``N - 1`` of a minimum spanning tree.
+The weighted maximal planar graph problem asks for the maximal planar subgraph of the largest total weight, and it is NP-complete. Neither graph solves it exactly. The planar maximally filtered graph of [tumminello2005](@cite) is a greedy heuristic: it takes the edges in order of weight, and it keeps an edge while the graph stays planar. The triangulation this function builds is a different and cheaper heuristic, from [PMFG](@cite): it inserts vertices, not edges, so the two graphs differ in general. The name of the function names the PMFG, and the algorithm builds the TMFG. Both are maximal planar graphs, so both carry exactly ``3N - 6`` edges against the ``N - 1`` of a minimum spanning tree.
+
+Steps 1 and 2 below are a rule of the MATLAB code that accompanies [DBHTs](@cite). Algorithm 1 of [PMFG](@cite) starts from the tetrahedron of the largest total weight. Steps 9 to 11 and the bound `N >= 9` come from the same code, not from [PMFG](@cite).
 
 # Mathematical definition
 
@@ -52,7 +54,7 @@ Where:
 
 # Validation
 
-  - `N >= 9` is required for a meaningful PMFG.
+  - `N >= 9` is required for a meaningful TMFG.
   - No entry in `W` is `NaN`.
   - All entries in `W` are non-negative.
 
@@ -69,8 +71,8 @@ These two checks are kept for the case those cannot cover: that family is open *
 
 # Returns
 
-  - `A::SparseMatrixCSC{<:Number, Int}`: Adjacency matrix of the PMFG with weights.
-  - `tri::Matrix{Int}`: List of triangles (triangular faces) in the PMFG.
+  - `A::SparseMatrixCSC{<:Number, Int}`: Adjacency matrix of the TMFG with weights.
+  - `tri::Matrix{Int}`: List of triangles (triangular faces) in the TMFG.
   - `clique3::Matrix{Int}`: List of 3-cliques that are not triangular faces; all 3-cliques are given by `[tri; clique3]`.
   - `cliques::Option{Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
   - `cliqueTree::Option{SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
@@ -83,8 +85,8 @@ These two checks are kept for the case those cannot cover: that family is open *
 
 # References
 
-  - $(ref_dict[:PMFG])
-  - $(ref_dict[:tumminello2005])
+  - $(ref_dict[:PMFG]) Section III.A, Algorithm 1, and Section I for the PMFG as a greedy heuristic.
+  - $(ref_dict[:tumminello2005]) For the PMFG and its construction by edge insertion.
 """
 function PMFG_T2s(W::MatNum, nargout::Integer = 3)
     N = size(W, 1)

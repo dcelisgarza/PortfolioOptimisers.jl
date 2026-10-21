@@ -92,14 +92,14 @@ end
           root::DBHTRootMethod = UniqueRoot(),
           sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing)
 
-Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering algorithm [DBHTs](@cite). This version uses a graph-theoretic filtering technique called Triangulated Maximally Filtered Graph (TMFG).
+Perform Direct Bubble Hierarchical Tree clustering, a deterministic clustering algorithm [DBHTs](@cite). This version uses a graph-theoretic filtering technique called Triangulated Maximally Filtered Graph (TMFG). [DBHTs](@cite) builds a planar maximally filtered graph instead, and [`DBHT`](@ref) states the difference. The `root` and `branchorder` keywords are this library's own.
 
-This function implements the full DBHT clustering pipeline: it constructs a Planar Maximally Filtered Graph (PMFG) from the similarity matrix, extracts the clique and bubble hierarchies, assigns clusters, and builds a hierarchical clustering (dendrogram) compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
+This function implements the full DBHT clustering pipeline: it constructs a Triangulated Maximally Filtered Graph (TMFG) from the similarity matrix, extracts the clique and bubble hierarchies, assigns clusters, and builds a hierarchical clustering (dendrogram) compatible with [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust).
 
 # Algorithm
 
  1. Check that `D` and `S` are non-empty and of equal size.
- 2. Build the PMFG from `S` with [`PMFG_T2s`](@ref), giving the weighted adjacency `Rpm`, and check its edge count with [`assert_pmfg_weights`](@ref).
+ 2. Build the TMFG from `S` with [`PMFG_T2s`](@ref), giving the weighted adjacency `Rpm`, and check its edge count with [`assert_pmfg_weights`](@ref).
  3. Copy the sparsity pattern of `Rpm` into `Apm` and fill it with the dissimilarities of `D`, so the structure comes from the similarities and the lengths from the distances.
  4. Take the shortest path lengths `Dpm` on `Apm` with [`distance_wei`](@ref).
  5. Build the clique and bubble hierarchies from `Rpm` with [`CliqHierarchyTree2s`](@ref), giving `Hb`, `Mb`, `CliqList` and `Sb`.
@@ -122,7 +122,7 @@ This function implements the full DBHT clustering pipeline: it constructs a Plan
   - `!isempty(S)`, raising `IsEmptyError`.
   - `!isempty(D)`, raising `IsEmptyError`.
   - `size(S) == size(D)`, raising `DimensionMismatch`.
-  - The PMFG built from `S` keeps its `3N - 6` edges, by [`assert_pmfg_weights`](@ref). An exactly zero similarity is an absent edge.
+  - The TMFG built from `S` keeps its `3N - 6` edges, by [`assert_pmfg_weights`](@ref). An exactly zero similarity is an absent edge.
 
 Symmetry is **not** among them. A caller that derives both matrices from a correlation matrix gets
 it by construction, and a caller that assembles either by hand carries the contract itself.
@@ -130,9 +130,9 @@ it by construction, and a caller that assembles either by hand carries the contr
 # Returns
 
   - `T8::Vector{Int}`: `N × 1` cluster membership vector. `T8[n] = k` puts vertex `n` in the `k`-th discrete cluster.
-  - `Rpm::SparseMatrixCSC{<:Number, Int}`: `N × N` adjacency matrix of the Planar Maximally Filtered Graph (PMFG).
+  - `Rpm::SparseMatrixCSC{<:Number, Int}`: `N × N` adjacency matrix of the Triangulated Maximally Filtered Graph (TMFG).
   - `Adjv::SparseMatrixCSC{Int, Int}`: Bubble cluster membership matrix from [`BubbleCluster8s`](@ref).
-  - `Dpm::Matrix{<:Number}`: `N × N` shortest path length matrix of the PMFG.
+  - `Dpm::Matrix{<:Number}`: `N × N` shortest path length matrix of the TMFG.
   - `Mv::SparseMatrixCSC{Int, Int}`: `N × Nb` bubble membership matrix. `Mv[n, bi] = 1` means vertex `n` is a vertex of bubble `bi`.
   - `Z::Matrix{<:Number}`: `(N-1)×3` linkage matrix in Matlab format.
   - `Z_hclust::Clustering.Hclust`: Dendrogram in [`Clustering.Hclust`](https://juliastats.org/Clustering.jl/stable/hclust.html#Clustering.Hclust) format.

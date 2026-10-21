@@ -18,7 +18,7 @@ Every row of `source` names the same number of vertices, because `tmp` is alloca
 
   - `jlogo`: `N × N` matrix to be updated in-place. It is added to, never cleared, so the caller sets what it starts from.
   - `sigma`: `N × N` covariance matrix. Only the blocks the rows of `source` name are read.
-  - `source`: `Ns×k` index matrix. Each row holds the `k` vertices of one clique or separator, and `k` is `4` for the cliques and `3` for the separators of a PMFG.
+  - `source`: `Ns×k` index matrix. Each row holds the `k` vertices of one clique or separator, and `k` is `4` for the cliques and `3` for the separators of a TMFG.
   - `sign`: `+1` for cliques, `-1` for separators.
 
 # Returns
@@ -65,7 +65,7 @@ end
 
 Compute the sparse inverse covariance matrix using the LoGo (Local-Global) algorithm [J_LoGo](@cite).
 
-This function implements the LoGo sparse inverse covariance estimation by combining clique and separator contributions from a Planar Maximally Filtered Graph (PMFG) or similar clique tree structure. It efficiently accumulates the inverses of covariance submatrices corresponding to cliques and separators, producing a sparse precision (inverse covariance) matrix suitable for robust portfolio optimization and risk management.
+This function implements the LoGo sparse inverse covariance estimation by combining clique and separator contributions from a Triangulated Maximally Filtered Graph (TMFG). It efficiently accumulates the inverses of covariance submatrices corresponding to cliques and separators, producing a sparse precision (inverse covariance) matrix suitable for robust portfolio optimization and risk management.
 
 # Mathematical definition
 
@@ -85,6 +85,8 @@ Where:
 
 ``J_{i,\\,j}`` is exactly zero for a pair that no clique holds together, so the sparsity pattern of ``\\mathbf{J}`` is the edge set of the network. That is the conditional independence the filtering states, and it survives in the precision alone.
 
+Equation 4 of [J_LoGo](@cite) weights the inverse of each separator block by ``k(S) - 1``, where ``k(S)`` is the number of components that the removal of the separator leaves. In a TMFG every separator joins exactly two cliques, so the weight is one and the formula above is Equation 4. On another clique tree the formula needs that weight.
+
 # Algorithm
 
  1. Set `jlogo` to a zero matrix of the size of `sigma`.
@@ -94,8 +96,8 @@ Where:
 # Arguments
 
   - `sigma`: `N × N` covariance matrix.
-  - `separators`: `Ns×3` index matrix. Each row holds the vertices of one separator, which are the 3-cliques of a PMFG.
-  - `cliques`: `Nq×4` index matrix. Each row holds the vertices of one clique, which are the 4-cliques of a PMFG.
+  - `separators`: `Ns×3` index matrix. Each row holds the vertices of one separator, which are the 3-cliques of a TMFG.
+  - `cliques`: `Nq×4` index matrix. Each row holds the vertices of one clique, which are the 4-cliques of a TMFG.
 
 # Returns
 
@@ -157,7 +159,7 @@ The family declares no interface of its own, and no method dispatches on this su
 
 # References
 
-  - $(ref_dict[:J_LoGo])
+  - $(ref_dict[:J_LoGo]) Section II.C, Equation 4.
 """
 abstract type InverseMatrixSparsificationAlgorithm <: AbstractMatrixProcessingAlgorithm end
 """
@@ -165,13 +167,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Sparsifies the inverse covariance matrix on the cliques of an information filtering network.
 
-`LoGo` is a composable algorithm type for estimating sparse inverse covariance matrices using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition, as described in [J_LoGo](@cite). It combines a distance estimator and a similarity matrix algorithm, both validated and extensible, to produce a robust, interpretable sparse precision matrix for use in portfolio optimization and risk management.
+`LoGo` is a composable algorithm type for estimating sparse inverse covariance matrices using the Triangulated Maximally Filtered Graph (TMFG) and clique-based decomposition, as described in [J_LoGo](@cite). It combines a distance estimator and a similarity matrix algorithm, both validated and extensible, to produce a robust, interpretable sparse precision matrix for use in portfolio optimization and risk management.
 
 # What is sparse is the precision, not the covariance
 
 [`J_LoGo`](@ref) sums the inverse of each clique block and subtracts the inverse of each separator block, and the matrix that comes out is **exactly zero** wherever the network carries no edge.
 
 `sigma` is then replaced by the inverse of that precision matrix, so what the caller receives is dense. The filtering is a statement about which pairs are conditionally independent given the rest, and it survives only in the precision.
+
+# The graph is built on `sim`, not on the likelihood
+
+Algorithm 1 of [J_LoGo](@cite) builds the TMFG by the log-likelihood: at each step it inserts the vertex that maximises ``\\log\\det\\hat{\\mathbf{R}}_{S} - \\log\\det\\hat{\\mathbf{R}}_{C}``. The same work notes that, to second order in the correlations, a TMFG on the squared correlations approximates that choice. This type builds the TMFG with [`PMFG_T2s`](@ref) on the similarity matrix of `sim`, and its default similarity is neither of the two. [J_LoGo](@cite) returns the precision matrix, and the inversion and the repair by `pdm` are this library's own.
 
 # Fields
 
@@ -213,7 +219,7 @@ LoGo
 
 # References
 
-  - $(ref_dict[:J_LoGo])
+  - $(ref_dict[:J_LoGo]) Section II.C, Equation 4 and Algorithm 1.
 """
 @concrete struct LoGo <: InverseMatrixSparsificationAlgorithm
     """
@@ -321,7 +327,7 @@ end
 
 Compute the LoGo (Local-Global) covariance matrix and update `sigma` in-place.
 
-This method implements the LoGo algorithm for sparse inverse covariance estimation using the Planar Maximally Filtered Graph (PMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the PMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is not `nothing`.
+This method implements the LoGo algorithm for sparse inverse covariance estimation using the Triangulated Maximally Filtered Graph (TMFG) and clique-based decomposition. It validates inputs, computes the similarity and distance matrices, constructs the TMFG, identifies cliques and separators, and updates the input covariance matrix `sigma` in-place by inverting the LoGo sparse inverse covariance estimate. The result is projected to the nearest positive definite matrix if a `Posdef` estimator is not `nothing`.
 
 # Algorithm
 

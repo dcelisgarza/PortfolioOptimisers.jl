@@ -281,11 +281,13 @@ Where:
   - ``g``: Vector-to-scalar measure `alg`, applied to one cluster's pairwise distances. A cluster of one asset has no pairwise distance and contributes ``0``.
   - $(math_dict[:N])
 
-The selected ``c`` is the **left end** of the triple, not its centre. That is the source's own statement of the problem, and the code maximises it as written.
+The selected ``c`` is the **left end** of the triple, not its centre. That is Equation 12.15 of [cajas2025](@cite) as printed, and the code maximises it as written. The equation admits ``c = 1``, and step 3 below excludes it.
 
-# The measure decides what "dispersion" means, and the default is not the source's
+# The measure decides what "dispersion" means
 
-The source takes ``W_{c}`` as the **mean** of a cluster's pairwise distances, which is `alg = MeanValue()`. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances, which is a different statistic and selects a different ``c``.
+Equation 12.15 of [cajas2025](@cite) calls ``W_{c}`` the within-cluster dispersion and defines it no further. The book takes the equation from [yue2008](@cite). No copy of that work was found, so its definition of ``W_{c}`` is not known here.
+
+The gap statistic of [tibshirani2001](@cite), Equation 2, takes ``W_{k} = \\sum_{r} D_{r} / (2 n_{r})``, where ``D_{r}`` is the sum of the pairwise distances of cluster ``r`` over the ordered pairs. That is ``(n_{r} - 1) / 2`` times the mean of the distances, so a large cluster weighs more. `alg = MeanValue()` takes the plain mean of a cluster's pairwise distances. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances. Each of the three selects a different ``c`` in general.
 
 !!! note
 
@@ -346,9 +348,9 @@ SecondOrderDifference
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 12.2.1.2, Equation 12.15.
+  - $(ref_dict[:cajas2025]) Section 12.2.1.2, Equation 12.15. $(ref_dict[:no_original_source])
   - $(ref_dict[:yue2008])
-  - $(ref_dict[:tibshirani2001])
+  - $(ref_dict[:tibshirani2001]) Equations 1-3, for the gap statistic that needs the simulation.
 """
 @propagatable @concrete struct SecondOrderDifference <:
                                AbstractOptimalNumberClustersAlgorithm
@@ -395,7 +397,9 @@ Where:
 
 # The default reduction is the source's standardised score
 
-`alg = StandardisedValue()` divides the mean of ``\\boldsymbol{s}`` by its corrected standard deviation, which is the source's *quality measure* term for term. The standardisation is what makes scores comparable across cluster counts, so it is the reduction the selection wants; the field is a knob only because a caller may want the plain mean instead. The two disagree in general, and the standardised form is the one this default computes.
+`alg = StandardisedValue()` divides the mean of ``\\boldsymbol{s}`` by its corrected standard deviation, which is the *quality measure* of [lopezdeprado2019](@cite) term for term. [lopezdeprado2019](@cite) writes ``q = \\mathrm{E}[\\{s_{i}\\}] / \\sqrt{\\mathrm{V}[\\{s_{i}\\}]}`` and does not say which variance it takes. Equation 12.14 of [cajas2025](@cite) takes the corrected one. At a fixed ``N`` the two differ by a constant factor, so they select the same ``c``. The standardisation is what makes scores comparable across cluster counts, so it is the reduction the selection wants; the field is a knob only because a caller may want the plain mean instead. The plain mean is the rule of [rousseeuw1987](@cite), which selects the count of the largest mean silhouette. The two disagree in general, and the standardised form is the one this default computes.
+
+Neither [rousseeuw1987](@cite) nor [lopezdeprado2019](@cite) bounds ``c`` by ``\\sqrt{N}``, and the second tries every count from ``2`` to ``N - 1``. The bound is the ceiling of [`OptimalNumberClusters`](@ref), which applies it to both rules.
 
 Unlike [`SecondOrderDifference`](@ref), the reduction here runs over **one vector of length** ``N``, never over one cluster at a time, so no cluster size makes it undefined.
 
@@ -453,9 +457,9 @@ SilhouetteScore
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 12.2.1.1, Equations 12.13-12.14.
-  - $(ref_dict[:rousseeuw1987])
-  - $(ref_dict[:lopezdeprado2019])
+  - $(ref_dict[:rousseeuw1987]) Section 2, pages 55-56, for ``s_{i}``, and page 59 for the mean silhouette width.
+  - $(ref_dict[:lopezdeprado2019]) Section 3, for the quality measure ``q``.
+  - $(ref_dict[:cajas2025]) Section 12.2.1.1, Equation 12.14, for the corrected variance in ``q``.
 """
 @propagatable @concrete struct SilhouetteScore <: AbstractOptimalNumberClustersAlgorithm
     """
@@ -481,6 +485,8 @@ Pairs a selection rule with a ceiling on the answer. `alg` is either an [`Abstra
 `max_k` caps every branch, and the cap is itself capped: the ceiling in force is `min(floor(Int, sqrt(N)), max_k)`, so a `max_k` above ``\\sqrt{N}`` buys nothing. A stated `k` above that ceiling is lowered to it.
 
 A stated `k` is also checked against the tree on the hierarchical branch. A cut into `k` clusters that no node of the dendrogram supports is not honoured; [`optimal_number_clusters`](@ref) searches upward and downward for the nearest `k` that is, and takes the nearer of the two. The data-driven branches apply the same test through [`valid_k_clusters`](@ref), which walks the scoring array from its largest entry down until one passes.
+
+The ceiling ``\\sqrt{N}`` is the bound of Equation 12.15 of [cajas2025](@cite), where it belongs to the two-difference gap statistic alone. The book takes that equation from a work of which no copy was found, see [`SecondOrderDifference`](@ref). The cap `max_k`, and the search of the dendrogram for a supported `k`, are this library's own.
 
 # Fields
 
@@ -533,7 +539,7 @@ OptimalNumberClusters
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 12.2.1.
+  - $(ref_dict[:cajas2025]) Section 12.2.1.2, Equation 12.15. $(ref_dict[:no_original_source])
 """
 @propagatable @concrete struct OptimalNumberClusters <:
                                AbstractOptimalNumberClustersEstimator
@@ -570,6 +576,10 @@ Builds a dendrogram by merging the two nearest clusters until one remains.
 
 `linkage` is the criterion that says how near two clusters are once they hold more than one asset. `:single` takes the smallest distance between their members and `:complete` the largest; `:average` takes the mean over all cross pairs; `:ward` merges the pair that raises the total within-cluster variance least. The symbol is passed straight to `Clustering.hclust`, so every criterion that package accepts is available.
 
+Figure 2 of [mullner2011](@cite) states each criterion twice: as the update of the distance after a merge, and as a closed form over the members. The formulas of `:ward` hold for Euclidean distances between points. `Clustering.hclust` squares the distances for `:ward`, applies the update to the squares, and takes the square root of the merge heights, which is the form of that figure. Equation 12.12 of [cajas2025](@cite) prints the same update without the squares.
+
+[mullner2011](@cite) is a survey. No copy was found of the works that first state the four criteria, nor of the work that first states the update common to all of them.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -599,8 +609,7 @@ HClustAlgorithm
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 12.1.1, Equations 12.6-12.12.
-  - $(ref_dict[:mullner2011])
+  - $(ref_dict[:mullner2011]) Figure 2. $(ref_dict[:no_original_source])
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
     """
@@ -700,10 +709,6 @@ ClustersEstimator
   - [`Clusters`](@ref)
   - [`clusterise`](@ref)
   - [`factory`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Section 12.1.1.
 """
 @propagatable @concrete struct ClustersEstimator <: AbstractClustersEstimator
     """

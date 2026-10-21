@@ -5,6 +5,8 @@ Abstract supertype for all Direct Bubble Hierarchical Tree (DBHT) root selection
 
 The root is chosen inside [`CliqHierarchyTree2s`](@ref), which builds the clique hierarchy of the planar graph. A hierarchy needs one node with no parent, and the planar clique tree can present several candidates, so the choice of which of them becomes the root is a member of this family.
 
+The candidates are the maximal 3-cliques of the graph, and there can be more than one. The hierarchy of [NHPG](@cite) is then a forest with one tree for each of them. [DBHTs](@cite) states no rule for the choice. The two members come from the MATLAB code that accompanies it.
+
 # Related
 
   - [`UniqueRoot`](@ref)
@@ -14,14 +16,15 @@ The root is chosen inside [`CliqHierarchyTree2s`](@ref), which builds the clique
 
 # References
 
-  - $(ref_dict[:NHPG])
-  - $(ref_dict[:DBHTs])
+  - $(ref_dict[:NHPG]) Theorem 2.8 and Corollary 3.6.
 """
 abstract type DBHTRootMethod <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Takes one clique of the planar hierarchy as its single root.
+Joins every root candidate of the planar hierarchy under one root.
+
+When the clique hierarchy has one root candidate, that 3-clique is the root. When it has several, [`CliqueRoot`](@ref) adds one synthetic clique and makes it the parent of every candidate. That clique is the imaginary 3-clique of [NHPG](@cite): its interior is the whole graph, so the hierarchy has a single maximal element.
 
 # Related
 
@@ -32,7 +35,7 @@ Takes one clique of the planar hierarchy as its single root.
 
 # References
 
-  - $(ref_dict[:NHPG])
+  - $(ref_dict[:NHPG]) Definition 4.1 and Corollary 4.2.
 """
 struct UniqueRoot <: DBHTRootMethod end
 """
@@ -40,7 +43,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Builds one root from the adjacency tree of every root candidate.
 
-This keeps several equally plausible roots of the DBHT hierarchy rather than choosing between them.
+This keeps several equally plausible roots of the DBHT hierarchy rather than choosing between them. [`CliqueRoot`](@ref) adds no clique. It joins two root candidates when they share two vertices.
+
+[NHPG](@cite) leaves the hierarchy a forest of one tree for each candidate, and states no rule that joins them. The rule comes from the MATLAB code that accompanies [DBHTs](@cite), and no published work states it.
 
 # Related
 
@@ -51,7 +56,7 @@ This keeps several equally plausible roots of the DBHT hierarchy rather than cho
 
 # References
 
-  - $(ref_dict[:NHPG])
+  - $(ref_dict[:NHPG]) Corollary 3.6. $(ref_dict[:no_original_source])
 """
 struct EqualRoot <: DBHTRootMethod end
 """
@@ -60,6 +65,8 @@ $(DocStringExtensions.TYPEDEF)
 Clusters assets by the bubble hierarchy of a triangulated maximally filtered graph.
 
 `DBHT` is a composable clustering algorithm type for constructing hierarchical clusterings using the Direct Bubble Hierarchical Tree (DBHT) method, as described in [DBHTs](@cite).
+
+[DBHTs](@cite) builds the planar maximally filtered graph of [tumminello2005](@cite), which inserts edges one at a time. This type builds the triangulated maximally filtered graph of [PMFG](@cite) with [`PMFG_T2s`](@ref) instead, as the MATLAB code that accompanies [DBHTs](@cite) does. Both are maximal planar graphs, so the bubble hierarchy of [DBHTs](@cite) applies to either.
 
 # Fields
 
@@ -97,7 +104,9 @@ DBHT
 
 # References
 
-  - $(ref_dict[:DBHTs])
+  - $(ref_dict[:DBHTs]) Section "Methods", Equations 1-5.
+  - $(ref_dict[:tumminello2005]) For the planar maximally filtered graph of the original DBHT method.
+  - $(ref_dict[:PMFG]) Section III.A, Algorithm 1, for the graph that this type builds.
 """
 @concrete struct DBHT <: AbstractHierarchicalClusteringAlgorithm
     """

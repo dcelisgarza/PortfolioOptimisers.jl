@@ -292,7 +292,9 @@ The budget is a **field** rather than an argument because it is stated in hops, 
 
 # The power sum is the source's range connection matrix
 
-[`phylogeny_matrix`](@ref)'s ``\\mathbf{P} = \\mathbb{1}_{x \\geq 1}\\left(\\sum_{i=0}^{n} \\mathbf{A}^{i}\\right) - \\mathbf{I}`` is the **range connection matrix** ``\\mathbf{B}_{1,n}`` of the source, spelled with one indicator instead of `n` of them. The source builds a per-length connection matrix ``\\mathbf{B}_{k} = \\mathbb{1}_{x \\geq 1}(\\mathbf{A}^{k} + \\mathbf{I}) - \\mathbf{I}`` and then indicates their sum; the library adds the powers first, and the ``\\mathbf{A}^{0} = \\mathbf{I}`` term the sum picks up is the term the trailing ``- \\mathbf{I}`` removes again. The two agree entry for entry: on the source's own six-node example the matrices are **identical for every** `n` from `1` to `5`.
+[`phylogeny_matrix`](@ref)'s ``\\mathbf{P} = \\mathbb{1}_{x \\geq 1}\\left(\\sum_{i=0}^{n} \\mathbf{A}^{i}\\right) - \\mathbf{I}`` is the **range connection matrix** ``\\mathbf{B}_{1,n}`` of the source, spelled with one indicator instead of `n` of them. The source builds a per-length connection matrix ``\\mathbf{B}_{k} = \\mathbb{1}_{x \\geq 1}(\\mathbf{A}^{k} + \\mathbf{I}) - \\mathbf{I}`` and then indicates their sum; the library adds the powers first, and the ``\\mathbf{A}^{0} = \\mathbf{I}`` term the sum picks up is the term the trailing ``- \\mathbf{I}`` removes again. The two agree entry for entry: on the source's own six-node example the matrices are **identical for every** `n` from `1` to `7`.
+
+The original, [graphpo1](@cite), prints the indicator as ``\\mathbb{1}_{x > 1}``. Read that way, a pair joined by exactly one walk drops out of ``\\mathbf{B}_{k}``, and its own Figure 9 contradicts it. Equations 13.1 and 13.2 of [cajas2025](@cite) print ``\\mathbb{1}_{x \\geq 1}``, which reproduces that figure, and that is the form the library builds.
 
 # The budget may be a rule instead of a number
 
@@ -344,7 +346,8 @@ HopCount
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.2, Equations 13.1-13.2.
+  - $(ref_dict[:graphpo1]) Section 2.2, Equations 1-2.
+  - $(ref_dict[:cajas2025]) Section 13.1.2, Equations 13.1-13.2, for the indicator ``\\mathbb{1}_{x \\geq 1}``.
 """
 @concrete struct HopCount <: AbstractSeparationAlgorithm
     """

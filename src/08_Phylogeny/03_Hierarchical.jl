@@ -48,8 +48,8 @@ ClusterNode
 
 # References
 
-  - $(ref_dict[:virtanen2020])
-  - $(ref_dict[:cajas2025]) Section 12.1.1, Equation 12.5.
+  - $(ref_dict[:virtanen2020]) The type ports `ClusterNode` and `to_tree` of `scipy.cluster.hierarchy`, which that work names and does not describe.
+  - $(ref_dict[:cajas2025]) Section 12.1.1, Equation 12.5, for the four columns of a linkage matrix.
 """
 @concrete struct ClusterNode <: AbstractResult
     """
@@ -179,7 +179,7 @@ The default strategy, and the only one that ships. [`to_tree`](@ref) numbers the
 
 # References
 
-  - $(ref_dict[:virtanen2020])
+  - $(ref_dict[:virtanen2020]) The traversal ports `ClusterNode.pre_order` of `scipy.cluster.hierarchy`, which that work names and does not describe.
 """
 struct PreorderTreeByID <: AbstractPreorderBy end
 """
@@ -441,7 +441,7 @@ end
 
 Order the leaves of a dendrogram so that the sum of the distances between adjacent leaves is the least that the tree permits.
 
-A flip of the two children of a merge keeps the tree and reverses the leaves below that merge. This method is the exact dynamic programme of [barjoseph2001](@cite), and it finds the least sum over every combination of flips in ``O(N^3)`` time and ``O(N^2)`` memory. `Clustering.orderbranches_barjoseph!` makes a heuristic from the same source. It decides each merge once, from its four outermost leaves, so it can miss the least sum.
+A flip of the two children of a merge keeps the tree and reverses the leaves below that merge. This method is the exact dynamic programme of [barjoseph2001](@cite), and it finds the least sum over every combination of flips in ``O(N^3)`` time and ``O(N^2)`` memory. The algorithm of [barjoseph2001](@cite) runs in ``O(N^4)`` time. The ``O(N^3)`` form is Section 3.2 of [barjoseph2003](@cite): its temporary table, Equation 3, is the table `T` of [`join_leaf_orders!`](@ref). Both works maximise a sum of similarities, and this method minimises the same sum of distances. `Clustering.orderbranches_barjoseph!` makes a heuristic from the same source. It decides each merge once, from its four outermost leaves, so it can miss the least sum.
 
 # Mathematical definition
 
@@ -483,7 +483,8 @@ Where:
 
 # References
 
-  - $(ref_dict[:barjoseph2001])
+  - $(ref_dict[:barjoseph2001]) Sections "Problem definition" and "Algorithm", for the problem and the recurrence.
+  - $(ref_dict[:barjoseph2003]) Section 3.2, Equations 2-4, for the ``O(N^3)`` time.
 """
 function optimal_leaf_order!(ml::AbstractVector{Int}, mr::AbstractVector{Int}, D::MatNum)
     N = length(ml) + 1

@@ -5,6 +5,8 @@ Partitions assets into `k` groups by Lloyd's algorithm, with no dendrogram.
 
 Runs [`Clustering.kmeans`](https://juliastats.org/Clustering.jl/stable/api/#Clustering.kmeans) over the **columns of the distance matrix**, so each asset is the point given by its distances to every asset, and two assets cluster together when they sit at similar distances from the rest of the universe. The result is a flat partition: there is no tree, so nothing downstream can cut it at a different `k`.
 
+`Clustering.kmeans` alternates two steps over all the points: it assigns each point to its nearest centre, and it moves each centre to the mean of its points. [lloyd1982](@cite) states that alternation for a quantiser of one real variable, in Method I of Section VI. [macqueen1967](@cite) names *k-means* and states the problem for points in ``N`` dimensions, but it moves a mean after each point, one point at a time. The work that first states the alternation over all the points in ``N`` dimensions was not read.
+
 `rng` and `seed` are here because the algorithm is randomised. [`resolve_rng`](@ref) combines them at the point of use, so a stated `seed` makes a run reproducible without the caller building a generator.
 
 # `kwargs` reaches `Clustering.kmeans` unchanged
@@ -52,7 +54,8 @@ KMeansAlgorithm
 
 # References
 
-  - $(ref_dict[:lloyd1982])
+  - $(ref_dict[:lloyd1982]) Section VI, Method I. $(ref_dict[:no_original_source])
+  - $(ref_dict[:macqueen1967]) Sections 1 and 2.1, for the name and the problem in ``N`` dimensions.
 """
 @concrete struct KMeansAlgorithm <: AbstractNonHierarchicalClusteringAlgorithm
     """

@@ -9,6 +9,8 @@ This function computes the distance matrix containing the lengths of the shortes
 
     It ports the function `distance_wei` of the Brain Connectivity Toolbox of [rubinovsporns2010](@citet).
 
+The algorithm is Problem 2 of [dijkstra1959](@cite), which settles the vertices in order of increasing distance from the source, and which holds on a directed graph by its Remark 1. The toolbox runs it from every source, settles every vertex at the least distance in one step, and counts the edges of each path in `B`. [dijkstra1959](@cite) states none of the three.
+
 # Mathematical definition
 
 ```math
@@ -63,6 +65,7 @@ A pair that no path joins keeps ``D_{u,\\,v} = \\infty``, because the minimum ov
 # References
 
   - $(ref_dict[:rubinovsporns2010])
+  - $(ref_dict[:dijkstra1959]) Problem 2 and Remark 1.
 """
 function distance_wei(L::MatNum)
     N = size(L, 1)
@@ -117,6 +120,8 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
     It ports the function `breadth` of the Brain Connectivity Toolbox of [rubinovsporns2010](@citet).
 
+Breadth-first search is older than the toolbox. No copy of the work that first states it was found, so the search follows the toolbox alone.
+
 # Algorithm
 
  1. Colour every vertex white, set every entry of `distance` to `Inf`, and set every entry of `branch` to zero.
@@ -147,7 +152,7 @@ This function performs a breadth-first search (BFS) on a binary (directed or und
 
 # References
 
-  - $(ref_dict[:rubinovsporns2010])
+  - $(ref_dict[:rubinovsporns2010]) Page 1065, for the toolbox that holds `breadth`. $(ref_dict[:no_original_source])
 """
 function breadth(CIJ::MatNum, source::Integer)
     N = size(CIJ, 1)

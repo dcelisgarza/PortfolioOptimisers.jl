@@ -9,10 +9,6 @@ All concrete and/or abstract types implementing network-based estimation algorit
 
   - [`NetworkEstimator`](@ref)
   - [`AbstractCentralityEstimator`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Section 13.1.
 """
 abstract type AbstractNetworkEstimator <: AbstractPhylogenyEstimator end
 """
@@ -148,10 +144,9 @@ NetworkEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.4.
-  - $(ref_dict[:mantegna1999])
-  - $(ref_dict[:tumminello2005])
-  - $(ref_dict[:PMFG])
+  - $(ref_dict[:mantegna1999]) Page 194, for the minimum spanning tree of a tree `alg`.
+  - $(ref_dict[:PMFG]) Section III.A, Algorithm 1, for the graph of a similarity `alg`.
+  - $(ref_dict[:graphpo1]) Sections 3.1 and 3.2, for the two networks of a portfolio.
 """
 @propagatable @concrete struct NetworkEstimator <: AbstractNetworkEstimator
     """

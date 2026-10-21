@@ -9,10 +9,6 @@ All concrete and/or abstract types implementing centrality-based estimation algo
 
   - [`CentralityEstimator`](@ref)
   - [`AbstractCentralityAlgorithm`](@ref)
-
-# References
-
-  - $(ref_dict[:cajas2025]) Section 13.1.5.1.
 """
 abstract type AbstractCentralityEstimator <: AbstractEstimator end
 """
@@ -23,6 +19,8 @@ Bundles a network source with the centrality algorithm that scores its assets.
 `CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
 
 The network is weighted where it can be. [`centrality_polarity`](@ref) answers which quantity `ct` needs — distances for the shortest-path algorithms, similarities for [`EigenvectorCentrality`](@ref) — and [`centrality_graph`](@ref) supplies it from `pl`.
+
+The centrality vector feeds the average centrality ``\\mathbf{C}_n^{\\prime} \\boldsymbol{w}`` of [graphpo1](@cite), Equation 6. That work computes ``\\mathbf{C}_n`` on the unweighted adjacency matrix of the tree or of the TMFG. The weights are this library's choice, and they follow the rule of [pozzi2013](@cite).
 
 The estimator carries no override of its own. A caller who wants the centrality over the network's topology alone configures `ct` itself, with [`TopologyOnly`](@ref) in its `ov` field, and this estimator is a pure bundle of `pl` and `ct` either way.
 
@@ -104,7 +102,8 @@ CentralityEstimator
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.5.1, Equation 13.6.
+  - $(ref_dict[:graphpo1]) Section 2.4.1, Equation 6, and Section 4, Equation 8.
+  - $(ref_dict[:pozzi2013]) Section "Methods", "Centrality and Peripherality measures".
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
     """

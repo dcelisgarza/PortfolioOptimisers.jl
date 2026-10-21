@@ -344,7 +344,7 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
  1. Reduce `Apm` to the binary adjacency `A`, and list every 3-clique of it with [`clique3`](@ref), giving `CliqList`.
  2. For each 3-clique, cut it out of the graph with [`FindDisjoint`](@ref), which splits the vertices into the clique `indx0`, the side `indx1` that the cut separated, and the side `indx2` that stayed connected.
- 3. Take the smaller of the two sides, together with the clique, as the separated set `indx_s`. A tie takes `indx1`, the side the cut separated. Record `length(indx_s) - 3` in `Sb[n]`, and mark the vertices of `indx_s` in column `n` of `M`.
+ 3. Take the smaller of the two sides, together with the clique, as the separated set `indx_s`. A tie takes `indx1`, the side the cut separated. The smaller side is the interior of the clique in [NHPG](@cite), Definition 2.2, which leaves a tie to an arbitrary choice. Record `length(indx_s) - 3` in `Sb[n]`, and mark the vertices of `indx_s` in column `n` of `M`.
  4. Build the parent vector `Pred` from `M` with [`BuildHierarchy`](@ref), and read the root candidates `Root` off it.
  5. Build the clique hierarchy `H` with [`CliqueRoot`](@ref), through the branch `root` selects.
  6. When `H` is non-empty, build the bubble hierarchy `H2` and the bubble membership `Mb` with [`BubbleHierarchy`](@ref), reduce `H2` to binary, and trim `Mb` to the rows of `CliqList`.
@@ -361,7 +361,7 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
   - `H2::SparseMatrixCSC{Int, Int}`: `Nb×Nb` symmetric adjacency matrix representing the bubble hierarchy tree, where `Nb` is the number of bubbles.
   - `Mb::Matrix{Int}`: Bubble membership matrix for 3-cliques (`Nc×Nb`), where `Mb[n, bi] = 1` indicates 3-clique `n` belongs to bubble `bi`.
   - `CliqList::Matrix{Int}`: List of 3-cliques (`Nc×3`), each row contains the vertex indices of a 3-clique.
-  - `Sb::Vector{Int}`: `Nc×1` vector indicating the size of the separating set for each 3-clique.
+  - `Sb::Vector{Int}`: `Nc×1` vector of the number of vertices in the interior of each 3-clique. An entry is positive exactly when its 3-clique separates the graph.
 
 # Related
 
@@ -373,7 +373,7 @@ This function builds the hierarchical structure of 3-cliques (triangles) and bub
 
 # References
 
-  - $(ref_dict[:NHPG])
+  - $(ref_dict[:NHPG]) Definition 2.2 for the interior, Definition 3.2 and Corollary 3.6 for `H`, and Definitions 4.3 and 5.1 for the bubbles and `H2`.
 """
 function CliqHierarchyTree2s(Apm::MatNum, root::DBHTRootMethod = UniqueRoot())
     N = size(Apm, 1)::Int

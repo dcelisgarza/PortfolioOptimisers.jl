@@ -13,6 +13,8 @@ A member says which quantity its edge weights must be, through [`centrality_pola
 
 The five members that do declare one carry an `ov` field, and [`TopologyOnly`](@ref) in it withdraws the declaration for that instance. [`centrality_polarity`](@ref) therefore answers the **effective** polarity, not the declared one.
 
+The rule is the one of [pozzi2013](@cite). It weights the degree and the eigenvector centrality by a similarity, ``1 + \\rho_{i,\\,j}``, and the betweenness, the eccentricity and the closeness by the distance ``\\sqrt{2(1 - \\rho_{i,\\,j})}``.
+
 # Interfaces
 
 In order to implement a new centrality algorithm that works seamlessly with the library, subtype `AbstractCentralityAlgorithm` with the routine's configuration as fields, and implement the following method:
@@ -58,8 +60,7 @@ In order to implement a new centrality algorithm that works seamlessly with the 
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.3.
-  - $(ref_dict[:estrada2011]) Chapter 7.
+  - $(ref_dict[:pozzi2013]) Section "Methods", "Centrality and Peripherality measures".
 """
 abstract type AbstractCentralityAlgorithm <: AbstractPhylogenyAlgorithm end
 """
@@ -320,6 +321,8 @@ The sum runs over the ordered pairs of distinct assets, so an undirected network
 
 A pair joined by several shortest paths shares one unit of score between them, because the summand is a fraction of ``\\sigma_{s,\\,t}``. [`StressCentrality`](@ref) omits that division and counts the paths themselves.
 
+[freeman1979](@cite) restates the measure of [freeman1977](@cite) over the unordered pairs, and divides it by its largest value, ``(n^2 - 3n + 2) / 2``, which the centre of a star reaches. That is the factor above, over the ordered pairs. No copy of the work of 1977 was found.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -359,7 +362,8 @@ BetweennessCentrality
 # References
 
   - $(ref_dict[:freeman1977])
-  - $(ref_dict[:brandes2001])
+  - $(ref_dict[:freeman1979]) Pages 223-224. $(ref_dict[:no_original_source])
+  - $(ref_dict[:brandes2001]) Sections 2 and 4, for the sum over the ordered pairs and the algorithm that `Graphs.jl` runs.
 """
 @concrete struct BetweennessCentrality <: AbstractCentralityAlgorithm
     """
@@ -413,6 +417,8 @@ The first factor is the reciprocal of the mean length from asset ``i`` to the as
 
 An asset that reaches nothing scores zero rather than an infinity, because the sum in the denominator is over ``\\mathcal{R}_i`` alone and an unreachable asset never enters it.
 
+[freeman1979](@cite) states the first factor for a connected network, as the reciprocal of the mean distance, and credits two earlier works with it. No copy of those works was found. The second factor, which extends the measure to a network in components, is the rule of `Graphs.jl`, and no copy was found of a work that states it first.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -451,7 +457,7 @@ ClosenessCentrality
 
 # References
 
-  - $(ref_dict[:freeman1979])
+  - $(ref_dict[:freeman1979]) Pages 225-226. $(ref_dict[:no_original_source])
 """
 @concrete struct ClosenessCentrality <: AbstractCentralityAlgorithm
     """
@@ -546,8 +552,8 @@ DegreeCentrality
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.3.1, Equation 13.3.
-  - $(ref_dict[:freeman1979])
+  - $(ref_dict[:graphpo1]) Section 2.3.1, Equation 3.
+  - $(ref_dict[:freeman1979]) Page 221, for the division by ``n - 1``.
 """
 @concrete struct DegreeCentrality <: AbstractCentralityAlgorithm
     """
@@ -590,6 +596,8 @@ Where:
 
 The right-hand side is ``\\mathbf{q}_{\\mathrm{max}}`` itself, so the score is the leading eigenvector under whatever normalisation the eigensolver applies. `Graphs.jl` returns it with unit 2-norm, and takes the absolute value of every entry — the leading eigenvector of a non-negative matrix shares one sign, by the Perron-Frobenius theorem, so that changes no ordering. The returned vector matches the formula above to eigensolver precision, which moves by a few ulps between calls on one graph.
 
+The formula above is Equation 4 of [graphpo1](@cite). [bonacich1987](@cite) states the measure as ``\\lambda \\mathbf{e} = \\mathbf{R}\\,\\mathbf{e}`` and prefers the largest eigenvalue. It credits the measure to a work of its author of 1972, of which no copy was found.
+
 Declares [`SimilarityPolarity`](@ref) — the only member that declares it — unless `ov` overrides it: it is the leading eigenvector of the adjacency matrix itself, so a stronger link must contribute a larger entry. It therefore reads weights on the similarity branch alone. A tree is selected by minimising a distance and carries no similarity, so this algorithm runs unweighted there rather than being handed the wrong quantity. Set `ov` to [`TopologyOnly`](@ref) to withdraw the declaration and read the topology alone.
 
 The weights change the answer by less than the shortest-path algorithms do, and they do change it: the weighted and unweighted vectors differ while still correlating closely, and withdrawing the weights also moves the structure's ``\\lambda_{\\mathrm{max}}``.
@@ -624,8 +632,8 @@ EigenvectorCentrality
 
 # References
 
-  - $(ref_dict[:cajas2025]) Section 13.1.3.2, Equation 13.4.
-  - $(ref_dict[:bonacich1987])
+  - $(ref_dict[:graphpo1]) Section 2.3.2, Equation 4.
+  - $(ref_dict[:bonacich1987]) Page 1172, Equations 1-2. $(ref_dict[:no_original_source])
 """
 @concrete struct EigenvectorCentrality <: AbstractCentralityAlgorithm
     """
@@ -672,6 +680,8 @@ Where:
 
 The series converges to the resolvent only for ``\\alpha < 1 / \\lambda_{\\mathrm{max}}``, and the two right-hand sides are equal only there. Outside that range the resolvent is still defined at almost every ``\\alpha``, and the vector it gives is the walk sum of nothing.
 
+[katz1953](@cite) sums the walks of length one and more, ``\\left(\\mathbf{I}_n - \\alpha\\,\\mathbf{A}\\right)^{-1} - \\mathbf{I}_n``, which is ``\\boldsymbol{v} - \\mathbf{1}_n``, and divides by a constant that depends on ``n`` and ``\\alpha``. `Graphs.jl` keeps the walk of length zero and scales to unit 2-norm. The ranking is the same, and the scores are not proportional. [katz1953](@cite) states the same bound on ``\\alpha``.
+
 # `alpha` must be below the reciprocal of the largest eigenvalue
 
 Above the bound the linear solve still returns a vector, and the vector is not a centrality: some of its scores turn negative, and a negative centrality has no reading.
@@ -711,7 +721,7 @@ KatzCentrality
 
 # References
 
-  - $(ref_dict[:katz1953])
+  - $(ref_dict[:katz1953]) Pages 41-42.
 """
 @concrete struct KatzCentrality <: AbstractCentralityAlgorithm
     """
@@ -756,6 +766,8 @@ Where:
 
 The three terms are the walk's three moves: it teleports to a uniformly drawn asset, it teleports out of a dangling asset it cannot leave, or it follows one of the edges into asset ``i``. Every score is therefore non-negative and the vector sums to one, which is what separates this member from the counting scores of the family.
 
+[brin1998](@cite) writes ``\\mathrm{PR}_i = (1 - \\alpha) + \\alpha \\sum_{j \\in \\mathcal{I}_i} \\mathrm{PR}_j / k_j``, with no division by ``n`` and no term for the dangling assets. The division by ``n`` makes the vector sum to one, as [brin1998](@cite) says it does. The uniform spread of the mass of the dangling assets is the rule of `Graphs.jl`, and no copy was found of a work that states it first.
+
 Every network this library builds is **undirected**, where ``\\mathcal{I}_i`` is the neighbourhood of asset ``i`` and ``k_j`` is its degree. On a connected undirected network the solution approaches the degree vector [`DegreeCentrality`](@ref) counts, up to a scale, as ``\\alpha`` approaches one, and a smaller ``\\alpha`` blends that limit with the uniform distribution.
 
 # Fields
@@ -797,7 +809,7 @@ Pagerank
 
 # References
 
-  - $(ref_dict[:brin1998])
+  - $(ref_dict[:brin1998]) Section 2.1.1. $(ref_dict[:no_original_source])
 """
 @concrete struct Pagerank <: AbstractCentralityAlgorithm
     """
@@ -853,6 +865,8 @@ The diameter is what separates this score from [`ClosenessCentrality`](@ref). Cl
 
 The score is at most ``1``, which an asset one edge away from every other reaches, and at least ``1/D``, which an asset whose mean length equals the diameter reaches. Both bounds move with ``D``, so two networks give comparable scores only when the two have the same diameter.
 
+[brandes2001](@cite) states the formula and credits it to [valente1998](@cite). No copy of that work was found. Brandes sums ``D + 1 - \\ell_{i,\\,j}`` over every asset ``j``, the asset ``i`` included, and divides by ``(n - 1) D``. Read that way, every score rises by ``(D + 1) / ((n - 1) D)``, so the ranking is the same. The form above, which `Graphs.jl` computes, leaves ``j = i`` out.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -884,6 +898,7 @@ RadialityCentrality
 # References
 
   - $(ref_dict[:valente1998])
+  - $(ref_dict[:brandes2001]) Section 4. $(ref_dict[:no_original_source])
 """
 @concrete struct RadialityCentrality <: AbstractCentralityAlgorithm
     """
@@ -920,6 +935,8 @@ Where:
   - $(math_dict[:sigma_st_i_paths])
 
 The sum runs over the ordered pairs of distinct assets, so an undirected network counts each pair twice. There is no normalisation, so the score is a count rather than a rate: it grows with the size of the network, and two networks give comparable scores only when the two hold the same number of assets.
+
+[brandes2001](@cite) states this sum and credits it to [shimbel1953](@cite). No copy of that work was found.
 
 It is [`BetweennessCentrality`](@ref)'s sum without the division by ``\\sigma_{s,\\,t}``. A pair joined by many shortest paths therefore contributes many units here and one unit there, so this score reads how much traffic an asset carries and betweenness reads how much of it the asset alone can carry.
 
@@ -962,6 +979,7 @@ StressCentrality
 # References
 
   - $(ref_dict[:shimbel1953])
+  - $(ref_dict[:brandes2001]) Section 2. $(ref_dict[:no_original_source])
 """
 @concrete struct StressCentrality <: AbstractCentralityAlgorithm
     """
