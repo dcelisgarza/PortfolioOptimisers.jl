@@ -524,6 +524,23 @@ end
     @test PO.naive_portfolio_risk(Variance(), sigma) ≈ dot(wn, sigma, wn)
     @test PO.naive_portfolio_risk(StandardDeviation(), sigma) ≈ sqrt(dot(wn, sigma, wn))
 
+    #=
+    #1785: the block is that of the code that accompanies cotton2024, built from R and M,
+    not the block of its Equation 4.2, Ac ./ (b * b'). The numbers below are those of an
+    independent implementation of the same method. The case of the issue has halves of two
+    assets, so M is the identity.
+    =#
+    S4 = cov(randn(StableRNG(5), 300, 4) * [1 0.5 0.3 0.2; 0 1 0.4 0.1; 0 0 1 0.3; 0 0 0 1])
+    A4, B4, D4 = S4[1:2, 1:2], S4[1:2, 3:4], S4[3:4, 3:4]
+    a4 = PO.schur_augmentation(A4, B4, D4, 0.6)
+    # Measured maxabs 0.
+    @test parity_compare(vec(a4),
+                         [1.1053754436644576, 0.5353025295713506, 0.5353025295713506,
+                          1.0072426334532807]; rtol = 0.0, atol = 1e-15,
+                         name = "Schur block 1785").ok
+    b4 = 1 .- 0.6 * B4 * (D4 \ ones(2))
+    @test maximum(abs, a4 - (A4 - 0.6 * B4 * (D4 \ B4')) ./ (b4 * b4')) > 0.4
+
     # At gamma = 0 a Variance measure gives the allocation of HierarchicalRiskParity with a
     # Variance measure. A StandardDeviation measure does not, because the naive weights
     # are inverse variance, not inverse volatility.
@@ -610,6 +627,59 @@ end
     pvv = PO.port_opt_view(pv, [2, 4], zeros(3, 6))
     @test pvv.r.sigma == sigma[[2, 4], [2, 4]]
     @test (pvv.gamma, pvv.alg, pvv.flag) == (0.4, NonMonotonicSchurComplement(), false)
+end
+@testset "Schur weights with halves of unequal size" begin
+    #=
+    #1785: seven assets split 3 | 4, and eleven split 5 | 6, then 2 | 3. So M is not the
+    identity. The weights and the gamma of the monotonic search are those of an
+    independent implementation of the same method, on the natural leaf order.
+    =#
+    PO = PortfolioOptimisers
+    function schur_unequal_sigma(seed, n)
+        rng = StableRNG(seed)
+        Fu = randn(rng, 300, 2)
+        Bu = randn(rng, n, 2)
+        Eu = randn(rng, 300, n) * 0.5
+        return prior(EmpiricalPrior(), (Fu * Bu' + Eu) / 100).sigma
+    end
+    # (seed and size, gamma, weights). A negative gamma is the monotonic search up to its
+    # absolute value, and the first entry of the weights is then the gamma it reports.
+    refs = ((7, 0.6,
+             [0.0914083785734791, 0.09533827770727978, 0.09013238744765777,
+              0.06316469206608843, 0.22088859035638636, 0.23029173902968295,
+              0.2087759348194256]),
+            (7, -1.0,
+             [1.0, 0.08461481709072553, 0.10812135044464641, 0.09585142817186296,
+              0.08954612295313644, 0.21755430290707614, 0.21067211392450186,
+              0.19363986450805065]),
+            (11, 0.6,
+             [0.05293367720134903, 0.15167664847135956, 0.04762384814741166,
+              0.056863556820243105, 0.024429737245511035, 0.05634856981900134,
+              0.0469309291601451, 0.19693231656541027, 0.24059285451904852,
+              0.09610818031415787, 0.02955968173636249]),
+            (11, -1.0,
+             [0.2796875, 0.03461756048276862, 0.1523572384859758, 0.032118516864646236,
+              0.042893033324147324, 0.014018044026135875, 0.03179207567468832,
+              0.020968507717496993, 0.21873004767145654, 0.32582029735495194,
+              0.1073726451777764, 0.019312033219955976]))
+    for (n, g, ref) in refs
+        su = schur_unequal_sigma(n, n)
+        prs = LowOrderPrior(; X = zeros(2, n), mu = zeros(n), sigma = su)
+        wbu = WeightBounds(; lb = zeros(n), ub = ones(n))
+        p = if g < 0
+            SchurComplementParams(; gamma = -g, alg = MonotonicSchurComplement(; N = 11))
+        else
+            SchurComplementParams(; gamma = g, alg = NonMonotonicSchurComplement(),
+                                  flag = false)
+        end
+        w, gamma, _ = PO.schur_complement_weights(prs, [collect(1:n)], wbu, p)
+        wref = g < 0 ? ref[2:end] : ref
+        # Measured maxabs 1.4e-16 on the weights, and 0 on gamma.
+        @test parity_compare([gamma], [g < 0 ? ref[1] : g]; rtol = 0.0, atol = 1e-12,
+                             name = "Schur unequal gamma $(n) $(g)").ok
+        @test parity_compare(w, wref; rtol = 0.0, atol = 1e-15,
+                             name = "Schur unequal w $(n) $(g)").ok
+    end
 end
 @testset "The docstrings of 04_HierarchicalEqualRiskContribution.jl against numbers" begin
     PO = PortfolioOptimisers
