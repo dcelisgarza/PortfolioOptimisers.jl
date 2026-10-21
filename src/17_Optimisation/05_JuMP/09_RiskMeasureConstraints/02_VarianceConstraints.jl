@@ -976,7 +976,7 @@ $(val_dict[:relax])
   - [`ucs_variance_risk_bounds!`](@ref)
   - [`set_sdp_constraints!`](@ref)
   - [`UncertaintySetVariance`](@ref)
-  - [`ucs_variance`](@ref): The value-level worst case, which omits ``\\mathbf{E}`` and so lies at or above the model's value.
+  - [`ucs_variance`](@ref): The value-level worst case, which omits ``\\mathbf{E}`` for the ellipsoid and the norm ball and fixes ``\\mathbf{W} = \\boldsymbol{w} \\boldsymbol{w}^\\intercal`` for the box, and so lies at or above the model's value.
   - [`norm_ball_dual_norm_epigraph!`](@ref)
 
 # References

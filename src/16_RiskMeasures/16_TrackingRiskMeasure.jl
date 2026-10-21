@@ -32,6 +32,8 @@ Where:
   - $(math_dict[:rho_track])
   - ``\\varepsilon``: Tolerance, the `err` field.
 
+Page 15 of [roll1992](@cite) states the independent mode for the variance, ``(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)``, and Equation 9.18 of [cajas2025](@cite) states its square root, the case of a [`StandardDeviation`](@ref). The independent mode under any other measure, and the dependent mode, are the library's own.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -95,8 +97,8 @@ RiskTrackingError
 
 # References
 
-  - $(ref_dict[:palomar2025])
-  - $(ref_dict[:cajas2025]) Section 9.2.
+  - $(ref_dict[:roll1992]) Page 15.
+  - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.18.
 """
 @concrete struct RiskTrackingError <: AbstractTracking
     """
@@ -243,7 +245,7 @@ Where:
   - $(math_dict[:d_ddof])
   - $(math_dict[:p_norm_order])
 
-With ``d = 0``, the ``L_2`` and ``L_1`` forms are Equations 9.16 and 9.17 of Cajas's book. With ``d = 0``, the squared ``L_2`` form is the empirical tracking error of Benidis, Feng and Palomar.
+Page 15 of [roll1992](@cite) takes the variance of the difference of the two returns as the tracking error. Equation 2 of [rudolf1999](@cite) minimises the sum of the squared differences of the two series, and its Equations 5 and 6 state the ``L_1`` and ``L_\\infty`` forms without a divisor. Equation 9 of [beasley2003](@cite) states the ``L_p`` form, but it divides by ``T`` for every ``p``, where the form above divides by ``T^{1/p}`` at ``d = 0``. With ``d = 0``, the ``L_2`` and ``L_1`` forms are Equations 9.16 and 9.17 of [cajas2025](@cite), and the squared ``L_2`` form is the empirical tracking error of Equation 13.5 of [palomar2025](@cite) and of [benidis2018](@cite). The divisor ``T - d`` is the library's own.
 
 # Fields
 
@@ -319,8 +321,11 @@ TrackingRiskMeasure
 
 # References
 
-  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:roll1992]) Page 15.
+  - $(ref_dict[:rudolf1999]) Pages 87 and 88, Equations 2, 5 and 6.
+  - $(ref_dict[:beasley2003]) Page 629, Equation 9.
   - $(ref_dict[:cajas2025]) Section 9.2, Equations 9.16 and 9.17.
+  - $(ref_dict[:palomar2025]) Section 13.3.1, Equation 13.5.
   - $(ref_dict[:benidis2018])
 """
 @propagatable @concrete struct TrackingRiskMeasure <: RiskMeasure
@@ -436,7 +441,7 @@ Where:
   - $(math_dict[:rho_track])
   - ``\\mathbf{\\Sigma}``: Covariance matrix of a [`StandardDeviation`](@ref) tracked measure.
 
-With a [`StandardDeviation`](@ref), the independent mode is ``\\sqrt{(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)}``, Equation 9.18 of Cajas's book.
+With a [`StandardDeviation`](@ref), the independent mode is ``\\sqrt{(\\boldsymbol{w} - \\boldsymbol{w}_b)^\\intercal \\mathbf{\\Sigma} (\\boldsymbol{w} - \\boldsymbol{w}_b)}``, Equation 9.18 of [cajas2025](@cite). Page 15 of [roll1992](@cite) states its square, the variance of the weight difference. The independent mode under any other measure, and the dependent mode, are the library's own.
 
 # Fields
 
@@ -516,7 +521,7 @@ RiskTrackingRiskMeasure
 
 # References
 
-  - $(ref_dict[:palomar2025])
+  - $(ref_dict[:roll1992]) Page 15.
   - $(ref_dict[:cajas2025]) Section 9.2, Equation 9.18.
 """
 @concrete struct RiskTrackingRiskMeasure <: RiskMeasure

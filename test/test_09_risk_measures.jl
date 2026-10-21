@@ -2316,6 +2316,30 @@ end
             optimize!(m)
             @test isapprox(PO.ucs_variance(box, S, v), objective_value(m); rtol = 1e-10)
         end
+        # The box value omits the condition that the matrix is positive semidefinite, as the
+        # ellipsoid does. Corners that are not semidefinite put it above the worst case of the
+        # set, and the model reaches that worst case through the slack of its lifted matrix.
+        boxn = BoxUncertaintySet(; lb = [0.01 -0.9; -0.9 0.02], ub = [0.5 0.9; 0.9 0.5])
+        wn = [0.5, 0.5]
+        m = tight_clarabel()
+        @variable(m, Sg[1:2, 1:2], PSD)
+        @constraint(m, boxn.lb .<= Sg)
+        @constraint(m, Sg .<= boxn.ub)
+        @objective(m, Max, dot(wn * transpose(wn), Sg))
+        optimize!(m)
+        @test PO.ucs_variance(boxn, S[1:2, 1:2], wn) ≈ 0.7
+        @test isapprox(objective_value(m), 0.5; rtol = 1e-8)
+        slvn = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                      settings = Dict("verbose" => false, "max_iter" => 500,
+                                      "tol_gap_abs" => 1e-10, "tol_gap_rel" => 1e-10,
+                                      "tol_feas" => 1e-10),
+                      check_sol = (; allow_local = true, allow_almost = true))
+        resn = optimise(MeanRisk(; r = UncertaintySetVariance(; ucs = boxn),
+                                 obj = MinimumRisk(),
+                                 opt = JuMPOptimiser(; slv = slvn,
+                                                     wb = WeightBounds(; lb = wn, ub = wn))),
+                        ReturnsResult(; X = X[:, 1:2], nx = ["A1", "A2"]))
+        @test isapprox(value(resn.model[:risk]), 0.5; rtol = 1e-6)
         # Ellipsoid: the value is the worst case without the condition that the matrix is
         # positive semidefinite, and it lies above the worst case with that condition.
         L = cholesky(Om).L

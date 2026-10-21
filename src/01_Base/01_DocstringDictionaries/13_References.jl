@@ -50,10 +50,13 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :meucciardiakeel2011 => "[meucciardiakeel2011](@cite) A. Meucci, D. Ardia and S. Keel. *Fully flexible extreme views*. The Journal of Risk 14, 39–49 (2011).",#
                  :vorobets2021 => "[vorobets2021](@cite) A. Vorobets. *Sequential entropy pooling heuristics*. Available at SSRN 3936392 (2021).",#
                  :cvar => "[cvar](@cite) R. T. Rockafellar and S. Uryasev. *Optimization of conditional value-at-risk*. Journal of Risk 2, 21–41 (2000).",#
+                 :rockafellar2002 => "[rockafellar2002](@cite) R. T. Rockafellar and S. Uryasev. *Conditional value-at-risk for general loss distributions*. Journal of Banking & Finance 26, 1443–1471 (2002).",#
                  :evar => "[evar](@cite) A. Ahmadi-Javid. *Entropic value-at-risk: A new coherent risk measure*. Journal of Optimization Theory and Applications 155, 1105–1123 (2012).",#
                  :kaniadakis2001 => "[kaniadakis2001](@cite) G. Kaniadakis. *Non-linear kinetics underlying generalized statistics*. Physica A: Statistical Mechanics and its Applications 296, 405–425 (2001).",#
                  :rlvar => "[rlvar](@cite) D. Cajas. *Portfolio Optimization of Relativistic Value at Risk*. Available at SSRN 4378498 (2023).",#
                  :cdar => "[cdar](@cite) A. Chekhlov, S. Uryasev and M. Zabarankin. *Drawdown measure in portfolio optimization*. International Journal of Theoretical and Applied Finance 8, 13–58 (2005).",#
+                 :artzner1999 => "[artzner1999](@cite) P. Artzner, F. Delbaen, J.-M. Eber and D. Heath. *Coherent measures of risk*. Mathematical Finance 9, 203–228 (1999).",#
+                 :morgan1996 => "[morgan1996](@cite) J.P. Morgan and Reuters. *RiskMetrics technical document*. Fourth edition, J.P. Morgan/Reuters (1996).",#
                  :pnvar => "[pnvar](@cite) P. A. Krokhmal. *Higher moment coherent risk measures*. Quantitative Finance 7, 373–387 (2007).",#
                  :ulcer => "[ulcer](@cite) P. G. Martin and B. B. McCann. *The Investor's Guide to Fidelity Funds* (John Wiley & Sons, 1989).",#
                  :minimax => "[minimax](@cite) M. R. Young. *A minimax portfolio selection rule with linear programming solution*. Management Science 44, 673–683 (1998).",#
@@ -63,7 +66,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :pkurt => "[pkurt](@cite) D. Cajas. *Convex Optimization of Portfolio Kurtosis*. Available at SSRN 4202967 (2022).",#
                  :pkurtapprox => "[pkurtapprox](@cite) D. Cajas. *Approximation of Portfolio Kurtosis through Sum of Squared Quadratic Forms*. Available at SSRN 4472793 (2023).",#
                  :nskew => "[nskew](@cite) D. Cajas. *On the Spectral Decomposition of Portfolio Skewness and its Application to Portfolio Optimization*. Available at SSRN 4540021 (2023).",#
-                 :robustaa => "[robustaa](@cite) R. H. Tütüncü and M. Koenig. *Robust asset allocation*. Annals of Operations Research 132, 157–187 (2004).",#
                  :sdpmom => "[sdpmom](@cite) D. Cajas. *Semidefinite Relaxation of Higher Portfolio Moments*. Available at SSRN 5284483 (2025).",#
                  :sdprp => "[sdprp](@cite) D. Cajas. *A Semidefinite Programming Approach to Risk Parity Portfolio Optimization*. Available at SSRN 5097869 (2025).",#
                  :emom => "[emom](@cite) D. Cajas. *Portfolio Optimization of Even Moments using Power Cone Programming*. Available at SSRN 6518258 (2026).",#

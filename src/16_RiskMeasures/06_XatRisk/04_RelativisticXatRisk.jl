@@ -230,6 +230,8 @@ Where:
 
 With equal observation weights, the sum in the objective is ``\\sum_{i=1}^{T} (\\psi_i + \\theta_i)``. The radius keeps the argument ``\\frac{1}{\\alpha T}`` when the weights are stated, because the Kaniadakis logarithm cannot absorb the weights into ``\\alpha T`` the way the natural logarithm does for [`EntropicValueatRisk`](@ref).
 
+Section 4.1 of [rlvar](@cite) states the measure and both programmes for the uniform sample distribution, Equations 12 to 15, and the consequences below, Equations 16 and 17. The weighted ball, with the factor ``p_t T`` in the programmes and in the cones, is the library's extension.
+
 The definition has these consequences:
 
 ```math
@@ -307,8 +309,7 @@ RelativisticValueatRisk
 
 # References
 
-  - $(ref_dict[:rlvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.2.7, Equations 7.65 to 7.69.
+  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 to 17.
 """
 @propagatable @concrete struct RelativisticValueatRisk <: RiskMeasure
     """
@@ -419,6 +420,8 @@ $(math_dict[:negated_upper_tail])
 
 Each term is the worst expected loss over its own Kaniadakis ball about the sample distribution. The first ball has the deformation ``\\kappa_a`` and the level ``\\alpha``, and the second ball has the deformation ``\\kappa_b`` and the level ``\\beta``. [`RelativisticValueatRisk`](@ref) states the ball.
 
+Section 7.2.3.5 of [cajas2025](@cite) defines this range, and its Section 7.2.3 names [owa1](@cite) as the source of the range measures. No copy of that work was found. Equation 7.84 of [cajas2025](@cite) prints a difference of the two tails, but its bound, Equation 7.85, and its programme state the sum above.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -481,8 +484,9 @@ RelativisticValueatRiskRange
 
 # References
 
-  - $(ref_dict[:rlvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equation 7.84.
+  - $(ref_dict[:rlvar]) Section 4.1, Equations 12 to 17.
+  - $(ref_dict[:cajas2025]) Section 7.2.3.5, Equations 7.84 and 7.85. $(ref_dict[:no_original_source])
+  - $(ref_dict[:owa1])
 """
 @propagatable @concrete struct RelativisticValueatRiskRange <: RiskMeasure
     """
@@ -650,6 +654,8 @@ Where:
   - ``\\mathrm{DaR}_{\\alpha}``, ``\\mathrm{CDaR}_{\\alpha}``, ``\\mathrm{EDaR}_{\\alpha}``: Drawdown-at-Risk, Conditional Drawdown-at-Risk and Entropic Drawdown-at-Risk at the same level ``\\alpha``.
   - ``\\mathrm{MDD}(\\boldsymbol{x}) = -\\min_{t} d_t``: Maximum drawdown.
 
+Equation 3.2 of [cdar](@cite) defines the drawdown, with the opposite sign. Section 4.3 of [rlvar](@cite) defines the RLDaR, Equation 23, and its Section 4.4 states the programmes.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -709,9 +715,8 @@ RelativisticDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:rlvar])
-  - $(ref_dict[:cajas2025]) Section 7.2.4.6, Equations 7.99 and 7.100.
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
+  - $(ref_dict[:rlvar]) Sections 4.3 and 4.4, Equation 23.
 """
 @propagatable @concrete struct RelativisticDrawdownatRisk <: RiskMeasure
     """
@@ -841,6 +846,8 @@ Where:
 
 So the Relative RLDaR is the worst expected relative drawdown over a Kaniadakis ball about the sample distribution of ``\\boldsymbol{rd}(\\boldsymbol{x})``. [`RelativisticValueatRisk`](@ref) states the ball.
 
+Section 3 of [cdar](@cite) defines the drawdown of the uncompounded cumulative return only, and Equation 23 of [rlvar](@cite) defines the RLDaR on that series. Neither work defines a measure on the relative drawdown, so this measure is the library's extension of them.
+
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -896,8 +903,8 @@ RelativeRelativisticDrawdownatRisk
 
 # References
 
-  - $(ref_dict[:cdar])
-  - $(ref_dict[:rlvar])
+  - $(ref_dict[:cdar]) Section 3, Equation 3.2.
+  - $(ref_dict[:rlvar]) Section 4.3, Equation 23.
 """
 @propagatable @concrete struct RelativeRelativisticDrawdownatRisk <: HierarchicalRiskMeasure
     """
