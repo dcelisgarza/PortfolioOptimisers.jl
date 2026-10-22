@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny estimator types.
 
-All concrete and/or abstract types implementing phylogeny-based estimation algorithms should be subtypes of `AbstractPhylogenyEstimator`.
+A subtype holds the configuration that finds the relations between assets from the data. A network estimator and a clusters estimator are the two families.
 
 # Related
 
@@ -16,7 +16,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny algorithm types.
 
-All concrete and/or abstract types implementing specific phylogeny algorithms should be subtypes of `AbstractPhylogenyAlgorithm`.
+A subtype selects one method inside a phylogeny estimator. A clustering algorithm, a tree type and a centrality algorithm are the three families.
 
 # Related
 
@@ -29,7 +29,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny result types.
 
-All concrete and/or abstract types representing the result of a phylogeny estimation should be subtypes of `AbstractPhylogenyResult`.
+A subtype holds the output of a phylogeny estimator, such as a clustering or a phylogeny matrix.
 
 # Related
 
@@ -42,7 +42,7 @@ abstract type AbstractPhylogenyResult <: AbstractResult end
 
 Alias for a phylogeny estimator or result.
 
-Matches either an [`AbstractPhylogenyEstimator`](@ref) or an [`AbstractPhylogenyResult`](@ref). Used internally for dispatch when either a phylogeny estimation configuration or pre-computed result is accepted.
+Matches an [`AbstractPhylogenyEstimator`](@ref) or an [`AbstractPhylogenyResult`](@ref). The library dispatches on it where a function accepts a phylogeny estimator or a precomputed result.
 
 # Related
 
@@ -55,17 +55,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the phylogeny estimator or result `pl` unchanged.
 
-Identity pass-through used when a phylogeny estimator or pre-computed result is provided in a context that calls [`factory`](@ref). A phylogeny estimator carries no prior-dependent field to rebuild, so every field is passed through and none is replaced.
+A caller that rebuilds an estimator with [`factory`](@ref) reaches this method for a phylogeny estimator or a precomputed result. A phylogeny estimator has no field that depends on a prior, so the method keeps every field and replaces none.
 
 # Algorithm
 
- 1. Return `pl` itself. No field of it is rebuilt, and `args` and `kwargs` are discarded.
+ 1. Return `pl` itself. The method rebuilds no field of it, and it discards `args` and `kwargs`.
 
 # Arguments
 
   - `pl`: Phylogeny estimator or phylogeny result.
-  - `args...`: Optional arguments (ignored).
-  - `kwargs...`: Optional keyword arguments (ignored).
+  - `args...`: Optional arguments. The method does not read them.
+  - `kwargs...`: Optional keyword arguments. The method does not read them.
 
 # Returns
 
@@ -85,17 +85,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the phylogeny algorithm `alg` unchanged.
 
-Identity pass-through used when a phylogeny algorithm is provided in a context that calls [`factory`](@ref). A phylogeny algorithm carries no prior-dependent field to rebuild, so every field is passed through and none is replaced.
+A caller that rebuilds an estimator with [`factory`](@ref) reaches this method for a phylogeny algorithm that has no nearer method. A phylogeny algorithm has no field that depends on a prior, so the method keeps every field and replaces none.
 
 # Algorithm
 
- 1. Return `alg` itself. No field of it is rebuilt, and `args` and `kwargs` are discarded.
+ 1. Return `alg` itself. The method rebuilds no field of it, and it discards `args` and `kwargs`.
 
 # Arguments
 
   - `alg`: Phylogeny algorithm.
-  - `args...`: Optional arguments (ignored).
-  - `kwargs...`: Optional keyword arguments (ignored).
+  - `args...`: Optional arguments. The method does not read them.
+  - `kwargs...`: Optional keyword arguments. The method does not read them.
 
 # Returns
 
@@ -115,31 +115,41 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all separation algorithms.
 
-A separation algorithm is the rule saying **how far apart** two assets sit in a network, and **how far is too far**. It answers two questions with one object, through three kernels: [`separation_graph`](@ref) builds the structure the member measures over, [`separation_matrix`](@ref) reads the dense `assets × assets` separations off that structure, and [`separation_budget`](@ref) resolves the budget beyond which a pair counts as unrelated. The family is open: a new member is a struct and one method of each.
+A separation algorithm states how far apart two assets are in a network, and how far apart two related assets can be. One object answers the two questions through three functions:
 
-The two questions travel together because they share a unit. A hop count is budgeted in hops and a weighted path length in the distance estimator's units, so a budget stated apart from the rule that measures it would be a number nobody could interpret — which is why the budget lives on the member rather than on [`NetworkEstimator`](@ref).
+  - [`separation_graph`](@ref) builds the structure that the member measures.
+  - [`separation_matrix`](@ref) reads the dense `assets × assets` separations from that structure.
+  - [`separation_budget`](@ref) resolves the budget. A pair further apart than the budget is unrelated.
 
-# Building the structure is a separate kernel from measuring it
+The family is open. A new member is a struct and one method of each function.
 
-The measuring kernel takes **the structure**, not the estimator that produces one: `separation_matrix(sep, g)` is the interface, and `separation_matrix(sep, nte, X)` is a wrapper that calls [`separation_graph`](@ref) first. The split is [`calc_weighted_adjacency_graph`](@ref)'s two-entry-point shape, for the same reason — the structure is expensive and a caller often holds one already. Under [`VariationInfoDistance`](@ref) building it is `98%` of [`clusterise`](@ref)'s runtime, so a consumer that resolves a budget rule *and* measures the separations must build once and pass the graph, not call two estimator-taking kernels.
+The two questions share a unit. A hop count has its budget in hops, and a weighted path length has its budget in the units of the distance estimator. A budget apart from the rule that measures it is a number with no unit. So the budget is a field of the member, not of [`NetworkEstimator`](@ref).
 
-`separation_matrix(sep, g)` is also the method that a test or an extension calls. Every structure a shipped estimator can build is connected — a spanning tree or a PMFG — so a disconnected graph, and with it the unreachable sentinel below, is reachable only by handing one in.
+# The structure and the measurement are two functions
 
-# Two more kernels, and why neither is a third question
+The function that measures takes the structure, not the estimator that builds it. `separation_matrix(sep, g)` is the interface, and `separation_matrix(sep, nte, X)` is a wrapper that calls [`separation_graph`](@ref) first. [`calc_weighted_adjacency_graph`](@ref) has the same two entry points for the same reason. The structure is expensive, and a caller often has one already.
 
-[`resolve_separation`](@ref) turns a member whose budget is a **rule** into one whose budget is a value, and is called by every consumer before the other two kernels. It is not a third question about the network: a member whose budget is already a number is returned unchanged by the fallback on this type, so an extension inherits the kernel and never writes one.
+Under [`VariationInfoDistance`](@ref), the structure takes `98%` of the runtime of [`clusterise`](@ref). A consumer that resolves a budget rule and also measures the separations must build the structure once and pass the graph to both functions.
 
-[`is_related`](@ref) applies the budget to one entry of the separation matrix, over [`is_reachable`](@ref)'s sentinel test. Both are single generic methods on this type rather than per-member ones, because the rule — *not the sentinel, and no further than the budget* — is the same rule whatever the unit; a member whose underlying routine reports an exotic sentinel overrides [`is_reachable`](@ref) alone. Every consumer applying a budget calls them instead of open-coding the comparison, which is what keeps the ordering obligation of [`separation_matrix`](@ref)'s "the unreachable sentinel" inside an interface.
+A test or an extension also calls `separation_matrix(sep, g)`. Every structure that a shipped estimator builds is connected, because it is a spanning tree or a PMFG. Only a graph that a caller gives can be disconnected and carry the unreachable sentinel.
 
-The two shipped members widen their budget field to admit a rule — [`HopCountValue`](@ref) and [`PathLengthValue`](@ref) — so a caller who cannot state the budget in advance states what would produce it instead. The resolution happens where the data is in hand, which is the only place a rule can be answered, and it is why [`separation_budget`](@ref) refuses an unresolved member rather than returning a function.
+# Two more functions
+
+[`resolve_separation`](@ref) changes a member whose budget is a rule into a member whose budget is a value. Every consumer calls it before the other two functions. It asks nothing new about the network. The fallback on this type returns a member with a numeric budget unchanged, so an extension inherits it and writes no method.
+
+[`is_related`](@ref) applies the budget to one entry of the separation matrix, after the sentinel test of [`is_reachable`](@ref). Each is one generic method on this type, because the rule is the same in every unit. A related pair is not the sentinel, and it is not further apart than the budget.
+
+A member whose routine reports a different sentinel overrides [`is_reachable`](@ref) alone. Every consumer that applies a budget calls these two functions and writes no comparison of its own. So the rule of "The unreachable sentinel" of [`separation_matrix`](@ref) stays inside one interface.
+
+The two shipped members accept a rule in the budget field, through [`HopCountValue`](@ref) and [`PathLengthValue`](@ref). A caller who cannot state the budget in advance gives the rule that calculates it. The library resolves the rule where the data is available, because a rule needs the data. For this reason [`separation_budget`](@ref) refuses an unresolved member and does not return a function.
 
 # Separation is not decay
 
-[`AbstractSeparationDecayAlgorithm`](@ref) turns a separation into a *score*; this family produces the separation and says where it runs out. The difference is that `sep` decides **which pairs are related** — every consumer of a network needs that — while `decay` decides **how strongly, as a number**, which only the feature producer wants. That is why `sep` sits on [`NetworkEstimator`](@ref) and `decay` sits on [`Proximity`](@ref).
+[`AbstractSeparationDecayAlgorithm`](@ref) changes a separation into a score. This family calculates the separation and its budget. `sep` decides which pairs are related, and every consumer of a network needs that. `decay` decides how strongly a pair is related, and only the feature producer needs that number. So `sep` is a field of [`NetworkEstimator`](@ref) and `decay` is a field of [`Proximity`](@ref).
 
-# The family is unqualified on purpose
+# The name does not say graph
 
-The name says nothing about graphs. A taxonomy depth is a separation too, so the room is left for a member that measures one, rather than being closed off by an `AbstractGraphSeparationAlgorithm`.
+The name of the family says nothing about graphs. A taxonomy depth is also a separation. The name leaves room for a member that measures one, and `AbstractGraphSeparationAlgorithm` does not.
 
 # Related
 
@@ -161,9 +171,11 @@ abstract type AbstractSeparationAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all rules computing a hop count from the network and the data.
+Abstract supertype for all rules that compute a hop count from the network and the data.
 
-A [`HopCount`](@ref) budget is usually a number the caller states. It does not have to be. A subtype of `HopCountAlgorithm` is a **callable struct** standing in the `n` field, and [`resolve_separation`](@ref) calls it with the network estimator and the data matrix in hand. That is what lets a budget follow a universe whose size the caller cannot know in advance — a cross-validation fold, or a subproblem of a meta optimiser such as [`NestedClustered`](@ref).
+The caller usually states a [`HopCount`](@ref) budget as a number, but the budget can also be a rule. A subtype of `HopCountAlgorithm` is a callable struct in the `n` field. [`resolve_separation`](@ref) calls it with the network estimator and the data matrix.
+
+A rule lets the budget follow a universe whose size the caller does not know in advance. Examples are a cross-validation fold and a subproblem of a meta optimiser such as [`NestedClustered`](@ref).
 
 # The extension contract
 
@@ -172,13 +184,13 @@ A subtype defines one method, the functor:
     (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum, g::Graphs.AbstractGraph;
                       dims::Int = 1, kwargs...) -> Integer
 
-`g` is the structure [`separation_graph`](@ref) built for the separation the rule stands in, so a rule reads what it needs off a graph it did **not** pay to build — through [`separation_matrix`](@ref), which takes `g` directly. It still pays for the all-pairs traversal; see [`resolve_separation`](@ref).
+`g` is the structure that [`separation_graph`](@ref) built for the separation that holds the rule. The rule reads what it needs from `g` through [`separation_matrix`](@ref), which takes `g` directly, so the rule builds no structure. It still runs the traversal of all pairs, as [`resolve_separation`](@ref) states.
 
-`nte` owns the separation and `X` is the data `g` was built from. Both are inert for the shipped rule, and are the channel through which an extension reaches what the graph does not carry — the distance estimator, the observation count, a covariance.
+`nte` holds the separation, and `X` is the data that `g` comes from. The shipped rule reads neither. An extension reads them to get what the graph does not hold, for example the distance estimator, the number of observations or a covariance.
 
-**The return value must be an `Integer`, and this is checked rather than bounded.** A functor's return type is not part of its signature, so the family cannot state the requirement in the type system. [`resolve_separation`](@ref) checks it instead, and the check is not a formality: three readers use `0:n` as a **matrix-power count**, where `0:1.5` silently drops a power rather than failing.
+The return value must be an `Integer`. The return type of a functor is not part of its signature, so the type system cannot state this requirement. [`resolve_separation`](@ref) checks the value instead. Three readers use `0:n` as a count of matrix powers, and `0:1.5` drops a power with no error.
 
-A bare `Function` is admitted in the same field and carries the same obligation, unchecked at construction. Subtype this instead when the rule has parameters — the struct holds them, prints them, and is comparable.
+The same field also accepts a bare `Function`, which has the same requirement. The constructor does not check it. Subtype this type instead when the rule has parameters, because the struct holds them, prints them and compares equal by them.
 
 # Related
 
@@ -193,11 +205,11 @@ abstract type HopCountAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all rules computing a path-length budget from the network and the data.
+Abstract supertype for all rules that compute a path-length budget from the network and the data.
 
-The [`PathLength`](@ref) counterpart of [`HopCountAlgorithm`](@ref): a **callable struct** standing in the `dmax` field, called by [`resolve_separation`](@ref) with the network estimator, the data matrix, and the structure already built from them in hand.
+This is the [`PathLength`](@ref) counterpart of [`HopCountAlgorithm`](@ref). A subtype is a callable struct in the `dmax` field. [`resolve_separation`](@ref) calls it with the network estimator, the data matrix and the structure that it built from them.
 
-The two families are separate because their return obligations differ, and the split is what lets one of them be checked. A hop count must be an `Integer`; a path-length budget is stated in the distance estimator's units, so it is any `Number` — or `nothing`, which resolves to the observed diameter exactly as a stated `nothing` does.
+The two families have different return types, so they are two types. The split lets [`resolve_separation`](@ref) check each return type. A hop count must be an `Integer`. A path-length budget is in the units of the distance estimator, so it can be any `Number`.
 
 # The extension contract
 
@@ -206,9 +218,9 @@ A subtype defines one method, the functor:
     (rule::MySubtype)(nte::AbstractNetworkEstimator, X::MatNum, g::Graphs.AbstractGraph;
                       dims::Int = 1, kwargs...) -> Number
 
-`g` is [`separation_graph`](@ref)'s structure, weighted by distance on both branches under a [`PathLength`](@ref). A bare `Function` is admitted in the same field and carries the same obligation, unchecked at construction.
+`g` is the structure of [`separation_graph`](@ref). Under a [`PathLength`](@ref) its edges carry distances on both branches. The same field also accepts a bare `Function`, which has the same requirement. The constructor does not check it.
 
-**A rule must return a `Number`, and `nothing` is not one.** `nothing` in the `dmax` field means the observed diameter, which is a statement the caller makes *instead of* stating a rule. A rule that meant to ask for the diameter is asking for something the field already spells, and a rule that returned `nothing` by accident would silently get the maximal ball. So [`PathLengthValue`](@ref) covers the rules and the numbers, and the field is an `Option` of it.
+A rule must return a `Number`, and `nothing` is not a `Number`. `nothing` in the `dmax` field means the observed diameter. The caller states it in place of a rule. A rule cannot ask for the diameter with `nothing`, because the field states that value already. If a rule returns `nothing` in error, [`resolve_separation`](@ref) throws an `ArgumentError` and does not give the largest ball. So [`PathLengthValue`](@ref) holds the rules and the numbers, and the field is an `Option` of it.
 
 # Related
 
@@ -223,9 +235,9 @@ abstract type PathLengthAlgorithm <: AbstractAlgorithm end
 """
     const HopCountRule = Union{<:HopCountAlgorithm, <:Function}
 
-Alias for the **dynamic** forms of a hop count.
+Alias for the forms of a hop count that are rules.
 
-Matches the two things [`resolve_separation`](@ref) *calls* rather than reads: a [`HopCountAlgorithm`](@ref) and a bare `Function`. Used for dispatch, so that `HopCount{<:HopCountRule}` names an unresolved separation and `HopCount{<:Integer}` a resolved one.
+Matches the two forms that [`resolve_separation`](@ref) calls and does not read: a [`HopCountAlgorithm`](@ref) and a bare `Function`. The library dispatches on it. `HopCount{<:HopCountRule}` is an unresolved separation, and `HopCount{<:Integer}` is a resolved one.
 
 # Related
 
@@ -238,9 +250,9 @@ const HopCountRule = Union{<:HopCountAlgorithm, <:Function}
 """
     const HopCountValue = Union{<:Integer, <:HopCountAlgorithm, <:Function}
 
-Alias for everything [`HopCount`](@ref)'s `n` field accepts.
+Alias for every value that the `n` field of [`HopCount`](@ref) accepts.
 
-Widens the field from the stated `Integer` to the rules of [`HopCountRule`](@ref) as well. The `Integer` case is the resolved one and every reader takes it directly; a rule is resolved by [`resolve_separation`](@ref) before any reader sees it.
+The field accepts a stated `Integer` and the rules of [`HopCountRule`](@ref). An `Integer` is the resolved form, and every reader reads it directly. [`resolve_separation`](@ref) resolves a rule before a reader gets it.
 
 # Related
 
@@ -253,9 +265,9 @@ const HopCountValue = Union{<:Integer, <:HopCountAlgorithm, <:Function}
 """
     const PathLengthRule = Union{<:PathLengthAlgorithm, <:Function}
 
-Alias for the **dynamic** forms of a path-length budget.
+Alias for the forms of a path-length budget that are rules.
 
-The [`PathLength`](@ref) counterpart of [`HopCountRule`](@ref).
+This is the [`PathLength`](@ref) counterpart of [`HopCountRule`](@ref).
 
 # Related
 
@@ -268,9 +280,9 @@ const PathLengthRule = Union{<:PathLengthAlgorithm, <:Function}
 """
     const PathLengthValue = Union{<:Number, <:PathLengthAlgorithm, <:Function}
 
-Alias for everything [`PathLength`](@ref)'s `dmax` field accepts, apart from `nothing`.
+Alias for every value that the `dmax` field of [`PathLength`](@ref) accepts, except `nothing`.
 
-The [`PathLength`](@ref) counterpart of [`HopCountValue`](@ref), and the field is `Option{PathLengthValue}` rather than this alias alone. The asymmetry is deliberate: `nothing` in that field means the observed diameter, which is one of the *stated* budgets and not something a rule may answer with. Keeping it outside the alias is what makes [`resolve_separation`](@ref)'s check a plain `isa(dmax, Number)`.
+This is the [`PathLength`](@ref) counterpart of [`HopCountValue`](@ref), but the field is `Option{PathLengthValue}`. `nothing` in that field means the observed diameter. It is a stated budget, and a rule cannot return it. The alias leaves `nothing` out, so the check of [`resolve_separation`](@ref) is `isa(dmax, Number)` alone.
 
 # Related
 
@@ -286,21 +298,23 @@ $(DocStringExtensions.TYPEDEF)
 
 Separation measured as the number of graph edges between two assets.
 
-The separation between two assets is the length of the shortest path between them counted in **edges**, ignoring the weights those edges carry, and the budget is `n` of them. It is the separation the network family has always used: [`phylogeny_matrix`](@ref)'s `sum(A^i for i in 0:n)` and both [`clusterise`](@ref) methods' power sums are hop budgets, and this member is where that `n` now lives.
+The separation between two assets is the number of edges on the shortest path between them. The weights of the edges have no effect. The budget is `n` edges. The power sum `sum(A^i for i in 0:n)` of [`phylogeny_matrix`](@ref) and the power sums of the two [`clusterise`](@ref) methods read this `n`.
 
-The budget is a **field** rather than an argument because it is stated in hops, a unit only this member uses. [`PathLength`](@ref) measures the same structure in the distance estimator's units and carries its own budget in those, so no caller has to know which unit is in play.
+The budget is a field and not an argument, because its unit is the hop, and only this member uses that unit. [`PathLength`](@ref) measures the same structure in the units of the distance estimator and holds its budget in those units. So a caller does not have to know the unit.
 
-# The power sum is the source's range connection matrix
+# The power sum is the range connection matrix of the source
 
-[`phylogeny_matrix`](@ref)'s ``\\mathbf{P} = \\mathbb{1}_{x \\geq 1}\\left(\\sum_{i=0}^{n} \\mathbf{A}^{i}\\right) - \\mathbf{I}`` is the **range connection matrix** ``\\mathbf{B}_{1,n}`` of the source, spelled with one indicator instead of `n` of them. The source builds a per-length connection matrix ``\\mathbf{B}_{k} = \\mathbb{1}_{x \\geq 1}(\\mathbf{A}^{k} + \\mathbf{I}) - \\mathbf{I}`` and then indicates their sum; the library adds the powers first, and the ``\\mathbf{A}^{0} = \\mathbf{I}`` term the sum picks up is the term the trailing ``- \\mathbf{I}`` removes again. The two agree entry for entry: on the source's own six-node example the matrices are **identical for every** `n` from `1` to `7`.
+The matrix ``\\mathbf{P} = \\mathbb{1}_{x \\geq 1}\\left(\\sum_{i=0}^{n} \\mathbf{A}^{i}\\right) - \\mathbf{I}`` of [`phylogeny_matrix`](@ref) is the range connection matrix ``\\mathbf{B}_{1,n}`` of the source, with one indicator in place of `n` indicators. The source builds a connection matrix for each walk length, ``\\mathbf{B}_{k} = \\mathbb{1}_{x \\geq 1}(\\mathbf{A}^{k} + \\mathbf{I}) - \\mathbf{I}``, and then applies the indicator to their sum.
 
-The original, [graphpo1](@cite), prints the indicator as ``\\mathbb{1}_{x > 1}``. Read that way, a pair joined by exactly one walk drops out of ``\\mathbf{B}_{k}``, and its own Figure 9 contradicts it. Equations 13.1 and 13.2 of [cajas2025](@cite) print ``\\mathbb{1}_{x \\geq 1}``, which reproduces that figure, and that is the form the library builds.
+The library adds the powers first. The sum then has the term ``\\mathbf{A}^{0} = \\mathbf{I}``, and the last ``- \\mathbf{I}`` removes it. The two forms are equal for every graph and every `n`. Off the diagonal, each one is `1` when a walk of length `1` to `n` joins the pair. On the diagonal, each one is `0`.
 
-# The budget may be a rule instead of a number
+The original, [graphpo1](@cite), prints the indicator as ``\\mathbb{1}_{x > 1}``. With that indicator, a pair that one walk joins is not in ``\\mathbf{B}_{k}``, and Figure 9 of the same source shows that it is. Equations 13.1 and 13.2 of [cajas2025](@cite) print ``\\mathbb{1}_{x \\geq 1}``, which gives that figure. The library builds this form.
 
-`n` also takes a [`HopCountAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `n(nte, X, g; dims = dims, kwargs...)` at the point of use, `g` being the structure the consumer already built. A caller who cannot state the budget in advance — because the universe is a cross-validation fold or a subproblem of a meta optimiser — states the *rule* that produces it instead of a number that was right for one universe. [`HopCountQuantile`](@ref) is the shipped rule.
+# The budget can be a rule
 
-`n` is still an `Integer` **once resolved**, and never a `Real`. Three readers use `0:(nte.sep.n)` as a **matrix-power count**, where `0:1.5` silently drops a power instead of failing, so [`resolve_separation`](@ref) checks the rule's return value rather than trusting it.
+`n` also accepts a [`HopCountAlgorithm`](@ref) or a bare `Function`. [`resolve_separation`](@ref) calls it as `n(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built. A caller who cannot state the budget in advance gives the rule that calculates it. This applies when the universe is a cross-validation fold or a subproblem of a meta optimiser. [`HopCountQuantile`](@ref) is the shipped rule.
+
+After resolution, `n` is an `Integer` and never a `Real`. Three readers use `0:n` as a count of matrix powers, and `0:1.5` drops a power with no error. So [`resolve_separation`](@ref) checks the return value of the rule.
 
 # Fields
 
@@ -373,37 +387,37 @@ $(DocStringExtensions.TYPEDEF)
 
 Separation measured as the length of the shortest weighted path between two assets.
 
-The separation between two assets is the sum of the **distances** along the shortest path joining them in the network, and the budget is `dmax` of the same units. It is the graded counterpart of [`HopCount`](@ref): both measure how far apart two assets sit in the same structure, but one counts the edges and the other adds up how long they are.
+The separation between two assets is the sum of the distances along the shortest path that joins them in the network. The budget `dmax` has the same units. It is the graded counterpart of [`HopCount`](@ref). Both measure how far apart two assets are in the same structure. `HopCount` counts the edges, and `PathLength` adds their lengths.
 
-It is a **library generalisation and rests on no published source**. [`HopCount`](@ref) has one — it is the range connection matrix of a walk length — but that literature counts edges throughout, and states no budget in the units a distance estimator emits.
+No published source states this separation. The library adds it. [`HopCount`](@ref) has a source, the range connection matrix of a walk length. That literature counts edges only, and states no budget in the units of a distance estimator.
 
-# The path runs over distances on both branches
+# The path uses distances on both branches
 
-The path is taken over the distance matrix **restricted to the structure's edge set** — [`calc_distance_weighted_graph`](@ref) — whichever branch built the structure. On the tree branch that is the graph's own weights; on the PMFG branch the structure is selected by similarity and then re-weighted by the distance that the similarity is a strictly decreasing function of.
+The path uses the distance matrix on the edges of the structure alone, through [`calc_distance_weighted_graph`](@ref). This is true for each branch that builds the structure. On the tree branch, the weights of the graph are these distances. On the PMFG branch, the similarity selects the structure. The distance then weights its edges, and the similarity is a strictly decreasing function of that distance.
 
-Pathing over the PMFG's similarities instead is not a second convention, it is backwards: a shortest path over similarities *minimises total similarity*, so it prefers the route through the weakest links. It fails quietly — measured over the four similarity algorithms, the backwards answer correlates `0.95` to `0.97` with the right one, which is far too close to catch by looking.
+A path over the similarities of the PMFG is wrong, not a second convention. A shortest path over similarities has the smallest total similarity, so it goes through the weakest links. The error is hard to see. Over the four similarity algorithms, the wrong answer has a Pearson correlation of `0.95` to `0.97` with the correct one.
 
-# It is not comparable with a hop count, only interchangeable with one
+# It can replace a hop count, but its values are not comparable
 
-`PathLength` and [`HopCount`](@ref) satisfy the same contract, so any consumer reading a separation *through that contract* takes either — [`Proximity`](@ref) and [`phylogeny_matrix`](@ref) both do. Their outputs are **not comparable as values**: the budgets are in different units, the supports differ, and under [`LinearDecay`](@ref) the scales differ.
+`PathLength` and [`HopCount`](@ref) satisfy the same contract. [`Proximity`](@ref) and [`phylogeny_matrix`](@ref) read a separation through that contract, so each one accepts the two members. Their outputs are not comparable as values. The budgets have different units and the supports are different. Under [`LinearDecay`](@ref), the scales are also different.
 
-Both [`clusterise`](@ref) methods are the exception, and refuse `PathLength` at dispatch. They do not read the separation through the contract at all: they index a matrix power by `sep.n`, and a radius has no analogue of one.
+The two [`clusterise`](@ref) methods refuse `PathLength` at dispatch. They do not read the separation through the contract. They use `sep.n` as the count of matrix powers, and a radius has no equivalent of that count.
 
-On a real universe the two agree far more than that suggests — measured over twenty assets, `rho = 0.99` on a minimum spanning tree and `0.95` to `0.98` on a PMFG, with `0.16%` of pairs of pairs strictly inverted on the tree and **none at all** on the PMFG — because both structures are selected by distance to begin with. That agreement is **empirical, not guaranteed**: it is a fact about the graphs an [`AbstractDistanceEstimator`](@ref) tends to produce, not a property of either separation.
+On real data the two separations agree more than this suggests, because the distance selects both structures. Over twenty assets, the Pearson correlation of the two separation matrices is `0.99` on a minimum spanning tree and `0.97` to `0.98` on a PMFG. On the tree `0.16%` of the pairs of pairs are in the opposite order, and on the PMFG none are. This agreement is a measurement, not a guarantee. It comes from the graphs that an [`AbstractDistanceEstimator`](@ref) usually gives, not from a property of the two separations.
 
 # The budget
 
-`dmax = nothing` is the default and means **the whole connected component**, implemented as the observed diameter: the largest finite entry of the separation matrix. It is the default because nobody has an intuition for a summed path in the units an [`AbstractDistanceEstimator`](@ref) emits — `dmax = 0.37` is not a number a caller can reason about, whereas "look at the whole component and let the decay do the falling off" is. Choosing a number is how a caller buys fold-stability.
+The default `dmax = nothing` means the whole connected component. The library uses the observed diameter, which is the largest finite entry of the separation matrix. A caller cannot easily choose a summed path length in the units of an [`AbstractDistanceEstimator`](@ref), such as `dmax = 0.37`. The default reads the whole component and lets the decay make the fall-off. A caller who needs the same radius in each fold states a number.
 
-[`separation_budget`](@ref) clamps a chosen `dmax` to the observed diameter. The clamp cuts nothing — no pair sits beyond the diameter — so it is a **scale-top correction** and bites only [`LinearDecay`](@ref), the one decay that reads the budget: without it, a `dmax` far above the diameter would flatten `Z` towards a constant while forbidding no pair at all.
+[`separation_budget`](@ref) clamps a stated `dmax` to the observed diameter. No pair is further apart than the diameter, so the clamp removes no pair. It changes only the top of the scale of [`LinearDecay`](@ref), which is the one decay that reads the budget. With no clamp, a `dmax` far above the diameter makes the scores of [`LinearDecay`](@ref) almost constant and excludes no pair.
 
-The default reads very differently through [`phylogeny_matrix`](@ref), which **selects** on the budget instead of shaping a fall-off inside it. "The whole connected component" there means every reachable pair is related, so `NetworkEstimator(; sep = PathLength())` yields a matrix of ones off the diagonal — the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
+[`phylogeny_matrix`](@ref) uses the budget to select pairs, not to shape a fall-off. There the default relates every reachable pair. So the phylogeny matrix of `NetworkEstimator(; sep = PathLength())` has ones at each entry off the diagonal. This is the opposite of the default `n = 1` of [`HopCount`](@ref), which gives the smallest neighbourhood. State a numeric `dmax` to select fewer pairs.
 
-# The budget may be a rule instead of a number
+# The budget can be a rule
 
-`dmax` also takes a [`PathLengthAlgorithm`](@ref) or a bare `Function`, which [`resolve_separation`](@ref) calls as `dmax(nte, X, g; dims = dims, kwargs...)` at the point of use, `g` being the structure the consumer already built. This is the answer to the paragraph above for a caller who *cannot* state a number: [`PathLengthQuantile`](@ref) asks for the budget that relates a stated **fraction of the reachable pairs**, which is a quantity a caller does have an intuition for, and which means the same thing on every fold of a cross-validation and in every subproblem of a meta optimiser.
+`dmax` also accepts a [`PathLengthAlgorithm`](@ref) or a bare `Function`. [`resolve_separation`](@ref) calls it as `dmax(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built. A rule helps a caller who cannot state a number. [`PathLengthQuantile`](@ref) gives the budget that relates a stated fraction of the reachable pairs. A caller can choose that fraction, and it means the same in each fold of a cross-validation and in each subproblem of a meta optimiser.
 
-A fixed `dmax` and a rule buy different things, and the difference is the whole point. A fixed `dmax` holds the **radius** still and lets the related-pair count move with the graph. A quantile rule holds the **count** still and lets the radius move. Neither is fold-stable in both senses at once, because the graph is refitted either way.
+A fixed `dmax` and a rule keep different quantities constant. A fixed `dmax` keeps the radius constant, and the number of related pairs changes with the graph. A quantile rule keeps the number constant, and the radius changes. Neither keeps both constant across folds, because each fold fits a new graph.
 
 # Fields
 
@@ -474,24 +488,24 @@ end
 
 Is `d` a separation at all, or the sentinel an unreachable pair carries?
 
-[`separation_matrix`](@ref) passes the underlying routine's sentinel through **unrepaired**, so this is the test that tells a measured separation from a missing one. It is one generic method on [`AbstractSeparationAlgorithm`](@ref) rather than one per member, because the two shipped sentinels are both covered by the same expression; a member whose routine reports something else overrides this method, and inherits [`is_related`](@ref) unchanged.
+[`separation_matrix`](@ref) does not repair the sentinel of the routine that it calls. This test tells a measured separation from a missing one. It is one generic method on [`AbstractSeparationAlgorithm`](@ref), because one expression covers the two shipped sentinels. A member whose routine reports a different sentinel overrides this method, and it inherits [`is_related`](@ref) unchanged.
 
 # The test is not `isfinite` alone, and not `typemax` alone
 
-Both clauses carry a sentinel of their own.
+Each clause rejects a sentinel that the other clause accepts.
 
-  - `isfinite` is `true` for every `Integer`, so on its own it admits [`HopCount`](@ref)'s `typemax(Int)` — which [`ReciprocalDecay`](@ref) then overflows.
-  - `typemax` of a `Float64` *is* `Inf`, so the comparison covers [`PathLength`](@ref)'s sentinel as well; `isfinite` stays to reject a `NaN`, which no shipped path produces and which would compare `false` against every budget anyway.
+  - `isfinite` is `true` for every `Integer`. Alone, it accepts the `typemax(Int)` of [`HopCount`](@ref), and [`ReciprocalDecay`](@ref) overflows at that value.
+  - `typemax` of a `Float64` is `Inf`, so the comparison also rejects the sentinel of [`PathLength`](@ref). `isfinite` rejects a `NaN`. No shipped path gives a `NaN`, and a `NaN` compares `false` with every budget.
 
 # Algorithm
 
- 1. Test `isfinite(d)`, rejecting a `NaN` and rejecting [`PathLength`](@ref)'s `Inf`.
- 2. Compare `d` against `typemax(typeof(d))`, rejecting [`HopCount`](@ref)'s `typemax(Int)`, which step 1 admits.
+ 1. Test `isfinite(d)`. This rejects a `NaN` and the `Inf` of [`PathLength`](@ref).
+ 2. Compare `d` with `typemax(typeof(d))`. This rejects the `typemax(Int)` of [`HopCount`](@ref), which step 1 accepts.
  3. Return `reachable`, the conjunction of the two tests. `&&` short-circuits, so step 2 runs only on a finite `d`.
 
 # Arguments
 
-  - `sep`: Separation algorithm. Inert for the shipped members, and the dispatch channel for an extension whose routine reports a different sentinel.
+  - `sep`: Separation algorithm. The shipped members do not read it. An extension whose routine reports a different sentinel dispatches on it.
   - `d`: One entry of a separation matrix from [`separation_matrix`](@ref).
 
 # Returns
@@ -514,27 +528,27 @@ end
 
 Does a separation of `d` count as related under a budget of `dmax`?
 
-The one place the budget is applied to an entry of a separation matrix: reachable, and no further than `dmax`. Every consumer that selects on a budget calls this instead of writing the comparison out, so the rule has one spelling — [`phylogeny_matrix`](@ref) and [`phylogeny_features`](@ref) had two, and one of them was a budget test with no sentinel test behind it.
+This is the one function that applies the budget to an entry of a separation matrix. A related pair is reachable, and it is not further apart than `dmax`. Each consumer that compares a separation with a budget calls this function and writes no comparison of its own. The [`PathLength`](@ref) branch of [`phylogeny_matrix`](@ref) and the [`Proximity`](@ref) method of [`phylogeny_features`](@ref) call it.
 
 # The reachability test comes first
 
-`d <= dmax` is not sufficient on its own. It happens to reject both shipped sentinels, because [`separation_budget`](@ref) clamps a [`PathLength`](@ref) budget to the observed **finite** diameter and a [`HopCount`](@ref) budget is capped far below `typemax(Int)` — but that is a property of the two shipped budgets, not of the comparison. [`is_reachable`](@ref) makes the rejection the predicate's own, so a budget that reached its unit's ceiling would still exclude an unreachable pair.
+`d <= dmax` alone is not sufficient. It rejects the two shipped sentinels only because of the two shipped budgets. [`separation_budget`](@ref) clamps a [`PathLength`](@ref) budget to the observed finite diameter, and a [`HopCount`](@ref) budget has a cap far below `typemax(Int)`. [`is_reachable`](@ref) makes the rejection part of the predicate. A budget at the largest value of its unit then still excludes an unreachable pair.
 
-# It does not remove the caller's obligation to short-circuit
+# The caller must still short-circuit
 
-A consumer that scores the separation must still keep the *evaluation* of the score inside a short-circuiting branch — `is_related(...) ? separation_decay(...) : zero(...)`, never `ifelse` — because an `ifelse` evaluates both arms and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError`. The predicate owns the rule; the call site owns the laziness.
+A consumer that scores the separation must put the score inside a branch that short-circuits. Write `is_related(...) ? separation_decay(...) : zero(...)`, and do not use `ifelse`. An `ifelse` evaluates the two branches. [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, and a fractional `power` then gives a `DomainError`. The predicate holds the rule, and the call site must not evaluate the score of an unrelated pair.
 
 # Algorithm
 
- 1. Call [`is_reachable`](@ref) on `sep` and `d`, giving the reachability test. This runs first, so a sentinel is rejected whatever `dmax` is.
- 2. Compare `d` against `dmax`, giving the budget test.
+ 1. Call [`is_reachable`](@ref) on `sep` and `d`, which gives the reachability test. This test runs first, so the function rejects a sentinel at each value of `dmax`.
+ 2. Compare `d` with `dmax`, which gives the budget test.
  3. Return `related`, the conjunction of the two tests. `&&` short-circuits, so step 2 runs only on a reachable `d`.
 
 # Arguments
 
-  - `sep`: Separation algorithm, forwarded to [`is_reachable`](@ref).
+  - `sep`: Separation algorithm, which the function passes to [`is_reachable`](@ref).
   - `d`: One entry of a separation matrix from [`separation_matrix`](@ref).
-  - `dmax`: Separation budget in scope, from [`separation_budget`](@ref). In the units `sep` measures in, which is why the two arrive together.
+  - `dmax`: Separation budget in scope, from [`separation_budget`](@ref). It has the units that `sep` measures in, so the two arguments come together.
 
 # Returns
 
@@ -557,29 +571,31 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all separation decay algorithms.
 
-A separation decay turns a **separation** `d >= 0` — how far apart two assets sit in whatever structure the caller is reading — into a score, and is applied by [`separation_decay`](@ref). The family is open: a caller wanting a different fall-off defines a member and a [`separation_decay`](@ref) method for it, exactly as [`AbstractSimilarityMatrixAlgorithm`](@ref) is extended through [`distance_to_similarity`](@ref).
+A separation decay changes a separation `d >= 0` into a score. The separation is how far apart two assets are in the structure that the caller reads. [`separation_decay`](@ref) applies the decay. The family is open. For a different fall-off, define a member and a [`separation_decay`](@ref) method for it. [`AbstractSimilarityMatrixAlgorithm`](@ref) and [`distance_to_similarity`](@ref) have the same pattern.
 
-`d` is a **real** separation rather than an integer hop count, so one family serves an unweighted graph — where hop counts enter as integer-valued reals — and any structure whose separation is continuous.
+`d` is a real separation and not an integer hop count. So one family serves an unweighted graph, where a hop count is a real with an integer value, and each structure whose separation is continuous.
 
 # The contract
 
-  - Defined for every `d >= 0`.
-  - `f(0) > 0` and maximal. Self-inclusion is load-bearing rather than cosmetic: a decay that does not put an asset at the top of its own scale silently produces a *structural equivalence* matrix instead of a proximity one — see [`PhylogenyPanel`](@ref)'s "Why the diagonal includes self".
-  - Monotone non-increasing in `d`.
-  - Never assumed to reach zero. **Truncation is a separate knob**: the consumer applies its own budget — [`separation_budget`](@ref) of the [`AbstractSeparationAlgorithm`](@ref) in scope — and the decay only shapes the fall-off inside it. An exponential never reaches zero, so budget and fall-off cannot be the same dial.
-  - `f(d) >= 0` for `0 <= d <= dmax`. `0` is the unreachable sentinel, so a negative score *inside* the budget would place a **reachable** pair strictly below an **unreachable** one — an ordering inversion within the producer's own scale. It is not a claim that a signed score is wrong in general: the feature matrix is signed-tolerant by decision, and [`assert_metric_domain`](@ref) checks non-negativity per metric at the consumer rather than blanket. This clause is producer-local, and it is non-negativity rather than strict positivity because a decay that bottoms out at zero says *no relatedness*, which is the same claim an unreachable pair makes.
+  - `f` has a value for every `d >= 0`.
+  - `f(0) > 0`, and `f(0)` is the largest value. A decay must put an asset at the top of its own scale. If not, the result is a structural equivalence matrix, not a proximity matrix. See "Why the diagonal includes self" of [`PhylogenyPanel`](@ref).
+  - `f` is monotone non-increasing in `d`.
+  - The contract does not ask `f` to reach zero. The budget truncates, and the decay does not. The consumer applies the budget, which is [`separation_budget`](@ref) of the [`AbstractSeparationAlgorithm`](@ref) in scope. The decay shapes the fall-off inside the budget. An exponential never reaches zero, so one parameter cannot set the budget and the fall-off.
+  - `f(d) >= 0` for `0 <= d <= dmax`. The score of an unreachable pair is `0`. A negative score inside the budget puts a reachable pair below an unreachable pair on the scale of the producer.
 
-The clause is **scoped to the budget** because the sign outside it is unobservable — the consumer's `h[u] <= n` test short-circuits before the decay is ever evaluated there — and because the family's own default violates the wider statement: [`LinearDecay`](@ref) crosses zero at `d = dmax + 1` and is negative above it. Binding the clause on all `d >= 0` would need the `max(0, ⋅)` floor the budget knob exists to avoid, a second truncation biting before `n` does.
+The last clause does not say that a signed score is always wrong. The feature matrix accepts signed values by decision, and [`assert_metric_domain`](@ref) checks non-negativity for each metric at the consumer. The clause applies to the producer alone. It asks for non-negativity and not strict positivity, because a decay that falls to zero says that the pair is unrelated. An unreachable pair says the same.
 
-A zero in the resulting feature matrix therefore means **functionally unreachable**: either the graph is disconnected there, or the decay has fallen to nothing — the same claim about the pair, and nothing downstream can act on the difference. No shipped member emits zero anywhere inside the budget, so for what ships a zero is disconnection and nothing else.
+The clause applies inside the budget alone, for two reasons. First, the sign outside the budget has no effect, because the consumer tests [`is_related`](@ref) first and does not evaluate the decay there. Second, the default of the family breaks the wider clause. [`LinearDecay`](@ref) is zero at `d = dmax + 1` and negative above it. A clause on all `d >= 0` needs a `max(0, ⋅)` floor, which is a second truncation inside the decay.
+
+So a zero in the feature matrix means that the pair is unrelated. The pair is unreachable, it is outside the budget, or the decay fell to zero. A consumer of the feature matrix cannot tell these cases apart. No shipped member gives zero inside the budget. For the shipped members, a zero means unreachable or outside the budget.
 
 # The budget is an argument, not a field
 
-[`separation_decay`](@ref) takes the budget in scope as its third argument, `dmax`, and members may ignore it — only [`LinearDecay`](@ref) reads it, to set `f(0)`. Keeping it off the member is what makes the two knobs impossible to desync: the [`AbstractSeparationAlgorithm`](@ref) stays the single source of truth for the budget, rather than mirroring it on an algorithm that cannot see it at construction. [`ExponentialDecay`](@ref) provides the self-versus-neighbour contrast a free top-of-scale would have bought, without the hazard of a second truncation hiding inside the decay.
+[`separation_decay`](@ref) takes the budget in scope as its third argument, `dmax`. A member can ignore it, and only [`LinearDecay`](@ref) reads it, to set `f(0)`. The member does not hold the budget, so the budget and the decay cannot disagree. The [`AbstractSeparationAlgorithm`](@ref) is the one place that holds the budget. A decay algorithm cannot see the budget when the caller constructs it. [`ExponentialDecay`](@ref) sets the contrast between an asset and its neighbour with its own rate, and adds no second truncation inside the decay.
 
 # Enforcement
 
-The contract is enforced rather than merely documented, by a probing [`assert_separation_decay`](@ref) fallback on this type. The shipped members satisfy it by construction and override that fallback to a no-op, so the check is **opt-out**: an extension that says nothing about itself gets probed.
+The fallback [`assert_separation_decay`](@ref) on this type probes a member and enforces the contract. The shipped members satisfy the contract by construction, and their method of that function does nothing. So an extension that defines no method of [`assert_separation_decay`](@ref) gets the probe.
 
 # Related
 
@@ -597,7 +613,7 @@ abstract type AbstractSeparationDecayAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Separation decay falling off linearly to the edge of the budget.
+Separation decay that falls linearly to the edge of the budget.
 
 # Mathematical definition
 
@@ -612,9 +628,9 @@ Where:
   - $(math_dict[:d_sep])
   - $(math_dict[:dmax_sep])
 
-The default, and the only member that reads the budget. It is the fall-off the graded neighbourhood hardcoded before the family existed, so it reproduces those values exactly: a direct neighbour scores ``d_{\\mathrm{max}}``, the asset itself ``d_{\\mathrm{max}} + 1``.
+This is the default member, and the only member that reads the budget. A direct neighbour scores ``d_{\\mathrm{max}}``, and the asset itself scores ``d_{\\mathrm{max}} + 1``.
 
-Because truncation lives with the budget rather than in the decay, no `max(0, ⋅)` floor is needed — on the kept range `0 <= d <= dmax` the expression is strictly positive, bottoming out at `1`.
+The budget truncates, and the decay does not, so the decay needs no `max(0, ⋅)` floor. On `0 <= d <= dmax` the score is strictly positive, and its smallest value is `1`.
 
 # Examples
 
@@ -639,7 +655,7 @@ struct LinearDecay <: AbstractSeparationDecayAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Separation decay falling off exponentially.
+Separation decay that falls exponentially.
 
 # Mathematical definition
 
@@ -654,9 +670,9 @@ Where:
   - $(math_dict[:d_sep])
   - ``\\lambda``: Rate of the fall-off, `rate`.
 
-Pins `f(0) = 1` and lets `rate` set the self-versus-neighbour contrast independently of the budget, which is what a caller wanting relatedness to drop *sharply* needs — the budget only says how far to look.
+The score of the asset itself is `f(0) = 1`. `rate` sets the contrast between an asset and its neighbour, and the budget has no effect on it. A large `rate` makes the score fall fast. The budget states only how far apart a related pair can be.
 
-Parameterised by rate rather than by per-step retention. ``\\rho^d`` and ``e^{-\\lambda d}`` are the same function (``\\lambda = -\\log\\rho``), but "retention per step" is a statement about integers, and the family's argument is a real separation. The rate form also matches [`ExponentialSimilarity`](@ref) and [`ExpGerberIQDecay`](@ref), and needs only a one-sided bound to stay monotone.
+The parameter is a rate, not a retention per step. ``\\rho^d`` and ``e^{-\\lambda d}`` are the same function when ``\\lambda = -\\log\\rho``. A retention per step applies to integer steps, but the separation is a real number. [`ExponentialSimilarity`](@ref) and [`ExpGerberIQDecay`](@ref) also use a rate. The rate needs one bound, `rate > 0`, for a monotone decay.
 
 # Fields
 
@@ -714,7 +730,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Separation decay falling off as a power of the separation.
+Separation decay that falls as a power of the separation.
 
 # Mathematical definition
 
@@ -729,9 +745,11 @@ Where:
   - $(math_dict[:d_sep])
   - ``p``: Exponent of the fall-off, `power`.
 
-The middle ground between [`LinearDecay`](@ref) and [`ExponentialDecay`](@ref): heavier-tailed than the exponential, so distant assets keep a small but non-negligible score.
+Its tail is heavier than the tail of [`ExponentialDecay`](@ref), so a distant asset keeps a small score.
 
-The `1 +` is what makes classical inverse-distance weighting finite at ``d = 0``; it also pins `f(0) = 1`, matching [`ExponentialDecay`](@ref)'s scale for free. The alternative spelling ``(1 + d^p)^{-1}`` is *not* used: it pins ``f(1) = 1/2`` for every `p`, and its response to `p` at fixed `d` **flips sign about that pivot** — raising the exponent scores a pair nearer than ``d = 1`` *higher* and a pair further away lower. So `p` is no fall-off dial there, because it cannot sharpen the decay inside the pivot at all. Under the spelling above, raising `p` lowers the score at every ``d > 0``.
+The `1 +` keeps the classical inverse-distance weight finite at ``d = 0``. It also sets `f(0) = 1`, which is the top of the scale of [`ExponentialDecay`](@ref).
+
+The library does not use the form ``(1 + d^p)^{-1}``. That form gives ``f(1) = 1/2`` for every `p`. A larger `p` raises the score of a pair nearer than ``d = 1``, and lowers the score of a pair further away. From `p = 1` to `p = 3`, the score at ``d = 0.5`` goes from `0.6667` to `0.8889`, and the score at ``d = 2`` goes from `0.3333` to `0.1111`. So in that form, `p` cannot make the decay steeper below ``d = 1``. In the form above, a larger `p` lowers the score at every ``d > 0``.
 
 # Fields
 
@@ -802,13 +820,13 @@ Where:
 
   - $(math_dict[:d_sep])
 
-# No decay is not no truncation
+# The budget still truncates
 
-The name is about the *fall-off* and nothing else. The budget still cuts: a pair outside it scores `0`, because truncation was never the decay's job — see [`AbstractSeparationDecayAlgorithm`](@ref)'s "The budget is an argument, not a field". What comes out is therefore an **indicator** of the neighbourhood the budget selects, not a matrix of ones.
+The name is about the fall-off alone. A pair outside the budget scores `0`, because the budget truncates and the decay does not. See "The contract" of [`AbstractSeparationDecayAlgorithm`](@ref). So the result is the indicator of the neighbourhood that the budget selects, not a matrix of ones.
 
-That is exactly what makes it useful. Under [`HopCount`](@ref) it turns [`Proximity`](@ref) into the `n`-hop neighbourhood indicator, which is what the retired `BinaryNeighbourhood` produced; under [`PathLength`](@ref) it is an ε-ball, and neither needs a type of its own once the fall-off is a knob.
+Under [`HopCount`](@ref), [`Proximity`](@ref) with this decay gives the indicator of the `n`-hop neighbourhood. Under [`PathLength`](@ref), it gives the indicator of the ball of radius `dmax`. Neither indicator needs a type of its own.
 
-It is the flat end of the family, so it is the only member that is not strictly decreasing. The contract asks for monotone **non**-increasing, which a constant satisfies.
+It is the only member that is not strictly decreasing. The contract asks for a monotone non-increasing function, and a constant is one.
 
 # Examples
 
@@ -838,11 +856,11 @@ struct NoDecay <: AbstractSeparationDecayAlgorithm end
 
 Score a separation under a decay algorithm.
 
-The whole extension contract of [`AbstractSeparationDecayAlgorithm`](@ref): a new member is a struct and one method of this function.
+This function is the extension contract of [`AbstractSeparationDecayAlgorithm`](@ref). A new member is a struct and one method of this function.
 
 # The method the call selects
 
-This function is a **selector** and runs no step of its own. It dispatches on `dk`, and the selected method evaluates one closed form. Each form is stated under `# Mathematical definition` on the member that owns it, and none is restated here.
+This function selects a method and runs no step of its own. It dispatches on `dk`, and the selected method evaluates one closed form. The `# Mathematical definition` of each member states its form, and this docstring does not repeat it.
 
 | `dk`                       | The fall-off it selects            | Reads `dmax` |
 |:-------------------------- |:---------------------------------- |:------------ |
@@ -851,21 +869,21 @@ This function is a **selector** and runs no step of its own. It dispatches on `d
 | [`ReciprocalDecay`](@ref)  | A power of `1 + d`, set by `power` | no           |
 | [`NoDecay`](@ref)          | Flat                               | no           |
 
-[`LinearDecay`](@ref) is the only member that reads the budget, which is why the other three methods leave their third argument unnamed.
+[`LinearDecay`](@ref) is the only member that reads the budget. So the other three methods leave their third argument unnamed.
 
 # Arguments
 
   - `dk`: Separation decay algorithm.
-  - `d`: Separation between two assets, `d >= 0`. Real rather than integral, so a weighted path length is as admissible as a hop count.
-  - `dmax`: Separation budget in scope. **Inert for members that do not need it** — only [`LinearDecay`](@ref) reads it. Inert arguments have precedent here: [`phylogeny_features`](@ref) ignores its `alg` entirely for a partition source.
+  - `d`: Separation between two assets, `d >= 0`. It is a real number, so it can be a weighted path length or a hop count.
+  - `dmax`: Separation budget in scope. Only [`LinearDecay`](@ref) reads it, and the other members ignore it.
 
 # Validation
 
-The contract is not checked here — this runs inside an `assets × assets` loop. Callers probe once up front with [`assert_separation_decay`](@ref) instead.
+This function does not check the contract, because it runs inside an `assets × assets` loop. A caller probes the decay once before the loop with [`assert_separation_decay`](@ref).
 
 # Returns
 
-  - `f::Number`: Score for the separation. Non-negative for `0 <= d <= dmax`; **above** the budget the sign is unconstrained and [`LinearDecay`](@ref) does go negative, which is harmless because the consumer's budget test short-circuits before the call.
+  - `f::Number`: Score for the separation. It is non-negative for `0 <= d <= dmax`. Above the budget the contract does not set the sign, and [`LinearDecay`](@ref) is negative there. The consumer tests the budget first, so it does not call this function there.
 
 # Examples
 
@@ -911,31 +929,38 @@ end
     assert_separation_decay(dk::Union{<:LinearDecay, <:ExponentialDecay, <:ReciprocalDecay,
                                       <:NoDecay}, ds, dmax::Number)
 
-Check that a separation decay honours its contract over the separations it will be asked about.
+Check that a separation decay satisfies its contract over the separations that the caller will score.
 
-The fallback **probes**: it evaluates [`separation_decay`](@ref) over `ds` and checks the result is finite, that `f(0)` is strictly positive and maximal, that the values are monotone non-increasing, and that none of them is negative. The four shipped members satisfy the contract by construction and override this to a no-op, so the probe costs nothing for what ships and is fail-safe for extensions.
+The fallback probes the decay. It evaluates [`separation_decay`](@ref) over `ds` and checks four properties:
 
-Probing is cheap where it is used because `ds` is small and the loop it guards is not: [`Proximity`](@ref) passes `0:dmax`, which under [`HopCount`](@ref) is *exhaustive* — every separation the `assets × assets` loop can ever ask about, in `dmax + 1` evaluations. Under a separation whose budget is not an integer the same range is a unit-spaced *sample*, which is all a continuum admits and all the clauses below need.
+  - Each value is finite.
+  - `f(0)` is strictly positive, and it is the largest value.
+  - The values are monotone non-increasing.
+  - No value is negative.
 
-Non-negativity gets **one extra evaluation at `d = dmax`**, whether or not `dmax` appears in `ds`, mirroring the out-of-loop evaluation of `f(0)`. That endpoint is what closes the clause over a *continuum*: monotonicity is already promised, so `f(dmax) >= 0` implies `f(d) >= 0` for every `d` in `[0, dmax]`, and a `ds` that can only ever be a sample — as it must be once separations are weighted path lengths — costs this clause nothing. Monotonicity itself gains nothing from the endpoint and remains genuinely sampled.
+The four shipped members satisfy the contract by construction, and their method does nothing. So the probe costs nothing for a shipped member, and it checks each extension.
+
+The probe is cheap where the library uses it, because `ds` is small and the loop after the probe is large. [`Proximity`](@ref) passes `0:dmax`. Under [`HopCount`](@ref), this range holds every separation that the `assets × assets` loop can score, in `dmax + 1` evaluations. Under a budget that is not an integer, the same range is a sample with a step of one. A continuum permits only a sample, and the checks below need no more.
+
+The non-negativity check has one more evaluation at `d = dmax`, also when `ds` does not contain `dmax`. It is the counterpart of the evaluation of `f(0)` before the loop. If the decay is monotone, `f(dmax) >= 0` gives `f(d) >= 0` for every `d` in `[0, dmax]`. So the check holds over the continuum, also when `ds` is a sample, as it is for weighted path lengths. The endpoint does not help the monotonicity check, which stays a sample.
 
 # Algorithm
 
-These are the steps of the probing fallback. The method on the four shipped members runs none of them.
+These are the steps of the probe in the fallback. The method on the four shipped members runs none of them.
 
- 1. Score the separation `zero(dmax)` with [`separation_decay`](@ref), giving `f0`, the top of the scale.
+ 1. Score the separation `zero(dmax)` with [`separation_decay`](@ref), which gives `f0`, the top of the scale.
  2. Check that `f0` is finite and strictly positive.
- 3. Sort `ds` when it is not sorted already, so that step 5 reads the separations in increasing order.
+ 3. If `ds` is not sorted, sort it, so that step 5 reads the separations in increasing order.
  4. Set `fp`, the score of the previous separation, to `f0`.
- 5. For each `d` of `ds`, score it with [`separation_decay`](@ref), giving `f`. Check that `f` is finite and does not exceed `f0`. Check that `f` does not exceed `fp`. Check that `f` is non-negative. Set `fp` to `f`.
- 6. Score `dmax` itself, giving `fmax`, and check that `fmax` is non-negative. This is the endpoint the paragraph above states, and step 5 need not have reached it.
+ 5. For each `d` of `ds`, score it with [`separation_decay`](@ref), which gives `f`. Check that `f` is finite and not more than `f0`. Check that `f` is not more than `fp`. Check that `f` is non-negative. Set `fp` to `f`.
+ 6. Score `dmax`, which gives `fmax`, and check that `fmax` is non-negative. This is the endpoint that the paragraph above states. Step 5 does not always reach it.
  7. Return `nothing`.
 
 # Arguments
 
   - `dk`: Separation decay algorithm.
-  - `ds`: Separations to probe. Need not be sorted. Precondition: `ds ⊆ [0, dmax]` — `ds` is what the guarded loop will ask about, and the loop never asks outside the budget.
-  - `dmax`: Separation budget in scope, forwarded to [`separation_decay`](@ref) and probed as an endpoint in its own right.
+  - `ds`: Separations to probe, in any order. Each separation must be in `[0, dmax]`, because the loop after the probe scores no separation outside the budget.
+  - `dmax`: Separation budget in scope. The function passes it to [`separation_decay`](@ref), and also probes it as an endpoint.
 
 # Validation
 

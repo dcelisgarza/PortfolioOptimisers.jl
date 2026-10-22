@@ -19,8 +19,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :treekwargs => "`kwargs`: Keyword arguments for the spanning tree function. [`assert_tree_args`](@ref) refuses `minimize`, which would invert the minimisation the tree branch is defined by.",#
                  :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
                  :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
-                 :ntn => "`n`: Number of steps to take in the network for deciding adjacency. An `Integer` is used as it stands. A [`HopCountAlgorithm`](@ref) or a `Function` is a **rule**, called as `n(nte, X, g; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, `g` being the structure the consumer already built, and must return an `Integer`.",#
-                 :sepdmax => "`dmax`: Separation budget, in the units the separation is measured in. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a **rule**, called as `dmax(nte, X, g; dims = dims, kwargs...)` by [`resolve_separation`](@ref) at the point of use, `g` being the structure the consumer already built, and must return a `Number`.",#
+                 :ntn => "`n`: Separation budget in hops. A pair whose shortest path has more than `n` edges is unrelated. The library uses an `Integer` as it is. A [`HopCountAlgorithm`](@ref) or a `Function` is a rule. [`resolve_separation`](@ref) calls it as `n(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built, and the rule must return an `Integer`.",#
+                 :sepdmax => "`dmax`: Separation budget, in the units of the separation. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a rule. [`resolve_separation`](@ref) calls it as `dmax(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built, and the rule must return a `Number`.",#
                  :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them the budget relates.",#
                  :clres => "`res`: Clustering result.",#
                  :S => "`S`: Similarity matrix.",#
@@ -37,8 +37,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :plsrc => "`pl`: Network estimator or clustering estimator. A precomputed `PhylogenyResult` or `Clusters` is **not** accepted: this slot says how to build the phylogeny for whatever universe the estimator is given, and a precomputed one answers for a fixed universe instead. Pass the constraint *result* if you already have the structure.",#
                  ## Separation and separation decay
                  :sdecay => "`decay`: Separation decay algorithm, the rule by which the score falls off as two assets get further apart. Distinct from the exponentially weighted moment estimators' `decay`, which is a smoothing constant over observations.",#
-                 :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. Larger values decay faster. The per-step retention form, `ratio^d`, is `rate = -log(ratio)`.",#
-                 :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. Larger values decay faster.",#
+                 :sdrate => "`rate`: Rate of the exponential fall-off, `exp(-rate * d)`. A larger rate makes the score fall faster. The retention form `ratio^d` is the same function at `rate = -log(ratio)`.",#
+                 :sdpower => "`power`: Exponent of the reciprocal fall-off, `inv((1 + d)^power)`. A larger power makes the score fall faster.",#
                  ## DBHT
                  :dbhtpower => "`power`: The exponent of each distance in the similarity transformation.",#
                  :dbhtcoef => "`coef`: The scale factor of the distance term in the similarity transformation.",#

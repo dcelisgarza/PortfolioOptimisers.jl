@@ -44,8 +44,8 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :sdrate => "`rate > 0`.",#
                  :sdpower => "`power > 0`.",#
                  :phX_Xv => "`If `X` is a `MatNum`:\n    + Must be symmetric, `LinearAlgebra.issymmetric(X)`\n    + Must have zero diagonal, `all(iszero, LinearAlgebra.diag(X))`.",#
-                 :ntn => "If `n` is an `Integer`, `1 <= n <= RESOURCE_LIMITS[].max_hop_count` (three readers sum `A^i` over `i in 0:n`, so the compute cost is linear in `n`; see [`RESOURCE_LIMITS`](@ref)). A rule is checked when it is resolved, not when it is stored.",#
-                 :sepdmax => "If `dmax` is a `Number`, `dmax > 0`. A rule is checked when it is resolved, not when it is stored.",#
+                 :ntn => "If `n` is an `Integer`, `1 <= n <= RESOURCE_LIMITS[].max_hop_count`. Three readers sum `A^i` over `i in 0:n`, so the compute cost is linear in `n`. See [`RESOURCE_LIMITS`](@ref). [`resolve_separation`](@ref) checks a rule when it resolves the rule, and the constructor does not check it.",#
+                 :sepdmax => "If `dmax` is a `Number`, `dmax > 0`. [`resolve_separation`](@ref) checks a rule when it resolves the rule, and the constructor does not check it.",#
                  :sepq => "`0 <= q <= 1`.",#
                  :ctargs_nomat => "No entry of `args` is an `AbstractMatrix`. A weight matrix reaches a centrality algorithm through [`centrality_polarity`](@ref), and never through `args`.",#
                  :treeargs_nochan => "No entry of `args` is an `AbstractMatrix` or an `AbstractVector`, and `kwargs` holds no `minimize` key. Each of those reaches a channel that would re-weight or re-orient the graph the [`NetworkEstimator`](@ref) built.",#

@@ -635,6 +635,10 @@ const WX = [0.0 1.0 5.0 0.0; 1.0 0.0 1.0 0.0; 5.0 1.0 0.0 0.1; 0.0 0.0 0.1 0.0]
     @test maximum(Wp) < minimum(Ws[Ws .!= 0])     # distances below every similarity here
     @test separation_matrix(np.sep, np, rd.X; dims = 1) !=
           G.floyd_warshall_shortest_paths(gs).dists
+    up = [i < k for i in 1:NA, k in 1:NA]
+    rs = StatsBase.cor(separation_matrix(np.sep, np, rd.X; dims = 1)[up],
+                       G.floyd_warshall_shortest_paths(gs).dists[up])
+    @test 0.95 <= round(rs; digits = 2) <= 0.97
 end
 
 @testset "The two separations order the same graph differently" begin
@@ -661,6 +665,41 @@ end
     # diagonal is `delta + 1` on one and `n + 1` on the other.
     @test all(==(2.1 + 1), diag(Zp))
     @test all(==(2 + 1), diag(Zh))
+end
+
+@testset "On the fixture the two separations agree by the numbers PathLength states" begin
+    # The docstring of `PathLength` states a Pearson correlation of 0.99 on the tree and 0.97
+    # to 0.98 on a PMFG, 0.16% of the pairs of pairs in the opposite order on the tree, and
+    # none on a PMFG. An earlier text said 0.95 to 0.98 on a PMFG.
+    up = [i < k for i in 1:NA, k in 1:NA]
+    function agreement(alg)
+        nh = if isnothing(alg)
+            NetworkEstimator(; sep = HopCount())
+        else
+            NetworkEstimator(; alg = alg, sep = HopCount())
+        end
+        np = if isnothing(alg)
+            NetworkEstimator(; sep = PathLength())
+        else
+            NetworkEstimator(; alg = alg, sep = PathLength())
+        end
+        a = Float64.(separation_matrix(nh.sep, nh, rd.X; dims = 1)[up])
+        b = separation_matrix(np.sep, np, rd.X; dims = 1)[up]
+        m = length(a)
+        inverted = count(((a[i] < a[k]) && (b[i] > b[k])) ||
+                             ((a[i] > a[k]) && (b[i] < b[k])) for i in 1:m
+                         for k in (i + 1):m)
+        return StatsBase.cor(a, b), inverted / binomial(m, 2)
+    end
+    r, f = agreement(nothing)
+    @test round(r; digits = 2) == 0.99
+    @test round(100 * f; digits = 2) == 0.16
+    for alg in (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                GeneralExponentialSimilarity(), ComplementSimilarity())
+        r, f = agreement(alg)
+        @test 0.97 <= round(r; digits = 2) <= 0.98
+        @test iszero(f)
+    end
 end
 
 @testset "The budget is the observed diameter, and a chosen one is capped by it" begin
