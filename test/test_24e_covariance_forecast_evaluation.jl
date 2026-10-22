@@ -335,9 +335,9 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
     end
 
     @testset "A bare covariance estimator reads the implied volatilities (#1643)" begin
-        # The regression reads windows of 20 rows and needs more than two of them, so the
-        # first training window is longer than the one above.
-        wv = 90
+        # The regression reads windows of 20 rows and needs more than four of them (#1796),
+        # so the first training window is longer than the one above.
+        wv = 102
         cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
         cvo = OnlineIndexWalkForward(wv, h; purged_size = p)
         iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
@@ -349,7 +349,7 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
             r = ReturnsResult(; nx = nx, X = X, iv = iv, ivpa = ivpa, ts = ts)
             # Batch: the bare estimator answers what the prior that holds it answers.
             b = cfe(ce, r, cvb)
-            @test length(b.dates) == 14
+            @test length(b.dates) == 11
             for est in (EmpiricalPrior(; ce = ce), poc(ce))
                 bb = cfe(est, r, cvb)
                 for f in columns
@@ -446,8 +446,9 @@ struct NoLocationCovariance <: PortfolioOptimisers.AbstractCovarianceEstimator e
                 @test finite_max(getfield(a, f), getfield(z, f)) == 0
             end
         end
-        # An `ImpliedVolatility` reads the surface of the assets beside `X - B`.
-        wv = 90
+        # An `ImpliedVolatility` reads the surface of the assets beside `X - B`. Its first
+        # training window keeps more than four windows of 20 rows after the purge (#1796).
+        wv = 102
         cvb = IndexWalkForward(wv, h; purged_size = p, expand_train = true)
         iv = 0.2 .+ abs.(randn(StableRNG(1643), T, N)) ./ 50
         ce = ImpliedVolatility(; ppy = 252)

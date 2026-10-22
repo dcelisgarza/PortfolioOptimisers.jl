@@ -791,19 +791,27 @@ end
     end
 
     @testset "ImpliedVolatility rejects what it cannot compute" begin
-        # A window of 2 or fewer observations carries no usable standard deviation.
-        @test_throws DomainError ImpliedVolatilityRegression(; ws = 2)
-        # The regression needs more than two windows: two of them leave one training row.
-        @test_throws DomainError cov(ImpliedVolatility(; ppy = 252,
-                                                       alg = ImpliedVolatilityRegression(;
-                                                                                         ws = 126)),
-                                     X; iv = iv)
-        # Three windows is the smallest the fit accepts, and it stays finite there. This is
-        # the oracle's own floor of three folds. There the fit has two rows for three
-        # coefficients, and #1796 asks whether to raise the floor.
+        # A window of one row has no dispersion: its corrected standard deviation is `NaN`
+        # and its uncorrected one is zero, whose logarithm is `-Inf`. A window of two rows
+        # has a corrected standard deviation with one degree of freedom (#1796).
+        @test_throws DomainError ImpliedVolatilityRegression(; ws = 1)
+        @test ImpliedVolatilityRegression(; ws = 2).ws == 2
+        #=
+        The fit has one row fewer than the windows, for three coefficients (#1796). Three
+        windows give two rows, so the coefficients have no unique value: the oracle accepts
+        that floor, and the second asset of the issue's reproduction got a per-period
+        volatility of 15. Four windows give three rows and no residual. So `T = 252` refuses
+        `ws = 63` (four windows) and `ws = 84` (three), and accepts `ws = 50` (five).
+        =#
+        for ws in (126, 84, 63)
+            @test_throws DomainError cov(ImpliedVolatility(; ppy = 252,
+                                                           alg = ImpliedVolatilityRegression(;
+                                                                                             ws = ws)),
+                                         X; iv = iv)
+        end
         @test all(isfinite,
                   diag(cov(ImpliedVolatility(; ppy = 252,
-                                             alg = ImpliedVolatilityRegression(; ws = 84)),
+                                             alg = ImpliedVolatilityRegression(; ws = 50)),
                            X; iv = iv)))
         # The premium algorithm has no default factor.
         @test_throws ArgumentError cov(ImpliedVolatility(; ppy = 252,

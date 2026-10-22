@@ -78,7 +78,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `ws > 2`.
+  - `ws > 1`. A window of one row has no dispersion. Its corrected standard deviation is `NaN`, and its uncorrected one is zero, which has no logarithm.
 
 ## Propagated parameters
 
@@ -121,7 +121,7 @@ ImpliedVolatilityRegression
     """
     @fprop ve
     """
-    Number of rows in each window. The number of windows is `div(size(X, 1), ws)`, and the regression needs more than two windows.
+    Number of rows in each window. The number of windows is `div(size(X, 1), ws)`, and the regression needs more than four windows.
     """
     ws
     # crit
@@ -131,9 +131,9 @@ ImpliedVolatilityRegression
     re
     function ImpliedVolatilityRegression(ve::AbstractVarianceEstimator, ws::Number,
                                          re::AbstractRegressionTarget)
-        @argcheck(2 < ws,
+        @argcheck(1 < ws,
                   DomainError(ws,
-                              "`ImpliedVolatilityRegression.ws` is $ws, and the regression needs more than two windows, so the window size is at least `3`. State an integer greater than `2`."))
+                              "`ImpliedVolatilityRegression.ws` is $ws, and a window of one row has no standard deviation whose logarithm the regression can take. State an integer greater than `1`."))
         return new{typeof(ve), typeof(ws), typeof(re)}(ve, ws, re)
     end
 end
@@ -629,14 +629,14 @@ Where:
   - ``\\varepsilon_c``: Regression residual.
   - $(math_dict[:T])
 
-The fit has ``C - 1`` rows and three coefficients, and the method needs ``C > 2``. At ``C = 3`` the fit has fewer rows than coefficients, so the coefficients have no unique value. At ``C = 4`` the fit has no residual. The fit has more rows than coefficients only when ``C > 4``.
+The fit has ``C - 1`` rows and three coefficients, and the method needs ``C > 4``. At ``C = 3`` the fit has fewer rows than coefficients, so the coefficients have no unique value. At ``C = 4`` the fit passes through each row and has no residual, so the data cannot estimate ``\\varepsilon_c``. The fit has more rows than coefficients only when ``C > 4``. The oracle accepts ``C = 3``. The library refuses ``C = 3`` and ``C = 4``.
 
 This is Equation 5 of [christensenprabhala1998](@cite). It regresses the log realised volatility of period ``t`` on the log implied volatility at the start of ``t`` and on the log realised volatility of period ``t - 1``. Section 2.2 of that work defines both as natural logarithms. It defines the realised volatility as the sample standard deviation of the returns of the period. Section 3.3 of that work forecasts one period ahead from the fitted equation, and it states no back-transformation. The exponential of the fitted logarithm is the choice of this library.
 
 # Algorithm
 
  1. Read `T` and `N` from `size(X)`, and set `chunk` to `div(T, alg.ws)`.
- 2. Check that `chunk` exceeds two.
+ 2. Check that `chunk` exceeds four.
  3. Call [`realised_vol`](@ref) with `alg.ve`. The result is `rv`, the realised volatility of each window.
  4. Call [`implied_vol`](@ref) on `iv` with the same `chunk`, `T` and `N`. The result replaces `iv`, and holds the implied volatility at the last row of each window. The window count comes from `X`, so the function reads `iv` over the rows of the returns sample.
  5. Check that `rv` and `iv` have the same size. Set `T2` to their number of rows, which is `chunk`.
@@ -657,7 +657,7 @@ The implied volatilities are the second positional argument, and the returns are
 
 # Validation
 
-  - `chunk > 2`. The regression needs more than two windows of data.
+  - `chunk > 4`. The fit has `chunk - 1` rows for three coefficients, so it has a residual only when `chunk > 4`.
   - `size(rv) == size(iv)`, one realised volatility for each implied volatility.
 
 # Returns
@@ -679,9 +679,9 @@ function predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::
                                ::Any)
     T, N = size(X)
     chunk = div(T, alg.ws)
-    @argcheck(2 < chunk,
+    @argcheck(4 < chunk,
               DomainError(chunk,
-                          "`X` holds $T observations, and `ImpliedVolatilityRegression.ws` is $(alg.ws), which gives $chunk windows. The regression needs more than two, so state a shorter window or supply more observations."))
+                          "`X` holds $T observations, and `ImpliedVolatilityRegression.ws` is $(alg.ws), which gives $chunk windows. The fit has one row fewer than the windows and three coefficients, so it needs more than four windows to have a residual. State a shorter window or supply more observations."))
     rv = realised_vol(alg.ve, X, alg.ws, chunk, T, N)
     iv = implied_vol(iv, alg.ws, chunk, T, N)
     @argcheck(size(rv) == size(iv), DimensionMismatch)

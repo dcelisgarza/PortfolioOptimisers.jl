@@ -319,7 +319,9 @@ end
         ivr = ImpliedVolatility(; ppy = 252)
         ivp = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityPremium())
         hopt(pe) = HierarchicalOptimiser(; pe = pe)
-        for r in (rdi, rdiv), t in (61, 80), ce in (ivr, ivp)
+        # The regression needs more than four windows of 20 rows (#1796), and 101 rows
+        # leave one row that no window covers.
+        for r in (rdi, rdiv), t in (101, 120), ce in (ivr, ivp)
             b = rows(r, 1:t)
             carry = EmpiricalPrior(; ce = ce)
             refit = po.Online(EmpiricalPrior(; ce = ce))
@@ -342,12 +344,12 @@ end
         opt = po.update_online_estimator(InverseVolatility(;
                                                            pe = po.Online(EmpiricalPrior(;
                                                                                          ce = ivr);
-                                                                          max_history = 70)))
-        o = step(opt, rdi, 110)
-        @test po.returns_result(o).iv == ivm[41:110, :]
+                                                                          max_history = 100)))
+        o = step(opt, rdi, 120)
+        @test po.returns_result(o).iv == ivm[21:120, :]
         @test isapprox(optimise(o).w,
                        optimise(InverseVolatility(; pe = EmpiricalPrior(; ce = ivr)),
-                                rows(rdi, 41:110)).w; rtol = 1e-12)
+                                rows(rdi, 21:120)).w; rtol = 1e-12)
         # The first step pins `ivpa`, and fixes whether the steps carry `iv`.
         o = step(InverseVolatility(; pe = EmpiricalPrior(; ce = ivp)), rdi, 10)
         r11 = rows(rdi, 11:11)

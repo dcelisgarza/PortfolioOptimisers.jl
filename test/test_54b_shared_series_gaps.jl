@@ -535,7 +535,7 @@ end
 
     @testset "A graph reader pairs iv by the marks" begin
         # The window is short enough that the regression of the 59 kept rows has more than
-        # two windows.
+        # four windows.
         ive = ImpliedVolatility(; ppy = 252, alg = ImpliedVolatilityRegression(; ws = 10))
         clp = ClustersEstimator(; ce = ive, x_src = PriorSource())
         ref = clusterise(clp, pr; iv = ivg[keep, :], ivpa = 1.1)

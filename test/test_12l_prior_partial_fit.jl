@@ -887,7 +887,7 @@ end
         @test occursin("the carry of `EmpiricalPrior`", m)
     end
     @testset "The buffer records the implied volatilities beside the returns (#1632)" begin
-        # The regression needs more than two windows of 20 rows, so the block is longer
+        # The regression needs more than four windows of 20 rows, so the block is longer
         # than the shared fixture. Its returns are complete, so the gap of `ivg` in column
         # 2 is the surface's own.
         Xc = randn(rng, 3 * T, N) ./ 100
