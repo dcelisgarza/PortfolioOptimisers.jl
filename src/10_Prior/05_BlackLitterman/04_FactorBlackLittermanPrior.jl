@@ -408,7 +408,7 @@ The shift is linear in ``r_f``, and it depends on the views through ``\\mathbf{G
   - `pe`: Factor Black-Litterman prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor matrix (observations × factors).
-  - $(arg_dict[:pnl_prior]) The panel reaches the reduction of step 3 alone, because the estimator fits its nested prior on the factors and no panel describes the factor axis.
+  - $(arg_dict[:pnl_prior]) The panel reaches the reduction of step 3 alone. The estimator fits its nested prior on the factors, and no panel describes the factor axis.
   - $(arg_dict[:dims])
   - `strict`: If `true`, enforce strict validation of views and sets. Default is `false`.
   - $(arg_dict[:cvg_active_mask])
