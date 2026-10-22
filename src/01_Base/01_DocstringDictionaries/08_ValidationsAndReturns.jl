@@ -25,7 +25,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :ep_gridK => "`isodd(K)` and `1 <= K <= RESOURCE_LIMITS[].max_ep_grid` (every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds; see [`RESOURCE_LIMITS`](@ref)).",#
                  :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                  :p_owa => "`!isempty(p)` and `all(x -> x > 1, p)`.",#
-                 :settings => "If not `nothing`, `!isempty(settings)`.",#
+                 :settings => "If `settings` is a collection, `!isempty(settings)`, else an [`IsEmptyError`](@ref). If `settings` is not `nothing`, each key is a [`SlvKeys`](@ref), else an `ArgumentError`.",#
                  :S => "`!isempty(S)`.",#
                  :D => "`!isempty(D)`.",#
                  :ck => "`k >= 1`.",#

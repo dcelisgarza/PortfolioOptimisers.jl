@@ -441,6 +441,23 @@ end
     @testset "Solver" begin
         @test_throws IsEmptyError Solver(; solver = nothing, settings = Dict{String, Any}())
         @test_throws IsEmptyError Solver(; solver = nothing, settings = Pair{String, Any}[])
+        # A key of `settings` is a string, a model attribute or an optimizer attribute,
+        # the three kinds of key that `JuMP.set_attribute` takes for a model.
+        MOI = PortfolioOptimisers.JuMP.MOI
+        @test Solver(; solver = nothing, settings = MOI.Silent() => true).settings ==
+              (MOI.Silent() => true)
+        @test length(Solver(; solver = nothing,
+                            settings = ["verbose" => false, MOI.TimeLimitSec() => 1.0,
+                                        MOI.Name() => "m"]).settings) == 3
+        @test length(Solver(; solver = nothing,
+                            settings = Dict{Any, Any}(MOI.RawOptimizerAttribute("verbose") =>
+                                                          false, "max_iter" => 10)).settings) ==
+              2
+        @test_throws ArgumentError Solver(; solver = nothing, settings = :verbose => false)
+        @test_throws ArgumentError Solver(; solver = nothing,
+                                          settings = [:verbose => false])
+        @test_throws ArgumentError Solver(; solver = nothing,
+                                          settings = Dict(:verbose => false))
 
         s = Solver(; solver = nothing)
         @test s.name == ""

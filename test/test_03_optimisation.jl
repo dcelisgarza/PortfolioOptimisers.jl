@@ -20,6 +20,60 @@
     end
 end
 
+@testset "Solver chain records" begin
+    using PortfolioOptimisers, JuMP, Test, Clarabel
+    @testset "optimise_JuMP_model!" begin
+        function qpmodel(lb)
+            model = JuMP.Model()
+            JuMP.@variable(model, w[1:3])
+            JuMP.@constraint(model, sum(w) == 1)
+            JuMP.@constraint(model, w .>= lb)
+            JuMP.@objective(model, Min, sum(w .^ 2))
+            return model
+        end
+        # An optimizer attribute reaches the solver, and a single `Solver` is a vector of one.
+        model = qpmodel(0.0)
+        res = PortfolioOptimisers.optimise_JuMP_model!(model,
+                                                       Solver(; solver = Clarabel.Optimizer,
+                                                              settings = MOI.Silent() =>
+                                                                  true))
+        @test res.success
+        @test isempty(res.trials)
+        @test JuMP.get_attribute(model, MOI.Silent())
+        @test isapprox(JuMP.value.(model[:w]), fill(inv(3), 3); rtol = 1e-6)
+        # An attribute that the solver refuses raises out of the loop, and no later
+        # solver is tried.
+        @test_throws Exception PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
+                                                                        [Solver(; name = :a,
+                                                                                solver = Clarabel.Optimizer,
+                                                                                settings = "no_such_attribute" =>
+                                                                                    1),
+                                                                         Solver(; name = :b,
+                                                                                solver = Clarabel.Optimizer)])
+        # The entry of a failed check also holds the settings of the solver.
+        res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.9),
+                                                       Solver(; name = :c,
+                                                              solver = Clarabel.Optimizer,
+                                                              settings = Dict("verbose" =>
+                                                                                  false)))
+        @test !res.success
+        @test Set(keys(res.trials[:c])) == Set([:assert_is_solved_and_feasible, :settings])
+        @test res.trials[:c][:settings] == Dict("verbose" => false)
+        # Two unnamed solvers share one entry, and two named solvers keep two.
+        nosolver = () -> error("no solver")
+        res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
+                                                       [Solver(; solver = nosolver),
+                                                        Solver(; solver = nosolver)])
+        @test length(res.trials) == 1
+        res = PortfolioOptimisers.optimise_JuMP_model!(qpmodel(0.0),
+                                                       [Solver(; name = :a,
+                                                               solver = nosolver),
+                                                        Solver(; name = :b,
+                                                               solver = nosolver)])
+        @test length(res.trials) == 2
+    end
+end
+
 @testset "Solver fallback chain robustness" begin
     using PortfolioOptimisers, JuMP, Test, Clarabel
     function testmodel(lb)
