@@ -1,8 +1,7 @@
 # Literature acronym aliases. Each `const` points at the canonical long-form type, and each
 # factory function builds a canonical type with a fixed algorithm. They are exported so a caller
 # who knows the acronym finds it by autocomplete. An acronym is aliased only when GLOSSARY.md
-# makes it unambiguous. `MAD` breaks that rule. It builds the mean absolute deviation, and the
-# glossary gives MAD to `MedianAbsoluteDeviation` (#1793).
+# makes it unambiguous.
 
 # ── Clustering / hierarchical optimisers ──────────────────────────────────────
 """

@@ -1091,9 +1091,9 @@ The per-observation series a conic tail measure reduces. Two exist: the net port
 ### Dispersion / moment measures
 
 - **Variance**, **StandardDeviation**, **UncertaintySetVariance** (robust).
-- **LowOrderMoment** (`FirstLowerMoment`, `MeanAbsoluteDeviation`, `SecondMoment`, `EvenMoment`) and **HighOrderMoment** (`ThirdLowerMoment`, `FourthMoment`, `StandardisedHighOrderMoment`).
+- **LowOrderMoment** (`FirstLowerMoment`, `MeanAbsoluteDeviation` (MAD), `SecondMoment`, `EvenMoment`) and **HighOrderMoment** (`ThirdLowerMoment`, `FourthMoment`, `StandardisedHighOrderMoment`).
 - **Kurtosis**, **Skewness**, **NegativeSkewness**, **VarianceSkewKurtosis** (composite), **ThirdCentralMoment**.
-- **MedianAbsoluteDeviation (MAD)**: centred by `MedianCentering` or `MeanCentering`.
+- **MedianAbsoluteDeviation**: centred by `MedianCentering` or `MeanCentering`. It has no acronym: MAD and the factory alias `MAD` name the mean absolute deviation, a `LowOrderMoment` with `MeanAbsoluteDeviation`.
 
 ### Quantile / tail measures (XatRisk)
 
