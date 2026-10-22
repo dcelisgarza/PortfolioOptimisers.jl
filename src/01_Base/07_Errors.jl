@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all custom exception types.
 
-All error types specific to `PortfolioOptimisers.jl` should be subtypes of `PortfolioOptimisersError`.
+All error types of `PortfolioOptimisers.jl` must subtype `PortfolioOptimisersError`.
 
 # Related
 
@@ -97,7 +97,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exception type thrown when an argument or value is unexpectedly non-finite (e.g., contains `NaN` or `Inf`).
+Exception type thrown when an argument or value is unexpectedly non-finite, for example when it holds `NaN` or `Inf`.
 
 # Fields
 
@@ -173,7 +173,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exception type thrown when an argument or value is mutually exclusive with another and both were supplied — a "must-be-absent" constraint was violated (e.g. an argument that must be `nothing` because a conflicting one is set).
+Exception type thrown when the caller gives two arguments that exclude each other. One argument must be `nothing` when the other is set, and the caller set both.
 
 # Fields
 
@@ -211,7 +211,7 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exception type thrown when a [`@forward_properties`](@ref) nested path cannot be descended because an intermediate node is `nothing`.
+Exception type thrown when [`@forward_properties`](@ref) cannot follow a nested path, because a node in the path is `nothing`.
 
 # Fields
 
@@ -247,9 +247,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Exception type thrown when a [`DynamicAbstractWeights`](@ref) cannot resolve observation weights for the data it was handed, because no [`get_observation_weights`](@ref) method is implemented for that input's shape.
+Exception type thrown when a [`DynamicAbstractWeights`](@ref) cannot resolve the observation weights for its data, because [`get_observation_weights`](@ref) has no method for the shape of that data.
 
-[`get_observation_weights`](@ref) returns `nothing` to mean *no weights were requested*, never *weights were unavailable*. Every `isnothing` branch downstream reads it the first way and computes an unweighted result, so a `DynamicAbstractWeights` that resolved to `nothing` would silently produce a numerically plausible but unweighted answer with no diagnostic. It raises instead.
+A `nothing` from [`get_observation_weights`](@ref) means that the caller asked for no weights. It never means that the weights are not available. Each `isnothing` branch after it reads `nothing` in that way and computes an unweighted result. A `DynamicAbstractWeights` that resolves to `nothing` thus gives an unweighted answer that looks correct, with no message. The library raises this error instead.
 
 # Fields
 
@@ -328,7 +328,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Exception type thrown when a positive definite repair returns a matrix that is not positive semidefinite.
 
-A repair returns a matrix that a consumer factorises or optimises over. A matrix with an eigenvalue below the round-off of a positive semidefinite matrix gives a negative variance in some direction, so every consumer would read a wrong number or meet a LAPACK refusal with no name. That is why the repair raises rather than returning the matrix. A singular result that is positive semidefinite to round-off is a valid covariance, and it returns with no message.
+A consumer factorises the matrix that a repair returns, or optimises over it. A matrix with an eigenvalue below the round-off of a positive semidefinite matrix gives a negative variance in one direction. Each consumer then reads a wrong number, or gets a LAPACK error that does not name the cause. The repair thus raises this error, and does not return the matrix. A singular result that is positive semidefinite to round-off is a valid covariance, and the repair returns it with no message.
 
 # Fields
 
@@ -366,17 +366,17 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Print human-readable representation of `PortfolioOptimisersError` subtypes to `io`, stripping parametric type suffixes.
+Print a subtype of `PortfolioOptimisersError` to `io` as its type name and its message, with no type parameters.
 
 # Algorithm
 
  1. Take `name`, the string of the concrete type of `err`.
- 2. Cut `name` at the first `{` or `(`, so a parametric subtype prints under its wrapper name alone.
+ 2. Cut `name` at the first `{` or `(`, so that a parametric subtype prints with its wrapper name alone.
  3. Print `name`, a colon, and the `msg` field of `err`.
 
 # Arguments
 
-  - `io`: Stream the message is printed to.
+  - `io`: The stream that the function prints the message to.
   - `err`: The error to render.
 
 # Returns

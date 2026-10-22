@@ -1,9 +1,9 @@
 """
     const ObsWeights = Union{<:DynamicAbstractWeights, <:StatsBase.AbstractWeights}
 
-Union type for observation weights accepted by estimators.
+Union type for the observation weights that an estimator accepts.
 
-Accepts either a [`DynamicAbstractWeights`](@ref) subtype (weights computed from data at fit time) or a `StatsBase.AbstractWeights` instance (pre-computed numeric weights).
+It holds a subtype of [`DynamicAbstractWeights`](@ref), which computes the weights from the data when the estimator fits. It also holds a `StatsBase.AbstractWeights`, which holds weights that the caller computed before.
 
 # Related
 
@@ -34,14 +34,14 @@ const ScenarioProbabilities = Union{<:StatsBase.AnalyticWeights,
 
 Wrap the probabilities `x` of the scenarios in the kind of the weights `w`. The one-argument method reads `w` as the probabilities, and returns it unchanged when it already has a kind of [`ScenarioProbabilities`](@ref).
 
-A prior that reweights its scenarios answers posterior probabilities of the same kind as its prior probabilities, so a caller who gives `StatsBase.ProbabilityWeights` keeps their correction. Without such weights, the probabilities are `StatsBase.AnalyticWeights`, whose correction is the one of reliability weights. [`ScenarioProbabilities`](@ref) states the two corrections.
+A prior that reweights its scenarios returns posterior probabilities of the same kind as its prior probabilities. A caller who gives `StatsBase.ProbabilityWeights` thus keeps that correction. With no such weights, the probabilities are `StatsBase.AnalyticWeights`, whose correction is the correction of reliability weights. [`ScenarioProbabilities`](@ref) states the two corrections.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `w` is a [`ScenarioProbabilities`](@ref): return weights of the kind of `w` over `x`. With no `x`, return `w`.
- 2. `w` is anything else, `nothing` and a plain vector included: return `StatsBase.aweights(x)`. With no `x`, return `StatsBase.aweights(w)`.
+ 1. When `w` is a [`ScenarioProbabilities`](@ref), return weights of the kind of `w` over `x`. With no `x`, return `w`.
+ 2. When `w` is a different value, which includes `nothing` and a plain vector, return `StatsBase.aweights(x)`. With no `x`, return `StatsBase.aweights(w)`.
 
 # Arguments
 
@@ -91,28 +91,28 @@ end
         kwargs...
     ) -> Option{<:VecNum}
 
-Get the observation weights for statistical estimation.
+Get the observation weights for a statistical estimate.
 
-`nothing` is returned only when `w === nothing`, and means *no weights were requested* — every `isnothing` branch downstream reads it that way and computes an unweighted result. It never means *weights were unavailable*: a [`DynamicAbstractWeights`](@ref) with no method for the given input shape throws [`ObservationWeightsError`](@ref) rather than resolving to `nothing`, because returning `nothing` there would silently yield an unweighted answer that looks plausible.
+The function returns `nothing` only when `w === nothing`, and `nothing` means that the caller asked for no weights. Each `isnothing` branch after it reads `nothing` in that way, and computes an unweighted result. `nothing` never means that the weights are not available. A [`DynamicAbstractWeights`](@ref) with no method for the shape of the input throws [`ObservationWeightsError`](@ref), and does not resolve to `nothing`. A `nothing` there gives an unweighted answer that looks correct, with no message.
 
-This is why call sites need no strictness check of their own. A `DynamicAbstractWeights` is resolved *before* dispatch (see [`average_drawdown`](@ref) for the pattern), so the estimator downstream only ever sees a concrete weight vector or a deliberate `nothing`.
+A call site thus needs no strictness check of its own. The library resolves a `DynamicAbstractWeights` before dispatch, and [`average_drawdown`](@ref) shows the pattern. The estimator after it thus sees only a concrete weight vector, or a `nothing` that the caller asked for.
 
-# The returned vector is borrowed, not owned
+# The returned vector is borrowed
 
-For a `StatsBase.AbstractWeights` this returns **the stored object itself**, not a copy — an estimator's `w` field is handed straight back. So the caller may **read** it but must never **mutate** it: writing through it permutes the estimator's own configuration, and every later evaluation of that estimator is then wrong.
+For a `StatsBase.AbstractWeights`, the function returns the stored object itself, and not a copy. It gives back the `w` field of the estimator, which still owns the vector. The caller can read the vector, but must never mutate it. A write to it changes the configuration of the estimator, and every later evaluation of that estimator is then wrong.
 
-This is the same obligation the rest of `src/` already meets: a `reverse!` or a `sort!` is applied only to a vector the surrounding expression has just allocated. Beware the indirect route in particular — `view(w, order)` is a **view**, so `reverse!` on the view writes through into `w` just as surely as `reverse!(w)` would. Reverse the permutation instead, or sort into a fresh vector.
+The rest of `src/` already obeys this rule. A `reverse!` or a `sort!` applies only to a vector that the expression around it allocated. Look for the indirect case. `view(w, order)` is a view, so `reverse!` on the view writes into `w` in the same way as `reverse!(w)`. Reverse the permutation instead, or sort into a fresh vector.
 
-A defensive copy here was considered and rejected: it would cost an allocation on every evaluation of every weighted estimator, and the obligation is cheap to keep.
+A defensive copy in this function costs an allocation on each evaluation of each weighted estimator. The rule costs almost nothing to obey, so the function makes no copy.
 
 # Algorithm
 
-The method Julia selects on the type of `w` is the algorithm. Three methods share the name, and a fourth is written by the caller.
+The method that Julia selects on the type of `w` is the algorithm. Three methods share the name, and the caller writes a fourth.
 
- 1. `w === nothing` selects the method that returns `nothing`, which is the deliberate request for an unweighted result.
- 2. A `StatsBase.AbstractWeights`, which is a `VecNum`, selects the method that returns the stored object itself. It allocates nothing, which is why the returned vector is borrowed.
- 3. A [`DynamicAbstractWeights`](@ref) for which the caller wrote no method selects the fallback, which raises. The fallback builds `shape` from the first positional argument, naming its dimension count and its size when that argument is an array and naming it as "the given input" otherwise, then raises [`ObservationWeightsError`](@ref) carrying `shape` and the two method signatures to write.
- 4. A [`DynamicAbstractWeights`](@ref) for which the caller wrote a method selects that method instead, because it is more specific than the fallback of step 3.
+ 1. `w === nothing` selects the method that returns `nothing`, which is the request for an unweighted result.
+ 2. A `StatsBase.AbstractWeights`, which is a `VecNum`, selects the method that returns the stored object itself. It allocates nothing, so the returned vector is borrowed.
+ 3. A [`DynamicAbstractWeights`](@ref) for which the caller wrote no method selects the fallback, which raises. The fallback builds `shape` from the first positional argument. When that argument is an array, `shape` names its number of dimensions and its size, and in the other case it is "the given input". The fallback then raises [`ObservationWeightsError`](@ref) with `shape` and the two method signatures to write.
+ 4. A [`DynamicAbstractWeights`](@ref) for which the caller wrote a method selects that method, because it is more specific than the fallback of step 3.
 
 # Arguments
 
@@ -122,7 +122,7 @@ The method Julia selects on the type of `w` is the algorithm. Three methods shar
 
 # Validation
 
-  - `w` is `nothing`, a `StatsBase.AbstractWeights`, or a [`DynamicAbstractWeights`](@ref) that has a method for the shape of the given input. A [`DynamicAbstractWeights`](@ref) with no such method raises [`ObservationWeightsError`](@ref), which names the two signatures to write. It never resolves to `nothing`, because that would silently give an unweighted answer that looks plausible.
+  - `w` is `nothing`, a `StatsBase.AbstractWeights`, or a [`DynamicAbstractWeights`](@ref) that has a method for the shape of the given input. A [`DynamicAbstractWeights`](@ref) with no such method raises [`ObservationWeightsError`](@ref), which names the two signatures to write. It never resolves to `nothing`, because a `nothing` gives an unweighted answer that looks correct, with no message.
 
 # Returns
 

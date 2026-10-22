@@ -74,7 +74,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # Norm-based error family.
                  :a_norm_err => "``\\boldsymbol{a}``: Portfolio weight or return vector ``T \\times 1``.",#
                  :b_norm_err => "``\\boldsymbol{b}``: Benchmark vector ``T \\times 1``.",#
-                 :d_ddof => "``d``: Degrees of freedom, `ddof`. When ``T`` is not provided the denominator is 1.",#
+                 :d_ddof => "``d``: Degrees of freedom, `ddof`. When the caller gives no ``T``, the denominator is 1.",#
                  :p_norm_order => "``p``: Norm order.",#
                  :tr_l2 => "``\\mathrm{TE}_{L_2}(\\boldsymbol{a},\\boldsymbol{b})``: L2-norm error.",#
                  :tr_l2sq => "``\\mathrm{TE}_{L_2^2}(\\boldsymbol{a},\\boldsymbol{b})``: Squared L2-norm error.",#

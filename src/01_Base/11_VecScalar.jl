@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Represents a composite result containing a vector and a scalar.
+A result that holds a vector and a scalar.
 
-Encapsulates a vector and a scalar value, commonly used for storing results that combine both types of data (e.g., weighted statistics, risk measures).
+The moment risk measures read a `VecScalar` as a target `mu`. The target of a portfolio with weights `w` is `dot(w, mu.v) + mu.s`.
 
 # Fields
 
@@ -16,7 +16,7 @@ $(DocStringExtensions.FIELDS)
         s::Number
     ) -> VecScalar
 
-Keywords correspond to the struct's fields.
+Each keyword sets the field of the same name.
 
 ## Validation
 
@@ -39,11 +39,11 @@ VecScalar
 """
 @concrete struct VecScalar <: AbstractResult
     """
-    Vector component.
+    The vector part.
     """
     v
     """
-    Scalar component.
+    The scalar part.
     """
     s
     function VecScalar(v::VecNum, s::Number)
@@ -58,7 +58,7 @@ end
 """
     const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
 
-Alias for a union of a numeric type, a vector of numeric types, or a `VecScalar` result.
+Alias for a union of a numeric type, a vector of numeric types and a `VecScalar` result.
 
 # Related
 
@@ -69,12 +69,13 @@ const Num_VecNum_VecScalar = Union{<:Num_VecNum, <:VecScalar}
 """
     const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar, <:DynamicAbstractWeights}
 
-Alias for a union of a numeric type, an array of numeric types, or a `VecScalar` result.
+Alias for a union of a numeric type, an array of numeric types, a `VecScalar` result and a [`DynamicAbstractWeights`](@ref).
 
 # Related
 
   - [`Num_ArrNum`](@ref)
   - [`VecScalar`](@ref)
+  - [`DynamicAbstractWeights`](@ref)
 """
 const Num_ArrNum_VecScalar_DynWeights = Union{<:Num_ArrNum, <:VecScalar,
                                               <:DynamicAbstractWeights}

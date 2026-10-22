@@ -9,7 +9,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :kmin => "`kmin`: Floor on the ratio problem's homogenisation variable `k`, or `nothing` to size it from the resolved characteristic. It keeps the solver off the degenerate ray `k = 0`, on which every homogeneous constraint holds vacuously.",#
                  :i_ret_term => "`i`: Index of the return term to maximise.",#
                  # Errors
-                 :msg => "`msg`: Error message describing the condition that triggered the exception.",#
+                 :msg => "`msg`: Error message that states the condition that caused the exception.",#
                  # Solver
                  :name => "`name`: The symbol or string that names the solver. [`optimise_JuMP_model!`](@ref) records a failure of the solver under this key in the `trials` of the [`JuMPResult`](@ref). Two solvers that share a name share one entry, and the later failure overwrites the earlier one. Give each solver of a vector its own name, because every solver has the default name `\"\"`.",#
                  :solver => "`solver`: The `optimizer_factory` argument of [`set_optimizer`](https://jump.dev/JuMP.jl/stable/api/JuMP/#JuMP.set_optimizer).",#

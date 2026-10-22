@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all estimator types.
 
-All custom estimators should subtype `AbstractEstimator`.
+All custom estimators must subtype `AbstractEstimator`.
 
-Estimators consume data to estimate parameters or models. Some estimators may utilise different algorithms. These can range from simple implementation details that don't change the result much but may have different numerical characteristics, to entirely different methodologies or algorithms yielding different results.
+An estimator reads data and estimates a parameter or a model from it. An estimator can hold an algorithm. One algorithm can differ from another only in its numerical behaviour, or it can use a different method that gives a different result.
 
 # Related
 
@@ -18,9 +18,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all algorithm types.
 
-All algorithms should subtype `AbstractAlgorithm`.
+All algorithms must subtype `AbstractAlgorithm`.
 
-Algorithms are often used by estimators to perform specific tasks. These can be in the form of simple implementation details to entirely different procedures for estimating a quantity.
+An estimator holds an algorithm to select how it does one task. The algorithm can change a numerical detail, or it can select a different procedure to estimate the quantity.
 
 # Related
 
@@ -33,9 +33,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all result types.
 
-All result objects should subtype `AbstractResult`.
+All result objects must subtype `AbstractResult`.
 
-Result types encapsulate the outcomes of estimators. This makes dispatch and usage more straightforward, especially when the results encapsulate a wide range of information.
+A Result holds the output of an estimator. A function that reads the output dispatches on the type of the Result, and it reads each quantity from a named field.
 
 # Related
 
@@ -46,15 +46,15 @@ abstract type AbstractResult end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the running state of an incremental fit.
+Abstract supertype for the state of an incremental fit.
 
-All partial-fit state objects should subtype `AbstractPartialFitState`.
+All partial-fit state objects must subtype `AbstractPartialFitState`.
 
-A partial-fit state carries the quantities an estimator needs to fold one more observation into an estimate without reading the sample again. It subtypes [`AbstractResult`](@ref), so it inherits the length-1 iteration protocol and the pretty `show`, but it is not consumable: the rest of the library reads an ordinary Result, so the batch verb called with no data turns a state into one first. It is the one kind of Result an estimator holds.
+A partial-fit state holds the quantities that an estimator needs to fold one more observation into an estimate, and the estimator does not read the sample again. The state subtypes [`AbstractResult`](@ref), so it gets the length-1 iteration protocol and the pretty `show`. No other part of the library reads a state. Each consumer reads an ordinary Result, and the batch verb called with no data first turns the state into one. A partial-fit state is the one kind of Result that an estimator holds.
 
 # Interfaces
 
-In order to implement a new partial-fit state which will work seamlessly with the library, subtype `AbstractPartialFitState` and implement the following two methods:
+To implement a new partial-fit state, subtype `AbstractPartialFitState` and implement the two methods below.
 
 ## Merging two states
 
@@ -67,19 +67,19 @@ In order to implement a new partial-fit state which will work seamlessly with th
 
 ### Returns
 
-  - `state::MyState`: The state the two blocks give when they are fitted as one block.
+  - `state::MyState`: The state that the two blocks give when the estimator fits them as one block.
 
 ### Algorithm
 
- 1. Call [`assert_mergeable_states`](@ref) on the pair, which refuses two states of different types and two states over different numbers of assets.
- 2. Refuse any further mismatch the family needs. An exponentially weighted pair must also agree on its decay, because the two states then weight the same observation differently.
- 3. Fold the observation count, the mean and the second-moment accumulator with [`chan_merge`](@ref), and rebuild the state from the result. A family whose state is not a sufficient statistic for its own block refuses the pair here instead, with a message naming the reason, because no fold can put back what the state never recorded.
+ 1. Call [`assert_mergeable_states`](@ref) on the pair. It refuses two states of different types, and two states over different numbers of assets.
+ 2. Refuse each other mismatch that the family cannot merge. An exponentially weighted pair must also have the same decay, because two decays give the same observation two different weights.
+ 3. Fold the observation count, the mean and the second-moment accumulator with [`chan_merge`](@ref), and build the merged state from the folded values. A family whose state is not a sufficient statistic for its own block refuses the pair at this step, with a message that gives the reason. No fold can recover a quantity that the state did not record.
 
 ## Copying a state
 
   - `Base.copy(x::MyState) -> MyState`: Returns a fresh state whose arrays alias none of the arrays of `x`.
 
-[`partial_fit`](@ref) calls this method, and the value semantics of that verb rest on it: the estimator handed over keeps the state it held, whatever [`partial_fit!`](@ref) then writes into the copy. A state that shares one array with its copy breaks the promise for that quantity alone, which is the hardest kind of defect to see.
+[`partial_fit`](@ref) calls this method, and the value semantics of that verb depend on it. The estimator that the caller gives keeps the state that it held, whatever [`partial_fit!`](@ref) then writes into the copy. A state that shares one array with its copy breaks this promise for the quantity in that array alone. No other quantity shows the defect, so it is hard to find.
 
 ### Arguments
 
@@ -91,7 +91,7 @@ In order to implement a new partial-fit state which will work seamlessly with th
 
 ### Algorithm
 
- 1. Name the state's own constructor, and pass `copy` of each array field and each scalar field unchanged. The constructor is named here rather than recovered by reflection, the way the prior results name theirs, so a family the library has never seen gets a `MethodError` naming this method rather than a state built by machinery.
+ 1. Call the constructor of the state by name. Pass `copy` of each array field, and pass each scalar field unchanged. The method names its constructor and does not find it by reflection, as the prior results do. A family that the library does not know then gets a `MethodError` that names this method, and not a state that reflection built.
 
 # Related
 
@@ -106,7 +106,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all cross-validation estimators.
 
-It is declared here rather than beside the rest of its family because an estimator of an earlier layer binds a slot to it: a fold split is read by the Return Forecast family, which loads long before the optimisation layer the other cross-validation types live in.
+This file declares it, and not the file of the rest of its family, because an estimator of an earlier layer binds a slot to it. The Return Forecast family reads a fold split, and that family loads before the optimisation layer that holds the other cross-validation types.
 
 # Related
 
@@ -120,29 +120,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for dynamically computed observation weight estimators.
 
-`DynamicAbstractWeights` subtypes are used when observation weights must be computed from data (rather than supplied directly as a numeric vector). They are passed to estimators that accept an `ObsWeights` argument and evaluated at fit time.
+A subtype of `DynamicAbstractWeights` computes the observation weights from the data, and the caller does not give them as a numeric vector. The caller passes it to an estimator that takes an `ObsWeights` argument, and the estimator evaluates it when it fits.
 
 # Interfaces
 
-In order to implement a new dynamic observation weight estimator which will work seamlessly with the library, subtype `DynamicAbstractWeights` with all necessary parameters struct, and implement the following methods:
+To implement a new dynamic observation weight estimator, subtype `DynamicAbstractWeights` with a struct that holds its parameters, and implement the two methods below.
 
-  - `get_observation_weights(w::DynamicAbstractWeights, X::VecNum; kwargs...) -> StatsBase.AbstractWeights`: Returns observation weights for a 1D vector `X`.
-  - `get_observation_weights(w::DynamicAbstractWeights, X::MatNum; dims::Int = 1, kwargs...) -> StatsBase.AbstractWeights`: Returns observation weights for a 2D matrix `X`, with `dims` specifying the dimension along which to compute weights.
+  - `get_observation_weights(w::DynamicAbstractWeights, X::VecNum; kwargs...) -> StatsBase.AbstractWeights`: Returns the observation weights for a vector `X`.
+  - `get_observation_weights(w::DynamicAbstractWeights, X::MatNum; dims::Int = 1, kwargs...) -> StatsBase.AbstractWeights`: Returns the observation weights for a matrix `X`. `dims` is the dimension that holds the observations.
 
 ## Arguments
 
-  - `w`: Subtype of `DynamicAbstractWeights` with all necessary parameters.
+  - `w`: The subtype of `DynamicAbstractWeights` that holds the parameters.
   - $(arg_dict[:X_Xv])
-  - `dims`: Dimension along which to compute weights for a 2D matrix `X`.
-  - `kwargs...`: Additional keyword arguments passed to the weight computation function.
+  - `dims`: The dimension of a matrix `X` that holds the observations.
+  - `kwargs...`: More keyword arguments for the weight computation.
 
 ## Returns
 
-  - `w::StatsBase.AbstractWeights`: Observation weights for the input data `X`.
+  - `w::StatsBase.AbstractWeights`: The observation weights for the input data `X`.
 
 # Examples
 
-We can create a dummy dynamic observation weight estimator as follows:
+A minimal dynamic observation weight estimator:
 
 ```jldoctest
 julia> struct MyWeights{T} <: PortfolioOptimisers.DynamicAbstractWeights
@@ -201,9 +201,9 @@ julia> PortfolioOptimisers.get_observation_weights(MyWeights(), ones(3, 10); dim
  1.0
 ```
 
-Both methods must be dispatched on the concrete subtype, as above — never on `DynamicAbstractWeights` itself, which would capture every other subtype too.
+Both methods must dispatch on the concrete subtype, as above. A method on `DynamicAbstractWeights` itself catches every other subtype too.
 
-Implementing only one of the two arities is the mistake to avoid. Rather than silently computing an unweighted result, the unimplemented shape raises [`ObservationWeightsError`](@ref) and names the methods to write:
+An implementation must give both methods. A call on a shape that has no method does not compute an unweighted result. It raises [`ObservationWeightsError`](@ref), and the message names the methods to write.
 
 ```jldoctest
 julia> struct PartialWeights <: PortfolioOptimisers.DynamicAbstractWeights end
@@ -240,13 +240,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all portfolio optimisation estimators.
 
-All optimisers and optimisation components should subtype `AbstractOptimisationEstimator` to participate in the optimisation dispatch system.
+All optimisers and optimisation components must subtype `AbstractOptimisationEstimator`, so that the optimisation methods dispatch on them.
 
 # Interfaces
 
-`AbstractOptimisationEstimator` declares no method of its own. It carries the default [`port_opt_view`](@ref), which returns the estimator unchanged, and it splits into two halves. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator [`optimise`](@ref) runs.
+`AbstractOptimisationEstimator` declares no method of its own. It has the default method of [`port_opt_view`](@ref), which returns the estimator unchanged. It has two subtypes. Subtype [`BaseOptimisationEstimator`](@ref) for a configuration that an optimiser holds, and [`OptimisationEstimator`](@ref) for an estimator that [`optimise`](@ref) runs.
 
-The root stands here rather than beside the optimisers it heads because a field bound earlier in the load order names it. `VarianceFraction.w0` admits a [`NonFiniteAllocationOptimisationEstimator`](@ref) as its reference portfolio, and it is declared in `src/11_UncertaintySets/`, which loads a hundred includes before `src/17_Optimisation/`. A bound is the enforcement the library prefers over a runtime check, so the chain the bound names is hoisted rather than the check weakened. [`CrossValidationEstimator`](@ref) stands here for the same reason.
+This file declares the root, and not the file of the optimisers, because a field bound earlier in the load order names it. `VarianceFraction.w0` accepts a [`NonFiniteAllocationOptimisationEstimator`](@ref) as its reference portfolio. `src/11_UncertaintySets/` declares `VarianceFraction`, and it loads before `src/17_Optimisation/`. The library prefers a type bound to a runtime check, so the types that the bound names moved to this file, and the bound stayed. [`CrossValidationEstimator`](@ref) is in this file for the same reason.
 
 # Related
 
@@ -260,29 +260,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for portfolio optimisation estimators that produce portfolio weights.
 
-Subtype `OptimisationEstimator` to implement concrete portfolio optimisers. All optimisers that can be invoked with `optimise` should subtype this.
+All optimisers that `optimise` can run must subtype `OptimisationEstimator`.
 
 # Interfaces
 
-In order to implement a new optimiser that works seamlessly with the library, subtype `OptimisationEstimator`, give it an `fb` field, and implement the following method:
+To implement a new optimiser, subtype `OptimisationEstimator`, give it an `fb` field, and implement the method below.
 
 ## `_optimise`
 
-  - `_optimise(opt::MyOptimiser, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult`: Solves the problem `opt` states over the data in `rd`, and returns the optimiser's own result type.
+  - `_optimise(opt::MyOptimiser, rd::ReturnsResult, args...; kwargs...) -> OptimisationResult`: Solves the problem that `opt` states over the data in `rd`, and returns the result type of the optimiser.
 
 ### Arguments
 
-  - `opt`: The concrete subtype instance.
-  - `rd`: Returns data.
-  - `args...`, `kwargs...`: Forwarded from [`optimise`](@ref).
+  - `opt`: An instance of the concrete subtype.
+  - `rd`: The returns data.
+  - `args...`, `kwargs...`: The arguments that [`optimise`](@ref) forwards.
 
 ### Returns
 
-  - `res::OptimisationResult`: The result, whose `retcode` decides whether [`optimise`](@ref) walks on to the fallback.
+  - `res::OptimisationResult`: The result. Its `retcode` decides whether [`optimise`](@ref) moves on to the fallback.
 
 ## The `fb` field
 
-[`optimise`](@ref) reads `opt.fb` to walk the fallback chain, so every subtype carries one. It holds the next optimiser to try, or `nothing` to end the chain.
+[`optimise`](@ref) reads `opt.fb` to go along the fallback chain, so every subtype has the field. It holds the next optimiser to try, or `nothing` to end the chain.
 
 # Related
 
@@ -297,7 +297,7 @@ Abstract supertype for portfolio optimisation estimators that produce continuous
 
 # Interfaces
 
-`NonFiniteAllocationOptimisationEstimator` adds no method to [`OptimisationEstimator`](@ref). It marks the optimisers whose weights are continuous, which is what admits them to the cross-validation and meta-optimisation entry points (see [`OptE_Opt`](@ref)).
+`NonFiniteAllocationOptimisationEstimator` adds no method to [`OptimisationEstimator`](@ref). It marks the optimisers whose weights are continuous. The cross-validation and meta-optimisation entry points accept an optimiser only when it has this mark. [`OptE_Opt`](@ref) is the union of these optimisers and of their results.
 
 # Related
 
@@ -309,9 +309,9 @@ abstract type NonFiniteAllocationOptimisationEstimator <: OptimisationEstimator 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Make estimators, algorithms, and results behave as length-1 iterables, returning the object itself on the first iteration and `nothing` thereafter.
+Make estimators, algorithms, and results iterate as length-1 collections. The first iteration returns the object itself, and the next returns `nothing`.
 
-This is what lets a caller write one loop over a value that may be a single estimator or a vector of them, without a branch on which it received.
+A caller can then write one loop over a value that is a single estimator or a vector of estimators, with no branch on which of the two it got.
 
 # Algorithm
 
@@ -321,7 +321,7 @@ This is what lets a caller write one loop over a value that may be a single esti
 # Arguments
 
   - `obj`: The estimator, algorithm or result to iterate.
-  - `state = 1`: Iteration state. Only `1` yields a value.
+  - `state = 1`: The iteration state. Only `1` gives a value.
 
 # Returns
 
@@ -342,12 +342,12 @@ Base.length(::Union{<:AbstractEstimator, <:AbstractAlgorithm, <:AbstractResult})
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Index into estimators, algorithms, and results as length-1 containers. Only index `1` is valid; any other index throws `BoundsError`.
+Index estimators, algorithms, and results as length-1 containers. Only index `1` is valid, and each other index throws a `BoundsError`.
 
 # Algorithm
 
  1. Return `obj` when `i` is `1`.
- 2. Otherwise throw a `BoundsError` naming `obj` and `i`.
+ 2. Otherwise throw a `BoundsError` that names `obj` and `i`.
 
 # Arguments
 
@@ -375,19 +375,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Computes a calibrated quantity from the data a prior result carries, so that the quantity refits whenever the sample moves.
+Computes a calibrated quantity from the data that a prior result holds, so that the quantity refits each time the sample changes.
 
-The quantity is a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight, a norm ceiling, a Spanned Shrinkage or an Orthogonal Forecast Scale. The root lives with the other roots, because the slots of a [`CrossSectionalFactorPrior`](@ref) are bound before the calibration rules load.
+The quantity is a tail probability, a deformation parameter, an ambiguity radius, an Esfahani-Kuhn tail weight, a norm ceiling, a Spanned Shrinkage or an Orthogonal Forecast Scale. This file declares the root with the other roots, because the slots of a [`CrossSectionalFactorPrior`](@ref) bind to it before the calibration rules load.
 
-All concrete subtypes should subtype one of the families under this root rather than the root itself, and `# Related` names them. A plain number in place of a rule is the quantity itself, exactly as it is today.
+All concrete subtypes must subtype one of the families under this root, not the root itself. `# Related` names the families. A plain number in the place of a rule is the quantity itself, with no calibration.
 
-A rule is named for the **method** it runs, and carries the name of the quantity as a suffix only where the bare method word is already claimed. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and stop there. Five names carry the quantity, and each of the five earns it. [`RateSignificance`](@ref) and [`RateRadius`](@ref) are one method over two quantities, so neither may hold the bare word `Rate`, and [`DimensionalRateRadius`](@ref) carries that same stem under a prefix. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) are each named after a mathematical object, so the bare word would name the object rather than the rule.
+The name of a rule is the name of the method that it uses. The name gets the quantity as a suffix only when another rule already has the method word alone. [`ScenarioCount`](@ref), [`EntropyBudget`](@ref), [`HillTailDecay`](@ref), [`RadialTailDecay`](@ref), [`TailTermParity`](@ref) and [`EffectiveAssetFloor`](@ref) name a method and no quantity. Five names contain the quantity, each for a reason. [`RateSignificance`](@ref) and [`RateRadius`](@ref) use one method for two quantities, so neither can have the word `Rate` alone. [`DimensionalRateRadius`](@ref) adds a prefix to the same stem. [`ConcentrationRadius`](@ref) and [`DualNormRadius`](@ref) each have the name of a mathematical object, and the method word alone names the object and not the rule.
 
-A rule states a default for every keyword it can, so a bare call constructs. Two rules state none, because the quantity the keyword takes is the whole content of the rule and no value suits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each stands at `nothing`, which is not a value of the quantity, so a bare call is refused with a message that names the quantity, the reason there is no default, and a value to start from.
+A rule gives a default to each keyword that can have one, so a call with no arguments constructs the rule. Two rules give no default, because their keyword is the full content of the rule and no value fits every sample. [`ScenarioCount`](@ref) and [`EntropyBudget`](@ref) are those two. The keyword of each is `nothing` by default, which is not a value of the quantity. A call with no arguments then fails, and the message names the quantity, the reason that it has no default, and a value to start from.
 
-A rule states the **method** and nothing else. The **slot** states the quantity: `alpha` names the lower tail, `kappa` names the deformation parameter, `r` names an ambiguity radius and `l2c` names a norm ceiling. So the caller writes the rule alone, and each slot's `Num_` bound names the one family that has a reading in that slot. A rule of another family is refused at construction, by the bound.
+A rule states the method and nothing more. The slot states the quantity: `alpha` is the lower tail, `kappa` is the deformation parameter, `r` is an ambiguity radius and `l2c` is a norm ceiling. The caller writes the rule alone. The `Num_` bound of each slot names the one family that has a meaning in that slot, so the bound refuses a rule of another family at construction.
 
-A **Calibration Rule** is not a [`DeferredQuantity`](@ref), and the two mechanisms stay parallel end to end. A Deferred Quantity is *fitted* and the quantity is read off the fit; a rule fits nothing, and reads the sample size and the moments the prior result already carries. A rule also sees the effective observation weights, which [`resolve_slot`](@ref) does not carry. So a rule resolves through [`resolve_calibration_slot`](@ref), is declared through [`calibration_slots`](@ref), and is refused at a value-level entry point by [`assert_calibrated_slots`](@ref).
+A Calibration Rule is not a [`DeferredQuantity`](@ref), and the two mechanisms do not share code. The library fits a Deferred Quantity and reads the quantity from the fit. A rule fits nothing. It reads the sample size and the moments that the prior result already holds. A rule also reads the effective observation weights, which [`resolve_slot`](@ref) does not pass. A rule resolves through [`resolve_calibration_slot`](@ref), and [`calibration_slots`](@ref) declares it. [`assert_calibrated_slots`](@ref) refuses it at a value-level entry point.
 
 # Related
 
@@ -405,9 +405,9 @@ abstract type AbstractCalibrationAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the centring of an exponentially weighted moment, the rule that says which location each deviation is taken from.
+Abstract supertype for the centring of an exponentially weighted moment. The centring selects the location that the estimator subtracts from each return to get a deviation.
 
-The four exponentially weighted moment estimators hold a centring in their `centring` field: [`ExpWeightedVariance`](@ref), [`ExpWeightedCovariance`](@ref), [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). [`EstimatedCentring`](@ref) estimates the location and corrects the bias that the estimate puts in each deviation. [`PreCentred`](@ref) takes the returns as deviations from a mean of zero. [`ZeroStartCentring`](@ref) takes the location of a recursion from zero that is not divided by its weight. The root lives with the other roots, because the estimators bind their field before the members load.
+The four exponentially weighted moment estimators hold a centring in their `centring` field: [`ExpWeightedVariance`](@ref), [`ExpWeightedCovariance`](@ref), [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). [`EstimatedCentring`](@ref) estimates the location and corrects the bias that the estimate puts in each deviation. [`PreCentred`](@ref) takes the returns as deviations from a mean of zero. [`ZeroStartCentring`](@ref) takes the location of a recursion from zero that is not divided by its weight. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
 
 # Interfaces
 
@@ -425,9 +425,9 @@ abstract type AbstractCentring <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the debias rule of a regime statistic, the rule that says whether the statistic corrects the bias of the estimated variance it reads.
+Abstract supertype for the debias rule of a regime statistic. The rule selects whether the statistic corrects the bias of the estimated variance that it reads.
 
-The two regime-adjusted estimators hold a debias rule in their `debias` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The root lives with the other roots, because the estimators bind their field before the members load.
+The two regime-adjusted estimators hold a debias rule in their `debias` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). This file declares the root with the other roots, because the estimators bind their field to it before the members load.
 
 # Interfaces
 
@@ -443,9 +443,9 @@ abstract type AbstractRegimeDebias <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the floor of a HAC term, the rule that says whether each HAC-adjusted product is floored at zero before it enters the variance recursion.
+Abstract supertype for the floor of a HAC term. The rule selects whether the estimator floors each HAC-adjusted product at zero before the product enters the variance recursion.
 
-The two regime-adjusted estimators hold a floor rule in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. On the covariance estimator it acts only on the variance of the separate correlation path, because the covariance of one decay floors no term. The root lives with the other roots, because the estimators bind their field before the members load.
+The two regime-adjusted estimators hold a floor rule in their `hac_floor` field: [`RegimeAdjustedExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedCovariance`](@ref). The rule acts only where `hac_lags` is not `nothing`. On the covariance estimator it acts only on the variance of the separate correlation path, because the covariance of one decay floors no term. This file declares the root with the other roots, because the estimators bind their field to it before the members load.
 
 # Interfaces
 
@@ -460,9 +460,9 @@ abstract type AbstractHacFloor <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the volatility that standardises a row of the separate correlation path under HAC, the rule that says whether the row is divided by the volatility before or after its own update.
+Abstract supertype for the volatility that standardises a row of the separate correlation path under HAC. The rule selects whether the estimator divides the row by the volatility before or after the volatility updates on that row.
 
-[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `hac_vol_before` field. The rule acts only where `hac_lags` is not `nothing` and `cor_decay` differs from `decay`. The root lives with the other roots, because the estimator binds its field before the members load.
+[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `hac_vol_before` field. The rule acts only where `hac_lags` is not `nothing` and `cor_decay` differs from `decay`. This file declares the root with the other roots, because the estimator binds its field to it before the members load.
 
 # Interfaces
 
@@ -477,9 +477,9 @@ abstract type AbstractHacVolatilityTiming <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for the variance that standardises each product of the separate correlation path, the rule that says whether the variance state is divided by its weight before the product divides by it.
+Abstract supertype for the variance that standardises each product of the separate correlation path. The rule selects whether the estimator divides the variance state by its weight before the product divides by the variance.
 
-[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `cor_vol` field. The rule acts only where `cor_decay` is not `nothing`, and only in the warm-up, where the weight of the variance state is below one. The root lives with the other roots, because the estimator binds its field before the members load.
+[`RegimeAdjustedExpWeightedCovariance`](@ref) holds the rule in its `cor_vol` field. The rule acts only where `cor_decay` is not `nothing`, and only in the warm-up, where the weight of the variance state is below one. This file declares the root with the other roots, because the estimator binds its field to it before the members load.
 
 # Interfaces
 
@@ -496,7 +496,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rule that says what the portfolio regime target does with a covariance block that is not positive definite.
 
-[`PortfolioTarget`](@ref) holds the rule in its `indefinite` field. A HAC block in the warm-up, and a block of assets with different histories, need not be positive definite, and a direction with a small positive variance on it then scores a large statistic. The root lives with the other roots, because the target binds its field before the members load.
+[`PortfolioTarget`](@ref) holds the rule in its `indefinite` field. A HAC block in the warm-up, and a block of assets with different histories, can be indefinite. A direction with a small positive variance then gives a large statistic. This file declares the root with the other roots, because the target binds its field to it before the members load.
 
 # Interfaces
 
@@ -514,7 +514,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the rule that computes the Mahalanobis bias factor from the level recursion over the directions of the estimate.
 
-[`MahalanobisTarget`](@ref) holds the rule in its `recursion` field. The level recursion of [`mahalanobis_level_bias`](@ref) takes the mean log-determinant of each level inside the exponential, and a rule names what it does about the variance it leaves out. The root lives with the other roots, because the target binds its field before the members load.
+[`MahalanobisTarget`](@ref) holds the rule in its `recursion` field. The level recursion of [`mahalanobis_level_bias`](@ref) puts the mean log-determinant of each level inside the exponential. The mean leaves out the covariance of the log-determinants, and the rule selects whether the recursion carries that covariance. This file declares the root with the other roots, because the target binds its field to it before the members load.
 
 # Interfaces
 
