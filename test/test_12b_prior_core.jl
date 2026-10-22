@@ -3786,3 +3786,34 @@ end
     @test isa(clusterise(ClustersEstimator(), pr; rd = rds, dims = 1,
                          branchorder = :optimal), PO.AbstractClusteringResult)
 end
+
+@testset "The claims that the /unslop pass of the base prior corrected (#531)" begin
+    PO = PortfolioOptimisers
+    # `AbstractPriorEstimator` names five families. `HighOrderPriorEstimator` subtypes the high
+    # order root directly, with an optional `F`, so the root is a public family too.
+    @test Base.ispublic(PO, :AbstractHighOrderPriorEstimator)
+    @test HighOrderPriorEstimator <: PO.AbstractHighOrderPriorEstimator
+    @test !(HighOrderPriorEstimator <: PO.AbstractHighOrderPriorEstimator_F)
+    @test HighOrderFactorPriorEstimator <: PO.AbstractHighOrderPriorEstimator_F
+    @test hasmethod(prior, Tuple{HighOrderPriorEstimator, Matrix{Float64}})
+    # `forward_prior` says that a hand-written constructor call names fourteen fields, and
+    # `LowOrderPrior` says that its six flat names cover fourteen fields.
+    @test fieldcount(LowOrderPrior) == 14
+    # The pool holds field names only, so no computed property is in it.
+    pool = PO.prior_result_property_pool()
+    for k in (:f_mu, :f_sigma, :f_kt, :f_V, :original_X)
+        @test k ∉ pool
+    end
+    # The view of a `LowOrderPrior` forwards `ss_gaps` and drops `pc`.
+    X = [0.01 0.02 0.03; 0.04 0.05 0.06; 0.07 0.08 0.09; 0.10 0.11 0.12]
+    ss_gaps = [true, false, false, false, false]
+    lo = LowOrderPrior(; X = X, mu = [0.02, 0.03, 0.04],
+                       sigma = [0.001 0.0 0.0; 0.0 0.001 0.0; 0.0 0.0 0.001],
+                       ss_gaps = ss_gaps,
+                       pc = (; X = nothing, w = fill(0.25, 4), pe2 = nothing))
+    v = PO.port_opt_view(lo, [1, 3])
+    @test v.ss_gaps === ss_gaps
+    @test isnothing(v.pc)
+    @test isnothing(v.o_X)
+    @test v.mu == [0.02, 0.04]
+end

@@ -9,7 +9,6 @@ AbstractLowOrderPriorEstimator
 AbstractLowOrderPriorEstimator_A_AF
 AbstractLowOrderPriorEstimator_F_AF
 AbstractLowOrderPriorEstimator_A_F_AF
-AbstractHighOrderPriorEstimator
 Pr_RR
 PrE_Pr
 assert_prior_regression
