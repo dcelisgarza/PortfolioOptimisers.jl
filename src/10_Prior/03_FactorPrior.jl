@@ -3,9 +3,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Factor-based prior estimator for asset returns.
 
-`FactorPrior` is a low order prior estimator that computes the mean and covariance of asset returns using a factor model. It combines a factor prior estimator, matrix post-processing, regression, and variance estimation to produce posterior moments. Optionally, it can add residual variance to the posterior covariance for robust estimation.
+`FactorPrior` is a low order prior estimator that computes the mean and covariance of asset returns from a factor model. `pe` fits the factor moments on the factor returns, and `re` fits the loadings of each asset on the factors. The estimator projects the factor moments through the loadings, and processes the covariance with `mp`. When `rsd` is `true`, it adds to the covariance the residual variances that `ve` measures.
 
-The covariance is the plug-in estimator of the factor model that [fan2008](@citet) state: the loadings times the factor covariance times the transposed loadings, plus the diagonal matrix of the residual variances. The library differs from the source in three ways. The mean adds the regression intercepts, where the model of the source has none. The default `re` is stepwise, so an asset can drop a factor, where the source fits every factor by least squares. `ve` sizes the residual variances, which the default [`SimpleVariance`](@ref) divides by `T - 1`, where the source divides by `T`.
+The covariance is the plug-in estimator of the factor model that [fan2008](@citet) state. It is the loadings times the factor covariance times the transposed loadings, plus the diagonal matrix of the residual variances. The library differs from the source in three ways:
+
+  - The mean adds the regression intercepts. The model of the source has no intercepts.
+  - The default `re` is stepwise, so an asset can drop a factor. The source fits every factor by least squares.
+  - `ve` sizes the residual variances. The default [`SimpleVariance`](@ref) divides by `T - 1`, and the source divides by `T`.
 
 # Fields
 
@@ -30,7 +34,7 @@ Keywords correspond to the struct's fields.
 
   - `x_src` is `nothing`, `DataSource()` or `ExcessSource()`, see [`assert_returns_source`](@ref).
   - The `x_src` of `pe`, `re` is `nothing`, because the prior picks the returns that it reads, see [`assert_inner_reader`](@ref).
-  - When `rsd` is `true`, `mp` states the estimator of its repair, see [`assert_matrix_processing_posdef`](@ref).
+  - When `rsd` is `true`, `mp` states the estimator that repairs the covariance, see [`assert_matrix_processing_posdef`](@ref).
 
 ## Propagated parameters
 
@@ -39,6 +43,7 @@ Keywords correspond to the struct's fields.
   - `pe`: Recursively updated via [`factory`](@ref).
   - `re`: Recursively updated via [`factory`](@ref).
   - `ve`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -46,15 +51,22 @@ Keywords correspond to the struct's fields.
 
   - `re`: Recursively viewed via [`port_opt_view`](@ref).
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+
+## The incremental fit
+
+This prior has no exact incremental recursion, so the online step refits from a sample buffer. [`Online`](@ref) seeds `cache`, and [`partial_fit!`](@ref) appends each observation to it. The one-argument [`prior`](@ref) runs the batch verb of this estimator over the rows in the buffer. The answer equals a batch fit over those rows, and a `max_history` on the wrapper cuts the whole fit.
+
+[`obs_weights_view`](@ref) drops `cache`, because a partial-fit state has no slice on the observation axis. [`show_fields`](@ref) does not render it, because a running buffer is not part of the configuration.
 
 ## Composition: what this estimator forwards
 
-This estimator **lifts** a factor-axis prior onto the asset axis, reconstructing `X` as `F * transpose(M) .+ transpose(b)`, so it builds its prior result directly rather than forwarding one along its own axis; the forwarding rule still governs each field. It is the plain projection of the family — nothing here modifies the factor distribution, so [`FactorBlackLittermanPrior`](@ref) is this estimator with views landing on the factor block on the way through.
+This estimator lifts a factor-axis prior onto the asset axis. It rebuilds `X` as `F * transpose(M) .+ transpose(b)`, so it builds its prior result itself and does not forward one along its own axis. The forwarding rule still governs each field. This estimator does not change the factor distribution. [`FactorBlackLittermanPrior`](@ref) is this estimator with views on the factor block before the lift.
 
-  - The factor block `fpr` **is** the wrapped factor prior, forwarded whole and untouched: it needs no reconstruction, because the asset moments are its projection rather than an update of it.
-  - `mu` and `sigma` are that block projected through the loadings, so the returned prior result is **internally consistent**: `mu == rr.M * fpr.mu + rr.b` holds by construction. `sigma` optionally gains a residual correction when `rsd` is `true`.
-  - `chol` is not forwarded but **rebuilt on the asset axis**, as `M * matrix_square_root(mtx_sqrt, fpr.sigma)` widened by the residual block when `rsd` is `true`, so it stays in sync with the `sigma` it factorises.
-  - `w` is the factor prior's, and is over the right axis: this estimator wraps only a factor prior, and `posterior_X` has exactly `F`'s rows, so it is the only weighting in existence. Its `ens`, `kld` and `ow` travel with it.
+  - The factor block `fpr` is the result of the wrapped factor prior, forwarded whole. It needs no reconstruction, because the asset moments are its projection and not an update of it.
+  - `mu` and `sigma` are that block projected through the loadings, so `mu == rr.M * fpr.mu + rr.b` holds for every investable asset. When `rsd` is `true`, `sigma` also holds the residual variances.
+  - `chol` is not forwarded. The lift rebuilds it on the asset axis from `M * matrix_square_root(mtx_sqrt, fpr.sigma)`, and adds the residual block when `rsd` is `true`. It factorises `sigma` before matrix processing, see [`factor_lift`](@ref). An `mp` that denoises or detones moves `sigma` and leaves `chol` as it was.
+  - `w` is the observation weights of the factor prior. This estimator wraps only a factor prior, and `posterior_X` has the rows of `F`, so these are the only weights, and they are on the correct axis. The `ens`, `kld` and `ow` of the factor prior come with them.
 
 # Examples
 
@@ -110,12 +122,6 @@ FactorPrior
   mtx_sqrt ┼ EigenFallbackSquareRoot()
      x_src ┴ nothing
 ```
-
-## The incremental fit
-
-This prior has no exact incremental recursion, so it takes the online step by **refitting from a sample buffer**: [`Online`](@ref) seeds `cache`, [`partial_fit!`](@ref) appends each observation to it verbatim, and the one-argument [`prior`](@ref) runs this estimator's own batch verb over the rows the buffer kept. The answer is therefore exactly a batch fit over those rows, and a `max_history` on the wrapper windows the whole fit.
-
-`cache` travels the three propagation channels as every partial-fit state does: [`factory`](@ref) carries it unchanged, [`port_opt_view`](@ref) slices it to the selected assets, and [`obs_weights_view`](@ref) drops it, because no slice of a state exists on the observation axis. It is not rendered, because a running buffer is not the configuration a reader looks the type up for.
 
 # Related
 
@@ -200,7 +206,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`FactorPrior`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorPrior, true)` to render it.
+The state in `cache` belongs to an incremental fit and is not part of the configuration, and it would print under the estimator at every site that renders one. Set `set_show_nothing_fields!(:FactorPrior, true)` to render it.
 
 # Arguments
 
@@ -208,7 +214,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :mp, :re, :ve, :rsd, :mtx_sqrt)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mp, :re, :ve, :rsd, :mtx_sqrt, :x_src)`.
 
 # Related
 
@@ -228,14 +234,14 @@ end
 
 Fit the loadings and rebuild the asset returns from the factor returns.
 
-This is the first half of the factor lift, and the only half every factor-axis estimator shares. It fits `re` on `(X, F)` and returns the regression result together with the *posterior returns matrix* `F * transpose(M) .+ transpose(b)` — the reconstruction that [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) each write into `LowOrderPrior.X`.
+This is the first half of the factor lift, and the only half that every factor-axis estimator uses. It fits `re` on `(X, F)`, and returns the regression result and the posterior returns matrix `F * transpose(M) .+ transpose(b)`. [`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) each write this matrix into `LowOrderPrior.X`.
 
-The second half — projecting the factor moments through the loadings — is [`factor_lift`](@ref). The two are separate because [`FactorBlackLittermanPrior`](@ref) needs the reconstruction before it has the moments to project: its views land on the factor distribution, so the factor moments only exist after the Black-Litterman update.
+[`factor_lift`](@ref) is the second half, which projects the factor moments through the loadings. The two halves are separate functions because [`FactorBlackLittermanPrior`](@ref) needs the reconstruction before it has the moments to project. Its views change the factor distribution, so its factor moments exist only after the Black-Litterman update.
 
 # Algorithm
 
- 1. Fit `re` on `(X, F)` with [`regression`](@ref), giving `rr`. It carries the ``N \\times K`` loadings `rr.M` and the ``N \\times 1`` intercepts `rr.b`.
- 2. Rebuild the asset returns as `F * transpose(rr.M) .+ transpose(rr.b)`, giving `posterior_X`, which has `F`'s rows and `X`'s columns.
+ 1. Fit `re` on `(X, F)` with [`regression`](@ref) to get `rr`. `rr.M` holds the ``N \\times K`` loadings, and `rr.b` holds the ``N \\times 1`` intercepts.
+ 2. Rebuild the asset returns as `F * transpose(rr.M) .+ transpose(rr.b)` to get `posterior_X`. It has the rows of `F` and the columns of `X`.
 
 # Arguments
 
@@ -264,16 +270,16 @@ end
     coverage_regression(re::AbstractTimeSeriesRegressionEstimator, cmsk::Nothing)
     coverage_regression(re::AbstractTimeSeriesRegressionEstimator, cmsk::BitVector)
 
-Views a regression estimator to the assets that a factor prior gives to its fit.
+Takes the view of a regression estimator at the assets that a factor prior fits.
 
-[`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) fit the regression on the columns of the returns that a mask keeps. A regression can hold one value per asset, such as the factor set of each asset in `included` of a [`StepwiseRegression`](@ref). That value must describe the same columns as the returns that the fit reads, so the prior views the regression with the same mask.
+[`FactorPrior`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) fit the regression on the columns of the returns that a mask keeps. A regression can hold one value per asset, such as the factor set of each asset in `included` of a [`StepwiseRegression`](@ref). That value must describe the same columns as the returns that the fit reads, so the prior takes the view of the regression with the same mask.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. `cmsk` is `nothing`: every asset is in the fit, so return `re`.
- 2. `cmsk` is a mask: return [`port_opt_view`](@ref) of `re` at `findall(cmsk)`.
+ 1. If `cmsk` is `nothing`, every asset is in the fit, so return `re`.
+ 2. If `cmsk` is a mask, return [`port_opt_view`](@ref) of `re` at `findall(cmsk)`.
 
 # Arguments
 
@@ -305,9 +311,9 @@ end
 
 Project factor moments onto the asset axis through the regression loadings.
 
-This is the second half of the factor lift, and it owns the algorithm that [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) both apply: map `f_mu` and `f_sigma` through the loadings, process the resulting covariance, and — when `rsd` is `true` — add the diagonal residual block and extend the Cholesky factor with it.
+This is the second half of the factor lift, and [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) both call it. It maps `f_mu` and `f_sigma` through the loadings and processes the covariance. When `rsd` is `true`, it adds the diagonal residual block to the covariance and to the square-root factor.
 
-Which factor moments arrive is the caller's decision, and it is the only thing that differs between the two sites: [`FactorPrior`](@ref) passes the wrapped prior's moments unchanged, while [`FactorBlackLittermanPrior`](@ref) passes the Black-Litterman posterior moments.
+The two callers differ only in the factor moments that they pass. [`FactorPrior`](@ref) passes the moments of the wrapped prior, and [`FactorBlackLittermanPrior`](@ref) passes the Black-Litterman posterior moments.
 
 # Mathematical definition
 
@@ -328,21 +334,21 @@ Where:
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix, `f_sigma`.
   - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
 
-The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the square root of ``\\mathbf{\\Sigma}_f`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. It is therefore ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`, the residual block being absent from `chol` and from ``\\hat{\\mathbf{\\Sigma}}`` alike.
+The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\mathbf{\\Sigma}_\\varepsilon^{1/2}]``, where ``\\mathbf{L}_f`` is the square root of ``\\mathbf{\\Sigma}_f`` that [`matrix_square_root`](@ref) takes under `mtx_sqrt`. By default it is the lower Cholesky factor of a positive definite matrix, and the eigen square root of a singular one. `chol` is ``(K + N) \\times N`` when `rsd` is `true`, and ``K \\times N`` when `rsd` is `false`. With `rsd = false`, neither `chol` nor ``\\hat{\\mathbf{\\Sigma}}`` holds the residual block.
 
-``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` holds **before** matrix processing, and that qualifier is load-bearing. `chol` is built from the `f_sigma` the caller passed, so step 4 of the algorithm rewrites `sigma` without rewriting `chol`. Under an `mp` that leaves the projected covariance where it found it — which the default [`MatrixProcessing`](@ref) does, its `pdm` being a no-op on a matrix that is already positive semi-definite — the two agree and the identity holds on the returned pair. Under an `mp` that denoises or detones, `sigma` moves and `chol` stays behind, so the identity holds against the unprocessed covariance alone. A consumer that needs a factor of the returned `sigma` must refactorise it.
+The identity ``\\mathtt{chol}^\\intercal \\mathtt{chol} = \\hat{\\mathbf{\\Sigma}}`` holds before matrix processing only. The lift builds `chol` from the `f_sigma` that the caller passed, so step 4 of the algorithm changes `sigma` and does not change `chol`. The default [`MatrixProcessing`](@ref) leaves the projected covariance as it is, because its `pdm` changes nothing on a positive semi-definite matrix. Under that `mp` the identity holds on the returned pair. An `mp` that denoises or detones moves `sigma` and leaves `chol` as it was, so the identity then holds against the unprocessed covariance only. A consumer that needs a factor of the returned `sigma` must factorise it again.
 
 # Algorithm
 
  1. Read the loadings `M` and the intercepts `b` off `rr`.
- 2. Project the factor mean through the loadings, giving `posterior_mu`.
- 3. Project the factor covariance through the loadings, giving `posterior_sigma`, the systematic block.
+ 2. Project the factor mean through the loadings to get `posterior_mu`.
+ 3. Project the factor covariance through the loadings to get `posterior_sigma`, the systematic block.
  4. Process `posterior_sigma` in place with [`matrix_processing!`](@ref), under `mp` and `posterior_X`.
- 5. Carry the square root of `f_sigma` under `mtx_sqrt`, from [`matrix_square_root`](@ref), through the loadings, giving `posterior_csigma`. This reads the `f_sigma` the caller passed, which step 4 does not touch.
- 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`, and read `esigma`, the column variances of `err` under `ve`. Read the counts of those variances with [`variance_count`](@ref), and restate them with [`residual_variance_counts`](@ref) against the `edof` of `rr`, giving `edof` and `ediv`. Size the residual block as `err_sigma`, the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
- 7. Still under `rsd`, add `err_sigma` to `posterior_sigma` and re-condition the sum with [`posdef!`](@ref), under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`. This is the body's only explicit [`posdef!`](@ref) call. For a [`MatrixProcessing`](@ref) that estimator is `mp.pdm`, and it also reaches `posterior_sigma` inside step 4, whenever `:pdm` is a member of `mp.order`.
- 8. Still under `rsd`, widen `posterior_csigma` with `sqrt.(err_sigma)`, so the block that step 7 added to the covariance enters the factor as well.
- 9. Reshape `posterior_csigma` to `length(posterior_mu)` columns, transpose it into `chol`, and return the four quantities.
+ 5. Take the square root of `f_sigma` under `mtx_sqrt` with [`matrix_square_root`](@ref), and multiply it by the loadings to get `posterior_csigma`. This reads the `f_sigma` that the caller passed, which step 4 does not change.
+ 6. When `rsd` is `true`, take the reconstruction error `err = X - posterior_X`. Measure `esigma`, the column variances of `err`, with `ve`. Read the counts of those variances with [`variance_count`](@ref), and combine them with the `edof` of `rr` through [`residual_variance_counts`](@ref) to get `edof` and `ediv`. Let `err_sigma` be the diagonal matrix of the variances. When `rsd` is `false`, `esigma` and `ediv` are `nothing`, and `edof` is the `edof` of `rr`.
+ 7. Under `rsd`, add `err_sigma` to `posterior_sigma`, and re-condition the sum with [`posdef!`](@ref) under the estimator that [`matrix_processing_posdef`](@ref) gives for `mp`. This is the only explicit [`posdef!`](@ref) call of the function. For a [`MatrixProcessing`](@ref) that estimator is `mp.pdm`, and it also acts on `posterior_sigma` inside step 4 when `:pdm` is a member of `mp.order`.
+ 8. Under `rsd`, append the columns of `sqrt.(err_sigma)` to `posterior_csigma`, so the factor also holds the block that step 7 added to the covariance.
+ 9. Reshape `posterior_csigma` to `length(posterior_mu)` columns and transpose it into `chol`. Return `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
 
 # Arguments
 
@@ -359,7 +365,7 @@ The returned `chol` is the transpose of ``[\\mathbf{B} \\mathbf{L}_f \\quad \\ma
 
 # Returns
 
-  - `(; mu, sigma, chol, esigma, edof, ediv)::NamedTuple`: Asset expected returns, asset covariance, the Cholesky-like factor whose trailing block is the residual standard deviations when `rsd` is `true`, the residual variances themselves, and their degrees of freedom and divisors. `esigma` and `ediv` are `nothing` when `rsd` is `false`, because no residual block was added. A caller writes the last three onto the loadings result it returns, so that a consumer that needs the idiosyncratic variances, or their sampling law, reads them off the block instead of recomputing them from the reconstruction error.
+  - `(; mu, sigma, chol, esigma, edof, ediv)::NamedTuple`: Asset expected returns, asset covariance, the square-root factor whose trailing block is the residual standard deviations when `rsd` is `true`, the residual variances, and their degrees of freedom and divisors. `esigma` and `ediv` are `nothing` when `rsd` is `false`, because the lift added no residual block. A caller writes the last three onto the loadings result that it returns. A consumer that needs the idiosyncratic variances, or their sampling law, then reads them off the block, and does not compute them again from the reconstruction error.
 
 # Related
 
@@ -404,7 +410,7 @@ end
 
 Degrees of freedom and divisor of each residual variance that a lift measures.
 
-The regression and the variance estimator each know half of the sampling law of a residual variance. The regression knows the parameters it spent on each asset, and records them as `edof`, the count of equally weighted observations that it left. The variance estimator knows the effective count of the observations it reads and its divisor, which [`variance_count`](@ref) states as `cnt`. This function combines them. Each case is a method, so no caller writes an `isnothing` test.
+The sampling law of a residual variance needs one fact from the regression and one from the variance estimator. The regression records in `edof` the count of equally weighted observations that remain after the parameters it spent on each asset. [`variance_count`](@ref) states in `cnt` the effective count of the observations that the variance estimator reads, and its divisor. This function combines the two. Each case is a method, so no caller writes an `isnothing` test.
 
 # Mathematical definition
 
@@ -421,7 +427,7 @@ Where:
   - $(math_dict[:T])
   - ``\\nu_{i}^{\\mathrm{fit}}``: Degrees of freedom that the regression left, `edof`. ``T - \\nu_{i}^{\\mathrm{fit}}`` is the number of parameters it spent on the asset.
 
-With equal weights ``n_{i} = T``, and the count of the regression passes through. Under unequal weights the spend is subtracted from the effective count, which approximates the law of a weighted sum of squared residuals.
+With equal weights ``n_{i} = T``, and the result is the `edof` of the regression. Under unequal weights the function subtracts the parameters that the regression spent from the effective count. This approximates the law of a weighted sum of squared residuals.
 
 # Arguments
 
@@ -453,13 +459,20 @@ end
 
 Declare how a prior estimator adds a residual block to the covariance it lifts.
 
-A consumer that needs to *undo* the residual block — [`HighOrderFactorPriorEstimator`](@ref) subtracts it to recover the systematic covariance its residual cokurtosis correction is defined on — cannot read `ve` and the repair of `mp` off the wrapped estimator's fields. Its `pe` slot is bounded [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry those fields; everything else in that bound is a wrapper or a pooling estimator, and a field access reaches past the type bound into a `FieldError`.
+[`HighOrderFactorPriorEstimator`](@ref) subtracts the residual block to recover the systematic covariance, because its residual cokurtosis correction is defined on that covariance. It cannot read `ve` and the repair of `mp` off the fields of the estimator that it wraps. Its `pe` field has the bound [`AbstractLowOrderPriorEstimator_F_AF`](@ref), and in that bound only [`FactorPrior`](@ref) and [`FactorBlackLittermanPrior`](@ref) carry both fields. The other members wrap a prior, pool priors, or build the asset moments with no residual block, as [`AugmentedBlackLittermanPrior`](@ref) does. A field access on one of them raises a `FieldError`.
 
-The declaration states whether a block was added and how to re-condition what remains. The block itself is on the loadings result, `rr.esigma`, measured under the weights of the fit. A prior that embeds this estimator can give the fit other weights than `ve` carries, a caller's `w` on an entropy pooling prior or the pooled weights of an opinion pool, so a consumer reads the block off `rr` and does not measure it again under `ve`.
+The declaration states whether the estimator added a block, and how to re-condition the covariance after a consumer removes the block. The block itself is on the loadings result, at `rr.esigma`, and the fit measured it under its own weights. A prior that embeds this estimator can give the fit weights other than those of `ve`, for example the `w` of a caller on an entropy pooling prior, or the pooled weights of an opinion pool. So a consumer reads the block off `rr`, and does not measure it again under `ve`.
 
-The declaration closes that gap. Every estimator answers, and it answers beside its own definition: the two that own a residual block report it, a wrapper forwards the answer of the estimator it wraps, and an estimator that adds none says so with an explicit `nothing` method. A pooling estimator is a wrapper for this purpose. It forwards the one estimator its moments come from, however many priors it pools. A `nothing` answer — and an answer whose `rsd` is `false` — both mean *no residual block was added*, so the consumer leaves the covariance alone.
+Each estimator declares its answer in a method beside its own definition:
 
-There is no default. A silent `nothing` fallback cannot separate *this estimator adds no residual block* from *the author of this estimator forgot the method*, and the second reading drops a residual block the covariance really carries. An undeclared type therefore throws and names itself, which is the polarity [`range_tails`](@ref) already uses for a per-type declaration whose absence is a defect rather than an answer.
+  - The two estimators that add a residual block report it.
+  - A wrapper forwards the answer of the estimator that it wraps. A pooling estimator is a wrapper here, and it forwards the one estimator that its moments come from.
+  - An estimator that adds no residual block returns `nothing` from an explicit method.
+  - [`CrossSectionalFactorPrior`](@ref) throws an `ArgumentError`. Its block is the idiosyncratic covariance that it measured, which a variance under `ve` does not rebuild.
+
+An answer of `nothing` and an answer whose `rsd` is `false` both mean that the estimator added no residual block, so the consumer leaves the covariance as it is.
+
+There is no default. A fallback that returns `nothing` cannot tell an estimator that adds no residual block from an estimator whose author forgot the method. In the second case the consumer does not subtract a residual block that the covariance holds. So the method for an undeclared type throws an `ArgumentError` that names the type. [`range_tails`](@ref) uses the same rule for a per-type declaration whose absence is a defect.
 
 # Arguments
 
@@ -472,7 +485,7 @@ There is no default. A silent `nothing` fallback cannot separate *this estimator
 # Returns
 
   - `nothing`: The estimator adds no residual block.
-  - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions a covariance the block was removed from, and whether the block is added at all. A factor prior gives `pdm` from [`matrix_processing_posdef`](@ref) when `rsd` is `true`, and `nothing` when `rsd` is `false`, because no consumer repairs a covariance that has no residual block.
+  - `(; ve, pdm, rsd)::NamedTuple`: The variance estimator that sizes the residual block, the positive definite matrix estimator that re-conditions the covariance after a consumer removes the block, and whether the estimator adds the block. A factor prior gives `pdm` from [`matrix_processing_posdef`](@ref) when `rsd` is `true`, and `nothing` when `rsd` is `false`, because no consumer repairs a covariance that has no residual block.
 
 # Related
 
@@ -495,7 +508,7 @@ end
 
 Check the shape of a [`factor_residual_config`](@ref) answer before a consumer reads it.
 
-A consumer reaches `ve`, `pdm` and `rsd` off the returned value by property access, which has no shape check of its own: a declaration that returns the wrong thing surfaces as a `FieldError` deep inside the correction rather than at the declaration that caused it. This checks the two shapes the contract admits, and names the estimator that answered.
+A consumer reads `ve`, `pdm` and `rsd` off the answer by property access, which checks no shape. A declaration that returns a wrong value would raise a `FieldError` deep inside the correction, far from the declaration that caused it. This function checks the two shapes that the contract permits, and its error names the estimator that answered.
 
 # Arguments
 
@@ -523,13 +536,13 @@ end
           active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, cache_reg::Bool = false,
           kwargs...)
 
-Compute factor-based prior moments for asset returns using a factor model.
+Compute the prior moments of asset returns from a factor model.
 
-`prior` estimates the mean and covariance of asset returns using the specified factor prior estimator, regression, and matrix post-processing. The factor returns matrix `F` is used to compute factor moments, which are then mapped to asset space via regression. Optionally, residual variance is added to the posterior covariance for robust estimation. The result is returned as a [`LowOrderPrior`](@ref) object.
+`pe.pe` fits the factor moments on `F`, and `pe.re` fits the loadings of the assets on the factors. [`factor_lift`](@ref) projects the factor moments onto the assets through the loadings. When `pe.rsd` is `true`, the lift adds the residual variances to the covariance. The method returns a [`LowOrderPrior`](@ref).
 
 # Mathematical definition
 
-The factor model maps factor moments to asset space via the loadings matrix ``\\mathbf{B}`` (with intercepts ``\\boldsymbol{\\alpha}``):
+The factor model maps the factor moments to the assets through the loadings matrix ``\\mathbf{B}`` and the intercepts ``\\boldsymbol{\\alpha}``:
 
 ```math
 \\begin{align}
@@ -544,27 +557,27 @@ Where:
   - ``\\hat{\\boldsymbol{f}}``: ``K \\times 1`` vector of factor expected returns.
   - ``\\boldsymbol{\\alpha}``: ``N \\times 1`` vector of regression intercepts, `rr.b`.
   - ``\\mathbf{\\Sigma}_f``: ``K \\times K`` factor covariance matrix.
-  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances (when `rsd = true`).
+  - ``\\mathbf{\\Sigma}_\\varepsilon``: ``N \\times N`` diagonal matrix of residual variances, present only when `rsd` is `true`.
 
-The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come from `pe.pe` fit on `F`, and the loadings from `pe.re` fit on `(X, F)`. The two equations are [`factor_lift`](@ref).
+`pe.pe` fits ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` on `F`, and `pe.re` fits the loadings on `(X, F)`. [`factor_lift`](@ref) computes the two equations.
 
 # Algorithm
 
  1. Orient `X` and `F` with [`dims_oriented`](@ref), to `observations × assets` and `observations × factors`.
- 2. Fit the wrapped prior `pe.pe` on `F`, giving `f_prior`, the factor-axis prior result. `strict` reaches it, because `pe.pe` admits [`BlackLittermanPrior`](@ref) and [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. `cache_reg` reaches it too, so a prior there stores the cache that a refit under new scenario weights reads from `fpr`.
- 3. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref). The reduction reads `active_mask` in the place of the active mask of `pnl` when the caller gives one. Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref), giving `rr` and `posterior_X`. The regression is `pe.re` viewed to the Coverage Universe with [`coverage_regression`](@ref).
- 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref), giving `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
- 5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances the lift measured and their counts, and under `pe.rsd = false` `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
- 6. Take the rows `r` that `f_prior.X` carries: the last `size(f_prior.X, 1)` observations. A Scenario Cap of `pe.pe` keeps the last rows of `F` alone, and the asset side keeps the same rows, so the two blocks describe the same observations. With no cap, `r` is every observation. The moments of steps 2 to 4 are fitted over every observation, so the cut changes no moment.
+ 2. Fit the wrapped prior `pe.pe` on `F` to get `f_prior`, the factor-axis prior result. The method passes `strict` to it, because `pe.pe` can be a [`BlackLittermanPrior`](@ref) or an [`EntropyPoolingPrior`](@ref), which resolve view names against a universe. The method also passes `cache_reg`, so that such a prior stores the cache that a refit under new scenario weights reads from `fpr`.
+ 3. Reduce `X` to its Coverage Universe with [`coverage_reduction`](@ref). When the caller gives `active_mask`, the reduction reads it in place of the active mask of `pnl`. Take the view of `pe.re` at the Coverage Universe with [`coverage_regression`](@ref). Fit the loadings and rebuild the asset returns with [`factor_reconstruction`](@ref) to get `rr` and `posterior_X`.
+ 4. Project `f_prior.mu` and `f_prior.sigma` through `rr` with [`factor_lift`](@ref) to get `mu`, `sigma`, `chol`, `esigma`, `edof` and `ediv`.
+ 5. Write `esigma`, `edof` and `ediv` onto `rr` with [`set_idiosyncratic_covariance`](@ref). Under `pe.rsd = true` the fields hold the residual variances that the lift measured and their counts. Under `pe.rsd = false`, `esigma` and `ediv` hold `nothing`, because the lift added no residual block.
+ 6. Let `r` be the rows that `f_prior.X` carries, which are the last `size(f_prior.X, 1)` observations. A Scenario Cap of `pe.pe` keeps only the last rows of `F`. The asset side keeps the same rows, so the two blocks describe the same observations. With no cap, `r` is every observation. Steps 2 to 4 fit the moments over every observation, so the cut changes no moment.
  7. Write `r` and `ts[r]` onto `rr` as its row key with [`set_row_key`](@ref), or `nothing` for `ts` when `ts` is `nothing`.
- 8. Assemble a [`LowOrderPrior`](@ref) over the rows `r` of `posterior_X`, with the rows `r` of the oriented `X` under `o_X`, both cut by [`scenario_window`](@ref), the three lifted moments, the factor prior's `w`, `ens`, `kld` and `ow`, the regression result under `rr`, and `f_prior` itself under `fpr`. No `Z` is carried; the composition note of [`FactorPrior`](@ref) says why.
+ 8. Assemble a [`LowOrderPrior`](@ref) over the rows `r` of `posterior_X`, with the rows `r` of the oriented `X` under `o_X`, both cut by [`scenario_window`](@ref). It holds the three lifted moments, the `w`, `ens`, `kld` and `ow` of the factor prior, the regression result under `rr`, and `f_prior` itself under `fpr`. It holds no Feature Matrix `Z`, because a Feature Matrix comes from the Asset Panel on the returns data, or from a producer on the distance that reads the loadings off this result.
 
 # Arguments
 
   - `pe`: Factor prior estimator.
   - `X`: Asset returns matrix (observations × assets).
   - `F`: Factor returns matrix (observations × factors).
-  - $(arg_dict[:pnl_prior]) The prior this estimator nests is fitted on the factors, whose axis no panel describes, so the panel stops here.
+  - $(arg_dict[:pnl_prior]) The nested prior fits the factors, and no panel describes the factor axis, so the method does not pass the panel on.
   - $(arg_dict[:dims])
   - $(arg_dict[:strict])
   - $(arg_dict[:ts]) It has one entry for each observation of `X`, and the loadings result records the entries of the rows the prior result carries, or `nothing`. The method that takes a [`ReturnsResult`](@ref) passes `rd.ts`.
@@ -575,11 +588,11 @@ The factor moments ``\\hat{\\boldsymbol{f}}`` and ``\\mathbf{\\Sigma}_f`` come f
 # Validation
 
   - `dims in (1, 2)`.
-  - If provided, `length(ts)` equals the number of observations of `X`. Raises a `DimensionMismatch`.
+  - If `ts` is not `nothing`, `length(ts)` equals the number of observations of `X`. Otherwise the method raises a `DimensionMismatch`.
 
 # Returns
 
-  - `pr::LowOrderPrior`: Result object containing posterior asset returns, mean vector, covariance matrix, Cholesky factor, regression result, and factor moments.
+  - `pr::LowOrderPrior`: The prior result. It holds the posterior asset returns, the mean vector, the covariance matrix, the square-root factor `chol`, the regression result and the factor prior result.
 
 # Related
 
@@ -653,7 +666,7 @@ end
 
 Fit a Factor Prior from a [`ReturnsResult`](@ref).
 
-The method passes the fields of `rd` to the returns-matrix method above, which runs the fit. The file defines this method instead of using [`prior(pe::AbstractPriorEstimator, rd::ReturnsResult)`](@ref), so that the timestamps `rd.ts` reach the fit, and the loadings result records the timestamp of each observation that the prior result carries.
+This method passes the fields of `rd` to the returns-matrix method, which runs the fit. It replaces [`prior(pe::AbstractPriorEstimator, rd::ReturnsResult)`](@ref) for this estimator, so that the timestamps `rd.ts` reach the fit. The loadings result then records the timestamp of each observation that the prior result carries.
 
 # Algorithm
 
@@ -673,7 +686,7 @@ The method passes the fields of `rd` to the returns-matrix method above, which r
 
 # Validation
 
-  - `rd.X` is not `nothing`. Raises an [`IsNothingError`](@ref).
+  - `rd.X` is not `nothing`. Otherwise the method raises an [`IsNothingError`](@ref).
   - The rules of [`benchmark_relative_returns`](@ref).
   - `rd.F` is not `nothing`, through [`assert_factor_returns`](@ref).
   - The rules of the returns-matrix method.
