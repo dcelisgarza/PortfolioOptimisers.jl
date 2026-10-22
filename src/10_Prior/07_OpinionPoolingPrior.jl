@@ -175,7 +175,7 @@ Keywords correspond to the struct's fields. All arguments are validated for type
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `pes`: Recursively updated via [`factory`](@ref).
   - `pe1`: Recursively updated via [`factory`](@ref).
@@ -183,7 +183,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `pes`: Recursively viewed via [`port_opt_view`](@ref).
   - `pe1`: Recursively viewed via [`port_opt_view`](@ref).

@@ -838,7 +838,7 @@ $(DocStringExtensions.FIELDS)
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets. `set` takes its own view, against the unreduced returns matrix of the head's rows when they exist, because the view of a tracking estimator asks for it. The view slices `w`, and `X` takes the view of the rows. The reduction of the held estimator to its Investable Mask views its `ccnt` with the rest of the optimiser. So the set stays in the reduced programme. A custom constraint with no view drops out of it.
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets. `set` takes its own view, against the unreduced returns matrix of the head's rows when they exist, because the view of a tracking estimator asks for it. The view slices `w`, and `X` takes the view of the rows. The reduction of the held estimator to its Investable Mask views its `ccnt` with the rest of the optimiser. So the set stays in the reduced programme. A custom constraint with no view drops out of it.
 
 # Related
 
@@ -981,7 +981,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, `opt` is viewed to the selected indices and `sel`, `gamma` and `proj` are carried unchanged.
+[`port_opt_view`](@ref) takes the view of `opt` at the selected indices and carries `sel`, `gamma` and `proj` unchanged.
 
 # Examples
 
@@ -1598,7 +1598,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the base rule is viewed and the rest is carried unchanged.
+[`port_opt_view`](@ref) takes the view of the base rule and carries the rest unchanged.
 
 # Examples
 

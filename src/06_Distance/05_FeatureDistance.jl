@@ -356,13 +356,13 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
@@ -498,13 +498,13 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
 
@@ -600,14 +600,14 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
   - `pair`: Recursively updated via [`factory`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
   - `pair`: Recursively indexed via [`obs_weights_view`](@ref).
@@ -715,7 +715,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `pair`: Recursively updated via [`factory`](@ref).
 
@@ -826,7 +826,7 @@ Keywords correspond to the struct's fields. The constructor sets `sim` to [`defa
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `alg`: Recursively updated via [`factory`](@ref).
   - `ape`: Recursively updated via [`factory`](@ref).

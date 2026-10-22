@@ -305,14 +305,14 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `pe`: Recursively viewed via [`port_opt_view`](@ref).
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
@@ -621,14 +621,14 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
@@ -848,14 +848,14 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `alpha`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
@@ -1132,14 +1132,14 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `wb`: Recursively viewed via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
@@ -1441,14 +1441,14 @@ Keywords correspond to the struct's fields. `fb` can hold a [`TimeDependent`](@r
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).

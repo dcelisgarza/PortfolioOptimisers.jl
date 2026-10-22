@@ -57,16 +57,14 @@ outer `settings`-controlled expression.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are
-automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `loss`: Recursively updated via [`factory`](@ref).
   - `gain`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields
-are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `loss`: Recursively viewed via [`port_opt_view`](@ref).
   - `gain`: Recursively viewed via [`port_opt_view`](@ref).

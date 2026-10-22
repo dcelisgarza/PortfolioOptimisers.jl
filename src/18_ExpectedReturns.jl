@@ -614,7 +614,7 @@ The type gains **no** scalariser: the return axis sums and never scalarises.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `rt`: Recursively updated via [`factory`](@ref).
 
@@ -756,7 +756,7 @@ The field beats a caller's `sca` keyword. A `sca` passed at the call site flows 
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `rt`: Recursively updated via [`factory`](@ref).
   - `rk`: Recursively updated via [`factory`](@ref).

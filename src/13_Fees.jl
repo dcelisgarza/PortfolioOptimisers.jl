@@ -124,7 +124,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `tn`: Recursively updated via [`factory`](@ref).
   - `lq`: Recursively updated via [`factory`](@ref).
@@ -431,7 +431,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `tn`: Recursively updated via [`factory`](@ref).
   - `lq`: Recursively updated via [`factory`](@ref).

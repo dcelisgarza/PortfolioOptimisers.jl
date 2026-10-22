@@ -66,7 +66,7 @@ A scalar `val` is a real input, not a mistake to refuse: a scalar [`RiskBudgetEs
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
 

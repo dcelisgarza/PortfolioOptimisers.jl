@@ -26,7 +26,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `ce`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
@@ -34,14 +34,14 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
   - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
   - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
@@ -316,7 +316,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `me`: Recursively updated via [`factory`](@ref).
   - `ce`: Recursively updated via [`factory`](@ref).
@@ -325,7 +325,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `me`: Recursively viewed via [`port_opt_view`](@ref).
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
@@ -333,7 +333,7 @@ When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagg
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `me`: Recursively indexed via [`obs_weights_view`](@ref).
   - `ce`: Recursively indexed via [`obs_weights_view`](@ref).
@@ -926,7 +926,7 @@ Keywords correspond to the struct's fields. A state seeded for `N` assets is `Co
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
   - `mu`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `M`: Sliced to the selected indices on both axes via [`port_opt_view`](@ref).

@@ -152,7 +152,7 @@ The **length** of `w` is not validated here. It is a property of the returns mat
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `a_pe`: Recursively updated via [`factory`](@ref).
   - `f_pe`: Recursively updated via [`factory`](@ref).
@@ -160,7 +160,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `a_pe`: Recursively viewed via [`port_opt_view`](@ref).
   - `re`: Recursively viewed via [`port_opt_view`](@ref).

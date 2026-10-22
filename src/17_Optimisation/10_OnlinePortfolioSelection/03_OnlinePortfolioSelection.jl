@@ -87,14 +87,14 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following fields are propagated:
+[`factory`](@ref) passes its arguments on to these fields:
 
   - `fees`: Recursively updated via [`factory`](@ref), which threads the previous weights into a turnover fee.
   - `fb`: Recursively updated via [`factory`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the fields with a per-asset axis are subset to the selected indices: `alg` and `set` recursively, `w0` sliced and renormalised, `fees` viewed at the indices, and `cache` through the state's own view.
+[`port_opt_view`](@ref) takes the view of the fields with a per-asset axis at the selected indices: `alg` and `set` recursively, `w0` sliced and renormalised, `fees` viewed at the indices, and `cache` through the state's own view.
 
 # Examples
 

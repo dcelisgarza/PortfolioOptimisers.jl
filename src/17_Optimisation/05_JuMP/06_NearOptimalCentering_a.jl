@@ -278,7 +278,7 @@ Where:
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `opt`: Recursively updated via [`factory`](@ref).
   - `r`: Recursively updated via [`factory`](@ref).

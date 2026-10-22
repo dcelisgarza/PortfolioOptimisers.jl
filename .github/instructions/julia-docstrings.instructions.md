@@ -388,8 +388,8 @@ end
 
 When a struct is decorated with `@propagatable`, its fields carry stackable tags inside the struct body. Three of them drive a generated method whose behaviour a reader of the type needs to know:
 
-- `@fprop` — **factory propagation**: the field is automatically propagated when [`factory`](@ref) is called on the enclosing struct (see `factory_child` for dispatch rules).
-- `@vprop` — **view propagation**: the field is automatically subset along the **asset** axis when [`port_opt_view`](@ref) is called on the enclosing struct (recursing into composed children, slicing data arrays).
+- `@fprop` — **factory propagation**: [`factory`](@ref) on the enclosing struct passes its arguments on to the field (see `factory_child` for dispatch rules).
+- `@vprop` — **view propagation**: [`port_opt_view`](@ref) on the enclosing struct takes the view of the field along the **asset** axis. It recurses into composed children and slices data arrays.
 - `@wprop` — **observation weights**: the field holds the weights themselves. It drives **two** channels, and they do different things to it: [`factory`](@ref) **replaces** it with an incoming [`ObsWeights`](@ref) value, and [`obs_weights_view`](@ref) **indexes** the value already there, along the **observation** axis.
 
 (`@pprop` and `@cprop` drive prior selection. They are documented on the prior families, not here.)
@@ -461,20 +461,20 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `nested_est`: Recursively updated via [`factory`](@ref).
   - `weight_field`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `nested_est`: Recursively viewed via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
-When [`obs_weights_view`](@ref) is called on this type, the following fields are automatically indexed to the selected observations:
+[`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
   - `nested_est`: Recursively indexed via [`obs_weights_view`](@ref).
   - `weight_field`: Indexed to the selected observations via [`obs_weights_view`](@ref).

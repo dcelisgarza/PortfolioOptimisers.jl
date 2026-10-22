@@ -329,7 +329,7 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `opt`: Recursively updated via [`factory`](@ref).

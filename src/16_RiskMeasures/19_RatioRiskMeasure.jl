@@ -35,7 +35,7 @@ Keywords correspond to the struct's fields.
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `r1`: Recursively updated via [`factory`](@ref).
   - `r2`: Recursively updated via [`factory`](@ref).
@@ -143,7 +143,7 @@ Both fields beat a caller's `sca` keyword. A `sca` passed at the call site flows
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `r1`: Recursively updated via [`factory`](@ref).
   - `r2`: Recursively updated via [`factory`](@ref).

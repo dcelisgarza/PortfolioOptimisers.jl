@@ -36,7 +36,7 @@ Keywords correspond to the struct's fields.
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
@@ -283,7 +283,7 @@ The rules are listed in the order of the raises, so the first rule a value break
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).

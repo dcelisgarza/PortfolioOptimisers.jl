@@ -22,7 +22,7 @@ Keywords correspond to the struct's fields. The default is the empty state that 
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
   - `buf`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `named`: Renumbered onto the selected indices, so an asset named before the slice is still named after it.

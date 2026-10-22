@@ -548,7 +548,7 @@ An entry of a schedule in `opti` or `opto` must be an estimator, as the static v
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `opti`: Recursively updated via [`factory`](@ref).

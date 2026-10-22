@@ -62,7 +62,7 @@ Keywords correspond to the struct's fields. The default is the empty seed that [
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, its fields are subset to the selected assets:
+[`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
   - `X`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `A`: Sliced to the selected indices via [`port_opt_view`](@ref).

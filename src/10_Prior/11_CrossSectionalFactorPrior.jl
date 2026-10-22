@@ -385,7 +385,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
 
 ## Propagated parameters
 
-When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fields are automatically propagated:
+[`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `cre`: Recursively updated via [`factory`](@ref).
   - `wa`: Recursively updated via [`factory`](@ref).
@@ -398,7 +398,7 @@ When [`factory`](@ref) is called on this type, the following `@fprop`-tagged fie
 
 ## View parameters
 
-When [`port_opt_view`](@ref) is called on this type, the following `@vprop`-tagged fields are automatically subset to the selected indices:
+[`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
