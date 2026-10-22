@@ -7,6 +7,7 @@
 #     code_health/gate_stamp.sh drop <gate>...          forget a stamp that does not bear on the push
 #     code_health/gate_stamp.sh waive <gate> <reason>   push without a required gate, for a reason
 #     code_health/gate_stamp.sh readers <file>          the gates that read a shared ledger file
+#     code_health/gate_stamp.sh reach                   the gates the change of the worktree reaches
 #     code_health/gate_stamp.sh check                   the pre-push guard of .pre-commit-config.yaml
 #
 # A gate measures a tree: the merge-base of the branch with origin/dev, plus the branch. When a
@@ -24,8 +25,12 @@
 #   - A shared ledger file, which nearly every ticket edits, stales only the gates that read it.
 #     `readers` names them, and `test/test_76_gate_tooling.jl` holds the list against the tests
 #     that name the file.
-#   - A push that changes src/ or ext/ needs a stamp of each gate in GATE_STAMP_REQUIRED, the gates
-#     of the `sweep-conform` skill. `waive` records the reason a gate does not apply.
+#   - A push that changes a `.jl` file under src/ or ext/ needs a stamp of each gate in
+#     GATE_STAMP_REQUIRED, the gates of the `sweep-conform` skill, that the change reaches.
+#     `code_health/gate_reach.jl` names the class of the change. A change to docstring prose
+#     reaches neither `jet` nor `doctest`. A changed `jldoctest` block needs only `doctest-files`,
+#     and a changed string literal needs `doctest` but not `jet`. `waive` records the reason a
+#     gate does not apply.
 #
 # `code_health/CodeHealth.jl` records every check and refresh of the gate scripts, and
 # `test/run_files.jl` records every test file it runs. `docs/doctest_files.jl` records
@@ -49,10 +54,11 @@ set -euo pipefail
 
 usage() {
     echo "usage: gate_stamp.sh record <gate>... | list | drop <gate>... | waive <gate> <reason>" \
-        "| readers <file> | check" >&2
+        "| readers <file> | reach | check" >&2
     exit 2
 }
 
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 top=$(git rev-parse --show-toplevel)
 gitdir=$(git rev-parse --absolute-git-dir)
 stamps="$gitdir/gate_stamps"
@@ -171,6 +177,50 @@ names_gate() {
     [ -f "$1" ] && awk -F '\t' -v g="$2" '$1 == g { found = 1 } END { exit !found }' "$1"
 }
 
+# Whether a stamp or a waiver covers the gate "$1". The full doctest run covers the scoped one.
+covered() {
+    names_gate "$stamps" "$1" || names_gate "$waivers" "$1" ||
+        { [ "$1" = doctest-files ] && covered doctest; }
+}
+
+# The class that code_health/gate_reach.jl names for the change from "$1" to "$2", a commit or
+# WORKTREE, or `code` when the script cannot run.
+reach_class() {
+    local out
+    if out=$(julia --startup-file=no "$here/gate_reach.jl" "$1" "$2" 2>/dev/null); then
+        printf '%s\n' "$out" | awk '$1 == "reach" { print $2 }'
+    else
+        echo code
+    fi
+}
+
+# The gates of the list "$1" that a change of the class "$2" reaches, one to a line.
+reached() {
+    local gate
+    for gate in $1; do
+        case "$2:$gate" in
+        prose:jet | prose:doctest | block:jet | literal:jet) ;;
+        block:doctest) echo doctest-files ;;
+        *) echo "$gate" ;;
+        esac
+    done
+}
+
+# Print the class of each changed file of the worktree against the ref, and the gates the change
+# reaches.
+reach() {
+    local base out class
+    base=$(git merge-base "$ref" HEAD)
+    out=$(julia --startup-file=no "$here/gate_reach.jl" "$base" WORKTREE)
+    printf '%s\n' "$out"
+    if [ "$(printf '%s\n' "$out" | wc -l)" -eq 1 ]; then
+        echo "gates none: no .jl file under src/ or ext/ changes"
+        return 0
+    fi
+    class=$(printf '%s\n' "$out" | awk '$1 == "reach" { print $2 }')
+    echo "gates" $(reached "$required" "$class")
+}
+
 # The files that the commits base..from change, without the commits this worktree pushed.
 moved_files() {
     local base=$1 from=$2
@@ -204,8 +254,8 @@ check() {
     own=$(git diff --name-only --no-renames "$(git merge-base "$from" "$to")" "$to")
     # `grep` exits 1 when the branch changes nothing under src/ or ext/, and `pipefail` would make
     # that exit the script's.
-    dirs=$(printf '%s\n' "$own" | { grep -E '^(src|ext)/' || true; } | xargs -r -n 1 dirname |
-        sort -u)
+    dirs=$(printf '%s\n' "$own" | { grep -E '^(src|ext)/.*\.jl$' || true; } |
+        xargs -r -n 1 dirname | sort -u)
 
     local stale="" names=""
     if [ -s "$stamps" ]; then
@@ -230,12 +280,11 @@ check() {
         done <"$stamps"
     fi
 
-    local absent=""
-    if [ -n "$dirs" ]; then
-        for gate in $required; do
-            if ! names_gate "$stamps" "$gate" && ! names_gate "$waivers" "$gate"; then
-                absent+=" $gate"
-            fi
+    local absent="" class=""
+    if [ -n "$dirs" ] && [ -n "$required" ]; then
+        class=$(reach_class "$(git merge-base "$from" "$to")" "$to")
+        for gate in $(reached "$required" "$class"); do
+            covered "$gate" || absent+=" $gate"
         done
     fi
 
@@ -249,7 +298,7 @@ check() {
         status=1
     fi
     if [ -n "$absent" ]; then
-        echo "This push changes src/ or ext/, and no stamp records these gates:$absent"
+        echo "This push changes src/ or ext/ ($class), and no stamp records these gates:$absent"
         echo "Run each one (the sweep-conform skill, § Land the branch), or record why it does not"
         echo "apply: code_health/gate_stamp.sh waive <gate> <reason>."
         status=1
@@ -274,6 +323,7 @@ readers)
     [ $# -eq 1 ] || usage
     readers "$1"
     ;;
+reach) reach ;;
 check) check ;;
 *) usage ;;
 esac

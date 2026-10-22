@@ -16,6 +16,9 @@ Each session wrote its own driver for one test file, and one of those drivers le
     push that changes `src/`, leaves out the commits the worktree pushed itself, and stales a
     stamp on a shared ledger file only when its gate reads the file. The test holds the list of
     readers against the tests that name each ledger file.
+  - `code_health/gate_reach.jl` names the class of a change, so the guard demands `jet` and
+    `doctest` only of a change they can reach. The test checks each class on a fixture file, and
+    the demand of the guard for each.
   - `code_health/julia_slot.jl` is the machine-wide slot that a run which loads the package takes,
     and `code_health/manifest_provenance.jl` refuses a commit that moves an analyser in the
     Manifest without the refresh of its baselines.
@@ -58,6 +61,10 @@ end
 
 module ProvenanceSeam
 include(joinpath(@__DIR__, "..", "code_health", "manifest_provenance.jl"))
+end
+
+module GateReachSeam
+include(joinpath(@__DIR__, "..", "code_health", "gate_reach.jl"))
 end
 
 using Test
@@ -119,6 +126,51 @@ function stamp(dir::AbstractString, args...; force::Bool = true, env...)
     cmd = addenv(Cmd(`bash $GATE_STAMP $args`; dir), vars...)
     p = run(pipeline(ignorestatus(cmd); stdout = io, stderr = io))
     return p.exitcode, String(take!(io))
+end
+
+const Q3 = "\"\"\""
+
+"""
+A source file with a docstring that holds a `jldoctest` block, a field docstring, and a function
+that returns a string. Each keyword changes one of them.
+"""
+function reach_text(; doc = "Doc of f.", out = "2", body = "x + 1", field = "field doc",
+                    msg = "message")
+    return """
+           $Q3
+               f(x)
+
+           $doc
+
+           ```jldoctest
+           julia> f(1)
+           $out
+           ```
+           $Q3
+           f(x) = $body
+
+           struct A
+               $Q3$field$Q3
+               a::Int
+           end
+
+           g() = "$msg"
+           """
+end
+
+"""
+A repository whose `trunk` holds `src/a/one.jl` as `reach_text()`, and whose `work` branch
+commits `text` there.
+"""
+function reach_repo(text::AbstractString)
+    dir = mktempdir()
+    git(dir, "init", "-q", "-b", "trunk")
+    put(dir, "src/a/one.jl", reach_text())
+    c0 = commit(dir, "c0")
+    git(dir, "checkout", "-q", "-b", "work")
+    put(dir, "src/a/one.jl", text)
+    c1 = commit(dir, "c1")
+    return dir, c0, c1
 end
 
 @testset "Gate tooling: scope, stamps and driver" begin
@@ -313,6 +365,56 @@ end
         dir2, d0, _, d2 = fixture_repo()
         @test first(stamp(dir2, "check"; push..., PRE_COMMIT_FROM_REF = d2,
                           PRE_COMMIT_TO_REF = d0)) == 0
+    end
+
+    @testset "gate_reach names the class of a change" begin
+        R = GateReachSeam.GateReach
+        old = reach_text()
+        @test R.file_class("src/a.jl", old, reach_text(; doc = "Other prose.")) == "prose"
+        @test R.file_class("src/a.jl", old, reach_text(; field = "other doc")) == "prose"
+        @test R.file_class("src/a.jl", old, reach_text(; out = "3")) == "block"
+        @test R.file_class("src/a.jl", old, reach_text(; msg = "other")) == "literal"
+        @test R.file_class("src/a.jl", old, reach_text(; body = "x + 2")) == "code"
+        @test R.file_class("src/a.jl", old, nothing) == "code"
+        @test R.file_class("src/a.jl", old, "f(x) = (") == "code"
+        # A string that a function returns is not a docstring.
+        h(s) = "function h()\n    \"$s\"\nend\n"
+        @test R.file_class("src/a.jl", h("a"), h("b")) == "literal"
+        # A key or a value of a docstring dictionary feeds only docstrings.
+        d(k, v) = "unique_key_dict!(arg_dict, :arg_dict, :$k => \"$v\")\n"
+        dicts = "src/01_Base/01_DocstringDictionaries/02_X.jl"
+        @test R.file_class(dicts, d("w", "a"), d("v", "b")) == "prose"
+        @test R.file_class("src/b.jl", d("w", "a"), d("w", "b")) == "literal"
+        @test R.file_class(dicts, d("w", "a"), d("w", "a") * "x = 1\n") == "code"
+    end
+
+    @testset "the push guard demands only the gates a change reaches" begin
+        guard(dir, from, to) = stamp(dir, "check"; PRE_COMMIT_FROM_REF = from,
+                                     PRE_COMMIT_TO_REF = to,
+                                     PRE_COMMIT_REMOTE_BRANCH = "refs/heads/dev",
+                                     GATE_STAMP_REQUIRED = "jet doctest")
+        demand(text) = guard(reach_repo(text)...)
+        @test demand(reach_text(; doc = "Other prose.")) == (0, "")
+        code, out = demand(reach_text(; msg = "other"))
+        @test occursin("(literal), and no stamp records these gates: doctest\n", out)
+        code, out = demand(reach_text(; body = "x + 2"))
+        @test occursin("(code), and no stamp records these gates: jet doctest\n", out)
+        # A changed block needs the scoped run, and the full run covers it.
+        dir, c0, c1 = reach_repo(reach_text(; out = "3"))
+        code, out = guard(dir, c0, c1)
+        @test code == 1
+        @test occursin("(block), and no stamp records these gates: doctest-files\n", out)
+        @test first(stamp(dir, "record", "doctest")) == 0
+        @test guard(dir, c0, c1) == (0, "")
+        # A file under src/ that is not Julia reaches no gate.
+        put(dir, "src/CLAUDE.md", "rules\n")
+        c2 = commit(dir, "c2")
+        @test guard(dir, c1, c2) == (0, "")
+        # `reach` reads the working tree against the ref, and names the gates.
+        put(dir, "src/a/one.jl", reach_text(; doc = "Other prose."))
+        code, out = stamp(dir, "reach"; GATE_STAMP_REQUIRED = "jet size doctest")
+        @test code == 0
+        @test occursin("prose src/a/one.jl\nreach prose\ngates size\n", out)
     end
 
     @testset "a commit this worktree pushed is not a sibling's change" begin

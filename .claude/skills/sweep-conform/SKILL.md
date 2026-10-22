@@ -132,12 +132,16 @@ the tree you will push:
 5. Run the targeted tests bare, with `run_in_background`, through the driver. It wakes you when
    it ends, and `--done` leaves the verdict in a file:
    `julia -t 1 --project=test test/run_files.jl --done=<path> test_X.jl test_Y.jl`.
-   Check the doctests of your files the same way:
+   Run `bash code_health/gate_stamp.sh reach`. It parses your changed files in about a second,
+   and names the gates the change reaches. When it names `doctest` or `doctest-files`, check the
+   doctests of your files the same way:
    `julia -t 1 --project=docs docs/doctest_files.jl --against origin/dev`.
 6. `git fetch origin dev`. If `git log --oneline HEAD..origin/dev` is not empty, rebase now, then
    run `bash code_health/gate_stamp.sh check`. It names the stamps that the rebase made stale.
-7. Run `test_26` and the full doctests (the `run-doctests` skill), then JET on a changed file,
-   scoped the same way.
+7. Run `test_26`. Then run the slow gates that `gate_stamp.sh reach` names, on the rebased tree:
+   the full doctests for `doctest` (the `run-doctests` skill), and JET on a changed file, scoped
+   the same way, for `jet`. A change to docstring prose reaches neither, and the push needs
+   neither.
 8. Commit, fetch, and rebase again if `dev` moved. Run `gate_stamp.sh check` again, then push with
    `git push origin HEAD:dev`.
 
@@ -148,9 +152,10 @@ the push in two cases, and the refusal names what to do:
   the gates your change can reach, and paste the `drop` line that the refusal prints for the rest.
   Your own pushed commits and a sibling's edit to a ledger file that a gate does not read do not
   count.
-- The push changes `src/` or `ext/`, and no stamp records `jet`, `size`, `complexity`, `perf` or
-  `doctest`. Run the gate. If it cannot apply, record why:
-  `code_health/gate_stamp.sh waive <gate> <reason>`.
+- The push changes a `.jl` file under `src/` or `ext/`, and no stamp records a gate that the
+  change reaches: `size`, `complexity` and `perf` always, and `jet`, `doctest` or
+  `doctest-files` as `gate_stamp.sh reach` names them. Run the gate. If it cannot apply, record
+  why: `code_health/gate_stamp.sh waive <gate> <reason>`.
 
 `code_health/gate_stamp.sh list` shows the stamps and the waivers.
 
