@@ -3,30 +3,32 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all implied volatility algorithms.
 
-All concrete and/or abstract types implementing implied volatility estimation algorithms should be subtypes of `ImpliedVolatilityAlgorithm`.
+A subtype predicts the realised volatility of each asset for the period that follows the sample.
 
 # Interfaces
 
-In order to implement a new concrete type that works seamlessly with the library, subtype `ImpliedVolatilityAlgorithm` and implement the following method:
+To add an implied volatility algorithm, subtype `ImpliedVolatilityAlgorithm` and add this method:
 
 ## Required method name
 
-  - `predict_realised_vols(alg::ImpliedVolatilityAlgorithm, iv::MatNum, X::MatNum, ivpa::Any)`: Predict the realised volatility of the period that follows the sample, one value per asset.
+  - `predict_realised_vols(alg::ImpliedVolatilityAlgorithm, iv::MatNum, X::MatNum, ivpa::Any)`: Returns the predicted realised volatility of each asset for the period that follows the sample.
 
 ### Arguments
 
-The implied volatilities are the **second** positional argument and the returns the **third**. The two are matrices of the same size, so a call that swaps them is well typed and silently wrong.
+The implied volatilities are the second positional argument, and the returns are the third. The two matrices have the same size, so a call that swaps them raises no error and returns a wrong answer.
 
-  - `alg`: The concrete subtype instance.
-  - `iv`: Implied volatility matrix `observations × assets`, already divided by ``\\sqrt{\\mathrm{ppy}}`` by the caller.
+  - `alg`: The instance of the concrete subtype.
+  - `iv`: Implied volatility matrix `observations × assets`. The caller divides it by ``\\sqrt{\\mathrm{ppy}}`` before the call.
   - `X`: Asset returns matrix `observations × assets`.
-  - `ivpa`: Implied volatility premium adjustment factor. It is `nothing` when the caller supplies none, so an algorithm that needs one raises on that method.
+  - `ivpa`: Implied volatility premium adjustment factor. It is `nothing` when the caller gives no factor, so an algorithm that needs a factor must raise an error on `nothing`.
 
 ### Returns
 
-  - `rv_p::VecNum`: Predicted realised volatility, one entry per asset, in the units of `X`.
+  - `rv_p::VecNum`: The predicted realised volatility of each asset, in the units of `X`.
 
 ### Examples
+
+The example below defines a minimal algorithm that returns the last row of `iv`.
 
 ```jldoctest
 julia> struct MyImpliedVolatilityAlgorithm <: PortfolioOptimisers.ImpliedVolatilityAlgorithm end
@@ -56,9 +58,9 @@ abstract type ImpliedVolatilityAlgorithm <: AbstractAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implied volatility algorithm that predicts realised volatility via regression on implied volatility.
+Predicts realised volatility by a log-linear regression on implied volatility and on the realised volatility of the window before.
 
-`ImpliedVolatilityRegression` fits a regression model relating implied and realised volatility over rolling windows, then uses the fitted model to predict the next period's realised volatility from the most recent implied volatility observation. The regression is Equation 5 of [christensenprabhala1998](@cite), which regresses the realised volatility of a period on the implied volatility at its start and on the realised volatility of the period before, both as logarithms. The model, the steps that fit it and the number of windows it needs are stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
+`ImpliedVolatilityRegression` splits the sample into windows of `ws` rows that do not overlap. For each asset, it regresses the realised volatility of a window on the implied volatility at the end of the window before, and on the realised volatility of the window before. It then predicts the realised volatility of the next window from the last window. The regression is Equation 5 of [christensenprabhala1998](@cite), and both series enter it as natural logarithms. This type selects a method of [`predict_realised_vols`](@ref), and the docstring of that method states the model, the steps and the number of windows that the fit needs.
 
 # Fields
 
@@ -119,7 +121,7 @@ ImpliedVolatilityRegression
     """
     @fprop ve
     """
-    Window size for computing rolling realised volatility. It also sets the number of windows, `div(size(X, 1), ws)`, and the regression needs more than two of them.
+    Number of rows in each window. The number of windows is `div(size(X, 1), ws)`, and the regression needs more than two windows.
     """
     ws
     # crit
@@ -145,11 +147,11 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Implied volatility algorithm that divides the latest implied volatility by a volatility risk premium adjustment.
+Divides the last implied volatility of each asset by a volatility risk premium adjustment factor.
 
-The method follows [egbersswinkels2015](@cite). No copy of that work was found, so the division is not checked against it.
+The method follows [egbersswinkels2015](@cite). The library has no copy of that work, so no check compares the division with it.
 
-The adjustment factor is not a field of this type. The caller passes it as the `ivpa` keyword of the `cov` and `cor` methods of [`ImpliedVolatility`](@ref), as a scalar or as one value per asset. The factor is mandatory: `ivpa = nothing` raises an `ArgumentError`. Every entry of it must be finite and strictly positive, and one that is not raises a `DomainError`, because a non-positive factor makes a negative volatility whose sign `StatsBase.cor2cov!` then hides. The closed form of the branch, and the rules it enforces, are stated by [`predict_realised_vols`](@ref), which is the method this tag selects.
+The adjustment factor is not a field of this type. The caller gives it as the `ivpa` keyword of the `cov` and `cor` methods of [`ImpliedVolatility`](@ref), as a scalar or as one value per asset. The factor is mandatory, and `ivpa = nothing` raises an `ArgumentError`. Each entry must be finite and strictly positive, or the method raises a `DomainError`. A factor that is not positive makes a negative volatility, and `StatsBase.cor2cov!` hides its sign. This type selects a method of [`predict_realised_vols`](@ref), and the docstring of that method states the closed form and the checks.
 
 # Constructors
 
@@ -177,9 +179,9 @@ struct ImpliedVolatilityPremium <: ImpliedVolatilityAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Covariance estimator based on implied volatility scaling.
+Covariance estimator that scales a correlation matrix by the realised volatilities that it predicts from implied volatilities.
 
-`ImpliedVolatility` computes a covariance matrix by combining a base correlation estimator with predicted realised volatilities derived from implied volatility data. It supports two algorithms: [`ImpliedVolatilityRegression`](@ref), which fits a regression model to predict realised volatility from implied volatility, and [`ImpliedVolatilityPremium`](@ref), which scales implied volatility by a user-supplied factor.
+`ImpliedVolatility` estimates the correlation matrix of the returns with a base estimator. It predicts the realised volatility of each asset from the implied volatilities, and scales the correlation matrix by those volatilities. Two algorithms make the prediction. [`ImpliedVolatilityRegression`](@ref) fits a regression of realised volatility on implied volatility. [`ImpliedVolatilityPremium`](@ref) divides the implied volatility by a factor that the caller gives.
 
 # Fields
 
@@ -195,7 +197,7 @@ $(DocStringExtensions.FIELDS)
         cache::Option{<:AbstractPartialFitState} = nothing
     ) -> ImpliedVolatility
 
-Keywords correspond to the struct's fields. `ppy` has no default. The implied volatility is annual, and `ppy` converts it to the period of the returns, so no value is right at every data frequency: the caller states it, for example `ppy = 252` for daily returns.
+Keywords correspond to the struct's fields. `ppy` has no default. The implied volatility is annual, and `ppy` converts it to the period of the returns. No single value is correct for all data frequencies, so the caller must give it, for example `ppy = 252` for daily returns.
 
 ## Validation
 
@@ -269,11 +271,11 @@ ImpliedVolatility
     """
     mp
     """
-    Implied volatility algorithm for predicting realised volatility.
+    Implied volatility algorithm that predicts the realised volatility of each asset.
     """
     @fprop alg
     """
-    Periods per year of the returns, which converts the annual implied volatility to the data frequency. The `cov` and `cor` methods divide the implied volatilities by `sqrt(ppy)` before the algorithm reads them.
+    Periods per year of the returns. It converts the annual implied volatility to the frequency of the returns. The `cov` and `cor` methods divide the implied volatilities by `sqrt(ppy)` before the algorithm reads them.
     """
     ppy
     """
@@ -303,11 +305,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of an [`ImpliedVolatility`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:ImpliedVolatility, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:ImpliedVolatility, true)` to render it.
 
 # Arguments
 
-  - `::ImpliedVolatility`: Implied volatility covariance estimator, read for its type alone.
+  - `::ImpliedVolatility`: The implied volatility covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -325,15 +327,15 @@ show_fields(::ImpliedVolatility) = (:ce, :mp, :alg, :ppy)
                  chunk::Option{<:Integer} = nothing, T::Option{<:Integer} = nothing,
                  N::Option{<:Integer} = nothing)
 
-Compute realised volatility over non-overlapping rolling windows.
+Returns the realised volatility of each asset over consecutive blocks of `ws` rows.
 
-This function splits the last `chunk * ws` rows of `X` into `chunk` non-overlapping blocks of `ws` rows each, and computes the standard deviation of every asset within each block using the estimator `ce`. The result is a matrix of size `(chunk, N)` representing rolling realised volatilities.
+The function splits the last `chunk * ws` rows of `X` into `chunk` blocks of `ws` rows that do not overlap. The estimator `ce` gives the standard deviation of each asset in each block. The result is a `chunk × N` matrix.
 
-Any estimator declared with [`@propagatable`](@ref) gets its [`obs_weights_view`](@ref) method generated from the [`@wprop`](@ref) tag its weights field already carries, so both shipped variance estimators answer with nothing written by hand. An estimator that holds weights outside that tag and defines no method of its own meets a block of `ws` rows with a vector of `T` weights, and the call raises.
+[`@propagatable`](@ref) makes an [`obs_weights_view`](@ref) method for each estimator that it declares, from the [`@wprop`](@ref) tag of the weights field. So both variance estimators of the library slice their weights with no method written by hand. An estimator can keep its weights in a field with no `@wprop` tag, and have no method of its own. Such an estimator receives a block of `ws` rows and a vector of `T` weights, and the call raises an error.
 
 # Mathematical definition
 
-Write ``C`` for `chunk` and ``w_s`` for `ws`. The blocks are counted back from the last observation, so the leading
+Write ``C`` for `chunk` and ``w_s`` for `ws`. The function counts the blocks back from the last observation, so the first
 
 ```math
 \\begin{align}
@@ -341,7 +343,7 @@ o &= T - C w_s
 \\end{align}
 ```
 
-rows lie in no block. Block ``c`` holds the rows
+rows are in no block. Block ``c`` holds the rows
 
 ```math
 \\begin{align}
@@ -361,33 +363,33 @@ Where:
 
   - $(math_dict[:T])
   - $(math_dict[:x_ti_ret])
-  - ``o``: Number of leading rows that no block covers.
+  - ``o``: Number of rows at the start of the sample that no block covers.
   - ``\\mathcal{R}_c``: Rows of block ``c``.
   - ``\\mathrm{rv}_{c,\\,i}``: Realised volatility of asset ``i`` over block ``c``.
 
-The last row of block ``c`` is ``o + c w_s``, which is the row [`implied_vol`](@ref) samples for the same window. A window count that does not divide ``T`` therefore drops the oldest rows and never the newest.
+The last row of block ``c`` is ``o + c w_s``. [`implied_vol`](@ref) samples the same row for the same window. When ``w_s`` does not divide ``T``, the function drops the oldest rows and keeps the newest.
 
 # Algorithm
 
  1. When `chunk`, `T` or `N` is `nothing`, read `T` and `N` from `size(X)` and set `chunk` to `div(T, ws)`.
- 2. Compute `offset`, the number of leading rows of `X` that no block covers.
- 3. For each block `c` in `1:chunk`, form `rows`, the `ws` row indices of that block.
- 4. Slice `ce` to `rows` with [`obs_weights_view`](@ref), giving the estimator that measures this block. It indexes every weights field on its own, so an estimator with a weighted mean and an unweighted dispersion keeps that shape, and an unweighted `ce` is returned unchanged.
- 5. Call `Statistics.std` on that estimator and on the block's rows of `X` along `dims = 1`, giving one row of standard deviations. The estimator is called once per block, so it only ever reads a matrix.
- 6. Stack the `chunk` rows with `vcat`, giving `rv`.
+ 2. Set `offset` to `T - chunk * ws`, the number of rows at the start of `X` that no block covers.
+ 3. For each block `c` in `1:chunk`, set `rows` to the `ws` row indices of that block.
+ 4. Slice `ce` to `rows` with [`obs_weights_view`](@ref). The result is the estimator for this block. [`obs_weights_view`](@ref) indexes each weights field on its own. So an estimator with a weighted mean and an unweighted dispersion keeps that shape, and an unweighted `ce` stays unchanged.
+ 5. Call `Statistics.std` with that estimator on the rows of the block of `X`, with `dims = 1`. The result is one row of standard deviations. The function calls the estimator once for each block, so the estimator reads only a matrix.
+ 6. Stack the `chunk` rows with `vcat` to make `rv`.
 
 # Arguments
 
-  - `ce`: Variance estimator used to compute standard deviations within each window. Its observation weights describe the whole sample, and step 4 slices them to each block.
-  - `X`: Data matrix of asset returns (observations × assets).
-  - `ws`: Window size (number of observations per block).
-  - `chunk`: Number of windows (computed as `div(T, ws)` if not provided).
-  - `T`: Total number of observations (inferred from `X` if not provided).
-  - `N`: Number of assets (inferred from `X` if not provided).
+  - `ce`: Variance estimator that gives the standard deviations in each block. Its observation weights describe the whole sample, and step 4 slices them to each block.
+  - `X`: Asset returns matrix `observations × assets`.
+  - `ws`: Window size, the number of rows in each block.
+  - `chunk`: Number of blocks, or `nothing`. Step 1 states the rule when one of `chunk`, `T` and `N` is `nothing`.
+  - `T`: Number of observations, or `nothing`.
+  - `N`: Number of assets, or `nothing`.
 
 # Returns
 
-  - `rv::Matrix{<:Number}`: Rolling realised volatility matrix (chunks × assets).
+  - `rv::Matrix{<:Number}`: Realised volatility matrix `chunk × assets`.
 
 # Examples
 
@@ -425,9 +427,9 @@ end
     implied_vol(X::MatNum, ws::Integer, chunk::Option{<:Integer} = nothing,
                 T::Option{<:Integer} = nothing, N::Option{<:Integer} = nothing)
 
-Extract non-overlapping implied volatility observations from `X` at the end of each rolling window.
+Returns the row of `X` at the end of each window of `ws` rows.
 
-This function selects the rows of `X` that close each rolling window of size `ws`, and returns them as a view of shape `(chunk, N)`.
+The function selects the last row of each window, and returns a `chunk × N` view of `X`.
 
 # Mathematical definition
 
@@ -451,26 +453,26 @@ Where:
 
   - $(math_dict[:T])
   - ``\\mathcal{S}``: Sampled rows, one per window.
-  - ``o``: Number of leading rows that no window covers.
+  - ``o``: Number of rows at the start of the sample that no window covers.
 
-``\\mathcal{S}_c`` is the last row of block ``c`` of [`realised_vol`](@ref), so the two functions read the same windows. The last sampled row is ``T`` whatever ``w_s`` is, so a window count that does not divide ``T`` drops the oldest rows and never the newest.
+``\\mathcal{S}_c`` is the last row of block ``c`` of [`realised_vol`](@ref), so the two functions read the same windows. The last sampled row is ``T`` for each ``w_s``. So when ``w_s`` does not divide ``T``, the function drops the oldest rows and keeps the newest.
 
 # Algorithm
 
  1. When `chunk`, `T` or `N` is `nothing`, read `T` and `N` from `size(X)` and set `chunk` to `div(T, ws)`.
- 2. Return the view of `X` over the rows `(T - (chunk - 1) * ws):ws:T`. The result is a view, so it shares its memory with `X`.
+ 2. Return the view of `X` over the rows `(T - (chunk - 1) * ws):ws:T`. The view shares its memory with `X`.
 
 # Arguments
 
-  - `X`: Implied volatility matrix (observations × assets).
-  - `ws`: Window size (number of observations per block).
-  - `chunk`: Number of windows (computed as `div(T, ws)` if not provided).
-  - `T`: Total number of observations (inferred from `X` if not provided).
-  - `N`: Number of assets (inferred from `X` if not provided).
+  - `X`: Implied volatility matrix `observations × assets`.
+  - `ws`: Window size, the number of rows in each window.
+  - `chunk`: Number of windows, or `nothing`. Step 1 states the rule when one of `chunk`, `T` and `N` is `nothing`.
+  - `T`: Number of observations, or `nothing`.
+  - `N`: Number of assets, or `nothing`.
 
 # Returns
 
-  - `iv::SubArray`: End-of-window implied volatility matrix (chunks × assets).
+  - `iv::SubArray`: The implied volatility at the end of each window, `chunk × assets`.
 
 # Examples
 
@@ -500,22 +502,22 @@ end
 """
     predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any, ivpa::Nothing)
 
-Error method: [`ImpliedVolatilityPremium`](@ref) requires an implied volatility premium adjustment factor.
+Raises an `ArgumentError`, because the premium algorithm needs an implied volatility premium adjustment factor.
 
-The adjustment factor is not a field of [`ImpliedVolatilityPremium`](@ref), so a caller that selects that algorithm and passes no `ivpa` reaches this method.
+The adjustment factor is not a field of [`ImpliedVolatilityPremium`](@ref). A caller that selects that algorithm and gives no `ivpa` reaches this method.
 
 # Arguments
 
-The implied volatilities are the **second** positional argument and the returns the **third**.
+The implied volatilities are the second positional argument, and the returns are the third.
 
   - `::ImpliedVolatilityPremium`: Implied volatility premium algorithm.
-  - `iv`: Implied volatility matrix (unused).
-  - `::Any`: Asset returns matrix (unused).
-  - `ivpa::Nothing`: Implied volatility premium adjustment (must not be `nothing`).
+  - `iv`: Implied volatility matrix. The method does not read it.
+  - `::Any`: Asset returns matrix. The method does not read it.
+  - `ivpa::Nothing`: `nothing`, because the caller gave no implied volatility premium adjustment factor.
 
 # Validation
 
-  - `ivpa` is not `nothing`. This method is the failing branch, and it raises an `ArgumentError`.
+  - `ivpa` is not `nothing`. This method is the branch that fails, and it raises an `ArgumentError`.
 
 # Related
 
@@ -529,9 +531,9 @@ end
     predict_realised_vols(::ImpliedVolatilityPremium, iv::MatNum, ::Any,
                           ivpa::Num_VecNum)
 
-Predict realised volatilities by scaling the latest implied volatility row by the premium adjustment factor.
+Predicts the realised volatility of each asset as its last implied volatility divided by the premium adjustment factor.
 
-The row read is the last row of `iv` itself, not the last row of a window, so this method needs no window size and no returns. The division follows [egbersswinkels2015](@cite). No copy of that work was found, so the formula is not checked against it.
+The method reads the last row of `iv` itself, not the last row of a window. So it needs no window size and no returns. The division follows [egbersswinkels2015](@cite). The library has no copy of that work, so no check compares the formula with it.
 
 # Mathematical definition
 
@@ -550,21 +552,21 @@ Where:
 
 # Arguments
 
-The implied volatilities are the **second** positional argument and the returns the **third**.
+The implied volatilities are the second positional argument, and the returns are the third.
 
   - `::ImpliedVolatilityPremium`: Implied volatility premium algorithm.
-  - `iv`: Implied volatility matrix (observations × assets); the last row is used.
-  - `::Any`: Asset returns matrix (unused).
-  - `ivpa`: Implied volatility premium adjustment factor (scalar or vector).
+  - `iv`: Implied volatility matrix `observations × assets`. The method reads its last row.
+  - `::Any`: Asset returns matrix. The method does not read it.
+  - `ivpa`: Implied volatility premium adjustment factor, a scalar or a vector.
 
 # Validation
 
-  - Every entry of `ivpa` is finite and strictly positive. A non-positive factor turns a volatility negative, and `StatsBase.cor2cov!` hides the sign: it squares the factor on the diagonal, so a negative scalar returns the matrix its absolute value returns, and a negative entry of a vector flips the sign of every covariance of that asset alone. Both answers stay positive definite, so [`matrix_processing!`](@ref) finds nothing to repair and no later step sees the defect.
-  - A vector `ivpa` carries one entry per asset. A wrong length raises a `DimensionMismatch` from the broadcast.
+  - Each entry of `ivpa` is finite and strictly positive. A factor that is not positive makes a negative volatility, and `StatsBase.cor2cov!` hides its sign. That function squares the factor on the diagonal. So a negative scalar gives the same matrix as its absolute value, and a negative entry of a vector flips the sign of each covariance of that asset only. Both results stay positive definite, so [`matrix_processing!`](@ref) finds no defect, and no later step sees it.
+  - A vector `ivpa` has one entry for each asset. A vector of a different length raises a `DimensionMismatch` from the broadcast.
 
 # Returns
 
-  - `rv::AbstractArray`: Predicted realised volatilities (last row of `iv` divided by `ivpa`).
+  - `rv::AbstractArray`: The predicted realised volatilities, which are the last row of `iv` divided by `ivpa`.
 
 # Examples
 
@@ -596,9 +598,9 @@ end
 """
     predict_realised_vols(alg::ImpliedVolatilityRegression, iv::MatNum, X::MatNum, ::Any)
 
-Predict realised volatilities using a regression model fitted on implied and realised volatility.
+Predicts the realised volatility of each asset from a regression on its implied and realised volatilities.
 
-For each asset, this function fits a regression model relating the implied volatility and the realised volatility of one window to the realised volatility of the next window, then predicts from the last window. The windows are the blocks of [`realised_vol`](@ref) and the rows of [`implied_vol`](@ref), so both series are read over the same rows of the sample.
+For each asset, the function regresses the realised volatility of a window on the implied volatility and the realised volatility of the window before. It then predicts the next window from the last window. The windows are the blocks of [`realised_vol`](@ref) and the rows of [`implied_vol`](@ref), so the two series read the same rows of the sample.
 
 # Mathematical definition
 
@@ -627,40 +629,40 @@ Where:
   - ``\\varepsilon_c``: Regression residual.
   - $(math_dict[:T])
 
-The fit takes ``C - 1`` rows, so ``C`` must exceed two for the model to have more rows than coefficients.
+The fit has ``C - 1`` rows and three coefficients, and the method needs ``C > 2``. At ``C = 3`` the fit has fewer rows than coefficients, so the coefficients have no unique value. At ``C = 4`` the fit has no residual. The fit has more rows than coefficients only when ``C > 4``.
 
-This is Equation 5 of [christensenprabhala1998](@cite), which regresses the log realised volatility of period ``t`` on the log implied volatility at the start of ``t`` and the log realised volatility of period ``t - 1``. Section 2.2 of that work defines both as natural logarithms, and the realised volatility as the sample standard deviation of the returns of the period. Section 3.3 of that work forecasts one period ahead from the fitted equation and states no back-transformation. Taking the exponential of the fitted logarithm is this library's choice.
+This is Equation 5 of [christensenprabhala1998](@cite). It regresses the log realised volatility of period ``t`` on the log implied volatility at the start of ``t`` and on the log realised volatility of period ``t - 1``. Section 2.2 of that work defines both as natural logarithms. It defines the realised volatility as the sample standard deviation of the returns of the period. Section 3.3 of that work forecasts one period ahead from the fitted equation, and it states no back-transformation. The exponential of the fitted logarithm is the choice of this library.
 
 # Algorithm
 
  1. Read `T` and `N` from `size(X)`, and set `chunk` to `div(T, alg.ws)`.
  2. Check that `chunk` exceeds two.
- 3. Call [`realised_vol`](@ref) with `alg.ve`, giving `rv`, the realised volatility of every window.
- 4. Call [`implied_vol`](@ref) on `iv`, giving `iv`, the implied volatility at the last row of every window. The window count comes from `X`, so `iv` is read over the rows of the returns sample.
- 5. Check that `rv` and `iv` have the same size.
+ 3. Call [`realised_vol`](@ref) with `alg.ve`. The result is `rv`, the realised volatility of each window.
+ 4. Call [`implied_vol`](@ref) on `iv` with the same `chunk`, `T` and `N`. The result replaces `iv`, and holds the implied volatility at the last row of each window. The window count comes from `X`, so the function reads `iv` over the rows of the returns sample.
+ 5. Check that `rv` and `iv` have the same size. Set `T2` to their number of rows, which is `chunk`.
  6. Replace `rv` and `iv` by their natural logarithms.
- 7. Build `ovec`, the intercept column of ones, of length `T2 - 1`.
- 8. For each asset `i`, build the design matrix `X_t` from `ovec` and the first `T2 - 1` rows of `iv` and `rv`, the response `y_t` from rows `2:T2` of `rv`, and the prediction row `X_p` from row `T2`.
- 9. Fit `alg.re` on `X_t` and `y_t`, giving `fri`, then predict from `X_p` and exponentiate, giving `rv_p[i]`.
+ 7. Make `ovec`, the intercept column of ones, of length `T2 - 1`.
+ 8. For each asset `i`, make the design matrix `X_t` from `ovec` and the first `T2 - 1` rows of `iv` and `rv`. Make the response `y_t` from the rows `2:T2` of `rv`, and the prediction row `X_p` from the row `T2`.
+ 9. Fit `alg.re` on `X_t` and `y_t`. Predict from `X_p` with the fit, and set `rv_p[i]` to the exponential of the prediction.
 10. Return `rv_p`.
 
 # Arguments
 
-The implied volatilities are the **second** positional argument and the returns the **third**. Both are matrices of the same size, so a call that swaps them is well typed and silently wrong.
+The implied volatilities are the second positional argument, and the returns are the third. The two matrices have the same size, so a call that swaps them raises no error and returns a wrong answer.
 
-  - `alg`: Implied volatility regression algorithm specifying the variance estimator, the window size and the regression target.
-  - `iv`: Implied volatility matrix (observations × assets).
-  - `X`: Asset returns matrix (observations × assets) used to compute realised volatility. It also fixes the window count, so `iv` must have as many rows as `X`.
-  - `::Any`: Ignored (placeholder for `ivpa`).
+  - `alg`: Implied volatility regression algorithm. It gives the variance estimator, the window size and the regression target.
+  - `iv`: Implied volatility matrix `observations × assets`.
+  - `X`: Asset returns matrix `observations × assets`, from which the function computes the realised volatility. It also sets the number of windows, so `iv` must have as many rows as `X`.
+  - `::Any`: The place of `ivpa`. The method does not read it.
 
 # Validation
 
-  - `chunk > 2` (i.e., there must be more than 2 windows of data to fit the regression).
-  - `size(rv) == size(iv)`, one realised volatility per implied volatility.
+  - `chunk > 2`. The regression needs more than two windows of data.
+  - `size(rv) == size(iv)`, one realised volatility for each implied volatility.
 
 # Returns
 
-  - `rv_p::Vector{<:Number}`: Predicted next-period realised volatilities (one per asset).
+  - `rv_p::Vector{<:Number}`: The predicted realised volatility of each asset for the next window.
 
 # Related
 
@@ -715,7 +717,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Refuses a fit of an [`ImpliedVolatility`](@ref) estimator that receives no implied volatilities.
 
-The estimator scales a correlation by the realised volatilities that it predicts from `iv`, so it has no answer without them. A [`prior`](@ref) over a [`ReturnsResult`](@ref) gives `rd.iv` to every member, and `rd.iv` is `nothing` when the returns carry no implied volatilities. So the keyword `iv` of each method of `cov` and `cor` admits `nothing`, and this function refuses it with an error that names the input and the remedy.
+The estimator scales a correlation by the realised volatilities that it predicts from `iv`, so it cannot compute a result without them. A [`prior`](@ref) over a [`ReturnsResult`](@ref) gives `rd.iv` to each estimator that it holds. `rd.iv` is `nothing` when the returns have no implied volatilities. So the `iv` keyword of each `cov` and `cor` method accepts `nothing`. This function then refuses `nothing` with an error that names the input and the remedy.
 
 # Arguments
 
@@ -723,7 +725,7 @@ The estimator scales a correlation by the realised volatilities that it predicts
 
 # Validation
 
-  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise.
+  - `iv` is not `nothing`. Otherwise the function throws an `IsNothingError`.
 
 # Returns
 
@@ -743,9 +745,9 @@ end
     Statistics.cov(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                    iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 
-Compute the covariance matrix using implied volatility scaling.
+Returns the covariance matrix of `X`, scaled by the realised volatilities that `ce.alg` predicts from `iv`.
 
-This method computes the correlation matrix of `X` using the base estimator in `ce`, then predicts realised volatilities from `iv` using the implied volatility algorithm in `ce.alg`. The predicted realised volatilities are used to convert the correlation matrix to a covariance matrix, which is then post-processed by the matrix processing estimator `ce.mp`.
+This method computes the correlation matrix of `X` with the base estimator `ce.ce`. It predicts the realised volatilities from `iv` with the algorithm `ce.alg`, and converts the correlation matrix to a covariance matrix with those volatilities. The matrix processing estimator `ce.mp` then processes the result.
 
 # Mathematical definition
 
@@ -758,39 +760,39 @@ This method computes the correlation matrix of `X` using the base estimator in `
 Where:
 
   - $(math_dict[:Sigma_hat])
-  - ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})``: Correlation matrix from asset returns, computed by `ce.ce`.
-  - ``\\hat{\\boldsymbol{\\sigma}}^{\\mathrm{rv}}``: Predicted realised volatilities, from ``\\mathbf{iv} / \\sqrt{\\mathrm{ppy}}``, where ``\\mathrm{ppy}`` is `ce.ppy`, the number of periods of `X` in one year.
+  - ``\\hat{\\boldsymbol{\\rho}} = \\operatorname{cor}(\\mathbf{X})``: Correlation matrix of the asset returns, from `ce.ce`.
+  - ``\\hat{\\boldsymbol{\\sigma}}^{\\mathrm{rv}}``: Predicted realised volatilities, from ``\\mathbf{iv} / \\sqrt{\\mathrm{ppy}}``. ``\\mathrm{ppy}`` is `ce.ppy`, the number of periods of `X` in one year.
 
-The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is therefore the square of the predicted realised volatility of each asset, and never a unit.
+So each diagonal entry of ``\\hat{\\mathbf{\\Sigma}}`` is the square of the predicted realised volatility of that asset, not one.
 
 # Algorithm
 
- 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
- 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref), and a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
- 3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `sigma`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it. Every other shipped estimator absorbs it into its own `kwargs...` and ignores it.
- 4. Divide `iv` by `sqrt(ce.ppy)`, converting the annualised implied volatility to the frequency of `X`.
- 5. Call [`predict_realised_vols`](@ref) with `ce.alg`, giving `iv`, one predicted realised volatility per asset. The implied volatilities are the second argument and the returns the third.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref). It checks `dims`, and it transposes both matrices when `dims` is `2`.
+ 2. Check that `X` and `iv` have the same size, so that row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref). Refuse a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
+ 3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`. The result is `sigma`, the base correlation matrix. The call forwards the oriented `iv`, so a base estimator that reads its own implied volatility series receives it. A nested [`ImpliedVolatility`](@ref) is such an estimator. Each other estimator of the library takes `iv` into its own `kwargs...` and does not read it.
+ 4. Divide `iv` by `sqrt(ce.ppy)`. This converts the annual implied volatility to the frequency of `X`.
+ 5. Call [`predict_realised_vols`](@ref) with `ce.alg`. The result replaces `iv`, and holds one predicted realised volatility for each asset. The implied volatilities are the second argument, and the returns are the third.
  6. Scale `sigma` in place with `StatsBase.cor2cov!`, which applies the closed form above.
- 7. Post-process `sigma` in place with [`matrix_processing!`](@ref) and `ce.mp`.
+ 7. Process `sigma` in place with [`matrix_processing!`](@ref) and `ce.mp`.
 
 # Arguments
 
   - `ce`: Implied volatility covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional pre-computed mean (passed to the base estimator).
-  - `iv`: Implied volatility matrix, annualised, oriented as `X` and of the same size.
-  - `ivpa`: Optional implied volatility premium adjustment factor (required for [`ImpliedVolatilityPremium`](@ref)).
-  - `kwargs...`: Additional keyword arguments passed to the base estimator.
+  - `mean`: Optional precomputed mean. The method gives it to the base estimator.
+  - `iv`: Annual implied volatility matrix, with the orientation and the size of `X`.
+  - `ivpa`: Optional implied volatility premium adjustment factor. [`ImpliedVolatilityPremium`](@ref) needs it.
+  - `kwargs...`: More keyword arguments for the base estimator and for [`matrix_processing!`](@ref).
 
 # Validation
 
-  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
-  - `dims in (1, 2)`, by [`dims_oriented`](@ref).
-  - `size(X) == size(iv)`, one implied volatility per return.
-  - Every entry of `X` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
-  - Every entry of `iv` is finite and non-negative. A `DomainError` is thrown otherwise. A gap is refused for the reason of `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, whose sign `StatsBase.cor2cov!` hides, and [`ImpliedVolatilityRegression`](@ref) takes its logarithm.
-  - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
+  - `iv` is not `nothing`. Otherwise [`assert_implied_volatility`](@ref) throws an `IsNothingError`.
+  - `dims in (1, 2)`. [`dims_oriented`](@ref) checks it.
+  - `size(X) == size(iv)`, one implied volatility for each return.
+  - Each entry of `X` is finite. Otherwise the method throws an `IsNonFiniteError`. The panel method removes an asset with a gap from the Coverage Universe, and this check keeps the plain call in agreement with it. Without the check, a plain call reads past the gap and gives a value for an asset that the panel method does not price.
+  - Each entry of `iv` is finite and not negative. Otherwise the method throws a `DomainError`. The method refuses a gap in `iv` for the same reason as a gap in `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, and `StatsBase.cor2cov!` hides its sign. [`ImpliedVolatilityRegression`](@ref) takes the logarithm of each entry.
+  - The checks of `ce.alg`, through [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, with each entry finite and strictly positive.
 
 # Returns
 
@@ -822,41 +824,41 @@ end
     Statistics.cor(ce::ImpliedVolatility, X::MatNum; dims::Int = 1, mean = nothing,
                    iv::Option{<:MatNum} = nothing, ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
 
-Compute the correlation matrix using implied volatility scaling.
+Returns the base correlation matrix of `X`, after the same checks as the covariance method.
 
-This method computes the correlation matrix of `X` using the base estimator in `ce`, normalises it, then post-processes it with the matrix processing estimator `ce.mp`.
+This method computes the correlation matrix of `X` with the base estimator `ce.ce`. It normalises the matrix, and processes it with the matrix processing estimator `ce.mp`.
 
-A correlation is scale free, so the predicted realised volatilities cannot move the answer, and the returned matrix is the base correlation of `X`. The volatility model runs even so, because `cor` must refuse every configuration `cov` refuses: a `ce.alg` that cannot answer the call raises here as it does in `cov`. Its prediction is discarded, and never multiplied into `rho` and divided back out again.
+A correlation has no scale, so the predicted realised volatilities cannot change it. The result is the base correlation of `X`. The volatility model runs in `cor` too, because `cor` must refuse each configuration that `cov` refuses. So a `ce.alg` that cannot answer the call raises an error here, as it does in `cov`. The method discards the prediction. It does not multiply `rho` by the prediction and then divide the prediction out again.
 
-That round trip was the identity in exact arithmetic alone. In floating point the round-off of one multiplication and one division moved an off-diagonal entry, and a predicted volatility of zero made the second call divide zero by zero. One asset whose last implied volatility was zero therefore turned a whole row and column of the correlation into `NaN`, and `matrix_processing!` raised on a matrix that carried no defect of its own.
+That round trip is the identity only in exact arithmetic. In floating point, the round-off of one multiplication and one division moves an off-diagonal entry. A predicted volatility of zero also makes the division compute zero divided by zero. So one asset with a last implied volatility of zero turns a full row and column of the correlation into `NaN`. Then `matrix_processing!` raises an error on a matrix that has no defect of its own.
 
 # Algorithm
 
- 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes both when `dims` is `2`.
- 2. Check that `X` and `iv` have the same size, so row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref), and a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
- 3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`, giving `rho`, the base correlation matrix. The oriented `iv` is forwarded so that a base estimator that reads its own implied volatility series, such as a nested [`ImpliedVolatility`](@ref), receives it.
- 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs for its raises alone, and `iv` is divided by `sqrt(ce.ppy)` for it exactly as it is in `cov`.
- 5. Normalise `rho` in place with `StatsBase.cov2cor!`, which divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. The call also mirrors the lower triangle into the upper one, clamps every off-diagonal entry into `[-1, 1]`, and sets the diagonal to exactly one. The exact diagonal is what step 6 needs: [`matrix_processing!`](@ref) reads the value of the diagonal to decide whether it holds a correlation matrix or a covariance matrix.
- 6. Post-process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
+ 1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Orient `X` and `iv` to `observations × assets` with [`dims_oriented`](@ref). It checks `dims`, and it transposes both matrices when `dims` is `2`.
+ 2. Check that `X` and `iv` have the same size, so that row `t` of `iv` is the implied volatility of observation `t` of `X`. Refuse a gap in `X` with [`assert_finite_sample`](@ref). Refuse a gap or a negative entry in `iv` with [`assert_nonempty_nonneg_finite_val`](@ref).
+ 3. Call `Statistics.cor(library_covariance_estimator(ce.ce), X; dims = 1, mean = mean, iv = iv, kwargs...)`. The result is `rho`, the base correlation matrix. The call forwards the oriented `iv`, so a base estimator that reads its own implied volatility series receives it. A nested [`ImpliedVolatility`](@ref) is such an estimator.
+ 4. Call [`predict_realised_vols`](@ref) with `ce.alg` and `iv / sqrt(ce.ppy)`, and discard the result. The call runs only for its errors. It divides `iv` by `sqrt(ce.ppy)`, as `cov` does.
+ 5. Normalise `rho` in place with `StatsBase.cov2cor!`. It divides the entry in row `i` and column `j` by the square roots of the diagonal entries `i` and `j`. It also copies the lower triangle into the upper triangle, clamps each off-diagonal entry into `[-1, 1]`, and sets each diagonal entry to one. Step 6 needs that diagonal of ones, because [`matrix_processing!`](@ref) reads the diagonal to find whether the matrix is a correlation matrix or a covariance matrix.
+ 6. Process `rho` in place with [`matrix_processing!`](@ref) and `ce.mp`.
 
 # Arguments
 
   - `ce`: Implied volatility covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `mean`: Optional pre-computed mean (passed to the base estimator).
-  - `iv`: Implied volatility matrix, annualised, oriented as `X` and of the same size.
-  - `ivpa`: Optional implied volatility premium adjustment factor (required for [`ImpliedVolatilityPremium`](@ref)).
-  - `kwargs...`: Additional keyword arguments passed to the base estimator.
+  - `mean`: Optional precomputed mean. The method gives it to the base estimator.
+  - `iv`: Annual implied volatility matrix, with the orientation and the size of `X`.
+  - `ivpa`: Optional implied volatility premium adjustment factor. [`ImpliedVolatilityPremium`](@ref) needs it.
+  - `kwargs...`: More keyword arguments for the base estimator and for [`matrix_processing!`](@ref).
 
 # Validation
 
-  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
-  - `dims in (1, 2)`, by [`dims_oriented`](@ref).
-  - `size(X) == size(iv)`, one implied volatility per return.
-  - Every entry of `X` is finite. An `IsNonFiniteError` is thrown otherwise. The panel method excludes an asset with a gap from the Coverage Universe, so a plain call that read past the gap would answer for an asset that the panel method does not price.
-  - Every entry of `iv` is finite and non-negative. A `DomainError` is thrown otherwise. A gap is refused for the reason of `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, whose sign `StatsBase.cor2cov!` hides, and [`ImpliedVolatilityRegression`](@ref) takes its logarithm.
-  - Whatever `ce.alg` refuses, by [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, and whose every entry is finite and strictly positive.
+  - `iv` is not `nothing`. Otherwise [`assert_implied_volatility`](@ref) throws an `IsNothingError`.
+  - `dims in (1, 2)`. [`dims_oriented`](@ref) checks it.
+  - `size(X) == size(iv)`, one implied volatility for each return.
+  - Each entry of `X` is finite. Otherwise the method throws an `IsNonFiniteError`. The panel method removes an asset with a gap from the Coverage Universe, and this check keeps the plain call in agreement with it. Without the check, a plain call reads past the gap and gives a value for an asset that the panel method does not price.
+  - Each entry of `iv` is finite and not negative. Otherwise the method throws a `DomainError`. The method refuses a gap in `iv` for the same reason as a gap in `X`. [`ImpliedVolatilityPremium`](@ref) turns a negative entry into a negative volatility, and `StatsBase.cor2cov!` hides its sign. [`ImpliedVolatilityRegression`](@ref) takes the logarithm of each entry.
+  - The checks of `ce.alg`, through [`predict_realised_vols`](@ref). [`ImpliedVolatilityPremium`](@ref) needs an `ivpa` that is not `nothing`, with each entry finite and strictly positive.
 
 # Returns
 
@@ -888,14 +890,14 @@ end
     coverage_reduced_ivpa(ivpa::Option{<:Number}, cmsk) -> Option{<:Number}
     coverage_reduced_ivpa(ivpa::VecNum, cmsk::BitVector) -> VecNum
 
-Reduce a per-asset implied volatility premium to the Coverage Universe.
+Reduces a per-asset implied volatility premium to the Coverage Universe.
 
-A scalar premium applies to every asset, so it survives the reduction untouched. A vector premium carries one entry per asset, so it takes the same slice `X` takes.
+A scalar premium applies to each asset, so the function returns it unchanged. A vector premium has one entry for each asset, so the function slices it as the caller slices `X`.
 
 # Arguments
 
-  - `ivpa`: The implied volatility premium adjustment, a scalar, a vector, or `nothing`.
-  - `cmsk`: The Coverage Universe, or `nothing`.
+  - `ivpa`: The implied volatility premium adjustment factor, as a scalar, a vector, or `nothing`.
+  - `cmsk`: The Coverage Universe as a mask of the assets, or `nothing`.
 
 # Returns
 
@@ -922,18 +924,18 @@ end
     reads_implied_volatility(p::Pair) -> Bool
     reads_implied_volatility(x) -> Bool
 
-Answer whether an estimator tree holds an [`ImpliedVolatility`](@ref), which reads the implied volatility surface `iv`.
+Returns `true` when an estimator tree holds an [`ImpliedVolatility`](@ref), which reads the implied volatility surface `iv`.
 
-The reduce-and-expand root of a moment verb, [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), reads the answer. A gap in the surface puts an asset outside the Coverage Universe only of a fit that reads the surface. A wrapper that holds an `ImpliedVolatility` and has no panel method of its own reaches the root, so the root must know that the tree reads the surface.
+The reduce-and-expand root of a moment verb, [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum, pnl::Option{<:AssetPanel}; dims::Int = 1, kwargs...)`](@ref), reads the result. A gap in the surface removes an asset from the Coverage Universe only for a fit that reads the surface. A wrapper that holds an `ImpliedVolatility` and has no panel method of its own reaches the root. So the root must know that the tree reads the surface.
 
 # Algorithm
 
-The method that Julia selects is the algorithm.
+Each step is one method, and Julia selects the method from the type of the argument.
 
- 1. An `ImpliedVolatility` answers `true`.
- 2. Any other estimator answers `true` when one of its fields answers `true`. A covariance estimator subtypes `StatsBase.CovarianceEstimator` and not `AbstractEstimator`, so the method takes both roots.
- 3. A vector of estimators answers `true` when one of its entries answers `true`, and a vector of numbers answers `false`. A `Pair` answers for its value.
- 4. Everything else answers `false`.
+ 1. An `ImpliedVolatility` returns `true`.
+ 2. Each other estimator returns `true` when one of its fields returns `true`. A covariance estimator subtypes `StatsBase.CovarianceEstimator` and not `AbstractEstimator`, so the method takes both supertypes.
+ 3. A vector of estimators returns `true` when one of its entries returns `true`. A vector of numbers returns `false`. A `Pair` returns the result for its value.
+ 4. Each other value returns `false`.
 
 # Arguments
 
@@ -976,19 +978,20 @@ end
                    active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing,
                    kwargs...) -> MatNum
 
-Fit an implied volatility estimate on the Coverage Universe, and expand it to the full asset universe.
+Fits an implied volatility estimate on the Coverage Universe, and expands it to the full asset universe.
 
-[`ImpliedVolatility`](@ref) overrides the reduce-and-expand root of its verb because it reads two more per-asset inputs than the root knows about: the implied volatility surface `iv`, which is `observations × assets`, and the premium `ivpa`, which is one number per asset where it is a vector. Both take the slice `X` takes, so that the three inputs describe the same universe.
+[`ImpliedVolatility`](@ref) has its own method of the reduce-and-expand root of its verb. The reason is that it reads two per-asset inputs that the root does not know. One is the implied volatility surface `iv`, `observations × assets`. The other is the premium `ivpa`, which has one number for each asset when it is a vector. Both take the slice that `X` takes, so the three inputs describe the same universe.
 
-The surface also *narrows* that universe. An implied volatility is padded `NaN` where it is silent, exactly as a return is, so the Coverage Universe of this fit is the one [`coverage_mask`](@ref) derives: an asset whose returns are complete but whose implied volatilities are not is excluded from the fit, and [`expand_moment`](@ref) writes its `NaN` row and column.
+The surface can also make that universe smaller. An implied volatility holds `NaN` where it has no value, as a return does. So the Coverage Universe of this fit is the one that [`coverage_mask`](@ref) finds from `X` and `iv`. The fit excludes an asset whose returns are complete but whose implied volatilities are not. [`expand_moment`](@ref) then writes `NaN` into the row and the column of that asset.
 
 # Algorithm
 
  1. Refuse a call with no `iv` through [`assert_implied_volatility`](@ref). Check `dims`, and orient `X` and `iv` to `observations × assets`.
- 2. Derive the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref). It reads `active_mask` in the place of the active mask of `pnl` when the caller gives one, through [`coverage_mask_source`](@ref).
- 3. Slice `X`, `iv` and `ivpa` onto it.
- 4. Call the two-argument method on the clean block.
- 5. Expand the matrix with [`expand_moment`](@ref).
+ 2. Check that `X` and `iv` have the same size.
+ 3. Find the Coverage Universe of `X` and `iv` with [`coverage_mask`](@ref). When the caller gives `active_mask`, [`coverage_mask_source`](@ref) puts it in the place of the active mask of `pnl`.
+ 4. Slice `X`, `iv` and `ivpa` to the Coverage Universe.
+ 5. Call the two-argument method on the slices.
+ 6. Expand the matrix with [`expand_moment`](@ref).
 
 # Arguments
 
@@ -998,20 +1001,20 @@ The surface also *narrows* that universe. An implied volatility is padded `NaN` 
   - $(arg_dict[:dims])
   - $(arg_dict[:omean])
   - `iv`: Implied volatility surface `observations × assets`.
-  - `ivpa`: Implied volatility premium adjustment.
+  - `ivpa`: Implied volatility premium adjustment factor, or `nothing`.
   - $(arg_dict[:cvg_active_mask])
-  - `kwargs...`: Additional keyword arguments passed to the two-argument method.
+  - `kwargs...`: More keyword arguments for the two-argument method.
 
 # Validation
 
-  - `iv` is not `nothing`. An `IsNothingError` is thrown otherwise, by [`assert_implied_volatility`](@ref).
+  - `iv` is not `nothing`. Otherwise [`assert_implied_volatility`](@ref) throws an `IsNothingError`.
   - $(val_dict[:dims])
   - `size(X) == size(iv)`.
-  - At least one asset must be covered.
+  - The Coverage Universe holds at least one asset.
 
 # Returns
 
-  - `sigma::MatNum`: The covariance matrix, or the correlation matrix, on the full asset universe.
+  - `sigma::MatNum`: The covariance matrix or the correlation matrix on the full asset universe.
 
 # Related
 

@@ -799,7 +799,8 @@ end
                                                                                          ws = 126)),
                                      X; iv = iv)
         # Three windows is the smallest the fit accepts, and it stays finite there. This is
-        # the oracle's own floor of three folds.
+        # the oracle's own floor of three folds. There the fit has two rows for three
+        # coefficients, and #1796 asks whether to raise the floor.
         @test all(isfinite,
                   diag(cov(ImpliedVolatility(; ppy = 252,
                                              alg = ImpliedVolatilityRegression(; ws = 84)),
