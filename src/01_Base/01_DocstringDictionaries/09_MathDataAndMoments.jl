@@ -5,7 +5,7 @@
 unique_key_dict!(math_dict, :math_dict,
                  # Data, target and linear constraints.
                  :Xv => "``\\boldsymbol{X}``: Data vector `observations × 1`.",#
-                 :tgt => "``t``: Target value, usually the unweighted (or weighted) expected value ``E[\\boldsymbol{X}]``.",#
+                 :tgt => "``t``: Target value. It is usually the expected value ``E[\\boldsymbol{X}]``, weighted or unweighted.",#
                  :A => "``\\mathbf{A}``: Constraint coefficient matrix.",#
                  :B => "``\\boldsymbol{B}``: Constraint response vector.",#
                  :x => "``\\boldsymbol{x}``: Constrained variable.",#

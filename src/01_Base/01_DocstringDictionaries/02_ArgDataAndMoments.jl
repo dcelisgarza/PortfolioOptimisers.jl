@@ -44,7 +44,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :metric_args => "`args`: More positional arguments, which `Distances.pairwise` takes after the series.",#
                  :metric_kwargs => "`kwargs`: More keyword arguments for `Distances.pairwise`.",#
                  :t => "`t`: Threshold value.",#
-                 :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
+                 :oiv => "`iv`: Optional implied volatility matrix. The estimator reads it only when one of its inner covariance estimators is an [`ImpliedVolatility`](@ref).",#
                  ## Regression
                  :M => "`M`: Loadings matrix `assets × factors`.",#
                  :L => "`L`: Loadings matrix `assets × reduced_dimensions` in the reduced basis of a dimension reduction.",#

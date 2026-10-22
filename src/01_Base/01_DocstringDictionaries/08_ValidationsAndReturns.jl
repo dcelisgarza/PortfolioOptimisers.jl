@@ -74,11 +74,11 @@ unique_key_dict!(ret_dict, :ret_dict,
                  :Ddist => "`D::MatNum`: Distance matrix `assets x assets`, in the units the distance algorithm defines.",#
                  :nbins => "`nbins::Integer`: Number of histogram bins for the variable pair.",#
                  :dx => "`dx::Number`: Optimal histogram bin width.",#
-                 :sigrho => "`sigrho::MatNum`: Covariance/correlation matrix `assets x assets`.",#
+                 :sigrho => "`sigrho::MatNum`: Covariance or correlation matrix, `assets × assets`.",#
                  :cskew => "`cskew::MatNum`: Coskewness tensor `assets x assets²`.",#
                  :cskewV => "`V::MatNum`: Negative spectral skewness matrix `assets x assets` of the coskewness tensor, after the matrix processing.",#
                  :ckurt => "`ckurt::MatNum`: Square cokurtosis matrix `assets² x assets²`.",#
-                 :me => "`me`: New expected returns estimator of the same type as the argument, with the appropriate weights applied.",#
+                 :me => "`me`: New expected returns estimator of the same type as the argument, with the new weights applied.",#
                  :ce => "`ce`: New covariance estimator of the same type as the argument, with the new weights applied.",#
                  :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
                  :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
