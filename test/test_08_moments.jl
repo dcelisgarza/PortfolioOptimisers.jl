@@ -1544,6 +1544,17 @@
         @test eltype(V462c) <: Real
         @test isapprox(V462c, [0.0 -0.5; -0.5 0.0])
 
+        # A tensor with no finite per-asset diagonal has no block, so `assert_finite_block`
+        # does not run and `eigen` raises on the first block, as step 2 states.
+        err462 = try
+            PortfolioOptimisers.negative_spectral_coskewness(fill(NaN, N462, N462^2), X462,
+                                                             nothing)
+        catch e
+            e
+        end
+        @test err462 isa ArgumentError
+        @test occursin("Infs or NaNs", sprint(showerror, err462))
+
         # Issue #543: `mp` is optional, because `matrix_processing!` already carries a
         # `Nothing` no-op. `nothing` returns the accumulated sum untouched, so it agrees
         # with the `pdm = nothing` estimator. A processing estimator that does act on the

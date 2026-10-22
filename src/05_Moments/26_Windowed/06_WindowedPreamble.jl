@@ -612,7 +612,7 @@ The inner estimator holds the state of the fold, so the method reads it there.
 
 # Returns
 
-  - $(ret_dict[:kte])
+  - $(ret_dict[:ckurt])
 
 # Related
 
