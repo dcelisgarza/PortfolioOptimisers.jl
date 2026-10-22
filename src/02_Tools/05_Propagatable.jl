@@ -9,13 +9,13 @@
 
 The propagation tag set of [`@propagatable`](@ref), as data.
 
-One entry per field tag. The recognition layer is derived from this tuple rather than
-spelled out per tag: the macro names ([`PROP_TAG_MACRO_NAMES`](@ref)), the lookup
-([`prop_tag`](@ref)), the gate ([`is_prop_tag_call`](@ref)), the peeler
+One entry per field tag. The code that recognises a tag comes from this tuple, and no
+tag is written out in that code. The macro names ([`PROP_TAG_MACRO_NAMES`](@ref)), the
+lookup ([`prop_tag`](@ref)), the test ([`is_prop_tag_call`](@ref)), the peeler
 ([`peel_prop_tags`](@ref)) and the parser ([`propagatable_parse_body`](@ref)) all read it.
-A new propagation channel is one row here, one branch in [`prop_tag_expr`](@ref), one entry
-in [`PROP_TAG_CHANNELS`](@ref) and one stub macro; [`check_prop_tag_macros`](@ref) refuses
-to load the module when a row lacks any of the three.
+A new tag is one row here, one branch in [`prop_tag_expr`](@ref), one entry in a channel of
+[`PROP_TAG_CHANNELS`](@ref) and one stub macro. [`check_prop_tag_macros`](@ref) refuses to
+load the module when a row has no stub macro, no channel or no branch.
 
 # Related
 
@@ -33,14 +33,14 @@ const PROP_TAG_NAMES = (:fprop, :vprop, :pprop, :cprop, :wprop)
 
 The macro name of every tag of [`PROP_TAG_NAMES`](@ref), in the same order.
 
-Derived from the tag names, so a row of the table carries no second spelling.
-[`prop_tag`](@ref) matches a `:macrocall` head against this tuple.
+The tuple comes from the tag names, so a row of the table has no second spelling.
+[`prop_tag`](@ref) matches the head of a `:macrocall` against this tuple.
 
 # Algorithm
 
- 1. Map each tag of [`PROP_TAG_NAMES`](@ref) to `Symbol("@", tag)`, which is the name Julia gives that tag's macro.
+ 1. Map each tag of [`PROP_TAG_NAMES`](@ref) to `Symbol("@", tag)`, which is the name that Julia gives the macro of that tag.
 
-The map preserves the order, so the ``k``-th entry here is the macro name of the ``k``-th tag there. [`prop_tag`](@ref) and [`check_prop_tag_macros`](@ref) both walk the two tuples together, and that pairing is what the shared order guarantees.
+The map keeps the order, so the ``k``-th entry here is the macro name of the ``k``-th tag there. [`prop_tag`](@ref) and [`check_prop_tag_macros`](@ref) both walk the two tuples together, and they need this shared order to pair each tag with its macro name.
 
 # Related
 
@@ -56,22 +56,21 @@ The propagation channels of [`@propagatable`](@ref), with their tag precedence a
 
 One entry per generated method. Each entry has two tuples of tags:
 
-  - `gate`: the tags that make [`@propagatable`](@ref) emit the method at all.
-  - `precedence`: the order in which a field's tags are consulted. The first tag of this
-    tuple that the field carries decides the field's transform; the rest are ignored for
-    that channel.
+  - `gate`: the tags that make [`@propagatable`](@ref) emit the method.
+  - `precedence`: the order in which the channel reads the tags of a field. The first tag
+    of this tuple that the field carries gives the transform of the field. The channel
+    ignores the other tags of that field.
 
-The `factory` channel prefers `@fprop` over `@wprop`. The `prior` channel prefers `@pprop`,
+The `factory` channel prefers `@fprop` to `@wprop`. The `prior` channel prefers `@pprop`,
 then `@cprop`, then `@wprop`, then `@fprop`, so `@pprop` wins over `@fprop` on one field.
-The precedence used to live in two hand-written `if`/`elseif` chains that no
-comment linked; it is now read by [`prop_channel_pairs`](@ref) for every channel.
+[`prop_channel_pairs`](@ref) reads the precedence for every channel.
 
 **A tag means what its channel says it means.** The `obs` channel reads the same `@wprop`
-and `@fprop` tags as `factory` and gives them different transforms: `factory` **replaces** a
-`@wprop` field with an incoming [`ObsWeights`](@ref) value, while `obs` **indexes** the value
-already there. This is why [`prop_tag_expr`](@ref) takes the channel as well as the tag. It
-also means a weights field opts into [`obs_weights_view`](@ref) by carrying `@wprop`, with no
-second tag to write and no second tag to forget.
+and `@fprop` tags as `factory`, and it gives them different transforms. `factory`
+**replaces** a `@wprop` field with an incoming [`ObsWeights`](@ref) value, and `obs`
+**indexes** the value that the field holds. For this reason, [`prop_tag_expr`](@ref) takes
+the channel as well as the tag. A weights field joins [`obs_weights_view`](@ref)
+through its `@wprop` tag, and it needs no second tag.
 
 # Related
 
@@ -93,9 +92,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 Return the tag of [`PROP_TAG_NAMES`](@ref) that `x` names, or `nothing`.
 
 `x` is the head of a `:macrocall` node. It is a bare `Symbol` in a struct body written by
-hand, and a `GlobalRef` once another macro has expanded around it, so both spellings
-resolve. A name outside [`PROP_TAG_MACRO_NAMES`](@ref) gives `nothing`, which is how the
-callers tell a tag from any other macro; no tag falls through to another tag.
+hand, and a `GlobalRef` after another macro expanded around it, so the function resolves
+both. A name outside [`PROP_TAG_MACRO_NAMES`](@ref) gives `nothing`. The callers use this to
+tell a tag from any other macro. A name never resolves to a tag that it does not name.
 
 # Algorithm
 
@@ -103,7 +102,7 @@ callers tell a tag from any other macro; no tag falls through to another tag.
  2. Walk [`PROP_TAG_NAMES`](@ref) and [`PROP_TAG_MACRO_NAMES`](@ref) together. Return the tag whose macro name is identical to `name`.
  3. No macro name matches: return `nothing`.
 
-The comparison is `===` on a `Symbol`, so a macro whose name merely resembles a tag never matches.
+The comparison is `===` on a `Symbol`, so only an identical name matches. A macro with a similar name never matches.
 
 # Arguments
 
@@ -142,8 +141,8 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a macro call to any tag of [`PROP_TAG_NAMES`](@ref).
 
-Used by [`peel_prop_tags`](@ref) and [`propagatable_parse_body`](@ref) to detect tagged
-fields in a struct body.
+[`peel_prop_tags`](@ref) and [`propagatable_parse_body`](@ref) use it to find the tagged
+fields of a struct body.
 
 # Algorithm
 
@@ -168,12 +167,12 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Peel any stack of tag macrocalls off a field expression, recording which tags were present.
+Peel the tag macrocalls off a field expression, and record the tags.
 
-Tags may be stacked in either order (`@pprop @fprop field`), which parses as nested
-`:macrocall` nodes; this unwraps them all and returns the bare field expression. Each tag
-is looked up with [`prop_tag`](@ref), so an untagged macro stops the peel and no tag is
-reached by falling through the others.
+A field can have a stack of tags in any order, such as `@pprop @fprop field`. The stack
+parses as nested `:macrocall` nodes. This function removes all of them and returns the bare
+field expression. It finds each tag with [`prop_tag`](@ref), so a macro that is not a tag
+stops the peel.
 
 # Algorithm
 
@@ -181,7 +180,7 @@ reached by falling through the others.
  2. While [`is_prop_tag_call`](@ref) of `expr` holds, push [`prop_tag`](@ref) of its first argument onto `tags`, and replace `expr` with its **last** argument, which is the expression the tag wraps.
  3. Return `tags` and the peeled `expr`.
 
-`tags` is a set, so a tag written twice on one field is recorded once. The loop stops at the first node that is not a tag call, so a non-tag macro between two tags hides the tags below it.
+`tags` is a set, so a tag written two times on one field is recorded once. The loop stops at the first node that is not a tag call, and a macro between two tags that is not a tag hides the tags below it.
 
 # Arguments
 
@@ -212,35 +211,36 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the expression that a tag substitutes for one field, inside a generated method.
 
-This is the `name → field transform` half of the tag table: one branch per tag of
-[`PROP_TAG_NAMES`](@ref), read by [`prop_channel_pairs`](@ref) for every channel. A tag of
-the table with no branch here errors, so it cannot silently take another tag's transform.
+This function gives the field transform of each tag. It has one branch per tag of
+[`PROP_TAG_NAMES`](@ref), and [`prop_channel_pairs`](@ref) calls it for every channel. A tag
+of the table with no branch here raises an error, so it cannot take the transform of
+another tag without a sign.
 
 # Algorithm
 
-The channel is read first, and then the tag, because one tag has two transforms.
+The function reads the channel first, and then the tag, because one tag has two transforms.
 
  1. `channel` is `:obs`:
-     1. `tag` is `:wprop`: return `nothing_scalar_array_getindex(xf, thread...)`. The field **is** the weights, so it is indexed to the selected observations. Indexing keeps the `AbstractWeights` subtype, which a view would not.
+     1. `tag` is `:wprop`: return `nothing_scalar_array_getindex(xf, thread...)`. The field **is** the weights, so the method indexes it at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not.
      2. `tag` is `:fprop`: return `obs_weights_view(xf, thread...)`. The field is a composed child, so the verb recurses into it.
  2. `channel` is any other channel:
      1. `tag` is `:fprop`: return `factory_child(xf, thread..., args...; kwargs...)`.
      2. `tag` is `:vprop`: return `view_child(xf, thread..., args...)`, which calls [`port_opt_view`](@ref) on every value but a precomputed optimisation result. This channel forwards no keywords.
-     3. `tag` is `:pprop`: return `sel(xf, getproperty(pr, fname))`, which is why the field name is an argument. The prior result supplies the property of the **same name**.
-     4. `tag` is `:cprop`: return `sel(xf, _ctx(args...))`, which reads the context out of the threaded arguments rather than the prior.
+     3. `tag` is `:pprop`: return `sel(xf, getproperty(pr, fname))`. The prior result gives the property of the **same name**, so the field name is an argument.
+     4. `tag` is `:cprop`: return `sel(xf, _ctx(args...))`, which reads the context from the threaded arguments and not from the prior.
      5. `tag` is `:wprop`: return `_wprop(xf, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref).
- 3. No branch matched: raise an error naming the tag and the channel, and ask for a branch here.
+ 3. No branch matched: raise an error that names the tag and the channel, and asks for a branch here.
 
-Steps 1.1 and 2.5 are the same tag with two transforms, so the channel decides what `@wprop` means. Every emitted name is qualified against `mod`, because the expansion is escaped into the caller's module.
+Steps 1.1 and 2.5 are the same tag with two transforms, so the channel decides what `@wprop` means. Every emitted name is qualified with `mod`, because the expansion is escaped into the module of the caller.
 
 # Arguments
 
   - `tag::Symbol`: A tag of [`PROP_TAG_NAMES`](@ref).
-  - `fname::Symbol`: The field name, needed by `@pprop` to name the prior property.
-  - `xf`: The expression that reads the field off the incoming struct.
+  - `fname::Symbol`: The field name. `@pprop` needs it to name the prior property.
+  - `xf`: The expression that reads the field from the incoming struct.
   - `mod::Module`: The module that defines [`@propagatable`](@ref). Every emitted name is
-    qualified against it, because the expansion is escaped into the caller.
-  - `thread`: Extra positional arguments the channel threads before `args...`.
+    qualified with it, because the expansion is escaped into the module of the caller.
+  - `thread`: The positional arguments that the channel threads before `args...`.
 
 # Returns
 
@@ -288,20 +288,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if a channel of [`PROP_TAG_CHANNELS`](@ref) must emit a method.
 
-A channel is active when at least one field carries a tag of the channel's `gate`.
+A channel is active when at least one field carries a tag of the `gate` of the channel.
 
 # Algorithm
 
  1. Read the `gate` tuple of the channel from [`PROP_TAG_CHANNELS`](@ref).
  2. Return `true` when at least one tag of `gate` has a non-empty entry in `tagged`, and `false` otherwise.
 
-The `precedence` tuple is **not** read here, so a tag that a channel consults but does not gate on never makes that channel emit a method on its own. The `obs` channel gates on `@wprop` alone and consults `@fprop`, so a type carrying `@fprop` and no `@wprop` gains no `obs` method.
+This function does **not** read the `precedence` tuple. So a tag that a channel reads, but does not gate on, never makes that channel emit a method alone. The `obs` channel gates on `@wprop` alone and reads `@fprop`, so a type with `@fprop` and no `@wprop` gets no `obs` method.
 
 # Arguments
 
   - `channel::Symbol`: A channel name of [`PROP_TAG_CHANNELS`](@ref).
-  - `tagged::AbstractDict`: Tag name to the field names that carry it, from
-    [`propagatable_parse_body`](@ref).
+  - `tagged::AbstractDict`: Map from a tag name to the names of the fields that carry it,
+    from [`propagatable_parse_body`](@ref).
 
 # Related
 
@@ -318,32 +318,31 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the keyword pairs of the constructor call that one channel generates.
 
-Every declared field gets one pair, in declaration order. The field's tags are consulted in
-the channel's `precedence` order; the first match gives the value through
-[`prop_tag_expr`](@ref), and a field carrying no tag of the channel is passed through
-unchanged.
+Every declared field gets one pair, in declaration order. The function reads the tags of
+a field in the `precedence` order of the channel. The first match gives the value through
+[`prop_tag_expr`](@ref). A field with no tag of the channel keeps its value.
 
 # Algorithm
 
  1. Read the `precedence` tuple of the channel from [`PROP_TAG_CHANNELS`](@ref).
  2. For each field name `fname` of `all_fields`, in declaration order:
-     1. Build `xf`, the expression `obj.fname` that reads the field off the incoming struct.
+     1. Build `xf`, the expression `obj.fname` that reads the field from the incoming struct.
      2. Find `idx`, the position of the **first** tag of `precedence` that `fname` carries.
-     3. When `idx` is `nothing`, the field carries no tag of this channel: the value is `xf` itself.
-     4. Otherwise the value is [`prop_tag_expr`](@ref) of that tag, in this channel.
+     3. When `idx` is `nothing`, the field carries no tag of this channel, and the value is `xf`.
+     4. Otherwise, the value is [`prop_tag_expr`](@ref) of that tag, in this channel.
      5. Push `Expr(:kw, fname, value)` onto `pairs`.
  3. Return `pairs`.
 
-Step 2.2 is where the precedence decides one field's transform. A field carrying `@pprop` and `@fprop` takes the `@pprop` transform on the `prior` channel and the `@fprop` transform on the `factory` channel, because the two channels order the tags differently.
+In step 2.2, the precedence decides the transform of one field. A field with `@pprop` and `@fprop` takes the `@pprop` transform on the `prior` channel and the `@fprop` transform on the `factory` channel, because the two channels put the tags in different orders.
 
 # Arguments
 
   - `channel::Symbol`: A channel name of [`PROP_TAG_CHANNELS`](@ref).
-  - `tagged::AbstractDict`: Tag name to the field names that carry it.
+  - `tagged::AbstractDict`: Map from a tag name to the names of the fields that carry it.
   - `all_fields::AbstractVector{Symbol}`: Every declared field, in declaration order.
-  - `obj::Symbol`: The struct the generated method reads the fields off.
+  - `obj::Symbol`: The struct from which the generated method reads the fields.
   - `mod::Module`: The module that defines [`@propagatable`](@ref).
-  - `thread`: Extra positional arguments the channel threads before `args...`.
+  - `thread`: The positional arguments that the channel threads before `args...`.
 
 # Returns
 
@@ -374,7 +373,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return `true` if `x` is a reference to Julia's `@doc` macro (bare `Symbol` or `GlobalRef`).
 
-Used by [`propagatable_parse_body`](@ref) to recognise docstring-prefixed fields in a struct body.
+[`propagatable_parse_body`](@ref) uses it to find the fields of a struct body that have a docstring.
 
 # Algorithm
 
@@ -382,7 +381,7 @@ Used by [`propagatable_parse_body`](@ref) to recognise docstring-prefixed fields
  2. Return `true` when `x` is equal to `Symbol("@doc")`.
  3. Return `false` otherwise.
 
-Both spellings are needed for the same reason [`prop_tag`](@ref) needs both: a struct body written by hand carries the bare `Symbol`, and one that another macro has already expanded carries the `GlobalRef`.
+The function needs both spellings for the same reason as [`prop_tag`](@ref). A struct body written by hand has the bare `Symbol`, and a struct body that another macro expanded has the `GlobalRef`.
 
 # Related
 
@@ -396,20 +395,21 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Extract the field name `Symbol` from a bare field or `field::Type` expression.
 
-Errors with a descriptive message when `expr` is neither a bare `Symbol` nor a
-`field::Type` annotation, since only those forms are valid after [`@fprop`](@ref).
+The function raises an error that names `expr` when `expr` is neither a bare `Symbol` nor a
+`field::Type` annotation. Only those two forms are valid after a tag such as
+[`@fprop`](@ref).
 
 # Algorithm
 
  1. `expr` is a `Symbol`: return it.
  2. `expr` is an `Expr` whose head is `:(::)`: return its first argument, which is the field name.
- 3. `expr` is anything else: raise an error naming the expression.
+ 3. `expr` is any other expression: raise an error that names the expression.
 
-Step 3 is what separates this function from [`try_field_name`](@ref), which returns `nothing` in the same case. A tag states that the node **is** a field, so a node that is not one is a defect in the struct body and not a node to skip.
+Step 3 is the difference from [`try_field_name`](@ref), which returns `nothing` in the same case. A tag states that the node **is** a field. So a node that is not a field is a defect in the struct body, and the function does not skip it.
 
 # Arguments
 
-  - `expr`: A `Symbol`, an `Expr` with head `:(::)`, or any other expression (triggers an error).
+  - `expr`: A `Symbol`, an `Expr` with head `:(::)`, or any other expression, which raises an error.
 
 # Returns
 
@@ -425,38 +425,38 @@ function extract_field_name(expr)
     if expr isa Expr && expr.head == :(::)
         return expr.args[1]
     end
-    return error("@propagatable: @fprop must precede a bare field name or field::Type, got: $(repr(expr))")
+    return error("@propagatable: a propagation tag must precede a bare field name or field::Type, got: $(repr(expr))")
 end
 extract_field_name(expr::Symbol) = expr
 
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Recursively unwrap macro call chains to locate the innermost `:struct` node.
+Find the innermost `:struct` node of a chain of macro calls, through a recursion.
 
-Returns `(struct_node, rebuild_fn)` where `rebuild_fn(new_struct)` reconstructs the
-original macro chain with `new_struct` in place of the original struct. This allows
-[`@propagatable`](@ref) to inject modified struct definitions back into arbitrary macro
-wrappers such as `@concrete`.
+The function returns `(struct_node, rebuild_fn)`. `rebuild_fn(new_struct)` builds the
+original macro chain again, with `new_struct` in place of the original struct. So
+[`@propagatable`](@ref) can put a changed struct definition back inside any wrapping
+macro, such as `@concrete`.
 
 # Algorithm
 
- 1. `expr` is not an `Expr`: raise an error naming its type.
- 2. `expr` has head `:struct`: return `expr` itself and `identity`, which rebuilds nothing.
+ 1. `expr` is not an `Expr`: raise an error that names its type.
+ 2. `expr` has head `:struct`: return `expr` and `identity`, which rebuilds nothing.
  3. `expr` has head `:macrocall`: take `inner`, its **last** argument, and call this function again on it. That call gives `struct_node` and `rebuild`. Read `prefix`, every argument of `expr` except the last. Return `struct_node` and the function `s -> Expr(:macrocall, prefix..., rebuild(s))`.
- 4. `expr` has any other head: raise an error naming the head.
+ 4. `expr` has any other head: raise an error that names the head.
 
-Step 3 rebuilds the chain from the inside out, so a struct wrapped in several macros comes back wrapped in the same macros, in the same order, with the same arguments. The prefix carries the macro's own arguments and its `LineNumberNode`, so nothing of the call is lost.
+Step 3 builds the chain again from the inside out. A struct inside several macros comes back inside the same macros, in the same order, with the same arguments. The prefix holds the arguments of the macro and its `LineNumberNode`, so the rebuilt call loses nothing.
 
 # Arguments
 
-  - `expr`: A `:struct` expression or a `:macrocall` expression wrapping one.
+  - `expr`: A `:struct` expression, or a `:macrocall` expression around one.
 
 # Returns
 
   - `struct_node::Expr`: The innermost `:struct` expression.
-  - `rebuild_fn::Function`: A function that, given a replacement `:struct`, returns the
-    full macro chain with the replacement in place of the original.
+  - `rebuild_fn::Function`: A function that takes a replacement `:struct` and returns the
+    full macro chain, with the replacement in place of the original.
 
 # Related
 
@@ -484,20 +484,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Extract the plain struct name `Symbol` from a potentially parameterised or
-supertype-constrained name expression.
+Get the plain struct name, as a `Symbol`, from a name expression that can have type
+parameters and a supertype.
 
-Handles the forms `Name`, `Name{T, ...}`, and `Name{T, ...} <: SuperType` by
-recursively peeling `:curly` and `:<:` wrappers until a bare `Symbol` is reached.
+The function accepts the forms `Name`, `Name{T, ...}` and `Name{T, ...} <: SuperType`. It
+peels the `:curly` and `:<:` nodes, through a recursion, until it gets a bare `Symbol`.
 
 # Algorithm
 
  1. `n` is a `Symbol`: return it.
  2. `n` has head `:curly`: call this function again on its first argument, which drops the type parameters.
  3. `n` has head `:<:`: call this function again on its first argument, which drops the supertype.
- 4. `n` is anything else: raise an error naming the expression.
+ 4. `n` is any other expression: raise an error that names the expression.
 
-Steps 2 and 3 compose, so `Name{T} <: Super` peels the supertype first and then the parameters.
+Steps 2 and 3 work together, so `Name{T} <: Super` loses the supertype first and then the parameters.
 
 # Arguments
 
@@ -523,20 +523,20 @@ propagatable_bare_name(n::Symbol) = n
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the field name `Symbol` for a plain field declaration, or `nothing` for
-non-field nodes.
+Return the field name, as a `Symbol`, of a plain field declaration, or `nothing` for a
+node that is not a field.
 
-Recognises bare `Symbol` fields and `field::Type` annotations. Returns `nothing` for
-`LineNumberNode`s, inner constructors, and any other expression that does not declare
-a single named field.
+The function accepts a bare `Symbol` field and a `field::Type` annotation. It returns
+`nothing` for a `LineNumberNode`, an inner constructor and every other expression that does
+not declare one named field.
 
 # Algorithm
 
  1. `expr` is a `Symbol`: return it.
  2. `expr` has head `:(::)` **and** its first argument is a `Symbol`: return that argument.
- 3. `expr` is anything else: return `nothing`.
+ 3. `expr` is any other expression: return `nothing`.
 
-Step 2 tests the first argument as well as the head, which [`extract_field_name`](@ref) does not. A node such as `::Type`, which annotates no name, therefore gives `nothing` here and reaches step 3.
+Step 2 tests the first argument as well as the head, and [`extract_field_name`](@ref) does not. So a node such as `a.b::Int`, whose first argument is not a `Symbol`, gives `nothing` here.
 
 # Arguments
 
@@ -563,38 +563,38 @@ try_field_name(expr::Symbol) = expr
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Walk a struct body, collecting the tagged field names (and all field names) and stripping
+Walk a struct body. Collect the names of the tagged fields and of all fields, and remove
 the tags from the body.
 
-Handles bare tagged fields (`@fprop field`, …), stacked tags
-(`@pprop @fprop field`, in any order), and docstring-prefixed forms
-(`"doc" \\n @fprop field`). Non-field nodes (line numbers, inner constructors) are carried
-through unchanged. The tags are the rows of [`PROP_TAG_NAMES`](@ref), so a new tag needs no
-change here.
+The function accepts a bare tagged field such as `@fprop field`, a stack of tags in any
+order such as `@pprop @fprop field`, and a field with a docstring such as
+`"doc" \\n @fprop field`. It keeps a node that is not a field, such as a line number or an
+inner constructor, with no change. The tags are the rows of [`PROP_TAG_NAMES`](@ref), so a
+new tag needs no change here.
 
 # Algorithm
 
- 1. Make `tagged`, one empty vector per tag of [`PROP_TAG_NAMES`](@ref); `all_fields`, an empty vector; and `new_args`, an empty vector for the stripped body.
+ 1. Make `tagged`, one empty vector per tag of [`PROP_TAG_NAMES`](@ref). Make `all_fields`, an empty vector, and `new_args`, an empty vector for the stripped body.
  2. For each node `arg` of the struct body, in declaration order, take one of three branches:
-     1. `arg` is a `@doc` macrocall, which is how a documented field parses. Peel the tags off `inner`, its last argument.
-         1. The field carries at least one tag: record the field name under each of its tags and in `all_fields`, then push a rebuilt `@doc` node whose last argument is the **stripped** field.
-         2. The field carries no tag: record its name in `all_fields` when [`try_field_name`](@ref) finds one, and push `arg` unchanged.
+     1. `arg` is a `@doc` macrocall, which is how a field with a docstring parses. Peel the tags off `inner`, its last argument.
+         1. The field carries at least one tag: record the field name under each of its tags and in `all_fields`. Then push a rebuilt `@doc` node whose last argument is the **stripped** field.
+         2. The field carries no tag: record its name in `all_fields` when [`try_field_name`](@ref) finds one, and push `arg` with no change.
      2. `arg` is a tag macrocall with no docstring: peel the tags, record the field name under each of them and in `all_fields`, and push the stripped field expression.
-     3. `arg` is anything else — a `LineNumberNode`, an untagged field, an inner constructor: record its name in `all_fields` when [`try_field_name`](@ref) finds one, and push `arg` unchanged.
+     3. `arg` is any other node, such as a `LineNumberNode`, an untagged field or an inner constructor: record its name in `all_fields` when [`try_field_name`](@ref) finds one, and push `arg` with no change.
  3. Return `tagged`, `all_fields`, and the new body as one `:block` expression.
 
-`all_fields` holds **every** declared field, tagged or not, and it is what makes the generated constructor call name every keyword. The returned body carries no tag, so the wrapped macros and Julia itself never see one.
+`all_fields` holds **every** declared field, with or without a tag. With it, the generated constructor call names every keyword. The returned body has no tag, so the wrapped macros and Julia never see one.
 
 # Arguments
 
-  - `body::Expr`: The `:block` expression forming the struct body.
+  - `body::Expr`: The `:block` expression of the struct body.
 
 # Returns
 
   - `tagged::Dict{Symbol, Vector{Symbol}}`: One entry per tag of [`PROP_TAG_NAMES`](@ref),
-    holding the names of the fields that carry it, in declaration order.
-  - `all_fields::Vector{Symbol}`: Names of every declared field (tagged or not).
-  - `new_body::Expr`: The struct body with all tags stripped.
+    which holds the names of the fields that carry the tag, in declaration order.
+  - `all_fields::Vector{Symbol}`: The names of every declared field, with or without a tag.
+  - `new_body::Expr`: The struct body with no tags.
 
 # Related
 
@@ -657,29 +657,28 @@ end
 """
     @fprop field
 
-Field tag for use inside a [`@propagatable`](@ref) struct body.
-Marks the field as participating in [`factory`](@ref) propagation —
-`factory_child` will be called on it when `factory` is invoked on the
-enclosing struct.
+Field tag for a [`@propagatable`](@ref) struct body. It marks a composed child for
+[`factory`](@ref) propagation. A call of `factory` on the struct calls `factory_child` on
+the field.
 
 # Algorithm
 
-The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+The tag never expands, because [`@propagatable`](@ref) runs first and removes it. The steps below tell what happens to the tagged field, not what this macro does.
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:fprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
 
- 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `factory` channel and the `obs` channel, and each active channel makes [`@propagatable`](@ref) emit one method.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `factory` channel alone, and an active channel makes [`@propagatable`](@ref) emit one method. The `obs` channel reads the tag, but it does not gate on it.
 
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
 
       + `factory` channel: `factory_child(x.field, args...; kwargs...)`, which recurses into the child.
       + `obs` channel: `obs_weights_view(x.field, i)`, which recurses into the child on the observation axis.
 
- 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+ 4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. The same tag has two transforms, because a channel decides what a tag means. The `obs` channel does not gate on `@fprop`, so a struct whose only tag is `@fprop` gains no [`obs_weights_view`](@ref) method; the tag is consulted there only when a sibling field carries [`@wprop`](@ref).
+Step 3 gives the meaning of the tag. The same tag has two transforms, because a channel decides what a tag means. The `obs` channel does not gate on `@fprop`, so a struct whose only tag is `@fprop` gets no [`obs_weights_view`](@ref) method. That channel reads the tag only when another field of the struct carries [`@wprop`](@ref).
 
-This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
 # Related
 
@@ -698,26 +697,25 @@ end
 """
     @vprop field
 
-Field tag for use inside a [`@propagatable`](@ref) struct body.
-Marks the field as participating in [`port_opt_view`](@ref) propagation —
-`port_opt_view` will be called on it when a view (index selection) is propagated
-through the enclosing struct.
+Field tag for a [`@propagatable`](@ref) struct body. It marks the field for
+[`port_opt_view`](@ref) propagation. A view of the struct at an index selection calls
+`port_opt_view` on the field.
 
-Orthogonal to [`@fprop`](@ref); the two may be stacked on one field
-(`@fprop @vprop field`) when it participates in both factory and view propagation.
+The tag is independent of [`@fprop`](@ref). A field can carry both, as
+`@fprop @vprop field`, when it takes part in factory propagation and in view propagation.
 
 # Algorithm
 
-The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+The tag never expands, because [`@propagatable`](@ref) runs first and removes it. The steps below tell what happens to the tagged field, not what this macro does.
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:vprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
- 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `view` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
- 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `view_child(x.field, i, args...)`, which is `port_opt_view(x.field, i, args...)` for every value but a precomputed optimisation result, kept as it is. The channel forwards the threaded tail and **no** keywords.
- 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `view` channel alone, and an active channel makes [`@propagatable`](@ref) emit one method.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `view_child(x.field, i, args...)`. This is `port_opt_view(x.field, i, args...)` for every value except a precomputed optimisation result, which it keeps with no change. The channel forwards the threaded tail and **no** keywords.
+ 4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. `@vprop` appears in one channel, so it carries one transform and no channel can give it a second meaning. The index that the method threads selects **assets**; the observation axis has its own verb, [`obs_weights_view`](@ref).
+Step 3 gives the meaning of the tag. `@vprop` is in one channel, so it has one transform and one meaning. The index that the method threads selects **assets**. The observation axis has its own verb, [`obs_weights_view`](@ref).
 
-This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
 # Related
 
@@ -733,27 +731,29 @@ end
 """
     @pprop field
 
-Field tag for use inside a [`@propagatable`](@ref) struct body.
-Marks the field as **prior-selected**: when `factory(x, pr::AbstractPriorResult, …)` is
-invoked, the field is set to `sel(getfield(x, :field), getproperty(pr, :field))` — the
-risk-measure value if present, else the same-named moment from the prior result.
+Field tag for a [`@propagatable`](@ref) struct body. It marks the field as
+**prior-selected**. A call `factory(x, pr::AbstractPriorResult, …)` sets the field to
+`sel(getfield(x, :field), getproperty(pr, :field))`. This is the value of the risk
+measure when it is not `nothing`, else the moment of the same name from the prior result.
 
-Orthogonal to, and stackable with, [`@wprop`](@ref) (`@pprop @wprop w` gives a weights
-field both a prior factory and an `ObsWeights` factory) or [`@fprop`](@ref); `@pprop` wins
-in the prior method. Mutually exclusive with [`@cprop`](@ref) on a single field.
+A field can carry this tag together with [`@wprop`](@ref) or [`@fprop`](@ref). For
+example, `@pprop @wprop w` gives a weights field a prior method and an `ObsWeights`
+method. `@pprop` wins in the prior method. Do not put this tag and [`@cprop`](@ref) on
+one field, because a value comes from one source. No check refuses the pair, and
+`@pprop` wins because it is first in the precedence of the `prior` channel.
 
 # Algorithm
 
-The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+The tag never expands, because [`@propagatable`](@ref) runs first and removes it. The steps below tell what happens to the tagged field, not what this macro does.
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:pprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
- 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `prior` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
- 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, getproperty(pr, :field))`. The prior result supplies the property of the **same name** as the field, so the tag names no source of its own.
- 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `prior` channel alone, and an active channel makes [`@propagatable`](@ref) emit one method.
+ 3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, getproperty(pr, :field))`. The prior result gives the property of the **same name** as the field, so the tag names no source of its own.
+ 4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. `@pprop` is first in the `prior` channel's precedence, so a field carrying both `@pprop` and [`@fprop`](@ref) takes the prior transform on that channel and the factory transform on the `factory` channel.
+Step 3 gives the meaning of the tag. `@pprop` is first in the precedence of the `prior` channel. So a field with `@pprop` and [`@fprop`](@ref) takes the prior transform on that channel and the factory transform on the `factory` channel.
 
-This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
 # Related
 
@@ -770,25 +770,25 @@ end
 """
     @cprop field
 
-Field tag for use inside a [`@propagatable`](@ref) struct body.
-Marks the field as **context-selected**: when `factory(x, pr::AbstractPriorResult, …)` is
-invoked, the field is set to `sel(getfield(x, :field), _ctx(args...))` — the risk-measure
-value if present, else the threaded optimiser value (a solver) located by type in the
-variadic tail. Used for `slv` fields, whose source is a threaded argument rather than the
-prior. Mutually exclusive with [`@pprop`](@ref) on a single field.
+Field tag for a [`@propagatable`](@ref) struct body. It marks the field as
+**context-selected**. A call `factory(x, pr::AbstractPriorResult, …)` sets the field to
+`sel(getfield(x, :field), _ctx(args...))`. This is the value of the risk measure when it
+is not `nothing`, else the threaded optimiser value, a solver, that `_ctx` finds by type in
+the tail. The `slv` fields use this tag, because their source is a threaded argument and
+not the prior. Do not put this tag and [`@pprop`](@ref) on one field.
 
 # Algorithm
 
-The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+The tag never expands, because [`@propagatable`](@ref) runs first and removes it. The steps below tell what happens to the tagged field, not what this macro does.
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:cprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
- 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `prior` channel alone, and each active channel makes [`@propagatable`](@ref) emit one method.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `prior` channel alone, and an active channel makes [`@propagatable`](@ref) emit one method.
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value: `sel(x.field, _ctx(args...))`. `_ctx` finds the value **by type** in the threaded tail, so the source is an argument and not the prior result.
- 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+ 4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. `@cprop` follows [`@pprop`](@ref) in the `prior` channel's precedence, and the two are mutually exclusive on one field.
+Step 3 gives the meaning of the tag. `@cprop` comes after [`@pprop`](@ref) in the precedence of the `prior` channel. If a field carries both, `@pprop` wins and the field ignores the context.
 
-This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
 # Related
 
@@ -804,35 +804,34 @@ end
 """
     @wprop field
 
-Field tag for use inside a [`@propagatable`](@ref) struct body.
-Marks the field as an **observation-weights slot**: when `factory(x, w::ObsWeights, …)`
-is invoked, the field is **replaced** by the incoming weights via `_wprop`; when no
-[`ObsWeights`](@ref) is threaded, it is left unchanged.
+Field tag for a [`@propagatable`](@ref) struct body. It marks the field as an
+**observation-weights slot**. A call `factory(x, w::ObsWeights, …)` **replaces** the field
+with the incoming weights through `_wprop`. When no [`ObsWeights`](@ref) is threaded, the
+field keeps its value.
 
-Distinct from [`@fprop`](@ref), which recurses into a sub-estimator value and leaves a
-`nothing` value untouched. A weights field defaults to `nothing` (meaning "uniform")
-and must become the incoming weights — so it cannot share `@fprop`'s `nothing`-handling
-without the two semantics colliding. Use `@wprop` for the `w`/weights field and `@fprop`
-for sub-estimators.
+This tag is different from [`@fprop`](@ref), which recurses into a sub-estimator and keeps
+a `nothing` value. A weights field has the default `nothing`, which means uniform weights,
+and it must take the incoming weights, which the `nothing` rule of `@fprop` does not do. Use
+`@wprop` for the weights field `w`, and `@fprop` for sub-estimators.
 
 # Algorithm
 
-The tag never expands. [`@propagatable`](@ref) runs first and consumes it, so the steps below are what happens to the tagged field, not what this macro does.
+The tag never expands, because [`@propagatable`](@ref) runs first and removes it. The steps below tell what happens to the tagged field, not what this macro does.
 
  1. [`propagatable_parse_body`](@ref) peels the tag off the field, records the field name under `:wprop`, and puts the **stripped** field into the struct body. Neither Julia nor a wrapped macro such as `@concrete` ever sees the tag.
 
- 2. [`prop_channel_active`](@ref) reads the recorded name. The channels this tag gates are the `factory` channel and the `obs` channel, and each active channel makes [`@propagatable`](@ref) emit one method.
+ 2. [`prop_channel_active`](@ref) reads the recorded name. This tag gates the `factory` channel and the `obs` channel, and each active channel makes [`@propagatable`](@ref) emit one method.
 
  3. [`prop_channel_pairs`](@ref) builds the keyword pair of the field for each emitted method, and [`prop_tag_expr`](@ref) gives the value:
 
-      + `factory` channel: `_wprop(x.field, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref) and keeps it when none is threaded.
-      + `obs` channel: `nothing_scalar_array_getindex(x.field, i)`, which **indexes** the value already there to the selected observations. Indexing rather than viewing is what keeps the `AbstractWeights` subtype.
+      + `factory` channel: `_wprop(x.field, args...; kwargs...)`, which **replaces** the field with an incoming [`ObsWeights`](@ref), and keeps it when none is threaded.
+      + `obs` channel: `nothing_scalar_array_getindex(x.field, i)`, which **indexes** the value of the field at the selected observations. An index keeps the `AbstractWeights` subtype, and a view does not.
 
- 4. The generated method rebuilds the struct with its keyword constructor, so every validation the constructor carries runs again on the propagated value.
+ 4. The generated method builds the struct again with its keyword constructor, so every check of the constructor runs again on the propagated value.
 
-Step 3 is the whole meaning of the tag. **The two channels do different things to the same field**, which is the one place a reader learns that [`factory`](@ref) and [`obs_weights_view`](@ref) are not two names for one operation. `@wprop` is also the only tag that gates the `obs` channel, so a field opts a struct into [`obs_weights_view`](@ref) by carrying this tag and no second one.
+Step 3 gives the meaning of the tag. **The two channels do different operations on the same field**, so [`factory`](@ref) and [`obs_weights_view`](@ref) are not two names for one operation. `@wprop` is also the only tag that gates the `obs` channel. One `@wprop` field gives the struct an [`obs_weights_view`](@ref) method, with no second tag.
 
-This macro body itself raises an error. It is reached only when the tag is written outside a [`@propagatable`](@ref) struct body, where nothing consumed it.
+The body of this macro raises an error. Julia runs it only when the tag is outside a [`@propagatable`](@ref) struct body, where no macro removed it.
 
 # Related
 
@@ -856,37 +855,38 @@ Check that every tag of [`PROP_TAG_NAMES`](@ref) is complete.
 
 A tag row is complete when it has a stub macro, a channel of [`PROP_TAG_CHANNELS`](@ref)
 that names it, and a field transform in [`prop_tag_expr`](@ref) **for every channel that
-names it**. A row that lacks one of the three is a tag that parses but never propagates,
-which is the failure the table exists to stop. The per-channel probe is what catches a tag
-added to a second channel without a transform there, now that a tag means what its channel
-says it means. All the violations are collected and reported together.
+names it**. A row without one of the three is a tag that parses but never propagates, and
+the table exists to stop that failure. A tag means what its channel says it means, so the
+function probes each channel. That probe finds a tag that a second channel names without a
+transform there. The function collects all the violations and reports them together.
 
-Runs once at the end of the module. Throws an
-[`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) listing
-every violation, so the package refuses to precompile rather than shipping a dead tag.
+The module calls this function once, at its end. It throws an
+[`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError) that lists
+every violation, so the package does not precompile with a tag that never propagates.
 
-The three tables are arguments, and each one defaults to the table the module ships. The
-shipped tables are complete, so the call the module makes never reports a violation; a caller
-that passes a table of its own drives each of the three clauses and reads the message it gives.
+The three tables are arguments, and each one has the table of the module as its default.
+The tables of the module are complete, so the call of the module never reports a violation.
+A caller can pass a table of its own to make each of the three clauses fail and read the
+message that it gives.
 
 # Algorithm
 
  1. Make `violations`, an empty vector of strings.
  2. For each tag of [`PROP_TAG_NAMES`](@ref), with its macro name from [`PROP_TAG_MACRO_NAMES`](@ref):
-     1. The macro name is not defined in this module: push a message that the tag declares no stub macro.
-     2. The tag appears in the `precedence` of no channel of [`PROP_TAG_CHANNELS`](@ref): push a message that the tag appears in no channel.
-     3. For each channel whose `precedence` names the tag, call [`prop_tag_expr`](@ref) with the probe name `:probe`. When that call raises, push a message naming the tag and the channel.
- 3. `violations` is not empty: throw an `ArgumentError` listing every one of them.
+     1. The macro name is not defined in `mod`: push a message that the tag declares no stub macro.
+     2. The tag is in the `precedence` of no channel of `channels`: push a message that the tag is in no channel.
+     3. For each channel whose `precedence` names the tag, call [`prop_tag_expr`](@ref) with the probe name `:probe`. When that call raises an error, push a message that names the tag and the channel.
+ 3. `violations` is not empty: throw an `ArgumentError` that lists all of them.
  4. Return `nothing`.
 
-Step 2.3 probes **each** channel that names the tag, not the tag alone. This is what catches a tag added to a second channel with no transform there, which the whole-tag probe of an earlier design let through.
+Step 2.3 probes **each** channel that names the tag, not the tag alone. This probe finds a tag that a second channel names with no transform there, and a probe of the tag alone does not.
 
 # Arguments
 
   - `tags`: The tag names to check.
   - `macro_names`: The stub macro name of each tag, in the order of `tags`.
-  - `channels`: The channel table whose `precedence` tuples are read.
-  - `mod::Module`: The module the stub macros are looked up in, and the module that qualifies the names [`prop_tag_expr`](@ref) emits.
+  - `channels`: The channel table whose `precedence` tuples the function reads.
+  - `mod::Module`: The module in which the function finds the stub macros. It also qualifies the names that [`prop_tag_expr`](@ref) emits.
 
 # Returns
 
@@ -936,11 +936,13 @@ end
 """
     PROPAGATABLE_CONTRACTS
 
-Every type declared with [`@propagatable`](@ref), paired with its `@pprop`-tagged field names.
+Every type declared with [`@propagatable`](@ref), with the names of its `@pprop` fields.
 
-One entry is appended by the macro itself, immediately after the struct it declares, so the
-list is complete by the time the module finishes loading — including types declared in
-external packages. [`check_propagatable_contracts`](@ref) is what reads it.
+The macro adds one entry immediately after the struct that it declares. When this module
+finishes its load, the list holds every type of this package, and
+[`check_propagatable_contracts`](@ref) reads it at that point. An external package adds its
+types when it loads, after that check, and it must call
+[`check_propagatable_contracts`](@ref) at the end of its own module.
 
 # Related
 
@@ -952,19 +954,19 @@ const PROPAGATABLE_CONTRACTS = Vector{Tuple{Type, Tuple{Vararg{Symbol}}}}()
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Record type `T` and its `@pprop`-tagged field names in [`PROPAGATABLE_CONTRACTS`](@ref).
+Record the type `T` and the names of its `@pprop` fields in [`PROPAGATABLE_CONTRACTS`](@ref).
 
-Called by [`@propagatable`](@ref) at the declaration itself. It only records: the outer
-keyword constructor is written *below* the struct, so it does not exist yet and cannot be
-checked here. [`check_propagatable_contracts`](@ref) does the checking once the module is
-complete.
+[`@propagatable`](@ref) calls it at the declaration. The function only records. The outer
+keyword constructor is written *below* the struct, so it does not exist yet, and the
+function cannot check it. [`check_propagatable_contracts`](@ref) does the check when the
+module is complete.
 
 # Algorithm
 
  1. Push the pair `(T, pprops)` onto [`PROPAGATABLE_CONTRACTS`](@ref).
  2. Return `nothing`.
 
-`T` is `@nospecialize`d, so one method serves every registered type and the registration costs no compilation.
+`T` has `@nospecialize`, so one method serves every registered type, and the registration costs no compilation.
 
 # Related
 
@@ -979,21 +981,21 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the keyword names accepted by the outer constructors of `T`, unioned over its methods.
+Return the keyword names that the outer constructors of `T` accept, as the union over its methods.
 
-A `kwargs...` slurp is dropped rather than counted. A slurp accepts `field = value` and then
-discards it, which is the silent failure this check exists to catch, so it must not satisfy
-the contract.
+The function drops a `kwargs...` slurp and does not count it. A slurp accepts
+`field = value` and then discards it without an error. The contract check exists to find
+that failure, so a slurp must not satisfy the contract.
 
 # Algorithm
 
  1. Make `kws`, an empty vector of symbols.
- 2. For each method `m` of the constructor `T`, append `Base.kwarg_decl(m)` to `kws`. The union runs over every outer constructor, so a keyword that any one of them names counts.
+ 2. For each method `m` of the constructor `T`, append `Base.kwarg_decl(m)` to `kws`. The union is over every outer constructor, so a keyword that any one of them names counts.
  3. Remove the repeats from `kws`.
- 4. Remove every name whose string ends in `...`, which is how `Base.kwarg_decl` reports a slurp.
+ 4. Remove every name whose string ends in `...`, because `Base.kwarg_decl` gives a slurp in that form.
  5. Return `kws`.
 
-Step 4 is the whole point of the function. A constructor that carries `kwargs...` reports the slurp as a keyword name, and counting it would let every field satisfy the contract.
+Step 4 is the reason for the function. A constructor with `kwargs...` gives the slurp as a keyword name. If the function counted it, every field would satisfy the contract.
 
 # Related
 
@@ -1009,30 +1011,30 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return the broken clauses of one type's [`@propagatable`](@ref) contract, as messages.
+Return the broken clauses of the [`@propagatable`](@ref) contract of one type, as messages.
 
-Two clauses are checked, and both are properties of the code the macro emits:
+The function checks two clauses. Both come from the code that the macro emits:
 
-  - **Every field name is a keyword of the outer constructor.** Each generated method rebuilds
-    the struct with `StructName(; field = …)` over *all* fields, tagged or not, so one field
-    that the keyword constructor does not name is a `MethodError` at the first
-    [`factory`](@ref) or [`port_opt_view`](@ref) call.
+  - **Every field name is a keyword of the outer constructor.** Each generated method builds
+    the struct again with `StructName(; field = …)` over *all* fields, with or without a
+    tag. One field that the keyword constructor does not name causes a `MethodError` at
+    the first call of [`factory`](@ref) or [`port_opt_view`](@ref).
   - **Every `@pprop` field is a property of a prior result.** The generated
-    `factory(x, pr::AbstractPriorResult, args...)` reads `getproperty(pr, :field)`, so a name
-    absent from [`prior_result_property_pool`](@ref) throws when a prior is threaded.
+    `factory(x, pr::AbstractPriorResult, args...)` reads `getproperty(pr, :field)`. So a
+    name that is not in [`prior_result_property_pool`](@ref) throws when a prior is threaded.
 
-The messages carry a [`suggest_declared_key`](@ref) suggestion, so a transposed or mistyped
-field name names its intended neighbour.
+Each message has a suggestion from [`suggest_declared_key`](@ref), so a field name with
+a typing error names the nearest valid name.
 
 # Algorithm
 
  1. Make `msgs`, an empty vector of strings.
  2. Read `kws`, the keywords of the outer constructors of `T`, with [`propagatable_keywords`](@ref).
- 3. For each field name of `T` that is absent from `kws`, push a message naming the type, the field and the [`suggest_declared_key`](@ref) suggestion drawn from `kws`.
- 4. For each name of `pprops` that is absent from `pool`, push a message naming the type, the field and the suggestion drawn from `pool`.
+ 3. For each field name of `T` that is not in `kws`, push a message that names the type, the field and the [`suggest_declared_key`](@ref) suggestion from `kws`.
+ 4. For each name of `pprops` that is not in `pool`, push a message that names the type, the field and the suggestion from `pool`.
  5. Return `msgs`.
 
-Every clause is collected, and none stops the walk, so one call reports every violation of one type at once. An empty result means that the type's contract holds.
+The function collects every clause, and no clause stops the walk, so one call reports every violation of one type. An empty result means that the contract of the type holds.
 
 # Related
 
@@ -1065,66 +1067,71 @@ end
 """
     @propagatable expr
 
-Define a struct and automatically generate its propagation methods from five
-orthogonal, stackable field tags:
+Define a struct, and make its propagation methods from five field tags. The tags are
+independent, and a field can carry more than one:
 
-  - [`@fprop`](@ref) (factory propagation): tagged fields receive `factory_child`
-    calls when [`factory`](@ref) is invoked, recursing runtime *values*
-    (observation weights, prior results, solvers, …) down the composition tree.
-    A `factory(x, args...)` method is always generated (it is the identity when no
-    field is tagged `@fprop`/`@wprop`).
-  - [`@wprop`](@ref) (weights replacement): tagged observation-weights fields are
-    *replaced* by an incoming [`ObsWeights`](@ref) argument via `_wprop` (and left
-    unchanged when none is threaded). Use `@wprop` for the weights slot and `@fprop`
-    for sub-estimators — a weights field that defaults to `nothing` must become the
-    incoming weights, which conflicts with `@fprop`'s `nothing`-passthrough.
-  - [`@vprop`](@ref) (view propagation): tagged fields receive
-    [`port_opt_view`](@ref) calls when a view (an index selection) is propagated,
-    recursing into composed children and slicing data arrays. A `port_opt_view`
-    method is generated **only when at least one field is tagged `@vprop`**.
-  - [`@pprop`](@ref) (prior selection): tagged fields are selected from the
-    same-named field on a prior result via `sel(getfield(x, :f), getproperty(pr, :f))`.
-  - [`@cprop`](@ref) (context selection): tagged fields are selected against a
-    threaded optimiser value (a solver) found by type via `sel(getfield(x, :f), _ctx(args...))`.
+  - [`@fprop`](@ref) (factory propagation): a call of [`factory`](@ref) calls
+    `factory_child` on each tagged field. It passes runtime *values*, such as
+    observation weights, prior results and solvers, down the tree of composed structs.
+    The macro always makes a `factory(x, args...)` method. When no field carries
+    `@fprop` or `@wprop`, that method returns `x`.
+  - [`@wprop`](@ref) (weights replacement): an incoming [`ObsWeights`](@ref) argument
+    *replaces* each tagged observation-weights field through `_wprop`. When no
+    `ObsWeights` is threaded, the field keeps its value. Use `@wprop` for the weights
+    field and `@fprop` for sub-estimators. A weights field with the default `nothing`
+    must take the incoming weights, but `@fprop` keeps a `nothing` value.
+  - [`@vprop`](@ref) (view propagation): a view of the struct at an index selection
+    calls [`port_opt_view`](@ref) on each tagged field. The call recurses into composed
+    children and views data arrays. The macro makes a `port_opt_view` method **only when
+    at least one field carries `@vprop`**.
+  - [`@pprop`](@ref) (prior selection): the prior method selects each tagged field
+    against the field of the same name of a prior result, through
+    `sel(getfield(x, :f), getproperty(pr, :f))`.
+  - [`@cprop`](@ref) (context selection): the prior method selects each tagged field
+    against a threaded optimiser value, a solver, that it finds by type, through
+    `sel(getfield(x, :f), _ctx(args...))`.
 
-When at least one field is tagged `@pprop` or `@cprop`, a second method
-`factory(x, pr::AbstractPriorResult, args...)` is generated. It selects `@pprop`/`@cprop`
-fields as above and threads `@fprop`-only fields with `pr`
-(`factory_child(getfield(x, :f), pr, args...)`); a field tagged both `@pprop` and `@fprop`
-is prior-selected in this method (`@pprop` wins). It then calls
-[`resolve_deferred_quantities`](@ref) on the **selected** struct — the identity unless the
-type declares a method — so the Deferred-Quantity resolution runs **last** and a slot that
-holds one sees the solver, the observation weights and the children already settled.
-Because this method is more specific than the general `factory(x, args...)`, it is chosen
-whenever a prior is passed.
+When at least one field carries `@pprop` or `@cprop`, the macro makes a second method,
+`factory(x, pr::AbstractPriorResult, args...)`. This method selects the `@pprop` and
+`@cprop` fields as above. It threads `pr` into the fields that carry only `@fprop`, as
+`factory_child(getfield(x, :f), pr, args...)`. A field with both `@pprop` and `@fprop`
+takes the prior selection in this method, because `@pprop` wins. Then the method calls
+[`resolve_deferred_quantities`](@ref) on the **selected** struct. That call returns the
+struct with no change when the type has no deferred slot and no method of its own. So
+the Deferred-Quantity resolution runs **last**, and a slot that holds a Deferred Quantity
+sees the solver, the observation weights and the children in their last state. This
+method is more specific than the general `factory(x, args...)`, so Julia selects it for
+every call that passes a prior.
 
-Untagged fields pass through unchanged in every method, regardless of type —
-tagging is explicit and opt-in. The tags are independent and the relevant field sets
-genuinely diverge. `@pprop` and `@cprop` are mutually exclusive on one field (a value comes
-from exactly one source); legal stacks are `@pprop @fprop` (sub-estimator) and
-`@pprop @wprop` (weights slot).
+A field with no tag keeps its value in every method, whatever its type. A tag is
+explicit, and the author adds it by choice. Do not put `@pprop` and `@cprop` on one
+field, because a value comes from one source. The valid stacks are `@pprop @fprop`, for a
+sub-estimator, and `@pprop @wprop`, for a weights field.
 
-Two consequences of the emitted code are **contracts on the declaration**, and both are checked
-where the struct is written rather than at the first call:
+Two results of the emitted code are **contracts on the declaration**. The library checks
+both where the author writes the struct, not at the first call:
 
-  - Every generated method rebuilds the struct as `StructName(; field = …)` over *all* fields,
-    tagged or not, so **every field name must also be a keyword of the outer constructor**. A
-    `kwargs...` slurp does not satisfy this: it accepts the keyword and then discards it.
-  - The prior method reads `getproperty(pr, :field)`, so **every `@pprop` field name must be a
-    property of a prior result** (see [`prior_result_property_pool`](@ref)).
+  - Every generated method builds the struct again as `StructName(; field = …)` over *all*
+    fields, with or without a tag. So **every field name must also be a keyword of the outer
+    constructor**. A `kwargs...` slurp does not satisfy this, because it accepts the
+    keyword and then discards it.
+  - The prior method reads `getproperty(pr, :field)`, so **every `@pprop` field name must be
+    a property of a prior result**. See [`prior_result_property_pool`](@ref).
 
-The macro registers each declaration in [`PROPAGATABLE_CONTRACTS`](@ref), and
-[`check_propagatable_contracts`](@ref) checks the whole registry once the module is complete.
-A mistyped field name therefore fails at precompilation with a
-[`suggest_declared_key`](@ref) suggestion, rather than surfacing as a `MethodError` at the
-first [`factory`](@ref) call. [`forward_prior`](@ref) leans on the same contract.
+The macro registers each declaration in [`PROPAGATABLE_CONTRACTS`](@ref).
+[`check_propagatable_contracts`](@ref) checks the whole registry when the module is
+complete. A field name with a typing error fails at precompilation with a suggestion
+from [`suggest_declared_key`](@ref). It does not wait to raise a `MethodError` at the first
+call of [`factory`](@ref). [`forward_prior`](@ref) uses the same contract.
 
-The tag set itself is data. [`PROP_TAG_NAMES`](@ref) holds the rows,
-[`prop_tag_expr`](@ref) holds each tag's field transform, and [`PROP_TAG_CHANNELS`](@ref)
-holds each channel's gate and tag precedence, so a new propagation channel is a table row
-rather than an edit at seven sites.
+The set of tags is data. [`PROP_TAG_NAMES`](@ref) holds the rows,
+[`prop_tag_expr`](@ref) holds the field transform of each tag, and
+[`PROP_TAG_CHANNELS`](@ref) holds the gate and the tag precedence of each channel. So a new
+tag is a row of those tables and a stub macro. A new channel is also a row of
+[`PROP_TAG_CHANNELS`](@ref), but it needs its own emission step in this macro, because
+each channel has its own method head.
 
-Composes with `@concrete` (put `@propagatable` outermost):
+The macro works with `@concrete`. Put `@propagatable` on the outside:
 
 ```julia
 @propagatable @concrete struct MyMeasure <: RiskMeasure
@@ -1139,33 +1146,32 @@ Composes with `@concrete` (put `@propagatable` outermost):
 end
 ```
 
-`@wprop` drives two channels at once, and they do different things to the same field:
-`factory` **replaces** it with an incoming [`ObsWeights`](@ref) value, while
-[`obs_weights_view`](@ref) **indexes** the value already there, to a set of observations.
-A weights field therefore needs no second tag to join the observation-axis view.
+`@wprop` gates two channels, and they do different operations on the same field.
+`factory` **replaces** the field with an incoming [`ObsWeights`](@ref) value.
+[`obs_weights_view`](@ref) **indexes** the value of the field at a set of observations.
+A weights field needs no second tag to join the view on the observation axis.
 
-The generated `factory`/`port_opt_view`/`obs_weights_view` methods are added to the
-`PortfolioOptimisers` functions, so `@propagatable` works correctly for types
-defined in external packages.
+The macro adds the generated `factory`, `port_opt_view` and `obs_weights_view` methods to
+the functions of `PortfolioOptimisers`. So `@propagatable` also works for a type that an
+external package defines.
 
-Docstrings on the enclosing definition are forwarded correctly via
-`Base.@__doc__`.
+`Base.@__doc__` forwards a docstring on the declaration to the struct.
 
 # Algorithm
 
- 1. Find the struct with [`propagatable_find_struct`](@ref), which gives `struct_node` and `rebuild`, the function that puts a replacement struct back inside the same chain of wrapping macros.
- 2. Read `type_head` and `body` off `struct_node`, and read `struct_name` off `type_head` with [`propagatable_bare_name`](@ref), which drops the type parameters and the supertype.
- 3. Parse the body with [`propagatable_parse_body`](@ref), which gives `tagged`, the field names per tag; `all_fields`, every declared field in declaration order; and `new_body`, the body with every tag stripped.
- 4. Build `new_struct` from `new_body`, and `chain` from `rebuild(new_struct)`. `chain` is the original declaration with the tags gone, so `@concrete` and Julia both see an ordinary struct.
- 5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name against it. A bare name would resolve in the caller's module, where `function factory(…)` declares a new function of the caller's own and the method never reaches `PortfolioOptimisers.factory`. That failure is silent, because the declaration compiles and the type never joins the propagation chain.
- 6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor whose pairs come from [`prop_channel_pairs`](@ref); otherwise the body is `x` itself. **This method is always emitted**, so an untagged [`@propagatable`](@ref) struct still answers [`factory`](@ref) with the identity.
- 7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`, whose channel threads `i` before `args...`.
- 8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`, whose channel threads `i` and takes no tail.
- 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body selects every tagged field off `x` and then hands the selected struct to [`resolve_deferred_quantities`](@ref), so **the Deferred-Quantity resolution runs last**. A Deferred Quantity and a **Calibration Rule** therefore see the solver, the observation weights and the children in the state the optimisation settled them in, and a rule may call [`ERM`](@ref) or [`RRM`](@ref). This method is more specific than the one of step 6, so a call that threads a prior chooses it.
-10. Build `pprop_tuple`, the `@pprop`-tagged field names as a tuple of quoted symbols.
-11. Return one escaped block holding, in order: `Base.@__doc__ chain`, so a docstring on the declaration reaches the struct; the emitted methods; and the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
+ 1. Find the struct with [`propagatable_find_struct`](@ref), which gives `struct_node` and `rebuild`. `rebuild` puts a replacement struct back inside the same chain of wrapping macros.
+ 2. Read `type_head` and `body` from `struct_node`. Read `struct_name` from `type_head` with [`propagatable_bare_name`](@ref), which drops the type parameters and the supertype.
+ 3. Parse the body with [`propagatable_parse_body`](@ref). It gives `tagged`, the field names of each tag, `all_fields`, every declared field in declaration order, and `new_body`, the body with no tags.
+ 4. Build `new_struct` from `new_body`, and `chain` from `rebuild(new_struct)`. `chain` is the original declaration without the tags, so `@concrete` and Julia both see an ordinary struct.
+ 5. Bind `POMOD` to the module that **defines** the macro, and qualify every emitted name with it. A bare name resolves in the module of the caller. There, `function factory(…)` declares a new function of the caller, and the method never gets to `PortfolioOptimisers.factory`. That failure gives no error, because the declaration compiles and the type never joins the propagation chain.
+ 6. Emit the `factory` method. When [`prop_channel_active`](@ref) holds for the `factory` channel, the body is a call to the keyword constructor, with the pairs from [`prop_channel_pairs`](@ref). Otherwise, the body is `x`. **The macro always emits this method**, so a [`@propagatable`](@ref) struct with no tags returns itself from [`factory`](@ref).
+ 7. When the `view` channel is active, emit `port_opt_view(x::StructName, i, args...)`. Its channel threads `i` before `args...`.
+ 8. When the `obs` channel is active, emit `obs_weights_view(x::StructName, i)`. Its channel threads `i` and takes no tail.
+ 9. When the `prior` channel is active, emit `factory(x::StructName, pr::AbstractPriorResult, args...; kwargs...)`. Its body selects every tagged field from `x`, and then gives the selected struct to [`resolve_deferred_quantities`](@ref), which makes **the Deferred-Quantity resolution the last operation**. A Deferred Quantity and a **Calibration Rule** see the solver, the observation weights and the children in the state that the optimisation gave them, and a rule can call [`ERM`](@ref) or [`RRM`](@ref). This method is more specific than the method of step 6, so Julia selects it for a call that threads a prior.
+10. Build `pprop_tuple`, the names of the `@pprop` fields as a tuple of quoted symbols.
+11. Return one escaped block. It holds `Base.@__doc__ chain`, so a docstring on the declaration gets to the struct. Then it holds the emitted methods, and last the call to [`propagatable_register!`](@ref) that records the type and `pprop_tuple`.
 
-Steps 6 to 9 differ only in the method head and in the arguments that the channel threads. Each reads its gate and its tag precedence off [`PROP_TAG_CHANNELS`](@ref), so a new channel is a row of that table, a branch in [`prop_tag_expr`](@ref) and a stub macro, rather than an edit at seven sites.
+Steps 6 to 9 differ only in the method head and in the arguments that the channel threads. Each step reads its gate and its tag precedence from [`PROP_TAG_CHANNELS`](@ref). A new tag is a row of the tables, a branch in [`prop_tag_expr`](@ref) and a stub macro, but a new channel also needs a new step here.
 
 # Related
 
@@ -1295,15 +1301,16 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Check the [`@propagatable`](@ref) contract of every type in [`PROPAGATABLE_CONTRACTS`](@ref).
 
-Runs once at the end of the module, so the contract behind every generated method is enforced
-where the structs are *declared* rather than at the first [`factory`](@ref) call. The
-violations of every type are collected and reported together, because a run that stops at the
-first one hides the rest. See [`propagatable_contract_violations`](@ref) for the two clauses.
+The module calls it once, at its end. So the library enforces the contract of every
+generated method where the structs are *declared*, not at the first call of
+[`factory`](@ref). The function collects the violations of every type and reports them
+together, because a run that stops at the first violation hides the others. See
+[`propagatable_contract_violations`](@ref) for the two clauses.
 
-Throws an [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError)
-listing every violation; the package refuses to precompile rather than shipping a type whose
-generated methods throw on first use. A package that declares its own `@propagatable` types
-calls this at the end of its own module to get the same guarantee.
+It throws an [`ArgumentError`](https://docs.julialang.org/en/v1/base/base/#Core.ArgumentError)
+that lists every violation. So the package does not precompile with a type whose generated
+methods throw at their first use. A package that declares its own `@propagatable` types
+calls this function at the end of its own module to get the same check.
 
 # Algorithm
 
@@ -1313,14 +1320,14 @@ calls this at the end of its own module to get the same guarantee.
  4. `msgs` is not empty: throw an `ArgumentError` naming the count and listing every message.
  5. Return `nothing`.
 
-Step 3 collects and never stops, so one run reports the violations of every registered type. The registry is filled by [`propagatable_register!`](@ref) at each declaration, so this function must run **after** the last one, which is why the module calls it at its end.
+Step 3 collects and never stops, so one run reports the violations of every registered type. [`propagatable_register!`](@ref) fills the registry at each declaration, so this function must run **after** the last declaration. For this reason, the module calls it at its end.
 
-Both the registry and the pool are arguments, and each defaults to the value the module ships. A caller that passes a registry of its own reads the message a broken contract gives, without registering a broken type.
+The registry and the pool are arguments, and each has the value of the module as its default. A caller can pass a registry of its own to read the message of a broken contract, and register no broken type.
 
 # Arguments
 
-  - `contracts`: The pairs of a type and its `@pprop`-tagged field names to check.
-  - `pool`: The property names a prior result can carry.
+  - `contracts`: The pairs to check, each a type and the names of its `@pprop` fields.
+  - `pool`: The property names that a prior result can carry.
 
 # Returns
 
