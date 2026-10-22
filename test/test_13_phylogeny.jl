@@ -3249,6 +3249,13 @@ end
         @test [n.id for n in nds8] == collect(1:15)
         @test root === nds8[end]
         @test root.level == 8
+        # `level` is not a depth. The walk of `pre_order` holds at most `depth + 1` nodes,
+        # and `depth + 1 <= level`, so a stack of `2 * level` slots is enough.
+        function depth(n)
+            PortfolioOptimisers.is_leaf(n) && return 0
+            return 1 + max(depth(n.left), depth(n.right))
+        end
+        @test depth(root) == 3
         @test PortfolioOptimisers.pre_order(root) == collect(1:8)
         @test length(PortfolioOptimisers.pre_order(root)) == root.level
         @test PortfolioOptimisers.is_leaf(nds8[1])
@@ -3382,6 +3389,32 @@ end
         # the count; the k-means per-point costs fall with it.
         @test kh == 3
         @test kk == 2
+        # The two series that the docstring of the flat method quotes, at the counts 2 to 6.
+        ma = SecondOrderDifference().alg
+        function cluster_dispersion(idx)
+            m = length(idx)
+            m < 2 && return 0.0
+            dists = [Dg[idx[r], idx[q]] for q in 1:m for r in (q + 1):m]
+            return PortfolioOptimisers.vec_to_real_measure(ma, dists)
+        end
+        function cut_dispersion(c)
+            lvl = cutree(rg; k = c)
+            return sum(j -> cluster_dispersion(findall(lvl .== j)), 1:c)
+        end
+        function cost_dispersion(c)
+            costs = PortfolioOptimisers.get_k_clusters_from_alg(algk, Dg, c).costs
+            return PortfolioOptimisers.vec_to_real_measure(ma, costs)
+        end
+        @test round.(cut_dispersion.(2:6); digits = 2) ==
+              [11.27, 26.04, 47.89, 112.96, 114.11]
+        @test round.(cost_dispersion.(2:6); digits = 2) == [6.58, 2.83, 2.57, 2.17, 2.06]
+        # `Clustering.kmeans` refuses a `weights` vector of the wrong length when it runs, and
+        # `Clustering.hclust` refuses a branch order it does not know.
+        alg_w = KMeansAlgorithm(; kwargs = (; weights = ones(5)))
+        @test_throws DimensionMismatch PortfolioOptimisers.get_k_clusters_from_alg(alg_w,
+                                                                                   Dg, 3)
+        @test_throws ArgumentError PortfolioOptimisers.branch_ordered_hclust(Dg, :ward,
+                                                                             Val(:x))
         # The hierarchical method answers a bare `k`; the flat one answers `(res, k)`.
         @test kh isa Integer
         @test pk isa Clustering.ClusteringResult

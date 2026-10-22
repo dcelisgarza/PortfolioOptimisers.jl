@@ -71,11 +71,11 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :eqn => "`eqn`: Formatted string representation of the constraint equation.",#
                  :ij => "`ij`: Pair of asset indices for correlation-based constraints.",#
                  # Cluster node.
-                 :id_node => "`id`: Node identifier.",#
-                 :left_node => "`left`: Left child node.",#
-                 :right_node => "`right`: Right child node.",#
-                 :height_node => "`height`: Height of the node in the dendrogram.",#
-                 :level_node => "`level`: Number of leaves in the subtree rooted at the node, `1` for a leaf. It is the fourth column of a linkage matrix, and [`pre_order`](@ref) sizes its traversal stack from it.",#
+                 :id_node => "`id`: The identifier of the node.",#
+                 :left_node => "`left`: The left child, or `nothing` for a leaf.",#
+                 :right_node => "`right`: The right child, or `nothing` for a leaf.",#
+                 :height_node => "`height`: The height of the node in the dendrogram.",#
+                 :level_node => "`level`: The number of leaves in the subtree below the node, `1` for a leaf. It is the fourth column of a linkage matrix, and [`pre_order`](@ref) sizes its traversal stack from it.",#
                  # Default weight bounds.
                  :dlb => "`dlb`: Default lower bound.",#
                  :dub => "`dub`: Default upper bound.",#
