@@ -2292,10 +2292,22 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     @test_throws DimensionMismatch BlackLittermanViews(; P = ones(2, 3), Q = [0.01])
     @test_throws IsEmptyError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
                                                   excl = Int[])
-    @test_throws DimensionMismatch BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
-                                                       excl = [1, 2, 3])
+    #=
+    `excl` indexes the views the caller wrote, the kept rows and the dropped ones, so two rows
+    with three dropped views are five views and `excl` is longer than `Q`. The guard counted
+    `excl` against `Q` alone, and three views of which two resolved no name raised a
+    `DimensionMismatch` instead of the documented drop (#535).
+    =#
     @test isa(BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02], excl = [1, 2]),
               BlackLittermanViews)
+    @test BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02], excl = [1, 2, 3]).excl ==
+          [1, 2, 3]
+    @test_throws ArgumentError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                   excl = [1, 1])
+    @test_throws DomainError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                 excl = [4])
+    @test_throws DomainError BlackLittermanViews(; P = ones(2, 3), Q = [0.01, 0.02],
+                                                 excl = [0])
 
     bsets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C"]))
     #=
@@ -2313,6 +2325,30 @@ no name, and the two guards that stand between a view and the wrong axis. Sweep 
     @test blv.excl == [2]
     @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2, 0.3], blv.excl)) ==
           [0.1, 0.3]
+    # More dropped views than kept rows is still a drop.
+    blv2 = @test_logs((:warn,), match_mode = :any,
+                      PortfolioOptimisers.get_black_litterman_views(parse_equation(["A == 0.01",
+                                                                                    "ZZZ == 0.02",
+                                                                                    "YYY == 0.03"]),
+                                                                    bsets))
+    @test collect(blv2.P) == [1.0 0.0 0.0]
+    @test blv2.Q == [0.01]
+    @test blv2.excl == [2, 3]
+
+    #=
+    A precomputed pair with `excl` takes one confidence for each view the caller wrote, as the
+    equation-shaped routes do. Counted against `Q` alone, `[0.3, 0.6]` over two kept rows lost
+    its second entry to `remove_excl_views`, `calc_omega` broadcast `0.3` over both rows, and
+    the posterior equalled the one of the scalar `0.3` with no error (#535).
+    =#
+    Xe = randn(StableRNG(987654321), 200, 3) .* 0.01
+    kept = BlackLittermanViews(; P = [1.0 0.0 0.0; 0.0 1.0 0.0], Q = [0.01, 0.02])
+    dropped = BlackLittermanViews(; P = [1.0 0.0 0.0; 0.0 1.0 0.0], Q = [0.01, 0.02],
+                                  excl = [2])
+    @test prior(BlackLittermanPrior(; views = dropped, views_conf = [0.3, 0.5, 0.6]), Xe).mu ==
+          prior(BlackLittermanPrior(; views = kept, views_conf = [0.3, 0.6]), Xe).mu
+    @test_throws DimensionMismatch BlackLittermanPrior(; views = dropped,
+                                                       views_conf = [0.3, 0.6])
     # `strict = true` refuses the same input rather than dropping it.
     @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation(["ZZZ == 0.02"]),
                                                                              bsets;

@@ -10,7 +10,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :per => "`pr`: Prior estimator or result.",#
                  :pr_rr => "`pr`: Prior result or returns result. Both carry the asset returns matrix `X`, so either can supply it.",#
                  # The risk-free rate of the Black-Litterman update.
-                 :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update blends the prior mean against the view returns, so it runs on the total-return scale those are written on. A mean taken from a wrapped prior estimator is on that scale already; an equilibrium mean is a bare risk premium, and the rate converts it before the update. A member with no equilibrium branch has nothing to convert and adds the rate to the posterior asset expected returns instead. It is added exactly once either way, and the wrapped prior estimators are left alone, so a risk-free rate one of them applied internally stays where it is.",#
+                 :bl_rf => "`rf`: Risk-free rate. The Black-Litterman update compares the prior mean with the view returns, so it uses the total-return scale of the views. A mean from a wrapped prior estimator has that scale. An equilibrium mean is only a risk premium, and the rate converts it before the update. A member with no equilibrium branch has no mean to convert, and it adds the rate to the posterior asset expected returns. In both cases the estimator adds the rate once. It does not change the wrapped prior estimators, so a risk-free rate that one of them applied stays in its mean.",#
                  # Prior results.
                  :chol => "`chol`: Cholesky factorisation of the covariance matrix.",#
                  :w_prior => "`w`: Observation weights the prior was computed under `observations × 1` (see [`ObsWeights`](@ref)), or `nothing` if it was computed unweighted. Binds `ens`, `kld` and `ow`, which are diagnostics of it (see [`forward_prior`](@ref)).",#
@@ -30,9 +30,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :horizon => "`horizon`: Optional investment horizon. The prior fits the log-returns, scales their moments to the horizon, and converts them back to arithmetic moments. If `nothing`, the prior fits the arithmetic returns as they are.",#
                  :fill_limit => "`fill_limit`: The share of the observations of an investable column that [`scenario_fill`](@ref) can fill with no warning. The fill tests the worst column against it. If `nothing`, [`resolve_fill_limit`](@ref) derives it at the fit as `1 - min_coverage` of the binding floor of the arms, which never fires. Where no arm states a floor, no share passes with no warning, and the fit names every fill.",#
                  :max_scenarios => "`max_scenarios`: Optional cap on the number of observations that the Prior Result carries as scenarios. `nothing` carries every observation that the fit read. A cap cuts `X` to its last `max_scenarios` rows, and `mu` and `sigma` stay fitted over every observation. The cap limits the memory that a scenario-based measure reads, and it changes no moment. The cap is a property of the result, so it acts the same in batch and online. When the cap cuts, the result writes into `ens` the number of observations that its moments read. A consumer that prices a sample size, such as an uncertainty set or a calibration rule, reads that count and not the number of carried rows. A bootstrap can resample only the carried rows, so it reads the cap. An entropy pooling prior around the capped prior states probabilities for the scenarios alone. Its posterior moments are those of the scenarios, with a zero weight on every observation that the cap removed, see [`scenario_weights`](@ref).",#
-                 :tau => "`tau`: Blending parameter controlling the weight given to the prior relative to the views.",#
-                 :views => "`views`: Views estimator or result.",#
-                 :views_conf => "`views_conf`: Views confidence estimator or result.",#
+                 :tau => "`tau`: The scale of the uncertainty of the prior mean, `tau > 0`. If `nothing`, the estimator uses `1/T`, where `T` is the number of observations.",#
+                 :views => "`views`: The views, a [`LinearConstraintEstimator`](@ref) of view equations or a precomputed [`BlackLittermanViews`](@ref).",#
+                 :views_conf => "`views_conf`: The confidence of the views, in `(0, 1)`, or `nothing`. A number is one confidence for all the views, and a vector holds one confidence for each view that the caller wrote. If `nothing`, the view uncertainty has no confidence scale, see [`calc_omega`](@ref).",#
                  :a_pe => "`a_pe`: Asset prior estimator.",#
                  :f_pe => "`f_pe`: Factor prior estimator.",#
                  :a_views => "`a_views`: Asset views estimator or result.",#
@@ -105,9 +105,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ep_seq_row => "`c`: Coefficients of the surrogate row, one per observation. They are the coefficient-weighted sum of the linear upper bounds of the primal side, read at the last posterior.",#
                  :ep_seq_b => "`b`: Constant of the surrogate row.",#
                  # Black-Litterman views.
-                 :P => "`P`: Views loading matrix `views × assets`.",#
-                 :Q => "`Q`: Views values vector `views × 1`.",#
-                 :excl => "`excl`: Indices of views to exclude.",#
+                 :P => "`P`: Views matrix, `views × n`, with one column for each name of the axis that the views update.",#
+                 :Q => "`Q`: View returns, one for each row of `P`.",#
+                 :excl => "`excl`: Indices of the views that `P` and `Q` do not hold, or `nothing`. The indices count over all the views that the caller wrote, so `excl` can be longer than `Q`.",#
                  # High order priors.
                  :skmp => "`skmp`: Coskewness matrix processing estimator.",#
                  :D2 => "`D2`: Duplication matrix.",#
