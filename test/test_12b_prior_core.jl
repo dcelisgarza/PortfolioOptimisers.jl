@@ -1532,6 +1532,25 @@ end
               for pp in (1.0, 10.0, 100.0, 1000.0)]
     @test issorted(masses)
     @test isapprox(masses[end], 1)
+
+    # The linear pool is a mixture, so its entropy is at least the opinion-weighted mean of
+    # the entropies of the opinions, and it can be less than the largest one. A uniform
+    # opinion and a point mass pool to an entropy below the uniform's `log(5)`.
+    Pu = hcat(fill(0.2, 5), [1.0, 0.0, 0.0, 0.0, 0.0])
+    au = [0.5, 0.5]
+    Hu = [StatsBase.entropy(view(Pu, :, k)) for k in 1:2]
+    Hlin = StatsBase.entropy(PortfolioOptimisers.compute_pooling(LinearOpinionPooling(), au,
+                                                                 Pu))
+    @test Hlin >= sum(au .* Hu)
+    @test Hlin < maximum(Hu)
+
+    # The logarithmic pool minimises the opinion-weighted divergence from the pool to each
+    # opinion, so no other distribution on the simplex scores lower.
+    obj(q) = sum(a[k] * StatsBase.kldivergence(q, view(P, :, k)) for k in 1:3)
+    rng = StableRNG(542)
+    @test all(obj(collect(lg)) <= obj(normalize(rand(rng, 5), 1)) for _ in 1:200)
+    @test all(obj(collect(lg)) <= obj(normalize(abs.(lg .+ 1e-3 * randn(rng, 5)), 1))
+              for _ in 1:200)
 end
 
 @testset "OpinionPoolingPrior constructor guards" begin
@@ -1549,6 +1568,9 @@ end
     # The sum guard is an inequality: weights summing to less than one are legal, and the
     # remainder becomes a uniform-prior opinion in `prior`.
     @test isa(OpinionPoolingPrior(; pes = [ep, ep], w = [0.3, 0.3]), OpinionPoolingPrior)
+    # Every field but `cache` renders, as the docstring of `show_fields` lists them.
+    @test PortfolioOptimisers.show_fields(OpinionPoolingPrior(; pes = [ep])) ==
+          (:pes, :pe1, :pe2, :p, :w, :alg, :ex, :x_src)
 end
 
 @testset "Factor block guard on wrapped priors" begin
