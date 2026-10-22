@@ -2220,6 +2220,14 @@
         @test knuth_f(xh, Mk) >= knuth_f(xh, Mk + 1)
         # The three width rules are genuinely different selections on one sample.
         @test length(unique([sc, fd, kdx])) == 3
+        #=
+        The interquartile range reads the middle half of the sorted data, so a larger
+        maximum leaves the Freedman-Diaconis width as it is. Scott's standard deviation moves.
+        =#
+        xo = copy(xh)
+        xo[argmax(xo)] += 5
+        @test PO.bin_width(FreedmanDiaconis(), xo) == fd
+        @test PO.bin_width(Scott(), xo) > sc
         # --- Hacine-Gharbi-Ravier, both closed forms ---
         ch = cor(xh, yh)
         @test !isone(abs(ch))
@@ -2315,6 +2323,8 @@
         @test iszero(PO.intrinsic_mutual_info(PO.calc_hist_data(xh, yh, 1)[3]))
         @test iszero(PO.intrinsic_mutual_info(ones(1, 4)))
         @test iszero(PO.intrinsic_mutual_info(ones(4, 1)))
+        # The estimate is in nats, so it can be larger than one.
+        @test PO.intrinsic_mutual_info(PO.calc_hist_data(xh, xh, nb)[3]) > 1
         # --- `mutual_info` at its two extremes ---
         rngm = StableRNG(123456789)
         Xm = randn(rngm, 500, 3)
@@ -2416,6 +2426,11 @@
         @test cor(MutualInfoCovariance(; bins = 8), Xc) ≈
               cor(MutualInfoCovariance(; bins = 8), Xc'; dims = 2)
         @test_throws DomainError cor(MutualInfoCovariance(; bins = 8), Xc; dims = 3)
+        # A strong negative linear relationship gives a large positive entry.
+        xneg = -xh .+ 0.05 .* yh
+        @test cor(xh, xneg) < -0.99
+        @test cor(MutualInfoCovariance(; bins = 8), hcat(xh, xneg))[1, 2] > 0.8
+        @test MutualInfoCovariance().bins isa HacineGharbiRavier
     end
     @testset "A histogram edge is widened by the spacing at the value (#493)" begin
         #=

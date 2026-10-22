@@ -1,13 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Measures codependence with mutual information, which captures a non-linear relationship a correlation misses.
+Measures codependence with mutual information, which detects a non-linear relationship that a correlation can miss.
 
-The mutual information matrix is optionally normalised by the smaller of the two marginal entropies, then rescaled by the marginal standard deviations of `ve` to give a covariance matrix.
+The estimator computes the mutual information matrix of the returns with [`mutual_info`](@ref). When `normalise` is `true`, it divides each entry by the smaller of the two marginal entropies. It then scales the matrix by the marginal standard deviations from `ve` to get a covariance matrix.
 
-Mutual information is non-negative, so every entry of the matrix is non-negative and no pair is ever reported as opposed. A negative linear relationship reads as a strong one, not as a negative one. When `normalise` is `false` the correlation matrix is unbounded above and its diagonal carries the marginal entropy in nats rather than one, so it is a codependence matrix rather than a correlation matrix in the usual sense.
+Mutual information is non-negative, so every entry of the matrix is non-negative, and the matrix shows no pair as opposed. A strong negative linear relationship gives a large positive entry. When `normalise` is `false`, the correlation matrix has no upper bound, and its diagonal is the marginal entropy in nats, not one. It is then a codependence matrix, not a correlation matrix in the usual sense.
 
-Section 12 of [shannon1948](@cite) defines the rate of transmission ``R = H(x) + H(y) - H(x,\\,y)``, which is the mutual information, with the entropies of Section 6. The estimate here replaces those entropies with histogram plug-in values. The division by the smaller marginal entropy is Equation 6.19 of [cajas2025](@cite). Section 3 of [meila2007](@cite) proves ``I \\leq \\min(H(C),\\, H(C'))`` for clusterings (Equation 18), which is the bound that makes the quotient lie in ``[0,\\, 1]``. No work that first states this normalisation was found.
+Section 12 of [shannon1948](@cite) defines the rate of transmission ``R = H(x) + H(y) - H(x,\\,y)``, which is the mutual information, with the entropies of Section 6. The estimate here replaces those entropies with histogram plug-in values. The division by the smaller marginal entropy is Equation 6.19 of [cajas2025](@cite). Equation 18 in Section 3 of [meila2007](@cite) proves ``I \\leq \\min(H(C),\\, H(C'))`` for clusterings, and this bound puts the quotient in ``[0,\\, 1]``. No work that first states this normalisation was found.
 
 # Mathematical definition
 
@@ -22,10 +22,10 @@ Where:
 
   - ``\\hat{\\boldsymbol{\\rho}}_{ij}``: Mutual information-based correlation between assets ``i`` and ``j``.
   - ``\\hat{\\mathbf{\\Sigma}}_{ij}``: Covariance between assets ``i`` and ``j``.
-  - ``\\mathrm{MI}(X_i, X_j)``: Mutual information between assets ``i`` and ``j``, computed by [`mutual_info`](@ref). When `normalise` is `true` it is divided by ``\\min(H(X_i), H(X_j))``, which bounds it to ``[0,\\, 1]``.
+  - ``\\mathrm{MI}(X_i, X_j)``: Mutual information between assets ``i`` and ``j``, computed by [`mutual_info`](@ref). When `normalise` is `true`, [`mutual_info`](@ref) divides it by ``\\min(H(X_i), H(X_j))``, which bounds it to ``[0,\\, 1]``.
   - ``\\hat{\\sigma}_i``: Marginal standard deviation of asset ``i`` from the variance estimator `ve`.
 
-The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is the variance whatever ``\\hat{\\boldsymbol{\\rho}}`` carries there, so the two values of `normalise` give the same diagonal and differ only off it.
+The diagonal of ``\\hat{\\mathbf{\\Sigma}}`` is the variance whatever value ``\\hat{\\boldsymbol{\\rho}}`` has there, so the two values of `normalise` give the same diagonal and differ only off it.
 
 # Fields
 
@@ -126,11 +126,11 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`MutualInfoCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:MutualInfoCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:MutualInfoCovariance, true)` to render it.
 
 # Arguments
 
-  - `::MutualInfoCovariance`: Mutual information covariance estimator, read for its type alone.
+  - `::MutualInfoCovariance`: The mutual information covariance estimator. The method reads only its type.
 
 # Returns
 
@@ -146,23 +146,24 @@ show_fields(::MutualInfoCovariance) = (:ve, :bins, :normalise)
 """
     Statistics.cor(ce::MutualInfoCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the mutual information (MI) correlation matrix using a [`MutualInfoCovariance`](@ref) estimator.
+Compute the mutual information correlation matrix with a [`MutualInfoCovariance`](@ref) estimator.
 
-This method computes the pairwise mutual information correlation matrix for the input data matrix `X`, using the binning strategy and normalisation specified in `ce`. The MI correlation captures both linear and nonlinear dependencies between asset returns, making it robust to complex relationships that may not be detected by traditional correlation measures.
+The method computes the mutual information of each pair of columns of `X` with [`mutual_info`](@ref), under the binning algorithm `ce.bins` and the flag `ce.normalise`. The mutual information detects a linear and a non-linear dependence, and the Pearson correlation detects only a linear one.
 
-The result is bounded by ``[0, 1]`` with a unit diagonal only when `ce.normalise` is `true`. When it is `false` the entries are mutual information in nats and the diagonal is the marginal entropy, as [`mutual_info`](@ref) states.
+The result is in ``[0, 1]`` with a unit diagonal only when `ce.normalise` is `true`. When it is `false`, the entries are mutual information in nats, and the diagonal is the marginal entropy, as [`mutual_info`](@ref) states.
 
 # Algorithm
 
- 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref), which validates `dims` and transposes when `dims` is `2`.
- 2. Return [`mutual_info`](@ref) of the oriented matrix, under the binning algorithm `ce.bins` and the flag `ce.normalise`.
+ 1. Orient `X` to `observations × assets` with [`dims_oriented`](@ref), which checks `dims` and transposes `X` when `dims` is `2`.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Return [`mutual_info`](@ref) of the oriented matrix, under the binning algorithm `ce.bins` and the flag `ce.normalise`.
 
 # Arguments
 
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments (currently unused).
+  - `kwargs...`: Ignored keyword arguments.
 
 # Validation
 
