@@ -3291,6 +3291,12 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     # the identity cannot be formed at all.
     @test isnothing(prl.fpr)
     @test isnothing(prl.rr)
+    # Over a factor prior it forwards the prior factor block, so the right-hand side exists
+    # and the gap is open. The docstring quotes `1.7e-3`.
+    prlf = prior(BlackLittermanPrior(; pe = FactorPrior(), sets = afs, views = av),
+                 BL536_Xr, F)
+    @test !isnothing(prlf.fpr)
+    @test 1e-3 < bl536_gap(prlf) < 1e-2
 
     # The intercept is no longer a cause, on either branch (#570). It goes into the prior
     # stack, where the update is affine in it, so on an exact factor model the identity
@@ -3303,6 +3309,13 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     @test bl536_gap(prior(abl, BL536_Xe0, F)) < 1e-13
     # Cause one: idiosyncratic variance. It survives a fitted intercept of `2.4e-4`.
     @test 1e-4 < bl536_gap(prior(abl, BL536_Xr0, F)) < 1e-3
+    # With a residual the intercept changes the size of cause one, because the gain moves
+    # the two halves by different amounts. The docstring quotes `7.1e-5` with the intercept
+    # and `1.2e-4` with the intercept removed from `X`.
+    g_b = bl536_gap(prior(abl, BL536_Xr, F))
+    g_nob = bl536_gap(prior(abl, BL536_Xr .- transpose(BL536_b), F))
+    @test 5e-5 < g_b < 1e-4
+    @test 1e-4 < g_nob < 2e-4
 
     # Setting `l` changes neither statement. This also covers the `!isempty(w)` guard of
     # the constructor, which no other test reaches.
@@ -3317,8 +3330,9 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     # Cause two: a non-zero `rf` with `l` set. The equilibrium branch adds the rate to the
     # whole stack, so the asset half gains `rf` and the factor half gains `rf` as well. The
     # identity carries the factor half through the loadings, so the two agree only where an
-    # asset's loadings sum to one, and the gap is `rf * (1 - s)` exactly. It is zero at the
-    # default `rf = 0.0`, and it is the only way the rate reaches this identity.
+    # asset's loadings sum to one. On this exact factor model the gap is `rf * (1 - s)`. It
+    # is zero at the default `rf = 0.0`, and it is the only way the rate reaches this
+    # identity.
     ablr = AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv, l = 2.0,
                                         rf = 0.03)
     prr = prior(ablr, BL536_Xe, F)
@@ -3326,6 +3340,14 @@ independent causes that open the augmented member's gap. Sweep ticket #536.
     @test isapprox(prr.mu .- (prr.rr.M * prr.fpr.mu .+ prr.rr.b), 0.03 .* (1 .- s536);
                    atol = 1e-13)
     @test !isapprox(s536, ones(N))
+    # With a residual the rate also goes through cause one, so the part of the gap that the
+    # rate adds is not `rf * (1 - s)`. The docstring quotes a difference of `5.9e-4`.
+    gv(pr) = pr.mu .- (pr.rr.M * pr.fpr.mu .+ pr.rr.b)
+    prr_r = prior(ablr, BL536_Xr, F)
+    prr_r0 = prior(AugmentedBlackLittermanPrior(; sets = afs, a_views = av, f_views = fv,
+                                                l = 2.0), BL536_Xr, F)
+    sr = vec(sum(prr_r.rr.M; dims = 2))
+    @test 1e-4 < maximum(abs.(gv(prr_r) .- gv(prr_r0) .- 0.03 .* (1 .- sr))) < 1e-3
 
     # Muting both view sets with views that repeat the prior makes the update null, so the
     # posterior is the prior and the identity holds exactly. Before #570 the gap here was
@@ -3579,6 +3601,23 @@ Sweep ticket #536.
     @test pr.fpr.w === fp.w
     @test isnothing(pr.chol)
     @test isnothing(pr.fpr.chol)
+    # Under the default `EmpiricalPrior` the five fields above are `nothing`, which passes for
+    # any code. Two entropy pooling priors carry real and different weightings.
+    aep = EntropyPoolingPrior(; sets = UniverseSets(; dict = Dict("nx" => afs.dict["nx"])),
+                              mu_views = LinearConstraintEstimator(; val = ["A1 == 0.002"]))
+    fep = EntropyPoolingPrior(; sets = UniverseSets(; dict = Dict("nx" => afs.dict["nf"])),
+                              mu_views = LinearConstraintEstimator(; val = ["F1 == 0.001"]))
+    apE = prior(aep, BL536_Xr)
+    fpE = prior(fep, F)
+    prE = prior(AugmentedBlackLittermanPrior(; sets = afs, a_pe = aep, f_pe = fep,
+                                             a_views = av, f_views = fv), BL536_Xr, F)
+    @test !isnothing(apE.w)
+    @test prE.w == apE.w
+    @test prE.ens == apE.ens
+    @test prE.kld == apE.kld
+    @test prE.ow == apE.ow
+    @test prE.fpr.w == fpE.w
+    @test prE.fpr.w != prE.w
 
     # The rate goes on the whole equilibrium stack, so both halves move by the same gain
     # applied to a vector of ones. Where `l` is `nothing` the two wrapped means are total

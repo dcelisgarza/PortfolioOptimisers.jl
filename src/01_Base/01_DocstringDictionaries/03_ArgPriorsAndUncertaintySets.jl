@@ -37,7 +37,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :f_pe => "`f_pe`: Factor prior estimator.",#
                  :a_views => "`a_views`: Asset views estimator or result.",#
                  :f_views => "`f_views`: Factor views estimator or result.",#
-                 :sets_af => "`sets`: Universe sets. This estimator reads **two** declared axes: `a_views` resolves against `sets.dict[sets.xkey]`, `f_views` against the time-series factor axis `sets.dict[sets.tfkey]`, and each axis must name the columns of `X` and `F` respectively, in order. Only the axis a [`LinearConstraintEstimator`](@ref) actually resolves names against is required — views supplied as a [`BlackLittermanViews`](@ref) result carry their own matrix and need no universe. A view slices the asset axis and leaves the factor entries untouched, which is why this field is `@vprop`.",#
+                 :sets_af => "`sets`: Universe sets. This estimator reads **two** declared axes. `a_views` resolves against `sets.dict[sets.xkey]`, which must name the columns of `X` in order. `f_views` resolves against the time-series factor axis `sets.dict[sets.tfkey]`, which must name the columns of `F` in order. A [`LinearConstraintEstimator`](@ref) needs only the axis that it resolves names against. Views in a [`BlackLittermanViews`](@ref) result carry their own matrix and need no universe. A view slices the asset axis and keeps the factor entries, so this field is `@vprop`.",#
                  :a_views_conf => "`a_views_conf`: Asset views confidence estimator or result.",#
                  :f_views_conf => "`f_views_conf`: Factor views confidence estimator or result.",#
                  :rsd => "`rsd`: Whether to include residual variance in the posterior covariance.",#
