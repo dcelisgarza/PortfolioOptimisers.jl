@@ -147,7 +147,7 @@ A view that is dropped is **dropped, not refused**. Its index joins `excl`, the 
   - When `lcs` is a vector, `!isempty(lcs)`.
   - A name that matches no entry of `sets.dict[key]` and none of the counterpart axis raises through [`strict_diagnostic`](@ref) when `strict` is `true`, and warns otherwise. The message names the axis. The row is dropped either way.
   - A name on the counterpart axis drops its row in silence, under both settings of `strict`.
-  - A view whose names all resolve and whose coefficients cancel raises the same way, and is dropped when `strict` is `false`.
+  - A view whose names all resolve and whose coefficients cancel raises an [`IsZeroError`](@ref) when `strict` is `true`, and warns otherwise. The row is dropped either way.
   - The assembled pair passes the [`BlackLittermanViews`](@ref) constructor's own checks.
 
 # Returns
@@ -234,7 +234,7 @@ function get_black_litterman_views(lcs::PR_VecPR, sets::UniverseSets,
             # — so this row resolved and still summed to zero, by its own cancelling
             # coefficients or by holding no name at all. It is not a typo.
             msg = empty_row_msg(lc.eqn, nx, k; noun = "view", axis = axis)
-            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k))
+            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k), exception = IsZeroError)
             push!(excl, i)
             continue
         end

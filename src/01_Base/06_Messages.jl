@@ -167,7 +167,7 @@ end
 
 Build the warning/error text for a centrality constraint whose centrality vector carries no information, so the row it would build is dropped.
 
-The vector is either empty or all zero. Either way the row reads `0' w <= B`, which every set of weights satisfies, so it constrains nothing. This is a fact about the graph and never a mistyped name: two assets under [`BetweennessCentrality`](@ref) give the zero vector, because no vertex lies on a shortest path between two others. Reporting it through [`unknown_variable_msg`](@ref) or one of its siblings would send a reader hunting for a typo that is not there, which is why this message is its own.
+The vector is either empty or all zero. Either way the row reads `0' w ⋄ B`, which does not depend on the weights, so it constrains nothing that the weights can change. This is a fact about the graph and never a mistyped name: two assets under [`BetweennessCentrality`](@ref) give the zero vector, because no vertex lies on a shortest path between two others. Reporting it through [`unknown_variable_msg`](@ref) or one of its siblings would send a reader hunting for a typo that is not there, which is why this message is its own.
 
 Names the centrality algorithm and the *length* of the vector only — never its entries — the same info-leak-safe discipline as [`empty_row_msg`](@ref).
 
@@ -192,7 +192,7 @@ function zero_centrality_msg(alg, n)
     else
         "all $(n) entries of its centrality vector are zero"
     end
-    return "centrality constraint under `$(nameof(typeof(alg)))` contributes no row because $(cause): the row it would build holds for every set of weights; row dropped"
+    return "centrality constraint under `$(nameof(typeof(alg)))` contributes no row because $(cause): the row it would build does not depend on the weights; row dropped"
 end
 """
     gross_budget_bounds_msg(lb, ub) -> String
@@ -229,9 +229,12 @@ function gross_budget_bounds_msg(lb, ub)
     return "gross budget (gbgt) requires weight bounds that admit short positions: with non-negative bounds no short weights exist, so the gross exposure equals the net exposure and the net budget (bgt) already constrains it. Got $(scope) with no negative element in lb or ub."
 end
 """
-    strict_diagnostic(msg::AbstractString, strict::Bool; id) -> Nothing
+    strict_diagnostic(msg::AbstractString, strict::Bool; id,
+                      exception::Type{<:Exception} = ArgumentError) -> Nothing
 
-Report a **term that cannot contribute a row**: throw an `ArgumentError` under `strict`, warn otherwise, and in both cases the offending term is dropped.
+Report a **term that cannot contribute a row**: throw an `exception` under `strict`, warn otherwise, and in both cases the offending term is dropped.
+
+A builder of linear constraint rows passes `exception = IsZeroError` when it drops a row whose coefficients are all zero. Such a row does not depend on the weights, so it holds for every set of weights or for none, and the builder drops it at construction time in both cases.
 
 `strict` governs what is droppable: a name that resolves against nothing, a row whose coefficients carry no information, as with a zero centrality vector, and a holding a factor attribution cannot attribute, in an asset the prior could not estimate or at an observation with no return. Nothing else is refused, and a malformed *entry* throws unconditionally, because there is no reading of it to fall back to. Every such diagnostic in the library routes through here, so the strictness policy is one edit.
 
@@ -239,18 +242,19 @@ The warning passes `maxlog = log_limit(:warn)` and `_id = id`. The caller gives 
 
 # Algorithm
 
- 1. Throw an `ArgumentError` carrying `msg` when `strict` is `true`, which ends the call.
+ 1. Throw an `exception` carrying `msg` when `strict` is `true`, which ends the call.
  2. Otherwise emit `msg` as a warning, under the cap of [`log_limit`](@ref) and the `_id` of the caller, and return.
 
 # Arguments
 
   - `msg`: The diagnostic text, built by [`unknown_variable_msg`](@ref) or one of its siblings.
-  - `strict`: If `true`, throws an `ArgumentError`; if `false`, issues a warning.
+  - `strict`: If `true`, throws an `exception`; if `false`, issues a warning.
   - `id`: The `_id` of the warning, made by [`@log_id`](@ref) at the site of the caller.
+  - `exception`: The exception type that `strict` throws. [`IsZeroError`](@ref) for a row whose coefficients are all zero, `ArgumentError` otherwise.
 
 # Validation
 
-  - The call raises an `ArgumentError` carrying `msg` when `strict` is `true`.
+  - The call raises an `exception` carrying `msg` when `strict` is `true`.
 
 # Returns
 
@@ -262,11 +266,13 @@ The warning passes `maxlog = log_limit(:warn)` and `_id = id`. The caller gives 
   - [`missing_group_assets_msg`](@ref)
   - [`empty_row_msg`](@ref)
   - [`zero_centrality_msg`](@ref)
+  - [`IsZeroError`](@ref)
   - [`@log_id`](@ref)
 """
-function strict_diagnostic(msg::AbstractString, strict::Bool; id)::Nothing
+function strict_diagnostic(msg::AbstractString, strict::Bool; id,
+                           exception::Type{<:Exception} = ArgumentError)::Nothing
     if strict
-        throw(ArgumentError(msg))
+        throw(exception(msg))
     end
     @warn(msg, maxlog = log_limit(:warn), _id = id)
     return nothing

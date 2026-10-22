@@ -916,7 +916,7 @@ Reduce one or more [`CentralityConstraint`](@ref) estimators to a [`LinearConstr
 
 Each estimator gives one row. The coefficients of the row are the centrality vector of the asset network. The right-hand side is a number, or a measure of that vector. A constraint whose centrality vector is empty or all zero gives no row, because its row does not depend on the weights. Two assets under [`BetweennessCentrality`](@ref) give the zero vector, and a lone such constraint makes this function return `nothing`. [`strict_diagnostic`](@ref) reports the drop, so `strict` decides whether it raises or warns.
 
-The dropped row compares zero with `B`, so it holds for every set of weights or for none. [`MinValue`](@ref) and [`MaxValue`](@ref) give zero for the zero vector, so their row holds for every set of weights. A negative number gives a row such as `0 <= -0.2`, which holds for no weights. The drop then removes an infeasible row, and the diagnostic is the only sign of it.
+The dropped row compares zero with `B`, so it does not depend on the weights. Every linear constraint builder drops such a row at construction time, and `strict = true` makes the drop raise an [`IsZeroError`](@ref).
 
 # Algorithm
 
@@ -937,14 +937,14 @@ Step 6 comes before step 7 on purpose. A measure of the scaled row negates the t
   - `ccs`: One [`CentralityConstraint`](@ref) or a vector of them.
   - `X`: The data matrix.
   - $(arg_dict[:dims])
-  - `strict`: If `true`, a constraint whose centrality vector is empty or all zero raises an `ArgumentError`. If `false`, it gives a warning. The function drops the constraint in both cases.
+  - `strict`: If `true`, a constraint whose centrality vector is empty or all zero raises an [`IsZeroError`](@ref). If `false`, it gives a warning. The function drops the constraint in both cases.
   - `kwargs...`: More keyword arguments for [`centrality_vector`](@ref).
 
 # Validation
 
   - `!isempty(ccs)` when `ccs` is a vector. A breach raises an `IsEmptyError`.
   - $(val_dict[:dims]) The check is made with [`assert_dims`](@ref), which raises the `DomainError`.
-  - A centrality vector that is empty or all zero raises an `ArgumentError` when `strict` is `true`, and gives a warning otherwise. The function drops the constraint in both cases.
+  - A centrality vector that is empty or all zero raises an [`IsZeroError`](@ref) when `strict` is `true`, and gives a warning otherwise. The function drops the constraint in both cases.
   - The function checks no value of `cc.B`. A `NaN` or an `Inf` threshold reaches the returned right-hand side unchanged.
 
 # Returns
@@ -980,7 +980,7 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1,
             # A zero centrality vector is a fact about the graph, not a mistyped name, so the
             # message is its own. The row it would build, `0' w <= B`, does not depend on `w`.
             strict_diagnostic(zero_centrality_msg(cc.A.ct, length(A)), strict;
-                              id = @log_id(typeof(cc.A.ct)))
+                              id = @log_id(typeof(cc.A.ct)), exception = IsZeroError)
             continue
         end
         d, flag_ineq = comparison_sign_ineq_flag(cc.comp)

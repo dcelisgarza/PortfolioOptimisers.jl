@@ -669,7 +669,7 @@ The function drops whole rows and never single terms. A row is one statement ove
   - `lcs` is non-empty, when it is a vector.
   - A variable name that matches no entry of the universe and none of the counterpart axis raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
   - A variable name on the counterpart axis drops its row in silence, under both settings of `strict`.
-  - A row whose terms all fall away raises when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
+  - A row whose terms all fall away raises an [`IsZeroError`](@ref) when `strict` is `true`, and issues a warning otherwise. The row is dropped either way.
   - Each `op` is one of `"=="`, `"<="` or `">="`, which [`comparison_sign_ineq_flag`](@ref) enforces.
 
 # Returns
@@ -746,7 +746,7 @@ function get_linear_constraints(lcs::PR_VecPR, sets::UniverseSets,
             else
                 empty_row_msg(lc.eqn, nx, k; axis = axis)
             end
-            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k))
+            strict_diagnostic(msg, strict; id = @log_id(lc.eqn, k), exception = IsZeroError)
             continue
         end
         d, flag = comparison_sign_ineq_flag(lc.op)

@@ -1055,8 +1055,8 @@ epview = LinearConstraintEstimator(; val = "a == 0.001")
     @test isempty(const_row.vars)
     @test isnothing(@test_logs (:warn,) PortfolioOptimisers.get_linear_constraints([const_row],
                                                                                    sall))
-    @test_throws ArgumentError PortfolioOptimisers.get_linear_constraints([const_row], sall;
-                                                                          strict = true)
+    @test_throws IsZeroError PortfolioOptimisers.get_linear_constraints([const_row], sall;
+                                                                        strict = true)
 end
 
 @testset "A row naming a departed asset is dropped whole, and a typo still names itself" begin
@@ -1636,9 +1636,9 @@ end
     @test blv.excl == [1]
     @test collect(PortfolioOptimisers.remove_excl_views([0.1, 0.2], blv.excl)) == [0.2]
     # And `strict` still refuses it, because nothing about it is a departure.
-    @test_throws ArgumentError PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"),
-                                                                             bsets;
-                                                                             strict = true)
+    @test_throws IsZeroError PortfolioOptimisers.get_black_litterman_views(parse_equation("A - A == 0.0"),
+                                                                           bsets;
+                                                                           strict = true)
     # `A` is in the universe, so the refusal must not say the row matched nothing: it says
     # the row resolved and cancelled, which is the failure the user has to fix (#943).
     msg = try

@@ -10,6 +10,7 @@ All error types specific to `PortfolioOptimisers.jl` should be subtypes of `Port
   - [`IsNothingError`](@ref)
   - [`IsEmptyError`](@ref)
   - [`IsNonFiniteError`](@ref)
+  - [`IsZeroError`](@ref)
   - [`ConflictingArgumentError`](@ref)
   - [`PropertyPathError`](@ref)
   - [`ObservationWeightsError`](@ref)
@@ -126,6 +127,44 @@ Stacktrace:
   - [`ConflictingArgumentError`](@ref)
 """
 @concrete struct IsNonFiniteError <: PortfolioOptimisersError
+    """
+    $(field_dict[:msg])
+    """
+    msg
+end
+"""
+$(DocStringExtensions.TYPEDEF)
+
+Exception type thrown when an argument or value is unexpectedly zero, such as a constraint row whose coefficients are all zero.
+
+# Fields
+
+$(DocStringExtensions.FIELDS)
+
+# Constructors
+
+    IsZeroError(msg) -> IsZeroError
+
+Arguments correspond to the fields above.
+
+# Examples
+
+```jldoctest
+julia> throw(IsZeroError(\"Constraint row must not be all zero\"))
+ERROR: IsZeroError: Constraint row must not be all zero
+Stacktrace:
+ [1] top-level scope
+   @ none:1
+```
+
+# Related
+
+  - [`PortfolioOptimisersError`](@ref)
+  - [`IsNothingError`](@ref)
+  - [`IsEmptyError`](@ref)
+  - [`strict_diagnostic`](@ref)
+"""
+@concrete struct IsZeroError <: PortfolioOptimisersError
     """
     $(field_dict[:msg])
     """
@@ -355,5 +394,6 @@ function Base.showerror(io::IO, err::PortfolioOptimisersError)
     return print(io, "$name: $(err.msg)")
 end
 
-export IsEmptyError, IsNothingError, IsNonFiniteError, ConflictingArgumentError,
-       PropertyPathError, ObservationWeightsError, NonPositiveWealthError, PosdefRepairError
+export IsEmptyError, IsNothingError, IsNonFiniteError, IsZeroError,
+       ConflictingArgumentError, PropertyPathError, ObservationWeightsError,
+       NonPositiveWealthError, PosdefRepairError

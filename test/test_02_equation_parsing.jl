@@ -1503,3 +1503,45 @@ end
     @test PortfolioOptimisers.constraint_row_length(nothing, ["F1", "F2"]) == 2
     @test PortfolioOptimisers.constraint_row_length(rr, ["F1", "F2"]) == 3
 end
+
+@testset "Both re-basis routes drop an all-zero row at construction (issue #1797)" begin
+    using PortfolioOptimisers, Test, Logging
+    # No asset loads on F2, so a row that weights F2 alone re-bases to the zero row. The
+    # row does not depend on the weights, so every linear builder drops it: `strict = true`
+    # raises an `IsZeroError`, and the default warns.
+    M = [0.5 0.0; 0.1 0.0; 0.3 0.0]
+    rr = Regression(; M = M)
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"], "nf" => ["F1", "F2"]))
+    fs = FactorSpace()
+    # The precomputed route.
+    lc = LinearConstraint(;
+                          ineq = PartialLinearConstraint(; A = [1.0 0.0; 0.0 1.0],
+                                                         B = [1.0, 2.0]),
+                          eq = PartialLinearConstraint(; A = [0.0 3.0], B = [0.5]))
+    ece = ExposureConstraintEstimator(; lce = lc, space = fs)
+    whole = @test_logs (:warn, r"all-zero row") (:warn, r"all-zero row") match_mode = :any linear_constraints(ece,
+                                                                                                              sets;
+                                                                                                              rr = rr)
+    @test whole.ineq.A == transpose(reshape(M[:, 1], :, 1))
+    @test whole.ineq.B == [1.0]
+    @test isnothing(whole.eq)
+    @test_throws IsZeroError linear_constraints(ece, sets; rr = rr, strict = true)
+    # A constraint that loses every row is `nothing`, as the estimator route gives.
+    lc0 = LinearConstraint(; ineq = PartialLinearConstraint(; A = [0.0 1.0], B = [2.0]))
+    @test isnothing(@test_logs (:warn, r"all-zero row") PortfolioOptimisers.project_linear_constraint(lc0,
+                                                                                                      M))
+    # The estimator route drops the same row with the same error type.
+    lce = LinearConstraintEstimator(; val = ["F1 <= 1", "F2 <= 2"])
+    step = @test_logs (:warn, r"all-zero row") linear_constraints(ExposureConstraintEstimator(;
+                                                                                              lce = lce,
+                                                                                              space = fs),
+                                                                  sets; rr = rr)
+    @test step.ineq.A == whole.ineq.A
+    @test step.ineq.B == whole.ineq.B
+    @test_throws IsZeroError linear_constraints(ExposureConstraintEstimator(; lce = lce,
+                                                                            space = fs),
+                                                sets; rr = rr, strict = true)
+    # An asset-space row whose coefficients cancel raises the same type.
+    asets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws IsZeroError linear_constraints("A - A <= 0.1", asets; strict = true)
+end

@@ -430,8 +430,11 @@ function constraint_space_basis(space::FactorSpace, sets::UniverseSets,
     return rr, key
 end
 """
-    project_linear_constraint(lc::LinearConstraint, M::MatNum) -> LinearConstraint
-    project_linear_constraint(plc::PartialLinearConstraint, M::MatNum) -> PartialLinearConstraint
+    project_linear_constraint(lc::LinearConstraint, M::MatNum; strict::Bool = false)
+        -> Option{<:LinearConstraint}
+    project_linear_constraint(plc::PartialLinearConstraint, M::MatNum; strict::Bool = false)
+        -> Option{<:PartialLinearConstraint}
+    project_linear_constraint(::Nothing, ::MatNum; kwargs...) -> Nothing
 
 Re-base an **already assembled** constraint by projecting its coefficient matrix, `A * transpose(M)`.
 
@@ -439,27 +442,33 @@ This is the precomputed-constraint half of the estimator path's per-term project
 
 `size(A, 2) == size(M, 2)` is checked rather than assumed, because a precomputed constraint carries no names and nothing else would catch an asset-space matrix handed to a [`FactorSpace`](@ref) wrapper whose asset and factor counts happen to differ.
 
+A re-based row whose coefficients are all zero does not depend on the weights, so the function drops it, as the estimator route drops it in [`get_linear_constraints`](@ref). The loadings make such a row when every factor that it weights has zero loadings.
+
 # Algorithm
 
 The [`PartialLinearConstraint`](@ref) method is the one that computes, and the [`LinearConstraint`](@ref) method is its fan-out over the two halves.
 
  1. Check that `plc.A` has one column per factor, `size(plc.A, 2) == size(M, 2)`.
- 2. Return a [`PartialLinearConstraint`](@ref) whose `A` is the re-based coefficient matrix and whose `B` is `plc.B`, taken over unchanged.
- 3. For a whole [`LinearConstraint`](@ref), apply steps 1 and 2 to `ineq` and to `eq`, skipping a half that is `nothing`, and rebuild the constraint from the two.
+ 2. Project the coefficient matrix, `A = plc.A * transpose(M)`.
+ 3. Report each row of `A` whose coefficients are all zero through [`strict_diagnostic`](@ref) with [`IsZeroError`](@ref), and drop it with its entry of `plc.B`.
+ 4. Return a [`PartialLinearConstraint`](@ref) of the rows that are left and their entries of `plc.B`, taken over unchanged. Return `nothing` when no row is left.
+ 5. For a whole [`LinearConstraint`](@ref), apply steps 1 to 4 to `ineq` and to `eq`, and rebuild the constraint from the two. A half that is `nothing` stays `nothing`, through the `Nothing` method. Return `nothing` when both halves are `nothing`.
 
 # Arguments
 
   - `lc`: The assembled [`LinearConstraint`](@ref), written over the factors.
   - `plc`: One half of it, a [`PartialLinearConstraint`](@ref).
   - `M`: The loadings, `Na × Nf`.
+  - `strict`: If `true`, a re-based row whose coefficients are all zero raises an [`IsZeroError`](@ref). If `false`, it warns. The row is dropped either way.
 
 # Validation
 
   - `size(plc.A, 2) == size(M, 2)`. Otherwise a `DimensionMismatch` names both counts.
+  - A re-based row whose coefficients are all zero raises an [`IsZeroError`](@ref) when `strict` is `true`, and warns otherwise. The row is dropped either way.
 
 # Returns
 
-  - `lc::LinearConstraint` or `plc::PartialLinearConstraint`: The same shape, over the assets. `A` is re-based and `B` is the input's own.
+  - `lc::Option{<:LinearConstraint}` or `plc::Option{<:PartialLinearConstraint}`: The same shape, over the assets, or `nothing` when every row was dropped. `A` is re-based and `B` is the input's own.
 
 # Related
 
@@ -467,16 +476,29 @@ The [`PartialLinearConstraint`](@ref) method is the one that computes, and the [
   - [`LinearConstraint`](@ref)
   - [`PartialLinearConstraint`](@ref)
 """
-function project_linear_constraint(plc::PartialLinearConstraint,
-                                   M::MatNum)::PartialLinearConstraint
+function project_linear_constraint(plc::PartialLinearConstraint, M::MatNum;
+                                   strict::Bool = false)::Option{<:PartialLinearConstraint}
     @argcheck(size(plc.A, 2) == size(M, 2),
               DimensionMismatch("a precomputed constraint being re-based must have one column per factor. Got\nsize(A, 2) => $(size(plc.A, 2))\nsize(M, 2) => $(size(M, 2))"))
-    return PartialLinearConstraint(; A = plc.A * transpose(M), B = plc.B)
+    A = plc.A * transpose(M)
+    keep = map(r -> any(!iszero, r), eachrow(A))
+    foreach(i -> strict_diagnostic("row $(i) of $(size(A, 1)) of a precomputed constraint projected to an all-zero row over $(size(A, 2)) assets: every factor it weights has zero loadings; row dropped",
+                                   strict; id = @log_id(), exception = IsZeroError),
+            findall(!, keep))
+    return any(keep) ? PartialLinearConstraint(; A = A[keep, :], B = plc.B[keep]) : nothing
 end
-function project_linear_constraint(lc::LinearConstraint, M::MatNum)::LinearConstraint
-    ineq = isnothing(lc.ineq) ? nothing : project_linear_constraint(lc.ineq, M)
-    eq = isnothing(lc.eq) ? nothing : project_linear_constraint(lc.eq, M)
-    return LinearConstraint(; ineq = ineq, eq = eq)
+function project_linear_constraint(::Nothing, ::MatNum; kwargs...)::Nothing
+    return nothing
+end
+function project_linear_constraint(lc::LinearConstraint, M::MatNum;
+                                   strict::Bool = false)::Option{<:LinearConstraint}
+    ineq = project_linear_constraint(lc.ineq, M; strict = strict)
+    eq = project_linear_constraint(lc.eq, M; strict = strict)
+    return if isnothing(ineq) && isnothing(eq)
+        nothing
+    else
+        LinearConstraint(; ineq = ineq, eq = eq)
+    end
 end
 """
     rebase_linear_constraints(lce, sets::UniverseSets, basis, key; datatype, strict, bl_flag)
@@ -493,7 +515,7 @@ The two single-shape methods reach the same row by two routes. The estimator rou
 
  1. For a [`LinearConstraintEstimator`](@ref), pick the key: `lce.key` when the wrapped estimator states one, and `key` otherwise.
  2. Call [`linear_constraints`](@ref) on `lce.val` against that key, with `basis` passed as `rr`. [`constraint_row_term`](@ref) then sums the selected columns of `basis.M` for each named term, which is the projection done one term at a time.
- 3. For a precomputed [`LinearConstraint`](@ref), call [`project_linear_constraint`](@ref) on it with `basis.M`, which projects the assembled coefficient matrix in one product. `basis.M` is the only field of the basis either route reads, so the regression's intercept never enters.
+ 3. For a precomputed [`LinearConstraint`](@ref), call [`project_linear_constraint`](@ref) on it with `basis.M` and `strict`, which projects the assembled coefficient matrix in one product. `basis.M` is the only field of the basis either route reads, so the regression's intercept never enters.
  4. For a vector, apply steps 1 to 3 to each element in turn and return the results in the order of the input.
 
 # Arguments
@@ -527,8 +549,9 @@ function rebase_linear_constraints(lce::LinearConstraintEstimator, sets::Univers
 end
 function rebase_linear_constraints(lce::LinearConstraint, ::UniverseSets,
                                    basis::AbstractLoadingsRegressionResult,
-                                   ::AbstractString; kwargs...)::LinearConstraint
-    return project_linear_constraint(lce, basis.M)
+                                   ::AbstractString; strict::Bool = false,
+                                   kwargs...)::Option{<:LinearConstraint}
+    return project_linear_constraint(lce, basis.M; strict = strict)
 end
 function rebase_linear_constraints(lce::VecLcE_Lc, sets::UniverseSets,
                                    basis::AbstractLoadingsRegressionResult,
