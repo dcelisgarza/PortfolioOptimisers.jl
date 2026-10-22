@@ -60,7 +60,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :S_ij_sim => "``S_{i,\\,j}``: The similarity between assets ``i`` and ``j``.",#
                  # Feature matrices and the collapse of a feature window.
                  :z_i_feature => "``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``, its row of the feature matrix.",#
-                 :z_tik_feature => "``z_{t,\\,i,\\,k}``: Feature window entry: feature ``k`` of asset ``i`` at observation ``t``.",#
+                 :z_tik_feature => "``z_{t,\\,i,\\,k}``: Value of feature ``k`` of asset ``i`` at observation ``t``, one entry of the feature window.",#
                  :zbar_ik_feature => "``\\bar{z}_{i,\\,k}``: Collapsed feature ``k`` of asset ``i``, the aggregate of ``z_{t,\\,i,\\,k}`` over the observation axis.",#
                  # Spectral denoising: the Marcenko-Pastur split of a spectrum.
                  :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#

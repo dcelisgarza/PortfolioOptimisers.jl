@@ -98,14 +98,14 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :dmetric_args => "`args`: More positional arguments, which `Distances.pairwise` takes after the base distance matrix.",#
                  :dmetric_kwargs => "`kwargs`: More keyword arguments for `Distances.pairwise`. A `dims` here replaces the default `dims = 2`.",#
                  :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
-                 :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
+                 :fcalg => "`alg`: Feature collapse algorithm, which reduces a window of time-varying features to one distance matrix. It has no effect on a 2-D feature matrix.",#
                  :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
-                 :loalg => "`alg`: Rule that names the row of the window read for each asset.",#
+                 :loalg => "`alg`: Rule that names the row of the window that the collapse reads for each asset.",#
                  :fdpair => "`pair`: Rule for a pair of assets with no shared active row in the window.",#
-                 :fdsim => "`sim`: Similarity matrix algorithm used to derive the similarity counterpart of the feature distance matrix.",#
-                 :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel that the returns data holds. A producer is configuration: it builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it, so a view passes it through and a fold refits it.",#
-                 :fdsel => "`sel`: Feature Selector naming the Panel Fields the Feature Matrix stacks, or `nothing` to stack every field's values. An entry is a field name, a field paired with the levels or labels it keeps, a field paired with one level or label, a tensor field paired with a [`LabelGroup`](@ref), or a field paired with `:observed`. The vector order is the column order.",#
-                 :fdstrict => "`strict`: Whether a `sel` entry naming a field, a level, a label or a group the Asset Panel does not hold throws instead of warning and being dropped.",#
+                 :fdsim => "`sim`: Similarity matrix algorithm that computes the similarity matrix from the feature distance matrix.",#
+                 :fdape => "`ape`: Asset Panel producer, or `nothing` to read the panel that the returns data holds. A producer is configuration. It builds a static panel at the point of use, from the prior result and the returns of the subproblem that runs it. So a view passes it through, and a fold refits it.",#
+                 :fdsel => "`sel`: Feature Selector that names the Panel Fields that the Feature Matrix stacks, or `nothing` to stack the values of every field. An entry is a field name, a field paired with the levels or labels that it keeps, a field paired with one level or label, a tensor field paired with a [`LabelGroup`](@ref), or a field paired with `:observed`. The order of the vector is the order of the columns.",#
+                 :fdstrict => "`strict`: Whether a `sel` entry throws when it names a field, a level, a label or a group that the Asset Panel does not hold. When `strict` is `false`, the entry warns, and the estimator drops it.",#
                  :fdrows => "`rows`: The observation rows a time-varying Asset Panel stacks, as positions or as a `Bool` mask, and `Colon()` for every row. A static panel has no observation axis and refuses any other value.",#
                  :fdplc => "`placeholder`: The value that the Feature Matrix holds at a value column's cell that holds the placeholder of a blank that no fill reached, or `nothing` to keep the stored placeholder. A cell that a fill policy wrote holds data, and the Feature Matrix keeps its value. The default `NaN` shows where no data exists, so no reader takes the placeholder as data.",#
                  # Stats.
@@ -123,7 +123,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :Xv => "`X`: Data vector `observations × 1`.",#
                  :X_sub => "`X`: Returns matrix of the subproblem, `observations × assets`.",#
                  :X_Xv => "`X`: Data matrix or vector.",#
-                 :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
+                 :Z => "`Z`: Feature matrix, `assets × features` when `dims = 1` and `features × assets` when `dims = 2`. It can also be a 3-D array of time-varying features, whose first axis is always the observation axis: `observations × assets × features` when `dims = 1`, and `observations × features × assets` when `dims = 2`.",#
                  :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                  :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
                  :dims => "`dims`: Dimension along which the computation runs.",#

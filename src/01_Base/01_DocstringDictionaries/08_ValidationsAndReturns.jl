@@ -16,8 +16,8 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :sbn => "`0 <= n`. `Inf` is permitted and `NaN` is not.",#
                  :dims => "`dims in (1, 2)`.",#
                  :nan_frame => "When an asset is outside the Coverage Universe, the element type of the moment holds `NaN`. An `Integer` or a `Rational` element type raises an `ArgumentError`.",#
-                 :fd_panel => "The panel resolves. [`asset_panel`](@ref) raises an [`IsNothingError`](@ref) naming the site when it does not.",#
-                 :fd_strict => "Under `de.strict = true`, every entry of `de.sel` names a Panel Field, a level or a label that the panel holds. Raises an `ArgumentError`. Under `de.strict = false`, such an entry warns and is dropped.",#
+                 :fd_panel => "The panel resolves. [`asset_panel`](@ref) raises an [`IsNothingError`](@ref) that names the site when it does not.",#
+                 :fd_strict => "Under `de.strict = true`, every entry of `de.sel` names a Panel Field, a level, a label or a group that the panel holds. Raises an `ArgumentError`. Under `de.strict = false`, such an entry warns, and the estimator drops it.",#
                  :alpha => "`0 < alpha < 1`.",#
                  :alpha_tail0 => "If `alpha` is a number: `0 <= alpha < 1`. At `alpha = 0` the measure is the largest loss among the observations with positive weight, [`worst_positive_weight_loss`](@ref), and an observation with zero weight cannot set it.",#
                  :beta => "`0 < beta < 1`.",#
