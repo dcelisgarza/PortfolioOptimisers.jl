@@ -913,6 +913,29 @@
         rho_pdm = cor(GerberCovariance(; alg = Gerber0(), pdm = Posdef()), Xg)
         @test minimum(eigvals(Symmetric(rho_pdm))) >= 0
         @test !isapprox(rho_raw, rho_pdm)
+
+        # ---- the keyword arguments reach both the deviation and the centring ---------------
+        # The `kwargs...` bullet of `cor` and `cov` names `demean_returns` as well as the
+        # standard deviation estimator. A `mean` keyword moves both, so the matrix is the
+        # statistic of `X .- m` thresholded by the deviation about `m`.
+        Xk = randn(StableRNG(454), 60, 4)
+        mk = fill(0.4, 1, 4)
+        for a in (Gerber0(), Gerber1(), Gerber2())
+            cek = GerberCovariance(; alg = a, pdm = nothing)
+            sdk = std(cek.ve, Xk; dims = 1, mean = mk)
+            sdk .= max.(sdk, eps(eltype(sdk)))
+            rhok = cor(cek, Xk; mean = mk)
+            @test isapprox(rhok, PortfolioOptimisers.gerber(cek, Xk .- mk, sdk))
+            @test !isapprox(rhok, cor(cek, Xk))
+            @test isapprox(cov(cek, Xk; mean = mk),
+                           rhok .* (vec(sdk) * transpose(vec(sdk))))
+        end
+
+        # The `ce` bullet of each `gerber` method follows an interpolated key that already
+        # ends in a period, and once rendered as "estimator.. Configured".
+        gerber_doc = string(@doc PortfolioOptimisers.gerber)
+        @test !occursin(r"\.\. ", gerber_doc)
+        @test count("Its `alg` field is a `Gerber", gerber_doc) == 3
     end
     @testset "Gerber IQ zero threshold (#498)" begin
         # `c = 0` puts the noise threshold at zero. The gate `abs(x) < 0` then drops

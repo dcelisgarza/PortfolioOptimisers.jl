@@ -85,7 +85,7 @@ unique_key_dict!(math_dict, :math_dict,
                  # and `02_SmythBrobyCovariance.jl` and `03_GerberIQCovariance_a.jl`
                  # build on the same symbols.
                  :x_ti_ret => "``x_{t,\\,i}``: Return of asset ``i`` at observation ``t``.",#
-                 :t_threshold => "``t``: Threshold parameter, read as a standalone symbol; a subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero, and a return of exactly zero never crosses.",#
+                 :t_threshold => "``t``: Threshold parameter, when ``t`` is a symbol that stands alone. A subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero. A return of exactly zero never crosses.",#
                  :sigma_i_asset => "``\\sigma_i``: Standard deviation of asset ``i``.",#
                  :mu_hat_i_rank => "``\\hat{\\mu}_i``: ``i``-th entry of the characteristic vector, sorted non-increasing.",#
                  :sigma_i_ucs => "``\\sigma_i``: Per-asset scaling of the ``i``-th entry of the characteristic vector; ``1`` when the set is unscaled.",#
