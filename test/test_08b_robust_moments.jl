@@ -2917,4 +2917,31 @@ struct UnresolvedDecay <: PO.GerberIQDecayEstimator end
         end
         @test worst <= 1
     end
+
+    @testset "A one-sided co-movement reaches Gerber1 and Gerber2 (#456)" begin
+        # The diagram bullets of the three templates once said that only `Gerber1` reads a
+        # co-movement with one return inside the noise zone. `Gerber2` reads it too: the
+        # asset that crosses adds its diagonal projection to the denominator. `Gerber0`
+        # ignores it. The last row of `X1` moves asset 1 alone.
+        X0 = [1.0 1.0; -1.0 -1.0; 1.0 -1.0; 1.0 1.0; -1.0 -1.0]
+        X1 = vcat(X0, [3.0 0.0])
+        sd1 = ones(1, 2)
+        no_decay = ExpGerberIQDecay(; e = 100, y = 0.0)
+        function rho(a, Xs)
+            ce1 = GerberIQCovariance(; alg = a, pdm = nothing, decay = no_decay,
+                                     sc = AssetVolatilityGerberIQScaler(), c = 0.1)
+            return PortfolioOptimisers.gerber_IQ(ce1, Xs, sd1)[1, 2]
+        end
+        @test rho(Gerber0(), X1) == rho(Gerber0(), X0)
+        @test rho(Gerber1(), X1) < rho(Gerber1(), X0)
+        @test rho(Gerber2(), X1) < rho(Gerber2(), X0)
+
+        # The `ex` field docstring follows `field_dict[:ex]`, which already ends in a
+        # period, and once rendered as "strategy..".
+        iq_doc = Docs.meta(PortfolioOptimisers)[Docs.Binding(PortfolioOptimisers,
+                                                             :GerberIQCovariance)]
+        iq_ex = strip(first(values(iq_doc.docs)).data[:fields][:ex])
+        @test endswith(iq_ex, "strategy.")
+        @test !endswith(iq_ex, "..")
+    end
 end
