@@ -3728,8 +3728,8 @@ end
 
     @testset "`DirectHb` sums signed mass, and no shipped route can reach one" begin
         #=
-        `PMFG_T2s`' docstring warns that a cancelling row manufactures a separating bubble
-        and that the failure is silent. Both halves are true, and the second is why the
+        `PMFG_T2s`' docstring warns that a negative weight can change the set of converging
+        bubbles and that the failure is silent. Both halves are true, and the second is why the
         first cannot arrive from a configuration this library ships.
 
         The reachability first: `PMFG_T2s` refuses a negative weight with a `DomainError`,
@@ -4609,4 +4609,55 @@ end
         @test isapprox(res2, d2)
         @test isapprox(res1, d1)
     end
+end
+@testset "The DBHT and LoGo docstrings state what the code returns (#469)" begin
+    using PortfolioOptimisers, Test, StableRNGs, Statistics, SparseArrays
+    rng = StableRNG(469)
+    X469 = randn(rng, 400, 20)
+    sigma469 = cov(X469)
+    # `LoGo_dist_assert` reads the asset axis of `X` from `dims`. The transposed data of a
+    # variation of information estimator gives the same matrix, and a short asset axis
+    # raises on either orientation.
+    for de in (Distance(; alg = VariationInfoDistance()),
+               DistanceDistance(; alg = VariationInfoDistance()))
+        je = LoGo(; de = de)
+        @test isapprox(PortfolioOptimisers.logo(je, sigma469, X469),
+                       PortfolioOptimisers.logo(je, sigma469, permutedims(X469); dims = 2))
+        @test_throws DimensionMismatch PortfolioOptimisers.logo(je, sigma469, X469[:, 1:10])
+        @test_throws DimensionMismatch PortfolioOptimisers.logo(je, sigma469,
+                                                                permutedims(X469[:, 1:10]);
+                                                                dims = 2)
+    end
+    # A default `LoGo()` reads no axis of `X`, so a mismatched `X` passes.
+    @test PortfolioOptimisers.logo(LoGo(), sigma469, X469[:, 1:10]) isa Matrix
+    # The method returns `sigma`, as the interface of the family states.
+    s469 = copy(sigma469)
+    @test PortfolioOptimisers.matrix_processing_algorithm!(LoGo(), s469, X469) === s469
+    @test isapprox(s469, PortfolioOptimisers.logo(LoGo(), sigma469, X469))
+
+    # `DBHTs` returns `Z` after `turn_into_Hclust_merges`, in the convention of
+    # `Clustering.Hclust`. With no branch order, its columns are the merges and heights.
+    cle = ClustersEstimator(; alg = DBHT())
+    S469, D469 = cor_and_dist(cle.de, cle.ce, X469)
+    S469 = PortfolioOptimisers.distance_to_similarity(cle.alg.sim; S = S469, D = D469)
+    _, Rpm, _, _, Mv, Z, hcl = PortfolioOptimisers.DBHTs(D469, S469; branchorder = :default)
+    @test size(Z) == (19, 4)
+    @test hcl.merges == Int.(Z[:, 1:2])
+    @test hcl.heights == Z[:, 3]
+    @test Z[end, 4] == 20
+
+    # `clique3`: each candidate edge has its smaller vertex first, and each vertex of
+    # `K3[n]` closes a triangle on edge `n`.
+    A = Rpm .!= 0
+    K3, E, cl = PortfolioOptimisers.clique3(A)
+    @test all(E[:, 1] .< E[:, 2])
+    @test all(all(A[E[n, 1], k] && A[E[n, 2], k] for k in K3[n]) for n in eachindex(K3))
+    # `FindDisjoint` puts every vertex outside the clique in `IndxNot`.
+    @test PortfolioOptimisers.FindDisjoint(A, cl[1, :])[2] == setdiff(1:20, cl[1, :])
+    # The element types of the bubble tree and of the directed bubble tree.
+    _, H2, Mb, CliqList, _ = PortfolioOptimisers.CliqHierarchyTree2s(Rpm)
+    @test eltype(H2) == Bool
+    @test Mb isa Matrix{Int}
+    @test PortfolioOptimisers.DirectHb(Rpm, H2, Mb, Mv, CliqList)[1] isa
+          SparseMatrixCSC{Float64, Int}
 end

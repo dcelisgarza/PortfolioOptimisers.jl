@@ -1,15 +1,19 @@
 """
     PMFG_T2s(W::MatNum, nargout::Integer = 3)
 
-Constructs a Triangulated Maximally Filtered Graph (TMFG) starting from a tetrahedron and recursively inserting vertices inside existing triangles (T2 move) in order to approximate the maximal planar graph with the largest total weight. The Planar Maximally Filtered Graph (PMFG) is an earlier approximation to the same graph. All weights must be non-negative.
+Build a Triangulated Maximally Filtered Graph (TMFG), an approximation of the maximal planar graph of the largest total weight.
 
-This function is a core step in the DBHT (Direct Bubble Hierarchical Tree) and LoGo algorithms, providing the planar graph structure and clique information required for hierarchical clustering and sparse inverse covariance estimation.
+The function starts from a tetrahedron. At each step it inserts one vertex into a triangular face, the T2 move. The Planar Maximally Filtered Graph (PMFG) is an earlier approximation of the same graph. All weights must be non-negative.
 
-`nargout` is a **positional** argument, and every caller passes it positionally.
+[`DBHTs`](@ref), [`logo!`](@ref) and the network estimators call this function. It gives them the planar graph and its cliques. DBHT clusters the assets on them, and LoGo computes a sparse precision matrix on them.
 
-# The TMFG approximates the PMFG, and is not it
+`nargout` is a positional argument, and every caller passes it as one.
 
-The weighted maximal planar graph problem asks for the maximal planar subgraph of the largest total weight, and it is NP-complete. Neither graph solves it exactly. The planar maximally filtered graph of [tumminello2005](@cite) is a greedy heuristic: it takes the edges in order of weight, and it keeps an edge while the graph stays planar. The triangulation this function builds is a different and cheaper heuristic, from [PMFG](@cite): it inserts vertices, not edges, so the two graphs differ in general. The name of the function names the PMFG, and the algorithm builds the TMFG. Both are maximal planar graphs, so both carry exactly ``3N - 6`` edges against the ``N - 1`` of a minimum spanning tree.
+# The TMFG is not the PMFG
+
+The problem of the weighted maximal planar graph asks for the maximal planar subgraph of the largest total weight, and it is NP-complete. Neither graph solves it exactly. The planar maximally filtered graph of [tumminello2005](@cite) is a greedy heuristic. It takes the edges in order of weight, and it keeps an edge while the graph stays planar.
+
+The TMFG that this function builds is a different and cheaper heuristic, from [PMFG](@cite). It inserts vertices, not edges, so the two graphs are different in general. The name of the function names the PMFG, but the algorithm builds the TMFG. Both are maximal planar graphs, so each has exactly ``3N - 6`` edges. A minimum spanning tree has ``N - 1``.
 
 Steps 1 and 2 below are a rule of the MATLAB code that accompanies [DBHTs](@cite). Algorithm 1 of [PMFG](@cite) starts from the tetrahedron of the largest total weight. Steps 9 to 11 and the bound `N >= 9` come from the same code, not from [PMFG](@cite).
 
@@ -30,52 +34,49 @@ Where:
   - ``f``: Triangular face, a set of three vertices.
   - ``F``: Set of the faces built so far.
   - ``V``: Set of the vertices inserted so far.
-  - ``g(v,\\, f)``: Gain of inserting vertex ``v`` into face ``f``.
+  - ``g(v,\\, f)``: Gain of the insertion of vertex ``v`` into face ``f``.
   - $(math_dict[:N])
 
 # Algorithm
 
  1. Score every vertex by `s`, the row sum of `W` over the entries above the mean of `W`.
  2. Take the four vertices of largest `s` as `in_v[1:4]`, and the rest as `ou_v`.
- 3. Build the tetrahedron on those four vertices: its four faces into `tri[1:4, :]`, and its six edges into `A`.
- 4. Build the gain table `gain[v, f]`, one entry per vertex of `ou_v` and per face of `tri`.
- 5. Take the pair of largest gain, giving the vertex `ve` and the face `agm`. Remove `ve` from `ou_v` and record it in `in_v`.
- 6. Join `ve` to the three vertices of face `agm` in `A`, and record that face in `clique3`, so it becomes a 3-clique that is no longer a face.
- 7. Replace face `agm` and append two more, so the three faces of the split each carry `ve`.
- 8. Rebuild the three changed columns of `gain`, and zero the row of `ve`. Repeat from step 5 until every vertex is inserted.
- 9. Weight the structure: `A = W ⊙ ((A + A') .== 1)`, so a stored entry is an edge and its value is its weight.
-10. When `nargout > 3`, build `cliques`: the initial tetrahedron, then one 4-clique per inserted vertex, holding the face it entered and itself.
-11. When `nargout > 4`, build `cliqueTree`: for each 4-clique, count in `ss` how many of its first three vertices every 4-clique holds, and mark the ones whose count is `2`.
+ 3. Build the tetrahedron on those four vertices. Write its four faces into `tri[1:4, :]`, and its six edges into `A`.
+ 4. Build the gain table `gain[v, f]`, one entry for each vertex of `ou_v` and each face of `tri`.
+ 5. Take the pair of largest gain, which gives the vertex `ve` and the face `agm`. Remove `ve` from `ou_v` and record it in `in_v`.
+ 6. Join `ve` to the three vertices of face `agm` in `A`, and record that face in `clique3`. The face becomes a 3-clique that is not a face.
+ 7. Replace face `agm` and append two more, so each of the three faces of the split has `ve`.
+ 8. Compute the three changed columns of `gain` again, and set the row of `ve` to zero. Repeat from step 5 until `ou_v` is empty.
+ 9. Weight the structure with `A = W ⊙ ((A + A') .== 1)`, so a stored entry is an edge and its value is its weight.
+10. When `nargout > 3`, build `cliques`. Its first row is the first tetrahedron. Each other row is the 4-clique of one inserted vertex, which holds the face that the vertex entered and the vertex.
+11. When `nargout > 4`, build `cliqueTree`. For each 4-clique, count in `ss` how many of its first three vertices each 4-clique holds, and mark the 4-cliques whose count is `2`.
 
 # Arguments
 
-  - `W`: `N × N` matrix of non-negative, finite weights (e.g. a similarity matrix from an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), or an absolute correlation matrix).
-  - `nargout`: Number of outputs to build. `cliques` is built when `nargout > 3` and `cliqueTree` when `nargout > 4`; each is `nothing` otherwise. The first three outputs are always built.
+  - `W`: `N × N` matrix of non-negative, finite weights, such as a similarity matrix of an [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) or an absolute correlation matrix.
+  - `nargout`: Number of outputs to build. The function builds `cliques` when `nargout > 3`, and `cliqueTree` when `nargout > 4`. Each is `nothing` otherwise. The function always builds the first three outputs.
 
 # Validation
 
-  - `N >= 9` is required for a meaningful TMFG.
-  - No entry in `W` is `NaN`.
-  - All entries in `W` are non-negative.
+  - `size(W, 1) >= 9`, raising `DimensionMismatch`.
+  - No entry of `W` is `NaN`, raising `DomainError`.
+  - Every entry of `W` is non-negative, raising `DomainError`.
 
-An entry that is exactly zero passes all three and still costs the graph an edge, because `A` carries
-the structure in its sparsity pattern and this function declines no edge on the way in. That is
-[`assert_pmfg_weights`](@ref)'s check, and it runs in the callers that consume the weighted structure
-rather than here, because [`logo!`](@ref) reads only the cliques and is unaffected by a zero.
+An entry that is exactly zero passes all three checks, but the graph loses an edge for it. `A` holds the structure in its sparsity pattern, and this function refuses no edge. [`assert_pmfg_weights`](@ref) holds that check. The callers that read the weighted structure run it. This function does not run it, because [`logo!`](@ref) reads only the cliques, and a zero does not change its result.
 
-# The checks are a backstop, not the enforcement
+# The estimators refuse a negative weight first
 
-Every estimator that reaches this function — [`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) — bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref) and calls [`assert_similarity_domain`](@ref) before it transforms, so a shipped configuration that would fail here fails earlier, at construction or in `assert_similarity_domain`, with a message that names the configuration rather than `W`.
+[`NetworkEstimator`](@ref), [`DBHT`](@ref) and [`LoGo`](@ref) reach this function. Each bounds its similarity field by [`AbstractNonNegativeSimilarityMatrixAlgorithm`](@ref), and each calls [`assert_similarity_domain`](@ref) before it maps the distances. Thus a configuration of the library that fails here fails earlier, in the constructor or in `assert_similarity_domain`. The message of that error names the configuration and not `W`.
 
-These two checks are kept for the case those cannot cover: that family is open **by declaration**, so an extension can subtype it and return a negative anyway. The failure downstream is silent — `DirectHb` sums signed mass and a cancelling row manufactures a separating bubble — so a wrong clustering would come back with no error at all.
+The two checks of this function cover the case that the estimators cannot cover. Any package can subtype that family, so an extension can return a negative weight. Without the checks, the error downstream is silent. [`DirectHb`](@ref) sums signed weights, so a negative weight can change the set of converging bubbles, and the result is a wrong clustering with no error.
 
 # Returns
 
-  - `A::SparseMatrixCSC{<:Number, Int}`: Adjacency matrix of the TMFG with weights.
-  - `tri::Matrix{Int}`: List of triangles (triangular faces) in the TMFG.
-  - `clique3::Matrix{Int}`: List of 3-cliques that are not triangular faces; all 3-cliques are given by `[tri; clique3]`.
-  - `cliques::Option{Matrix{Int}}`: List of all 4-cliques (tetrahedra), or `nothing` if `nargout <= 3`.
-  - `cliqueTree::Option{SparseMatrixCSC{Int, Int}}`: 4-cliques tree structure (adjacency matrix), or `nothing` if `nargout <= 4`.
+  - `A::SparseMatrixCSC{<:Number, Int}`: Weighted adjacency matrix of the TMFG.
+  - `tri::Matrix{Int}`: List of the triangular faces of the TMFG, one face for each row.
+  - `clique3::Matrix{Int}`: List of the 3-cliques that are not triangular faces, one 3-clique for each row. `[tri; clique3]` holds every 3-clique.
+  - `cliques::Option{Matrix{Int}}`: List of every 4-clique, a tetrahedron, one for each row, or `nothing` if `nargout <= 3`.
+  - `cliqueTree::Option{SparseMatrixCSC{Int, Int}}`: Adjacency matrix of the tree of the 4-cliques, or `nothing` if `nargout <= 4`.
 
 # Related
 
@@ -199,39 +200,39 @@ end
                         sim::Option{<:AbstractSimilarityMatrixAlgorithm} = nothing,
                         de::Option{<:AbstractDistanceEstimator} = nothing)
 
-Check that the weights did not delete an edge from the graph [`PMFG_T2s`](@ref) built.
+Check that no zero weight removed an edge from the graph that [`PMFG_T2s`](@ref) built.
 
-A maximal planar graph on `N >= 3` vertices has exactly `3N - 6` edges, and [`PMFG_T2s`](@ref) returns the structure and the weights in one matrix, `A = W ⊙ ((A + A') .== 1)`. An **exactly zero** weight is therefore an *absent* edge rather than a weak one, and what reaches the consumer is no longer a PMFG. This function counts the stored edges and refuses the difference.
+A maximal planar graph on `N >= 3` vertices has exactly `3N - 6` edges. [`PMFG_T2s`](@ref) returns the structure and the weights in one matrix, `A = W ⊙ ((A + A') .== 1)`. Thus a weight that is exactly zero is an absent edge, not a weak edge, and the consumer does not get a PMFG. This function counts the stored edges, and it refuses a count that is not `3N - 6`.
 
-# The zero is admissible input and an unusable structure
+# A zero weight is a valid input, but it removes an edge
 
-[`PMFG_T2s`](@ref)'s own check is `>= 0` and stays that way, because a zero is an honest similarity. [`ExponentialSimilarity`](@ref) maps the infinite distance [`LogDistance`](@ref) returns at an exactly zero correlation to `exp(-Inf)`, which is `0` exactly, and [`ComplementSimilarity`](@ref) maps `D = 1` to `0`. The value is right. What it cannot do is carry an edge.
+The check of [`PMFG_T2s`](@ref) is `>= 0`, because zero is a correct similarity. [`LogDistance`](@ref) returns an infinite distance at a correlation of exactly zero, and [`ExponentialSimilarity`](@ref) maps it to `exp(-Inf)`, which is exactly `0`. [`ComplementSimilarity`](@ref) maps `D = 1` to `0`. The value is correct, but a zero weight cannot hold an edge.
 
-Without this check the failure is a `BoundsError` about a matrix index, raised much later inside [`turn_into_Hclust_merges`](@ref), because [`HierarchyConstruct4s`](@ref) then builds fewer merges than the dendrogram needs.
+Without this check, the error is a `BoundsError` about a matrix index. [`turn_into_Hclust_merges`](@ref) raises it much later, because [`HierarchyConstruct4s`](@ref) then builds fewer merges than the dendrogram needs.
 
-# Where it runs, and where it deliberately does not
+# The callers that run the check
 
-At the three sites that consume the **weighted** structure: [`DBHTs`](@ref), [`calc_weighted_adjacency_graph`](@ref) and [`calc_distance_weighted_graph`](@ref).
+The three callers that read the weighted structure run it: [`DBHTs`](@ref), [`calc_weighted_adjacency_graph`](@ref) and [`calc_distance_weighted_graph`](@ref).
 
-[`logo!`](@ref) is the fourth [`PMFG_T2s`](@ref) caller and is **not** guarded. It reads separators and cliques, which [`PMFG_T2s`](@ref) derives from the insertion order rather than from `A`, so a zero weight does not change its answer and refusing it would refuse a configuration that works.
+[`logo!`](@ref) is the fourth caller of [`PMFG_T2s`](@ref), and it does not run the check. It reads the separators and the cliques. [`PMFG_T2s`](@ref) derives them from the order of insertion and not from `A`, so a zero weight does not change the result of `logo!`. A refusal there would refuse a configuration that works.
 
 # Algorithm
 
- 1. Count the stored non-zero entries of `A` and halve them, giving `edges`. `A` is symmetric, so each edge is stored twice.
- 2. Build `source`, the part of the message that names the configuration, from as much of `sim` and `de` as the caller passed.
+ 1. Count the non-zero entries of `A`, and divide the count by two, which gives `edges`. `A` is symmetric, so it stores each edge two times.
+ 2. Build `source`, the part of the message that names the configuration, from the parts of `sim` and `de` that the caller gives.
  3. Raise a `DomainError` when `edges` is not `expected`, which is `3N - 6`.
 
 # Arguments
 
   - `A`: `N × N` weighted adjacency matrix, the first output of [`PMFG_T2s`](@ref).
-  - `sim`: Similarity matrix algorithm that produced the weights, named in the message. Read for nothing else, as [`assert_similarity_domain`](@ref) reads its `de`.
-  - `de`: Distance estimator the similarity was derived from, named in the message beside `sim`.
+  - `sim`: Similarity matrix algorithm that made the weights. The message names it, and the function reads it for nothing else, as [`assert_similarity_domain`](@ref) reads its `de`.
+  - `de`: Distance estimator from which the similarity comes. The message names it next to `sim`.
 
-Each caller passes what it holds, so the message names as much of the configuration as the site knows. [`calc_distance_weighted_graph`](@ref) holds both halves, [`calc_weighted_adjacency_graph`](@ref) and [`DBHTs`](@ref) hold the similarity, and a caller that holds only the matrices names neither.
+Each caller gives the parts that it holds, so the message names all of the configuration that the caller knows. [`calc_distance_weighted_graph`](@ref) holds both parts, [`calc_weighted_adjacency_graph`](@ref) and [`DBHTs`](@ref) hold the similarity, and a caller that holds only the matrices names neither.
 
 # Validation
 
-  - The number of stored edges is `3N - 6`.
+  - The number of stored edges is `3N - 6`, raising `DomainError`.
 
 # Returns
 

@@ -1,15 +1,15 @@
 """
     distance_wei(L::MatNum)
 
-Compute the shortest weighted path lengths between all node pairs in a network.
+Compute the length of the shortest weighted path between each pair of vertices of a network.
 
-This function computes the distance matrix containing the lengths of the shortest paths between all node pairs in a (possibly weighted) network, using Dijkstra's algorithm. An entry `[u, v]` represents the length of the shortest path from node `u` to node `v`. The average shortest path length is the characteristic path length of the network.
+The function runs the algorithm of Dijkstra on a weighted or unweighted network. Entry `[u, v]` of the result is the length of the shortest path from vertex `u` to vertex `v`. The mean of the shortest path lengths is the characteristic path length of the network.
 
 !!! note
 
     It ports the function `distance_wei` of the Brain Connectivity Toolbox of [rubinovsporns2010](@citet).
 
-The algorithm is Problem 2 of [dijkstra1959](@cite), which settles the vertices in order of increasing distance from the source, and which holds on a directed graph by its Remark 1. The toolbox runs it from every source, settles every vertex at the least distance in one step, and counts the edges of each path in `B`. [dijkstra1959](@cite) states none of the three.
+The algorithm is Problem 2 of [dijkstra1959](@cite). It settles the vertices in the order of their distance from the source, and by its Remark 1 it holds on a directed graph. The toolbox runs it from every source, settles every vertex at the least distance in one step, and counts the edges of each path in `B`. [dijkstra1959](@cite) states none of the three.
 
 # Mathematical definition
 
@@ -42,18 +42,18 @@ A pair that no path joins keeps ``D_{u,\\,v} = \\infty``, because the minimum ov
 
 # Arguments
 
-  - `L`: `N × N` directed or undirected connection-length matrix.
+  - `L`: `N × N` connection-length matrix of a directed or undirected network.
 
-      + Lengths between disconnected nodes should be set to `Inf`.
-      + Lengths on the main diagonal should be set to `0`.
+      + A pair with no edge holds `0` or `Inf`. The function reads only the non-zero entries, and an `Inf` length never gives a shorter path, so the two values give the same result.
+      + The main diagonal holds `0`.
 
 !!! note
 
-    The input matrix must be a connection-length matrix, typically obtained by mapping weights to lengths (e.g., inverse of a similarity or correlation matrix). In weighted networks, shortest weighted paths may traverse more edges than shortest binary paths.
+    The input matrix must hold lengths, not weights. A caller maps each weight to a length, for example with the reciprocal of a similarity. [`DBHTs`](@ref) puts the entries of its distance matrix on the edges of the TMFG. In a weighted network, a shortest weighted path can have more edges than a shortest binary path.
 
 # Returns
 
-  - `D::Matrix{<:Number}`: `N × N` shortest weighted path length matrix. `D[u, v]` is the length of the shortest path from vertex `u` to vertex `v`.
+  - `D::Matrix{<:Number}`: `N × N` matrix of the lengths of the shortest weighted paths. `D[u, v]` is the length of the shortest path from vertex `u` to vertex `v`.
   - `B::Matrix{Int}`: `N × N` matrix of the edge count of each shortest weighted path.
 
 # Related
@@ -112,38 +112,38 @@ end
 """
     breadth(CIJ::MatNum, source::Integer)
 
-Breadth-first search.
+Run a breadth-first search from one source vertex.
 
-This function performs a breadth-first search (BFS) on a binary (directed or undirected) connection matrix, starting from a specified source vertex. It computes the shortest path distances from the source to all other vertices and records the predecessor (branch) for each node in the BFS tree. The tree holds one shortest path per reachable vertex, and not every shortest path, so `branch` reconstructs one route of minimum length rather than all of them.
+The function searches a binary connection matrix of a directed or undirected graph, from the vertex `source`. It computes the shortest path distance from the source to each other vertex. It records in `branch` the predecessor of each vertex in the search tree. The tree holds one shortest path for each reachable vertex, and not every shortest path, so `branch` gives one path of minimum length to each vertex.
 
 !!! note
 
     It ports the function `breadth` of the Brain Connectivity Toolbox of [rubinovsporns2010](@citet).
 
-Breadth-first search is older than the toolbox. No copy of the work that first states it was found, so the search follows the toolbox alone.
+Breadth-first search is older than the toolbox. The library has no copy of the work that first states it, so this function follows the toolbox alone.
 
 # Algorithm
 
  1. Colour every vertex white, set every entry of `distance` to `Inf`, and set every entry of `branch` to zero.
  2. Colour `source` grey, set its distance to zero and its branch to `-1`, and put it in the queue `Q`.
  3. Take the head `u` of `Q`, and read its out-neighbours `ns` from the stored entries of row `u`.
- 4. For each neighbour `v` whose distance is still zero, set it to `distance[u] + 1`. The source starts at zero, so this arm also fires on the source itself as soon as one of its own neighbours is expanded.
+ 4. For each neighbour `v` whose distance is still zero, set it to `distance[u] + 1`. The distance of the source starts at zero, so this step also changes it when the search expands a neighbour of the source.
  5. For each white neighbour `v`, colour it grey, set `distance[v]` to `distance[u] + 1`, set `branch[v]` to `u`, and append `v` to `Q`.
  6. Drop `u` from `Q` and colour it black. Repeat from step 3 until `Q` is empty.
 
 !!! warning
 
-    `distance[source]` does not stay `0`. Step 4 fires on the source itself the first time one of the source's own neighbours is expanded, so on an undirected graph without a self-loop the entry ends at `2`, and at `1` where the graph carries a self-loop on the source. This is the behaviour of the MATLAB original. All three callers reset the entry after the call: [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) each write a `0` into it. On a five-vertex path with a leaf, the source reads `2.0`.
+    `distance[source]` does not stay `0`. Step 4 changes it the first time that the search expands a neighbour of the source. On an undirected graph with no self-loop, the entry ends at `2`. When the graph has a self-loop on the source, it ends at `1`. The MATLAB original has the same behaviour. [`FindDisjoint`](@ref), [`DirectHb`](@ref) and [`BubbleCluster8s`](@ref) call this function, and each writes `0` into the entry after the call.
 
 # Arguments
 
-  - `CIJ`: `N × N` binary (0/1) connection matrix representing the graph. Row `u` holds the out-neighbours of vertex `u`.
-  - `source`: Index of the source vertex from which to start the search.
+  - `CIJ`: `N × N` binary connection matrix of the graph. A non-zero entry is an edge. Row `u` holds the out-neighbours of vertex `u`.
+  - `source`: Index of the vertex where the search starts.
 
 # Returns
 
-  - `distance::VecNum`: `N × 1` vector of shortest path distances from the source to each vertex, in the type a division of `CIJ`'s entries lands in. `Inf` marks a vertex no path reaches. The source's own entry is **not** `0`; see the warning above.
-  - `branch::Vector{Int}`: `N × 1` vector of predecessor indices for each vertex in the BFS tree (`-1` for the source, `0` for an unreachable vertex).
+  - `distance::VecNum`: `N × 1` vector of the shortest path distance from the source to each vertex. Its element type is `float_if_integer(eltype(CIJ))`, so an integer or `Bool` matrix gives a floating-point vector. `Inf` marks a vertex that no path reaches. The entry of the source is not `0`, as the warning states.
+  - `branch::Vector{Int}`: `N × 1` vector of the predecessor of each vertex in the search tree. It is `-1` at the source and `0` at an unreachable vertex.
 
 # Related
 
