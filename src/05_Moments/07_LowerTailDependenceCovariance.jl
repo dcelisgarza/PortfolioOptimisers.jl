@@ -1,11 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Measures co-movement in the lower tail: the share of an asset's worst returns that fall on the same dates as another's.
+Measures co-movement in the lower tail, the share of the worst returns of one asset that fall on the same dates as the worst returns of another asset.
 
-The statistic is the empirical lower tail dependence coefficient at level `alpha`. It captures the dependence that matters for joint drawdowns and for stress scenarios, which a full-sample correlation averages away.
+The statistic is the empirical lower tail dependence coefficient at the level `alpha`. It measures the dependence of joint drawdowns and of stress scenarios. A correlation over the full sample mixes that dependence with the dependence of the rest of the distribution.
 
-The coefficient is the limit ``\\lambda_L = \\lim_{v \\to 0^{+}} \\Pr[U_1 \\leq v \\mid U_2 \\leq v]`` of the conditional probability that one series is in its lower tail given the other is. Section 2 and Equation 1 of [luca2011](@cite) state it, and in terms of the copula ``C`` as ``\\lim_{v \\to 0^{+}} C(v,\\, v) / v``. In the dependence function ``\\Omega`` of Definition 1 of [sibuya1960](@cite), ``\\Pr(X < x,\\, Y < y) = \\Omega(G, H)\\,G\\,H``, so ``\\lambda_L`` is the limit of ``v\\,\\Omega(v,\\, v)``. That work does not name the coefficient, and it does not state an estimator of it. The estimator the library computes is the count of joint exceedances over ``k = \\lceil T \\alpha \\rceil``, which is the rank form of the empirical lower tail copula at ``(1,\\, 1)`` in Equations 12 and 16 of Section 4 of [schmidt2006](@cite). [luca2011](@cite) estimates the coefficient from a fitted Archimedean copula instead, so it does not state this estimator. `alpha` sets the tail fraction ``k / T`` and so is the library's name for the threshold of that estimator.
+The coefficient is the limit ``\\lambda_L = \\lim_{v \\to 0^{+}} \\Pr[U_1 \\leq v \\mid U_2 \\leq v]`` of the conditional probability that one series is in its lower tail when the other series is in its lower tail. Section 2 and Equation 1 of [luca2011](@cite) state it, and they also state it with the copula ``C`` as ``\\lim_{v \\to 0^{+}} C(v,\\, v) / v``. Definition 1 of [sibuya1960](@cite) gives the dependence function ``\\Omega``, with ``\\Pr(X < x,\\, Y < y) = \\Omega(G, H)\\,G\\,H``, so ``\\lambda_L`` is the limit of ``v\\,\\Omega(v,\\, v)``. That work does not name the coefficient, and it does not state an estimator of it.
+
+The library counts the joint exceedances and divides the count by ``k = \\lceil T \\alpha \\rceil``. This is the rank form of the empirical lower tail copula at ``(1,\\, 1)`` in Equations 12 and 16 of Section 4 of [schmidt2006](@cite). [luca2011](@cite) estimates the coefficient from a fitted Archimedean copula, so it does not state this estimator. `alpha` sets the tail fraction ``k / T``, so `alpha` is the threshold of that estimator.
 
 # Fields
 
@@ -106,15 +108,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`LowerTailDependenceCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:LowerTailDependenceCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:LowerTailDependenceCovariance, true)` to render it.
 
 # Arguments
 
-  - `::LowerTailDependenceCovariance`: Lower tail dependence covariance estimator, read for its type alone.
+  - `::LowerTailDependenceCovariance`: The lower tail dependence covariance estimator. The method reads only its type.
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:ve, :alpha, :ex)`.
+  - `fields::Tuple`: The names of the fields to render, `(:ve, :alpha, :ex)`.
 
 # Related
 
@@ -127,13 +129,13 @@ show_fields(::LowerTailDependenceCovariance) = (:ve, :alpha, :ex)
     lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                           ex::FLoops.Transducers.Executor = FLoops.SequentialEx())
 
-Compute the lower tail dependence matrix for a set of asset returns.
+Compute the lower tail dependence matrix of a matrix of asset returns.
 
-The lower tail dependence (LTD) between two assets quantifies the probability that both assets experience returns in their respective lower tails (i.e., joint drawdowns or adverse events), given a specified quantile level `alpha`. This function estimates the LTD matrix for all pairs of assets in the input matrix `X`, which is particularly useful for risk management and stress testing.
+The lower tail dependence of two assets is the probability that the returns of the two assets are in their lower tails at the same time, at the quantile level `alpha`. The function estimates it for each pair of columns of `X`.
 
 # Mathematical definition
 
-For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil``, let ``\\hat{q}_i`` denote the empirical ``\\alpha``-quantile of asset ``i`` (the ``k``-th order statistic). The lower tail dependence between assets ``i`` and ``j`` is estimated as:
+For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil``, let ``\\hat{q}_i`` be the empirical ``\\alpha``-quantile of asset ``i``, which is the ``k``-th order statistic. The estimate of the lower tail dependence of assets ``i`` and ``j`` is:
 
 ```math
 \\begin{align}
@@ -141,38 +143,40 @@ For a quantile level ``\\alpha \\in (0,1)`` and ``k = \\lceil T \\alpha \\rceil`
 \\end{align}
 ```
 
-The resulting matrix is symmetric with entries clamped to ``[\\sqrt{\\varepsilon},\\, 1]``, where ``\\varepsilon`` is the machine epsilon of `eltype(X)`. **The floor is not zero.** A pair whose tails never coincide is reported as `1.4901161193847656e-8` for a `Float64` input, so a caller may divide by an entry or take its logarithm.
-
 Where:
 
-  - ``\\hat{\\lambda}_{ij}``: Lower tail dependence estimate between assets ``i`` and ``j``.
+  - ``\\hat{\\lambda}_{ij}``: The estimate of the lower tail dependence of assets ``i`` and ``j``.
   - $(math_dict[:T])
   - $(math_dict[:alpha_rm])
-  - ``k = \\lceil T \\alpha \\rceil``: Number of observations in the lower tail.
-  - ``x_{ti}``: Return of asset ``i`` at time ``t``.
-  - ``\\hat{q}_i``: Empirical ``\\alpha``-quantile of asset ``i``.
+  - ``k = \\lceil T \\alpha \\rceil``: The number of observations in the lower tail.
+  - ``x_{ti}``: The return of asset ``i`` at time ``t``.
+  - ``\\hat{q}_i``: The empirical ``\\alpha``-quantile of asset ``i``.
+
+The function clamps each entry of the symmetric result to ``[\\sqrt{\\varepsilon},\\, 1]``, where ``\\varepsilon`` is the machine epsilon of `eltype(X)`. The floor is not zero. A pair whose tails never coincide gets `1.4901161193847656e-8` for a `Float64` input, so a caller can divide by an entry or take its logarithm.
 
 # Algorithm
 
- 1. Set ``k = \\lceil T \\alpha \\rceil``, the number of observations the lower tail holds, and allocate the result as a matrix of zeros. The allocation is `zeros` and not `undef`, so a `k` of zero reaches the caller as zeros and never as uninitialised memory.
- 2. When `k` is zero, return that zero matrix. `# Validation` states the two cases that reach this branch.
- 3. Copy `X`, and partially sort each column of the copy about position `k`. Position `k` of the sorted column is the ``k``-th order statistic, which is the empirical ``\\alpha``-quantile of that asset.
- 4. Build the whole boolean mask, one column at a time: entry `(t, j)` is true when ``x_{tj}`` is at or below the quantile of step 3. The mask is complete before any pair is counted, because the pair loop of step 5 reads a column of lower index than the one it writes.
- 5. For each pair ``(i, j)`` with ``i \\leq j``, count the observations whose two mask entries are both true, divide that count by `k`, and clamp the ratio to ``[\\sqrt{\\varepsilon},\\, 1]``. Write the clamped value into both `rho[i, j]` and `rho[j, i]`. The executor `ex` runs this loop.
+ 1. Set ``k = \\lceil T \\alpha \\rceil``, the number of observations in the lower tail. Allocate the result as a matrix of zeros. The allocation is `zeros` and not `undef`, so the caller gets zeros and not uninitialised memory when `k` is not positive.
+ 2. If `k` is not positive, return the zero matrix. The `# Validation` section states the cases that get to this branch.
+ 3. Copy `X`. Partially sort each column of the copy about position `k`. Position `k` of the sorted column is then the ``k``-th order statistic, which is the empirical ``\\alpha``-quantile of that asset.
+ 4. Fill the boolean mask one column at a time. Entry `(t, j)` is true when ``x_{tj}`` is at or below the quantile of step 3. The method fills all of the mask before step 5. Iteration `j` of the threaded loop of step 5 reads each column `i <= j`, so a mask that the loop fills itself can be incomplete when an iteration reads it.
+ 5. For each pair ``(i, j)`` with ``i \\leq j``, count the observations at which the two mask entries are true. Divide the count by `k`, and clamp the ratio to ``[\\sqrt{\\varepsilon},\\, 1]``. Write the clamped value into `rho[i, j]` and into `rho[j, i]`. The executor `ex` runs this loop.
 
 # Arguments
 
-  - `X`: Data matrix of asset returns (observations × assets).
-  - `alpha`: Quantile level for the lower tail.
-  - `ex`: Parallel execution strategy.
+  - `X`: The data matrix of asset returns, `observations × assets`.
+  - `alpha`: The quantile level of the lower tail.
+  - `ex`: The parallel execution strategy.
 
 # Validation
 
-  - `ceil(Int, T * alpha) > 0`. The count is zero in exactly two cases, and the function then returns a zero matrix rather than an estimate: `alpha` is exactly `0`, or `X` carries no observation. **No small positive `alpha` reaches this branch.** `ceil` of any positive real is at least `1`, so `alpha = nextfloat(0.0)` on a matrix of one or more observations still selects one observation. [`LowerTailDependenceCovariance`](@ref) rules the first case out at construction, because [`assert_unit_interval`](@ref) requires `0 < alpha < 1`.
+  - `ceil(Int, T * alpha) > 0`. If the count is not positive, the function returns a zero matrix and not an estimate. This happens when `alpha <= 0` or when `X` has no observation. A small positive `alpha` does not get to this branch, because `ceil` of a positive real is at least `1`. So `alpha = nextfloat(0.0)` on a matrix of one or more observations selects one observation.
+  - `ceil(Int, T * alpha) <= T`. The function does not check it. An `alpha > 1` makes `k` larger than `T`, and `partialsort!` raises a `BoundsError`.
+  - [`LowerTailDependenceCovariance`](@ref) refuses an `alpha` outside ``(0, 1)`` at construction, because [`assert_unit_interval`](@ref) requires `0 < alpha < 1`. So only a direct call gets to the two cases above.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence coefficients, where `rho[i, j]` is the estimated LTD between assets `i` and `j`. The diagonal is exactly `1`, and every entry lies in ``[\\sqrt{\\varepsilon},\\, 1]``.
+  - `rho::Matrix{<:Number}`: The symmetric matrix of lower tail dependence coefficients. `rho[i, j]` is the estimate for assets `i` and `j`. If `k` is positive, the diagonal is exactly `1` and each entry is in ``[\\sqrt{\\varepsilon},\\, 1]``. If `k` is not positive, each entry is `0`.
 
 # Related
 
@@ -183,8 +187,8 @@ function lower_tail_dependence(X::MatNum, alpha::Number = 0.05,
                                ex::FLoops.Transducers.Executor = FLoops.SequentialEx())
     T, N = size(X)
     k = ceil(Int, T * alpha)
-    # `zeros`, not `undef`: when `alpha` is small enough that `k` is zero the loop below
-    # never runs, and an uninitialised matrix would reach the caller as an estimate.
+    # `zeros`, not `undef`: when `alpha <= 0` or `T == 0`, `k` is not positive and the loop
+    # below never runs, so an uninitialised matrix would reach the caller as an estimate.
     rho = zeros(eltype(X), N, N)
     if k > 0
         Xs = copy(X)
@@ -211,21 +215,22 @@ end
 """
     Statistics.cor(ce::LowerTailDependenceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the lower tail dependence correlation matrix using a [`LowerTailDependenceCovariance`](@ref) estimator.
+Compute the lower tail dependence correlation matrix with a [`LowerTailDependenceCovariance`](@ref) estimator.
 
-This method computes the lower tail dependence (LTD) correlation matrix for the input data matrix `X` using the quantile level and parallel execution strategy specified in `ce`. The LTD correlation quantifies the probability that pairs of assets experience joint drawdowns or adverse events, as measured by their co-movement in the lower tail. The estimator's `ve` field is read by the generic covariance fallback and not by this method.
+The quantile level `ce.alpha` and the executor `ce.ex` configure the computation. Entry ``(i, j)`` is the probability that assets ``i`` and ``j`` have returns in their lower tails at the same time. The generic covariance fallback reads the `ve` field of the estimator, and this method does not read it.
 
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
- 2. Return [`lower_tail_dependence`](@ref) of the oriented matrix, called with the estimator's `alpha` and its executor `ex`.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Return [`lower_tail_dependence`](@ref) of the oriented matrix, with the `alpha` and the executor `ex` of the estimator.
 
 # Arguments
 
-  - `ce`: Lower tail dependence covariance estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - `ce`: The lower tail dependence covariance estimator.
+  - `X`: The data matrix of asset returns, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Validation
 
@@ -233,7 +238,7 @@ This method computes the lower tail dependence (LTD) correlation matrix for the 
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of lower tail dependence correlation coefficients.
+  - `rho::Matrix{<:Number}`: The symmetric matrix of lower tail dependence coefficients.
 
 # Examples
 

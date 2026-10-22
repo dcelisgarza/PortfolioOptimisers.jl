@@ -40,9 +40,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :mu_intensity => "`intensity`: Rule that sets the interval of the shrinkage intensity, a member of [`AbstractShrunkExpectedReturnsIntensity`](@ref).",#
                  :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
                  :me_cval => "`val`: Custom expected returns value.\n\n  - If a scalar, every asset is assigned this value.\n  - If a vector, each element is one asset's value.\n  - If a callable, it is called as `val(X; dims = dims, kwargs...)` and must return one value per asset.",#
-                 :metric => "`metric`: Distance metric used for pairwise computations.",#
-                 :metric_args => "`args`: Additional positional arguments for the distance metric.",#
-                 :metric_kwargs => "`kwargs`: Additional keyword arguments for the distance metric.",#
+                 :metric => "`metric`: The metric that `Distances.pairwise` applies to the observations of each series.",#
+                 :metric_args => "`args`: More positional arguments, which `Distances.pairwise` takes after the series.",#
+                 :metric_kwargs => "`kwargs`: More keyword arguments for `Distances.pairwise`.",#
                  :t => "`t`: Threshold value.",#
                  :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
                  ## Regression
@@ -133,7 +133,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :omean => "`mean`: Optional precomputed centre of the data.",
                  :ex => "`ex`: Parallel execution strategy.",#
                  :alpha => "`alpha`: Quantile level for the lower tail. The bound is [`Num_SigCal`](@ref), so the slot takes the level itself, an [`AbstractSignificanceCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
-                 :alpha_ltd => "`alpha`: Quantile level for the lower tail.",#
+                 :alpha_ltd => "`alpha`: The quantile level of the lower tail.",#
                  :beta => "`beta`: Quantile level for the upper tail. The bound is [`Num_SigCal`](@ref), so the slot takes the level itself, an [`AbstractSignificanceCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
                  # Risk-free rate.
                  :rf => "`rf`: Risk-free rate.",#

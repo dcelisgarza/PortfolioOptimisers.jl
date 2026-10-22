@@ -1659,7 +1659,7 @@ THREE FACTS SHAPE THE PROBES.
 
 3. `lower_tail_dependence`'s `k > 0` guard is NOT reached by a small positive `alpha`. `ceil`
    of any positive real is at least 1, so `alpha = nextfloat(0.0)` on a non-empty matrix
-   still selects one observation. The two cases that do reach it are `alpha == 0` on a direct
+   still selects one observation. The cases that do reach it are `alpha <= 0` on a direct
    call, and a matrix with no observation. The docstring said otherwise before #458.
 =#
 using Test, PortfolioOptimisers, Statistics, StatsBase, LinearAlgebra, StableRNGs, FLoops
@@ -1811,11 +1811,15 @@ end
     @test all(isone, diag(tiny))
     @test !all(iszero, tiny)
 
-    # The two cases that DO reach it: alpha exactly zero, and a matrix with no observation.
+    # The cases that DO reach it: alpha <= 0, and a matrix with no observation.
     @test all(iszero, PortfolioOptimisers.lower_tail_dependence(Xt, 0.0))
+    @test all(iszero, PortfolioOptimisers.lower_tail_dependence(Xt, -0.5))
     empty_res = PortfolioOptimisers.lower_tail_dependence(zeros(0, 3), 0.05)
     @test size(empty_res) == (3, 3)
     @test all(iszero, empty_res)
+
+    # The function does not check `k <= T`: an alpha above one fails in `partialsort!`.
+    @test_throws BoundsError PortfolioOptimisers.lower_tail_dependence(Xt, 1.5)
 
     # The estimator rules the first case out at construction.
     @test_throws DomainError LowerTailDependenceCovariance(; alpha = 0.0)
@@ -1868,6 +1872,34 @@ end
     @test cor(SpearmanCovariance(), Xun)[1, 2] ≈
           1 - 6 * sum((ru .- su) .^ 2) / (T * (T^2 - 1))
     @test cor(KendallCovariance(), Xun)[1, 2] ≈ (C - D) / binomial(T, 2)
+end
+
+@testset "Rank covariances: Example 3 of kendall1945" begin
+    # The ten ranks of Examples 1 and 3. The work scores 33 over sqrt(41 * 36) and prints
+    # the truncated 0.8589, so the docstring names the unrounded quotient.
+    Xk = [1.0 1.0; 2.5 2.0; 2.5 4.5; 4.5 4.5; 4.5 4.5; 6.5 4.5; 6.5 8.0; 8.0 8.0; 9.5 8.0;
+          9.5 10.0]
+    tau = cor(KendallCovariance(), Xk)[1, 2]
+    @test tau == 33 / sqrt(41 * 36)
+    @test round(tau; digits = 5) == 0.85896
+    @test trunc(tau; digits = 4) == 0.8589
+end
+
+@testset "Dependence covariances: a constant series" begin
+    # A constant column has a distance variance of zero, so its distance correlations are
+    # 0 / 0. The rank correlations keep a unit diagonal and are NaN off it.
+    Xc = [1.0 2.0; 1.0 4.0; 1.0 6.0; 1.0 3.0]
+    ce = DistanceCovariance(; ex = FLoops.SequentialEx())
+    @test all(isnan, cor(ce, Xc)[1, :])
+    @test isone(cor(ce, Xc)[2, 2])
+    @test iszero(cov(ce, Xc)[1, 1])
+    @test iszero(PortfolioOptimisers.cov_distance(ce, Xc[:, 1], Xc[:, 1]))
+    @test isnan(PortfolioOptimisers.cor_distance(ce, Xc[:, 1], Xc[:, 2]))
+    for est in (KendallCovariance(), SpearmanCovariance())
+        R = cor(est, Xc)
+        @test all(isone, diag(R))
+        @test isnan(R[1, 2]) && isnan(R[2, 1])
+    end
 end
 
 @testset "The generic ve fallback rescales the three that carry one" begin

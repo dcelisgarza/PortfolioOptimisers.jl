@@ -3,9 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures linear and non-linear codependence from doubly-centred pairwise distance matrices.
 
-The statistic is the distance covariance, which is zero if and only if the two series are independent. `metric`, `args` and `kwargs` configure the pairwise distance; `w` weights the observations and `ex` selects the parallel execution strategy.
+The statistic is the distance covariance. Its population value is zero if and only if the two series are independent. `metric`, `args` and `kwargs` configure the pairwise distance. `w` weights the observations, and `ex` selects the parallel execution strategy.
 
-Section 2.2 of [szekely2007](@cite) defines the sample statistics: the doubly centred distance matrices (Definition 4), the squared distance covariance as their mean element-wise product with divisor ``n^{2}``, a V-statistic (Equation 2.8), and the distance correlation as the square root of ``\\mathcal{V}_n^2(X, Y) / \\sqrt{\\mathcal{V}_n^2(X)\\,\\mathcal{V}_n^2(Y)}`` (Definition 5, Equations 2.9 and 2.10). Without weights the library computes these values. The observation weights `w` and the choice of `metric` are the library's extension.
+Section 2.2 of [szekely2007](@cite) defines the sample statistics. Definition 4 gives the doubly centred distance matrices. Equation 2.8 gives the squared distance covariance, the mean of their element-wise product with the divisor ``n^{2}``, which is a V-statistic. Definition 5 and Equations 2.9 and 2.10 give the distance correlation, the square root of ``\\mathcal{V}_n^2(X, Y) / \\sqrt{\\mathcal{V}_n^2(X)\\,\\mathcal{V}_n^2(Y)}``. Without weights, the library computes these values. The observation weights `w` and the choice of `metric` are extensions of the library.
 
 # Fields
 
@@ -115,15 +115,15 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`DistanceCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:DistanceCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit. That state is not part of the configuration, and it prints under the estimator at each site that renders the estimator. Set `set_show_nothing_fields!(:DistanceCovariance, true)` to render it.
 
 # Arguments
 
-  - `::DistanceCovariance`: Distance covariance estimator, read for its type alone.
+  - `::DistanceCovariance`: The distance covariance estimator. The method reads only its type.
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:metric, :args, :kwargs, :w, :ex)`.
+  - `fields::Tuple`: The names of the fields to render, `(:metric, :args, :kwargs, :w, :ex)`.
 
 # Related
 
@@ -135,23 +135,23 @@ show_fields(::DistanceCovariance) = (:metric, :args, :kwargs, :w, :ex)
 """
     calc_pairwise_dists(ce::DistanceCovariance, v1::VecNum, v2::VecNum) -> (MatNum, MatNum)
 
-Compute pairwise distance matrices between two vectors using the configured metric.
+Compute the pairwise distance matrix of each of two vectors with the metric of the estimator.
 
-Internal helper used in distance correlation and distance covariance computation. The observation weights never reach it. They weight the statistic that [`calc_centred_dists`](@ref) and [`calc_dcov2`](@ref) build, and not the data that the metric measures.
+[`cor_distance`](@ref) and [`cov_distance`](@ref) call this helper. It takes no observation weights. The weights apply to the statistic that [`calc_centred_dists`](@ref) and [`calc_dcov2`](@ref) compute, and not to the data that the metric measures.
 
 # Algorithm
 
- 1. Apply the estimator's `metric` to `v1` and to `v2` as the caller gave them, and pass `ce.args` and `ce.kwargs` to `Distances.pairwise`.
- 2. Return the two matrices in the order `(D1, D2)`. Each is ``T \\times T`` for a pair of series of ``T`` observations, and `D1[t, s]` is the distance between observations ``t`` and ``s`` of the same series.
+ 1. Call `Distances.pairwise` with `ce.metric`, `ce.args` and `ce.kwargs` on `v1` and on `v2`. The method does not scale or weight the two vectors.
+ 2. Return the two matrices as `(D1, D2)`. Each matrix is ``T \\times T`` for series of ``T`` observations. `D1[t, s]` is the distance between observations ``t`` and ``s`` of `v1`.
 
 # Arguments
 
-  - `ce`: [`DistanceCovariance`](@ref) estimator with metric configuration.
-  - `v1`, `v2`: Data vectors.
+  - `ce`: The [`DistanceCovariance`](@ref) estimator that holds the metric.
+  - `v1`, `v2`: The two data vectors.
 
 # Returns
 
-  - Tuple of pairwise distance matrices `(D1, D2)`.
+  - The tuple `(D1, D2)` of the pairwise distance matrices of `v1` and of `v2`.
 
 # Related
 
@@ -167,24 +167,24 @@ end
 """
     calc_centred_dists(a::MatNum, w::Option{<:StatsBase.AbstractWeights}) -> MatNum
 
-Doubly centre a pairwise distance matrix, weighting every observation by `w`.
+Doubly centre a pairwise distance matrix, with the weight `w` on each observation.
 
-Internal helper used in distance correlation and distance covariance computation. The weights enter the three means, so a constant weight vector cancels from each of them and returns the unweighted matrix.
+[`cor_distance`](@ref) and [`cov_distance`](@ref) call this helper. The weights apply to the three means. A constant weight vector cancels from each mean, so it gives the unweighted matrix.
 
 # Algorithm
 
- 1. Without weights, take the ordinary row means, column means and grand mean of `a`.
- 2. With weights, take the same three means weighted by `w`. Each is normalised by the sum of the weights that it uses, so the scale of `w` cancels.
- 3. Subtract the row means and the column means from `a`, then add the grand mean back, giving `A`.
+ 1. Without weights, take the row means, the column means and the grand mean of `a`.
+ 2. With weights, take the same three means with the weights `w`. Each mean divides by the sum of the weights that it uses, so the scale of `w` cancels.
+ 3. Subtract the row means and the column means from `a`. Add the grand mean to get `A`.
 
 # Arguments
 
-  - `a`: Pairwise distance matrix.
-  - `w`: Observation weights, or `nothing` for the unweighted statistic.
+  - `a`: The pairwise distance matrix.
+  - `w`: The observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
-  - `A::MatNum`: Doubly centred distance matrix.
+  - `A::MatNum`: The doubly centred distance matrix.
 
 # Related
 
@@ -206,21 +206,21 @@ end
 
 Contract two doubly centred distance matrices into a squared distance covariance.
 
-Internal helper used in distance correlation and distance covariance computation. The weights enter both indices of the contraction, so a constant weight vector cancels and returns the unweighted value.
+[`cor_distance`](@ref) and [`cov_distance`](@ref) call this helper. The weights apply to the two indices of the contraction, so a constant weight vector cancels and gives the unweighted value.
 
 # Algorithm
 
- 1. Without weights, take the Frobenius inner product of `A` and `B`, and divide it by the number of entries of `A`.
- 2. With weights, take the element-wise product of `A` and `B`, contract it with `w` on both of its indices, and divide by the square of the sum of the weights.
+ 1. Without weights, divide the Frobenius inner product of `A` and `B` by the number of entries of `A`.
+ 2. With weights, contract the element-wise product of `A` and `B` with `w` on its two indices. Divide the result by the square of the sum of the weights.
 
 # Arguments
 
-  - `A`, `B`: Doubly centred distance matrices, as [`calc_centred_dists`](@ref) returns them.
-  - `w`: Observation weights, or `nothing` for the unweighted statistic.
+  - `A`, `B`: The doubly centred distance matrices that [`calc_centred_dists`](@ref) returns.
+  - `w`: The observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
-  - `dcov2::Number`: Squared distance covariance of the two matrices.
+  - `dcov2::Number`: The squared distance covariance of the two matrices.
 
 # Related
 
@@ -239,13 +239,13 @@ end
     cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
                  w::Option{<:StatsBase.AbstractWeights} = nothing)
 
-Compute the distance correlation between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
+Compute the distance correlation of two vectors with a [`DistanceCovariance`](@ref) estimator.
 
-This function computes the distance correlation between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance correlation procedure, centering the pairwise distance matrices and normalizing the result.
+The metric, the `args` and the `kwargs` of `ce` set the pairwise distances, and `w` sets the weights of the observations. A constant series has a distance variance of zero, so its distance correlation with each series is `NaN`.
 
 # Mathematical definition
 
-Let ``a_{ts} = d(v_{1t}, v_{1s})`` and ``b_{ts} = d(v_{2t}, v_{2s})`` be pairwise distance matrices. Define doubly-centered versions, whose three means carry the observation weights:
+Let ``a_{ts} = d(v_{1t}, v_{1s})`` and ``b_{ts} = d(v_{2t}, v_{2s})`` be the entries of the two pairwise distance matrices. The doubly centred matrices subtract and add three means, and each mean uses the observation weights:
 
 ```math
 \\begin{align}
@@ -259,17 +259,17 @@ B_{ts} &= b_{ts} - \\bar{b}_{t\\cdot} - \\bar{b}_{\\cdot s} + \\bar{b}_{\\cdot\\
 
 Where:
 
-  - ``a_{ts}``, ``b_{ts}``: Pairwise distances between observations ``t`` and ``s``.
-  - ``\\bar{a}_{t\\cdot}``: ``t``-th weighted row mean of ``\\mathbf{a}``.
-  - ``\\bar{a}_{\\cdot s}``: ``s``-th weighted column mean of ``\\mathbf{a}``.
-  - ``\\bar{a}_{\\cdot\\cdot}``: Weighted grand mean of ``\\mathbf{a}``.
-  - ``A_{ts}``, ``B_{ts}``: Doubly centred pairwise distances.
+  - ``a_{ts}``, ``b_{ts}``: The pairwise distances between observations ``t`` and ``s``.
+  - ``\\bar{a}_{t\\cdot}``: The ``t``-th weighted row mean of ``\\mathbf{a}``.
+  - ``\\bar{a}_{\\cdot s}``: The ``s``-th weighted column mean of ``\\mathbf{a}``.
+  - ``\\bar{a}_{\\cdot\\cdot}``: The weighted grand mean of ``\\mathbf{a}``.
+  - ``A_{ts}``, ``B_{ts}``: The doubly centred pairwise distances.
   - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
 
-The three means of ``\\mathbf{b}`` take the form that the three means of ``\\mathbf{a}`` take.
+The three means of ``\\mathbf{b}`` have the same form as the three means of ``\\mathbf{a}``.
 
-The squared distance covariances and distance correlation are:
+The squared distance covariances and the distance correlation are:
 
 ```math
 \\begin{align}
@@ -281,7 +281,7 @@ The squared distance covariances and distance correlation are:
 
 Where:
 
-  - ``\\widehat{\\mathrm{dCov}}^2(X,Y)``: Squared distance covariance of ``X`` and ``Y``.
+  - ``\\widehat{\\mathrm{dCov}}^2(X,Y)``: The squared distance covariance of ``X`` and ``Y``.
 
 ```math
 \\begin{align}
@@ -291,23 +291,23 @@ Where:
 
 Where:
 
-  - ``\\hat{R}_{\\mathrm{dist}}(X, Y)``: Distance correlation between ``X`` and ``Y``.
+  - ``\\hat{R}_{\\mathrm{dist}}(X, Y)``: The distance correlation of ``X`` and ``Y``.
 
-Each quotient above divides two forms of one degree in the weights, so a constant weight cancels from all of them. The value ``w_{t} = 1`` reduces the three squared distance covariances to ``\\mathbf{A}:\\mathbf{B} / T^{2}``, the Frobenius inner product ``\\sum_{t,\\,s} A_{ts} B_{ts}`` over ``T^{2}``, which is the unweighted statistic.
+In each quotient above, the numerator and the denominator have the same degree in the weights, so a constant weight cancels. With ``w_{t} = 1``, the squared distance covariance of ``X`` and ``Y`` is ``\\mathbf{A}:\\mathbf{B} / T^{2}``, the Frobenius inner product ``\\sum_{t,\\,s} A_{ts} B_{ts}`` divided by ``T^{2}``. This is the unweighted statistic, and the other two squared distance covariances have the same form.
 
 # Algorithm
 
- 1. Build the two pairwise distance matrices ``\\mathbf{a}`` and ``\\mathbf{b}`` with [`calc_pairwise_dists`](@ref), which carries the estimator's metric, its `args` and its `kwargs`.
- 2. Doubly centre each matrix with [`calc_centred_dists`](@ref), which weights the three means it subtracts and adds, giving ``\\mathbf{A}`` and ``\\mathbf{B}``.
- 3. Contract the three pairs ``(\\mathbf{A}, \\mathbf{A})``, ``(\\mathbf{A}, \\mathbf{B})`` and ``(\\mathbf{B}, \\mathbf{B})`` with [`calc_dcov2`](@ref), giving the three squared distance covariances.
- 4. Return ``\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,Y)}`` divided by the square root of the product of the two remaining square roots.
+ 1. Compute the two pairwise distance matrices ``\\mathbf{a}`` and ``\\mathbf{b}`` with [`calc_pairwise_dists`](@ref). It uses the metric, the `args` and the `kwargs` of `ce`.
+ 2. Doubly centre each matrix with [`calc_centred_dists`](@ref) to get ``\\mathbf{A}`` and ``\\mathbf{B}``. The three means that it subtracts and adds use the weights.
+ 3. Contract the three pairs ``(\\mathbf{A}, \\mathbf{A})``, ``(\\mathbf{A}, \\mathbf{B})`` and ``(\\mathbf{B}, \\mathbf{B})`` with [`calc_dcov2`](@ref) to get the three squared distance covariances.
+ 4. Return ``\\sqrt{\\widehat{\\mathrm{dCov}}^2(X,Y)}`` divided by the square root of the product of the other two square roots.
 
 # Arguments
 
-  - `ce`: Distance covariance estimator.
-  - `v1`: First data vector.
-  - `v2`: Second data vector.
-  - `w`: Observation weights, or `nothing` for the unweighted statistic.
+  - `ce`: The distance covariance estimator.
+  - `v1`: The first data vector.
+  - `v2`: The second data vector.
+  - `w`: The observation weights, or `nothing` for the unweighted statistic.
 
 # Validation
 
@@ -316,7 +316,7 @@ Each quotient above divides two forms of one degree in the weights, so a constan
 
 # Returns
 
-  - `rho::Float64`: The computed distance correlation between `v1` and `v2`. A series against itself gives exactly `1.0`.
+  - `rho::Number`: The distance correlation of `v1` and `v2`. A series that is not constant gives exactly `1.0` against itself. A constant series gives `NaN`.
 
 # Related
 
@@ -342,25 +342,25 @@ end
     cor_distance(ce::DistanceCovariance, X::MatNum,
                  w::Option{<:StatsBase.AbstractWeights} = nothing)
 
-Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
+Compute the distance correlation matrix of the columns of a data matrix with a [`DistanceCovariance`](@ref) estimator.
 
-This function computes the distance correlation between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance correlation between two assets.
+Entry ``(i, j)`` of the symmetric result is the distance correlation of assets ``i`` and ``j``. The metric of `ce` sets the distances, `w` sets the observation weights, and `ce.ex` runs the loop over the columns.
 
 # Algorithm
 
- 1. Allocate an ``N \\times N`` matrix, where ``N`` is the number of columns of `X`. The result is indexed by asset and never by observation, so a non-square `X` cannot hide a transposed index.
- 2. For each column `j`, and for each column `i` at or below `j`, call [`cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref) on the two columns and write the value into both `rho[i, j]` and `rho[j, i]`. The estimator's `ex` field runs the outer loop.
- 3. Return the symmetric matrix. Its diagonal is exactly `1.0`, because the pair `(j, j)` is one of the pairs step 2 computes.
+ 1. Allocate an ``N \\times N`` matrix, where ``N`` is the number of columns of `X`. The indices of the result are assets and not observations, so a non-square `X` cannot hide a transposed index.
+ 2. For each column `j`, and for each column `i` with `i <= j`, call [`cor_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref) on the two columns. Write the value into `rho[i, j]` and into `rho[j, i]`. The executor `ce.ex` runs the outer loop.
+ 3. Return the symmetric matrix. Step 2 computes the pair `(j, j)` too, so the diagonal entry of a column that is not constant is exactly `1.0`. The diagonal entry of a constant column is `NaN`.
 
 # Arguments
 
-  - `ce`: Distance covariance estimator.
-  - `X`: Data matrix (observations × assets).
-  - `w`: Observation weights, or `nothing` for the unweighted statistic.
+  - `ce`: The distance covariance estimator.
+  - `X`: The data matrix, `observations × assets`.
+  - `w`: The observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Distance correlation matrix.
+  - `rho::Matrix{<:Number}`: The distance correlation matrix.
 
 # Related
 
@@ -382,20 +382,21 @@ end
 """
     Statistics.cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the pairwise distance correlation matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
+Compute the distance correlation matrix of the columns of a data matrix with a [`DistanceCovariance`](@ref) estimator.
 
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
- 2. Resolve the estimator's `w` field against the oriented matrix with [`get_observation_weights`](@ref), giving `nothing` for an unweighted estimator.
- 3. Return [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref) of the oriented matrix and those weights.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Get the observation weights from `ce.w` and the oriented matrix with [`get_observation_weights`](@ref). An unweighted estimator gets `nothing`.
+ 4. Return [`cor_distance(ce::DistanceCovariance, X::MatNum)`](@ref) of the oriented matrix and those weights.
 
 # Arguments
 
-  - `ce`: Distance covariance estimator.
-  - `X`: Data matrix (observations × assets).
+  - `ce`: The distance covariance estimator.
+  - `X`: The data matrix, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments (currently unused).
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Validation
 
@@ -403,7 +404,7 @@ Compute the pairwise distance correlation matrix for all columns in a data matri
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: Symmetric matrix of pairwise distance correlations, with a diagonal of exactly `1.0`.
+  - `rho::Matrix{<:Number}`: The symmetric matrix of pairwise distance correlations. The diagonal entry of a column that is not constant is exactly `1.0`, and that of a constant column is `NaN`.
 
 # Examples
 
@@ -440,13 +441,13 @@ end
     cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum,
                  w::Option{<:StatsBase.AbstractWeights} = nothing)
 
-Compute the distance covariance between two vectors using a configured [`DistanceCovariance`](@ref) estimator.
+Compute the distance covariance of two vectors with a [`DistanceCovariance`](@ref) estimator.
 
-This function computes the distance covariance between `v1` and `v2` using the specified distance metric, optional weights, and any additional arguments or keyword arguments provided in the estimator. The computation follows the standard distance covariance procedure, centering the pairwise distance matrices and aggregating the result.
+The metric, the `args` and the `kwargs` of `ce` set the pairwise distances, and `w` sets the weights of the observations.
 
 # Mathematical definition
 
-Using the same doubly-centered matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` as in [`cor_distance`](@ref):
+The doubly centred matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` are those of [`cor_distance`](@ref):
 
 ```math
 \\begin{align}
@@ -456,28 +457,28 @@ Using the same doubly-centered matrices ``\\mathbf{A}`` and ``\\mathbf{B}`` as i
 
 Where:
 
-  - ``\\widehat{\\mathrm{dCov}}(X, Y)``: Distance covariance between ``X`` and ``Y``.
-  - ``A_{ts}``, ``B_{ts}``: Doubly centred pairwise distances.
+  - ``\\widehat{\\mathrm{dCov}}(X, Y)``: The distance covariance of ``X`` and ``Y``.
+  - ``A_{ts}``, ``B_{ts}``: The doubly centred pairwise distances.
   - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
 
-The value ``w_{t} = 1`` reduces the quotient to ``\\mathbf{A}:\\mathbf{B} / T^{2}``, the Frobenius inner product ``\\sum_{t,\\,s} A_{ts} B_{ts}`` over ``T^{2}``, which is the unweighted statistic.
+With ``w_{t} = 1``, the quotient is ``\\mathbf{A}:\\mathbf{B} / T^{2}``, the Frobenius inner product ``\\sum_{t,\\,s} A_{ts} B_{ts}`` divided by ``T^{2}``. This is the unweighted statistic.
 
-The square root takes no absolute value. It needs none: the doubly-centred V-statistic is non-negative for a metric of strong negative type, which the Euclidean default is.
+The square root takes no absolute value, and it needs none. The doubly centred V-statistic is non-negative for a metric of strong negative type, and the Euclidean default is such a metric.
 
 # Algorithm
 
- 1. Build the two pairwise distance matrices ``\\mathbf{a}`` and ``\\mathbf{b}`` with [`calc_pairwise_dists`](@ref), which carries the estimator's metric, its `args` and its `kwargs`.
- 2. Doubly centre each matrix with [`calc_centred_dists`](@ref), which weights the three means it subtracts and adds, giving ``\\mathbf{A}`` and ``\\mathbf{B}``.
- 3. Contract the pair ``(\\mathbf{A}, \\mathbf{B})`` with [`calc_dcov2`](@ref), giving the squared distance covariance.
- 4. Return the square root of that value. Steps 1 and 2 are those of [`cor_distance`](@ref); this method takes one of the three contractions and takes no ratio.
+ 1. Compute the two pairwise distance matrices ``\\mathbf{a}`` and ``\\mathbf{b}`` with [`calc_pairwise_dists`](@ref). It uses the metric, the `args` and the `kwargs` of `ce`.
+ 2. Doubly centre each matrix with [`calc_centred_dists`](@ref) to get ``\\mathbf{A}`` and ``\\mathbf{B}``. The three means that it subtracts and adds use the weights.
+ 3. Contract the pair ``(\\mathbf{A}, \\mathbf{B})`` with [`calc_dcov2`](@ref) to get the squared distance covariance.
+ 4. Return the square root of that value. Steps 1 and 2 are the steps of [`cor_distance`](@ref). This method computes one of the three contractions, and it computes no ratio.
 
 # Arguments
 
-  - `ce`: Distance covariance estimator.
-  - `v1`: First data vector.
-  - `v2`: Second data vector.
-  - `w`: Observation weights, or `nothing` for the unweighted statistic.
+  - `ce`: The distance covariance estimator.
+  - `v1`: The first data vector.
+  - `v2`: The second data vector.
+  - `w`: The observation weights, or `nothing` for the unweighted statistic.
 
 # Validation
 
@@ -486,7 +487,7 @@ The square root takes no absolute value. It needs none: the doubly-centred V-sta
 
 # Returns
 
-  - `rho::Number`: The computed distance covariance between `v1` and `v2`. A series against itself gives the distance standard deviation ``\\widehat{\\mathrm{dVar}}^{1/2}(X)``, which is not the sample standard deviation.
+  - `rho::Number`: The distance covariance of `v1` and `v2`. A series against itself gives its distance standard deviation ``\\widehat{\\mathrm{dVar}}^{1/2}(X)``, which is not the sample standard deviation. A constant series gives `0`.
 
 # Related
 
@@ -509,25 +510,25 @@ end
     cov_distance(ce::DistanceCovariance, X::MatNum,
                  w::Option{<:StatsBase.AbstractWeights} = nothing)
 
-Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
+Compute the distance covariance matrix of the columns of a data matrix with a [`DistanceCovariance`](@ref) estimator.
 
-This function computes the distance covariance between each pair of columns in `X`, using the specified distance metric, optional weights, and parallel execution strategy. The resulting matrix is symmetric, with each entry representing the distance covariance between two assets.
+Entry ``(i, j)`` of the symmetric result is the distance covariance of assets ``i`` and ``j``. The metric of `ce` sets the distances, `w` sets the observation weights, and `ce.ex` runs the loop over the columns.
 
 # Algorithm
 
- 1. Allocate an ``N \\times N`` matrix, where ``N`` is the number of columns of `X`. The result is indexed by asset and never by observation, so a non-square `X` cannot hide a transposed index.
- 2. For each column `j`, and for each column `i` at or below `j`, call [`cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref) on the two columns and write the value into both `sigma[i, j]` and `sigma[j, i]`. The estimator's `ex` field runs the outer loop.
- 3. Return the symmetric matrix. Its diagonal is the distance standard deviation of each asset, because the pair `(j, j)` is one of the pairs step 2 computes.
+ 1. Allocate an ``N \\times N`` matrix, where ``N`` is the number of columns of `X`. The indices of the result are assets and not observations, so a non-square `X` cannot hide a transposed index.
+ 2. For each column `j`, and for each column `i` with `i <= j`, call [`cov_distance(ce::DistanceCovariance, v1::VecNum, v2::VecNum)`](@ref) on the two columns. Write the value into `sigma[i, j]` and into `sigma[j, i]`. The executor `ce.ex` runs the outer loop.
+ 3. Return the symmetric matrix. Step 2 computes the pair `(j, j)` too, so the diagonal holds the distance standard deviation of each asset.
 
 # Arguments
 
-  - `ce`: Distance covariance estimator.
-  - `X`: Data matrix (observations × assets).
-  - `w`: Observation weights, or `nothing` for the unweighted statistic.
+  - `ce`: The distance covariance estimator.
+  - `X`: The data matrix, `observations × assets`.
+  - `w`: The observation weights, or `nothing` for the unweighted statistic.
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: The symmetric matrix of pairwise distance covariances.
 
 # Related
 
@@ -549,22 +550,23 @@ end
 """
     Statistics.cov(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the pairwise distance covariance matrix for all columns in a data matrix using a configured [`DistanceCovariance`](@ref) estimator.
+Compute the distance covariance matrix of the columns of a data matrix with a [`DistanceCovariance`](@ref) estimator.
 
-This method overrides the generic covariance fallback, which [`DistanceCovariance`](@ref) cannot use because it carries no variance estimator field. So the diagonal is the **distance** standard deviation of each asset and not the sample standard deviation, and the matrix that [`cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns is exactly this matrix rescaled by the square roots of that diagonal.
+This method replaces the generic covariance fallback. [`DistanceCovariance`](@ref) cannot use the fallback, because it has no variance estimator field. So the diagonal is the distance standard deviation of each asset and not the sample standard deviation. The matrix that [`cor(ce::DistanceCovariance, X::MatNum; dims::Int = 1, kwargs...)`](@ref) returns is this matrix divided by the square roots of its diagonal, row by row and column by column.
 
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), which transposes it when `dims` is `2` and refuses any other value.
- 2. Resolve the estimator's `w` field against the oriented matrix with [`get_observation_weights`](@ref), giving `nothing` for an unweighted estimator.
- 3. Return [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref) of the oriented matrix and those weights.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Get the observation weights from `ce.w` and the oriented matrix with [`get_observation_weights`](@ref). An unweighted estimator gets `nothing`.
+ 4. Return [`cov_distance(ce::DistanceCovariance, X::MatNum)`](@ref) of the oriented matrix and those weights.
 
 # Arguments
 
-  - `ce`: Distance covariance estimator.
-  - `X`: Data matrix (observations × assets).
+  - `ce`: The distance covariance estimator.
+  - `X`: The data matrix, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments (currently unused).
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Validation
 
@@ -572,7 +574,7 @@ This method overrides the generic covariance fallback, which [`DistanceCovarianc
 
 # Returns
 
-  - `sigma::Matrix{<:Number}`: Symmetric matrix of pairwise distance covariances.
+  - `sigma::Matrix{<:Number}`: The symmetric matrix of pairwise distance covariances.
 
 # Examples
 
