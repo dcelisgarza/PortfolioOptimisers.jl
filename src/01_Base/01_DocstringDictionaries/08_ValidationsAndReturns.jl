@@ -21,7 +21,7 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :alpha => "`0 < alpha < 1`.",#
                  :alpha_tail0 => "If `alpha` is a number: `0 <= alpha < 1`. At `alpha = 0` the measure is the largest loss among the observations with positive weight, [`worst_positive_weight_loss`](@ref), and an observation with zero weight cannot set it.",#
                  :beta => "`0 < beta < 1`.",#
-                 :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins` (the joint histogram is `bins × bins`; see [`RESOURCE_LIMITS`](@ref)).",#
+                 :bins => "If `bins` is an integer, `0 < bins <= RESOURCE_LIMITS[].max_bins`. The joint histogram is `bins × bins`, and [`RESOURCE_LIMITS`](@ref) sets the cap.",#
                  :ep_gridK => "`isodd(K)` and `1 <= K <= RESOURCE_LIMITS[].max_ep_grid` (every grid point is one binary variable of the mixed-integer program an upper-bound or equality view builds; see [`RESOURCE_LIMITS`](@ref)).",#
                  :dopower => "If `power` is not `nothing`, `power >= 1`.",#
                  :p_owa => "`!isempty(p)` and `all(x -> x > 1, p)`.",#

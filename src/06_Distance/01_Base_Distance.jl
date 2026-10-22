@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all distance estimator types.
 
-All concrete and/or abstract types implementing distance-based estimation algorithms should be subtypes of `AbstractDistanceEstimator`.
+A subtype turns a correlation matrix or a data matrix into a distance matrix. [`distance`](@ref) and [`cor_and_dist`](@ref) dispatch on it.
 
 # Related
 
@@ -18,7 +18,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all distance algorithm types.
 
-All concrete and/or abstract types implementing specific distance-based algorithms (such as correlation distance, absolute distance, log distance, or information-theoretic distances) should be subtypes of `AbstractDistanceAlgorithm`.
+A subtype names the transform that a distance estimator applies. Four subtypes transform a correlation matrix, [`VariationInfoDistance`](@ref) reads the data matrix, and [`CanonicalDistance`](@ref) selects one of the others from the covariance estimator.
 
 # Related
 
@@ -38,7 +38,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Turns a signed correlation into a distance by ``\\sqrt{(1 - \\rho) / 2}``.
 
-The halving keeps the result in ``[0,\\,1]`` over the whole signed range of the correlation, which is what makes this the algorithm for a codependence measure on ``[-1,\\,1]``: Pearson, Spearman, Kendall and the Gerber statistic.
+The factor ``1/2`` keeps the result in ``[0,\\,1]`` over the whole signed range of the correlation. So this is the algorithm for a codependence measure on ``[-1,\\,1]``, such as the Pearson, Spearman and Kendall correlations and the Gerber statistic.
 
 # Mathematical definition
 
@@ -53,9 +53,9 @@ Where:
   - $(math_dict[:d_ij_dist])
   - $(math_dict[:rho_ij])
 
-The clamp is a numerical guard and nothing more. ``(1 - \\rho_{i,\\,j}) / 2`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``, so it binds only on a correlation that a shrinking, denoising or repairing estimator pushed a hair outside ``[-1,\\,1]``. Contrast [`CorrelationDistance`](@ref), where the same clamp binds on ordinary data.
+The clamp is only a numerical guard. ``(1 - \\rho_{i,\\,j}) / 2`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``. So the clamp binds only when an estimator that shrinks, denoises or repairs the matrix moves a correlation slightly outside ``[-1,\\,1]``. In [`CorrelationDistance`](@ref), the same clamp binds on every negative correlation.
 
-Lemma 3 of [vandongen2012](@cite) states this distance, ``\\sin(\\theta / 2)`` of the angle ``\\theta = \\arccos(\\rho)``, and proves that it is a metric for a Pearson or a Spearman correlation and for a cosine. [lopezdeprado2016](@cite) states it independently for the correlation of asset returns, with its own proof that it is a metric and a worked example.
+Lemma 3 of [vandongen2012](@cite) states this distance as ``\\sin(\\theta / 2)`` of the angle ``\\theta = \\arccos(\\rho)``. The lemma proves that it is a metric for a Pearson or a Spearman correlation and for a cosine. [lopezdeprado2016](@cite) also states it for the correlation of asset returns. That work gives a separate proof that it is a metric, and a worked example.
 
 # Related
 
@@ -77,7 +77,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Turns the magnitude of a correlation into a distance by ``\\sqrt{1 - \\lvert\\rho\\rvert}``.
 
-Reading the magnitude discards the sign, so two assets that move together and two that move oppositely are equally close. This is the algorithm for a codependence measure that is already non-negative, and for the case where only the strength of the relationship matters.
+The magnitude discards the sign. So two assets that move together and two assets that move in opposite directions with the same strength are equally close. This is the algorithm for a codependence measure that is already non-negative, and for the case where only the strength of the relationship matters.
 
 # Mathematical definition
 
@@ -92,7 +92,7 @@ Where:
   - $(math_dict[:d_ij_dist])
   - $(math_dict[:rho_ij])
 
-The clamp is a numerical guard and nothing more, as in [`SimpleDistance`](@ref): ``1 - \\lvert\\rho_{i,\\,j}\\rvert`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``.
+As in [`SimpleDistance`](@ref), the clamp is only a numerical guard. ``1 - \\lvert\\rho_{i,\\,j}\\rvert`` already lies in ``[0,\\,1]`` for every ``\\lvert\\rho_{i,\\,j}\\rvert \\leq 1``.
 
 Appendix A.1 of the online supplementary materials of [lopezdeprado2016](@cite) states this distance and proves that it is a metric for a Pearson correlation.
 
@@ -104,7 +104,7 @@ Appendix A.1 of the online supplementary materials of [lopezdeprado2016](@cite) 
   - [`CorrelationDistance`](@ref)
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
-  - [`_absguard`](@ref): supplies the magnitude. It is an allocation guard and not a branch in the mathematics, so a non-negative codependence measure reaches this algorithm unchanged and pays no allocation for it.
+  - [`_absguard`](@ref): supplies the magnitude. It decides only whether to allocate a copy, and it does not change the mathematics. On a non-negative codependence measure it returns the same matrix and allocates nothing.
 
 # References
 
@@ -116,7 +116,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Turns the magnitude of a correlation into an unbounded distance by ``-\\log\\lvert\\rho\\rvert``.
 
-The range is ``[0,\\,\\infty)`` rather than ``[0,\\,1]``, so the distance grows without limit as the relationship weakens. This is the algorithm for a tail dependence coefficient, and the one [`CanonicalDistance`](@ref) selects for [`LowerTailDependenceCovariance`](@ref).
+The range is ``[0,\\,\\infty)`` and not ``[0,\\,1]``, so the distance grows without limit as the relationship weakens. This is the algorithm for a tail dependence coefficient, and [`CanonicalDistance`](@ref) selects it for [`LowerTailDependenceCovariance`](@ref).
 
 # Mathematical definition
 
@@ -131,9 +131,9 @@ Where:
   - $(math_dict[:d_ij_dist])
   - $(math_dict[:rho_ij])
 
-The floor at zero is not cosmetic. A covariance estimator that shrinks, denoises or repairs a matrix can return ``\\lvert\\rho_{i,\\,j}\\rvert`` a hair above one, and ``-\\log`` of that is *negative* — unlike the square-root algorithms, which already clamp before taking the root. A negative distance inverts the ordering it is meant to express and is unsound under the shortest-path routines that consume it.
+The floor at zero is necessary. A covariance estimator that shrinks, denoises or repairs a matrix can return ``\\lvert\\rho_{i,\\,j}\\rvert`` slightly above one, and ``-\\log`` of that value is negative. The square-root algorithms do not have this problem, because they clamp before the root. A negative distance inverts the order that the distance expresses, and a shortest-path routine that reads it gives a wrong result.
 
-Perfectly uncorrelated assets remain infinitely far apart: ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, which is a meaningful value here and is left alone.
+Two uncorrelated assets are infinitely far apart. ``\\rho_{i,\\,j} = 0`` gives ``d_{i,\\,j} = \\infty``, and the algorithm keeps that value.
 
 Equation 2 of Section 3 of [luca2011](@cite) proposes ``-\\log \\hat{\\lambda}_L`` for an estimated lower tail dependence coefficient ``\\hat{\\lambda}_L``. That section calls it a dissimilarity and not a distance, because it does not satisfy the triangle inequality. A tail dependence coefficient lies in ``[0,\\,1]``, so the absolute value and the floor at zero are this library's guards.
 
@@ -143,10 +143,10 @@ Equation 2 of Section 3 of [luca2011](@cite) proposes ``-\\log \\hat{\\lambda}_L
   - [`AbstractDistanceEstimator`](@ref)
   - [`LowerTailDependenceCovariance`](@ref)
   - [`CanonicalDistance`](@ref)
-  - [`assert_similarity_domain`](@ref): refuses this algorithm under [`MaximumDistanceSimilarity`](@ref) on the PMFG path, because an infinite entry is the one the two bounded similarity members cannot take.
+  - [`assert_similarity_domain`](@ref): on the PMFG path, refuses an entry above `1` under [`ComplementSimilarity`](@ref) and an infinite entry under [`MaximumDistanceSimilarity`](@ref). This algorithm can give both.
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
-  - [`_absguard`](@ref): supplies the magnitude, as it does for [`SimpleAbsoluteDistance`](@ref). It is an allocation guard and not a branch in the mathematics.
+  - [`_absguard`](@ref): supplies the magnitude, as it does for [`SimpleAbsoluteDistance`](@ref). It decides only whether to allocate a copy, and it does not change the mathematics.
 
 # References
 
@@ -156,9 +156,9 @@ struct LogDistance <: AbstractDistanceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Turns a non-negative codependence into a distance by ``\\sqrt{1 - \\rho}``, without halving.
+Turns a non-negative codependence into a distance by ``\\sqrt{1 - \\rho}``, with no factor ``1/2``.
 
-This is [`SimpleAbsoluteDistance`](@ref) with the absolute value dropped, and it is the algorithm for a codependence measure whose own range is ``[0,\\,1]``. It is what [`CanonicalDistance`](@ref) selects for [`DistanceCovariance`](@ref).
+It is [`SimpleAbsoluteDistance`](@ref) without the absolute value. It is the algorithm for a codependence measure whose range is ``[0,\\,1]``, and [`CanonicalDistance`](@ref) selects it for [`DistanceCovariance`](@ref).
 
 # Mathematical definition
 
@@ -175,13 +175,13 @@ Where:
 
 !!! warning "The clamp binds on a negative correlation"
 
-    This is the one algorithm in the family whose clamp is not a numerical guard. Without the halving, ``1 - \\rho_{i,\\,j}`` runs over ``[0,\\,2]`` on a signed correlation, so the clamp truncates every negative entry to a distance of exactly `1`.
+    This is the one algorithm in the family whose clamp is not a numerical guard. Without the factor ``1/2``, ``1 - \\rho_{i,\\,j}`` runs over ``[0,\\,2]`` on a signed correlation, so the clamp truncates every negative entry to a distance of exactly `1`.
 
-    The truncation is not monotone: ``\\rho_{i,\\,j} = -0.1`` and ``\\rho_{i,\\,j} = -1`` are both reported as ``1``, where ``\\sqrt{1 - \\rho_{i,\\,j}}`` separates them as ``\\sqrt{1.1}`` and ``\\sqrt{2}``. The ordering the distance is meant to express is lost across the whole negative half.
+    The truncation removes the order of the negative entries. ``\\rho_{i,\\,j} = -0.1`` and ``\\rho_{i,\\,j} = -1`` both give ``1``, but ``\\sqrt{1 - \\rho_{i,\\,j}}`` gives ``\\sqrt{1.1}`` and ``\\sqrt{2}``. So the distance does not separate two negative correlations.
 
-    The intended domain has no negative entry. Give a signed correlation to [`SimpleDistance`](@ref), which halves and therefore never saturates, or to [`SimpleAbsoluteDistance`](@ref), which reads the magnitude.
+    The intended domain has no negative entry. Give a signed correlation to [`SimpleDistance`](@ref), which halves the radicand and so never saturates. Or give it to [`SimpleAbsoluteDistance`](@ref), which reads the magnitude.
 
-On a non-negative ``\\rho_{i,\\,j}`` the formula is the distance ``\\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert}`` of Appendix A.1 of the online supplementary materials of [lopezdeprado2016](@cite). That appendix proves the metric property for a Pearson correlation alone. Section 3.2 of [mlp1](@cite) proves it again for a correlation estimate with ``\\sigma[X, Y] = \\rho[X, Y] \\sigma[X] \\sigma[Y]``, and it does not name a distance correlation. Section 6.2.1 of [cajas2025](@cite) gives the formula for a distance correlation, and no work that first states that use was found.
+On a non-negative ``\\rho_{i,\\,j}`` the formula is the distance ``\\sqrt{1 - \\lvert\\rho_{i,\\,j}\\rvert}`` of Appendix A.1 of the online supplementary materials of [lopezdeprado2016](@cite). That appendix proves the metric property for a Pearson correlation alone. Section 3.2 of [mlp1](@cite) proves it again for a correlation estimate with ``\\sigma[X, Y] = \\rho[X, Y] \\sigma[X] \\sigma[Y]``, and it does not name a distance correlation. Section 6.2.1 of [cajas2025](@cite) gives the formula for a distance correlation. A search found no earlier work that states that use.
 
 # Related
 
@@ -206,7 +206,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the information one asset loses about another, from the entropies of a joint histogram.
 
-This is the only algorithm in the family that reads the data matrix rather than a correlation matrix, so it captures a non-linear relationship that no correlation coefficient sees. It is what [`CanonicalDistance`](@ref) selects for [`MutualInfoCovariance`](@ref).
+It is the only algorithm in the family that reads the data matrix and not a correlation matrix. So it can measure a non-linear dependence that a correlation coefficient does not show. [`CanonicalDistance`](@ref) selects it for [`MutualInfoCovariance`](@ref).
 
 # Mathematical definition
 
@@ -216,7 +216,7 @@ This is the only algorithm in the family that reads the data matrix rather than 
 \\end{align}
 ```
 
-When `normalise` is `true`, the result is divided by the joint entropy:
+When `normalise` is `true`, the algorithm divides the result by the joint entropy:
 
 ```math
 \\begin{align}
@@ -235,14 +235,15 @@ The first formula is the variation of information of Equation 19 of [meila2007](
 
 # Algorithm
 
-This is the only algorithm of the family that runs a procedure rather than applying a closed form to a correlation entry. [`variation_info`](@ref) carries out the steps; `bins` and `normalise` are the two fields below.
+It is the only algorithm of the family that runs a procedure. The other algorithms apply a closed form to each correlation entry. [`variation_info`](@ref) does these steps for each pair of asset columns, and `bins` and `normalise` are the two fields below.
 
- 1. Take the number of histogram bins from `bins`. An `Integer` is that count; a bin-width rule computes the count from the sample size and the pairwise correlation.
- 2. Build the joint histogram of the two asset columns over that bin count, giving the joint distribution.
- 3. Reduce the joint histogram along each axis, giving the two marginal distributions.
- 4. Take the Shannon entropy of each marginal and of the joint histogram, giving ``H(X_{i})``, ``H(X_{j})`` and ``H(X_{i},\\,X_{j})``.
- 5. Form the mutual information ``I(X_{i};X_{j}) = H(X_{i}) + H(X_{j}) - H(X_{i},\\,X_{j})``, and from it the variation of information of the first formula above.
- 6. When `normalise` is `true`, divide by the joint entropy ``H(X_{i}) + H(X_{j}) - I(X_{i};X_{j})``, giving the second formula.
+ 1. Take the number of histogram bins from `bins`. An `Integer` is that count. [`HacineGharbiRavier`](@ref) computes the count from the sample size and the correlation of the pair. A bin-width rule divides the range of each column by its bin width, and takes the larger of the two counts.
+ 2. Fit a histogram to each of the two columns over that bin count, and take its Shannon entropy. The results are ``H(X_{i})`` and ``H(X_{j})``.
+ 3. Fit the joint histogram of the two columns over the same bin edges.
+ 4. Compute the mutual information ``I(X_{i};X_{j})`` from the joint histogram and its two marginal sums.
+ 5. Compute the variation of information of the first formula above.
+ 6. When `normalise` is `true`, divide by the joint entropy ``H(X_{i}) + H(X_{j}) - I(X_{i};X_{j})`` to get the second formula.
+ 7. Floor the result at zero. The diagonal is exactly zero, and the procedure does not estimate it.
 
 # Fields
 
@@ -311,18 +312,18 @@ $(DocStringExtensions.TYPEDEF)
 
 Selects the distance algorithm that matches the covariance estimator it is given.
 
-It owns no formula of its own. It is a redirect, and it exists so that a codependence measure reaches the distance transform its own range calls for: a signed correlation must be halved, a mutual information has no correlation to transform at all, and a tail dependence coefficient wants an unbounded distance.
+It has no formula. It is a redirect that sends each codependence measure to the distance transform that fits its range. A signed correlation needs the factor ``1/2``. A mutual information has no correlation to transform. A tail dependence coefficient needs an unbounded distance.
 
-| Covariance Estimator                                                               | Distance Metric                 |
+| Covariance estimator                                                               | Distance algorithm              |
 | ----------------------------------------------------------------------------------:|:------------------------------- |
 | [`MutualInfoCovariance`](@ref)                                                     | [`VariationInfoDistance`](@ref) |
 | [`LowerTailDependenceCovariance`](@ref)                                            | [`LogDistance`](@ref)           |
 | [`DistanceCovariance`](@ref)                                                       | [`CorrelationDistance`](@ref)   |
 | [`StatsBase.CovarianceEstimator`](https://juliastats.org/StatsBase.jl/stable/cov/) | [`SimpleDistance`](@ref)        |
 
-The table also applies to [`PortfolioOptimisersCovariance`](@ref) where `ce` is one of the aforementioned estimators.
+The table also applies to a [`PortfolioOptimisersCovariance`](@ref) whose `ce` is one of these estimators.
 
-When used with a covariance matrix directly, uses [`SimpleDistance`](@ref).
+With a correlation or a covariance matrix and no estimator, it uses [`SimpleDistance`](@ref).
 
 # Related
 

@@ -1920,6 +1920,10 @@
         # --- the constructor refuses a power below one ---
         @test_throws DomainError Distance(; power = 0)
         @test_throws DomainError Distance(; power = -2)
+        # The message states the bound alone. `power` raises the correlation under four
+        # algorithms, so a message that says it raises the distance is wrong (#448).
+        @test_throws "`Distance.power` is 0, but it must be at least `1`." Distance(;
+                                                                                    power = 0)
     end
     @testset "The distance-of-distances sweep of #449" begin
         #=
@@ -1988,6 +1992,8 @@
         # --- the constructor refuses a power below one ---
         @test_throws DomainError DistanceDistance(; power = 0)
         @test_throws DomainError DistanceDistance(; power = -2)
+        @test_throws "`DistanceDistance.power` is 0, but it must be at least `1`." DistanceDistance(;
+                                                                                                    power = 0)
         #=
         The Euclidean norm of two columns of a bounded distance matrix is not itself
         bounded by one, which is why `ComplementSimilarity` is out of domain against this

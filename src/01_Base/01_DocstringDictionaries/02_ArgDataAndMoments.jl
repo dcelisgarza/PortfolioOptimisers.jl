@@ -85,14 +85,14 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
                  ## Mutual and var info
                  :bins => "`bins`: Binning algorithm or fixed number of bins.",#
-                 :normalise => "`normalise`: Whether to normalise the mutual and/or variation of information calculation.",#
+                 :normalise => "`normalise`: If `true`, the result is the normalised mutual information or the normalised variation of information.",#
                  :xj => "`xj`: Data vector for variable `j`.",#
                  :xi => "`xi`: Data vector for variable `i`.",#
                  :jidx => "`j`: Index of variable `j`.",#
                  :iidx => "`i`: Index of variable `i`.",#
                  :Tobs => "`T`: Number of observations.",#
                  ## Distance
-                 :dopower => "`power`: Optional matrix exponent. `nothing` and `1` both give the base distance, so only `power >= 2` changes the result.",#
+                 :dopower => "`power`: Optional integer exponent, which the distance algorithm applies entry by entry. [`Distance`](@ref) states which quantity it raises. `nothing` and `1` both give the base distance, so only `power >= 2` changes the result.",#
                  :dalg => "`alg`: Distance algorithm.",#
                  :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
                  :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
@@ -126,7 +126,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :Z => "`Z`: Feature matrix `assets × features` if `dims = 1`, `features × assets` when `dims = 2`. May also be a 3-D array of time-varying features, in which case the observation axis always leads: `observations × assets × features` if `dims = 1`, `observations × features × assets` when `dims = 2`.",#
                  :plfe => "`pl`: Structure source, always an estimator so that it refits per fold: a network estimator (a graph, whose `sep` measures the separations `alg` grades) or a clustering estimator (a partition, for which `alg` is inert). A precomputed result is not accepted -- an Estimator does not hold a Result.",#
                  :plfalg => "`alg`: Phylogeny feature algorithm: the rule turning the source's separations into feature values. Inert for a partition source, which has no separation to grade.",#
-                 :dims => "`dims`: Dimension along which to perform the computation.",#
+                 :dims => "`dims`: Dimension along which the computation runs.",#
                  :dims_rd => "`dims`: Accepted and ignored. A `ReturnsResult` holds its observations along the rows, so the call passes `dims = 1`. The method takes no other keyword that it does not list: an unknown keyword raises the `MethodError` of the language, and no estimator swallows it.",#
                  :dims_chk => "`dims`: Dimension selector to check.",#
                  :sym_msg => "`sym`: Symbolic name used in the error message.",#
