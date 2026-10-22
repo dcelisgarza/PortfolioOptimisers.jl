@@ -3,17 +3,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all constraint result types.
 
-All concrete and/or abstract types representing the result of constraint generation or evaluation should be subtypes of `AbstractConstraintResult`.
+A subtype holds the output of a constraint generator. Most subtypes are assembled constraints, and a field of a [`JuMPOptimiser`](@ref) accepts them as precomputed values.
 
 # Interfaces
 
-In order to implement a new constraint result which will work seamlessly with the library, subtype `AbstractConstraintResult` and hold the assembled constraint in its fields. Both methods below carry a library-wide fallback, so a result the fallback already describes implements neither, and a result the fallback describes wrongly implements one or both.
+To make a new constraint result, subtype `AbstractConstraintResult` and put the assembled constraint in its fields. Each method below has a fallback for the whole library. A result that the fallback describes correctly implements neither method. A result that the fallback describes wrongly implements one or both.
 
 ## Routing target
 
-  - `PortfolioOptimisers.implicit_constraint_target(res::AbstractConstraintResult) -> Option{Symbol}`: The one [routing target](@ref PIPELINE_ROUTING_TARGETS) a result of this type can land in, or `nothing` when the type names none.
+  - `PortfolioOptimisers.implicit_constraint_target(res::AbstractConstraintResult) -> Option{Symbol}`: The one [routing target](@ref PIPELINE_ROUTING_TARGETS) that a result of this type can go to, or `nothing` when the type names none.
 
-The fallback answers `nothing`, and `add_constraint_result` then pairs the value with the target its step declared, in a [`TargetedConstraint`](@ref). Implement the method only when the type names exactly one field of a [`JuMPOptimiser`](@ref), which is what lets the value be injected bare.
+The fallback returns `nothing`. `add_constraint_result` then puts the value in a [`TargetedConstraint`](@ref), with the target that its step declared. Implement the method only when the type names exactly one field of a [`JuMPOptimiser`](@ref). Only then can the pipeline put the value in that field without the wrapper.
 
 ### Arguments
 
@@ -25,9 +25,9 @@ The fallback answers `nothing`, and `add_constraint_result` then pairs the value
 
 ## Asset view
 
-  - `PortfolioOptimisers.port_opt_view(res::AbstractConstraintResult, i, args...) -> AbstractConstraintResult`: An asset-sliced copy of the result.
+  - `PortfolioOptimisers.port_opt_view(res::AbstractConstraintResult, i, args...) -> AbstractConstraintResult`: A copy of the result over the selected assets.
 
-The generic fallback slices an array field along the asset axis, and `@propagatable`'s `@vprop` tag derives the method for a struct whose fields are all asset-parallel. Write the method by hand when the fallback is wrong for the type. [`LinearConstraint`](@ref) is the case: its method reads neither the index nor the tail that follows it, and the reason the identity is the right answer there is stated on the method itself.
+The generic fallback slices an array, and returns a scalar, `nothing`, an estimator or an algorithm unchanged. It has no method for a result struct, and raises a `MethodError` on one. A result that a view can reach needs its own method. Tag each field that the view slices with `@vprop`, and `@propagatable` makes the method. Write the method by hand when the tags cannot state the view. [`LinearConstraint`](@ref) is that case. Its method reads neither the index nor the arguments after it, and the method states why the identity is correct.
 
 ### Arguments
 
@@ -52,17 +52,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all constraint estimator types.
 
-All concrete and/or abstract types implementing constraint generation or estimation algorithms should be subtypes of `AbstractConstraintEstimator`.
+A subtype holds the configuration of one constraint family. The generation verb of the family turns the configuration into a constraint over a universe.
 
 # Interfaces
 
-In order to implement a new constraint family which will work seamlessly with the library, subtype `AbstractConstraintEstimator` with all necessary parameters as part of the struct, and implement the following methods.
+To make a new constraint family, subtype `AbstractConstraintEstimator` and put its parameters in the fields of the struct. Then implement the methods below.
 
 ## Constraint generation
 
-  - `<family>_constraints(ce::AbstractConstraintEstimator, sets::UniverseSets)`: Assemble the family's constraint over the declared universe.
+  - `<family>_constraints(ce::AbstractConstraintEstimator, sets::UniverseSets)`: Assemble the constraint of the family over the declared universe.
 
-The family owns the verb, and the library holds one verb per family rather than one shared name: [`linear_constraints`](@ref), [`weight_bounds_constraints`](@ref), [`threshold_constraints`](@ref), [`risk_budget_constraints`](@ref), [`asset_sets_matrix`](@ref), [`phylogeny_constraints`](@ref) and [`centrality_constraints`](@ref). A family that refits its structure from data takes a [`ReturnsResult`](@ref) in place of the sets. This is the method a caller reaches directly, and it is the one the pipeline step below delegates to.
+Each family has its own verb, and the library has no shared verb name. The verbs are [`linear_constraints`](@ref), [`weight_bounds_constraints`](@ref), [`threshold_constraints`](@ref), [`risk_budget_constraints`](@ref), [`asset_sets_matrix`](@ref), [`phylogeny_constraints`](@ref) and [`centrality_constraints`](@ref). A family that fits its structure to data takes a [`ReturnsResult`](@ref) in place of the sets. A caller calls this method directly, and the pipeline step below calls it too.
 
 ### Arguments
 
@@ -71,16 +71,16 @@ The family owns the verb, and the library holds one verb per family rather than 
 
 ### Returns
 
-  - `res`: The assembled constraint. Every family but the asset sets matrix returns an [`AbstractConstraintResult`](@ref); [`asset_sets_matrix`](@ref) returns a plain membership matrix, and the [routing target](@ref PIPELINE_ROUTING_TARGETS) carries it instead of the type.
+  - `res`: The assembled constraint. Every family except the asset sets matrix returns an [`AbstractConstraintResult`](@ref). [`asset_sets_matrix`](@ref) returns a plain membership matrix, so the [routing target](@ref PIPELINE_ROUTING_TARGETS) tells the pipeline where the matrix goes, and the type does not.
 
 ## Pipeline step
 
-Implement both methods, or neither. [`pipe_constraint_targets`](@ref) falls back to an empty tuple, which declares that the family computes no value for the `constraints` slot and is therefore not a [`Pipeline`](@ref) step, and `resolve_constraint_target` raises on that tuple before the value is ever reached. [`JuMPConstraintEstimator`](@ref) is the family that takes the fallback: it is configuration for the model rather than a computation over data.
+Implement both methods, or neither. The fallback of [`pipe_constraint_targets`](@ref) is an empty tuple. That tuple declares that the family computes no value for the `constraints` slot, so the family is not a [`Pipeline`](@ref) step. `resolve_constraint_target` raises on the empty tuple before it reads the value. [`JuMPConstraintEstimator`](@ref) is the family that takes the fallback, because it configures the model and computes nothing from data.
 
-  - `PortfolioOptimisers.pipe_constraint_targets(ce::AbstractConstraintEstimator) -> Tuple`: The [routing targets](@ref PIPELINE_ROUTING_TARGETS) the family's result can land in. One target places the value with no annotation, several make the [`PipelineStep`](@ref) wrapper name one.
-  - `PortfolioOptimisers.constraint_step_value(ce::AbstractConstraintEstimator, ctx::PipelineContext)`: The value the step contributes, computed by calling the family's own verb above.
+  - `PortfolioOptimisers.pipe_constraint_targets(ce::AbstractConstraintEstimator) -> Tuple`: The [routing targets](@ref PIPELINE_ROUTING_TARGETS) that the result of the family can go to. With one target, the step places the value with no annotation. With more than one, the [`PipelineStep`](@ref) wrapper must name one.
+  - `PortfolioOptimisers.constraint_step_value(ce::AbstractConstraintEstimator, ctx::PipelineContext)`: The value that the step adds. The method calls the generation verb of the family to compute it.
 
-`pipe_reads` and `pipe_writes` need no method. The family answers `(:returns,)` and `:constraints` for every subtype, and a family that reads a computed slot as well states so on its own type.
+`pipe_reads` and `pipe_writes` need no method. They return `(:returns,)` and `:constraints` for every subtype. A family that also reads a computed slot declares it with its own `pipe_reads` method, as [`ExposureConstraintEstimator`](@ref) does for `:prior`.
 
 ### Arguments
 
@@ -103,11 +103,11 @@ abstract type AbstractConstraintEstimator <: AbstractEstimator end
 """
     const ComparisonOperator = Union{typeof(==), typeof(<=), typeof(>=)}
 
-Union type representing supported comparison operators for constraint generation.
+Union of the comparison operators that a constraint accepts.
 
-This type is used to specify which comparison operators are valid for defining constraints. It includes equality and both directions of inequality.
+It matches the equality `==` and the two inequalities `<=` and `>=`.
 
-The group exists to be a **type bound** rather than a check. A field annotated with it refuses a fourth operator where the value is stored, so `CentralityConstraint(; comp = <)` raises a `TypeError` from the keyword constructor, and no constraint generator carries a branch for an operator it can never receive.
+The union is a type bound, not a check. A field that it bounds refuses a fourth operator when the constructor stores the value. Thus `CentralityConstraint(; comp = <)` raises a `TypeError` from the keyword constructor. No constraint generator needs a branch for an operator that it cannot receive.
 
 # Related
 
@@ -119,9 +119,9 @@ const ComparisonOperator = Union{typeof(==), typeof(<=), typeof(>=)}
     comparison_sign_ineq_flag(op::ComparisonOperator)
     comparison_sign_ineq_flag(op::AbstractString)
 
-Return the multiplicative sign and inequality flag for a given comparison operator.
+Return the sign and the inequality flag of a comparison operator.
 
-This is the one table mapping a comparison operator to the pair every constraint generator needs: the sign that files a `>=` row as a `<=` row, and the flag that sorts the row into the inequality block or the equality block. A parsed constraint carries its operator as a `String`, and a constraint estimator carries it as a function, so the table dispatches on both spellings and neither caller writes its own copy.
+This function is the one table from a comparison operator to the pair that every constraint generator needs. The sign turns a `>=` row into a `<=` row. The flag puts the row in the inequality block or in the equality block. A parsed constraint holds its operator as a `String`, and a constraint estimator holds it as a function. The table has a method for each form, so no caller keeps its own copy.
 
 # Arguments
 
@@ -130,13 +130,13 @@ This is the one table mapping a comparison operator to the pair every constraint
 
 # Validation
 
-  - A string `op` is one of `"=="`, `"<="` or `">="`. Anything else raises an `ArgumentError` naming the three.
-  - A function `op` outside [`ComparisonOperator`](@ref) matches no method and raises a `MethodError`. A field bounded by that alias refuses such an operator earlier, at construction.
+  - A string `op` is one of `"=="`, `"<="` or `">="`. Another string raises an `ArgumentError` that names the three.
+  - A function `op` outside [`ComparisonOperator`](@ref) matches no method and raises a `MethodError`. A field that the alias bounds refuses such an operator before this, at construction.
 
 # Returns
 
-  - `sign::Int`: The multiplicative sign for the constraint.
-  - `is_inequality::Bool`: `true` if the operator is an inequality, `false` for equality.
+  - `sign::Int`: The sign that multiplies the row and its right-hand side.
+  - `is_inequality::Bool`: `true` for an inequality, `false` for an equality.
 
 # Examples
 
@@ -182,21 +182,21 @@ end
 """
     resolve_axis_name(name, nx::AbstractVector, sdict::AbstractDict) -> Option{Vector}
 
-Resolve one name against an axis: an axis entry names itself, a `sdict` key expands to its members, and an unknown name gives `nothing`.
+Resolve one name against an axis. An entry of the axis resolves to itself, a key of `sdict` resolves to its members, and an unknown name gives `nothing`.
 
-This is the precedence every name-taking constraint generator uses — asset first, then group — written once. The caller diagnoses the `nothing`, because the suggestion pool differs by caller. The member vector is a **copy**: `sdict` is the caller's [`UniverseSets`](@ref) dictionary, which is configuration reused across folds and optimisers, so de-duplication must never edit it.
+Every constraint generator that takes names uses this order, asset first and then group, and this function holds it once. The caller diagnoses `nothing`, because each caller suggests names from a different pool. The member vector is a copy. `sdict` is the dictionary of the [`UniverseSets`](@ref) of the caller. The removal of duplicates must not change it, because folds and optimisers reuse it as configuration.
 
 # Algorithm
 
- 1. When `name` is on `nx`, return `[name]`. The axis is read before the dictionary, so an asset and a group of one name resolve to the asset, and a group of that name is unreachable.
- 2. Otherwise read `members`, the entry `sdict` holds for `name`, or `nothing` when it holds none.
- 3. Return `unique(members)`, so a group naming one asset twice contributes one member.
+ 1. When `name` is on `nx`, return `[name]`. The function reads the axis before the dictionary. Thus an asset and a group with the same name resolve to the asset, and the group is unreachable.
+ 2. Otherwise read `members`, the entry of `sdict` for `name`, or `nothing` when `sdict` has no such entry.
+ 3. Return `unique(members)`, so a group that names one asset twice gives one member. Return `nothing` when `members` is `nothing`.
 
 # Arguments
 
   - `name`: The name to resolve.
   - `nx`: The axis, usually the asset universe.
-  - `sdict`: Dictionary mapping group names to vectors of member names.
+  - `sdict`: Dictionary from group names to vectors of member names.
 
 # Returns
 
@@ -206,7 +206,7 @@ This is the precedence every name-taking constraint generator uses — asset fir
 
 # Examples
 
-An asset name wins over a group of the same name, and a repeated member collapses.
+An asset name wins over a group with the same name, and a repeated member counts once.
 
 ```jldoctest
 julia> nx = [\"A\", \"B\", \"C\"];
@@ -243,26 +243,26 @@ end
 """
     axis_name_indices(members, nx::AbstractVector, on_missing) -> Vector
 
-Map resolved member names to axis indices, drop the members that miss the axis, and report them once through `on_missing`.
+Map resolved member names to indices on an axis, drop the members that are not on the axis, and report them once through `on_missing`.
 
-`on_missing` takes the vector of missing members and decides the policy, so a caller can throw, warn, or stay silent without a second copy of the mapping. `on_missing` is not called when every member is on the axis.
+`on_missing` receives the vector of missing members and applies the policy of the caller. Each caller can then throw, warn or do nothing, and the mapping has one copy. The function does not call `on_missing` when every member is on the axis.
 
 # Algorithm
 
- 1. Map each member to `idx`, its first index on `nx`, or to `nothing` when it is on no index. A repeated axis name is therefore reachable only at its first index.
+ 1. Map each member to its first index on `nx`, or to `nothing` when it is not on `nx`, and call the result `idx`. A repeated axis name is reachable only at its first index.
  2. Collect `missing_members`, the members whose index is `nothing`.
  3. Drop the `nothing`s from `idx`.
- 4. When `missing_members` is not empty, call `on_missing` on it. The call comes **after** step 3, so a callback that throws throws with the surviving indices already discarded, and a callback that warns leaves the caller holding them.
+ 4. When `missing_members` is not empty, call `on_missing` on it. This call comes after step 3. Thus a callback that throws discards the indices that remain, and a callback that warns gives them to the caller.
 
 # Arguments
 
   - `members`: Member names, as [`resolve_axis_name`](@ref) returns them.
   - `nx`: The axis, usually the asset universe.
-  - `on_missing`: Callable applied to the vector of members that miss the axis.
+  - `on_missing`: Function that receives the vector of members that are not on the axis.
 
 # Returns
 
-  - `idx`: Axis indices of the members that are on the axis, in the order of `members`. The element type is `Int` when no member missed the axis, and `Union{Nothing, Int}` when one did, because step 3 removes the `nothing`s from the vector and not from its type.
+  - `idx`: The indices on the axis of the members that are on it, in the order of `members`. The element type is `Int` when no member is missing, and `Union{Nothing, Int}` when one is. Step 3 removes the `nothing`s from the vector, but not from its element type.
 
 # Examples
 
