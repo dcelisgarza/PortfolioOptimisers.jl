@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all centrality estimator types.
+Abstract supertype for the estimators that score the centrality of each asset.
 
-All concrete and/or abstract types implementing centrality-based estimation algorithms should be subtypes of `AbstractCentralityEstimator`.
+Every concrete or abstract type that estimates a centrality vector must subtype `AbstractCentralityEstimator`.
 
 # Related
 
@@ -16,27 +16,27 @@ $(DocStringExtensions.TYPEDEF)
 
 Bundles a network source with the centrality algorithm that scores its assets.
 
-`CentralityEstimator` encapsulates the configuration for computing centrality measures on a network, including the network estimator and the centrality algorithm.
+`pl` builds the network or the partition, and `ct` scores each asset on it.
 
-The network is weighted where it can be. [`centrality_polarity`](@ref) answers which quantity `ct` needs — distances for the shortest-path algorithms, similarities for [`EigenvectorCentrality`](@ref) — and [`centrality_graph`](@ref) supplies it from `pl`.
+The network has weights where it can have them. [`centrality_polarity`](@ref) returns the quantity that `ct` needs, and [`centrality_graph`](@ref) gives that quantity from `pl`. The shortest path algorithms need distances, and [`EigenvectorCentrality`](@ref) needs similarities.
 
-The centrality vector feeds the average centrality ``\\mathbf{C}_n^{\\prime} \\boldsymbol{w}`` of [graphpo1](@cite), Equation 6. That work computes ``\\mathbf{C}_n`` on the unweighted adjacency matrix of the tree or of the TMFG. The weights are this library's choice, and they follow the rule of [pozzi2013](@cite).
+The centrality vector is the input of the average centrality ``\\mathbf{C}_n^{\\prime} \\boldsymbol{w}`` of Equation 6 of [graphpo1](@cite). That work computes ``\\mathbf{C}_n`` on the unweighted adjacency matrix of the tree or of the TMFG. The weights are a choice of this library, and they follow the rule of [pozzi2013](@cite).
 
-The estimator carries no override of its own. A caller who wants the centrality over the network's topology alone configures `ct` itself, with [`TopologyOnly`](@ref) in its `ov` field, and this estimator is a pure bundle of `pl` and `ct` either way.
+The estimator has no override of its own. For the centrality over the topology alone, put [`TopologyOnly`](@ref) in the `ov` field of `ct`. In both cases, this estimator only holds `pl` and `ct`.
 
 !!! warning
 
-    Five cases run on the **unweighted** graph, and none of them raises. A caller names a configured algorithm and never asks *for* weights, so an unweightable pairing has not been handed a request it cannot serve. [`TopologyOnly`](@ref) asks *away* from them, which every source can serve, so it adds no case to this list and is not one of the five.
+    Five cases run on the unweighted graph, and none of them raises an error. A caller names a configured algorithm and never asks for weights. A source and an algorithm that cannot use weights have no request to refuse. [`TopologyOnly`](@ref) asks for no weights, and every source can give that, so it is not one of the five cases.
 
-     1. A clustering estimator or a precomputed [`Clusters`](@ref) as `pl`, or a precomputed [`PhylogenyResult`](@ref) passed to [`centrality_vector`](@ref) directly. A partition has no edge weights, and does not borrow any.
-     2. [`DegreeCentrality`](@ref). `Graphs.jl` ignores weights.
-     3. [`Pagerank`](@ref). `Graphs.jl` ignores weights.
-     4. [`KatzCentrality`](@ref). `Graphs.katz_centrality` binarises through `adjacency_matrix(g, Bool)`.
+     1. A clustering estimator as `pl`. A precomputed [`Clusters`](@ref) or [`PhylogenyResult`](@ref) passed directly to [`centrality_vector`](@ref) is the same case. Neither a partition nor a precomputed phylogeny matrix has edge weights, and neither borrows weights.
+     2. [`DegreeCentrality`](@ref). `Graphs.jl` does not read the weights.
+     3. [`Pagerank`](@ref). `Graphs.jl` does not read the weights.
+     4. [`KatzCentrality`](@ref). `Graphs.katz_centrality` reads `adjacency_matrix(g, Bool)`, and raises an `InexactError` on a weighted graph.
      5. [`EigenvectorCentrality`](@ref) on a tree branch. The branch carries no similarity for it to read.
 
-    On the weighted routes the `sep` field of a [`NetworkEstimator`](@ref) is **inert**: they read the structure itself rather than the separation closure [`phylogeny_matrix`](@ref) builds. At the default `HopCount(; n = 1)` the two agree, because the closure of a graph at one hop is the graph.
+    The weighted routes do not read the `sep` field of a [`NetworkEstimator`](@ref). They read the structure, and not the separation closure that [`phylogeny_matrix`](@ref) builds. At the default `HopCount(; n = 1)` the two agree, because the closure of a graph at one hop is the graph.
 
-[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) do read the weights, and are nonetheless unchanged by them on a tree: a tree has exactly one path between any two vertices, so the shortest-path set is the same at any weights. That is a theorem about the graph rather than a limitation of the algorithm, and it does not hold on the similarity branch.
+[`BetweennessCentrality`](@ref) and [`StressCentrality`](@ref) read the weights, but the weights do not change them on a tree. A tree has exactly one path between two vertices, so the set of shortest paths is the same at all weights. This is a property of the tree, and it does not hold on the similarity branch.
 
 # Fields
 
@@ -54,8 +54,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
-  - `returns_source(pl) === nothing`: the network or clustering estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). The constructor throws an `ArgumentError` otherwise.
+  - `returns_source(pl) === nothing`. The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own, see [`assert_inner_reader`](@ref). The constructor throws an `ArgumentError` otherwise.
 
 # Examples
 
@@ -107,7 +107,7 @@ CentralityEstimator
 """
 @concrete struct CentralityEstimator <: AbstractCentralityEstimator
     """
-    $(field_dict[:pler])
+    Network estimator or clustering estimator that builds the structure. The bound [`NwE_ClE`](@ref) refuses a precomputed `PhylogenyResult` or `Clusters`.
     """
     pl
     """

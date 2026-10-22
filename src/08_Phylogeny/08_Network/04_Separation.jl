@@ -7,32 +7,32 @@
 
 Build the structure a separation measures over.
 
-One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_matrix`](@ref) and [`separation_budget`](@ref) are the other two. It exists as a kernel of its own so that **the structure is built once per consumer call**: [`separation_matrix`](@ref) and [`resolve_separation`](@ref) both take the graph, and a consumer that needs the separations *and* a budget rule answered would otherwise build the same structure twice, through two estimator-taking kernels that each derive it privately.
+This function is one of the three kernels that a member of [`AbstractSeparationAlgorithm`](@ref) implements. [`separation_matrix`](@ref) and [`separation_budget`](@ref) are the other two. It is a kernel of its own, so that a consumer builds the structure one time for each call. [`separation_matrix`](@ref) and [`resolve_separation`](@ref) both take the graph. Without this kernel, a consumer that needs the separations and a resolved budget rule builds the same structure two times.
 
 # What each member measures over
 
-  - [`HopCount`](@ref): [`calc_adjacency`](@ref)'s structure as a `Graphs.SimpleGraph`. Binary, because a hop count ignores the weights and its consumers do not — [`_phylogeny_matrix`](@ref) reads `Graphs.adjacency_matrix` off this graph for a power sum, where a weight would make `A^i` sum *products of distances* instead of counting walks.
-  - [`PathLength`](@ref): [`calc_distance_weighted_graph`](@ref)'s structure. The same edge set, weighted by **distance** on either branch, because a shortest path over the PMFG's similarities seeks the route through the weakest links.
+  - [`HopCount`](@ref): the structure of [`calc_adjacency`](@ref), as a `Graphs.SimpleGraph`. The graph is binary, because a hop count does not read the weights and its consumers do. [`_phylogeny_matrix`](@ref) reads `Graphs.adjacency_matrix` of this graph for a sum of powers. With weights, `A^i` sums products of distances and does not count walks.
+  - [`PathLength`](@ref): the structure of [`calc_distance_weighted_graph`](@ref). It has the same edge set, with distances as weights on either branch. A shortest path over the similarities of a PMFG takes the route through the weakest links.
 
-# Two entry points, and why only the hop count gets the graph-taking one
+# Two entry points, and why only the hop count takes a graph
 
-The estimator-taking methods derive the structure from `X`. The graph-taking method is for a caller that already holds it: both [`clusterise`](@ref) methods build the structure from the selecting quantity they already paid for, through [`calc_weighted_adjacency_graph`](@ref)'s own two-argument entry point, and would otherwise re-derive the distance — `98%` of `clusterise`'s runtime under [`VariationInfoDistance`](@ref) — to answer a budget rule.
+The methods that take `nte` build the structure from `X`. The method that takes `G` is for a caller that already holds the structure. Both [`clusterise`](@ref) methods build it from the quantity that selects the edges, through the entry point of [`calc_weighted_adjacency_graph`](@ref) that takes `alg`. Without this method, they compute the distance again to resolve a budget rule. Under [`VariationInfoDistance`](@ref), that computation is `98%` of the run time of `clusterise`.
 
-[`PathLength`](@ref) has **no** graph-taking method, and cannot: a graph carries no polarity tag, so `G` is a distance-weighted structure on the tree branch and a similarity-weighted one on the PMFG branch, and nothing in the argument distinguishes them. Handing the PMFG's similarities to a shortest path returns an answer instead of raising — see [`calc_distance_weighted_graph`](@ref). The hop count is exempt because it discards the weights.
+[`PathLength`](@ref) has no method that takes a graph, and it cannot have one. A graph carries no polarity tag. `G` has distances as weights on the tree branch and similarities on the PMFG branch, and the argument does not show which. A shortest path over the similarities of a PMFG returns an answer and raises no error, see [`calc_distance_weighted_graph`](@ref). The hop count is not affected, because it removes the weights.
 
 # Algorithm
 
- 1. Build the structure `X` implies, through the branch that `sep` selects.
+ 1. Build the structure from `X`, through the branch that `sep` selects.
 
-      + [`HopCount`](@ref): [`calc_adjacency`](@ref)'s binary matrix.
-      + [`PathLength`](@ref): [`calc_distance_weighted_graph`](@ref)'s distance-weighted structure, which is already the answer.
+      + [`HopCount`](@ref): the binary matrix of [`calc_adjacency`](@ref).
+      + [`PathLength`](@ref): the structure of [`calc_distance_weighted_graph`](@ref), with distances as weights. It is the answer.
 
- 2. Rebuild a [`HopCount`](@ref)'s structure as a `Graphs.SimpleGraph`, which discards the weights. The graph-taking method is handed `G` and starts here.
+ 2. Convert the structure of a [`HopCount`](@ref) to a `Graphs.SimpleGraph`, which removes the weights. The method that takes `G` receives it and starts here.
 
 # Arguments
 
-  - `sep`: Separation algorithm. Dispatched on, and its budget is not read — a member whose budget is still a **rule** measures over the same structure as one whose budget is a number, which is what lets [`resolve_separation`](@ref) be handed this graph.
-  - `G`: Network structure a caller already holds, in either polarity.
+  - `sep`: Separation algorithm. The function dispatches on its type and does not read its budget. A member whose budget is a rule measures over the same structure as a member whose budget is a number. [`resolve_separation`](@ref) can therefore take this graph.
+  - `G`: Network structure that the caller holds, in either polarity.
   - $(arg_dict[:nte])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
@@ -75,39 +75,41 @@ end
 
 Compute the dense `assets × assets` matrix of separations under a separation algorithm.
 
-One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_graph`](@ref) and [`separation_budget`](@ref) are the other two.
+This function is one of the three kernels that a member of [`AbstractSeparationAlgorithm`](@ref) implements. [`separation_graph`](@ref) and [`separation_budget`](@ref) are the other two.
 
-# The graph-taking form is the interface
+# The method that takes a graph is the interface
 
-The separations depend on the structure alone, so `separation_matrix(sep, g)` is where each member's method lives and the estimator-taking form is a wrapper that calls [`separation_graph`](@ref) first. A consumer holding a graph — because it built one for [`resolve_separation`](@ref), or because a test chose one — enters at the graph, and pays for one structure rather than two.
+The separations depend on the structure alone. Each member implements `separation_matrix(sep, g)`, and the method that takes `nte` is a wrapper that first calls [`separation_graph`](@ref). A consumer that holds a graph calls the method that takes `g`, and builds one structure and not two. It can hold a graph because it built one for [`resolve_separation`](@ref), or because a test selected one.
 
-The wrapper is generic rather than per-member: it is [`separation_graph`](@ref) that knows which structure the member reads, so there is nothing left for a member to say here.
+One wrapper serves every member. [`separation_graph`](@ref) selects the structure that the member reads, so a member has nothing to add here.
 
 # The unreachable sentinel
 
-An unreachable pair carries whatever sentinel the underlying routine uses, **not** a repaired value: `Graphs.gdistances` reports `typemax(Int)` for [`HopCount`](@ref), and `Graphs.floyd_warshall_shortest_paths` reports `typemax(T)` for [`PathLength`](@ref), which on the `Float64` weights it is handed is `Inf`. A consumer therefore reads an entry through [`is_related`](@ref) rather than comparing it against the budget itself, and keeps the *evaluation* of anything it scores the entry with inside a short-circuiting branch — an `ifelse` evaluates both arms, and [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, which a fractional `power` turns into a `DomainError` rather than a discarded number.
+An unreachable pair keeps the sentinel of the routine that measures it, and the function does not repair it. `Graphs.gdistances` gives `typemax(Int)` for [`HopCount`](@ref). `Graphs.floyd_warshall_shortest_paths` gives `typemax(T)` for [`PathLength`](@ref), which is `Inf` for its `Float64` weights. A consumer reads an entry through [`is_related`](@ref), and does not compare it with the budget itself.
+
+A consumer must also put the score of an entry inside a branch that short-circuits. An `ifelse` evaluates both arms. [`ReciprocalDecay`](@ref) overflows `1 + d` at `typemax(Int)`, and a fractional `power` then raises a `DomainError`.
 
 # The two shipped members read the same structure differently
 
-[`HopCount`](@ref) counts the edges of the binarised structure; [`PathLength`](@ref) sums the distances along them. Which structure each reads is [`separation_graph`](@ref)'s answer, not this function's. All-pairs shortest paths come from one `floyd_warshall_shortest_paths` call rather than a Dijkstra per vertex — measured about **7 times faster** on this shape, and within about `1.3` times of the breadth-first loop the hop count uses.
+[`HopCount`](@ref) counts the edges of the binary structure. [`PathLength`](@ref) sums the distances along them. [`separation_graph`](@ref) selects the structure that each member reads. One call to `floyd_warshall_shortest_paths` gives the shortest paths of all pairs, and the function does not run Dijkstra from each vertex. On this shape, the measured call is about 7 times faster than Dijkstra, and about `1.3` times slower than the breadth-first loop of the hop count.
 
 # Algorithm
 
- 1. Build the structure with [`separation_graph`](@ref). The graph-taking methods are handed `g` and start at step 2.
+ 1. Build the structure with [`separation_graph`](@ref). The methods that take `g` receive it and start at step 2.
 
  2. Measure every pair over that structure, through the branch that `sep` selects.
 
-      + [`HopCount`](@ref): one `Graphs.gdistances` breadth-first traversal per vertex, whose answer becomes that vertex's column of a dense `Matrix{Int}`.
-      + [`PathLength`](@ref): one `Graphs.floyd_warshall_shortest_paths` call over the whole graph, whose `dists` field is the matrix.
+      + [`HopCount`](@ref): one breadth-first traversal with `Graphs.gdistances` from each vertex. Its answer is the column of that vertex in a dense `Matrix{Int}`.
+      + [`PathLength`](@ref): one call to `Graphs.floyd_warshall_shortest_paths` over the whole graph. Its `dists` field is the matrix.
 
 # Arguments
 
-  - `sep`: Separation algorithm. Its budget is not read; a member whose budget is still a rule measures the same separations.
+  - `sep`: Separation algorithm. The function does not read its budget, so a member whose budget is a rule measures the same separations.
   - `g`: Structure to measure over, from [`separation_graph`](@ref).
-  - `nte`: Network estimator. On the wrapper only, where the structure is derived from `X` on every call.
-  - `X`: Data matrix (observations × assets).
+  - `nte`: Network estimator. Only the wrapper takes it, and the wrapper builds the structure from `X` on every call.
+  - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments forwarded to the underlying phylogeny routines.
+  - `kwargs...`: Keyword arguments that the wrapper passes to [`separation_graph`](@ref).
 
 # Returns
 
@@ -144,42 +146,42 @@ end
     separation_budget(sep::HopCount, nte::AbstractNetworkEstimator, d::MatNum)
     separation_budget(sep::PathLength, nte::AbstractNetworkEstimator, d::MatNum)
 
-Resolve the separation budget in scope: the separation beyond which a pair counts as unrelated.
+Return the separation budget, the separation beyond which a pair counts as unrelated.
 
-One third of the extension contract of [`AbstractSeparationAlgorithm`](@ref); [`separation_graph`](@ref) and [`separation_matrix`](@ref) are the other two. Split from `separation_matrix` because a consumer needs the budget on its own — to probe a decay before entering the `assets × assets` loop, or to threshold a matrix it already holds.
+This function is one of the three kernels that a member of [`AbstractSeparationAlgorithm`](@ref) implements. [`separation_graph`](@ref) and [`separation_matrix`](@ref) are the other two. It is separate from `separation_matrix`, because a consumer can need the budget alone. The consumer can test a decay before its loop over the `assets × assets` pairs, or apply a threshold to a matrix that it already holds.
 
-# The separations are passed in, not recomputed
+# The function takes the separations, and does not compute them again
 
-`d` is the matrix [`separation_matrix`](@ref) produced, so a member whose budget is *observed* rather than configured — the diameter of what the graph actually turned out to be — can read it without a second traversal. That is why the argument is the **matrix** and not a diameter: finding the largest finite entry is itself the `assets²` reduction, so passing a diameter would charge [`HopCount`](@ref) for one it ignores. Handing over `d` pushes the reduction into [`PathLength`](@ref), the member that wants it.
+`d` is the matrix that [`separation_matrix`](@ref) made. A member can observe its budget from the graph, and not take it from the configuration. The diameter of the graph is such a budget, and the member reads it from `d` with no second traversal. This is why the argument is the matrix, and not a diameter. The largest finite entry is a reduction over `assets²` entries, and a diameter argument makes [`HopCount`](@ref) pay for a reduction that it does not read. With `d`, only [`PathLength`](@ref), the member that needs the reduction, does it.
 
-`nte` is inert for what ships: it is the channel through which an extension budget can see the estimator that owns it. Inert arguments have precedent here — [`separation_decay`](@ref)'s `dmax` is read by only one of five members.
+The shipped members do not read `nte`. It lets the budget of an extension read the estimator that owns it. [`separation_decay`](@ref) has a similar argument, because only one of its four members reads `dmax`.
 
 # The observed diameter is a ceiling, not only a default
 
-[`PathLength`](@ref) clamps a chosen `dmax` to the observed diameter as well as substituting the diameter for `nothing`. The clamp **truncates nothing** — no pair sits beyond the diameter — so it is a scale-top correction and is visible only through [`LinearDecay`](@ref), the one decay reading the budget. Without it, `dmax = 100` on a graph of diameter `3.5` would flatten the scores towards a constant while forbidding no pair at all.
+[`PathLength`](@ref) puts the observed diameter in place of `dmax = nothing`. It also clamps a stated `dmax` to the observed diameter. The clamp removes no pair, because no pair is beyond the diameter. It corrects the top of the scale, and only [`LinearDecay`](@ref), the one decay that reads the budget, shows it. Without the clamp, `dmax = 100` on a graph of diameter `3.5` moves every score near to one constant, and refuses no pair.
 
 # Algorithm
 
- 1. Refuse a separation whose budget is still a rule. A [`HopCount`](@ref) carrying a [`HopCountAlgorithm`](@ref), and a [`PathLength`](@ref) carrying a [`PathLengthAlgorithm`](@ref), each throw here.
+ 1. Refuse a separation whose budget is a rule. A [`HopCount`](@ref) that holds a [`HopCountAlgorithm`](@ref), and a [`PathLength`](@ref) that holds a [`PathLengthAlgorithm`](@ref), each throw here.
 
- 2. Answer the budget, through the branch that `sep` selects.
+ 2. Return the budget, through the branch that `sep` selects.
 
-      + [`HopCount`](@ref): `sep.n`, the number of hops the caller stated. `d` is not read.
-      + [`PathLength`](@ref): walk `d`, keep the largest entry [`is_reachable`](@ref) admits, and call it `delta`, the observed diameter. Answer `delta` when `sep.dmax` is `nothing`, and the smaller of `sep.dmax` and `delta` otherwise.
+      + [`HopCount`](@ref): `sep.n`, the number of hops that the caller stated. The method does not read `d`.
+      + [`PathLength`](@ref): find `delta`, the largest entry of `d` that [`is_reachable`](@ref) admits. It is the observed diameter. Return `delta` when `sep.dmax` is `nothing`, and the smaller of `sep.dmax` and `delta` otherwise.
 
 # Arguments
 
   - `sep`: Separation algorithm.
-  - `nte`: Network estimator that owns `sep`. **Inert** for the shipped members.
-  - `d`: Separation matrix from [`separation_matrix`](@ref). **Inert** for [`HopCount`](@ref), whose budget is configured rather than observed; read by [`PathLength`](@ref), whose budget is capped by what the graph turned out to be.
+  - `nte`: Network estimator that owns `sep`. The shipped members do not read it.
+  - `d`: Separation matrix from [`separation_matrix`](@ref). [`HopCount`](@ref) does not read it, because its budget comes from the configuration. [`PathLength`](@ref) reads it, because the observed diameter caps its budget.
 
 # Validation
 
-  - Throws an `ArgumentError` if `sep` carries a budget rule rather than a value. Call [`resolve_separation`](@ref) first.
+  - Throws an `ArgumentError` if `sep` holds a budget rule and not a value. Call [`resolve_separation`](@ref) first.
 
 # Returns
 
-  - `dmax::Number`: Separation budget. Stated in the units `sep` measures in — hops for [`HopCount`](@ref), the distance estimator's units for [`PathLength`](@ref) — so it is only ever compared against entries of `d`.
+  - `dmax::Number`: Separation budget, in the units of `sep`. The unit is the hop for [`HopCount`](@ref), and the unit of the distance estimator for [`PathLength`](@ref). A consumer compares it only with entries of `d`.
 
 # Related
 
@@ -222,29 +224,29 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Quantile of the reachable off-diagonal entries of a separation matrix.
+Compute the quantile of the reachable off-diagonal entries of a separation matrix.
 
-The population is the pairs a budget can be *about*: the diagonal is zero by construction and an unreachable pair carries [`separation_matrix`](@ref)'s sentinel, so neither is a separation. It is also the population [`phylogeny_matrix`](@ref) selects from, which is what makes `q` read as the fraction of pairs the resulting budget relates.
+The population is the set of pairs that a budget can relate. The diagonal is zero, and an unreachable pair holds the sentinel of [`separation_matrix`](@ref), so neither is a separation. [`phylogeny_matrix`](@ref) selects from the same population. `q` is then the fraction of the pairs that the budget relates.
 
-# The sentinel test is the family's
+# The test for the sentinel belongs to the family
 
-The population excludes an unreachable pair through [`is_reachable`](@ref) rather than through a test written out here. `isfinite` alone would not do it: it is `true` for every `Integer`, so it admits [`HopCount`](@ref)'s `typemax(Int)`.
+The function removes an unreachable pair from the population with [`is_reachable`](@ref), and not with a test of its own. `isfinite` does not work. It is `true` for every `Integer`, so it admits the sentinel `typemax(Int)` of [`HopCount`](@ref).
 
 # Algorithm
 
- 1. Collect the off-diagonal entries of `d` that [`is_reachable`](@ref) admits, giving `v`, the population of the quantile.
+ 1. Collect into `v` the off-diagonal entries of `d` that [`is_reachable`](@ref) admits. `v` is the population of the quantile.
  2. Throw an `ArgumentError` when `v` is empty.
- 3. Take the `q`-quantile of `v` with `Statistics.quantile`.
+ 3. Return the `q`-quantile of `v` from `Statistics.quantile`.
 
 # Arguments
 
-  - `sep`: Separation algorithm the matrix was measured under, forwarded to [`is_reachable`](@ref).
+  - `sep`: Separation algorithm that measured the matrix. The function passes it to [`is_reachable`](@ref).
   - `d`: Separation matrix from [`separation_matrix`](@ref).
   - `q`: Quantile in `[0, 1]`.
 
 # Validation
 
-  - Throws an `ArgumentError` if no off-diagonal entry of `d` is reachable, because a budget cannot be placed at a quantile of an empty population.
+  - Throws an `ArgumentError` if no off-diagonal entry of `d` is reachable, because an empty population has no quantile.
 
 # Returns
 
@@ -269,29 +271,29 @@ $(DocStringExtensions.TYPEDEF)
 
 Places the hop budget at a quantile of the observed hop separations.
 
-The shipped [`HopCountAlgorithm`](@ref). `HopCount(; n = HopCountQuantile(; q = 0.25))` asks for the hop budget that relates about a quarter of the reachable pairs, instead of naming a number of hops that was right for one universe.
+It is the shipped [`HopCountAlgorithm`](@ref). `HopCount(; n = HopCountQuantile(; q = 0.25))` asks for the hop budget that relates about a quarter of the reachable pairs. A stated number of hops can be correct for one set of assets and wrong for the next.
 
-# What it holds still
+# What it keeps constant
 
-A stated `n` holds the **number of hops** still and lets the related-pair count move with the graph. This rule holds the **count** still — about `q` of the reachable pairs — and lets the number of hops move. On a cross-validation fold or a subproblem of a meta optimiser the second is usually what the caller meant, because the constraint strength a downstream consumer feels is the cardinality, not the hop number.
+A stated `n` keeps the number of hops constant, and the number of related pairs changes with the graph. This rule keeps the number of related pairs near `q` of the reachable pairs, and the number of hops changes. On a fold of a cross-validation, or on a subproblem of a meta-optimiser, the caller usually wants the second. The strength of a downstream constraint follows the number of related pairs, and not the number of hops.
 
-# The rounding is where the two stop matching
+# The rounding makes the two different
 
-A hop count is an `Integer` and the quantile is not, so the budget is rounded to the nearest hop. The related-pair count therefore lands *near* `q` rather than on it, and on a small graph the shells are coarse enough that it can miss by a lot — a hop budget can only ever select one of a handful of cardinalities. [`PathLengthQuantile`](@ref) has no such step and hits `q` closely; that is the sharpest practical difference between the two separations.
+A hop count is an `Integer`, and the quantile is not. The rule rounds the budget to the nearest hop, and the share of related pairs is near `q` but not equal to it. On a small graph the shells are coarse, and the share can be far from `q`. A hop budget can select only a small number of cardinalities. [`PathLengthQuantile`](@ref) does not round, and its share is close to `q`. This is the largest practical difference between the two separations.
 
-# It pays for a traversal, but not for a structure
+# It costs a traversal, but not a structure
 
-Resolving this rule runs [`separation_matrix`](@ref) once, which the hop-ball branch of [`_phylogeny_matrix`](@ref) does not otherwise do — it walks matrix powers instead. A dynamic budget costs one all-pairs traversal that a stated one does not.
+To resolve this rule, the call runs [`separation_matrix`](@ref) one time. The hop branch of [`_phylogeny_matrix`](@ref) does not run it otherwise, because that branch sums matrix powers. A budget from a rule costs one traversal of all pairs, and a stated budget does not.
 
-It does **not** cost a second structure. The rule is handed the graph its consumer already built, through [`separation_graph`](@ref), so the distance derivation — `98%` of [`clusterise`](@ref)'s runtime under [`VariationInfoDistance`](@ref) — is paid once per consumer call whether the budget is a rule or a number.
+It does not cost a second structure. The rule receives the graph that its consumer built through [`separation_graph`](@ref). The consumer computes the distance one time for each call, whether the budget is a rule or a number. Under [`VariationInfoDistance`](@ref), that computation is `98%` of the run time of [`clusterise`](@ref).
 
 # Algorithm
 
-The steps below are the call operator's, which [`resolve_separation`](@ref) invokes.
+These are the steps of the call operator, which [`resolve_separation`](@ref) calls.
 
- 1. Measure the hop separations over `g` with [`separation_matrix`](@ref), giving `d`. A bare [`HopCount`](@ref) is the probe, because that kernel dispatches on the separation's type and reads no field of it.
+ 1. Measure the hop separations over `g` into `d` with [`separation_matrix`](@ref). The call passes a default [`HopCount`](@ref), because that kernel dispatches on the type of the separation and reads no field of it.
  2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref).
- 3. Round that quantile to the nearest `Int`, giving the hop budget. The smallest off-diagonal hop separation is `1`, so the quantile never falls below one and the round never has to be clamped up to [`HopCount`](@ref)'s floor.
+ 3. Round that quantile to the nearest `Int`, and return it as the hop budget. The smallest off-diagonal hop separation is `1`, so the quantile is never less than one. The rounded value is therefore never below the floor of [`HopCount`](@ref), and no clamp is necessary.
 
 # Fields
 
@@ -353,22 +355,22 @@ $(DocStringExtensions.TYPEDEF)
 
 Places the path-length budget at a quantile of the observed path separations.
 
-The shipped [`PathLengthAlgorithm`](@ref), and the direct answer to [`PathLength`](@ref)'s own complaint that nobody has an intuition for a summed path in the units an [`AbstractDistanceEstimator`](@ref) emits. `dmax = 0.37` is not a number a caller can reason about; "the budget that relates a quarter of the reachable pairs" is.
+It is the shipped [`PathLengthAlgorithm`](@ref). [`PathLength`](@ref) states that a sum of path lengths, in the units of an [`AbstractDistanceEstimator`](@ref), is difficult to choose. A caller cannot reason about `dmax = 0.37`. A caller can reason about the budget that relates a quarter of the reachable pairs.
 
-# What it holds still
+# What it keeps constant
 
-A stated `dmax` holds the **radius** still and lets the related-pair count move with the graph. This rule holds the **count** still and lets the radius move. Both are refitted per fold, so neither is stable in both senses at once — the choice is which of the two a downstream consumer is sensitive to, and for [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref) the constraint strength *is* the cardinality.
+A stated `dmax` keeps the radius constant, and the number of related pairs changes with the graph. This rule keeps the number of related pairs constant, and the radius changes. Each fold fits both again, so neither is constant in both senses. Select the one that the downstream consumer is sensitive to. For [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref), the strength of the constraint is the number of related pairs.
 
-# It reaches the cardinalities a hop count cannot
+# It reaches the cardinalities that a hop count cannot reach
 
-This is where the radius ball's one real gain becomes reachable by name. A hop budget steps through a handful of shell cardinalities and cannot stop between them; `q` is continuous, so `PathLengthQuantile(; q = 0.3)` asks for a cardinality directly and lands on it closely.
+This rule lets a caller ask for the one real gain of the radius ball. A hop budget moves through a small number of shell cardinalities, and it cannot stop between them. `q` is continuous, so `PathLengthQuantile(; q = 0.3)` asks for a cardinality, and the result is close to it.
 
 # Algorithm
 
-The steps below are the call operator's, which [`resolve_separation`](@ref) invokes.
+These are the steps of the call operator, which [`resolve_separation`](@ref) calls.
 
- 1. Measure the path separations over `g` with [`separation_matrix`](@ref), giving `d`. A bare [`PathLength`](@ref) is the probe, for the same reason as on the hop rule.
- 2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref). That quantile is the radius budget, and it takes no rounding.
+ 1. Measure the path separations over `g` into `d` with [`separation_matrix`](@ref). The call passes a default [`PathLength`](@ref), for the same reason as the hop rule.
+ 2. Take the `q`-quantile of the reachable off-diagonal entries of `d` with [`separation_quantile`](@ref). Return that quantile as the radius budget, with no rounding.
 
 # Fields
 
@@ -434,44 +436,44 @@ end
                                   <:PathLength{<:PathLengthRule}},
                        nte::AbstractNetworkEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Replace a separation whose budget is a **rule** by one whose budget is a value.
+Replace a separation whose budget is a rule by one whose budget is a value.
 
-The fourth kernel of [`AbstractSeparationAlgorithm`](@ref), and the only one an extension does not have to write: the fallback on the abstract type returns `sep` unchanged, so a member whose budget is already a number passes through at no cost and gains nothing to maintain.
+This function is the fourth kernel of [`AbstractSeparationAlgorithm`](@ref), and the only one that an extension does not have to implement. The method on the abstract type returns `sep` unchanged. A member whose budget is a number costs nothing here, and needs no method of its own.
 
-# It is called by the consumer, not by the other kernels
+# The consumer calls it, and the other kernels do not
 
-Every shipped consumer of a network resolves `nte.sep` **first** and passes the resolved separation to [`separation_matrix`](@ref) and [`separation_budget`](@ref) — [`phylogeny_matrix`](@ref), both [`clusterise`](@ref) methods, and [`phylogeny_features`](@ref) for [`Proximity`](@ref).
+Every shipped consumer of a network first resolves `nte.sep`. It then passes the resolved separation to [`separation_matrix`](@ref) and [`separation_budget`](@ref). The consumers are [`phylogeny_matrix`](@ref), both [`clusterise`](@ref) methods, and [`phylogeny_features`](@ref) for [`Proximity`](@ref).
 
-The alternative was to resolve inside [`separation_budget`](@ref), and it does not work: that kernel takes the separation **matrix** rather than the data, deliberately, so that [`HopCount`](@ref) never pays for a diameter reduction it ignores. A rule needs the structure, which is the one thing the budget kernel does not have. So `separation_budget` refuses an unresolved separation instead, and this kernel is where the structure is still in hand.
+[`separation_budget`](@ref) cannot resolve a rule. It takes the separation matrix and not the data, so that [`HopCount`](@ref) does not pay for a reduction to a diameter that it does not read. A rule needs the structure, and the budget kernel does not have it. `separation_budget` refuses a separation that is not resolved, and this kernel resolves it while the structure is available.
 
-# The rule is handed the structure, not asked to build one
+# The rule receives the structure, and does not build one
 
-`g` is [`separation_graph`](@ref)'s structure, and the graph-taking methods are the interface: a consumer builds once, resolves the rule against that graph, and measures the separations over the same graph. The rule reads what it needs through `separation_matrix(sep, g)`.
+`g` is the structure of [`separation_graph`](@ref), and the methods that take `g` are the interface. A consumer builds the structure one time. It resolves the rule against that graph, and measures the separations over the same graph. The rule reads what it needs through `separation_matrix(sep, g)`.
 
-The estimator-taking methods are wrappers, and the resolved case has one of its own so that **a stated budget builds nothing at all**. Dispatching the wrapper on the rule-carrying parameterisation is what keeps that true — a single generic wrapper would derive a structure before discovering that the fallback ignores it.
+The methods that take only `nte` and `X` are wrappers. The resolved case has a wrapper of its own, so that a stated budget builds no structure. The wrapper for a rule dispatches on the type parameter that holds the rule. One generic wrapper builds a structure before it finds that the method on the abstract type does not read it.
 
-# The return check is a run-time one, and it has to be
+# The check of the return value runs at run time, and it must
 
-A functor's return type is not part of its signature, so a [`HopCountAlgorithm`](@ref) cannot promise an `Integer` in the type system. This kernel checks the value and throws otherwise. The check earns its place: three readers use `0:n` as a **matrix-power count**, where `0:1.5` drops a power silently.
+The return type of a functor is not part of its signature, so the type system cannot make a [`HopCountAlgorithm`](@ref) return an `Integer`. This kernel checks the value, and throws if it is not an `Integer`. The check is necessary. Three readers use `0:n` as a count of matrix powers, and `0:1.5` removes a power with no error.
 
-Resolution goes back through the ordinary constructor, so the rule's answer meets exactly the validation a stated budget meets — `n >= 1`, `n <= RESOURCE_LIMITS[].max_hop_count`, and `dmax > 0`. That is why the resource cap needs no second check here: a rule that returns an absurd hop count is rejected by the same `assert_resource_cap` a stated one meets.
+The kernel builds the resolved member through its usual constructor. The answer of the rule meets the same checks as a stated budget: `n >= 1`, `n <= RESOURCE_LIMITS[].max_hop_count` and `dmax > 0`. For this reason, the resource cap needs no second check here. The same `assert_resource_cap` refuses a hop count that is too large, from a rule or from the caller.
 
 # Algorithm
 
- 1. Answer `sep` unchanged when its budget is already a value. The wrapper carries a method of its own for this case, so a stated budget builds no structure at all.
- 2. Build the structure the rule measures over with [`separation_graph`](@ref), on the wrapper. The graph-taking methods are handed `g` and start at step 3.
- 3. Call the rule in the budget field with `nte`, `X` and `g`, forwarding `dims` and `kwargs`, giving the budget the rule answers.
- 4. Check the type of that answer. A [`HopCount`](@ref) rule must answer with an `Integer`, and a [`PathLength`](@ref) rule with a `Number`. Throw an `ArgumentError` otherwise.
- 5. Rebuild the member through its ordinary constructor, carrying the answer as its budget.
+ 1. Return `sep` unchanged when its budget is a value. The wrapper has a method of its own for this case, so a stated budget builds no structure.
+ 2. In the wrapper, build the structure that the rule measures over with [`separation_graph`](@ref). The methods that take `g` receive it and start at step 3.
+ 3. Call the rule in the budget field with `nte`, `X` and `g`, and pass on `dims` and `kwargs`. The rule returns the budget.
+ 4. Check the type of that answer. A [`HopCount`](@ref) rule must return an `Integer`, and a [`PathLength`](@ref) rule must return a `Number`. Throw an `ArgumentError` otherwise.
+ 5. Build the member again through its usual constructor, with the answer as its budget.
 
 # Arguments
 
   - `sep`: Separation algorithm, resolved or not.
-  - `nte`: Network estimator that owns `sep`, handed to the rule as the channel to anything the graph does not carry.
-  - `X`: Data matrix (observations × assets).
-  - `g`: Structure the rule measures over, from [`separation_graph`](@ref). Derived from `X` by the wrappers.
+  - `nte`: Network estimator that owns `sep`. The rule receives it, and can read from it what the graph does not hold.
+  - $(arg_dict[:X])
+  - `g`: Structure that the rule measures over, from [`separation_graph`](@ref). The wrappers build it from `X`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments, forwarded to the rule.
+  - `kwargs...`: Keyword arguments that the function passes to the rule.
 
 # Validation
 
@@ -480,7 +482,7 @@ Resolution goes back through the ordinary constructor, so the rule's answer meet
 
 # Returns
 
-  - `sep::AbstractSeparationAlgorithm`: The same member with a resolved budget. `sep` itself when the budget was already a value.
+  - `sep::AbstractSeparationAlgorithm`: The same member with a resolved budget. It is `sep` when the budget is a value.
 
 # Related
 

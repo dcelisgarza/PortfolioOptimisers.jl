@@ -3,7 +3,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries a validated phylogeny matrix or a centrality vector.
 
-`PhylogenyResult` stores the output of phylogeny-based estimation routines, such as network or clustering-based phylogeny matrices, or centrality vectors. It is used throughout the package to represent validated phylogeny structures for constraint generation, centrality analysis, and related workflows.
+`PhylogenyResult` holds one of two arrays. [`phylogeny_matrix`](@ref) returns a phylogeny matrix, with `1` for a pair of related assets and `0` for every other pair. [`centrality_vector`](@ref) returns a vector with one centrality score for each asset.
+
+[`SemiDefinitePhylogeny`](@ref), [`IntegerPhylogeny`](@ref), [`centrality_vector`](@ref) and [`asset_phylogeny`](@ref) can take a `PhylogenyResult` in place of the estimator that makes it. The result holds the assets of the call that made it. A call on a different set of assets reads the same array.
 
 # Fields
 
@@ -19,7 +21,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:Xe]).
+  - $(val_dict[:Xe])
   - $(val_dict[:phX_Xv])
 
 # Examples
@@ -49,7 +51,7 @@ PhylogenyResult
         @argcheck(!isempty(X), IsEmptyError)
         if isa(X, MatNum)
             @argcheck(LinearAlgebra.issymmetric(X) && all(iszero, LinearAlgebra.diag(X)),
-                      ArgumentError("phylogeny needs a distance matrix (symmetric, zero diagonal). Got a $(ifelse(LinearAlgebra.issymmetric(X), "symmetric", "non-symmetric")) $(ifelse(all(iszero, LinearAlgebra.diag(X)), "zero diagonal", "non-zero diagonal")) matrix."))
+                      ArgumentError("a phylogeny matrix must be symmetric with a zero diagonal. Got a $(ifelse(LinearAlgebra.issymmetric(X), "symmetric", "non-symmetric")) $(ifelse(all(iszero, LinearAlgebra.diag(X)), "zero diagonal", "non-zero diagonal")) matrix."))
         end
         return new{typeof(X)}(X)
     end
@@ -60,15 +62,15 @@ end
 """
     phylogeny_matrix(plr::PhylogenyResult{<:MatNum}, args...; kwargs...)
 
-Fallback no-op for returning a validated phylogeny matrix result as-is.
+Return a precomputed phylogeny matrix unchanged.
 
-This method provides a generic interface for handling precomputed phylogeny matrices wrapped in a [`PhylogenyResult`](@ref). It simply returns the input object unchanged, enabling consistent downstream workflows for constraint generation and analysis.
+A [`PhylogenyResult`](@ref) that holds a matrix already holds the answer, so this method builds nothing and returns `plr`. The constructor of `plr` checked the matrix, and this method does not check it again. The method reads no data, so the matrix keeps the size of the set of assets that made it.
 
 # Arguments
 
-  - `plr::PhylogenyResult{<:MatNum}`: Phylogeny matrix result object.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `plr::PhylogenyResult{<:MatNum}`: Precomputed phylogeny matrix.
+  - `args...`: Positional arguments. The method does not read them.
+  - `kwargs...`: Keyword arguments. The method does not read them.
 
 # Returns
 
@@ -95,15 +97,15 @@ end
 """
     centrality_vector(plr::PhylogenyResult{<:VecNum}, args...; kwargs...)
 
-Fallback no-op for returning a validated centrality vector result as-is.
+Return a precomputed centrality vector unchanged.
 
-This method provides a generic interface for handling precomputed centrality vectors wrapped in a [`PhylogenyResult`](@ref). It simply returns the input object unchanged, enabling consistent downstream workflows for centrality-based analysis and constraint generation.
+A [`PhylogenyResult`](@ref) that holds a vector already holds the answer, so this method builds nothing and returns `plr`. It does not read a centrality algorithm, so an algorithm in `args` does not change the scores. The vector keeps the length of the set of assets that made it.
 
 # Arguments
 
-  - `plr::PhylogenyResult{<:VecNum}`: Centrality vector result object.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `plr::PhylogenyResult{<:VecNum}`: Precomputed centrality vector.
+  - `args...`: Positional arguments. The method does not read them.
+  - `kwargs...`: Keyword arguments. The method does not read them.
 
 # Returns
 

@@ -15,13 +15,13 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ctargs => "`args`: Positional arguments for the centrality function.",#
                  :ctkwargs => "`kwargs`: Keyword arguments for the centrality function.",#
                  :ctov => "`ov`: Polarity override. [`TopologyOnly`](@ref) asks for the centrality over the network's topology alone, so [`centrality_polarity`](@ref) answers `nothing` and [`centrality_graph`](@ref) builds the plain graph. `nothing` leaves the algorithm's declared polarity in force.",#
-                 :treeargs => "`args`: Positional arguments for the spanning tree function. Every positional slot those functions declare is a weight channel, so [`assert_tree_args`](@ref) refuses a matrix or a vector here: the weights arrive with the graph.",#
-                 :treekwargs => "`kwargs`: Keyword arguments for the spanning tree function. [`assert_tree_args`](@ref) refuses `minimize`, which would invert the minimisation the tree branch is defined by.",#
-                 :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity here selects the network by building a PMFG, so the family is the non-negative one and [`AngularSimilarity`](@ref) is refused.",#
-                 :ntsep => "`sep`: Separation algorithm, the rule measuring how far apart two assets sit in the network and the budget beyond which they count as unrelated.",#
+                 :treeargs => "`args`: Positional arguments for the spanning tree function. Every positional slot of those functions is a weight channel, so [`assert_tree_args`](@ref) refuses a matrix or a vector here. The weights come with the graph.",#
+                 :treekwargs => "`kwargs`: Keyword arguments for the spanning tree function. [`assert_tree_args`](@ref) refuses `minimize`, because `minimize = false` inverts the minimisation that defines the tree branch.",#
+                 :ntalg => "`alg`: Tree or similarity matrix algorithm. A similarity algorithm selects the network through a PMFG, so it must come from the non-negative family. The type bound refuses [`AngularSimilarity`](@ref).",#
+                 :ntsep => "`sep`: Separation algorithm. It states how to measure how far apart two assets are in the network, and the budget beyond which two assets count as unrelated.",#
                  :ntn => "`n`: Separation budget in hops. A pair whose shortest path has more than `n` edges is unrelated. The library uses an `Integer` as it is. A [`HopCountAlgorithm`](@ref) or a `Function` is a rule. [`resolve_separation`](@ref) calls it as `n(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built, and the rule must return an `Integer`.",#
                  :sepdmax => "`dmax`: Separation budget, in the units of the separation. `nothing` means the observed diameter of the structure. A [`PathLengthAlgorithm`](@ref) or a `Function` is a rule. [`resolve_separation`](@ref) calls it as `dmax(nte, X, g; dims = dims, kwargs...)`, where `g` is the structure that the consumer built, and the rule must return a `Number`.",#
-                 :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them the budget relates.",#
+                 :sepq => "`q`: Quantile of the observed separations to take as the budget. The reachable off-diagonal pairs are the population, so `q` is the fraction of them that the budget relates.",#
                  :clres => "`res`: Clustering result.",#
                  :S => "`S`: Similarity matrix.",#
                  :D => "`D`: Distance matrix.",#

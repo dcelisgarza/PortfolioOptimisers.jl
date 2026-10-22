@@ -4661,3 +4661,66 @@ end
     @test PortfolioOptimisers.DirectHb(Rpm, H2, Mb, Mv, CliqList)[1] isa
           SparseMatrixCSC{Float64, Int}
 end
+@testset "The network and centrality docstrings state what the code returns (#471)" begin
+    using PortfolioOptimisers, Test, StableRNGs, LinearAlgebra
+    rng = StableRNG(471)
+    X471 = randn(rng, 200, 10)
+    # `graph_weight_matrix` floats an integer matrix before the repair, because an `Integer`
+    # has no smallest positive value. A matrix that needs no repair is not copied.
+    Di = [0 0 1; 0 0 1; 1 1 0]
+    Wi = PortfolioOptimisers.graph_weight_matrix(Di)
+    @test eltype(Wi) == Float64
+    @test Wi[1, 2] == Wi[2, 1] == nextfloat(0.0)
+    @test Wi[1, 3] == 1 && all(iszero, diag(Wi))
+    Df = [0.0 0.5; 0.5 0.0]
+    @test PortfolioOptimisers.graph_weight_matrix(Df) === Df
+    gi = PortfolioOptimisers.calc_weighted_adjacency_graph(KruskalTree(), Di)
+    @test PortfolioOptimisers.Graphs.ne(gi) == 2
+    # `phylogeny_matrix` of a clustering estimator has one row per asset under either `dims`.
+    cle = ClustersEstimator()
+    p1 = phylogeny_matrix(cle, X471)
+    @test p1 isa PhylogenyResult{Matrix{Int}}
+    @test size(p1.X) == (10, 10)
+    @test phylogeny_matrix(cle, permutedims(X471); dims = 2).X == p1.X
+    w471 = fill(0.1, 10)
+    @test asset_phylogeny(cle, w471, permutedims(X471); dims = 2) ≈
+          asset_phylogeny(cle, w471, X471)
+    # A weight vector of zeros has a zero denominator.
+    @test isnan(asset_phylogeny(zeros(3), [0 1 0; 1 0 1; 0 1 0]))
+    # Both `centrality_vector` queries return a `PhylogenyResult` of a vector.
+    @test centrality_vector(NetworkEstimator(), DegreeCentrality(), X471) isa
+          PhylogenyResult{<:AbstractVector}
+    @test centrality_vector(CentralityEstimator(), X471) isa
+          PhylogenyResult{<:AbstractVector}
+    # `HClE_HCl` has three members, a network clustering estimator among them.
+    @test NetworkClustersEstimator() isa PortfolioOptimisers.HClE_HCl
+    # `Graphs.katz_centrality` reads a `Bool` adjacency matrix, so a weighted graph raises.
+    ntp = NetworkEstimator(; alg = MaximumDistanceSimilarity())
+    gw = PortfolioOptimisers.calc_weighted_adjacency_graph(ntp, X471)
+    @test_throws InexactError PortfolioOptimisers.calc_centrality(KatzCentrality(), gw)
+    # The three `kind` values agree on an undirected graph.
+    gt = PortfolioOptimisers.Graphs.SimpleGraph(phylogeny_matrix(NetworkEstimator(), X471).X)
+    dc = [PortfolioOptimisers.calc_centrality(DegreeCentrality(; kind = k), gt)
+          for k in 0:2]
+    @test dc[1] == dc[2] == dc[3]
+    # A radiality score is at most one on an unweighted graph, and can exceed one on a
+    # weighted graph, where a length can be less than one.
+    rt = PortfolioOptimisers.calc_centrality(RadialityCentrality(), gt)
+    @test maximum(rt) <= 1
+    rw = PortfolioOptimisers.calc_centrality(RadialityCentrality(),
+                                             PortfolioOptimisers.centrality_graph(ntp,
+                                                                                  RadialityCentrality(),
+                                                                                  X471))
+    @test maximum(rw) > 1
+    # The constructor message names a phylogeny matrix, and the validation renders.
+    err = try
+        PhylogenyResult(; X = [0 1; 2 0])
+    catch e
+        e
+    end
+    @test err isa ArgumentError
+    @test occursin("a phylogeny matrix must be symmetric", err.msg)
+    doc471 = string(@doc PhylogenyResult)
+    @test !occursin("`..", doc471)
+    @test occursin("If `X` is a `MatNum`, `LinearAlgebra.issymmetric(X)`", doc471)
+end
