@@ -478,3 +478,51 @@ and `hac_floor = PerTermHacFloor()` keeps it (ADR 0190).
     @test covariance_multiplier(PO.MahalanobisTarget(), RMS; min_obs = 17,
                                 debias = RawStatistic()) > 2
 end
+
+#=
+A row with no valid asset is one lag of the HAC products. The variance estimator returned before
+it pushed the row into its buffer, so the returns on the two sides of a holiday read as one lag
+apart, and its variance left the diagonal of the covariance, which kept the row.
+=#
+@testset "a row with no valid asset is one lag of the HAC products" begin
+    # Two finite returns two observations apart give no product at one lag, so the variance is
+    # (λ r₁² + r₃²) / (1 + λ). The defect read 2 ω₁ r₁ r₃ more, 4.33e-4 for 3e-4.
+    lam = 0.5
+    kw = (; decay = lam, min_obs = 1, regime_method = nothing, centring = PreCentred(),
+          hac_lags = 1)
+    X = reshape([0.01, NaN, 0.02], :, 1)
+    expected = (lam * 0.01^2 + 0.02^2) / (1 + lam)
+    @test isapprox(var(RegimeAdjustedExpWeightedVariance(; kw...), X)[1], expected;
+                   rtol = 1e-14)
+    online = partial_fit!(RegimeAdjustedExpWeightedVariance(; kw...), X[1:1, :])
+    v1 = copy(online.cache.variance)
+    online = partial_fit!(online, X[2:2, :])
+    # The holiday holds every estimate and every count, and enters the buffer as one lag.
+    @test online.cache.variance == v1 && online.cache.obs_count == [1]
+    @test all(isnan, only(online.cache.ret_buffer))
+    online = partial_fit!(online, X[3:3, :])
+    @test isapprox(var(online)[1], expected; rtol = 1e-14)
+
+    # An asset reads the same lags whether a neighbour is valid on its holidays or not, under
+    # both centrings, at one and three lags, and across one and three holidays.
+    for centring in (PreCentred(), EstimatedCentring()), L in (1, 3), gap in (1, 3)
+        x = [0.01; fill(NaN, gap); -0.02; 0.015; fill(NaN, gap); 0.03; 0.005; -0.01]
+        kw = (; decay = 2.0^(-1 / 5), min_obs = 1, regime_method = nothing, centring,
+              hac_lags = L)
+        alone = var(RegimeAdjustedExpWeightedVariance(; kw...), reshape(x, :, 1))[1]
+        mixed = var(RegimeAdjustedExpWeightedVariance(; kw...),
+                    hcat(x, 0.01 .* sin.(axes(x, 1))))[1]
+        @test isapprox(alone, mixed; rtol = 1e-13)
+    end
+
+    # On a panel with holidays the scalar HAC variance is still the diagonal of the HAC
+    # covariance of one decay.
+    R = randn(StableRNG(1795), 400, 4) .* 0.01
+    R[[30, 31, 120, 250, 251, 252], :] .= NaN
+    R[[60, 61], 2] .= NaN
+    plain = (; decay = 2.0^(-1 / 20), min_obs = 5, regime_method = nothing,
+             centring = PreCentred(), hac_lags = 2)
+    @test isapprox(var(RegimeAdjustedExpWeightedVariance(; plain...), R),
+                   diag(cov(RegimeAdjustedExpWeightedCovariance(; plain...), R));
+                   rtol = 1e-12)
+end

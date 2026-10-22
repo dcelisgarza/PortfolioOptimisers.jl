@@ -1207,7 +1207,9 @@ Processes a single observation row (or column) to update the online variance cac
 
 Updates the running location, variance, and standardised squared innovations in `cache`,
 then advances the smoothed regime state. A `regime_method` of `nothing` advances no regime
-state, so the variance stays the plain exponentially weighted recursion.
+state, so the variance stays the plain exponentially weighted recursion. A row with no valid
+asset changes no estimate and no count, but under HAC it enters the buffer as one lag, so a lag
+counts observations whatever the assets hold.
 
 # Arguments
 
@@ -1252,10 +1254,8 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
         cache.active .= true
     end
 
-    if !any(valid)
-        return cache
-    end
-
+    # A row with no valid asset takes this path too, as in the covariance. It writes no
+    # estimate and no count, but its blank deviations enter the buffer as one HAC lag.
     copyto!(cache.old_obs_count, cache.obs_count)
     Xi, dvalid = centring_location!(ce.centring, cache.location, cache.obs_count, X, valid,
                                     ce.decay)
