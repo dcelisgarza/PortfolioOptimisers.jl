@@ -77,8 +77,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :height_node => "`height`: The height of the node in the dendrogram.",#
                  :level_node => "`level`: The number of leaves in the subtree below the node, `1` for a leaf. It is the fourth column of a linkage matrix, and [`pre_order`](@ref) sizes its traversal stack from it.",#
                  # Default weight bounds.
-                 :dlb => "`dlb`: Default lower bound.",#
-                 :dub => "`dub`: Default upper bound.",#
+                 :dlb => "`dlb`: Lower bound of an asset that a dictionary or a pair in `lb` does not name. `nothing` resolves to `zero(datatype)`.",#
+                 :dub => "`dub`: Upper bound of an asset that a dictionary or a pair in `ub` does not name. `nothing` resolves to `one(datatype)`.",#
                  # Weight bounds.
                  :wb => "`wb`: Weight bounds.",#
                  # Constraint generation.
