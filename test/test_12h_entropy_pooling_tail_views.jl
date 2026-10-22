@@ -234,6 +234,37 @@ end
                                            w = ep_w0)(rd.X[:, 1]), rtol = 1e-5)
 end
 
+@testset "ep_rlvar_tail is the minimum of the two power cones" begin
+    # Cone A bounds `psi` below by a multiple of `|u - omega|^((1 + k) / k)`, and cone B
+    # bounds `theta` below by a multiple of `omega^(-(1 - k) / k)`. The sum is convex in
+    # `omega > 0`. Its stationary point is the positive root `(u + sigma) / 2` of a
+    # quadratic whose discriminant is `sigma^2`, as `math_dict[:rlvar_sigma]` states.
+    for k in (0.1, 0.3, 0.6, 0.9), z in (1e-3, 0.1, 1.0), u in (-0.5, 0.0, 0.2, 1.0)
+        A = k / (1 + k) * (2 * k / ((1 + k) * z))^(1 / k)
+        B = k * (1 - k)^((1 - k) / k) * (z / (2 * k))^(1 / k)
+        h = om -> A * abs(u - om)^((1 + k) / k) + B * om^(-(1 - k) / k)
+        sigma = sqrt(u^2 + (1 - k^2) * z^2 / k^2)
+        om = (u + sigma) / 2
+        # `om - u` cancels when `u` is large against `z`, so this check reads at 1e-6.
+        @test isapprox(om * (om - u), (1 - k^2) * z^2 / (4 * k^2); rtol = 1e-6)
+        @test isapprox(h(om), PO.ep_rlvar_tail(u, z, k); rtol = 1e-9)
+        @test all(h(om) <= h(om * s) for s in (0.9, 0.99, 1.01, 1.1))
+    end
+end
+
+@testset "the EVaR and the RLVaR are concave in the probabilities" begin
+    # A lower-bound view on a positive combination of these measures is an upper level set
+    # of a concave function, so it is convex, as the conic formulations state. The two
+    # weight vectors are far apart, so the gap at the midpoint is far above the search error.
+    x = -rd.X[:, 1]
+    w1 = LinearAlgebra.normalize(collect(range(0.1, 1.9; length = T)), 1)
+    w2 = reverse(w1)
+    wm = (w1 + w2) / 2
+    for f in (w -> PO.ep_rlvar(x, w, ep_a, ep_k).rlvar, w -> PO.ep_evar(x, w, ep_a).evar)
+        @test f(wm) > (f(w1) + f(w2)) / 2
+    end
+end
+
 @testset "RLVaR views, conic formulation" begin
     # RLVaR sits close to the worst realisation of the sample, so the headroom a lower
     # bound has is small. A modest multiple keeps the view reachable.

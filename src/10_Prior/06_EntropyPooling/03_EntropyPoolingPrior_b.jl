@@ -117,25 +117,25 @@ end
                  kwargs::NamedTuple = (;),
                  bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
-Extract the Relativistic Value-at-Risk (RLVaR) for asset `i` from a prior result.
+Compute the relativistic value at risk (RLVaR) of asset `i` from a prior result.
 
-`get_pr_value` computes the RLVaR at confidence level `alpha` and deformation parameter `kappa` for the asset indexed by `i` from the prior result object `pr`, by minimising the primal objective of the sample RLVaR with [`ep_rlvar`](@ref). The observations carry `w`, the weights the initial prior result was read at, on the reasoning the entropic value at risk method above gives.
+`get_pr_value` computes the RLVaR of asset `i` at the significance level `alpha` and the deformation parameter `kappa`. It minimises the primal objective of the sample RLVaR of `pr` with [`ep_rlvar`](@ref). The observations take the weights `w` at which the library read the first prior result, for the reason that the method of the entropic value at risk gives.
 
 # Arguments
 
-  - `pr`: Prior result containing asset return information. Only its returns matrix is read, under the weights `w` names.
-  - `i`: Index of the asset.
-  - `::Val{:rlvar}`: Dispatch tag for RLVaR extraction.
-  - `alpha`: Confidence level (e.g. `0.05` for 5% RLVaR).
-  - `kappa`: Deformation parameter, in `(0, 1)`.
+  - `pr`: The prior result. The function reads only its returns matrix, under the weights `w`.
+  - `i`: The index of the asset.
+  - `::Val{:rlvar}`: The dispatch tag of the RLVaR.
+  - `alpha`: The significance level, for example `0.05` for the RLVaR at 5 %.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
   - $(arg_dict[:oow])
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
+  - `bracket`: The spans of the searches, which go to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
 
 # Returns
 
-  - `rlvar::Number`: Relativistic Value-at-Risk for asset `i` at level `alpha` and deformation `kappa`.
+  - `rlvar::Number`: The relativistic value at risk of asset `i` at the level `alpha` and the deformation `kappa`.
 
 # Related
 
@@ -404,7 +404,7 @@ end
 
 Pick the formulation of one conditional value-at-risk view.
 
-A stated formulation is returned unchanged. `nothing` takes [`LinearConditionalValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex, and [`IntegerConditionalValueatRiskView`](@ref) otherwise: a view whose coefficients carry both signs, an upper bound, and an equality below the prior value of the left hand side.
+A stated formulation is returned unchanged. `nothing` takes [`LinearConditionalValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose upper level set is convex, and [`IntegerConditionalValueatRiskView`](@ref) otherwise: a view whose coefficients carry both signs, an upper bound, and an equality below the prior value of the left hand side.
 
 The branch each input takes:
 
@@ -454,7 +454,7 @@ end
 
 Pick the formulation of one entropic value-at-risk view.
 
-A stated formulation is returned unchanged. `nothing` takes [`ConicEntropicValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex. An upper bound and an equality below the prior value take [`GridEntropicValueatRiskView`](@ref) when the view names one asset. The grid is one asset's, so the same views over several assets take [`SequentialEntropicValueatRiskView`](@ref), the one formulation that expresses them. So does a view whose coefficients carry both signs.
+A stated formulation is returned unchanged. `nothing` takes [`ConicEntropicValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose upper level set is convex. An upper bound and an equality below the prior value take [`GridEntropicValueatRiskView`](@ref) when the view names one asset. The grid is one asset's, so the same views over several assets take [`SequentialEntropicValueatRiskView`](@ref), the one formulation that expresses them. So does a view whose coefficients carry both signs.
 
 The branch each input takes:
 
@@ -511,7 +511,7 @@ end
 
 Pick the formulation of one relativistic value-at-risk view.
 
-A stated formulation is returned unchanged. `nothing` takes [`ConicRelativisticValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose lower level set is convex. An upper bound and an equality below the prior value take [`GridRelativisticValueatRiskView`](@ref) when the view names one asset. The grid is one asset's, so the same views over several assets take [`SequentialRelativisticValueatRiskView`](@ref), the one formulation that expresses them. So does a view whose coefficients carry both signs.
+A stated formulation is returned unchanged. `nothing` takes [`ConicRelativisticValueatRiskView`](@ref) wherever it expresses the view exactly, which is every view whose upper level set is convex. An upper bound and an equality below the prior value take [`GridRelativisticValueatRiskView`](@ref) when the view names one asset. The grid holds one asset only, so the same views over several assets take [`SequentialRelativisticValueatRiskView`](@ref), the one formulation that can write them. A view whose coefficients have both signs also takes [`SequentialRelativisticValueatRiskView`](@ref).
 
 The branch each input takes:
 
@@ -528,12 +528,12 @@ The branch each input takes:
 
 # Arguments
 
-  - `alg`: Stated formulation, or `nothing`.
-  - `mixed`: Whether the coefficients of the view carry both signs.
+  - `alg`: The stated formulation, or `nothing`.
+  - `mixed`: Whether the coefficients of the view have both signs.
   - `single`: Whether the view names one asset.
-  - `op`: Comparison operator of the view.
-  - `rhs`: Target value of the view.
-  - `pv`: Prior value of the view's left hand side.
+  - `op`: The comparison operator of the view.
+  - `rhs`: The target value of the view.
+  - `pv`: The prior value of the left hand side of the view.
 
 # Returns
 
@@ -654,7 +654,7 @@ function ep_add_cvar_view!(tvs::AbstractVector, ::LinearConditionalValueatRiskVi
                            rhs::Number, alpha::Number, w::VecNum, pv::Number,
                            eqn::AbstractString)
     @argcheck(all(>(zero(eltype(coef))), coef),
-              ArgumentError("View `$(eqn)` carries coefficients of both signs. `LinearConditionalValueatRiskView` writes a positive combination of CVaRs, whose lower level set is convex; a relative view needs `IntegerConditionalValueatRiskView` or `SequentialConditionalValueatRiskView`."))
+              ArgumentError("View `$(eqn)` carries coefficients of both signs. `LinearConditionalValueatRiskView` writes a positive combination of CVaRs, whose upper level set is convex; a relative view needs `IntegerConditionalValueatRiskView` or `SequentialConditionalValueatRiskView`."))
     @argcheck(op != :leq,
               ArgumentError("View `$(eqn)` is an upper bound. `LinearConditionalValueatRiskView` bounds the CVaR from below only; use `IntegerConditionalValueatRiskView` or `SequentialConditionalValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
@@ -756,7 +756,7 @@ function ep_add_evar_view!(epc::AbstractDict, tvs::AbstractVector,
                            zstar::VecNum, pv::Number, eqn::AbstractString; args::Tuple = (),
                            kwargs::NamedTuple = (;), zlo_frac::Option{<:Number} = nothing)
     @argcheck(all(>(zero(eltype(coef))), coef),
-              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicEntropicValueatRiskView` writes a positive combination of EVaRs, whose lower level set is convex; a relative view needs `SequentialEntropicValueatRiskView`."))
+              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicEntropicValueatRiskView` writes a positive combination of EVaRs, whose upper level set is convex; a relative view needs `SequentialEntropicValueatRiskView`."))
     @argcheck(op != :leq,
               ArgumentError("View `$(eqn)` is an upper bound. `ConicEntropicValueatRiskView` bounds the EVaR from below only; use `GridEntropicValueatRiskView` for a single asset, or `SequentialEntropicValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
@@ -877,43 +877,43 @@ end
                        kwargs::NamedTuple = (;),
                        bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
-Lower one relativistic value-at-risk view into the constraints its formulation needs.
+Lower one relativistic value-at-risk view into the constraints that its formulation needs.
 
-[`ConicRelativisticValueatRiskView`](@ref) and [`SequentialRelativisticValueatRiskView`](@ref) produce one tail view constraint each. [`GridRelativisticValueatRiskView`](@ref) produces linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half, so an equality view produces both.
+[`ConicRelativisticValueatRiskView`](@ref) and [`SequentialRelativisticValueatRiskView`](@ref) each make one tail view constraint. [`GridRelativisticValueatRiskView`](@ref) makes linear rows on the posterior probabilities for the lower-bound half of the view, and a tail view constraint for the upper-bound half. An equality view therefore gets both.
 
 # Algorithm
 
- 1. [`ConicRelativisticValueatRiskView`](@ref) checks the three preconditions below, then appends one [`ConicRelativisticValueatRiskViewConstraint`](@ref) carrying `x`, `coef`, `alpha`, `kappa` and `rhs`.
- 2. [`GridRelativisticValueatRiskView`](@ref) checks that the view names one asset, and normalises `w` to sum to one, giving `wi`.
+ 1. [`ConicRelativisticValueatRiskView`](@ref) checks the three conditions of the `Validation` section. Then it appends one [`ConicRelativisticValueatRiskViewConstraint`](@ref) that holds `x`, `coef`, `alpha`, `kappa` and `rhs`.
+ 2. [`GridRelativisticValueatRiskView`](@ref) checks that the view names one asset. It normalises `w` to sum to one, which gives `wi`.
  3. It builds the grid `t`, `z` of primal points with [`ep_rlvar_grid`](@ref).
- 4. It keeps the points whose row is finite, giving `keep`, and raises where `keep` is empty. For the upper-bound half it keeps only the points whose bound is positive, and raises where none is.
- 5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_rlvar_grid_row`](@ref), and adds it to `epc` under `:ineq` with [`add_ep_constraint!`](@ref), negated so the row reads as the `<=` sense that key states.
- 6. For the upper-bound half of the view, it appends one [`GridRelativisticValueatRiskViewConstraint`](@ref) carrying `x`, the kept grid, `alpha`, `kappa`, `rhs` and the big-M multiplier `M`.
- 7. [`SequentialRelativisticValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref), builds a [`SequentialRelativisticValueatRiskViewConstraint`](@ref) with an empty surrogate row, reads its first row from the prior `w` with [`ep_sequential_start`](@ref), and appends it.
+ 4. It keeps the points whose row is finite, as `keep`, and raises an error if `keep` is empty. For the upper-bound half, it keeps only the points whose bound is positive, and raises an error if no point has a positive bound.
+ 5. For the lower-bound half of the view, it builds the row of each kept point with [`ep_rlvar_grid_row`](@ref). It multiplies the row by minus one, so that the row has the `<=` sense of the key `:ineq`, and adds the row to `epc` under that key with [`add_ep_constraint!`](@ref).
+ 6. For the upper-bound half of the view, it appends one [`GridRelativisticValueatRiskViewConstraint`](@ref) that holds `x`, the kept grid, `alpha`, `kappa`, `rhs` and the big-M multiplier `M`.
+ 7. [`SequentialRelativisticValueatRiskView`](@ref) orients the view and splits its assets with [`ep_sequential_sides`](@ref). It builds a [`SequentialRelativisticValueatRiskViewConstraint`](@ref) with an empty surrogate row. It reads the first row at the prior `w` with [`ep_sequential_start`](@ref), and appends the constraint.
 
 # Arguments
 
-  - `epc`: Dictionary of entropy pooling constraints, mapping keys to `(lhs, rhs)` pairs.
-  - `tvs`: Tail view constraints, appended to.
-  - `alg`: Formulation of the view. A grid formulation is also where the number of steps and the tolerance of the anchor live, and a sequential one where the number of re-solves and their tolerance live.
-  - `x`: Per asset the view names, its loss series.
-  - `coef`: Per asset, the coefficient the view gives its RLVaR.
-  - `alpha`: Significance level of the view.
-  - `kappa`: Deformation parameter of the view.
-  - `op`: Comparison operator of the view.
-  - `rhs`: Target value of the view.
-  - `w`: Prior probability weights. They start the search for the point the grid is centred on, and they pin the shift of each grid point where that search does not converge. They are also where the first surrogate row of a sequential view is read.
-  - `zstar`: Per asset, the dual variable that attains its prior RLVaR.
-  - `pv`: Prior value of the view's left hand side. With `rhs` it fixes the translation a grid centred on the prior carries.
-  - `eqn`: Equation of the view, used in the error messages.
+  - `epc`: The dictionary of entropy pooling constraints, from keys to `(lhs, rhs)` pairs.
+  - `tvs`: The vector of tail view constraints, to which the function appends.
+  - `alg`: The formulation of the view. A grid formulation also holds the number of steps and the tolerance of the anchor. A sequential formulation also holds the number of re-solves and their tolerance.
+  - `x`: The loss series of each asset that the view names.
+  - `coef`: The coefficient that the view gives the RLVaR of each asset.
+  - `alpha`: The significance level of the view.
+  - `kappa`: The deformation parameter of the view.
+  - `op`: The comparison operator of the view.
+  - `rhs`: The target value of the view.
+  - `w`: The prior probability weights. The search for the centre of the grid starts from them. If that search does not converge, they set the shift of each grid point. A sequential view reads its first surrogate row at them.
+  - `zstar`: The dual variable that attains the prior RLVaR of each asset.
+  - `pv`: The prior value of the left hand side of the view. With `rhs`, it sets the translation of a grid that has its centre at the prior.
+  - `eqn`: The equation of the view, for the error messages.
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
+  - `bracket`: The spans of the searches, which go to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
 
 # Validation
 
   - [`ConicRelativisticValueatRiskView`](@ref) needs coefficients of one sign, an operator other than `<=`, and, for an equality, a target at or above the prior value of the left hand side.
-  - [`GridRelativisticValueatRiskView`](@ref) needs one asset, and at least one grid point whose row is finite, and whose bound is positive where the view carries an upper-bound half. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, which is where the grid sits when `kappa` approaches one. The bound `rhs - t - z * ln_kappa(1 / (alpha * T))` of a point is at or below zero where the target lies below what the point can reach. Those points are dropped, and a grid that keeps none of them raises.
+  - [`GridRelativisticValueatRiskView`](@ref) needs one asset. It also needs at least one grid point whose row is finite and, if the view has an upper-bound half, whose bound is positive. [`ep_rlvar_tail`](@ref) overflows at a dual variable near zero, and the grid is near zero when `kappa` goes near one. The bound `rhs - t - z * ln_kappa(1 / (alpha * T))` of a point is at or below zero when the target is below the value that the point can reach. The function drops these points, and raises an error if it keeps no point.
 
 # Returns
 
@@ -937,7 +937,7 @@ function ep_add_rlvar_view!(epc::AbstractDict, tvs::AbstractVector,
                             eqn::AbstractString; args::Tuple = (), kwargs::NamedTuple = (;),
                             bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
     @argcheck(all(>(zero(eltype(coef))), coef),
-              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicRelativisticValueatRiskView` writes a positive combination of RLVaRs, whose lower level set is convex; a relative view needs `SequentialRelativisticValueatRiskView`."))
+              ArgumentError("View `$(eqn)` carries coefficients of both signs. `ConicRelativisticValueatRiskView` writes a positive combination of RLVaRs, whose upper level set is convex; a relative view needs `SequentialRelativisticValueatRiskView`."))
     @argcheck(op != :leq,
               ArgumentError("View `$(eqn)` is an upper bound. `ConicRelativisticValueatRiskView` bounds the RLVaR from below only; use `GridRelativisticValueatRiskView` for a single asset, or `SequentialRelativisticValueatRiskView`."))
     @argcheck(op != :eq || rhs >= pv,
@@ -1033,7 +1033,7 @@ end
 
 Normalise the coefficients of a tail view, read the loss series it is stated on, and say whether its coefficients carry both signs.
 
-The steps below are shared by every tail view. A view of one asset is divided by its coefficient, so its target is the measure itself. A view of several assets whose coefficients share one sign is multiplied by that sign, so every coefficient is positive and the view is a positive combination of measures, whose lower level set is convex. A view whose coefficients carry both signs is a relative view, and is left as stated.
+The steps below are shared by every tail view. A view of one asset is divided by its coefficient, so its target is the measure itself. A view of several assets whose coefficients share one sign is multiplied by that sign, so every coefficient is positive and the view is a positive combination of measures, whose upper level set is convex. A view whose coefficients carry both signs is a relative view, and is left as stated.
 
 # Algorithm
 

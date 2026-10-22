@@ -24,13 +24,13 @@ unique_key_dict!(math_dict, :math_dict,
                  # them state one programme, so they share these symbols.
                  :kappa_rm => "``\\kappa``: Kaniadakis deformation parameter, ``\\kappa \\in (0, 1)``.",#
                  :rlvar_loss => "``\\boldsymbol{x}``: ``T \\times 1`` loss series of one asset, the negated returns, whose ``j``-th entry is ``x_{j}``.",#
-                 :rlvar_probs => "``\\boldsymbol{w}``: ``T \\times 1`` observation probabilities, summing to one. In a view they are the posterior probabilities the model solves for.",#
+                 :rlvar_probs => "``\\boldsymbol{w}``: ``T \\times 1`` observation probabilities, which sum to one. In a view, they are the posterior probabilities that the model solves for.",#
                  :rlvar_stat => "``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X)``: Relativistic value at risk of the loss series ``\\boldsymbol{x}`` at level ``\\alpha`` and deformation ``\\kappa``.",#
                  :rlvar_t => "``t``: Shift variable of the primal programme.",#
                  :rlvar_z => "``z > 0``: Dual variable of the primal programme.",#
                  :rlvar_u => "``u``: Shifted loss of one observation, ``t - x_{j}``.",#
-                 :rlvar_sigma => "``\\sigma``: Positive root of the stationarity condition of ``\\varphi_{\\kappa}``.",#
-                 :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum the pair of power cones of one observation allows.",#
+                 :rlvar_sigma => "``\\sigma``: Square root of the discriminant of the stationarity condition of ``\\varphi_{\\kappa}``, a quadratic whose positive root ``(u + \\sigma) / 2`` is the minimiser.",#
+                 :rlvar_phi => "``\\varphi_{\\kappa}(u, z)``: Smallest sum of the two tail variables that the pair of power cones of one observation allows.",#
                  :rlvar_target => "``\\bar{\\vartheta}``: Target relativistic value at risk of the view.",#
                  # The primal power-cone programme of `RelativisticValueatRisk`, which
                  # `RRM` builds and solves. The measure states it and `RRM` registers it.

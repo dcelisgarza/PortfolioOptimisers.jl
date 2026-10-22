@@ -116,9 +116,9 @@ end
 """
     ep_rlvar_tail(u::Number, z::Number, kappa::Number)
 
-Evaluate the smallest tail penalty the pair of power cones of one observation allows.
+Compute the smallest tail penalty that the pair of power cones of one observation allows.
 
-The primal programme of the relativistic value at risk carries two power cones and two non-negative variables per observation. Their sum is minimised out in closed form, which is what turns a point of the primal programme into a row that is linear in the posterior probabilities. [EPRLVaR](@citet) states the cones and not the closed form, which is the library's own.
+The primal programme of the relativistic value at risk has two power cones and two non-negative variables per observation. This function minimises the sum of the two variables in closed form. With this closed form, a point of the primal programme gives a row that is linear in the posterior probabilities. [EPRLVaR](@citet) states the cones but not the closed form, which is the library's own.
 
 # Mathematical definition
 
@@ -139,13 +139,13 @@ Where:
 
 # Arguments
 
-  - `u`: Shifted return of the observation, `t - x` for a loss series `x`.
-  - `z`: Dual variable of the primal programme.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
+  - `u`: The shifted loss of the observation, `t - x` for a loss `x`.
+  - `z`: The dual variable of the primal programme.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
 
 # Returns
 
-  - `phi::Number`: Smallest sum of the two tail variables of the observation.
+  - `phi::Number`: The smallest sum of the two tail variables of the observation.
 
 # Related
 
@@ -197,26 +197,26 @@ Where:
 
 # Arguments
 
-  - `x`: Loss series (`-returns`).
-  - `w`: Observation probabilities, summing to one.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
-  - `lnk`: Kaniadakis logarithm of `inv(alpha * T)`, from [`kappa_log`](@ref).
-  - `z`: Dual variable of the primal programme.
-  - $(arg_dict[:optargs]) Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
+  - `x`: The loss series (`-returns`).
+  - `w`: The observation probabilities, which sum to one.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
+  - `lnk`: The Kaniadakis logarithm of `inv(alpha * T)`, from [`kappa_log`](@ref).
+  - `z`: The dual variable of the primal programme.
+  - $(arg_dict[:optargs]) An empty `args` gives `Optim.Brent()`, which `Optim.optimize` selects for a bracketed scalar minimisation.
   - $(arg_dict[:optkwargs])
-  - `bracket`: Spans of the searches of a relativistic value-at-risk view, or `nothing` to take the one [`RelativisticValueatRiskViewBracket`](@ref) states. This function reads `tspan` alone. It is a margin, not a proof, so widen it where the minimising shift lands on an end of the bracket. [`ep_rlvar`](@ref) reads the other two fields.
+  - `bracket`: The spans of the searches of a relativistic value-at-risk view, or `nothing` for the default spans of [`RelativisticValueatRiskViewBracket`](@ref). This function reads only `tspan`. The span is a margin and not a proof, so make it wider if the minimiser is at an end of the bracket. [`ep_rlvar`](@ref) reads the other two fields.
 
 # Validation
 
-  - The search converges. It is a bracketed scalar minimisation of a convex function, so it fails only under `args` or `kwargs` that stop it early. A minimiser that lands on an end of the bracket does not fail it: `Optim` reports that end as converged.
+  - The search converges. It is a bracketed scalar minimisation of a convex function, so it fails only when `args` or `kwargs` stop it early. A minimiser at an end of the bracket does not make the search fail, because `Optim` reports that end as converged.
 
 # Returns
 
-  - `res::@NamedTuple{risk::Number, t::Number}`: The value at the minimising shift, and that shift.
+  - `res::@NamedTuple{risk::Number, t::Number}`: The smallest value of the objective, and the shift that attains it.
 
 # Algorithm
 
- 1. Bracket the shift by the loss range widened by `tspan` of its spans on each side. The minimising shift sits near the largest loss, so the bracket holds it with a wide margin.
+ 1. Bracket the shift by the loss range, widened on each side by `tspan` times the span of the losses. The minimiser is near the largest loss, so the bracket holds it with a wide margin.
  2. Minimise the objective over the bracket with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/).
 
 # Related
@@ -257,7 +257,7 @@ end
 
 Compute the sample relativistic value at risk of a loss series and the primal point that attains it.
 
-`ep_rlvar` minimises the two-variable primal objective of the sample RLVaR, whose per-observation power cones [`ep_rlvar_tail`](@ref) has already minimised out. It is used by the entropy pooling view machinery, which needs both the value (to compare a view against its prior) and the minimiser (to centre the grid of [`GridRelativisticValueatRiskView`](@ref)). The objective is the primal programme of [EPRLVaR](@cite). [EPRLVaR](@citet) does not state how to search for the minimum, so the two searches and their brackets are the library's own.
+`ep_rlvar` minimises the primal objective of the sample RLVaR over its two variables. [`ep_rlvar_tail`](@ref) already minimises out the power cones of each observation. The entropy pooling views need the value and the minimiser. The value compares a view with its prior, and the minimiser is the centre of the grid of [`GridRelativisticValueatRiskView`](@ref). The objective is the primal programme of [EPRLVaR](@cite). [EPRLVaR](@citet) does not state how to search for the minimum, so the two searches and their brackets are the library's own.
 
 # Mathematical definition
 
@@ -282,17 +282,17 @@ Where:
 
 # Arguments
 
-  - `x`: Loss series (`-returns`).
-  - `w`: Observation probabilities. Normalised to sum to one.
-  - `alpha`: Significance level.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
-  - $(arg_dict[:optargs]) It reaches both searches. Left empty it takes `Optim.Brent()`, which is what `Optim.optimize` selects for a bracketed scalar minimisation.
-  - $(arg_dict[:optkwargs]) They reach both searches.
-  - `bracket`: Spans of the searches, or `nothing` to take the one [`RelativisticValueatRiskViewBracket`](@ref) states. This function reads `log_zlo` and `log_zhi`, the ends of the bracket of the logarithm of the dual variable, as offsets from the logarithm of the loss range. They are a margin, not a proof, so widen one where the minimising dual variable lands on an end of the bracket. [`ep_rlvar_shift`](@ref) reads `tspan`.
+  - `x`: The loss series (`-returns`).
+  - `w`: The observation probabilities. The function normalises them to sum to one.
+  - `alpha`: The significance level.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
+  - $(arg_dict[:optargs]) They go to both searches. An empty `args` gives `Optim.Brent()`, which `Optim.optimize` selects for a bracketed scalar minimisation.
+  - $(arg_dict[:optkwargs]) They go to both searches.
+  - `bracket`: The spans of the searches, or `nothing` for the default spans of [`RelativisticValueatRiskViewBracket`](@ref). This function reads `log_zlo` and `log_zhi`. They are the ends of the bracket of the logarithm of the dual variable, as offsets from the logarithm of the loss range. They are a margin and not a proof, so widen one if the minimiser is at an end of the bracket. [`ep_rlvar_shift`](@ref) reads `tspan`.
 
 # Validation
 
-  - Both searches converge. Each is a bracketed scalar minimisation of a convex function, so one fails only under `args` or `kwargs` that stop it early. A minimiser that lands on an end of a bracket does not fail it: `Optim` reports that end as converged.
+  - Both searches converge. Each is a bracketed scalar minimisation of a unimodal function, so a search fails only when `args` or `kwargs` stop it early. A minimiser at an end of a bracket does not make a search fail, because `Optim` reports that end as converged.
 
 # Returns
 
@@ -300,9 +300,9 @@ Where:
 
 # Algorithm
 
- 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/), over a bracket running from `exp(log_zlo)` to `exp(log_zhi)` times the loss range, which is about `2e-9` to about `2e4` under the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
+ 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). The bracket goes from `exp(log_zlo)` to `exp(log_zhi)` times the loss range, which is about `2e-9` to about `2e4` for the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable. The logarithm is increasing, so the function of the outer minimisation is unimodal, but it is not convex in general.
  2. Minimise over the shift at each candidate dual variable with [`ep_rlvar_shift`](@ref).
- 3. Re-run the inner minimisation at the minimising dual variable, so the shift returned is the one that attains the value.
+ 3. Do the inner minimisation again at the dual variable of the minimum, so that the returned shift is the shift that attains the value.
 
 # Related
 
@@ -347,21 +347,21 @@ end
 
 Build one scaled row of the grid formulation of a relativistic value-at-risk view.
 
-`ep_rlvar_grid_row` returns the coefficients `T * phi(t - x, z)` divided by their largest entry, together with the target of the row divided by that same entry. Scaling the row keeps the coefficients in `(0, 1]` however small `z` is, so the row does not overflow before it is built. The target then falls far below one at a small `z`, so an upper-bound row reaches the model divided by that target too, by [`add_ep_tail_view!`](@ref). A lower-bound row keeps the norm scale of [`ep_add_grid_tail_view!`](@ref). [EPRLVaR](@citet) states the primal programme and no grid of its points, so the row is the library's own, built on the primal programme as the grid rows of the entropic value at risk are built on its primal in [EPTail](@cite).
+`ep_rlvar_grid_row` returns the coefficients `T * phi(t - x, z)` divided by their largest entry, and the target of the row divided by the same entry. This scale keeps each finite coefficient in `(0, 1]`, at a small `z` too. At a small `z` the scaled target is much smaller than one, so [`add_ep_tail_view!`](@ref) also divides an upper-bound row by its target. A lower-bound row keeps the norm scale of [`ep_add_grid_tail_view!`](@ref). [EPRLVaR](@citet) states the primal programme and no grid of its points. The row is the library's own, and it uses the primal programme as the grid rows of the entropic value at risk in [EPTail](@cite) use its primal.
 
 # Arguments
 
-  - `x`: Loss series (`-returns`).
-  - `vbar`: Target relativistic value at risk.
-  - `t`: Shift variable of the grid point.
-  - `z`: Dual variable of the grid point.
-  - `alpha`: Significance level.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
+  - `x`: The loss series (`-returns`).
+  - `vbar`: The target relativistic value at risk.
+  - `t`: The shift variable of the grid point.
+  - `z`: The dual variable of the grid point.
+  - `alpha`: The significance level.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
 
 # Returns
 
-  - `c::VecNum`: Scaled coefficients.
-  - `b::Number`: Scaled target the row is compared against.
+  - `c::VecNum`: The scaled coefficients.
+  - `b::Number`: The scaled target of the row.
 
 # Related
 
@@ -621,25 +621,25 @@ end
                     kwargs::NamedTuple = (;),
                     bracket::Option{<:RelativisticValueatRiskViewBracket} = nothing)
 
-Find the primal point of the relativistic value at risk that a posterior meeting an upper-bound view attains.
+Find the primal point of the relativistic value at risk that a posterior attains when it meets an upper-bound view.
 
-A grid point states the view as one row, and a posterior that makes the row tight reaches the target only where that point is the point the posterior itself attains. `ep_rlvar_anchor` solves for the pair that satisfies both conditions at once, which is the pair the grid of [`GridRelativisticValueatRiskView`](@ref) is centred on. It calls no solver. [EPRLVaR](@citet) states no grid and no anchor, so both are the library's own, built on the primal programme.
+A grid point states the view as one row. A posterior that makes the row tight reaches the target only if that grid point is the point that the posterior attains. `ep_rlvar_anchor` finds the pair that meets both conditions, and the grid of [`GridRelativisticValueatRiskView`](@ref) has this pair as its centre. The function calls no solver. [EPRLVaR](@citet) states no grid and no anchor, so both are the library's own, and both use the primal programme.
 
 # Arguments
 
-  - `x`: Loss series (`-returns`).
-  - `w`: Prior probabilities, summing to one.
-  - `alpha`: Significance level.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
-  - `rhs`: Target relativistic value at risk.
-  - `t`: Shift variable the iteration starts from.
-  - `z`: Dual variable the iteration starts from.
-  - `iters::Integer = 50`: Largest number of steps the iteration takes.
-  - `tol::Number = 1e-10`: Relative distance from the target at which the iteration stops.
-  - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
+  - `x`: The loss series (`-returns`).
+  - `w`: The prior probabilities, which sum to one.
+  - `alpha`: The significance level.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
+  - `rhs`: The target relativistic value at risk.
+  - `t`: The shift variable at the start of the iteration.
+  - `z`: The dual variable at the start of the iteration.
+  - `iters::Integer = 50`: The largest number of steps of the iteration.
+  - `tol::Number = 1e-10`: The relative distance from the target at which the iteration stops.
+  - `tilt_iters::Integer = 200`: The largest number of bisection steps of the tilt of one row, in [`ep_row_tilt`](@ref).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
+  - `bracket`: The spans of the searches, which go to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
 
 # Returns
 
@@ -647,11 +647,11 @@ A grid point states the view as one row, and a posterior that makes the row tigh
 
 # Algorithm
 
- 1. Build the row of the current pair with [`ep_rlvar_grid_row`](@ref). Return `nothing` when it is not finite.
- 2. Tilt the prior so the row is tight with [`ep_row_tilt`](@ref). Return `nothing` when no probability vector makes it tight.
- 3. Recompute the pair as the minimiser at the tilted probabilities with [`ep_rlvar`](@ref).
- 4. Stop when the relativistic value at risk of the tilted probabilities is within `tol` of the target, and return the pair and those probabilities.
- 5. Return `nothing` after `iters` steps without that.
+ 1. Build the row of the current pair with [`ep_rlvar_grid_row`](@ref). Return `nothing` when the row is not finite.
+ 2. Tilt the prior with [`ep_row_tilt`](@ref), so that the row is tight. Return `nothing` when no probability vector makes the row tight.
+ 3. Compute the pair again with [`ep_rlvar`](@ref), as the minimiser at the tilted probabilities.
+ 4. Stop when the relativistic value at risk of the tilted probabilities is within `tol` of the target. Return the pair and those probabilities.
+ 5. Return `nothing` if `iters` steps do not reach the target.
 
 # Related
 
@@ -695,38 +695,38 @@ end
 
 Build the grid of primal points a relativistic value-at-risk view is written on.
 
-[EPRLVaR](@citet) states the primal programme and no grid of its points. The grid, its translation and its anchor are the library's own, built on the primal programme.
+[EPRLVaR](@citet) states the primal programme and no grid of its points. The grid, its translation and its anchor are the library's own, and they use the primal programme.
 
-A view that carries an upper-bound half is centred on the pair [`ep_rlvar_anchor`](@ref) finds, and every shift is the one that minimises at the posterior that pair belongs to. A lower-bound view, and a view whose anchor does not converge, is centred on the prior's dual variable instead, and every shift is the one that minimises under the prior probabilities, less the distance from the prior value to the target. The relativistic value at risk and the shift that attains it are both translation-equivariant, so a posterior that moves the value to the target behaves, to first order, like translating every loss by that distance.
+For a view with an upper-bound half, the centre of the grid is the pair that [`ep_rlvar_anchor`](@ref) finds. Each shift then minimises the objective at the posterior of that pair. For a lower-bound view, and for a view whose anchor does not converge, the centre is the dual variable of the prior. Each shift then minimises the objective under the prior probabilities, minus the distance from the prior value to the target. The relativistic value at risk and the shift that attains it are both translation-equivariant, so a posterior that moves the value to the target acts, to first order, like a translation of each loss by that distance.
 
 # Arguments
 
-  - `x`: Loss series (`-returns`).
-  - `w`: Prior probabilities, summing to one.
-  - `alpha`: Significance level.
-  - `kappa`: Deformation parameter, in `(0, 1)`.
-  - `op`: Comparison operator of the view.
-  - `rhs`: Target relativistic value at risk.
-  - `zstar`: Dual variable that attains the prior RLVaR of the asset.
-  - `pv`: Prior RLVaR of the asset.
-  - `pct`: Half-width of the grid, as a fraction of the dual variable it is centred on.
-  - `K`: Number of grid points.
-  - `iters::Integer = 50`: Largest number of steps the anchor takes.
-  - `tol::Number = 1e-10`: Relative distance from the target at which the anchor stops.
-  - `tilt_iters::Integer = 200`: Largest number of bisection steps the tilt of one row takes (see [`ep_row_tilt`](@ref)).
+  - `x`: The loss series (`-returns`).
+  - `w`: The prior probabilities, which sum to one.
+  - `alpha`: The significance level.
+  - `kappa`: The deformation parameter, in `(0, 1)`.
+  - `op`: The comparison operator of the view.
+  - `rhs`: The target relativistic value at risk.
+  - `zstar`: The dual variable that attains the prior RLVaR of the asset.
+  - `pv`: The prior RLVaR of the asset.
+  - `pct`: The half-width of the grid, as a fraction of the dual variable at its centre.
+  - `K`: The number of grid points.
+  - `iters::Integer = 50`: The largest number of steps of the anchor.
+  - `tol::Number = 1e-10`: The relative distance from the target at which the anchor stops.
+  - `tilt_iters::Integer = 200`: The largest number of bisection steps of the tilt of one row, in [`ep_row_tilt`](@ref).
   - $(arg_dict[:optargs])
   - $(arg_dict[:optkwargs])
-  - `bracket`: Spans of the searches, forwarded to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
+  - `bracket`: The spans of the searches, which go to [`ep_rlvar`](@ref) and [`ep_rlvar_shift`](@ref).
 
 # Returns
 
-  - `t::VecNum`: Shift variable of each grid point.
-  - `z::VecNum`: Dual variable of each grid point.
+  - `t::VecNum`: The shift variable of each grid point.
+  - `z::VecNum`: The dual variable of each grid point.
 
 # Algorithm
 
- 1. Take the prior's pair as the centre, and the distance from the prior value to the target as the translation each shift carries.
- 2. Where the view carries an upper-bound half, replace both with the pair and the posterior of [`ep_rlvar_anchor`](@ref), and drop the translation. Keep the prior's pair when the anchor does not converge.
+ 1. Use the pair of the prior as the centre. Use the distance from the prior value to the target as the translation of each shift.
+ 2. If the view has an upper-bound half, use the pair and the posterior of [`ep_rlvar_anchor`](@ref) instead, with no translation. Keep the pair of the prior if the anchor does not converge.
  3. Span the dual variable from `zc * (1 - pct)` to `zc * (1 + pct)` in `K` points. `K` is odd, so the centre is a point of the grid, and a grid of one point is the centre alone.
  4. Minimise the objective over the shift at each point with [`ep_rlvar_shift`](@ref), and subtract the translation.
 
@@ -978,7 +978,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the loss series and coefficient of every asset, the significance level, the deformation parameter and the target of a conic relativistic value-at-risk view.
 
-The view parser produces one of these per view that takes the conic formulation. [`add_ep_tail_view!`](@ref) then writes the power cones that are the dual representation of RLVaR from it, one pair per observation per asset. Every coefficient is positive: a view whose coefficients carry both signs takes another formulation.
+[`ep_add_rlvar_view!`](@ref) makes one of these for each view that uses the conic formulation. From it, [`add_ep_tail_view!`](@ref) then writes the power cones of the dual representation of RLVaR, one pair for each observation of each asset. Every coefficient is positive. A view whose coefficients have both signs uses another formulation.
 
 # Fields
 
@@ -1026,9 +1026,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries the grid of primal points that an upper-bound or equality relativistic value-at-risk view selects one point of.
+Carries the grid of primal points from which an upper-bound or equality relativistic value-at-risk view selects one point.
 
-A lower-bound grid view is a set of rows on the posterior probabilities alone, so it goes into the constraint dictionary and never reaches this tail view constraint. An equality view emits both: the rows go into the dictionary and the selector block comes here. [EPRLVaR](@citet) states no upper-bound view of the relativistic value at risk. The grid and its selector are the library's own, built on the primal programme as the entropic grid of [`GridEntropicValueatRiskViewConstraint`](@ref) is.
+A lower-bound grid view is a set of rows on the posterior probabilities alone. These rows go into the constraint dictionary, and not into this tail view constraint. An equality view makes both parts. Its rows go into the dictionary, and its selector block goes into this constraint. [EPRLVaR](@citet) states no upper-bound view of the relativistic value at risk. The grid and its selector are the library's own, and they use the primal programme as the entropic grid of [`GridEntropicValueatRiskViewConstraint`](@ref) does.
 
 # Fields
 
@@ -1258,7 +1258,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Carries the two sides of a sequential relativistic value-at-risk view, its surrogate row, its stopping rule, and the settings of the search for the primal pair.
 
-The view parser produces one of these per view that takes [`SequentialRelativisticValueatRiskView`](@ref), with the surrogate row read at the prior. [`ep_refine_tail_view`](@ref) then re-reads the row at each posterior [`entropy_pooling`](@ref) produces, which runs [`ep_rlvar`](@ref) once per asset of the primal side under `args`, `kwargs` and `bracket`. [EPRLVaR](@citet) states the dual and the primal formulations. The sequential formulation, the surrogate row and the re-reads are the library's own.
+[`ep_add_rlvar_view!`](@ref) makes one of these for each view that uses [`SequentialRelativisticValueatRiskView`](@ref), and reads its first surrogate row at the prior. [`ep_refine_tail_view`](@ref) then reads the row again at each posterior that [`entropy_pooling`](@ref) finds. Each read runs [`ep_rlvar`](@ref) once for each asset of the primal side, with `args`, `kwargs` and `bracket`. [EPRLVaR](@citet) states the dual and the primal formulations. The sequential formulation, the surrogate row and the later reads are the library's own.
 
 # Fields
 
@@ -1330,11 +1330,11 @@ Arguments correspond to the fields above.
     """
     tol
     """
-    $(field_dict[:optargs]) They reach the searches of [`ep_rlvar`](@ref) each re-read runs.
+    $(field_dict[:optargs]) They go to the searches of [`ep_rlvar`](@ref) that each read runs.
     """
     args
     """
-    $(field_dict[:optkwargs]) They reach the same searches `args` does.
+    $(field_dict[:optkwargs]) They go to the same searches as `args`.
     """
     kwargs
     """

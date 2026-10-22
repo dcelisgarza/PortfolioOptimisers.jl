@@ -200,7 +200,7 @@ Where:
 
 The box and the simplex describe every reweighting of the sample that no observation gives more than ``1/\\alpha`` times its posterior probability, and the largest loss such a reweighting attains is the CVaR. So the constraint set is feasible if and only if ``\\mathrm{CVaR}_{\\alpha}(X) \\geq \\bar{c}``, and a lower-bound view is exact.
 
-A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{CVaR}_{\\alpha}(X_{i}) \\geq \\bar{c}`` with every ``\\gamma_{i} > 0``, takes one block of the first three rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{c}``. The CVaR is concave in the probabilities, so a positive combination of CVaRs is concave and its lower level set is convex. Each block attains its asset's CVaR on its own, so the encoding stays exact. A view with coefficients of both signs has no convex lower level set, and this formulation refuses it. [EPTail](@cite) states the rows for a view on one asset. The view over several assets is the library's own extension.
+A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{CVaR}_{\\alpha}(X_{i}) \\geq \\bar{c}`` with every ``\\gamma_{i} > 0``, takes one block of the first three rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{c}``. The CVaR is concave in the probabilities, so a positive combination of CVaRs is concave and its upper level set is convex. Each block attains its asset's CVaR on its own, so the encoding stays exact. The upper level set of a view with coefficients of both signs is not convex in general, and this formulation refuses such a view. [EPTail](@cite) states the rows for a view on one asset. The view over several assets is the library's own extension.
 
 # Examples
 
@@ -448,7 +448,7 @@ Where:
 
 The relative entropy budget is the dual description of EVaR, so the constraint set is feasible if and only if ``\\mathrm{EVaR}_{\\alpha}(X) \\geq \\bar{e}``.
 
-A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{EVaR}_{\\alpha}(X_{i}) \\geq \\bar{e}`` with every ``\\gamma_{i} > 0``, takes one block of the first three rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{e}``. The EVaR is concave in the probabilities, so a positive combination of EVaRs is concave and its lower level set is convex. Each block attains its asset's EVaR on its own, so the encoding stays exact. A view with coefficients of both signs has no convex lower level set, and this formulation refuses it.
+A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{EVaR}_{\\alpha}(X_{i}) \\geq \\bar{e}`` with every ``\\gamma_{i} > 0``, takes one block of the first three rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{e}``. The EVaR is concave in the probabilities, so a positive combination of EVaRs is concave and its upper level set is convex. Each block attains its asset's EVaR on its own, so the encoding stays exact. The upper level set of a view with coefficients of both signs is not convex in general, and this formulation refuses such a view.
 
 # Examples
 
@@ -729,13 +729,13 @@ Power cone formulation of a relativistic value-at-risk view [EPRLVaR](@cite).
 
 `ConicRelativisticValueatRiskView` writes the view through the dual representation of RLVaR. It adds ``3T`` continuous variables and ``2T`` power cones, and it is exact.
 
-It accepts the operators `>=` and `==`, over any number of assets whose coefficients share one sign. An equality view needs a target greater than or equal to the prior RLVaR of the view's left hand side. Use [`GridRelativisticValueatRiskView`](@ref) or [`SequentialRelativisticValueatRiskView`](@ref) below it, and the latter for a relative view whose coefficients carry both signs. The solver must handle the power cone alongside the exponential cone the entropy pooling objective needs.
+It accepts the operators `>=` and `==`, over any number of assets whose coefficients have one sign. An equality view needs a target at or above the prior RLVaR of the left hand side of the view. For a target below the prior RLVaR, use [`GridRelativisticValueatRiskView`](@ref) or [`SequentialRelativisticValueatRiskView`](@ref). A relative view, whose coefficients have both signs, needs [`SequentialRelativisticValueatRiskView`](@ref). The solver must support the power cone, and also the exponential cone that the entropy pooling objective needs.
 
-The programme is a demanding solve. A long sample, a small `alpha`, a small `kappa` or several of these views in one model can make a conic solver stop short of a solution. Give `opt` a vector of solver configurations, shorten the sample, or state the view under [`GridRelativisticValueatRiskView`](@ref), whose rows are linear in the posterior probabilities.
+A conic solver can stop on this programme before it finds an optimal solution. A long sample, a small `alpha`, a small `kappa` or many of these views in one model make this more probable. Then give `opt` a vector of solver configurations, use a shorter sample, or state the view with [`GridRelativisticValueatRiskView`](@ref), whose rows are linear in the posterior probabilities.
 
 # Mathematical definition
 
-The view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` on one asset is written as:
+For one asset, the formulation writes the view ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}`` as:
 
 ```math
 \\begin{align}
@@ -764,7 +764,7 @@ Where:
 
 The budget is the dual description of RLVaR, so the constraint set is feasible if and only if ``\\mathrm{RLVaR}_{\\alpha,\\kappa}(X) \\geq \\bar{\\vartheta}``.
 
-A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{RLVaR}_{\\alpha,\\kappa}(X_{i}) \\geq \\bar{\\vartheta}`` with every ``\\gamma_{i} > 0``, takes one block of the first five rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{\\vartheta}``. The RLVaR is concave in the probabilities, so a positive combination of RLVaRs is concave and its lower level set is convex. Each block attains its asset's RLVaR on its own, so the encoding stays exact. A view with coefficients of both signs has no convex lower level set, and this formulation refuses it.
+A view over several assets, ``\\sum_{i} \\gamma_{i} \\mathrm{RLVaR}_{\\alpha,\\kappa}(X_{i}) \\geq \\bar{\\vartheta}`` with every ``\\gamma_{i} > 0``, takes one block of the first five rows per asset, and the last row reads ``\\sum_{i} \\gamma_{i} \\sum_{j=1}^{T} \\nu_{i,\\,j} x_{i,\\,j} \\geq \\bar{\\vartheta}``. The RLVaR is concave in the probabilities, so a positive combination of RLVaRs is concave and its upper level set is convex. Each block attains the RLVaR of its asset on its own, so the encoding stays exact. The upper level set of a view with coefficients of both signs is not convex in general, and this formulation refuses such a view.
 
 # Examples
 
@@ -792,15 +792,17 @@ $(DocStringExtensions.TYPEDEF)
 
 Grid formulation of a relativistic value-at-risk view.
 
-[EPRLVaR](@cite) states no grid for the relativistic value at risk. The grid is the library's own, and it takes the primal programme of Equation 5 of [EPRLVaR](@cite).
+[EPRLVaR](@cite) states no grid for the relativistic value at risk. The grid is the library's own, and it uses the primal programme of Equation 5 of [EPRLVaR](@cite).
 
-`GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR, centred on the point a posterior that meets the view attains. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that handles mixed-integer exponential cone programs.
+`GridRelativisticValueatRiskView` writes the view on a grid of points of the primal programme of RLVaR. The centre of the grid is the point that a posterior attains when it meets the view. A lower-bound view is a set of linear constraints and needs no integer variable. An upper-bound or equality view selects one grid point with a binary vector and a big-``M`` relaxation, and needs a solver that supports mixed-integer exponential cone programs.
 
-Each row of the upper-bound block reaches the model divided by its bound, so it reads against one at every grid point. Read at its own scale, the row of a small dual variable is smaller than a solver's feasibility tolerance, and the solver takes it as met by any posterior. The rows of the lower-bound block keep their own scale: a posterior that meets a lower bound moves mass toward the largest loss, so a row with a small bound is slack by far more than the tolerance. The big-M constant of each row is the smallest that releases it, which the data fix, and `M` multiplies it. The upper-bound block drops a grid point whose bound is at or below zero, because its row holds at no posterior. The lower-bound block keeps it: its row holds at every posterior.
+The formulation divides each row of the upper-bound block by its bound, so the row reads against one at every grid point. At its own scale, the row of a small dual variable is smaller than the feasibility tolerance of a solver, and the solver accepts any posterior for it. The rows of the lower-bound block keep their own scale. A posterior that meets a lower bound moves mass toward the largest loss, so the slack of a row with a small bound is much larger than the tolerance. The big-M constant of each row is the smallest constant that releases the row, the data set it, and `M` multiplies it.
 
-It accepts `==`, `>=` and `<=`, one asset per view. The view is normalised so its coefficient is one, which flips the operator when the coefficient is negative, so this formulation restricts neither the operator nor the sign.
+The upper-bound block drops a grid point whose bound is at or below zero, because its row holds at no posterior. The lower-bound block keeps such a point, because its row holds at every posterior.
 
-As `kappa` approaches one the RLVaR approaches the largest loss, and [`ep_rlvar_tail`](@ref) overflows at the dual variable that attains it. The points it overflows at are dropped, and a grid that keeps none of them raises. The centre of the grid is found by an iteration that reads the same tail function, so it too stops converging there and the grid falls back to the prior's dual variable, which lands short of the target. Prefer a smaller `kappa`, or [`ConicRelativisticValueatRiskView`](@ref) where the operator admits it.
+It accepts `==`, `>=` and `<=`, with one asset per view. The library divides the view by its coefficient, so the coefficient becomes one. This division flips the operator when the coefficient is negative, so this formulation restricts neither the operator nor the sign.
+
+When `kappa` goes near one, the RLVaR goes near the largest loss, and [`ep_rlvar_tail`](@ref) overflows at the dual variable that attains it. The formulation drops each grid point at which the tail function overflows, and raises an error when it keeps no point. The iteration that finds the centre of the grid reads the same tail function, so it does not converge there either. The grid then has the dual variable of the prior as its centre, and the posterior falls short of the target. Use a smaller `kappa`, or use [`ConicRelativisticValueatRiskView`](@ref) when it accepts the operator.
 
 # Fields
 
@@ -808,7 +810,7 @@ $(DocStringExtensions.FIELDS)
 
 # Mathematical definition
 
-The sample RLVaR is the value of a two-variable minimisation, in which the pair of power cones of each observation is already minimised out:
+[`ep_rlvar_tail`](@ref) minimises out the pair of power cones of each observation in closed form, so the sample RLVaR is the value of a minimisation over two variables:
 
 ```math
 \\begin{align}
@@ -816,7 +818,7 @@ The sample RLVaR is the value of a two-variable minimisation, in which the pair 
 \\end{align}
 ```
 
-where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` the two power cones of one observation allow, and has the closed form:
+where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` that the two power cones of one observation allow. Its closed form is:
 
 ```math
 \\begin{align}
@@ -825,7 +827,7 @@ where ``\\varphi_{\\kappa}(u, z)`` is the smallest ``\\psi + \\theta`` the two p
 \\end{align}
 ```
 
-The objective is linear in ``\\boldsymbol{w}`` once ``t`` and ``z`` are fixed, which is what makes a grid point a row. On a grid ``(\\bar{t}_{1}, \\bar{z}_{1}),\\ldots,(\\bar{t}_{K}, \\bar{z}_{K})`` that gives, for a lower-bound view:
+At a fixed ``t`` and ``z``, the objective is linear in ``\\boldsymbol{w}``, so each grid point gives one row. On a grid ``(\\bar{t}_{1}, \\bar{z}_{1}),\\ldots,(\\bar{t}_{K}, \\bar{z}_{K})``, a lower-bound view gives these rows:
 
 ```math
 \\begin{align}
@@ -833,7 +835,7 @@ The objective is linear in ``\\boldsymbol{w}`` once ``t`` and ``z`` are fixed, w
 \\end{align}
 ```
 
-and for an upper-bound view, with ``\\boldsymbol{y}`` a binary selector, and each row divided by its bound ``b_{k}`` so that it reads against one:
+An upper-bound view gives the rows below. ``\\boldsymbol{y}`` is a binary selector, and the formulation divides each row by its bound ``b_{k}``, so that the row reads against one:
 
 ```math
 \\begin{align}
@@ -861,14 +863,14 @@ Where:
   - $(math_dict[:rlvar_sigma])
   - $(math_dict[:rlvar_phi])
   - ``\\psi``, ``\\theta``: The two tail variables of one observation, whose smallest sum is ``\\varphi_{\\kappa}``.
-  - ``\\bar{t}_{k}``, ``\\bar{z}_{k}``: Shift and dual variable of the ``k``-th grid point.
-  - ``K``: Number of grid points.
-  - ``\\boldsymbol{y}``: ``K \\times 1`` binary selector, one entry per grid point.
-  - ``b_{k}``: Bound of the row of the ``k``-th grid point. The upper-bound block drops a point whose bound is at or below zero.
-  - ``M_{k}``: Smallest big-M constant that releases the row of the ``k``-th grid point. The weights sum to one, so the left hand side of the row never exceeds its largest coefficient.
-  - ``M``: Big-M multiplier.
+  - ``\\bar{t}_{k}``, ``\\bar{z}_{k}``: The shift and the dual variable of the ``k``-th grid point.
+  - ``K``: The number of grid points.
+  - ``\\boldsymbol{y}``: The ``K \\times 1`` binary selector, with one entry for each grid point.
+  - ``b_{k}``: The bound of the row of the ``k``-th grid point. The upper-bound block drops a point whose bound is at or below zero.
+  - ``M_{k}``: The smallest big-M constant that releases the row of the ``k``-th grid point. The weights sum to one, so the left hand side of the row is never larger than its largest coefficient.
+  - ``M``: The big-M multiplier.
 
-An equality view carries both blocks. Every grid point is a feasible point of the primal programme, so the upper-bound block is never violated: it can only be tighter than the view asks. The lower-bound block holds at the grid points and may fall short between them, so prefer [`ConicRelativisticValueatRiskView`](@ref) whenever the view admits it.
+An equality view has both blocks. Each grid point is a feasible point of the primal programme, so a posterior that meets the upper-bound block also meets the view. The block can only be tighter than the view. The lower-bound block holds at the grid points and can fall short between them, so use [`ConicRelativisticValueatRiskView`](@ref) when it accepts the view.
 
 # Constructors
 
@@ -971,15 +973,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Sequential convex formulation of a relativistic value-at-risk view.
 
-[EPRLVaR](@cite) states no sequential formulation. It is the library's own. It takes the dual representation of Equation 7 and the primal programme of Equation 5 of [EPRLVaR](@cite).
+[EPRLVaR](@cite) states no sequential formulation. The sequential formulation is the library's own. It uses the dual representation of Equation 7 and the primal programme of Equation 5 of [EPRLVaR](@cite).
 
-`SequentialRelativisticValueatRiskView` writes every view [`ConicRelativisticValueatRiskView`](@ref) cannot, with no integer variable and no grid: an upper bound, an equality below the prior RLVaR, and a relative view whose coefficients carry both signs. It replaces the RLVaR of every asset on the wrong side of the inequality by a linear upper bound, solves the convex problem that results, and re-solves with the bound re-read at the posterior until the bound is tight. The view holds on every posterior of that sequence, and the divergence of each is at most that of the one before it.
+`SequentialRelativisticValueatRiskView` writes the views that [`ConicRelativisticValueatRiskView`](@ref) cannot write, with no integer variable and no grid. These views are an upper bound, an equality below the prior RLVaR, and a relative view whose coefficients have both signs. The formulation replaces the RLVaR of each asset on the wrong side of the inequality by a linear upper bound, and solves the convex problem that results. It then reads the bound again at the posterior and solves again, until the bound is tight. The view holds at each posterior of this sequence, and the divergence of each posterior is at most the divergence of the posterior before it.
 
-The posterior is a local minimiser of the divergence. The feasible set of an upper-bound or relative RLVaR view is not convex, so no convex program describes it exactly, and the sequence stops at a fixed point rather than at the posterior of least divergence. [`GridRelativisticValueatRiskView`](@ref) searches a grid of primal points with binary variables instead, and holds the view only at the grid points. A view of one asset with a lower-bound operator is convex, and the formulation then reduces to the conic one with no re-solve.
+The posterior is a local minimiser of the divergence. The feasible set of an upper-bound or relative RLVaR view is not convex, so no convex program describes it exactly. The sequence stops at a fixed point, which is not always the posterior of least divergence. [`GridRelativisticValueatRiskView`](@ref) uses binary variables to search a grid of primal points instead, and the view then holds only at the grid points. A lower-bound view whose coefficients are all positive is convex, and the formulation is then the conic one, with no re-solve.
 
 # Mathematical definition
 
-Orient the view as a lower bound, negating both sides where its operator is `<=`, and write ``\\mathcal{P}`` for the assets whose coefficient is then positive and ``\\mathcal{N}`` for those whose coefficient is negative. The relativistic value at risk is concave in the observation probabilities, so the assets of ``\\mathcal{P}`` take the dual representation of [`ConicRelativisticValueatRiskView`](@ref), which is exact, and each asset of ``\\mathcal{N}`` takes the primal representation at a fixed pair ``(t_{i}, z_{i})``, which is linear in the probabilities and bounds the measure from above:
+Orient the view as a lower bound. Where its operator is `<=`, multiply both sides by minus one. Write ``\\mathcal{P}`` for the assets whose coefficient is then positive, and ``\\mathcal{N}`` for the assets whose coefficient is negative. The relativistic value at risk is concave in the observation probabilities, so the assets of ``\\mathcal{P}`` take the exact dual representation of [`ConicRelativisticValueatRiskView`](@ref). Each asset of ``\\mathcal{N}`` takes the primal representation at a fixed pair ``(t_{i}, z_{i})``. This representation is linear in the probabilities, and it bounds the measure from above:
 
 ```math
 \\begin{align}
@@ -988,13 +990,13 @@ Orient the view as a lower bound, negating both sides where its operator is `<=`
 \\end{align}
 ```
 
-The bound holds with equality where ``(t_{i}, z_{i})`` attains the RLVaR of ``X_{i}`` under ``\\boldsymbol{w}``, so the row is tight at the probabilities it was read at. Each re-solve reads the pair at the last posterior, which stays feasible for the row that results, and that is why the divergence cannot rise. An equality view is written as the bound the prior violates, and the entropy minimiser makes it tight.
+The bound holds with equality where ``(t_{i}, z_{i})`` attains the RLVaR of ``X_{i}`` under ``\\boldsymbol{w}``, so the row is tight at the probabilities at which the formulation reads it. Each re-solve reads the pair at the last posterior. That posterior stays feasible for the new row, so the divergence cannot increase. The formulation writes an equality view as the bound that the prior violates, and the minimisation of the divergence makes that bound tight.
 
-The solver must handle the power cone alongside the exponential cone, as [`ConicRelativisticValueatRiskView`](@ref) states, and only where the view carries an asset in ``\\mathcal{P}``. A view whose assets are all in ``\\mathcal{N}``, which is every upper bound on a group, is one linear row.
+The solver must support the power cone and the exponential cone, as [`ConicRelativisticValueatRiskView`](@ref) states, but only when the view has an asset in ``\\mathcal{P}``. A view whose assets are all in ``\\mathcal{N}`` is one linear row. An upper bound whose coefficients are all positive is such a view.
 
 Where:
 
-  - ``x_{i,\\,j}``: Loss of asset ``i`` at observation ``j``, the negated return.
+  - ``x_{i,\\,j}``: The loss of asset ``i`` at observation ``j``, which is the negated return.
   - $(math_dict[:rlvar_probs])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:kappa_rm])
@@ -1003,9 +1005,9 @@ Where:
   - $(math_dict[:rlvar_phi])
   - $(math_dict[:rlvar_target])
   - ``\\boldsymbol{\\nu}_{i}``: ``T \\times 1`` vector of weights that attains the RLVaR of asset ``i``, the variable of its dual representation.
-  - ``\\gamma_{i}``: Coefficient the view gives asset ``i``.
-  - ``(t_{i}, z_{i})``: Shift and dual variable that attain the RLVaR of asset ``i`` under the probabilities the row was read at, from [`ep_rlvar`](@ref).
-  - ``\\mathcal{P}``, ``\\mathcal{N}``: Assets whose coefficient is positive and negative once the view is oriented as a lower bound.
+  - ``\\gamma_{i}``: The coefficient that the view gives asset ``i``.
+  - ``(t_{i}, z_{i})``: The shift and the dual variable that attain the RLVaR of asset ``i`` under the probabilities of the row, from [`ep_rlvar`](@ref).
+  - ``\\mathcal{P}``, ``\\mathcal{N}``: The assets whose coefficient is positive, and the assets whose coefficient is negative, after the orientation of the view as a lower bound.
 
 # Fields
 
@@ -1110,7 +1112,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Spans of the two searches that read a relativistic value at risk.
 
-[`ep_rlvar_shift`](@ref) minimises over the shift of the primal programme, and [`ep_rlvar`](@ref) minimises over the logarithm of the dual variable. Neither bracket is a proof: each is a margin wide enough for the data this library was measured on. Widen one where the minimiser lands on an end of it. `Optim` reports an end as converged, so read the minimiser rather than trust the flag. [EPRLVaR](@cite) states the primal programme in Equation 5 and states no span for a search. The spans are the library's own.
+[`ep_rlvar_shift`](@ref) minimises over the shift of the primal programme, and [`ep_rlvar`](@ref) minimises over the logarithm of the dual variable. No proof shows that a bracket holds the minimiser. Each bracket is a margin that is wide enough for the data on which the library was measured. If the minimiser is at an end of a bracket, make that bracket wider. `Optim` reports a minimiser at an end as converged, so read the minimiser and do not trust the flag. [EPRLVaR](@cite) states the primal programme in Equation 5 and states no span for a search, so the spans are the library's own.
 
 # Fields
 
@@ -1392,9 +1394,9 @@ $(DocStringExtensions.TYPEDEF)
 
 A group of **relativistic value at risk** views, with the significance level, the deformation parameter and the formulation they are read under.
 
-A `prior(...)` reference inside `views` is replaced by the prior relativistic value at risk at this group's `alpha` and `kappa`, so a view stated against the prior moves with both.
+[`replace_prior_views`](@ref) replaces a `prior(...)` reference inside `views` by the prior relativistic value at risk at the `alpha` and the `kappa` of this group. A view stated against the prior therefore changes with both.
 
-`alg` is where the grid of primal points and the big-M multiplier live: a [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`, so views at different significance levels can take different grids.
+The field `alg` holds the settings of the grid of primal points and the big-M multiplier. A [`GridRelativisticValueatRiskView`](@ref) in this field gives these views their own `pct`, `K` and `M`, so views at different significance levels can use different grids.
 
 # Fields
 
@@ -1467,11 +1469,11 @@ RelativisticValueatRiskView
     """
     alg
     """
-    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/) call these views make: the two searches of [`ep_rlvar`](@ref), the shift of [`ep_rlvar_shift`](@ref), and the centre of the grid of [`ep_rlvar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
+    $(field_dict[:optargs]) They go to each [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/) call that these views make. These calls are the two searches of [`ep_rlvar`](@ref), the search for the shift in [`ep_rlvar_shift`](@ref), and the search for the centre of the grid in [`ep_rlvar_anchor`](@ref). Each call is a bracketed scalar minimisation, so an empty `args` gives `Optim.Brent()`.
     """
     args
     """
-    $(field_dict[:optkwargs]) They reach the same searches `args` does.
+    $(field_dict[:optkwargs]) They go to the same searches as `args`.
     """
     kwargs
     """
