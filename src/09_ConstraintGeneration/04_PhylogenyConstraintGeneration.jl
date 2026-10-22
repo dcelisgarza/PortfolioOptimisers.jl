@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny-based constraint estimators.
 
-All concrete and/or abstract types representing phylogeny-based constraint estimators should be subtypes of `AbstractPhylogenyConstraintEstimator`.
+A subtype holds the configuration that fits the relatedness of the assets to returns. [`phylogeny_constraints`](@ref) turns it into an [`AbstractPhylogenyConstraintResult`](@ref).
 
 # Related
 
@@ -18,7 +18,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all phylogeny-based constraint result types.
 
-All concrete and/or abstract types representing the results of phylogeny-based constraint generation should be subtypes of `AbstractPhylogenyConstraintResult`.
+A subtype holds a fitted relatedness matrix and the parameter of the constraint that the model writes on it.
 
 # Related
 
@@ -34,7 +34,7 @@ abstract type AbstractPhylogenyConstraintResult <: AbstractConstraintResult end
 
 Alias for a phylogeny constraint estimator or result.
 
-Matches either a [`AbstractPhylogenyConstraintEstimator`](@ref) or a [`AbstractPhylogenyConstraintResult`](@ref). Used internally for dispatch in phylogeny-based constraint generation.
+Matches an [`AbstractPhylogenyConstraintEstimator`](@ref) or an [`AbstractPhylogenyConstraintResult`](@ref). The library dispatches on it where a function accepts a phylogeny constraint estimator or a precomputed result.
 
 # Related
 
@@ -48,7 +48,7 @@ const PlCE_PlC = Union{<:AbstractPhylogenyConstraintEstimator,
 
 Alias for a vector of phylogeny constraint estimators or results.
 
-Represents a collection of [`PlCE_PlC`](@ref) objects, enabling batch processing of multiple phylogeny-based constraint estimators or results.
+[`phylogeny_constraints`](@ref) maps such a vector to a vector of results, in the same order.
 
 # Related
 
@@ -58,9 +58,9 @@ const VecPlCE_PlC = AbstractVector{<:PlCE_PlC}
 """
     const PlCE_PlC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 
-Alias for a single or vector of phylogeny constraint estimators or results.
+Alias for one phylogeny constraint estimator or result, or a vector of them.
 
-Matches either a single [`PlCE_PlC`](@ref) or a vector of them ([`VecPlCE_PlC`](@ref)). Used internally for dispatch on phylogeny-based constraint generation that accepts one or many constraints.
+Matches a [`PlCE_PlC`](@ref) or a [`VecPlCE_PlC`](@ref). It bounds the `ple` keyword of [`JuMPOptimiser`](@ref) and the `frc_ple` keyword of [`FactorRiskContribution`](@ref), so several phylogeny constraints can hold at once.
 
 # Related
 
@@ -73,7 +73,7 @@ const PlCE_PlC_VecPlCE_PlC = Union{<:PlCE_PlC, <:VecPlCE_PlC}
 
 Alias for a vector of phylogeny constraint results.
 
-Represents a collection of [`AbstractPhylogenyConstraintResult`](@ref) objects.
+Matches the vector that [`phylogeny_constraints`](@ref) returns for a vector of estimators and results.
 
 # Related
 
@@ -84,9 +84,9 @@ const VecPlC = AbstractVector{<:AbstractPhylogenyConstraintResult}
 """
     const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 
-Alias for a single or vector of phylogeny constraint results.
+Alias for one phylogeny constraint result, or a vector of them.
 
-Matches either a single [`AbstractPhylogenyConstraintResult`](@ref) or a vector of them ([`VecPlC`](@ref)).
+Matches an [`AbstractPhylogenyConstraintResult`](@ref) or a [`VecPlC`](@ref). It bounds the fitted phylogeny constraints that the model builders read.
 
 # Related
 
@@ -97,17 +97,17 @@ const PlC_VecPlC = Union{<:AbstractPhylogenyConstraintResult, <:VecPlC}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Forbids co-movement between related assets through a semidefinite relaxation, refitting the structure from returns.
+Fits the relatedness of the assets to returns, and drives the product of the weights of each related pair to zero through a semidefinite relaxation.
 
-The estimator holds the source that builds the relatedness matrix and the penalty factor `p`. [`phylogeny_constraints`](@ref) refits the source against a returns matrix and returns a [`SemiDefinitePhylogeny`](@ref), which carries the equations this constraint solves.
+The estimator holds the source that builds the relatedness matrix, and the penalty factor `p`. [`phylogeny_constraints`](@ref) fits the source to a returns matrix and returns a [`SemiDefinitePhylogeny`](@ref), which holds the matrix and `p` for the model.
 
-Which pairs a network source relates — and therefore how strong the constraint is — comes from its [`AbstractSeparationAlgorithm`](@ref), not from anything set here. The constraint is **weight-inert**: `A ⊙ W == 0` is the same constraint at any magnitude, so the separation changes the *cardinality* of the forbidden set and nothing else.
+The [`AbstractSeparationAlgorithm`](@ref) of a network source decides which pairs are related. No field of this estimator changes that set. The row `A ⊙ W == 0` reads only which entries of `A` are non-zero, not their size. So the separation algorithm changes the number of forbidden pairs, and nothing else.
 
-[graphpo1](@cite) states the constraint over a network. Section 13.2.4.2 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the same constraint over clusters. No copy of that work was found.
+[graphpo1](@citet) states the constraint over a network. Section 13.2.4.2 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the same constraint over clusters. No copy of that work is available.
 
 !!! warning
 
-    `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs — and this estimator then forbids all pairwise co-movement. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
+    `NetworkEstimator(; sep = PathLength())` relates every pair of assets that a path joins. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so no pair is outside the budget. On a tree of 20 assets it relates all 190 pairs, and the constraint then drives the product of the weights of every pair to zero. [`HopCount`](@ref) with its default `n = 1` is the other extreme, and relates only the neighbours. Set a numeric `dmax` to relate fewer pairs.
 
 # Fields
 
@@ -126,9 +126,9 @@ Keywords correspond to the struct's fields. The default `p = 0.05` is the penalt
 ## Validation
 
   - `p >= 0`.
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
-  - `returns_source(pl) === nothing`: the network or clustering estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
-  - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`SemiDefinitePhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). Otherwise the constructor raises an `ArgumentError`.
+  - `returns_source(pl) === nothing`, see [`assert_inner_reader`](@ref). The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own. Otherwise the constructor raises an `ArgumentError`.
+  - The type bound [`NwE_ClE`](@ref) of `pl` refuses a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref). So the keyword constructor raises a `TypeError` at once, and not later in a solve. To use a precomputed structure, build the [`SemiDefinitePhylogeny`](@ref) that `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
 
@@ -208,9 +208,9 @@ end
 """
     const MatNum_PhRMatNum = Union{<:PhylogenyResult{<:MatNum}, <:MatNum}
 
-Alias for a phylogeny result wrapping a numeric matrix or a numeric matrix directly.
+Alias for a numeric matrix, or a phylogeny result that holds one.
 
-Used internally to accept either a [`PhylogenyResult`](@ref) containing a numeric matrix or a plain numeric matrix as a constraint matrix input.
+The constructors of [`SemiDefinitePhylogeny`](@ref) and [`IntegerPhylogeny`](@ref) accept it for `A`. They read the matrix out of a [`PhylogenyResult`](@ref).
 
 # Related
 
@@ -223,13 +223,15 @@ $(DocStringExtensions.TYPEDEF)
 
 Drives the product of weights of every related pair of assets to zero through a semidefinite relaxation.
 
-Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster. [graphpo1](@cite) states the constraint over a network. Section 13.2.4.2 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the same constraint over clusters. No copy of that work was found.
+The source that built `A` decides which assets are related. A network source relates the assets of one neighbourhood, and a clustering source relates the assets of one cluster. [graphpo1](@citet) states the constraint over a network. Section 13.2.4.2 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the same constraint over clusters. No copy of that work is available.
 
-`p` sets the size of the **relaxation gap** and not the strength of the constraint. `A ⊙ W == 0` is written whether or not `p` is read, so a larger `p` forbids no more pairs. It only makes `W` track the outer product it stands for more closely. A wider gap lets a pair of related assets both hold weight while their entry of `W` absorbs the product.
+`p` sets the size of the relaxation gap, not the strength of the constraint. The model writes `A ⊙ W == 0` for every `p`, so a larger `p` forbids no more pairs. A larger `p` only holds `W` closer to the outer product of the weights. When the gap is wide, both assets of a related pair can hold weight while their entry of `W` is zero.
+
+A [`Variance`](@ref) in a model with this constraint always takes the constraint form below, whatever its `alg` field states. Under [`MaximumRatio`](@ref), the `ratio_alg` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio, and the `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. Under that objective, [`set_sdp_phylogeny_constraints!`](@ref) writes the rows on the lifted matrix of [`set_sdp_objective_lift!`](@ref).
 
 # Mathematical definition
 
-The relaxation replaces the outer product of the weights with a symmetric matrix variable and bounds it below through a Schur complement. Where the objective is already a trace against that variable — a variance — the constraint form applies:
+The relaxation replaces the outer product of the weights with a symmetric matrix variable, and bounds it below through a Schur complement. A variance objective is already a trace against that variable, so the constraint form applies:
 
 ```math
 \\begin{align}
@@ -240,7 +242,7 @@ The relaxation replaces the outer product of the weights with a symmetric matrix
 \\end{align}
 ```
 
-For every other risk measure nothing in the objective pulls the relaxation down, so a penalty term does it instead:
+For every other risk measure, no term of the objective holds the matrix variable down to the outer product. A penalty on its trace does that instead:
 
 ```math
 \\begin{align}
@@ -261,8 +263,6 @@ Where:
   - ``\\mathbb{S}^{N}``: Set of real symmetric ``N \\times N`` matrices.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-A [`Variance`](@ref) in a model that holds this constraint takes the constraint form, whatever its `alg` says. Under [`MaximumRatio`](@ref) the `ratio_alg` of the variance selects the degree of its objective term, and so the ratio. The default gives the Sharpe ratio. The `# Mathematical definition` of [`MaximumRatio`](@ref) states the rule. The rows then read the lift of the objective, [`set_sdp_phylogeny_constraints!`](@ref).
-
 # Fields
 
 $(DocStringExtensions.FIELDS)
@@ -282,8 +282,8 @@ Keywords correspond to the struct's fields. The default `p = 0.05` is the penalt
 
 ## Validation
 
-  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`.
-  - `p >= 0`.
+  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`. A breach raises an `ArgumentError`.
+  - `p >= 0`. A breach raises a `DomainError`.
 
 # Examples
 
@@ -341,16 +341,16 @@ end
 
 Check the length of `B` against an integer cluster count `alg`.
 
-The fallback method takes every other argument list and checks nothing, so a clustering algorithm that is not an integer count places no bound on `B`. The default [`OptimalNumberClusters`](@ref) carries a [`SecondOrderDifference`](@ref), so this guard is silent for it.
+The fallback method takes every other argument list and checks nothing, so a clustering algorithm that is not an integer count puts no bound on `B`. The default [`OptimalNumberClusters`](@ref) holds a [`SecondOrderDifference`](@ref), so this check does nothing for it.
 
 # Arguments
 
-  - `alg`: Number of clusters the source returns.
+  - `alg`: The number of clusters that the source returns.
 
       + `Integer`: Bounds `length(B)`.
-      + Anything else: No check is made.
+      + Any other type: The function checks nothing.
 
-  - `B`: Vector of per-row bounds.
+  - `B`: The vector of bounds, one per row.
 
 # Validation
 
@@ -378,21 +378,21 @@ end
     validate_length_integer_phylogeny_constraint_B(cle::ClustersEstimator, B::VecNum)
     validate_length_integer_phylogeny_constraint_B(args...)
 
-Check the length of `B` against the number of clusters the estimator `cle` may return.
+Check the length of `B` against the number of clusters that the estimator `cle` can return.
 
-Only the [`ClustersEstimator`](@ref) method checks anything. Every other argument list reaches the fallback and passes, a [`NetworkEstimator`](@ref) included, so the commonest source of an [`IntegerPhylogenyEstimator`](@ref) is unguarded here. A network's row count is not known until [`phylogeny_matrix`](@ref) has run, and [`IntegerPhylogeny`](@ref)'s own constructor raises then.
+Only the [`ClustersEstimator`](@ref) method checks `B`. Every other argument list goes to the fallback, which checks nothing. A [`NetworkEstimator`](@ref) goes there too, so this function does not check the default source of an [`IntegerPhylogenyEstimator`](@ref). The row count of a network is known only after [`phylogeny_matrix`](@ref) runs, and the constructor of [`IntegerPhylogeny`](@ref) checks the length then.
 
 # Arguments
 
-  - `cle`: Clustering estimator whose `onc` field states the number of clusters.
-  - `B`: Vector of per-row bounds.
-  - `args...`: Every other argument list. No check is made.
+  - `cle`: The clustering estimator whose `onc` field states the number of clusters.
+  - `B`: The vector of bounds, one per row.
+  - `args...`: Any other arguments. The fallback checks nothing.
 
 # Validation
 
   - `length(B) <= cle.onc.max_k`, when `max_k` is set. A breach raises a `DomainError`.
   - `length(B) <= cle.onc.alg`, through [`_validate_length_integer_phylogeny_constraint_B`](@ref), when `alg` is an `Integer`.
-  - Neither bound exists on the default `OptimalNumberClusters()`, whose `max_k` is `nothing` and whose `alg` is a [`SecondOrderDifference`](@ref), so a `B` of any length passes.
+  - The default `OptimalNumberClusters()` sets neither bound. Its `max_k` is `nothing` and its `alg` is a [`SecondOrderDifference`](@ref), so a `B` of any length passes.
 
 # Returns
 
@@ -418,15 +418,15 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Caps how many related assets may be held at once, refitting the structure from returns.
+Fits the relatedness of the assets to returns, and caps the number of related assets that the portfolio holds at once.
 
-The estimator holds the source that builds the relatedness matrix and the cap `B`. [`phylogeny_constraints`](@ref) refits the source against a returns matrix and returns an [`IntegerPhylogeny`](@ref), which carries the equations this constraint solves.
+The estimator holds the source that builds the relatedness matrix, and the cap `B`. [`phylogeny_constraints`](@ref) fits the source to a returns matrix and returns an [`IntegerPhylogeny`](@ref), which holds the matrix and `B` for the model.
 
-Which pairs a network source relates comes from its [`AbstractSeparationAlgorithm`](@ref), and `B` is an integer cardinality counted over them. The relatedness itself stays binary under either separation: [`PhylogenyResult`](@ref)'s matrix is `Int`, and a graded one would not be countable here.
+The [`AbstractSeparationAlgorithm`](@ref) of a network source decides which pairs are related, and `B` counts the held assets over them. The relatedness is binary under every separation algorithm. The matrix of a [`PhylogenyResult`](@ref) is an `Int` matrix. A cap cannot count over a graded relation.
 
 !!! warning
 
-    `NetworkEstimator(; sep = PathLength())` relates **every reachable pair**. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so nothing is outside the budget — measured, `190` of `190` pairs. It is the opposite end of the dial from [`HopCount`](@ref)'s default `n = 1`. State a numeric `dmax` to select anything narrower.
+    `NetworkEstimator(; sep = PathLength())` relates every pair of assets that a path joins. A bare [`PathLength`](@ref) leaves `dmax = nothing`, which resolves to the observed diameter, so no pair is outside the budget. On a tree of 20 assets it relates all 190 pairs. [`HopCount`](@ref) with its default `n = 1` is the other extreme, and relates only the neighbours. Set a numeric `dmax` to relate fewer pairs.
 
 # Fields
 
@@ -444,15 +444,15 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - [`assert_nonempty_nonneg_finite_val`](@ref) checks `B`.
 
-      + `AbstractVector`: It is additionally validated with [`validate_length_integer_phylogeny_constraint_B`](@ref).
+      + `AbstractVector`: [`validate_length_integer_phylogeny_constraint_B`](@ref) also checks it.
 
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). Otherwise the constructor raises an `ArgumentError`.
 
-  - `returns_source(pl) === nothing`: the network or clustering estimator reads the matrix that this estimator picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
+  - `returns_source(pl) === nothing`, see [`assert_inner_reader`](@ref). The network or clustering estimator reads the matrix that this estimator selects, so it states no source of its own. Otherwise the constructor raises an `ArgumentError`.
 
-  - `pl` is bounded by [`NwE_ClE`](@ref): a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref) is rejected by the type, not by a check, so the keyword constructor raises `TypeError` rather than deferring the problem to a solve. Build [`IntegerPhylogeny`](@ref) instead, which is what `phylogeny_constraints(estimator, X)` returns.
+  - The type bound [`NwE_ClE`](@ref) of `pl` refuses a precomputed [`PhylogenyResult`](@ref) or [`Clusters`](@ref). So the keyword constructor raises a `TypeError` at once, and not later in a solve. To use a precomputed structure, build the [`IntegerPhylogeny`](@ref) that `phylogeny_constraints(estimator, X)` returns.
 
 # Examples
 
@@ -543,13 +543,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Caps at `B` the number of related assets a mixed-integer model may hold at once.
+Caps at `B` the number of related assets that a mixed-integer model can hold at once.
 
-Relatedness is whatever the source that built `A` calls related: a neighbourhood over a network, or membership of one cluster. A clustering source with `B = 1` holds at most one asset per cluster.
+The source that built `A` decides which assets are related. A network source relates the assets of one neighbourhood, and a clustering source relates the assets of one cluster. A clustering source with `B = 1` holds at most one asset per cluster.
 
-A network source with `B = 1` holds at most one asset of each closed neighbourhood, which is an asset together with its neighbours. So it forbids two neighbours, and it also forbids two assets that share a neighbour: the held assets are at a distance of at least three in the network. On the seven-asset graph of Figure 13 of [graphpo1](@cite), 32 selections hold no two neighbours, but only 12 satisfy this constraint. The semidefinite form, [`SemiDefinitePhylogeny`](@ref), forbids only the pairs that `A` relates.
+A network source with `B = 1` holds at most one asset of each closed neighbourhood, which is an asset together with its neighbours. So it forbids two neighbours, and it also forbids two assets that share a neighbour. The held assets are thus at a distance of at least three in the network. On the graph of seven assets in Figure 13 of [graphpo1](@cite), 32 selections hold no two neighbours, but only 12 satisfy this constraint. The semidefinite form, [`SemiDefinitePhylogeny`](@ref), forbids only the pairs that `A` relates.
 
-[riccascozzari2024](@cite) state the constraint for the neighbours of a network, and [graphpo1](@cite) extends it to the assets that a walk of a given length links. Section 13.2.4.1 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the constraint over clusters and of a cap per cluster. No copy of that work was found.
+[riccascozzari2024](@citet) state the constraint for the neighbours of a network. [graphpo1](@citet) extends it to the assets that a walk of a given length links. Section 13.2.4.1 of [cajas2025](@cite) names [graphpo2](@cite) as the source of the constraint over clusters, and of a cap per cluster. No copy of that work is available.
 
 # Mathematical definition
 
@@ -581,7 +581,7 @@ The constructor rewrites the matrix it is given, so the stored `A` is a derived 
 
  1. Check that the diagonal of `A` is zero and that `A` is symmetric.
  2. Add the identity to `A`, which puts each asset in its own row.
- 3. Drop the repeated rows of the sum with `unique(...; dims = 1)`, giving the stored `A`. One row survives per distinct neighbourhood or cluster, so the stored matrix is usually shorter than it is wide.
+ 3. Drop the repeated rows of the sum with `unique(...; dims = 1)`. The result is the stored `A`. One row survives per distinct neighbourhood or cluster, so the stored matrix usually has fewer rows than columns.
  4. Check that `B` is non-empty, non-negative and finite.
  5. Check `size(A, 1) == length(B)` when `B` is a vector, against the row count of step 3 and not against the number of assets.
 
@@ -604,11 +604,11 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`.
+  - `LinearAlgebra.issymmetric(A)` and `all(iszero, LinearAlgebra.diag(A))`. A breach raises an `ArgumentError`.
 
-  - `B` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - [`assert_nonempty_nonneg_finite_val`](@ref) checks `B`.
 
-      + `AbstractVector`: `size(unique(A + LinearAlgebra.I; dims = 1), 1) == length(B)`.
+      + `AbstractVector`: `size(unique(A + LinearAlgebra.I; dims = 1), 1) == length(B)`. A breach raises a `DimensionMismatch`.
 
 # Examples
 
@@ -667,26 +667,25 @@ end
     phylogeny_constraints(plc::Option{<:PlCE_PlC}, X::MatNum; dims::Int = 1, kwargs...)
     phylogeny_constraints(plcs::VecPlCE_PlC, args...; kwargs...)
 
-Generate phylogeny-based portfolio constraints from an estimator or result.
+Build a phylogeny constraint result from an estimator, or pass a result through.
 
-`phylogeny_constraints` constructs constraint objects based on phylogenetic, res, or network structures among assets. It supports both semi-definite and integer constraint forms, accepting either an estimator (which wraps a phylogeny or clustering model and penalty parameters) or a precomputed result. If `plc` is `nothing`, returns `nothing`.
-
-If `plcs` is a vector, this method broadcasts over each element, returning a vector of constraint results.
+An estimator fits its network or clustering source to `X` with [`phylogeny_matrix`](@ref). A [`SemiDefinitePhylogenyEstimator`](@ref) gives a [`SemiDefinitePhylogeny`](@ref), and an [`IntegerPhylogenyEstimator`](@ref) gives an [`IntegerPhylogeny`](@ref). A precomputed result and `nothing` pass through unchanged, and the function builds nothing for them. A vector gives a vector of results in the same order.
 
 # Arguments
 
-  - `plc`: A phylogeny constraint estimator, result, or `nothing`.
-  - `X`: Data matrix (`observations × assets`) (ignored when `plc` is not an estimator).
+  - `plc`: A phylogeny constraint estimator, a phylogeny constraint result, or `nothing`.
+  - `plcs`: A vector of phylogeny constraint estimators and results.
+  - `X`: The data matrix. Only an estimator reads it.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the underlying phylogeny matrix routine (ignored when `est` is not an estimator).
+  - `kwargs...`: More keyword arguments for [`phylogeny_matrix`](@ref). Only an estimator reads them.
 
 # Returns
 
-  - `res`: Constraint result.
+  - `res`: The phylogeny constraint result, or a vector of them for `plcs`.
 
-      + `SemiDefinitePhylogeny`: For semi-definite constraint estimators/results.
-      + `IntegerPhylogeny`: For integer constraint estimators/results.
-      + `nothing`: If `est` is `nothing`.
+      + `SemiDefinitePhylogeny`: For a semidefinite estimator or result.
+      + `IntegerPhylogeny`: For an integer estimator or result.
+      + `nothing`: When `plc` is `nothing`.
 
 # Related
 
@@ -720,9 +719,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all centrality-based constraint types.
 
-All concrete types implementing centrality-based portfolio constraints should be subtypes of `AbstractCentralityConstraint`.
-
-A subtype states a bound on a linear function of the weights whose coefficients come from a graph, so [`centrality_constraints`](@ref) reduces it to a [`LinearConstraint`](@ref) before the model sees it.
+A subtype states a bound on a linear function of the weights whose coefficients come from a graph. [`centrality_constraints`](@ref) reduces it to a [`LinearConstraint`](@ref) before the optimiser builds the model.
 
 # Related
 
@@ -735,9 +732,9 @@ abstract type AbstractCentralityConstraint <: AbstractConstraintEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Bounds the average centrality of the portfolio against a threshold read off the centrality vector itself.
+Bounds the average centrality of the portfolio by a number, or by a measure of the centrality vector.
 
-The constraint diversifies by the influence an asset has in the network, rather than by its weight. [`centrality_constraints`](@ref) turns it into one row of a [`LinearConstraint`](@ref).
+The constraint controls how central the portfolio is in the asset network, not how its weight is spread. [`centrality_constraints`](@ref) turns it into one row of a [`LinearConstraint`](@ref). Section 4 of [graphpo1](@cite) states the constraint as an equality against a target average centrality. This type also accepts either inequality.
 
 # Mathematical definition
 
@@ -758,9 +755,7 @@ Where:
   - ``\\phi``: Objective function of the optimiser.
   - ``\\mathcal{W}``: Rest of the feasible set.
 
-The original states this constraint as an equality against a desired average centrality. Either sense of the inequality is admitted here as well.
-
-When `B` is a [`VectorToScalarMeasure`](@ref), ``\\bar{c}`` is that measure of ``\\boldsymbol{c}``, so the threshold moves with the graph and the constraint always has a feasible point.
+When `B` is a [`VectorToScalarMeasure`](@ref), ``\\bar{c}`` is that measure of ``\\boldsymbol{c}``, so the threshold moves with the graph. Under [`MinValue`](@ref) or [`MaxValue`](@ref), ``\\bar{c}`` is an entry of ``\\boldsymbol{c}``. The portfolio fully invested in that asset then meets the constraint with equality, under every comparison operator.
 
 # Fields
 
@@ -780,9 +775,9 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `A` is bounded by [`CentralityEstimator`](@ref), `B` by [`Num_VecToScaM`](@ref), and `comp` by [`ComparisonOperator`](@ref). A value outside a bound raises a `TypeError` from the keyword constructor.
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
-  - `returns_source(A) === nothing`: the centrality estimator reads the matrix that this constraint picks, so it states no source of its own, see [`assert_inner_reader`](@ref). An `ArgumentError` is thrown otherwise.
-  - No value of `B` is checked. A non-finite `B` reaches the generated row unchanged: [`centrality_constraints`](@ref) stores a `NaN` or an `Inf` right-hand side and the model carries it to the solver.
+  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). Otherwise the constructor raises an `ArgumentError`.
+  - `returns_source(A) === nothing`, see [`assert_inner_reader`](@ref). The centrality estimator reads the matrix that this constraint selects, so it states no source of its own. Otherwise the constructor raises an `ArgumentError`.
+  - The constructor checks no value of `B`. A non-finite `B` reaches the generated row unchanged. [`centrality_constraints`](@ref) stores a `NaN` or an `Inf` right-hand side, and the model gives it to the solver.
 
 # Examples
 
@@ -879,7 +874,7 @@ end
 
 Alias for a vector of [`CentralityConstraint`](@ref) objects.
 
-Represents a collection of centrality-based portfolio constraints.
+[`centrality_constraints`](@ref) reduces such a vector to one [`LinearConstraint`](@ref), with at most one row per constraint.
 
 # Related
 
@@ -890,9 +885,9 @@ const VecCC = AbstractVector{<:CentralityConstraint}
 """
     const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
 
-Alias for a single or vector of [`CentralityConstraint`](@ref) objects.
+Alias for one [`CentralityConstraint`](@ref), or a vector of them.
 
-Matches either a single [`CentralityConstraint`](@ref) or a vector of them ([`VecCC`](@ref)).
+Matches a [`CentralityConstraint`](@ref) or a [`VecCC`](@ref). [`centrality_constraints`](@ref) dispatches on it.
 
 # Related
 
@@ -903,9 +898,9 @@ const CC_VecCC = Union{<:CentralityConstraint, <:VecCC}
 """
     const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 
-Alias for a centrality constraint or linear constraint.
+Alias for a centrality constraint, a vector of them, or a linear constraint.
 
-Matches either a [`CentralityConstraint`](@ref), a vector of them, or a [`LinearConstraint`](@ref). Used for dispatch in centrality-based constraint generation that also accepts linear constraints.
+Matches a [`CC_VecCC`](@ref) or a [`LinearConstraint`](@ref). It bounds the `cte` keyword of [`JuMPOptimiser`](@ref), which accepts the estimators or the linear constraint that they reduce to.
 
 # Related
 
@@ -919,7 +914,9 @@ const Lc_CC_VecCC = Union{<:CC_VecCC, <:LinearConstraint}
 
 Reduce one or more [`CentralityConstraint`](@ref) estimators to a [`LinearConstraint`](@ref).
 
-Each estimator contributes one row. The coefficients of the row are the centrality vector of the asset network, and the right-hand side is read off that vector or given as a number. A constraint whose centrality vector is empty or all zero contributes **no row**, because the row it would build holds for every set of weights: two assets under [`BetweennessCentrality`](@ref) give the zero vector, and a lone such constraint makes this function return `nothing`. The drop is reported through [`strict_diagnostic`](@ref), so `strict` decides whether it raises or warns.
+Each estimator gives one row. The coefficients of the row are the centrality vector of the asset network. The right-hand side is a number, or a measure of that vector. A constraint whose centrality vector is empty or all zero gives no row, because its row does not depend on the weights. Two assets under [`BetweennessCentrality`](@ref) give the zero vector, and a lone such constraint makes this function return `nothing`. [`strict_diagnostic`](@ref) reports the drop, so `strict` decides whether it raises or warns.
+
+The dropped row compares zero with `B`, so it holds for every set of weights or for none. [`MinValue`](@ref) and [`MaxValue`](@ref) give zero for the zero vector, so their row holds for every set of weights. A negative number gives a row such as `0 <= -0.2`, which holds for no weights. The drop then removes an infeasible row, and the diagnostic is the only sign of it.
 
 # Algorithm
 
@@ -931,28 +928,28 @@ Each estimator contributes one row. The coefficients of the row are the centrali
  6. Derive the right-hand side `B` from `cc.B` against the unscaled `A` with [`vec_to_real_measure`](@ref), and scale it by `d`.
  7. Scale `A` by `d`, which negates a `>=` row so that every inequality is stored in the `A w <= B` sense.
  8. Append `A` and `B` to the inequality pair or to the equality pair, as `flag_ineq` selects.
- 9. Reshape each flat accumulator into `N` columns, giving one row per surviving constraint, and build the [`LinearConstraint`](@ref) from the halves that hold a row. Return `nothing` when neither half does.
+ 9. Reshape each flat accumulator into `N` columns, so that each surviving constraint gives one row. Build the [`LinearConstraint`](@ref) from the halves that hold a row. Return `nothing` when neither half does.
 
-Step 6 runs before step 7 by design. Deriving the threshold from the scaled row negates it a second time, which cancels the flip and turns a `MinValue()` into a `MaxValue()` with the wrong sign.
+Step 6 comes before step 7 on purpose. A measure of the scaled row negates the threshold a second time. That cancels the sign flip, and turns a `MinValue()` into a `MaxValue()` with the wrong sign.
 
 # Arguments
 
-  - `ccs`: A single [`CentralityConstraint`](@ref) or a vector of them.
-  - `X`: Data matrix.
+  - `ccs`: One [`CentralityConstraint`](@ref) or a vector of them.
+  - `X`: The data matrix.
   - $(arg_dict[:dims])
-  - `strict`: If `true`, a constraint whose centrality vector is empty or all zero raises an `ArgumentError`; if `false`, it issues a warning. The constraint is dropped either way.
-  - `kwargs...`: Additional keyword arguments passed to the centrality estimator.
+  - `strict`: If `true`, a constraint whose centrality vector is empty or all zero raises an `ArgumentError`. If `false`, it gives a warning. The function drops the constraint in both cases.
+  - `kwargs...`: More keyword arguments for [`centrality_vector`](@ref).
 
 # Validation
 
   - `!isempty(ccs)` when `ccs` is a vector. A breach raises an `IsEmptyError`.
   - $(val_dict[:dims]) The check is made with [`assert_dims`](@ref), which raises the `DomainError`.
-  - A centrality vector that is empty or all zero raises an `ArgumentError` when `strict` is `true`, and issues a warning otherwise. The constraint is dropped either way.
-  - No value of `cc.B` is checked. A `NaN` or an `Inf` threshold reaches the returned right-hand side unchanged.
+  - A centrality vector that is empty or all zero raises an `ArgumentError` when `strict` is `true`, and gives a warning otherwise. The function drops the constraint in both cases.
+  - The function checks no value of `cc.B`. A `NaN` or an `Inf` threshold reaches the returned right-hand side unchanged.
 
 # Returns
 
-  - `lc::Option{<:LinearConstraint}`: The assembled inequality and equality rows, or `nothing` when every constraint was skipped.
+  - `lc::Option{<:LinearConstraint}`: The inequality rows and the equality rows, or `nothing` when the function drops every constraint.
 
 # Related
 
@@ -981,7 +978,7 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1,
         lhs_flag = isempty(A) || all(iszero, A)
         if lhs_flag
             # A zero centrality vector is a fact about the graph, not a mistyped name, so the
-            # message is its own. The row it would build, `0' w <= B`, holds for every `w`.
+            # message is its own. The row it would build, `0' w <= B`, does not depend on `w`.
             strict_diagnostic(zero_centrality_msg(cc.A.ct, length(A)), strict;
                               id = @log_id(typeof(cc.A.ct)))
             continue
@@ -1023,21 +1020,21 @@ function centrality_constraints(ccs::CC_VecCC, X::MatNum; dims::Int = 1,
     end
 end
 """
-    centrality_constraints(ccs::Option{<:LinearConstraint}, args...; kwargs...)
+    centrality_constraints(lc::Option{<:LinearConstraint}, args...; kwargs...)
 
-No-op fallback for centrality-based constraint propagation.
+Return a [`LinearConstraint`](@ref) or `nothing` unchanged.
 
-This method returns the input [`LinearConstraint`](@ref) object or `nothing` unchanged. It is used to pass through an already constructed centrality-based constraint object, enabling composability and uniform interface handling in constraint generation workflows.
+A caller can give the linear constraint that the [`CentralityConstraint`](@ref) estimators reduce to, in place of the estimators. This method passes it through and builds nothing.
 
 # Arguments
 
-  - `ccs`: An existing [`LinearConstraint`](@ref) object or `nothing`.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `lc`: A [`LinearConstraint`](@ref) or `nothing`.
+  - `args...`: Any positional arguments. The method ignores them.
+  - `kwargs...`: Any keyword arguments. The method ignores them.
 
 # Returns
 
-  - `ccs::Option{<:LinearConstraint}`: The input constraint object or `nothing`, unchanged.
+  - `lc::Option{<:LinearConstraint}`: The input, unchanged.
 
 # Related
 

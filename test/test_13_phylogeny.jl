@@ -4378,8 +4378,12 @@ end
     #=
     Two assets give a one-edge tree, and no vertex lies on a shortest path between two
     others, so `BetweennessCentrality` and `StressCentrality` both give the zero vector.
-    The row such a constraint would build, `0' w <= B`, holds for every `w`, so
-    `centrality_constraints` drops it. Issue #516 measured the drop, and issue #527 chose
+    The row such a constraint would build, `0' w <= B`, does not depend on `w`, so
+    `centrality_constraints` drops it. Under `MinValue()` or `MaxValue()` the threshold is 0
+    and the row holds for every `w`. A negative number makes the row hold for NO `w`, so the
+    drop then removes an infeasible row, and the warning is the only sign of it (#516, the
+    /unslop pass). #1797 asks whether that case must raise. Issue #516 measured the drop, and
+    issue #527 chose
     the diagnostic: the drop routes through `strict_diagnostic`, so `strict = true` raises
     and the default warns. The drop happens either way. The NAME messages are NOT reused --
     a zero centrality vector is a fact about the graph and not a typo -- which is what
@@ -4399,6 +4403,12 @@ end
     @test isnothing(lcm.eq)
     @test_throws ArgumentError centrality_constraints(zc, X2; strict = true)
     @test_throws ArgumentError centrality_constraints([zc, dc], X2; strict = true)
+    @test iszero(PortfolioOptimisers.vec_to_real_measure(MinValue(), zeros(2)))
+    @test iszero(PortfolioOptimisers.vec_to_real_measure(MaxValue(), zeros(2)))
+    zcn = CentralityConstraint(; A = CentralityEstimator(; ct = BetweennessCentrality()),
+                               B = -0.2)
+    @test isnothing(@test_logs (:warn, r"BetweennessCentrality") centrality_constraints(zcn,
+                                                                                        X2))
     msg = PortfolioOptimisers.zero_centrality_msg(BetweennessCentrality(), 2)
     @test occursin("BetweennessCentrality", msg)
     @test occursin("all 2 entries", msg)
