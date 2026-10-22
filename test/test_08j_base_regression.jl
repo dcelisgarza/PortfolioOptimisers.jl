@@ -1041,6 +1041,8 @@ end
         raw = MVS.fit(MVS.PPCA, Fs; maxoutdim = 5)
         @test all(isnan, raw.W)
         @test_throws ArgumentError MVS.projection(raw)
+        # `prep_dim_red_reg` calls `predict` first, and the `PPCA` docstring names it.
+        @test_throws ArgumentError StatsAPI.predict(raw, Fs)
 
         # The library checks the width first, so the caller meets a `DomainError` that names
         # `maxoutdim` and the factor count. It is raised at the fit, before `MultivariateStats`

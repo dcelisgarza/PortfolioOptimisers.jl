@@ -41,7 +41,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :b1_opt => "`b1::Option{<:MatNum} = nothing`: Basis of the decision vector of [`FactorRiskContribution`](@ref), which maps it to the asset weights: the pseudoinverse of the transposed loadings, followed by the off-factor basis when `flag = true`. `nothing` for all other optimisers.",
                  :optargs => "`args`: Additional positional arguments passed to the optimisation function.",
                  :optkwargs => "`kwargs`: Additional keyword arguments passed to the optimisation function.",
-                 :ignargs => "`args`: Additional positional arguments (ignored).",
+                 :ignargs => "`args`: More positional arguments, which the method ignores.",
                  :ignkwargs => "`kwargs`: More keyword arguments, which the method ignores.",
                  :rd => "`rd`: The returns result to use.",
                  :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel that the returns data held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
@@ -116,7 +116,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :x_src_cfer => "`x_src`: The source of the returns that the evaluation read, [`DataSource`](@ref) or [`ExcessSource`](@ref). An evaluation at `x_src = nothing` records `DataSource()`. The forecasts are forecasts of the returns in this frame, so [`covariance_forecast_portfolio`](@ref) reads its test rows in it.",#
                  :frame_x => "`x`: The value to walk: a reader of the returns, a value that holds readers, a vector of them, or any other value.",#
                  :frame_path => "`path`: The path of the value from the head, for example `\"pe\"`, `\"cle\"` or `\"r[2].pe\"`. A warning names a reader by its path.",#
-                 :frame_refit => "`refit`: Whether a regression reader at `x_src = nothing` in the group fits its regression on the raw returns data, see [`refits_regression`](@ref).",#
+                 :frame_refit => "`refit`: `true` when a regression reader at `x_src = nothing` in the group fits its regression on the raw returns data. [`refits_regression`](@ref) finds the value.",#
                  :frame_head => "`head`: The value whose group the walk reads: an optimiser, a `Pipeline` or an [`OnlinePortfolioSelection`](@ref).",#
                  :iv_x_src => "`iv`: Optional implied volatility matrix, `observations × assets`, read by an [`ImpliedVolatility`](@ref) estimator in the tree. The estimator receives the last rows of `iv`, one for each row of the picked `X`, through [`implied_volatility_picker`](@ref), so a prior that keeps fewer rows than the returns data still pairs each row of its `X` with the implied volatility of the same observation.",#
                  :wf => "`wf`: Weight finaliser.",#
