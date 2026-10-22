@@ -45,7 +45,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ignkwargs => "`kwargs`: Additional keyword arguments (ignored).",
                  :rd => "`rd`: The returns result to use.",
                  :pnl_prior => "`pnl`: Optional [`AssetPanel`](@ref), the panel that the returns data held. A wrapping prior forwards it unchanged, so that it can compose an estimator that is fitted on a panel. An estimator that reads no panel ignores it.",
-                 :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref), whose active mask the Coverage Universe of the fit is derived from. `nothing` makes the rule finiteness alone.",
+                 :pnl_moment => "`pnl`: Optional [`AssetPanel`](@ref). The Coverage Universe of the fit comes from its active mask. If it is `nothing`, the rule reads only the finiteness of the returns.",
                  :window => "`window`: Observation window. An integer selects the last `window` observations, and a vector of indices selects those observations.",
                  :window_rule => "`rule`: [`AbstractWindowRule`](@ref) that says which observations the window keeps on the online step. [`RollingWindow`](@ref) keeps the window at every fit, and [`SeedWindow`](@ref) keeps it at the first fit alone.",
                  # Frontier.

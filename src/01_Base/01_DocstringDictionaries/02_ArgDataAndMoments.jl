@@ -21,7 +21,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :mpa => "`mpa`: Matrix processing algorithm.",
                  # Moments.
                  :me => "`me`: Expected returns estimator.",
-                 :ome => "`me`: Optional expected returns estimator. It is not needed when used on a vector. If `nothing` and used on a matrix, defaults to [`SimpleExpectedReturns`](@ref).",
+                 :ome => "`me`: Optional expected returns estimator. A vector method does not use it. If it is `nothing`, a matrix method uses a [`SimpleExpectedReturns`](@ref).",
                  :ce => "`ce`: Covariance estimator.",#
                  :ve => "`ve`: Variance estimator.",#
                  :ske => "`ske`: Coskewness estimator.",
@@ -33,9 +33,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pf_M2 => "`M2`: Running second central co-moment accumulator, `assets × assets`. It is the sum over the observations and not the covariance, so the call with no data divides it by `n`.",
                  :pf_M3 => "`M3`: Running third central co-moment accumulator, `assets × assets²`. It is the sum over the observations and not the coskewness, so the call with no data divides it by `n`.",
                  :pfcache => "`cache`: Optional partial-fit state. It is `nothing` until [`partial_fit!`](@ref) writes one. When the caller gives no data matrix, the batch verb of the estimator reads it. Each propagation channel does one thing with it. [`factory`](@ref) keeps it unchanged, because a factory call resolves the configuration, not the sample. [`port_opt_view`](@ref) copies the entries of the selected assets into a new state, so the viewed estimator holds the state of those assets alone. [`obs_weights_view`](@ref) removes it, because a state has no slice on the observation axis. Only a type with an observation-weights field has that channel. A type with no such field falls through to the identity method, so it keeps its state. A family whose state has no exact asset slice removes it on both axes and names the reason.",
-                 :cvg => "`cvg`: Optional [`CoveragePolicy`](@ref). `nothing` is the reduce-and-expand path of the Coverage Universe, in which an asset that is non-finite or inactive at any observation of the window is `NaN` throughout the answer. A policy replaces it by available-case estimation: every cell is fitted on the observations at which the assets of that cell are all finite and active, each cell carries its own denominator, and an asset reaches the answer where [`admits`](@ref) says so.",
-                 :pf_cvg => "`cvg`: Optional [`CoverageCounts`](@ref), the per-cell denominators and per-asset bookkeeping of an available-case fold. It is `nothing` when the estimator carries no [`CoveragePolicy`](@ref), so the plain state costs nothing.",
-                 :corrected => "`corrected`: Whether to apply Bessel's correction. `Statistics` or `StatsBase` applies it, with the divisor that each weight type defines.",#
+                 :cvg => "`cvg`: Optional [`CoveragePolicy`](@ref). `nothing` selects the reduce-and-expand path of the Coverage Universe. On that path, an asset that is not finite or not active at an observation of the window is `NaN` in all of the result. A policy replaces that path with available-case estimation. The fit of each cell reads the observations at which all the assets of that cell are finite and active, and each cell has its own denominator. An asset is in the result where [`admits`](@ref) admits it.",
+                 :pf_cvg => "`cvg`: Optional [`CoverageCounts`](@ref), the per-cell denominators and the per-asset records of an available-case fold. It is `nothing` when the estimator holds no [`CoveragePolicy`](@ref), so the plain state costs nothing.",
+                 :corrected => "`corrected`: If `true`, the estimator applies the Bessel correction. `Statistics` or `StatsBase` applies it, with the divisor that each weight type defines.",#
                  :mutgt => "`tgt`: Shrinkage target.",#
                  :mu_intensity => "`intensity`: Rule that sets the interval of the shrinkage intensity, a member of [`AbstractShrunkExpectedReturnsIntensity`](@ref).",#
                  :me_shrink_alg => "`alg`: Expected returns shrinkage algorithm.",#
@@ -130,7 +130,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :dims_rd => "`dims`: Accepted and ignored. A `ReturnsResult` holds its observations along the rows, so the call passes `dims = 1`. The method takes no other keyword that it does not list: an unknown keyword raises the `MethodError` of the language, and no estimator swallows it.",#
                  :dims_chk => "`dims`: Dimension selector to check.",#
                  :sym_msg => "`sym`: Symbolic name used in the error message.",#
-                 :omean => "`mean`: Optional mean value to use for centering.",
+                 :omean => "`mean`: Optional precomputed centre of the data.",
                  :ex => "`ex`: Parallel execution strategy.",#
                  :alpha => "`alpha`: Quantile level for the lower tail. The bound is [`Num_SigCal`](@ref), so the slot takes the level itself, an [`AbstractSignificanceCalibrationAlgorithm`](@ref) that computes it from the prior result, or a plain function of the same five arguments.",#
                  :alpha_ltd => "`alpha`: Quantile level for the lower tail.",#

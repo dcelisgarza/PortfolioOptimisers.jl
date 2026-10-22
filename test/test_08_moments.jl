@@ -2140,6 +2140,34 @@
         @test_throws DimensionMismatch PortfolioOptimisers.find_uncorrelated_indices(W453;
                                                                                      scores = [1.0,
                                                                                                2.0])
+        #=
+        The `/unslop` pass of #453 corrected four claims, pinned here. The keywords of
+        `mean(::SimpleExpectedReturns, X)` go to the observation weights and never to
+        `Statistics.mean`, which refuses an unknown keyword. A pair at exactly the threshold
+        `t` is too correlated. The constructor of `SimpleVariance` does not check
+        `corrected` against the weight type, the fit refuses it. A `GeneralCovariance`
+        refuses a gapped sample in both verbs.
+        =#
+        @test_throws MethodError mean(Xsm; dims = 1, unknown_keyword = 1)
+        @test mean(SimpleExpectedReturns(), Xsm; dims = 1, unknown_keyword = 1) ==
+              mean(Xsm; dims = 1)
+        @test mean(SimpleExpectedReturns(; cvg = CoveragePolicy()), Xsm; dims = 1,
+                   unknown_keyword = 1) ≈ mean(Xsm; dims = 1)
+        let X3 = hcat(B453[:, 1], B453[:, 1], B453[:, 2])
+            t3 = cor(Covariance(), X3)[2, 1]
+            @test abs(cor(Covariance(), X3)[3, 1]) < t3
+            @test PortfolioOptimisers.find_uncorrelated_indices(X3; ce = Covariance(),
+                                                                t = t3) == [3]
+            @test PortfolioOptimisers.find_uncorrelated_indices(X3; ce = Covariance(),
+                                                                t = nextfloat(t3)) ==
+                  [1, 2, 3]
+        end
+        @test SimpleVariance(; w = Weights(wv)) isa SimpleVariance
+        let Xg = copy(Xsm)
+            Xg[1, 1] = NaN
+            @test_throws PortfolioOptimisers.IsNonFiniteError cov(GeneralCovariance(), Xg)
+            @test_throws PortfolioOptimisers.IsNonFiniteError cor(GeneralCovariance(), Xg)
+        end
     end
     @testset "The information-theoretic sweep of #459" begin
         #=

@@ -11,32 +11,32 @@
         pdm::Option{<:AbstractPosdefEstimator},
     ) -> PortfolioOptimisersCovariance
 
-Convenience constructor. Returns a [`PortfolioOptimisersCovariance`](@ref) configured to apply
-positive definite projection then a custom matrix processing algorithm, in that order, via
-[`MatrixProcessing`](@ref).
+Returns a [`PortfolioOptimisersCovariance`](@ref) that projects the covariance matrix to the
+positive definite cone and then applies a matrix processing algorithm of the caller. A
+[`MatrixProcessing`](@ref) applies the two steps in that order.
 
 [`matrix_processing!`](@ref) in `src/04_MatrixProcessing/04_MatrixProcessing.jl` states what an
-[`AbstractMatrixProcessingAlgorithm`](@ref) does to the matrix, and [`posdef!`](@ref) in
+[`AbstractMatrixProcessingAlgorithm`](@ref) does to the matrix. [`posdef!`](@ref) in
 `src/04_MatrixProcessing/01_PosdefMatrix.jl` states the mathematics of the projection.
 
 # Algorithm
 
  1. Build a [`MatrixProcessing`](@ref) from `pdm` and `alg`, with `order = (:pdm, :alg)`.
- 2. Return a [`PortfolioOptimisersCovariance`](@ref) carrying `ce` and that estimator.
+ 2. Return a [`PortfolioOptimisersCovariance`](@ref) that holds `ce` and that estimator.
 
-`order` is what fixes the composition: `Statistics.cov` runs `ce` first, then projects the matrix
-onto the positive definite cone, and applies `alg` last. A caller who needs the reverse order builds
-the [`MatrixProcessing`](@ref) itself.
+The `order` field sets the composition. `Statistics.cov` runs `ce` first. Then it projects the
+matrix onto the positive definite cone, and it applies `alg` last. For the reverse order, build the
+[`MatrixProcessing`](@ref) directly.
 
 # Arguments
 
   - $(arg_dict[:ce])
-  - `alg`: Optional matrix processing algorithm applied after the projection. If `nothing`, the projection is the only step.
+  - `alg`: The optional matrix processing algorithm that runs after the projection. If `alg` is `nothing`, the projection is the only step.
   - $(arg_dict[:opdm])
 
 # Returns
 
-  - `ce::PortfolioOptimisersCovariance`: Composite estimator that applies `alg` to the matrix `ce` computes.
+  - `ce::PortfolioOptimisersCovariance`: The composite estimator that applies `alg` to the matrix that `ce` computes.
 
 # Examples
 

@@ -3,7 +3,7 @@
 
 Compute the variance vector from the diagonal of the covariance matrix.
 
-This method is the fallback that gives every [`AbstractCovarianceEstimator`](@ref) a marginal variance, so a caller needs no separate variance estimator to read the diagonal of the matrix the covariance estimator already builds.
+This method is the fallback that gives a marginal variance to each [`AbstractCovarianceEstimator`](@ref). A caller does not need a separate variance estimator to read the diagonal of the covariance matrix.
 
 # Mathematical definition
 
@@ -15,7 +15,7 @@ This method is the fallback that gives every [`AbstractCovarianceEstimator`](@re
 
 Where:
 
-  - ``\\hat{\\sigma}_i^2``: Variance of asset ``i``.
+  - ``\\hat{\\sigma}_i^2``: The variance of asset ``i``.
   - $(math_dict[:Sigma_hat])
   - $(math_dict[:Sigma_hat_ii])
 
@@ -30,11 +30,11 @@ Where:
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - `kwargs...`: More keyword arguments for the covariance estimator.
 
 # Returns
 
-  - `var::Matrix{<:Number}`: Variance vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `var::Matrix{<:Number}`: The variance vector. Its shape is `(1, N)` if `dims == 1`, or `(N, 1)` if `dims == 2`.
 
 # Examples
 
@@ -61,7 +61,7 @@ end
 
 Compute the standard deviation vector from the diagonal of the covariance matrix.
 
-This method is the fallback that gives every [`AbstractCovarianceEstimator`](@ref) a marginal standard deviation, so a caller needs no separate variance estimator to read the diagonal of the matrix the covariance estimator already builds.
+This method is the fallback that gives a marginal standard deviation to each [`AbstractCovarianceEstimator`](@ref). A caller does not need a separate variance estimator to read the diagonal of the covariance matrix.
 
 # Mathematical definition
 
@@ -88,11 +88,11 @@ Where:
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - `kwargs...`: More keyword arguments for the covariance estimator.
 
 # Returns
 
-  - `sd::Matrix{<:Number}`: Standard deviation vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `sd::Matrix{<:Number}`: The standard deviation vector. Its shape is `(1, N)` if `dims == 1`, or `(N, 1)` if `dims == 2`.
 
 # Examples
 
@@ -117,9 +117,9 @@ end
 """
     Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Always throw a `MethodError`. [`AbstractVarianceEstimator`](@ref) resolves one marginal variance per asset and holds no cross-asset structure, so it has no covariance to return.
+Always throw a `MethodError`. An [`AbstractVarianceEstimator`](@ref) estimates one marginal variance for each asset. It has no structure across assets, so it has no covariance matrix to return.
 
-Without this method, `cov` would fall through to [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref), which calls `cor`. A variance estimator has no `cor` method of its own either, so that call would fall through in turn to a generic fallback that calls `cov` again, and the two calls would recurse without end. This method throws before that fallback ever runs.
+This method stops a recursion. Without it, `cov` falls through to [`Statistics.cov(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref), which calls `cor`. A variance estimator has no `cor` method of its own, so a generic fallback of `cor` calls `cov` again. The two calls then recurse without end. This method throws before that fallback runs.
 
 Use a covariance estimator, for example [`Covariance`](@ref), for a covariance matrix.
 
@@ -145,9 +145,9 @@ end
 """
     Statistics.cor(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Always throw a `MethodError`. [`AbstractVarianceEstimator`](@ref) resolves one marginal variance per asset and holds no cross-asset structure, so it has no correlation to return.
+Always throw a `MethodError`. An [`AbstractVarianceEstimator`](@ref) estimates one marginal variance for each asset. It has no structure across assets, so it has no correlation matrix to return.
 
-Without this method, `cor` would fall through to a generic fallback that calls [`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref), which throws a `MethodError` on its own. This method throws the same kind of error one call sooner, and names `cor` in it, so the error names the verb the caller actually used.
+Without this method, `cor` falls through to a generic fallback that calls [`Statistics.cov(ve::AbstractVarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)`](@ref), and that method throws a `MethodError`. This method throws the same kind of error one call before. The error names `cor`, which is the verb that the caller used.
 
 Use a covariance estimator, for example [`Covariance`](@ref), for a correlation matrix.
 
@@ -175,7 +175,7 @@ end
 
 Compute the standard deviation vector as the element-wise square root of the variance vector.
 
-This is the fallback for an [`AbstractVarianceEstimator`](@ref) that defines [`Statistics.var`](@ref) alone. It resolves `std` from `var` directly, so it never calls [`Statistics.cov`](@ref), which an [`AbstractVarianceEstimator`](@ref) cannot answer. A member that computes its own standard deviation, for example [`SimpleVariance`](@ref), overrides this method.
+This method is the fallback for an [`AbstractVarianceEstimator`](@ref) that defines only [`Statistics.var`](@ref). It computes `std` from `var`, so it does not call [`Statistics.cov`](@ref), which throws for an [`AbstractVarianceEstimator`](@ref). A member that computes its own standard deviation overrides this method. [`SimpleVariance`](@ref) is an example.
 
 # Mathematical definition
 
@@ -199,7 +199,7 @@ Where:
   - $(arg_dict[:ve])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the variance estimator.
+  - `kwargs...`: More keyword arguments for the variance estimator.
 
 # Returns
 
@@ -216,11 +216,11 @@ end
 """
     variance_series(ce::AbstractCovarianceEstimator, X::MatNum; dims::Int = 1, kwargs...)
 
-Compute the point-in-time variance series, one row per observation.
+Compute the point-in-time variance series, with one row for each observation.
 
-Row `t` holds the variance of each asset estimated from observations `1` to `t` alone, so a caller that reads row `t - 1` holds a variance that observation `t` did not enter. That is what a weight paired with observation `t` needs: a variance carrying the date-`t` squared residual would down-weight an asset for its own shock, and would correlate the weights with the residuals.
+Row `t` holds the variance of each asset, as estimated from observations `1` to `t` only, so row `t - 1` holds a variance that does not contain observation `t`. A weight for observation `t` needs this variance. A variance that contains the squared residual of date `t` gives less weight to an asset for its own shock, and it correlates the weights with the residuals.
 
-This method is the fallback that gives every [`AbstractCovarianceEstimator`](@ref) a series, so a member needs no method of its own to answer correctly. It refits on an expanding window, at a cost of one fit per observation. A member whose estimate is a recursion overrides it with a single forward pass.
+This method is the fallback that gives a series to each [`AbstractCovarianceEstimator`](@ref), so a member does not need a method of its own. It fits the estimator again on an expanding window, which costs one fit for each observation. A member whose estimate is a recursion overrides this method with one forward pass.
 
 # Mathematical definition
 
@@ -232,9 +232,9 @@ This method is the fallback that gives every [`AbstractCovarianceEstimator`](@re
 
 Where:
 
-  - ``\\mathbf{V}_{ti}``: Variance of asset ``i`` after observation ``t``.
-  - ``\\hat{\\sigma}_i^2``: Variance of asset ``i``, as `ce` estimates it.
-  - ``\\mathbf{X}_{1:t}``: First ``t`` observations of the data matrix.
+  - ``\\mathbf{V}_{ti}``: The variance of asset ``i`` after observation ``t``.
+  - ``\\hat{\\sigma}_i^2``: The variance of asset ``i``, as `ce` estimates it.
+  - ``\\mathbf{X}_{1:t}``: The first ``t`` observations of the data matrix.
   - $(math_dict[:T])
 
 # Algorithm
@@ -248,7 +248,7 @@ Where:
   - $(arg_dict[:ce])
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the variance estimator. A keyword carrying one entry per observation is passed unsliced, so an estimator that takes one must override this method.
+  - `kwargs...`: More keyword arguments for the variance estimator. The method does not slice a keyword that has one entry for each observation, so an estimator that takes such a keyword must override this method.
 
 # Validation
 
@@ -256,7 +256,7 @@ Where:
 
 # Returns
 
-  - `val::Matrix{<:Number}`: Variance series, shaped as `(T, N)` if `dims == 1` or `(N, T)` if `dims == 2`.
+  - `val::Matrix{<:Number}`: The variance series. Its shape is `(T, N)` if `dims == 1`, or `(N, T)` if `dims == 2`.
 
 # Examples
 
@@ -270,7 +270,7 @@ julia> PortfolioOptimisers.variance_series(SimpleVariance(), X)
    0.0001    0.0001
 ```
 
-Row `1` is a fit on a single observation, so an estimator that needs two returns `NaN` there.
+Row `1` is a fit on one observation. An estimator that needs two observations returns `NaN` in that row.
 
 # Related
 
@@ -295,15 +295,15 @@ end
     variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
     variance_count(ve::WindowedVariance, X::MatNum)
 
-Effective count and divisor of the variance that `ve` measures on each column of `X`.
+Return the effective count and the divisor of the variance that `ve` measures on each column of `X`.
 
-A consumer that prices the sampling error of a variance needs two facts that only the estimator knows: how many observations the estimate is worth, and what the estimator divides the sum of squares by. This function states both. A prior that writes the idiosyncratic variances of a loadings block calls it on the residuals, and writes the answer beside the variances, so that [`ResidualInflation`](@ref) reads it off the block.
+A consumer that prices the sampling error of a variance needs two facts that only the estimator knows. The first fact is the number of observations that the estimate is worth. The second fact is the divisor of the sum of squares. This function returns both. A prior that writes the idiosyncratic variances of a loadings block calls this function on the residuals. The prior writes the result next to the variances, so that [`ResidualInflation`](@ref) reads it from the block.
 
-The method over [`AbstractVarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. It is not a default count. A consumer that needs one refuses a block that carries none, and names the way out.
+The method for [`AbstractVarianceEstimator`](@ref) returns `nothing`, which means that the estimator states no count. `nothing` is not a default count. A consumer that needs a count refuses a block that has none, and its error names the fix.
 
 # Mathematical definition
 
-Let the estimate of asset ``i`` be a weighted sum of squares, ``\\hat{d}_{i} = \\sum_{t} a_{t} e_{t,i}^{2}``, of residuals with variance ``d_{i}``. Its law is approximated by a scaled chi-squared law with the same mean and variance:
+Let the estimate of asset ``i`` be a weighted sum of squares, ``\\hat{d}_{i} = \\sum_{t} a_{t} e_{t,i}^{2}``, of residuals with variance ``d_{i}``. A scaled chi-squared law with the same mean and the same variance approximates the law of the estimate:
 
 ```math
 \\begin{align}
@@ -315,29 +315,29 @@ m_{i} &= \\dfrac{n_{i}}{\\sum_{t} a_{t}}\\,.
 
 Where:
 
-  - ``n_{i}``: Effective count of the observations of asset ``i``, Kish's count of the weights ``a_{t}``.
-  - ``m_{i}``: Divisor of the variance of asset ``i`` in that count. It is the sum of squares of ``n_{i}`` equally weighted observations that ``\\hat{d}_{i}`` divides by ``m_{i}``.
-  - ``a_{t}``: Weight of observation ``t`` in the estimate.
-  - ``e_{t,i}``: Residual of asset ``i`` at observation ``t``.
-  - ``d_{i}``: True variance of asset ``i``.
+  - ``n_{i}``: The effective count of the observations of asset ``i``. It is the Kish count of the weights ``a_{t}``.
+  - ``m_{i}``: The divisor of the variance of asset ``i`` for that count. The estimate ``\\hat{d}_{i}`` equals the sum of squares of ``n_{i}`` observations of equal weight, divided by ``m_{i}``.
+  - ``a_{t}``: The weight of observation ``t`` in the estimate.
+  - ``e_{t,i}``: The residual of asset ``i`` at observation ``t``.
+  - ``d_{i}``: The true variance of asset ``i``.
 
-On an unweighted sample of ``T`` observations, ``n_{i} = T`` and ``m_{i}`` is `T - 1` or `T`, as the estimator corrects the bias or not. The relation is then exact for Gaussian residuals, and approximate for any other weights.
+On an unweighted sample of ``T`` observations, ``n_{i} = T``. Then ``m_{i}`` is `T - 1` if the estimator corrects the bias, and `T` if it does not. For Gaussian residuals the relation is then exact. For all other weights it is an approximation.
 
 # Algorithm
 
  1. On [`AbstractVarianceEstimator`](@ref), return `nothing`.
- 2. On [`SimpleVariance`](@ref), take the finite rows of each column, and read the count off the observation weights with [`simple_variance_count`](@ref).
- 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take Kish's count of the exponential weights over the finite rows of each column with [`exp_weighted_variance_count`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment are not counted.
- 4. On [`WindowedVariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref), and ask the inner estimator.
+ 2. On [`SimpleVariance`](@ref), take the finite rows of each column, and read the count from the observation weights with [`simple_variance_count`](@ref).
+ 3. On [`ExpWeightedVariance`](@ref) and [`RegimeAdjustedExpWeightedVariance`](@ref), take the Kish count of the exponential weights over the finite rows of each column with [`exp_weighted_variance_count`](@ref). The weights sum to one after the correction of the cold start, so the divisor equals the count. The count ignores the regime multiplier and the lags of a Heteroskedasticity and Autocorrelation Consistent (HAC) adjustment.
+ 4. On [`WindowedVariance`](@ref), apply the window and the weights of the wrapper with [`windowed_preamble`](@ref). Then return the count of the inner estimator.
 
 # Arguments
 
   - $(arg_dict[:ve])
-  - `X`: Data matrix `observations × assets`.
+  - `X`: The data matrix, of shape `observations × assets`.
 
 # Returns
 
-  - `cnt::Option{<:NamedTuple}`: `(; n, m)`, two vectors with one entry per column of `X`: the effective count `n` and the divisor `m`. `nothing` when the estimator states no count.
+  - `cnt::Option{<:NamedTuple}`: The named tuple `(; n, m)` of two vectors, with one entry for each column of `X`. `n` is the effective count and `m` is the divisor. The value is `nothing` if the estimator states no count.
 
 # Related
 
@@ -355,24 +355,24 @@ end
     Statistics.var(ve::AbstractVarianceEstimator)
     Statistics.std(ve::AbstractVarianceEstimator)
 
-Reads a moment out of the partial-fit state that a covariance or variance estimator carries.
+Reads a moment from the partial-fit state that a covariance or variance estimator holds.
 
-This is the call with no data of an estimator that has no such call of its own. It reads the state out of the `cache` field with [`partial_fit_cache`](@ref), and it gives the state to the method of the same verb that takes one. A [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, runs the batch verb over the rows of the buffer. A family that folds exactly has a call with no data of its own, so this method serves the estimators that fold by buffering alone, such as [`GerberCovariance`](@ref) and [`WindowedCovariance`](@ref).
+This method is the call with no data for an estimator that has no such call of its own. It reads the state from the `cache` field with [`partial_fit_cache`](@ref). Then it gives the state to the method of the same verb that takes a state. For a [`SampleBufferState`](@ref), which [`Online`](@ref) seeds, that method runs the batch verb over the rows of the buffer. A family that folds exactly has its own call with no data, so this method serves the estimators that fold only through a buffer, for example [`GerberCovariance`](@ref) and [`WindowedCovariance`](@ref).
 
 # Arguments
 
   - $(arg_dict[:ce])
   - $(arg_dict[:ve])
-  - `kwargs...`: Keyword arguments passed to the method that reads the state, `strict` among them.
+  - `kwargs...`: The keyword arguments for the method that reads the state, for example `strict`.
 
 # Validation
 
-  - The estimator carries a state. An `ArgumentError` is thrown otherwise.
+  - The estimator holds a state. An `ArgumentError` is thrown otherwise.
 
 # Returns
 
-  - `sigma::MatNum`: The covariance matrix, or `rho`, the correlation matrix, for `cov` and `cor`.
-  - `sigma::ArrNum`: The variance, or the standard deviation, for `var` and `std`, with one entry per asset.
+  - `sigma::MatNum`: The covariance matrix for `cov`, or the correlation matrix `rho` for `cor`.
+  - `sigma::ArrNum`: The variance for `var`, or the standard deviation for `std`, with one entry for each asset.
 
 # Related
 

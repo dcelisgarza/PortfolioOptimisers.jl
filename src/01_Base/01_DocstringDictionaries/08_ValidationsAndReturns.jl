@@ -85,10 +85,10 @@ unique_key_dict!(ret_dict, :ret_dict,
                  :ve => "`ve`: New variance estimator of the same type as the argument, with the new weights applied.",#
                  :skev => "`skev`: New coskewness estimator of the same type as the argument, for the new view.",#
                  :ktev => "`kev`: New cokurtosis estimator of the same type as the argument, for the new view.",#
-                 :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",#
-                 :stdvarnum => "`res::Number`: Variance or standard deviation `X`",#
-                 :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
-                 :vararr => "`vr::ArrNum`: Variance vector of `X`, reshaped to be consistent with the dimension along which the value is computed.",
+                 :stdvar => "`res::ArrNum`: Variance or standard deviation vector of `X`, with the shape that matches the dimension of the computation.",#
+                 :stdvarnum => "`res::Number`: Variance or standard deviation of `X`.",#
+                 :stdarr => "`sd::ArrNum`: Standard deviation vector of `X`, with the shape that matches the dimension of the computation.",
+                 :vararr => "`vr::ArrNum`: Variance vector of `X`, with the shape that matches the dimension of the computation.",
                  :stdnum => "`sd::Number`: Standard deviation of `X`.",
                  :varnum => "`vr::Number`: Variance of `X`.",
                  :alg => "`alg`: The original algorithm instance.")
