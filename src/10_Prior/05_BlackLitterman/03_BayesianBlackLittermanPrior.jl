@@ -594,8 +594,8 @@ function bbl_posterior(pe::BayesianBlackLittermanPrior, prior_result::AbstractPr
     # Everything else the wrapped prior carried is forwarded (see [`forward_prior`](@ref));
     # `chol` is the only drop, because `posterior_sigma` supersedes the covariance it
     # factorises. `posterior_X` is `prior_result.X` unchanged, so the wrapped `w` still
-    # describes exactly the rows of the returned `X`, its `ens`/`kld`/`ow` still describe that
-    # `w`, and the feature matrix is still over this asset axis. `rr` is unchanged — the
+    # describes exactly the rows of the returned `X`, and its `ens`/`kld`/`ow` still describe
+    # that `w`. `rr` is unchanged — the
     # regression is over data the views do not modify — so the factor block it projects is now
     # the posterior one.
     return forward_prior(prior_result; mu = posterior_mu, sigma = posterior_sigma,

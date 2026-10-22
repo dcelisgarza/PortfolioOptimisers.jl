@@ -30,7 +30,7 @@ Keywords correspond to the struct's fields.
 
 ## Composition: what this estimator forwards
 
-The views are applied to the **assets**. The wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld`, `ow` and `Z` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
+The views are applied to the **assets**. The wrapped prior is forwarded whole and only the deviations are spelled out: `mu` and `sigma` become the posterior, and `chol` is **dropped** because the posterior covariance supersedes the one it factorises. Everything else forwards — Black-Litterman leaves the observation axis untouched, so `w`, `ens`, `kld` and `ow` all still describe the axis they were computed over, and `rr` and the factor block `fpr` are structural, over data the views do not modify.
 
 !!! warning
 

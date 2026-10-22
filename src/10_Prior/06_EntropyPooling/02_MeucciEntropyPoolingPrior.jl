@@ -339,7 +339,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :ds_opt, :dm_opt, :opt, :w, :alg)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :ds_opt, :dm_opt, :opt, :w, :alg, :x_src)`.
 
 # Related
 
@@ -783,7 +783,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
  6. Stage three, the correlation, the skewness and the kurtosis. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`, and pin the mean and the variance of every asset those rows read with [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same emptiness test, solve into `w1`, and refit `pr` under it.
  7. Read the reference each of steps 5 and 6 solves from: `w0` under [`H1_EntropyPooling`](@ref), and the previous stage's `w1` under [`H2_EntropyPooling`](@ref).
  8. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
- 9. Return a [`LowOrderPrior`](@ref) carrying the last refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
+ 9. Return a [`LowOrderPrior`](@ref) carrying the last refit's moments, `w1`, `ens` and `kld`. The factor block `fpr` is forwarded from that refit unchanged.
 
 # Arguments
 
@@ -917,8 +917,6 @@ function ep_prior(alg::StagedEP, pe::MeucciEntropyPoolingPrior, X::MatNum,
         end
     end
     announce_ep_departures(ni, led, isempty(epc) && isnothing(cvv) && !isempty(led))
-    # Entropy pooling reweights observations without touching either axis of `Z`, so the
-    # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole. It is *not* stamped with the
     # pooled weights: `w1` is threaded into the wrapped estimator by `factory` above, so a
     # factor prior that records its own weighting will report it here, and one that does not
@@ -975,7 +973,7 @@ Posterior moments are then read as probability-weighted sample statistics under 
  6. Write the `sk_views`, `kt_views` and `rho_views` rows into `epc`.
  7. When `epc` holds a row or `cvv` states a search, solve the whole accumulated set once through [`ep_cvar_views_solve!`](@ref) into `w1`, and refit `pr` under it. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
  8. Read the effective number of scenarios `ens` as the exponential of the entropy of `w1`, and the divergence `kld` as the Kullback-Leibler divergence of `w1` from `w0`.
- 9. Return a [`LowOrderPrior`](@ref) carrying the refit's moments, `w1`, `ens` and `kld`. The feature matrix `Z` and the factor block `fpr` are forwarded from that refit unchanged.
+ 9. Return a [`LowOrderPrior`](@ref) carrying the refit's moments, `w1`, `ens` and `kld`. The factor block `fpr` is forwarded from that refit unchanged.
 
 # Arguments
 
@@ -1070,8 +1068,6 @@ function ep_prior(alg::H0_EntropyPooling, pe::MeucciEntropyPoolingPrior, X::MatN
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
     end
-    # Entropy pooling reweights observations without touching either axis of `Z`, so the
-    # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole. It is *not* stamped with the
     # pooled weights: `w1` is threaded into the wrapped estimator by `factory` above, so a
     # factor prior that records its own weighting will report it here, and one that does not

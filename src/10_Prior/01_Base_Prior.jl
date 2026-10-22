@@ -381,7 +381,7 @@ const PrE_Pr = Union{<:AbstractPriorEstimator, <:AbstractPriorResult}
 """
     const Pr_RR = Union{<:AbstractPriorResult, <:ReturnsResult}
 
-Groups the two result types that hold an asset returns matrix `X` and a feature matrix `Z`.
+Groups the two result types that hold an asset returns matrix `X`.
 
 `Pr_RR` is the bridge the clustering, phylogeny and centrality forwarders below dispatch on. Each of them reads `X` off the result it receives and delegates to the asset-returns method, so an estimator that needs returns can be driven from a fitted prior or from the raw data with one method apiece rather than two. Each result type holds its observations along the rows, so each forwarder passes `dims = 1` after `kwargs`, and a `dims` in `kwargs` has no effect. Where both results are present, [`returns_matrix_picker`](@ref) picks between them; both travel on to the estimator tree as `pr` and `rd`, so a [`FeatureDistance`](@ref) resolves its Asset Panel from them.
 
@@ -606,7 +606,7 @@ Three fields are *bound* to another field's value rather than being independent,
 
 A binding is inert when the bound field is already `nothing` (there is nothing stale to carry) or absent from `pr`.
 
-Everything else the constructor already covers: `rr` and `fpr` must be supplied together or not at all, and `w`, `chol` and `Z` are re-checked against the shape of `X` and `mu`.
+Everything else the constructor already covers: `rr` and `fpr` must be supplied together or not at all, and `w`, `chol`, `o_X`, `ss_gaps` and `pc` are re-checked against the shape of `X` and `mu`.
 
 ## What does not fit
 
@@ -1126,7 +1126,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a [`LowOrderPrior`](@ref) restricted to assets at index `i`.
 
-The feature matrix is subselected on its asset axis only. Its feature axis is never sliced: a prior-side `Z` is *derived*, and every producer that builds a square one refits on the subproblem's own universe, so there is no full-universe square matrix here to cut down. Observations are taken whole (`Colon`): folds slice observations *before* the prior is fit, so a derived `Z` is already fold-local by the time it reaches here.
+Observations are taken whole (`Colon`), because folds slice observations before the prior is fit.
 
 The factor block is forwarded **unsliced**: `i` indexes assets, and `fpr` is a distribution over factors. Only `rr` is cut down, on its asset axis.
 

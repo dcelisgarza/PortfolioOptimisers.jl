@@ -572,8 +572,6 @@ function prior(pe::OpinionPoolingPrior, X::MatNum, F::Option{<:MatNum} = nothing
     X = something(X1, X)
     w, ow, pw = opinion_pooling_weights(pe, X, F, pnl; strict = strict, kwargs...)
     pe2 = factory(pe.pe2, w)
-    # Opinion pooling reweights observations without touching either axis of `Z`, so the
-    # pooled prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole rather than stamped with the
     # pooled weights — see the note at the same step in `03_EntropyPoolingPrior_c.jl`.
     pr2 = prior(pe2, X, F, pnl; strict = strict, kwargs..., cache_reg = cache_reg)

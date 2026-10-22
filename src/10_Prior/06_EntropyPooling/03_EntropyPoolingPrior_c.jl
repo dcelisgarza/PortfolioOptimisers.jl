@@ -372,7 +372,7 @@ The state a `cache` holds is the running detail of an incremental fit, not the c
 
 # Returns
 
-  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w, :alg)`.
+  - `fields::Tuple`: The field names to render, which is `(:pe, :mu_views, :var_views, :cvar_views, :evar_views, :rlvar_views, :sigma_views, :sk_views, :kt_views, :cov_views, :rho_views, :sets, :opt, :w, :alg, :x_src)`.
 
 # Related
 
@@ -461,7 +461,7 @@ Compute entropy pooling prior moments with tail views, enforcing the views in st
  4. Stage two holds the variance and covariance views, with the mean of every asset they name pinned by [`fix_mu!`](@ref). Where `epc` or `tvs` is non-empty, solve from `w0` under [`H1_EntropyPooling`](@ref), or from the previous `w1` under [`H2_EntropyPooling`](@ref), and refit `pr` at the new `w1`.
  5. Stage three holds the skewness, kurtosis and correlation views, with the mean and the variance of every asset they name pinned by [`fix_mu!`](@ref) and [`fix_sigma!`](@ref). Under the same emptiness test, solve from the same start step 4 takes, and refit `pr` at the new `w1`.
  6. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
- 7. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The feature matrix and the factor block come from `pr` unchanged.
+ 7. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The factor block comes from `pr` unchanged.
 
 Every row of every family can drop under `strict = false`, and a stage then states no view. The emptiness test is on the rows the stages hold, not on the fields the caller set, so such a fit answers the prior: `w1` is `w0`, `kld` is zero, and no refit runs.
 
@@ -588,8 +588,6 @@ function ep_prior(alg::StagedEP, pe::EntropyPoolingPrior, X::MatNum, F::Option{<
         end
     end
     announce_ep_departures(ni, led, isempty(epc) && isempty(tvs) && !isempty(led))
-    # Entropy pooling reweights observations without touching either axis of `Z`, so the
-    # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
     # note at the same step in `MeucciEntropyPoolingPrior`'s `ep_prior`.
     (; X, o_X, mu, sigma, chol, rr, fpr, ss_gaps) = pr
@@ -615,7 +613,7 @@ Compute entropy pooling prior moments with tail views, enforcing every view in o
  3. Build every view against that one `pr`: the mean, value at risk, conditional, entropic and relativistic value at risk, variance, covariance, skewness, kurtosis and correlation views. Each row that is linear in the posterior probabilities reaches the constraint dictionary `epc`, and each tail view that needs auxiliary variables reaches the tail view vector `tvs`. No asset's mean or variance is pinned.
  4. Where `epc` or `tvs` is non-empty, solve once from `w0` with [`entropy_pooling`](@ref), giving `w1`, and refit `pr` at `w1`. Every row of every family can drop under `strict = false`, and the view set then states nothing: `w1` is `w0`, `kld` is zero, and no refit runs.
  5. Compute `ens`, the effective number of scenarios of `w1`, and `kld`, the divergence of `w1` from `w0`.
- 6. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The feature matrix and the factor block come from `pr` unchanged.
+ 6. Return a [`LowOrderPrior`](@ref) carrying the refit moments, `w1`, `ens` and `kld`. The factor block comes from `pr` unchanged.
 
 # Arguments
 
@@ -691,8 +689,6 @@ function ep_prior(alg::H0_EntropyPooling, pe::EntropyPoolingPrior, X::MatNum,
         pr = scenario_prior(pe.pe, w1, pr0, X, F, pnl; strict = strict, kwargs...,
                             cache_reg = true)
     end
-    # Entropy pooling reweights observations without touching either axis of `Z`, so the
-    # wrapped prior's feature matrix is forwarded unchanged (see [`LowOrderPrior`](@ref)).
     # The factor block is the refit prior's, forwarded whole, on the same reasoning as the
     # note at the same step in `MeucciEntropyPoolingPrior`'s `ep_prior`.
     (; X, o_X, mu, sigma, chol, rr, fpr, ss_gaps) = pr
