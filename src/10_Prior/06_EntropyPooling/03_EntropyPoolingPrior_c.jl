@@ -64,6 +64,7 @@ Keywords correspond to the struct's fields.
 
   - `pe`: Recursively updated via [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -71,6 +72,7 @@ Keywords correspond to the struct's fields.
 
   - `pe`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 

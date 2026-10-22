@@ -395,6 +395,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
   - `f_mp`: Recursively updated via [`factory`](@ref).
   - `mp`: Recursively updated via [`factory`](@ref).
   - `rfe`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -402,6 +403,7 @@ Keywords correspond to the struct's fields. `factors`, `neutralise` and `familie
 
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
   - `ce`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 

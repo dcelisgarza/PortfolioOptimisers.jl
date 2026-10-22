@@ -73,6 +73,7 @@ The refusal is not decoration over a failure that would otherwise be visible. Th
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `pe`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -80,6 +81,7 @@ The refusal is not decoration over a failure that would otherwise be visible. Th
 
   - `pe`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 

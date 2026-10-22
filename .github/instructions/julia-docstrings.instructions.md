@@ -402,6 +402,7 @@ A field may carry any combination (`@fprop @vprop field`, in either order) — t
 
 - **Observation-weight fields** (`@wprop`; type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
 - **Estimator, algorithm, or result fields** (`@fprop`; subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
+- **The partial-fit state** (`@fprop cache`; `Option{<:AbstractPartialFitState}`): write `` `cache`: Carried unchanged via [`factory`](@ref). ``
 
 `## View parameters` — the **view** channel. Write it when the type has a [`port_opt_view`](@ref) method, whether [`@propagatable`](@ref) generates that method from a `@vprop` tag or the file defines one by hand. The two cases carry different content.
 
@@ -409,6 +410,7 @@ A field may carry any combination (`@fprop @vprop field`, in either order) — t
 
 - **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed via [`port_opt_view`](@ref). ``
 - **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices via [`port_opt_view`](@ref). ``
+- **The partial-fit state** (`@vprop cache`): write `` `cache`: Sliced to the selected assets via [`port_opt_view`](@ref). ``
 
 **A hand-written method** — no field carries `@vprop`, and the file defines `port_opt_view(x::MyType, i, args...)`. A field list misdescribes such a method: it reads arguments no tag can name, and it applies rules no tag can encode. Open the subsection with
 
@@ -431,7 +433,7 @@ Describe the method, do not transcribe it. A field carried through with nothing 
 
 > **The same field appears in two subsections, saying two different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. That is not a duplication to collapse: it is the one place a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling appears in both too, and recurses in both.
 
-List fields in the same order they appear in the struct body, and add [`factory`](@ref), [`port_opt_view`](@ref) and/or [`obs_weights_view`](@ref) to `# Related` to match the subsections present.
+List fields in the same order they appear in the struct body, and add [`factory`](@ref), [`port_opt_view`](@ref) and/or [`obs_weights_view`](@ref) to `# Related` to match the subsections present. `test/test_83_propagation_list_census.jl` holds the two lists of the `factory` and `view` channels: each names exactly the fields its channel reads, in body order.
 
 **Template.**
 

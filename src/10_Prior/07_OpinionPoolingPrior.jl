@@ -180,6 +180,7 @@ Keywords correspond to the struct's fields. All arguments are validated for type
   - `pes`: Recursively updated via [`factory`](@ref).
   - `pe1`: Recursively updated via [`factory`](@ref).
   - `pe2`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -188,6 +189,7 @@ Keywords correspond to the struct's fields. All arguments are validated for type
   - `pes`: Recursively viewed via [`port_opt_view`](@ref).
   - `pe1`: Recursively viewed via [`port_opt_view`](@ref).
   - `pe2`: Recursively viewed via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 

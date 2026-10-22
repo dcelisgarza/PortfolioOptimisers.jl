@@ -309,6 +309,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -319,6 +320,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -625,6 +627,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -634,6 +637,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -852,6 +856,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -862,6 +867,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
@@ -1136,6 +1142,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
 
   - `fees`: Recursively updated via [`factory`](@ref).
   - `fb`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -1145,6 +1152,7 @@ Keywords correspond to the struct's fields. A field typed [`TD`](@ref), [`TD_Opt
   - `fees`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `fb`: Recursively viewed via [`port_opt_view`](@ref), except a precomputed result, which is kept (see [`view_child`](@ref)).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 

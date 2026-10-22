@@ -157,6 +157,7 @@ The **length** of `w` is not validated here. It is a property of the returns mat
   - `a_pe`: Recursively updated via [`factory`](@ref).
   - `f_pe`: Recursively updated via [`factory`](@ref).
   - `re`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -166,6 +167,7 @@ The **length** of `w` is not validated here. It is a property of the returns mat
   - `re`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 

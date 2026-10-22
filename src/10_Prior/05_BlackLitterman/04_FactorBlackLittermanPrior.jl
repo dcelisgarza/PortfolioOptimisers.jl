@@ -68,6 +68,7 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - `pe`: Recursively updated via [`factory`](@ref).
   - `re`: Recursively updated via [`factory`](@ref).
   - `ve`: Recursively updated via [`factory`](@ref).
+  - `cache`: Carried unchanged via [`factory`](@ref).
 
 ## View parameters
 
@@ -77,6 +78,7 @@ Its siblings differ: [`BayesianBlackLittermanPrior`](@ref) also satisfies the id
   - `ve`: Recursively viewed via [`port_opt_view`](@ref).
   - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
   - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
 
 # Examples
 
