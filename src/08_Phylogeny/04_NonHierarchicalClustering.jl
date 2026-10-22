@@ -195,7 +195,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
                                  alg::AbstractNonHierarchicalClusteringAlgorithm, D::MatNum)
     N = size(D, 1)
     max_k = isnothing(onc.max_k) ? floor(Int, sqrt(N)) : onc.max_k
-    c1 = min(min(floor(Int, sqrt(N)), max_k) + 2, N)
+    max_k = min(floor(Int, sqrt(N)), max_k)
+    c1 = min(max_k + 2, N)
     cluster_lvls = [get_k_clusters_from_alg(alg, D, k) for k in 1:c1]
     measure_alg = onc.alg.alg
     W_list = Vector{eltype(D)}(undef, c1)
@@ -208,7 +209,8 @@ function optimal_number_clusters(onc::OptimalNumberClusters{<:Any, <:SecondOrder
         gaps = @views W_list[1:(end - 2)] .+ W_list[3:end] .- 2 .* W_list[2:(end - 1)]
         all(!isfinite, gaps) ? length(gaps) : argmax(gaps)
     else
-        c1
+        # `c1 <= 2` only when `N <= 2`, where the ceiling is `1`. `c1` itself can be `2`.
+        max_k
     end
     return cluster_lvls[k], k
 end

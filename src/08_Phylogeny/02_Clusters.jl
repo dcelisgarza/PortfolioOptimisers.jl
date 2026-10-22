@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering estimator types.
 
-All concrete and/or abstract types implementing clustering-based estimation algorithms should be subtypes of `AbstractClustersEstimator`.
+A subtype holds the configuration that clusters the assets of a universe. [`clusterise`](@ref) runs it and returns an [`AbstractClusteringResult`](@ref). [`ClustersEstimator`](@ref) and [`NetworkClustersEstimator`](@ref) are the two subtypes.
 
 # Related
 
@@ -16,7 +16,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering algorithm types.
 
-All concrete and/or abstract types implementing specific clustering algorithms should be subtypes of `AbstractClustersAlgorithm`.
+A subtype selects the method that clusters a distance matrix. The hierarchical algorithms and the non-hierarchical algorithms are the two families.
 
 # Related
 
@@ -29,17 +29,17 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return the clustering algorithm `alg` unchanged.
 
-Identity pass-through used when a clustering algorithm is provided in a context that calls [`factory`](@ref). A clustering algorithm carries no prior-dependent field to rebuild, so every field is passed through and none is replaced.
+A caller that rebuilds an estimator with [`factory`](@ref) reaches this method for a clustering algorithm. A clustering algorithm has no field that depends on a prior, so the method keeps every field and replaces none.
 
 # Algorithm
 
- 1. Return `alg` itself. No field of it is rebuilt, and `args` and `kwargs` are discarded.
+ 1. Return `alg` itself. The method rebuilds no field of it, and it discards `args` and `kwargs`.
 
 # Arguments
 
   - `alg`: Clustering algorithm.
-  - `args...`: Optional arguments (ignored).
-  - `kwargs...`: Optional keyword arguments (ignored).
+  - `args...`: Optional arguments. The method does not read them.
+  - `kwargs...`: Optional keyword arguments. The method does not read them.
 
 # Returns
 
@@ -58,7 +58,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all hierarchical clustering algorithm types.
 
-All concrete and/or abstract types implementing hierarchical clustering algorithms (such as hierarchical agglomerative clustering or DBHT) should be subtypes of `AbstractHierarchicalClusteringAlgorithm`.
+A subtype builds a dendrogram, a `Clustering.Hclust`. [`optimal_number_clusters`](@ref) then cuts the dendrogram at the selected number of clusters. [`HClustAlgorithm`](@ref) and [`DBHT`](@ref) are the subtypes.
 
 # Related
 
@@ -72,7 +72,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all non-hierarchical clustering algorithm types.
 
-All concrete and/or abstract types implementing non-hierarchical clustering algorithms (such as k-means) should be subtypes of `AbstractNonHierarchicalClusteringAlgorithm`.
+A subtype makes a flat partition, a `Clustering.ClusteringResult`, at one number of clusters. A partition has no dendrogram to cut, so [`optimal_number_clusters`](@ref) runs the algorithm once for each candidate count. [`KMeansAlgorithm`](@ref) is the subtype.
 
 # Related
 
@@ -85,7 +85,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all optimal number of clusters estimator types.
 
-All concrete and/or abstract types implementing algorithms to estimate the optimal number of clusters should be subtypes of `AbstractOptimalNumberClustersEstimator`.
+A subtype holds the configuration that selects the number of clusters. [`OptimalNumberClusters`](@ref) is the subtype.
 
 # Related
 
@@ -97,7 +97,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all optimal number of clusters algorithm types.
 
-All concrete and/or abstract types implementing specific algorithms for determining the optimal number of clusters should be subtypes of `AbstractOptimalNumberClustersAlgorithm`.
+A subtype is a score that [`optimal_number_clusters`](@ref) calculates for each candidate count, and the count with the largest score wins. [`SecondOrderDifference`](@ref) and [`SilhouetteScore`](@ref) are the subtypes.
 
 # Related
 
@@ -109,7 +109,7 @@ abstract type AbstractOptimalNumberClustersAlgorithm <: AbstractAlgorithm end
 
 Alias for an integer or optimal number of clusters algorithm.
 
-Matches either a plain integer (specifying the number of clusters directly) or an [`AbstractOptimalNumberClustersAlgorithm`](@ref) (which determines the optimal number automatically).
+Matches an integer, which states the number of clusters, or an [`AbstractOptimalNumberClustersAlgorithm`](@ref), which selects the number from the data.
 
 # Related
 
@@ -122,7 +122,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all clustering result types.
 
-All concrete and/or abstract types representing the result of a clustering estimation should be subtypes of `AbstractClusteringResult`.
+A subtype holds the output of a clustering estimator. [`Clusters`](@ref) is the subtype.
 
 # Related
 
@@ -135,7 +135,7 @@ abstract type AbstractClusteringResult <: AbstractPhylogenyResult end
 
 Alias for clustering result types from the Clustering.jl package.
 
-Matches either a `Clustering.ClusteringResult` or `Clustering.Hclust`. Used internally to accept output from the Clustering.jl library for both flat and hierarchical clustering results.
+Matches a `Clustering.ClusteringResult` or a `Clustering.Hclust`. The `res` field of [`Clusters`](@ref) accepts either, so one result type holds a flat partition or a dendrogram.
 
 # Related
 
@@ -146,13 +146,13 @@ const ClTypes = Union{<:Clustering.ClusteringResult, <:Clustering.Hclust}
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries a clustering of the asset universe together with the matrices it was computed from.
+Holds a clustering of the asset universe and the matrices that the clustering used.
 
-Holds the result of either family, because `res` takes both shapes [`clusterise`](@ref) produces: a `Clustering.Hclust` from a hierarchical algorithm and a `Clustering.ClusteringResult` from a non-hierarchical one. `k` is the number of clusters selected by an [`AbstractOptimalNumberClustersEstimator`](@ref), and [`assignments`](@ref) is what reads a cluster label per asset off the pair — cutting the tree at `k` on the hierarchical branch, reading the field on the other.
+`res` holds either of the two outputs of [`clusterise`](@ref). A hierarchical algorithm makes a `Clustering.Hclust`, and a non-hierarchical algorithm makes a `Clustering.ClusteringResult`. `k` is the number of clusters that an [`AbstractOptimalNumberClustersEstimator`](@ref) selected. [`assignments`](@ref) reads one cluster label per asset from `res` and `k`. On the hierarchical branch it cuts the tree at `k`, and on the other branch it reads the labels that `res` holds.
 
-# `D` is what the clustering saw, unless `P` is present
+# The matrix that the clustering used
 
-`S` and `D` are the similarity and distance matrices of the universe, and an ordinary [`ClustersEstimator`](@ref) clusters `D` itself and leaves `P` as `nothing`. A [`NetworkClustersEstimator`](@ref) instead accumulates a **pseudo-distance** matrix out of the network structure and clusters *that*, so it fills `P` and `res` is the clustering of `P`. Both matrices are kept because a consumer wants the network's clustering and the universe's own distances.
+`S` is the similarity matrix of the universe, and `D` is its distance matrix. A [`ClustersEstimator`](@ref) clusters `D` and sets `P` to `nothing`. A [`NetworkClustersEstimator`](@ref) makes a pseudo-distance matrix from the structure of the network and clusters that matrix. It stores the matrix in `P`, so `res` is the clustering of `P`. The result also keeps `D`, so a caller can read the distances of the universe next to the clustering of the network.
 
 # Fields
 
@@ -230,17 +230,17 @@ end
 
 Return the clustering result `cle` unchanged.
 
-Identity pass-through, so that every consumer takes an estimator or a precomputed result through one call. A [`ClustersEstimator`](@ref) reaching this function has already been run; a result reaching it is not run again.
+A consumer calls `clusterise` on a clustering estimator or on a precomputed result. For a result, this method runs no clustering, so the library never clusters a result again.
 
 # Algorithm
 
- 1. Return `cle` itself. No clustering is run, and `args` and `kwargs` are discarded.
+ 1. Return `cle` itself. The method runs no clustering, and it discards `args` and `kwargs`.
 
 # Arguments
 
   - `cle`: Clustering result.
-  - `args...`: Additional positional arguments, ignored.
-  - `kwargs...`: Additional keyword arguments, ignored.
+  - `args...`: Positional arguments. The method does not read them.
+  - `kwargs...`: Keyword arguments. The method does not read them.
 
 # Returns
 
@@ -258,9 +258,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Picks the number of clusters at which the within-cluster dispersion curve bends most sharply.
+Selects the number of clusters at which the within-cluster dispersion has its largest second-order difference.
 
-The two-difference gap statistic. It reads the second-order difference of the within-cluster dispersion across cluster counts, so it finds the elbow of that curve without the Monte Carlo simulation the original gap statistic needs.
+This score is the two-difference gap statistic. The second-order difference finds the elbow of the curve of the dispersion over the cluster counts. The gap statistic of [tibshirani2001](@cite) needs a Monte Carlo simulation for this, and the second-order difference does not.
 
 # Mathematical definition
 
@@ -277,32 +277,34 @@ Where:
   - $(math_dict[:c_star_clusters])
   - ``W_{c}``: Within-cluster dispersion of a cut into ``c`` clusters.
   - ``\\mathcal{C}_{j}``: Set of assets in the ``j``-th cluster of that cut.
-  - ``d_{uv}``: Entry of the distance matrix the clustering ran on.
-  - ``g``: Vector-to-scalar measure `alg`, applied to one cluster's pairwise distances. A cluster of one asset has no pairwise distance and contributes ``0``.
+  - ``d_{uv}``: Entry of the distance matrix that the clustering used.
+  - ``g``: Vector-to-scalar measure `alg`. It reduces the pairwise distances of one cluster to one number. A cluster of one asset has no pairwise distance and contributes ``0``.
   - $(math_dict[:N])
 
-The selected ``c`` is the **left end** of the triple, not its centre. That is Equation 12.15 of [cajas2025](@cite) as printed, and the code maximises it as written. The equation admits ``c = 1``, and step 3 below excludes it.
+The selected ``c`` is the left end of the triple, not its centre. Equation 12.15 of [cajas2025](@cite) prints it so, and the code maximises the equation as printed. The equation admits ``c = 1``, and step 3 of the algorithm below excludes it.
 
-# The measure decides what "dispersion" means
+# The measure defines the dispersion
 
-Equation 12.15 of [cajas2025](@cite) calls ``W_{c}`` the within-cluster dispersion and defines it no further. The book takes the equation from [yue2008](@cite). No copy of that work was found, so its definition of ``W_{c}`` is not known here.
+Equation 12.15 of [cajas2025](@cite) calls ``W_{c}`` the within-cluster dispersion and gives no other definition. The book takes the equation from [yue2008](@cite). No copy of that work is available, so its definition of ``W_{c}`` is not known.
 
-The gap statistic of [tibshirani2001](@cite), Equation 2, takes ``W_{k} = \\sum_{r} D_{r} / (2 n_{r})``, where ``D_{r}`` is the sum of the pairwise distances of cluster ``r`` over the ordered pairs. That is ``(n_{r} - 1) / 2`` times the mean of the distances, so a large cluster weighs more. `alg = MeanValue()` takes the plain mean of a cluster's pairwise distances. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances. Each of the three selects a different ``c`` in general.
+The gap statistic of [tibshirani2001](@cite), Equation 2, takes ``W_{k} = \\sum_{r} D_{r} / (2 n_{r})``. ``D_{r}`` is the sum of the pairwise distances of cluster ``r`` over the ordered pairs. That is ``(n_{r} - 1) / 2`` times the mean of the distances, so a large cluster has more weight. `alg = MeanValue()` takes the mean of the pairwise distances of a cluster. The default `alg = StandardisedValue()` divides that mean by the corrected standard deviation of the same distances.
+
+The three definitions can select three different counts. On the sample `randn(StableRNG(987654321), 400, 40)`, `MeanValue()` selects 6 and `StandardisedValue()` selects 4.
 
 !!! note
 
-    A cluster of exactly two assets carries **one** pairwise distance, and a single value has no corrected standard deviation. [`StandardisedValue`](@ref) divides by ``1`` in that case, so such a cluster contributes its mean pairwise distance to ``W_{c}``. The gap series stays finite, and the selected ``c`` is a real maximiser. The two measures still differ on every larger cluster.
+    A cluster of two assets has one pairwise distance, and one value has no corrected standard deviation. [`StandardisedValue`](@ref) divides by ``1`` in that case, so such a cluster contributes its mean pairwise distance to ``W_{c}``. The gap series stays finite, and the selected ``c`` is a real maximiser. The two measures still differ on every larger cluster.
 
 # Algorithm
 
-[`optimal_number_clusters`](@ref) runs these steps, and both branches run the same ones. The bodies live in `03_Hierarchical.jl` and in `04_NonHierarchicalClustering.jl`.
+[`optimal_number_clusters`](@ref) does these steps on both branches. Its methods are in `03_Hierarchical.jl` and in `04_NonHierarchicalClustering.jl`.
 
- 1. Take the ceiling `min(floor(Int, sqrt(N)), max_k)` from the enclosing [`OptimalNumberClusters`](@ref), add ``2`` to it, and cap the sum at ``N``, giving `c1`, the number of candidate counts to build. The two extra counts exist because the difference at ``c`` reads the dispersions of ``c + 1`` and ``c + 2`` as well.
- 2. Cluster the universe at every count from ``1`` to `c1`, giving `cluster_lvls`.
+ 1. Take the ceiling `min(floor(Int, sqrt(N)), max_k)` from the [`OptimalNumberClusters`](@ref) that holds the score. Add ``2`` to it and cap the sum at ``N``. The result is `c1`, the number of candidate counts. The difference at ``c`` also reads the dispersions at ``c + 1`` and ``c + 2``, so the method builds two more counts.
+ 2. Cluster the universe at every count from ``1`` to `c1`. The cuts are `cluster_lvls`.
  3. Set `W_list[1]` to `typemin`, so that the difference at ``c = 1`` cannot win.
- 4. Reduce every cut from ``2`` to `c1` to one dispersion with `alg`, filling the rest of `W_list`. On the hierarchical branch `alg` runs once per cluster over that cluster's pairwise distances and the results are summed; on the non-hierarchical branch it runs once over the k-means per-point costs.
- 5. Take the second-order difference of `W_list`, giving `gaps`, one entry per candidate count up to the ceiling. A universe so small that `c1` does not exceed ``2`` carries no such difference, and both branches return `c1` itself.
- 6. Select the count. The hierarchical branch hands `gaps` to [`valid_k_clusters`](@ref), which walks down from the largest entry until the dendrogram admits the count; the non-hierarchical branch has no dendrogram to reject a count, so it takes the `argmax` as it stands. Both branches read the length of the score array in place of the `argmax` when no entry of it is finite.
+ 4. Reduce every cut from ``2`` to `c1` to one dispersion with `alg`, and write it into `W_list`. On the hierarchical branch, `alg` runs once for each cluster over the pairwise distances of that cluster, and the method sums the results. On the non-hierarchical branch, `alg` runs once over the per-point costs of the k-means run.
+ 5. Take the second-order difference of `W_list`. The result is `gaps`, one entry for each candidate count up to the ceiling. If `c1` is ``2`` or less, there is no such difference. This happens only when ``N \\leq 2``, where the ceiling is ``1``, and both branches return the ceiling.
+ 6. Select the count. The hierarchical branch gives `gaps` to [`valid_k_clusters`](@ref). That function moves down from the largest entry until the dendrogram accepts the count. The non-hierarchical branch has no dendrogram to reject a count, so it takes the `argmax` of `gaps`. If no entry of the scores is finite, both branches take the length of the score array in place of the `argmax`.
 
 # Fields
 
@@ -369,9 +371,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Picks the number of clusters whose assets sit best inside their own cluster.
+Selects the number of clusters from the silhouettes of the assets.
 
-Each asset gets a silhouette, which compares how far it sits from its own cluster against how far it sits from the nearest other one. `alg` reduces the whole vector of them to one number per cluster count, and the count with the largest number wins.
+The silhouette of an asset compares its mean distance to its own cluster with its mean distance to the nearest other cluster. For each candidate count, `alg` reduces the vector of silhouettes to one number. The count with the largest number wins.
 
 # Mathematical definition
 
@@ -386,10 +388,10 @@ c^{\\star} &= \\underset{c}{\\arg\\max} \\; g\\left(\\boldsymbol{s}\\right)\\,, 
 
 Where:
 
-  - ``s_{i}``: Silhouette of asset ``i``, in ``\\left[-1,\\, 1\\right]``. It is ``1`` when the asset is clustered well and ``-1`` when it is clustered wrongly.
+  - ``s_{i}``: Silhouette of asset ``i``, in ``\\left[-1,\\, 1\\right]``. It is ``1`` when ``a_{i} = 0`` and ``-1`` when ``b_{i} = 0``.
   - ``a_{i}``: Mean distance from asset ``i`` to the other members of its own cluster ``\\mathcal{C}_{I}``.
   - ``b_{i}``: Smallest mean distance from asset ``i`` to the members of any other cluster.
-  - ``d_{ij}``: Entry of the distance matrix the clustering ran on.
+  - ``d_{ij}``: Entry of the distance matrix that the clustering used.
   - ``\\boldsymbol{s}``: Vector of silhouettes over all assets, one per asset.
   - ``g``: Vector-to-scalar measure `alg`.
   - $(math_dict[:c_star_clusters])
@@ -397,22 +399,24 @@ Where:
 
 # The default reduction is the source's standardised score
 
-`alg = StandardisedValue()` divides the mean of ``\\boldsymbol{s}`` by its corrected standard deviation, which is the *quality measure* of [lopezdeprado2019](@cite) term for term. [lopezdeprado2019](@cite) writes ``q = \\mathrm{E}[\\{s_{i}\\}] / \\sqrt{\\mathrm{V}[\\{s_{i}\\}]}`` and does not say which variance it takes. Equation 12.14 of [cajas2025](@cite) takes the corrected one. At a fixed ``N`` the two differ by a constant factor, so they select the same ``c``. The standardisation is what makes scores comparable across cluster counts, so it is the reduction the selection wants; the field is a knob only because a caller may want the plain mean instead. The plain mean is the rule of [rousseeuw1987](@cite), which selects the count of the largest mean silhouette. The two disagree in general, and the standardised form is the one this default computes.
+`alg = StandardisedValue()` divides the mean of ``\\boldsymbol{s}`` by its corrected standard deviation. This is the quality measure of [lopezdeprado2019](@cite), term for term. [lopezdeprado2019](@cite) writes ``q = \\mathrm{E}[\\{s_{i}\\}] / \\sqrt{\\mathrm{V}[\\{s_{i}\\}]}`` and does not say which variance it takes. Equation 12.14 of [cajas2025](@cite) takes the corrected variance. At a fixed ``N`` the two forms differ by a constant factor, so they select the same ``c``.
 
-Neither [rousseeuw1987](@cite) nor [lopezdeprado2019](@cite) bounds ``c`` by ``\\sqrt{N}``, and the second tries every count from ``2`` to ``N - 1``. The bound is the ceiling of [`OptimalNumberClusters`](@ref), which applies it to both rules.
+`alg = MeanValue()` gives the rule of [rousseeuw1987](@cite), which selects the count with the largest mean silhouette. The mean and the standardised score can select different counts. On the sample `randn(StableRNG(987654321), 400, 40)`, the mean selects 6 and the standardised score selects 4.
 
-Unlike [`SecondOrderDifference`](@ref), the reduction here runs over **one vector of length** ``N``, never over one cluster at a time, so no cluster size makes it undefined.
+Neither [rousseeuw1987](@cite) nor [lopezdeprado2019](@cite) bounds ``c`` by ``\\sqrt{N}``, and the second tries every count from ``2`` to ``N - 1``. The bound is the ceiling of [`OptimalNumberClusters`](@ref), which applies to both scores.
+
+The reduction runs over one vector of length ``N``, not over one cluster at a time as in [`SecondOrderDifference`](@ref). So a cluster of one or two assets needs no special case here.
 
 # Algorithm
 
-[`optimal_number_clusters`](@ref) runs these steps, and both branches run the same ones. The bodies live in `03_Hierarchical.jl` and in `04_NonHierarchicalClustering.jl`.
+[`optimal_number_clusters`](@ref) does these steps on both branches. Its methods are in `03_Hierarchical.jl` and in `04_NonHierarchicalClustering.jl`.
 
- 1. Take the ceiling `min(floor(Int, sqrt(N)), max_k)` from the enclosing [`OptimalNumberClusters`](@ref), giving `c1`, the largest candidate count. No count beyond the ceiling is built here, because the score at ``c`` reads that cut alone.
- 2. Cluster the universe at every count from ``1`` to `c1`, giving `cluster_lvls`.
+ 1. Take the ceiling `min(floor(Int, sqrt(N)), max_k)` from the [`OptimalNumberClusters`](@ref) that holds the score. The result is `c1`, the largest candidate count. The score at ``c`` reads only the cut at ``c``, so the method builds no count above the ceiling.
+ 2. Cluster the universe at every count from ``1`` to `c1`. The cuts are `cluster_lvls`.
  3. Set `W_list[1]` to `typemin`, so that a single cluster cannot win.
- 4. Compute the per-asset silhouettes of every cut from ``2`` to `c1` with `Clustering.silhouettes`, giving `sl`, one entry per asset.
- 5. Reduce each `sl` to one score with `alg`, filling the rest of `W_list`.
- 6. Select the count. The hierarchical branch hands `W_list` to [`valid_k_clusters`](@ref), which walks down from the largest entry until the dendrogram admits the count; the non-hierarchical branch has no dendrogram to reject a count, so it takes the `argmax` as it stands. Both branches read the length of the score array in place of the `argmax` when no entry of it is finite.
+ 4. Calculate the silhouettes of the assets for every cut from ``2`` to `c1` with `Clustering.silhouettes`. The result for one cut is `sl`, with one entry for each asset.
+ 5. Reduce each `sl` to one score with `alg`, and write it into `W_list`.
+ 6. Select the count. The hierarchical branch gives `W_list` to [`valid_k_clusters`](@ref). That function moves down from the largest entry until the dendrogram accepts the count. The non-hierarchical branch has no dendrogram to reject a count, so it takes the `argmax` of `W_list`. If no entry of the scores is finite, both branches take the length of the score array in place of the `argmax`.
 
 # Fields
 
@@ -476,17 +480,17 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Decides how many clusters to cut a dendrogram or a partition into.
+Selects the number of clusters of a dendrogram or a flat partition, under a ceiling.
 
-Pairs a selection rule with a ceiling on the answer. `alg` is either an [`AbstractOptimalNumberClustersAlgorithm`](@ref), which chooses the count from the data, or an `Integer`, which states it outright.
+`alg` is an [`AbstractOptimalNumberClustersAlgorithm`](@ref), which selects the count from the data, or an `Integer`, which states the count.
 
-# A stated `k` is a request, not a guarantee
+# The ceiling and a stated `k`
 
-`max_k` caps every branch, and the cap is itself capped: the ceiling in force is `min(floor(Int, sqrt(N)), max_k)`, so a `max_k` above ``\\sqrt{N}`` buys nothing. A stated `k` above that ceiling is lowered to it.
+The ceiling is `min(floor(Int, sqrt(N)), max_k)` on every branch. A `max_k` above ``\\sqrt{N}`` has no effect, and `max_k = nothing` sets the ceiling to `floor(Int, sqrt(N))`. The selection lowers a stated `k` above the ceiling to the ceiling.
 
-A stated `k` is also checked against the tree on the hierarchical branch. A cut into `k` clusters that no node of the dendrogram supports is not honoured; [`optimal_number_clusters`](@ref) searches upward and downward for the nearest `k` that is, and takes the nearer of the two. The data-driven branches apply the same test through [`valid_k_clusters`](@ref), which walks the scoring array from its largest entry down until one passes.
+On the hierarchical branch, [`validate_k_value`](@ref) also tests a stated `k` against the tree. If no node of the dendrogram supports a cut into `k` clusters, [`optimal_number_clusters`](@ref) searches up and down for the nearest valid count and takes the nearer one. On the same branch, the two scores apply the same test through [`valid_k_clusters`](@ref). That function moves down the score array from the largest entry until a count passes.
 
-The ceiling ``\\sqrt{N}`` is the bound of Equation 12.15 of [cajas2025](@cite), where it belongs to the two-difference gap statistic alone. The book takes that equation from a work of which no copy was found, see [`SecondOrderDifference`](@ref). The cap `max_k`, and the search of the dendrogram for a supported `k`, are this library's own.
+The ceiling ``\\sqrt{N}`` is the bound of Equation 12.15 of [cajas2025](@cite). There, it applies only to the two-difference gap statistic. The book takes that equation from a work of which no copy is available, see [`SecondOrderDifference`](@ref). The cap `max_k` and the search of the dendrogram for a valid `k` are additions of this library.
 
 # Fields
 
@@ -572,13 +576,21 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Builds a dendrogram by merging the two nearest clusters until one remains.
+Builds a dendrogram that merges the two nearest clusters at each step, until one cluster remains.
 
-`linkage` is the criterion that says how near two clusters are once they hold more than one asset. `:single` takes the smallest distance between their members and `:complete` the largest; `:average` takes the mean over all cross pairs; `:ward` merges the pair that raises the total within-cluster variance least. The symbol is passed straight to `Clustering.hclust`, so every criterion that package accepts is available.
+`linkage` is the criterion for the distance between two clusters that have more than one asset.
 
-Figure 2 of [mullner2011](@cite) states each criterion twice: as the update of the distance after a merge, and as a closed form over the members. The formulas of `:ward` hold for Euclidean distances between points. `Clustering.hclust` squares the distances for `:ward`, applies the update to the squares, and takes the square root of the merge heights, which is the form of that figure. Equation 12.12 of [cajas2025](@cite) prints the same update without the squares.
+  - `:single` takes the smallest distance between the members of the two clusters.
+  - `:complete` takes the largest distance between the members of the two clusters.
+  - `:average` takes the mean distance over all pairs with one member in each cluster.
+  - `:ward` merges the pair of clusters that increases the total within-cluster variance least.
+  - `:ward_presquared` is `:ward` for a matrix that holds squared distances.
 
-[mullner2011](@cite) is a survey. No copy was found of the works that first state the four criteria, nor of the work that first states the update common to all of them.
+[`clusterise`](@ref) gives the symbol to `Clustering.hclust` unchanged, so every criterion of that function is available.
+
+Figure 2 of [mullner2011](@cite) states each criterion in two forms. One form updates the distance after a merge, and the other is a closed form over the members. The formulas of `:ward` hold for Euclidean distances between points. `Clustering.hclust` squares the distances for `:ward`, applies the update to the squares, and takes the square root of the merge heights. This is the form of that figure. Equation 12.12 of [cajas2025](@cite) prints the same update without the squares.
+
+[mullner2011](@cite) is a survey. No copy is available of the works that first state the four criteria, or of the work that first states the update that they share.
 
 # Fields
 
@@ -613,7 +625,7 @@ HClustAlgorithm
 """
 @concrete struct HClustAlgorithm <: AbstractHierarchicalClusteringAlgorithm
     """
-    Linkage method for hierarchical clustering from [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html). The constructor accepts **any** `Symbol` and checks none of them, because the set of criteria belongs to `Clustering.hclust` and not to this library. A symbol that function does not accept raises its own `ArgumentError` at the point of use inside [`clusterise`](@ref), not at construction: `HClustAlgorithm(; linkage = :nonsense)` builds, and clustering with it raises `ArgumentError: Unsupported cluster linkage nonsense`.
+    Linkage criterion of `Clustering.hclust`, see [`Clustering.jl`](https://juliastats.org/Clustering.jl/stable/hclust.html). The constructor accepts any `Symbol` and checks none, because `Clustering.hclust` owns the set of criteria. `HClustAlgorithm(; linkage = :nonsense)` builds. [`clusterise`](@ref) then throws `ArgumentError: Unsupported cluster linkage nonsense` from `Clustering.hclust`.
     """
     linkage
     function HClustAlgorithm(linkage::Symbol)
@@ -626,13 +638,20 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Turns a return matrix into a clustering of the asset universe.
+Clusters the assets of a universe from a return matrix.
 
-Holds the four steps in the order they run: `ce` estimates the covariance, `de` turns it into a distance matrix, `alg` clusters that matrix, and `onc` decides how many clusters to keep. [`clusterise`](@ref) runs them and returns a [`Clusters`](@ref).
+Four of the fields are steps, in the order that they run.
 
-# The universe is clustered, not the observations
+  - `ce` estimates the correlation matrix `S`.
+  - `de` makes the distance matrix.
+  - `alg` clusters the distance matrix.
+  - `onc` selects the number of clusters.
 
-Every step reads an `assets x assets` matrix, so the number of observations leaves the picture at `ce`. That is why `alg` and `onc` carry no `@fprop` tag: an [`ObsWeights`](@ref) weights observations, and there is no observation left for it to weight once `de` has run. `ce` and `de` are tagged, and they are where a weight belongs.
+[`clusterise`](@ref) runs the steps and returns a [`Clusters`](@ref). On the non-hierarchical branch, `onc` runs `alg` once for each candidate count.
+
+# The fields that take observation weights
+
+`ce` and `de` read the observations of the return matrix. A [`VariationInfoDistance`](@ref) in `de` reads the return matrix itself, not the correlation matrix. So `ce` and `de` carry the `@fprop` tag, and the weights of an [`ObsWeights`](@ref) reach them. `alg` and `onc` read only the `assets × assets` distance matrix. They have no observation to weight, so they carry no `@fprop` tag.
 
 # Fields
 
@@ -652,7 +671,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `x_src in ALL_RETURNS_SOURCES`, see [`assert_returns_source`](@ref). An `ArgumentError` is thrown otherwise.
+  - `x_src in ALL_RETURNS_SOURCES`. [`assert_returns_source`](@ref) throws an `ArgumentError` otherwise.
 
 ## Propagated parameters
 
@@ -763,7 +782,7 @@ end
 
 Alias for a clustering estimator or result.
 
-Matches either an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`](@ref). Used for dispatch in phylogeny and network estimation workflows that accept either form.
+Matches an [`AbstractClustersEstimator`](@ref) or an [`AbstractClusteringResult`](@ref). The library dispatches on it where a function accepts a clustering estimator or a precomputed result.
 
 # Related
 

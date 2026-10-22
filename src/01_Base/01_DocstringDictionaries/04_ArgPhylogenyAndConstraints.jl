@@ -25,14 +25,14 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :clres => "`res`: Clustering result.",#
                  :S => "`S`: Similarity matrix.",#
                  :D => "`D`: Distance matrix.",#
-                 :ck => "`k`: Optimal number of clusters.",#
-                 :vsalg => "`alg`: The measure used to evaluate clustering quality.",#
-                 :max_k => "`max_k`: Maximum number of clusters to consider. If `nothing`, computed as the `floor(Int, sqrt(assets))`.",#
-                 :kalg => "`alg`: Algorithm for selecting the optimal number of clusters. If an integer, defines the number of clusters directly.",#
+                 :ck => "`k`: Selected number of clusters.",#
+                 :vsalg => "`alg`: Vector-to-scalar measure that the score applies at each candidate count.",#
+                 :max_k => "`max_k`: Largest number of clusters that the selection considers. The ceiling is `min(floor(Int, sqrt(N)), max_k)`, where `N` is the number of assets. `nothing` sets the ceiling to `floor(Int, sqrt(N))`.",#
+                 :kalg => "`alg`: Algorithm that selects the number of clusters, or an `Integer` that states it.",#
                  :clalg => "`alg`: Clustering algorithm.",#
-                 :onc => "`onc`: Optimal number of clusters estimator.",#
+                 :onc => "`onc`: Estimator of the optimal number of clusters.",#
                  :phX_Xv => "`X`: Phylogeny matrix or vector.",#
-                 :clP => "`P`: Pseudo-distance matrix the clustering was run on, `nothing` when the clustering ran on `D` itself. A [`NetworkClustersEstimator`](@ref) builds it by accumulating the network structure out of the distance or similarity matrix; see [`clusterise`](@ref).",#
+                 :clP => "`P`: Pseudo-distance matrix that the clustering used, or `nothing` when the clustering used `D`. A [`NetworkClustersEstimator`](@ref) makes it from the structure of the network, see [`clusterise`](@ref).",#
                  :pler => "`pl`: Network estimator, phylogeny result, clustering estimator, or clustering result.",#
                  :plsrc => "`pl`: Network estimator or clustering estimator. The field refuses a precomputed `PhylogenyResult` or `Clusters`. It states how to build the phylogeny for the universe of each call, and a precomputed structure holds one fixed universe. To use a precomputed structure, pass the constraint result instead.",#
                  ## Separation and separation decay

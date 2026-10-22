@@ -3125,8 +3125,8 @@ end
     using PortfolioOptimisers, Test, StableRNGs, StatsBase
     @testset "The two dispersion measures answer 6 and 4 on the named sample" begin
         # `SecondOrderDifference`'s docstring names this sample and these two numbers. The
-        # source takes the mean of a cluster's pairwise distances; the default standardises
-        # it, which is a different statistic and selects a different count.
+        # mean of a cluster's pairwise distances and the default, which standardises that
+        # mean, select different counts.
         X = randn(StableRNG(987654321), 400, 40)
         k(g) = clusterise(ClustersEstimator(;
                                             onc = OptimalNumberClusters(;
@@ -3137,6 +3137,31 @@ end
         @test k(StandardisedValue()) == 4
         # 6 is the ceiling itself, so the two differ inside the admissible range.
         @test floor(Int, sqrt(size(X, 2))) == 6
+        # `SilhouetteScore`'s docstring says that the mean and the standardised score can
+        # select different counts. They do on the same sample.
+        ks(g) = clusterise(ClustersEstimator(;
+                                             onc = OptimalNumberClusters(;
+                                                                         alg = SilhouetteScore(;
+                                                                                               alg = g))),
+                           X).k
+        @test ks(MeanValue()) == 6
+        @test ks(StandardisedValue()) == 4
+    end
+    @testset "A universe of two assets keeps the ceiling of one cluster" begin
+        # `floor(Int, sqrt(2)) == 1`. `SecondOrderDifference` builds `c1 = min(1 + 2, 2)`
+        # candidate counts, which leaves no second-order difference, and it returned `c1 = 2`
+        # above the ceiling. Both branches now return the ceiling, as `SilhouetteScore` and a
+        # stated `k` do.
+        X = randn(StableRNG(987654321), 200, 2)
+        for alg in (HClustAlgorithm(), KMeansAlgorithm(; rng = StableRNG(1), seed = 1)),
+            onc_alg in (SecondOrderDifference(), SilhouetteScore(), 2)
+
+            clr = clusterise(ClustersEstimator(; alg = alg,
+                                               onc = OptimalNumberClusters(; alg = onc_alg)),
+                             X)
+            @test clr.k == 1
+            @test all(isone, assignments(clr))
+        end
     end
     @testset "`linkage` is unchecked at construction and raises at use" begin
         # The set of criteria belongs to `Clustering.hclust`, so the constructor takes any
@@ -3419,13 +3444,14 @@ end
         @test kh isa Integer
         @test pk isa Clustering.ClusteringResult
 
-        # A universe too small to carry a second-order difference answers `c1` itself.
+        # A universe too small to carry a second-order difference answers the ceiling,
+        # `floor(Int, sqrt(2)) == 1`. It answered `c1 == 2` above the ceiling before #467.
         X2 = Xg[:, 1:2]
         _, D2 = cor_and_dist(Distance(), PortfolioOptimisersCovariance(), X2)
         r2 = hclust(D2; linkage = :ward, branchorder = :optimal)
         @test PortfolioOptimisers.optimal_number_clusters(OptimalNumberClusters(;
                                                                                 alg = SecondOrderDifference()),
-                                                          r2, D2) == 2
+                                                          r2, D2) == 1
 
         # `resolve_rng` copies and seeds, so a seeded estimator never advances its own
         # generator and two calls partition alike.
