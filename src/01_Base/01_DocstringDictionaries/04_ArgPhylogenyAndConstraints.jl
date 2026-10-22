@@ -69,7 +69,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :rhs => "`rhs`: Right-hand side value of the constraint.",#
                  :rhs_rho => "`rhs`: Right-hand side of the constraint. A view over a single asset pair carries one value. A view over a pair of groups carries one value per spanned pair, in the order of `ij`.",#
                  :eqn => "`eqn`: Formatted string representation of the constraint equation.",#
-                 :ij => "`ij`: Pair of asset indices for correlation-based constraints.",#
+                 :ij => "`ij`: One asset index pair for each term of a correlation or covariance view. A term over a pair of groups holds a pair of index vectors.",#
                  # Cluster node.
                  :id_node => "`id`: The identifier of the node.",#
                  :left_node => "`left`: The left child, or `nothing` for a leaf.",#
