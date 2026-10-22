@@ -3,13 +3,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the expected excess returns that a set of equilibrium weights implies, by reverse optimisation.
 
-It holds a covariance estimator, the equilibrium weights and the risk aversion parameter. The Black-Litterman members use the same expression to build their prior mean.
+It holds a covariance estimator, the equilibrium weights and the risk aversion parameter. [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) build their prior mean with the same expression when their `l` is set.
 
 The equilibrium risk premium vector ``\\mathbf{\\Pi} = \\delta \\mathbf{\\Sigma} \\mathbf{W}`` is step 6 of the Appendix of [black1991](@cite) and of [black1992](@cite), with the market weights ``\\mathbf{W}``. [sharpe1974](@cite) derives it earlier. It maximises ``E_p - \\lambda_S V_p`` under full investment, sets the gradient to zero, and finds the implied excess return ``E_i - \\pi = 2 \\lambda_S (\\mathbf{\\Sigma} \\boldsymbol{x})_i`` of every asset held, where ``\\pi`` is the riskless return. It also finds ``\\lambda_S = (E_p - \\pi) / (2 V_p)``. Equations 5.1 and 5.2 of [cajas2025](@cite) derive the same result by setting the gradient of the quadratic utility ``\\boldsymbol{x}^\\intercal \\boldsymbol{\\Pi} - \\frac{\\delta}{2} \\boldsymbol{x}^\\intercal \\mathbf{\\Sigma} \\boldsymbol{x}`` to zero, so ``\\delta = 2 \\lambda_S``.
 
-`l` is the risk aversion of the representative investor. It is the ``\\lambda`` of the equation below, which [black1991](@cite) and [black1992](@cite) write ``\\delta``. Both say that ``\\delta`` is a proportionality constant based on the formulas of [black1989universal](@cite). That work gives the universal hedging constant, on page 18, and no formula for ``\\delta``. This library takes `l` from the caller. It is a caller-supplied number and it is not estimated from the data. A larger `l` scales every equilibrium return up, and a `l` of zero gives a zero mean.
+`l` is the risk aversion of the representative investor. It is the ``\\lambda`` of the equation below, which [black1991](@cite) and [black1992](@cite) write ``\\delta``. Both say that ``\\delta`` is a proportionality constant based on the formulas of [black1989universal](@cite). That work gives the universal hedging constant, on page 18, and no formula for ``\\delta``. This library takes `l` from the caller, and does not estimate it from the data. The result is linear in `l`. Twice the `l` gives twice every return, so a negative return moves down as `l` grows. An `l` of zero gives a zero mean.
 
-`w` is the weight vector the market is assumed to hold, which is a market-capitalisation vector or a benchmark vector. It is caller-supplied for the same reason: the data hold returns, not holdings. If `w` is `nothing`, the equal-weight vector of the right length is used, and the length is read from the covariance matrix rather than from `X`.
+`w` is the weight vector that the model assumes the market holds, such as the market capitalisation weights or the weights of a benchmark. The caller supplies it too, because the data hold returns and no holdings. If `w` is `nothing`, [`equilibrium_mu`](@ref) uses equal weights. It reads their number from the columns of the covariance matrix, not from `X`.
 
 # Fields
 
@@ -116,11 +116,11 @@ end
 
 Compute equilibrium expected returns from a risk aversion parameter, a covariance block, and equilibrium weights.
 
-`equilibrium_mu` is the **single owner** of the ``\\lambda \\mathbf{\\Sigma} \\boldsymbol{w}`` expression and of its equal-weight fallback. [`EquilibriumExpectedReturns`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all reach it, so the fallback and the length check are stated once.
+This function is the one place in the library that computes ``\\lambda \\mathbf{\\Sigma} \\boldsymbol{w}`` and its equal-weight fallback. [`EquilibriumExpectedReturns`](@ref), [`FactorBlackLittermanPrior`](@ref) and [`AugmentedBlackLittermanPrior`](@ref) all call it, so the three share one fallback and one length check.
 
-The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it. This is why the Black-Litterman members apply [`apply_rf`](@ref) to the result of this function, and only on the branch where they call it: a mean taken from a wrapped prior estimator is a total return already and needs no conversion.
+The result is an excess return. Reverse optimisation implies a risk premium, so the result holds no risk-free rate. For this reason the two Black-Litterman priors add the rate to the result of this function with [`apply_rf`](@ref). They add it only when they call this function. A mean that they take from a wrapped prior estimator is a total return already.
 
-`sigma` is a covariance **block**, not necessarily a square covariance matrix. Its columns are the assets the weights are written over, so `size(sigma, 2)` is the length `w` must have. A square covariance gives the plain equilibrium returns. A rectangular block gives the equilibrium returns of the rows it spans, which is how the factor Black-Litterman members build a prior mean over factors from asset weights.
+`sigma` is a covariance block, which can be rectangular. Its columns are the assets of the weights, so `w` must have the length `size(sigma, 2)`. A square covariance matrix gives the equilibrium returns of the assets. A rectangular block gives one equilibrium return for each of its rows. [`FactorBlackLittermanPrior`](@ref) passes a `factors × assets` block, and gets a prior mean of the factors from asset weights. [`AugmentedBlackLittermanPrior`](@ref) puts the asset covariance matrix on top of that block, and gets the assets and the factors in one vector.
 
 # Mathematical definition
 
@@ -132,21 +132,21 @@ The result is an **excess** return. Reverse optimisation implies a risk premium,
 
 Where:
 
-  - ``\\lambda``: Risk aversion parameter.
-  - ``\\mathbf{\\Sigma}``: ``M \\times N`` covariance block.
-  - ``\\boldsymbol{w}``: ``N \\times 1`` equilibrium portfolio weights.
+  - ``\\lambda``: The risk aversion parameter.
+  - ``\\mathbf{\\Sigma}``: The ``M \\times N`` covariance block.
+  - ``\\boldsymbol{w}``: The ``N \\times 1`` equilibrium portfolio weights.
 
 # Algorithm
 
  1. When `w` is `nothing`, read the asset count `N` from `size(sigma, 2)`, and build the equal-weight vector `fill(inv(N), N)`.
  2. When `w` is a vector, check that `length(w)` equals `size(sigma, 2)`.
- 3. Apply the expression above to `l`, `sigma` and the weights of step 1 or step 2, giving `mu`.
+ 3. Apply the expression above to `l`, `sigma` and the weights of step 1 or step 2. The result is `mu`.
 
 # Arguments
 
-  - `l`: Risk aversion parameter.
-  - `sigma`: Covariance block whose columns are the assets.
-  - `w`: Equilibrium weights, or `nothing` for equal weights.
+  - `l`: The risk aversion parameter.
+  - `sigma`: The covariance block. Its columns are the assets.
+  - `w`: The equilibrium weights, or `nothing` for equal weights.
 
 # Validation
 
@@ -154,7 +154,7 @@ Where:
 
 # Returns
 
-  - `mu::VecNum`: Equilibrium expected returns vector of length `size(sigma, 1)`.
+  - `mu::VecNum`: The equilibrium expected returns, a vector of length `size(sigma, 1)`.
 
 # Related
 
@@ -176,9 +176,9 @@ end
 
 Compute equilibrium expected returns from a covariance estimator, weights, and risk aversion.
 
-This method computes equilibrium expected returns as `λ * Σ * w`, where `λ` is the risk aversion parameter `me.l`, `Σ` is the covariance matrix that `me.ce` estimates from `X`, and `w` are the equilibrium weights `me.w`. If `me.w` is `nothing`, equal weights are used. The expression and the fallback belong to [`equilibrium_mu`](@ref).
+The method returns `λ * Σ * w`. `λ` is the risk aversion parameter `me.l`, `Σ` is the covariance matrix that `me.ce` estimates from `X`, and `w` is the vector of equilibrium weights `me.w`. [`equilibrium_mu`](@ref) computes the expression, and uses equal weights if `me.w` is `nothing`.
 
-The result is an **excess** return. Reverse optimisation implies a risk premium, so no risk-free rate is in it and none is taken off it.
+The result is an excess return. Reverse optimisation implies a risk premium, so the result holds no risk-free rate, and the method subtracts none.
 
 # Mathematical definition
 
@@ -190,29 +190,29 @@ The result is an **excess** return. Reverse optimisation implies a risk premium,
 
 Where:
 
-  - ``\\lambda``: Risk aversion parameter (`me.l`).
-  - ``\\hat{\\mathbf{\\Sigma}}``: `N × N` covariance matrix estimated from the data.
-  - ``\\boldsymbol{w}``: `N × 1` equilibrium portfolio weights (equal weights if not provided).
+  - ``\\lambda``: The risk aversion parameter `me.l`.
+  - ``\\hat{\\mathbf{\\Sigma}}``: The `N × N` covariance matrix that `me.ce` estimates from the data.
+  - ``\\boldsymbol{w}``: The `N × 1` equilibrium portfolio weights `me.w`, or equal weights if `me.w` is `nothing`.
 
 # Algorithm
 
- 1. Estimate the covariance matrix of `X` with `me.ce`, giving `sigma`.
- 2. Pass `me.l`, `sigma` and `me.w` to [`equilibrium_mu`](@ref), which selects the equal-weight fallback when `me.w` is `nothing`, and which gives `mu`.
+ 1. Estimate the covariance matrix of `X` with `me.ce`, through [`library_covariance_estimator`](@ref). The result is `sigma`.
+ 2. Pass `me.l`, `sigma` and `me.w` to [`equilibrium_mu`](@ref). It selects the equal-weight fallback when `me.w` is `nothing`. Its result is `mu`.
 
 # Arguments
 
-  - `me`: Equilibrium expected returns estimator.
-  - `X`: Data matrix (observations × assets).
+  - `me`: The equilibrium expected returns estimator.
+  - `X`: The data matrix, `observations × assets`.
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the covariance estimator.
+  - `kwargs...`: More keyword arguments, which the method passes to the covariance estimator.
 
 # Validation
 
-  - $(val_dict[:dims]) The check is not made by this method: the covariance estimator `me.ce` is what raises the `DomainError`.
+  - $(val_dict[:dims]) This method does not check `dims`. The covariance estimator `me.ce` raises the `DomainError`.
 
 # Returns
 
-  - `mu::VecNum`: Equilibrium expected returns, a vector of length `N`. Unlike the other expected returns estimators, this method returns a plain vector for both values of `dims`, because [`equilibrium_mu`](@ref) reduces the covariance block against the weights. `dims` reaches the covariance estimator only, and the covariance matrix is `N × N` for both values, so `dims` does not change the shape of the result.
+  - `mu::VecNum`: The equilibrium expected returns, a vector of length `N`. The method returns a vector for both values of `dims`, where most expected returns estimators return a `(1, N)` or an `(N, 1)` matrix. [`equilibrium_mu`](@ref) multiplies the covariance matrix by the weight vector, and the product is a vector. `dims` reaches the covariance estimator alone, and the covariance matrix is `N × N` for both values of `dims`.
 
 # Related
 

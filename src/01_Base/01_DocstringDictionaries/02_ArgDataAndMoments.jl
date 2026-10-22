@@ -7,7 +7,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :pw => "`w`: Portfolio weights vector `assets × 1`.",#
                  :ow => "`w`: Observation weights vector `observations × 1`.",#
                  :oow => "`w`: Optional observation weights vector `observations × 1`, or a concrete subtype of [`DynamicAbstractWeights`](@ref). If `nothing`, the computation is unweighted.",#
-                 :eqw => "`w`: Optional equilibrium weights vector `assets × 1`. If `nothing`, equal weights are used.",#
+                 :eqw => "`w`: Optional equilibrium weights vector `assets × 1`. If `nothing`, [`equilibrium_mu`](@ref) uses equal weights.",#
                  :w_pin => "`w`: The observation weights under which the batch fit makes the choice that the method pins, or `nothing` when that fit is unweighted.",#
                  # Matrix processing.
                  :pdm => "`pdm`: Positive definite matrix estimator.",
@@ -39,7 +39,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :mutgt => "`tgt`: Shrinkage target.",#
                  :mu_intensity => "`intensity`: The rule that sets the interval of the shrinkage intensity. It is a member of [`AbstractShrunkExpectedReturnsIntensity`](@ref).",#
                  :me_shrink_alg => "`alg`: The shrinkage algorithm. It holds the shrinkage target.",#
-                 :me_cval => "`val`: Custom expected returns value.\n\n  - If a scalar, every asset is assigned this value.\n  - If a vector, each element is one asset's value.\n  - If a callable, it is called as `val(X; dims = dims, kwargs...)` and must return one value per asset.",#
+                 :me_cval => "`val`: Custom expected returns value.\n\n  - If a scalar, every asset gets this value.\n  - If a vector, each element is the value of one asset.\n  - If a callable, the estimator calls it as `val(X; dims = dims, kwargs...)`, and it must return one value per asset.",#
                  :metric => "`metric`: The metric that `Distances.pairwise` applies to the observations of each series.",#
                  :metric_args => "`args`: More positional arguments, which `Distances.pairwise` takes after the series.",#
                  :metric_kwargs => "`kwargs`: More keyword arguments for `Distances.pairwise`.",#

@@ -157,6 +157,14 @@
         # `nothing` weights are the equal-weight vector, not a zero vector.
         @test mean(EquilibriumExpectedReturns(; l = 3.0), X461) ≈
               mean(EquilibriumExpectedReturns(; w = fill(inv(3), 3), l = 3.0), X461)
+        # The result is linear in `l`, so a larger `l` moves a negative return down.
+        Sn461 = [4.0 -3.0 0.0; -3.0 9.0 0.0; 0.0 0.0 1.0]
+        wn461 = [0.1, 0.6, 0.3]
+        mu1461 = PortfolioOptimisers.equilibrium_mu(1.0, Sn461, wn461)
+        mu2461 = PortfolioOptimisers.equilibrium_mu(2.0, Sn461, wn461)
+        @test mu2461 == 2 * mu1461
+        @test mu1461[1] < 0
+        @test mu2461[1] < mu1461[1]
 
         # --- ExcessExpectedReturns ------------------------------------------
         exc461 = ExcessExpectedReturns(; me = SimpleExpectedReturns(), rf = 0.01)
@@ -170,6 +178,12 @@
         @test_throws DomainError mean(exc461, X461; dims = 3)
         @test_throws PortfolioOptimisers.IsNonFiniteError ExcessExpectedReturns(; rf = Inf)
         @test_throws PortfolioOptimisers.IsNonFiniteError ExcessExpectedReturns(; rf = NaN)
+        # `me` holds any expected returns estimator, and the result keeps its shape.
+        exe461 = ExcessExpectedReturns(; me = EquilibriumExpectedReturns(; w = w461),
+                                       rf = 0.01)
+        @test mean(exe461, X461) ==
+              mean(EquilibriumExpectedReturns(; w = w461), X461) .- 0.01
+        @test isa(mean(exe461, X461), Vector)
 
         # --- StandardDeviationExpectedReturns and VarianceExpectedReturns ----
         # One is the elementwise square of the other, on the same data and the same `ce`.
@@ -185,6 +199,14 @@
         @test !isapprox(mean(factory(sd461, fw), X461), mean(sd461, X461))
         @test_throws DomainError mean(sd461, X461; dims = 3)
         @test_throws DomainError mean(vr461, X461; dims = 3)
+        # The result is the diagonal of the matrix that `ce` returns. Denoising changes the
+        # correlation and keeps that diagonal, so it leaves the result unchanged.
+        cedn461 = PortfolioOptimisersCovariance(; mp = MatrixProcessing(; dn = Denoise()))
+        for ce in (PortfolioOptimisersCovariance(), cedn461)
+            @test vec(mean(StandardDeviationExpectedReturns(; ce = ce), X461)) ==
+                  sqrt.(diag(cov(ce, X461)))
+            @test vec(mean(VarianceExpectedReturns(; ce = ce), X461)) == diag(cov(ce, X461))
+        end
 
         # --- MedianExpectedReturns ------------------------------------------
         #=
@@ -230,6 +252,16 @@
         @test_throws DomainError mean(MedianExpectedReturns(), Xq461; dims = 3)
         @test_throws PortfolioOptimisers.IsEmptyError MedianExpectedReturns(;
                                                                             w = StatsBase.Weights(Float64[]))
+        # Both methods refuse a gapped sample.
+        Xg461 = copy(Xq461)
+        Xg461[2, 2] = NaN
+        @test_throws PortfolioOptimisers.IsNonFiniteError mean(MedianExpectedReturns(),
+                                                               Xg461)
+        @test_throws PortfolioOptimisers.IsNonFiniteError mean(mew461, Xg461)
+        # StatsBase has a weighted median of a vector and none of a matrix, so the weighted
+        # method takes one column at a time.
+        @test !hasmethod(median, Tuple{Matrix{Float64}, typeof(wq461)})
+        @test hasmethod(median, Tuple{Vector{Float64}, typeof(wq461)})
 
         # --- CustomValueExpectedReturns -------------------------------------
         # The assertion is the whole contract, so drive every rejection and assert the
@@ -278,6 +310,10 @@
         @test_throws DomainError mean(CustomValueExpectedReturns(), X461; dims = 3)
         @test_throws PortfolioOptimisers.IsEmptyError CustomValueExpectedReturns(;
                                                                                  val = Float64[])
+        # The keyword constructor refuses a type outside the alias. The field has no bound, so
+        # the positional constructor that `@concrete` adds accepts it unchecked (#264).
+        @test_throws TypeError CustomValueExpectedReturns(; val = "a")
+        @test CustomValueExpectedReturns("a").val == "a"
 
         #=
         `assert_nonempty` labelled its bullet `!isempty(sym)` and reported the value of

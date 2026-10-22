@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Computes the expected returns as the per-asset median of the asset returns.
 
-`w` carries optional observation weights. If `w` is `nothing`, the median is unweighted. The median resists an outlier that would move the sample mean.
+`w` holds optional observation weights. If `w` is `nothing`, the median is unweighted. An outlier moves the sample mean in proportion to its size, and it moves the median only through its rank.
 
 # Fields
 
@@ -74,9 +74,9 @@ end
 
 Compute expected returns as the median of each asset.
 
-This method returns the median of each asset across observations in `X`. If `me.w` is `nothing`,
-the median is computed directly with `Statistics.median(X; dims = dims)`. Otherwise, the method
-computes a weighted median for each asset using the observation weights `w`.
+This method returns the median of each asset over the observations in `X`. If `me.w` is
+`nothing`, the method calls `Statistics.median(X; dims = dims)`. Otherwise, the method takes the
+weighted median of each asset under the observation weights `me.w`.
 
 # Mathematical definition
 
@@ -90,11 +90,11 @@ Unweighted:
 
 Where:
 
-  - ``\\hat{\\mu}_j``: Median expected return of asset ``j``.
+  - ``\\hat{\\mu}_j``: The median expected return of asset ``j``.
   - $(math_dict[:r_tj])
   - $(math_dict[:T])
 
-Weighted. The weighted median is the `StatsBase` weighted quantile at probability ``1/2``, which **interpolates between two order statistics**. Order the returns of asset ``j`` so that ``r_{(1)j} \\leq \\ldots \\leq r_{(T)j}``, and let ``w_{(t)}`` be the weight that travels with each one:
+Weighted. The weighted median is the `StatsBase` weighted quantile at probability ``1/2``, which interpolates between two order statistics. Sort the returns of asset ``j`` so that ``r_{(1)j} \\leq \\ldots \\leq r_{(T)j}``, and let ``w_{(t)}`` be the weight of the observation that gives ``r_{(t)j}``.
 
 ```math
 \\begin{align}
@@ -108,30 +108,31 @@ k &= \\max \\left\\lbrace m : S_m \\leq h \\right\\rbrace\\,, \\\\
 Where:
 
   - $(math_dict[:w_t_obs])
-  - ``w_{(t)}``: Weight of the ``t``-th smallest return, so the weights are permuted with the returns.
-  - ``r_{(t)j}``: ``t``-th smallest return of asset ``j``.
-  - ``S_m``: Cumulative weight of the ``m`` smallest returns.
-  - ``h``: Cumulative weight that the probability ``1/2`` corresponds to.
+  - ``w_{(t)}``: The weight of the ``t``-th smallest return. The sort moves each weight with its return.
+  - ``r_{(t)j}``: The ``t``-th smallest return of asset ``j``.
+  - ``S_m``: The cumulative weight of the ``m`` smallest returns.
+  - ``h``: The cumulative weight at the probability ``1/2``.
 
-Two consequences follow, and both separate this from an order statistic.
+The weighted median is not an order statistic, for two reasons.
 
-  - The result is **not in general one of the observed returns**, because the last line interpolates between ``r_{(k)j}`` and ``r_{(k+1)j}``. Under equal weights it reduces to the ordinary median.
-  - ``w_{(1)}`` in the second line is the weight of the **smallest** return, not the weight of the first observation. The weights are sorted with the returns before ``h`` is formed, so a sample whose smallest return arrives last gives a different ``h`` from the one that reading `w[1]` would give, and a different result.
+  - The result is in general not one of the observed returns, because the last line interpolates between ``r_{(k)j}`` and ``r_{(k+1)j}``. Under equal weights it reduces to the ordinary median.
+  - ``w_{(1)}`` in the second line is the weight of the smallest return, not the weight of the first observation. The sort moves the weights with the returns before the second line gives ``h``. A sample whose smallest return is the last observation therefore gives a different ``h`` from the one that `w[1]` gives, and a different result.
 
 # Arguments
 
-  - `me`: Median expected returns estimator.
-  - `X`: Data matrix of asset returns (observations × assets).
+  - `me`: The median expected returns estimator.
+  - `X`: The data matrix of asset returns, `observations × assets`.
   - $(arg_dict[:dims])
   - $(arg_dict[:ignkwargs])
 
 # Validation
 
   - $(val_dict[:dims])
+  - `all(isfinite, X)`. Both methods refuse a gapped sample with [`assert_finite_sample`](@ref), which raises an [`IsNonFiniteError`](@ref).
 
 # Returns
 
-  - `mu::Matrix{<:Number}`: Median vector, shaped as `(1, N)` if `dims == 1` or `(N, 1)` if `dims == 2`.
+  - `mu::Matrix{<:Number}`: The medians, a `(1, N)` matrix if `dims == 1` or an `(N, 1)` matrix if `dims == 2`.
 
 # Related
 
@@ -147,21 +148,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Weighted-median overload of [`mean(me::MedianExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). Computes per-asset weighted median using the [`ObsWeights`](@ref) stored in `me.w`.
+The weighted-median method of [`mean(me::MedianExpectedReturns, X::MatNum; dims::Int = 1, kwargs...)`](@ref). It takes the weighted median of each asset under the [`ObsWeights`](@ref) in `me.w`.
 
-The weighted branch has no matrix-wide method to call, so it reduces one column at a time. The mathematics of one column is the weighted-quantile expression of the method above.
+`StatsBase` has a weighted median of a vector and none of a matrix, so the method takes one column at a time. The weighted-quantile expression of the method above gives the result of one column.
 
 # Algorithm
 
  1. Orient `X` with [`dims_oriented`](@ref), so that the observations run down the columns. This step also checks `dims`.
- 2. Resolve `me.w` against the oriented `X` with [`get_observation_weights`](@ref), giving `w`.
- 3. Allocate the result vector `Y`, of length `size(X, 2)`.
- 4. For each column `i` of `X`, take the weighted median of that column under `w`, giving `Y[i]`.
- 5. Insert the reduced dimension back into `Y` with `insertdims`, giving a `(1, N)` matrix when `dims == 1` and an `(N, 1)` matrix when `dims == 2`.
+ 2. Refuse a gapped sample with [`assert_finite_sample`](@ref).
+ 3. Resolve `me.w` against the oriented `X` with [`get_observation_weights`](@ref). The result is `w`.
+ 4. Allocate the result vector `Y`, of length `size(X, 2)`.
+ 5. For each column `i` of `X`, put the weighted median of that column under `w` in `Y[i]`.
+ 6. Insert the reduced dimension back into `Y` with `insertdims`. The result is a `(1, N)` matrix when `dims == 1` and an `(N, 1)` matrix when `dims == 2`.
 
 # Validation
 
-  - $(val_dict[:dims]) The check is not made by this method: [`dims_oriented`](@ref) is what raises the `DomainError`.
+  - $(val_dict[:dims]) This method does not check `dims` itself. [`dims_oriented`](@ref) raises the `DomainError`.
+  - `all(isfinite, X)`, which [`assert_finite_sample`](@ref) checks.
 """
 function Statistics.mean(me::MedianExpectedReturns{<:ObsWeights}, X::MatNum; dims::Int = 1,
                          kwargs...)
