@@ -478,6 +478,27 @@ end
     @test_throws DimensionMismatch agf(nothing, [S3], nothing, [thr, thr])
 end
 
+@testset "A threshold above one excludes one asset (#518)" begin
+    # `Threshold` states this: a vector threshold above the upper bound of one asset sets
+    # that asset to zero, and the other assets still meet the budget. A scalar threshold
+    # above one excludes every asset, so the model has no solution.
+    res0 = optimise(MeanRisk(; opt = JuMPOptimiser(; pe = pr, slv = mip_slv)))
+    j = argmax(res0.w)
+    @test res0.w[j] > 0.3
+    tv = zeros(length(res0.w))
+    tv[j] = 1.5
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                                                lt = Threshold(tv))))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test abs(res.w[j]) <= 1e-8
+    @test isapprox(sum(res.w), 1; rtol = 1e-6)
+    res = optimise(MeanRisk(;
+                            opt = JuMPOptimiser(; pe = pr, slv = mip_slv,
+                                                lt = Threshold(1.5))))
+    @test isa(res.retcode, OptimisationFailure)
+end
+
 @testset "Phylogeny" begin
     plc = IntegerPhylogenyEstimator(; pl = NetworkEstimator(), B = 1)
     opt = JuMPOptimiser(; pe = pr, slv = mip_slv, sbgt = 1, bgt = 1, ple = plc,

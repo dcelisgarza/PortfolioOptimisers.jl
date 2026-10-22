@@ -1,13 +1,13 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Carries the vector of non-negative risk budgets that a risk-budgeting optimiser targets.
+Holds the non-negative risk budgets that a risk-budgeting optimiser targets.
 
-The budget names how much of the total risk each entry of an axis is asked to carry. [`AssetRiskBudgeting`](@ref) writes it over the assets and [`FactorRiskBudgeting`](@ref) over the factors. A budget built by hand keeps the sum it was written with, and still reaches the same weights as its normalised twin, because the barrier row that reads it is homogeneous in the budget.
+The budget sets the target share of the total risk for each entry of an axis. [`AssetRiskBudgeting`](@ref) reads it over the assets, and [`FactorRiskBudgeting`](@ref) reads it over the factors. A budget built by hand keeps its own sum. It gives the same weights as the normalised budget, because the barrier row is homogeneous in the budget.
 
 # Mathematical definition
 
-A risk-budgeting model minimises the risk of an unnormalised weight vector under a logarithmic barrier, and recovers the portfolio by dividing out the budget variable:
+A risk-budgeting model minimises the risk of an unnormalised weight vector under a logarithmic barrier. It divides that vector by the budget variable to get the portfolio weights.
 
 ```math
 \\begin{align}
@@ -19,7 +19,7 @@ A risk-budgeting model minimises the risk of an unnormalised weight vector under
 \\end{align}
 ```
 
-The barrier is what states the budget. At the optimum the Karush-Kuhn-Tucker conditions give the risk-contribution identity:
+The barrier row states the budget. At the optimum, the Karush-Kuhn-Tucker conditions give the risk-contribution identity:
 
 ```math
 \\begin{align}
@@ -36,9 +36,9 @@ Where:
   - ``\\phi``: Risk measure of the optimiser.
   - ``\\lambda``: Multiplier of the barrier constraint.
 
-The original states the barrier as ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq c`` with an arbitrary constant ``c``, and rescales ``\\boldsymbol{y}`` to sum to one after the solve. This library writes ``c = 0``.
+The original source writes the barrier as ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq c`` with an arbitrary constant ``c``. It scales ``\\boldsymbol{y}`` to sum to one after the solve. This library writes ``c = 0``.
 
-Only the **relative** entries of ``\\boldsymbol{b}`` reach the solution. With ``c = 0`` the barrier is positively homogeneous of degree one in ``\\boldsymbol{b}``, so ``s\\, \\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` and ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` cut the same set for every ``s > 0``, and the multiplier ``\\lambda`` of the risk-contribution identity absorbs the scale.
+Only the relative entries of ``\\boldsymbol{b}`` change the solution. With ``c = 0``, the barrier row is positively homogeneous of degree one in ``\\boldsymbol{b}``. Thus ``s\\, \\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` and ``\\boldsymbol{b}^\\intercal \\ln(\\boldsymbol{y}) \\geq 0`` define the same set for every ``s > 0``. The multiplier ``\\lambda`` of the risk-contribution identity takes the scale.
 
 # Fields
 
@@ -53,16 +53,16 @@ $(DocStringExtensions.FIELDS)
         val::Num_VecNum
     ) -> RiskBudget
 
-Keywords correspond to the struct's fields. The keyword form forwards to the positional one, so both run the same checks.
+Keywords correspond to the struct's fields. The keyword form calls the positional form, so both forms run the same checks.
 
 ## Validation
 
   - `!isempty(val)`, `IsEmptyError` otherwise.
-  - `all(x -> zero(x) <= x, val)`, `DomainError` otherwise. A zero entry is admitted; only a negative one raises.
+  - `all(x -> zero(x) <= x, val)`, `DomainError` otherwise. The check accepts a zero entry and refuses a negative entry.
 
-The inner constructor is typed on `Num_VecNum` rather than on `VecNum`, and that width is load-bearing. `@concrete` emits a generic `RiskBudget(val::__T_val) where __T_val`, which every argument matches. A `VecNum`-typed inner method does not apply to a scalar at all, so a scalar would reach the generic method and pass neither check. `Num_VecNum` applies, and it is more specific than the unbounded generic, so both routes run both checks.
+The inner constructor takes `Num_VecNum` and not `VecNum`, because `@concrete` makes a generic method `RiskBudget(val::__T_val) where __T_val`. Every argument matches that generic method. An inner method on `VecNum` does not apply to a scalar, so a scalar goes to the generic method and skips both checks. `Num_VecNum` applies to a scalar, and it is more specific than the generic method, so both forms run both checks.
 
-A scalar `val` is a real input, not a mistake to refuse: a scalar [`RiskBudgetEstimator`](@ref) resolves to one, because [`risk_budget_constraints`](@ref) normalises the budget to sum to one and a scalar divided by itself is `1.0`. Such a budget states one allocation over a one-entry axis, and an optimiser accepts it only for a one-asset universe, because the risk-budgeting builder checks the budget's length against the weight count.
+A scalar `val` is a valid input. A scalar [`RiskBudgetEstimator`](@ref) resolves to the scalar `1.0`, because [`risk_budget_constraints`](@ref) divides the scalar by itself. Such a budget states one allocation over a one-entry axis. An optimiser accepts it only for a one-asset universe, because the risk-budgeting builder compares the length of the budget with the number of weights.
 
 ## View parameters
 
@@ -81,7 +81,7 @@ RiskBudget
 # Related
 
   - [`RiskBudgetEstimator`](@ref)
-  - [`risk_budget_constraints`](@ref): normalises the budget to sum to one on its estimator branch only. The identity branch returns this object untouched, so a hand-built budget keeps its own sum.
+  - [`risk_budget_constraints`](@ref): only its estimator method normalises the budget to sum to one. Its method for a `RiskBudget` returns the object unchanged, so a budget built by hand keeps its own sum.
   - [`AbstractConstraintResult`](@ref)
   - [`AssetRiskBudgeting`](@ref)
   - [`FactorRiskBudgeting`](@ref)
@@ -123,11 +123,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Resolves a risk budget written in asset or group names against a universe.
 
-[`risk_budget_constraints`](@ref) turns it into a [`RiskBudget`](@ref): every name in `val` is mapped to its indices in the selected universe, an unnamed asset takes `dval`, and the result is normalised to sum to one. A group name assigns its value to every asset in the group.
+[`risk_budget_constraints`](@ref) resolves it to a [`RiskBudget`](@ref). The function finds the indices of each name of `val` in the selected universe, and gives `dval` to each unnamed entry. Then it normalises the budget to sum to one. A group name gives its value to every asset in the group.
 
-This estimator carries **no `key` field**. [`risk_budget_constraints`](@ref) takes the key as a positional argument instead, and resolves a `nothing` key to `sets.xkey` inside the verb. [`ThresholdEstimator`](@ref) is the same shape with the key held as a field. A `dval` of `nothing` becomes `1/length` of the axis the key selects, so an unnamed entry starts at the uniform share of that axis rather than at zero — on a universe of four assets and two factors, a factor budget naming only `F1` fills `F2` with `0.5`.
+This estimator has no `key` field. [`risk_budget_constraints`](@ref) takes the key as a positional argument, and uses `sets.xkey` when the key is `nothing`. [`ThresholdEstimator`](@ref) has the same shape, but it holds the key in a field.
 
-A **scalar** `val` is accepted, and resolves to a scalar rather than to a uniform vector. The normalisation divides the scalar by itself, so every scalar resolves to the same `RiskBudget(1.0)` and the number written here reaches nothing. Only a one-entry axis can consume such a budget: [`RiskBudgeting`](@ref) reads the budget against an `N`-vector of weights. Write the uniform budget as `nothing`, which [`risk_budget_constraints`](@ref) turns into `1/N` over `N` entries, or as [`UniformValues`](@ref), which resolves to the same vector through this estimator.
+A `dval` of `nothing` becomes the reciprocal of the length of the axis that the key selects. An unnamed entry starts at the uniform share of that axis, not at zero. On a universe of four assets and two factors, a factor budget that names only `F1` gives `F2` the value `0.5`.
+
+A scalar `val` resolves to a scalar, not to a uniform vector. The normalisation divides the scalar by itself, so every scalar resolves to `RiskBudget(1.0)`, and the value of the scalar has no effect. Only a one-entry axis can use such a budget, because [`RiskBudgeting`](@ref) compares the budget with a vector of `N` weights. Write the uniform budget as `nothing`, which [`risk_budget_constraints`](@ref) turns into `1/N` over `N` entries. [`UniformValues`](@ref) gives the same range through this estimator.
 
 # Fields
 
@@ -144,7 +146,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - `val` is validated with [`assert_nonempty_nonneg_finite_val`](@ref).
+  - [`assert_nonempty_nonneg_finite_val`](@ref) checks `val`, and it checks `dval` when `dval` is not `nothing`.
 
 # Examples
 
@@ -160,7 +162,7 @@ RiskBudgetEstimator
   dval ┴ nothing
 ```
 
-Two different scalars resolve to the same budget, and the uniform budget over the universe is written as `nothing`:
+Two different scalars resolve to the same budget. The uniform budget over the universe is `nothing`:
 
 ```jldoctest
 julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"]));
@@ -183,7 +185,7 @@ RiskBudget
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
   - [`UniverseSets`](@ref)
-  - [`ThresholdEstimator`](@ref): the same shape with the universe key held as a field.
+  - [`ThresholdEstimator`](@ref): has the same shape, and holds the universe key in a field.
 
 # References
 
@@ -215,47 +217,49 @@ end
 
 Alias for a risk budget estimator or result.
 
-Matches either a [`RiskBudgetEstimator`](@ref) (specifying how to generate risk budget constraints) or a [`RiskBudget`](@ref) result (a pre-computed risk budget allocation). Used internally to accept either form in constraint generation dispatch.
+Matches a [`RiskBudgetEstimator`](@ref), which states how to make a risk budget, or a [`RiskBudget`](@ref), which holds a resolved budget. The `rkb` field of [`AssetRiskBudgeting`](@ref) and [`FactorRiskBudgeting`](@ref) takes this type, so a caller can give either form.
 
-There is no vector counterpart, and [`risk_budget_constraints`](@ref) has no vector method. A risk budget is one allocation over the whole universe, so an optimiser holds exactly one. This is the same reason [`WbE_Wb`](@ref) and [`FeesE_Fees`](@ref) are singular, and the reason [`TnE_Tn`](@ref), [`LcE_Lc`](@ref) and [`PlCE_PlC`](@ref) are not: several turnover, linear or phylogeny constraints can hold at once, and each of those does carry a vector alias and a broadcast method.
+This alias has no vector counterpart, and [`risk_budget_constraints`](@ref) has no vector method. A risk budget is one allocation over the whole universe, so an optimiser holds one budget. [`WbE_Wb`](@ref) and [`FeesE_Fees`](@ref) have no vector counterpart for the same reason. [`TnE_Tn`](@ref), [`LcE_Lc`](@ref) and [`PlCE_PlC`](@ref) have one, because an optimiser can hold several turnover, linear or phylogeny constraints. Each of those three families has a vector alias and a broadcast method.
 
-The gap is a decision, not an omission. The routing targets that accumulate are `(:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx)`, and a risk budget's target `:rkb` is not among them, while four of the threshold's six targets — `:slt`, `:sst`, `:sglt` and `:sgst` — are, each holding a positional list with one entry per scenario or group block. That is why [`threshold_constraints`](@ref) carries a [`VecOptBtE_Bt`](@ref) method and this family carries none. Passing a vector here raises `MethodError`; no broader method takes it silently.
+The gap is deliberate. The routing targets that accumulate are `(:lcse, :cte, :ple, :slt, :sst, :sglt, :sgst, :smtx, :sgmtx)`. The target of a risk budget, `:rkb`, is not in this set. Four of the six targets of a threshold are in it: `:slt`, `:sst`, `:sglt` and `:sgst`. Each of the four holds a positional list, with one entry for each scenario or group block. Thus [`threshold_constraints`](@ref) has a [`VecOptBtE_Bt`](@ref) method, and this family has none.
+
+A vector given to [`risk_budget_constraints`](@ref) raises `MethodError`, because no broader method accepts it.
 
 # Related
 
   - [`RiskBudgetEstimator`](@ref)
   - [`RiskBudget`](@ref)
   - [`risk_budget_constraints`](@ref)
-  - [`BtE_Bt_VecOptBtE_Bt`](@ref): the threshold family's alias, which does carry a vector arm.
+  - [`BtE_Bt_VecOptBtE_Bt`](@ref): the alias of the threshold family, which includes a vector type.
 """
 const RkbE_Rkb = Union{<:RiskBudgetEstimator, <:RiskBudget}
 """
     risk_budget_constraints(::Nothing, args...; N::Integer, kwargs...)
 
-No-op fallback for risk budget constraint generation.
+Makes the uniform risk budget when the caller gives no risk budget.
 
-This method returns a uniform risk budget allocation when no explicit risk budget is specified (`nothing`). It creates a [`RiskBudget`](@ref) with equal budgets summing to one over `N` entries. This is useful as a default in workflows where a risk budget is optional or omitted.
+This method returns a [`RiskBudget`](@ref) with `N` equal entries of `1/N`.
 
-The vector is a constant `range`, not an `Array`, and its element type is always `Float64` because it comes from `inv(N)`. This method takes no `datatype` keyword; one passed here is swallowed by `kwargs...` and changes nothing.
+The vector is a constant `range`, not an `Array`. `inv(N)` sets its element type, which is `Float64` for an `Int` `N` and `BigFloat` for a `BigInt` `N`. This method takes no `datatype` keyword, and it ignores a `datatype` in `kwargs...`.
 
-This is the one branch whose budget sums to **exactly** one. `sum` of a range reads the arithmetic series rather than the entries, so it lands on exactly `1.0` for any `N`, where summing the collected entries would accumulate rounding error instead. The estimator branch divides by a computed sum instead, and lands within round-off of one rather than on it.
+`sum` of a range uses the formula of the arithmetic series, and does not add the entries. For each `N` from 1 to 20000, the sum of the budget is within `1.1e-16` of one, and the sum of the collected entries is within `2.0e-15` of one. The sum of the budget is exactly `1.0` for `N = 3`, `7` and `10`, but it is `0.9999999999999999` for `N = 49`. The estimator method divides by a computed sum, and its sum is also within round-off of one.
 
 # Algorithm
 
  1. Compute `iN`, the reciprocal of `N`.
- 2. Build the constant range of length `N` whose start and stop are both `iN`.
+ 2. Make the constant range of length `N` whose start and stop are both `iN`.
  3. Wrap it in a [`RiskBudget`](@ref), which checks that it is non-empty and non-negative.
 
 # Arguments
 
-  - `::Nothing`: Indicates that no explicit risk budget is specified.
-  - `args...`: Additional positional arguments (ignored).
-  - `N::Integer`: Number of entries of the budgeted axis (required).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `::Nothing`: Shows that the caller gives no risk budget.
+  - `args...`: More positional arguments, which the method ignores.
+  - `N::Integer`: Number of entries of the budgeted axis. This keyword has no default.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 
-  - `rb::RiskBudget`: A result object containing a uniform risk budget vector of length `N`, with each entry equal to `1/N`.
+  - `rb::RiskBudget`: A [`RiskBudget`](@ref) whose `val` is a range of `N` entries, each equal to `1/N`.
 
 # Examples
 
@@ -277,11 +281,11 @@ end
 """
     risk_budget_constraints(rb::RiskBudget, args...; kwargs...)
 
-No-op fallback for risk budget constraint propagation.
+Returns a resolved risk budget unchanged.
 
-This method returns the input [`RiskBudget`](@ref) object unchanged. It is used to pass through an already constructed risk budget allocation result, enabling composability and uniform interface handling in risk budgeting workflows.
+This method lets a caller give a [`RiskBudget`](@ref) wherever [`risk_budget_constraints`](@ref) also accepts a [`RiskBudgetEstimator`](@ref).
 
-It does **not** normalise, unlike the estimator branch, so a hand-built `RiskBudget(; val = [1, 2, 3])` reaches an optimiser summing to `6`. That is harmless: the barrier row the optimiser writes is homogeneous in the budget, and the same three-asset variance model returns the same weights for `[1, 2, 3]` as for `[1/6, 2/6, 3/6]` to within `3.5e-5`, which is solver tolerance.
+This method does not normalise the budget, unlike the estimator method. A budget built by hand, such as `RiskBudget(; val = [1, 2, 3])`, reaches the optimiser with a sum of `6`. The solution does not change, because the barrier row is homogeneous in the budget. On a three-asset variance model, the weights for `[1, 2, 3]` and for `[1/6, 2/6, 3/6]` differ by at most `3.5e-5`, which is the solver tolerance.
 
 # Algorithm
 
@@ -289,13 +293,13 @@ It does **not** normalise, unlike the estimator branch, so a hand-built `RiskBud
 
 # Arguments
 
-  - `rb`: An existing [`RiskBudget`](@ref) object.
-  - `args...`: Additional positional arguments (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `rb`: A [`RiskBudget`](@ref).
+  - `args...`: More positional arguments, which the method ignores.
+  - `kwargs...`: More keyword arguments, which the method ignores.
 
 # Returns
 
-  - `rb::RiskBudget`: The input `RiskBudget` object, unchanged.
+  - `rb::RiskBudget`: The input `RiskBudget`, unchanged.
 
 # Examples
 
@@ -323,37 +327,37 @@ end
                             key::Option{<:AbstractString} = nothing; strict::Bool = false,
                             kwargs...)
 
-Generate a risk budget allocation from asset/group mappings and asset sets.
+Resolves a map from asset or group names to risk budget values against a universe.
 
-This method constructs a [`RiskBudget`](@ref) from a mapping of asset or group names to risk budget values, using the provided [`UniverseSets`](@ref). The mapping can be a dictionary, a single pair, or a vector of pairs. Names are resolved against the universe `key` selects, and the resulting risk budget vector is normalised to sum to one.
+The map can be a dictionary, a pair or a vector of pairs. `rb` can also be a scalar, a vector or an algorithmic rule such as [`UniformValues`](@ref). The method resolves each name against the universe that `key` selects in `sets`, and normalises the result to sum to one.
 
-A **scalar** `rb` resolves to a scalar, not to a uniform vector, so the normalisation returns `1.0` whatever the scalar was. The result is a `RiskBudget` holding one number, and an optimiser accepts it only for a one-asset universe. Write the uniform budget as `nothing`, which the no-op method turns into `1/N` over `N` entries.
+A scalar `rb` resolves to a scalar, not to a uniform vector, so the normalisation returns `1.0` for every value of the scalar. An optimiser accepts this budget only for a one-asset universe. Write the uniform budget as `nothing`, which the method for `Nothing` turns into `1/N` over `N` entries.
 
-The normalisation divides by a computed sum, so the result lands within round-off of one rather than on it. Only the `nothing` branch sums to exactly one.
+The normalisation divides by a computed sum, so the sum of the result is within round-off of one, and not always exactly one.
 
 # Algorithm
 
- 1. Take `dval` as the fill value. When it is `nothing`, use `1/length` of the universe that `key` selects, or of `sets.xkey`'s universe when `key` is `nothing` too.
- 2. Resolve `rb` against `sets` with [`estimator_to_val`](@ref), giving `val`. A name that names an asset writes one entry, a name that names a group writes one entry per member of the group, and every unnamed entry keeps the fill value of step 1.
- 3. Divide `val` by `sum(val)`, giving the normalised budget.
- 4. Wrap it in a [`RiskBudget`](@ref), which checks that it is non-empty and non-negative.
+ 1. Take `dval` as the fill value. If `dval` is `nothing`, use the reciprocal of the length of the universe that `key` selects. If `key` is also `nothing`, use the universe of `sets.xkey`.
+ 2. Resolve `rb` against `sets` with [`estimator_to_val`](@ref), and call the result `val`. An asset name writes one entry. A group name writes one entry for each member of the group. Each unnamed entry keeps the fill value of step 1.
+ 3. Divide `val` by `sum(val)`.
+ 4. Wrap the result in a [`RiskBudget`](@ref), which checks that it is non-empty and non-negative.
 
 # Arguments
 
-  - `rb`: A dictionary, pair, or vector of pairs mapping asset or group names to risk budget values.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the universe and groupings.
-  - `dval`: Default value to use for names not found in `rb`. If `nothing`, a default value of `1/length(sets.dict[key])` is used.
+  - `rb`: Map from asset or group names to risk budget values, or a scalar, a vector or an algorithmic rule.
+  - `sets`: [`UniverseSets`](@ref) that holds the universe and the groups.
+  - `dval`: Fill value of each entry that `rb` does not name. If `nothing`, the method uses `1/length(sets.dict[key])`, with `sets.xkey` in place of a `nothing` key.
   - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes the factor axis key of its own `re`, because its budget is written in factor names.
-  - `strict`: If `true`, throws an error if a key in `rb` is not found in `sets`; if `false`, issues a warning.
+  - `strict`: If `true`, a name in `rb` that `sets` does not resolve raises `ArgumentError`. If `false`, the name logs a warning.
 
 # Validation
 
-  - A name in `rb` that names neither an asset nor a group of `sets` raises `ArgumentError` when `strict` is `true`. A warning is issued otherwise, and the name writes nothing.
-  - A budget whose entries are all zero divides by zero in step 3, and the resulting `NaN` vector fails [`RiskBudget`](@ref)'s own non-negativity check, so the call raises `DomainError` rather than returning a `NaN` budget. `RiskBudget` admits a zero **entry**, and only an all-zero budget reaches this raise.
+  - A name in `rb` that names neither an asset nor a group of `sets` raises `ArgumentError` when `strict` is `true`. Otherwise the method logs a warning, and the name writes nothing.
+  - A budget whose entries are all zero divides by zero in step 3. The result is a `NaN` vector, which fails the non-negativity check of [`RiskBudget`](@ref). The call raises `DomainError`, and does not return a `NaN` budget. A zero entry is valid, and only an all-zero budget raises this error.
 
 # Returns
 
-  - `rb::RiskBudget`: A result object containing the normalised risk budget vector.
+  - `rb::RiskBudget`: A [`RiskBudget`](@ref) that holds the normalised budget.
 
 # Examples
 
@@ -366,7 +370,7 @@ RiskBudget
   val ┴ Vector{Float64}: [0.41379310344827586, 0.41379310344827586, 0.17241379310344826]
 ```
 
-A budget written in factor names resolves against the declared factor axis, which is what [`FactorRiskBudgeting`](@ref) passes — the unspecified factors take the `1/length(sets.dict[key])` default before normalisation:
+A budget written in factor names resolves against the factor axis, which is the key that [`FactorRiskBudgeting`](@ref) passes. Each factor that the budget does not name takes the default `1/length(sets.dict[key])` before the normalisation:
 
 ```jldoctest
 julia> sets = UniverseSets(; dict = Dict(\"nx\" => [\"A\", \"B\", \"C\"], \"nf\" => [\"F1\", \"F2\"]));
@@ -399,27 +403,29 @@ end
                             key::Option{<:AbstractString} = nothing; strict::Bool = false,
                             kwargs...)
 
-This method unpacks a [`RiskBudgetEstimator`](@ref) and calls the mapping method with its two fields. It is used for type stability and to give a uniform interface for processing constraint estimators.
+Resolves a [`RiskBudgetEstimator`](@ref) against a universe.
 
-The key is a **positional** argument here, not a field of the estimator. [`ThresholdEstimator`](@ref) holds its key instead, so [`threshold_constraints`](@ref) needs no such argument. Both routes end at the same [`estimator_to_val`](@ref), and a key naming the factor axis resolves on either: on a universe of four assets and two factors, a budget naming only `F1` returns a two-entry vector.
+This method calls the mapping method with the two fields of the estimator.
 
-There is **no vector method**. A vector of estimators raises `MethodError`, and no broader method takes it silently. [`RkbE_Rkb`](@ref) states the decision that governs the gap.
+The key is a positional argument of this method, not a field of the estimator. [`ThresholdEstimator`](@ref) holds its key in a field, so [`threshold_constraints`](@ref) takes no key argument. Both functions call [`estimator_to_val`](@ref), and both resolve a key of the factor axis. On a universe of four assets and two factors, a budget that names only `F1` returns a vector of two entries.
+
+This function has no vector method. A vector of estimators raises `MethodError`, because no broader method accepts it. [`RkbE_Rkb`](@ref) gives the reason.
 
 # Algorithm
 
- 1. Call `risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict, kwargs...)`, which resolves the mapping, normalises it and builds the [`RiskBudget`](@ref).
+ 1. Call `risk_budget_constraints(rb.val, sets, rb.dval, key; strict = strict, kwargs...)`. This call resolves the map, normalises it and makes the [`RiskBudget`](@ref).
 
 # Arguments
 
-  - `rb`: A [`RiskBudgetEstimator`](@ref) carrying the mapping and the default value.
-  - `sets`: A [`UniverseSets`](@ref) object specifying the universe and groupings.
+  - `rb`: A [`RiskBudgetEstimator`](@ref) that holds the map and the fill value.
+  - `sets`: [`UniverseSets`](@ref) that holds the universe and the groups.
   - $(arg_dict[:ekey]) [`FactorRiskBudgeting`](@ref) passes the factor axis key of its own `re`, because its budget is written in factor names.
-  - `strict`: If `true`, throws an error if a name in `rb.val` is not found in `sets`; if `false`, issues a warning.
-  - `kwargs...`: Additional keyword arguments forwarded to the mapping method.
+  - `strict`: If `true`, a name in `rb.val` that `sets` does not resolve raises `ArgumentError`. If `false`, the name logs a warning.
+  - `kwargs...`: More keyword arguments, which the method gives to the mapping method.
 
 # Returns
 
-  - `rb::RiskBudget`: A result object containing the normalised risk budget vector.
+  - `rb::RiskBudget`: A [`RiskBudget`](@ref) that holds the normalised budget.
 
 # Examples
 

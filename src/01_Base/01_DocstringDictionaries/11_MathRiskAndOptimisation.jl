@@ -61,7 +61,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :pos_part => "``(\\cdot)_{+} = \\max(\\cdot, 0)``: Positive part.",#
                  :tau_wb_tol => "``\\tau``: The tolerance that [`weights_bound_tolerance`](@ref) gives for the element type of ``\\boldsymbol{w}``, which is ``\\sqrt{\\epsilon}`` for a floating-point type and zero for an exact type such as `Rational`.",#
                  # JuMP optimisation variables.
-                 :k_budget => "``k``: Budget scaling / homogenisation variable.",#
+                 :k_budget => "``k``: Variable that scales the budget in the homogenised problem.",#
                  :sc_scale => "``s_c``: Constraint scale. It multiplies both sides of a row, so a positive value leaves the feasible set unchanged.",#
                  # The second moment in a JuMP model: the matrix, its factor, its lift and the
                  # epigraph of its square root.

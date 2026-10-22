@@ -61,7 +61,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :eq => "`eq`: Optional equality constraints.",#
                  :ineq => "`ineq`: Optional inequality constraints.",#
                  # Constraint generation.
-                 :dval => "`dval`: Default value for assets not specified in `val`.",#
+                 :dval => "`dval`: Default value of each entry that `val` does not name.",#
                  :dict => "`dict`: Dictionary mapping group identifiers to member labels.",#
                  :vars => "`vars`: Variable names in the parsed constraint expression.",#
                  :coef_c => "`coef`: Coefficients corresponding to the constraint variables.",#
@@ -82,8 +82,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Weight bounds.
                  :wb => "`wb`: Weight bounds.",#
                  # Constraint generation.
-                 :rkb_val => "`val`: Vector of non-negative risk budgets, one per entry of the axis the budget is written against. [`risk_budget_constraints`](@ref) normalises it to sum to one; a hand-built vector is stored as given, and the model reads it inside a logarithmic barrier, so only its **relative** entries matter.",#
-                 :rkbe_val => "`val`: Mapping of names to risk budget values. A name may be an asset or a group, and a group assigns its value to every asset in it. A scalar is accepted and resolves to `RiskBudget(1.0)` whatever the scalar was, so only a one-entry axis can consume it. Write the uniform budget as `nothing`.",#
+                 :rkb_val => "`val`: Vector of non-negative risk budgets, one for each entry of the axis that the budget is written against. The estimator method of [`risk_budget_constraints`](@ref) normalises the budget to sum to one. A budget built by hand keeps its own sum. The model reads the budget inside a logarithmic barrier, so only the relative entries change the solution.",#
+                 :rkbe_val => "`val`: Map from names to risk budget values. A name can be an asset or a group, and a group gives its value to every asset in the group. A scalar resolves to `RiskBudget(1.0)` for every value of the scalar, so only a one-entry axis can use it. Write the uniform budget as `nothing`.",#
                  :us_xkey => "`xkey`: Key in `dict` identifying the primary asset list. Required, and the axis a view slices.",#
                  :us_uxkey => "`uxkey`: Key prefix for unique-entry asset group variants in `dict`.",#
                  :us_tfkey => "`tfkey`: Key in `dict` of the time-series factor list, the columns of `rd.F`, against which a time-series regression fits one loading vector per asset. Optional. A consumer that needs it and does not find it throws when it reads the axis.",#
@@ -103,8 +103,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ece_space => "`space`: Basis the wrapped constraint is written in. Required — the absence of a re-basis is spelled by using a bare `LinearConstraintEstimator`, not by a space member.",#
                  :fs_re => "`re`: Source of the loadings the rows are re-based through, or `nothing` to read the prior's `rr`. A precomputed `Regression` states the basis outright; an estimator fits one from the returns, which is what makes a factor mandate legal on a prior that carries no factor block. The precedence is `resolve_factor_regression`'s: a precomputed result wins, then the prior's `rr`, then a refit.",#
                  :asets_val => "`val`: Group name key for asset set membership matrix extraction.",#
-                 :thr_val => "`val`: Asset-specific minimum-holding threshold value(s).",#
-                 :thr_res_val => "`val`: Minimum-holding threshold(s) on the portfolio weights. A held position must reach its threshold; a position below it is driven to zero. The threshold binds the **held** weight, never the trade, so a reference portfolio does not enter it.",#
+                 :thr_val => "`val`: Minimum-holding thresholds, as a map from asset or group names to values, a scalar, a vector or an algorithmic rule.",#
+                 :thr_res_val => "`val`: Minimum-holding thresholds of the portfolio weights, as one scalar for every asset or one value for each asset. A position is zero, or it is at least its threshold. The threshold bounds the held weight and not the trade, so no reference portfolio enters it.",#
                  # Preselection. `20_AssetSelection.jl` pairs two redundancy
                  # algorithms over one correlation matrix, and two selection
                  # rules over one taken set, so each of the five descriptions
