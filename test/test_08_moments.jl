@@ -1999,6 +1999,7 @@
         bounded by one, which is why `ComplementSimilarity` is out of domain against this
         estimator's own default.
         =#
+        @test maximum(distance(Distance(), Cd)) <= 1
         @test maximum(distance(DistanceDistance(), Cd)) > 1
     end
     """

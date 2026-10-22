@@ -140,6 +140,25 @@
         @test isapprox(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
                                                                   D = Daf), cosf;
                        atol = 1e-14)
+        #=
+        The claims of the `/unslop` pass. `AngularSimilarity` is the one member that goes
+        negative at a distance in `[0, 1]`; `ComplementSimilarity` goes negative only above
+        `1`. A larger `coef` lowers the similarity at each positive distance, and a larger
+        `power` moves it towards `1` below `D = 1` and towards `0` above it.
+        =#
+        Dunit = collect(0:0.01:1)'
+        for sim in (MaximumDistanceSimilarity(), ExponentialSimilarity(),
+                    GeneralExponentialSimilarity(; coef = 3, power = 4), ComplementSimilarity())
+            @test all(>=(0), PortfolioOptimisers.distance_to_similarity(sim; D = Dunit))
+        end
+        @test minimum(PortfolioOptimisers.distance_to_similarity(AngularSimilarity();
+                                                                 D = Dunit)) < 0
+        Dtwo = [0.5 2.0]
+        d2s = PortfolioOptimisers.distance_to_similarity
+        gsim(; kwargs...) = d2s(GeneralExponentialSimilarity(; kwargs...); D = Dtwo)
+        @test all(gsim(; coef = 3) .< gsim(; coef = 1))
+        @test gsim(; power = 3)[1] > gsim(; power = 1)[1]
+        @test gsim(; power = 3)[2] < gsim(; power = 1)[2]
     end
     @testset "Non-negative similarity interface (#239)" begin
         nonneg = (MaximumDistanceSimilarity(), ExponentialSimilarity(),

@@ -93,10 +93,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :Tobs => "`T`: Number of observations.",#
                  ## Distance
                  :dopower => "`power`: Optional integer exponent, which the distance algorithm applies entry by entry. [`Distance`](@ref) states which quantity it raises. `nothing` and `1` both give the base distance, so only `power >= 2` changes the result.",#
-                 :dalg => "`alg`: Distance algorithm.",#
-                 :dmetric => "`metric`: Distance metric used for the distances of distances computations.",#
-                 :dmetric_args => "`args`: Additional positional arguments for the distances of distances metric.",#
-                 :dmetric_kwargs => "`kwargs`: Additional keyword arguments for the distances of distances metric.",#
+                 :dalg => "`alg`: The distance algorithm.",#
+                 :dmetric => "`metric`: The metric that `Distances.pairwise` applies to the columns of the base distance matrix.",#
+                 :dmetric_args => "`args`: More positional arguments, which `Distances.pairwise` takes after the base distance matrix.",#
+                 :dmetric_kwargs => "`kwargs`: More keyword arguments for `Distances.pairwise`. A `dims` here replaces the default `dims = 2`.",#
                  :fdmetric => "`metric`: Distance metric applied to the rows of the feature matrix.",#
                  :fcalg => "`alg`: Feature collapse algorithm, used to reduce a window of time-varying features to a single distance matrix. Inert for a 2-D feature matrix.",#
                  :calg => "`alg`: Collapse algorithm, the aggregator applied along the observation axis.",#
