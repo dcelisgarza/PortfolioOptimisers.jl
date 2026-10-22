@@ -78,10 +78,10 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :gerbalg => "`alg`: Gerber covariance algorithm.",#
                  :gerbce => "`ce`: Gerber covariance estimator.",#
                  :stdarr => "`sd`: Standard deviation vector of `X`, shaped to be consistent with `X`.",#
-                 :c1 => "`c1`: Zone of confusion threshold, in units of the asset's standard deviation. It is read against the raw, uncentred return, and it rejects an observation only when both assets fall inside it.",#
-                 :c2 => "`c2`: Zone of indecision threshold, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when both assets fall inside it. A centred return of exactly zero is inside it at every `c2`.",#
-                 :c3 => "`c3`: Outer cut-off, in units of the asset's standard deviation. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
-                 :sbn => "`n`: Severity exponent of the Smyth-Broby contribution. It sets how hard the divergence of a pair is penalised.",#
+                 :c1 => "`c1`: Confusion-zone threshold on the raw, uncentred return, in standard deviations of the asset. The confusion zone rejects an observation only when both assets are inside it.",#
+                 :c2 => "`c2`: Indecision-zone threshold on the centred, standardised return, in standard deviations of the asset. The indecision zone rejects an observation when both assets are inside it. A centred return of exactly zero is inside the zone at every `c2`.",#
+                 :c3 => "`c3`: Outer cut-off on the centred, standardised return, in standard deviations of the asset. The cut-off rejects an observation when either asset is above it.",#
+                 :sbn => "`n`: Severity exponent of the Smyth-Broby contribution. The contribution of an observation is `kappa / (1 + gamma^n)`, where `gamma` is the divergence of the pair.",#
                  :sbalg => "`alg`: Smyth-Broby covariance algorithm.",#
                  ## Mutual and var info
                  :bins => "`bins`: Binning algorithm or fixed number of bins.",#

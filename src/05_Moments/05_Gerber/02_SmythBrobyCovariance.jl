@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Smyth-Broby covariance estimators.
 
-All concrete and/or abstract types implementing Smyth-Broby covariance estimation algorithms should be subtypes of `BaseSmythBrobyCovariance`. It is a subtype of [`BaseGerberCovariance`](@ref), because a Smyth-Broby statistic is a Gerber statistic with a second zone and a real-valued contribution in place of the vote. The Gerber statistic itself is stated in `01_GerberCovariance.jl` and is not restated here.
+Every concrete or abstract type that implements a Smyth-Broby covariance estimator must subtype `BaseSmythBrobyCovariance`. It subtypes [`BaseGerberCovariance`](@ref), because a Smyth-Broby statistic is a Gerber statistic with a second zone. Each observation adds a real-valued contribution to it, not a count of one. [`GerberCovariance`](@ref) states the Gerber statistic, and this docstring does not repeat it.
 
 # Related
 
@@ -22,9 +22,9 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for all Smyth-Broby covariance algorithm types.
 
-All concrete and/or abstract types implementing specific Smyth-Broby covariance algorithms should be subtypes of `SmythBrobyCovarianceAlgorithm`.
+Every concrete or abstract type that implements a Smyth-Broby covariance algorithm must subtype `SmythBrobyCovarianceAlgorithm`. A subtype goes in the `alg` field of a [`SmythBrobyCovariance`](@ref) estimator.
 
-These types are used to specify the algorithm when constructing a [`SmythBrobyCovariance`](@ref) estimator. A marker names two independent choices at once: its **prefix** selects the score triple through [`sb_pair_scores`](@ref), and its **trailing digit** selects the denominator through [`comovement_ratio`](@ref). The digit means the same thing here as it does in the Gerber family.
+A marker makes two independent choices. Its prefix selects the score triple through [`sb_pair_scores`](@ref). Its trailing digit selects the denominator through [`comovement_ratio`](@ref), and the digit has the same meaning as in the Gerber family.
 
 # Related
 
@@ -62,14 +62,14 @@ Where:
   - $(math_dict[:possum_sb])
   - $(math_dict[:rho_ij])
 
-The source defines one statistic, and it keeps the neutral sum in the denominator; [`SmythBroby1`](@ref) is that statistic. This tag drops the neutral term, on the shape [`Gerber0`](@ref) sets, so it is the library's own reduction and not a formulation of the source.
+The source defines one statistic, [`SmythBroby1`](@ref), and that statistic keeps the neutral sum in the denominator. This marker removes the neutral term, as [`Gerber0`](@ref) does. It is a reduction of the library, not a formulation of the source.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this marker selects runs these steps.
 
- 1. Read `(pos, neg, nn)` from the pair accumulator, giving the scores `(p, q, u)`. The contribution sums are taken and the counts are discarded.
- 2. Return `(p - q) / (p + q)`, or `zero(T)` when the denominator vanishes.
+ 1. Read the contribution sums `(pos, neg, nn)` from the pair accumulator as the scores `(p, q, u)`. The counts are not read.
+ 2. Return `(p - q) / (p + q)`, or `zero(T)` when the denominator is zero.
 
 # Constructors
 
@@ -114,14 +114,16 @@ Where:
   - $(math_dict[:possum_sb])
   - $(math_dict[:rho_ij])
 
-**This is the statistic the source defines**, and it is the only one the source defines. It is Equation 5 of [smyth2022enhanced](@cite): the contributions of the concordant, discordant and neutral co-movements of the lookback window, with the discordant sum subtracted in the numerator. The neutral zone is the four regions DN, NU, UN and ND of Section 2, the observations on which exactly one asset left the indecision zone. The neutral sum keeps the matrix positive semidefinite, which is the purpose the Gerber neutral count already served.
+This is Equation 5 of [smyth2022enhanced](@cite), and it is the only statistic that the source defines. The numerator is the concordant sum minus the discordant sum over the lookback window. The denominator adds the concordant, discordant and neutral sums. The neutral zone is the four regions DN, NU, UN and ND of Section 2 of the source. These are the observations on which exactly one asset leaves the indecision zone.
+
+Section 2 of the source states that the neutral sum keeps the covariance matrix positive semidefinite, and its footnote 2 states that this has no proof. The claim is false. On a sample of 30 observations of 20 standard normal returns, the matrix of this marker has a negative eigenvalue. The `pdm` field of [`SmythBrobyCovariance`](@ref) repairs it.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this marker selects runs these steps.
 
- 1. Read `(pos, neg, nn)` from the pair accumulator, giving the scores `(p, q, u)`. The contribution sums are taken and the counts are discarded.
- 2. Return `(p - q) / (p + q + u)`, or `zero(T)` when the denominator vanishes.
+ 1. Read the contribution sums `(pos, neg, nn)` from the pair accumulator as the scores `(p, q, u)`. The counts are not read.
+ 2. Return `(p - q) / (p + q + u)`, or `zero(T)` when the denominator is zero.
 
 # Constructors
 
@@ -167,15 +169,15 @@ Where:
   - $(math_dict[:h_ij_sb])
   - $(math_dict[:rho_ij])
 
-The normalisation is a property of the whole matrix and not of one pair, so the diagonal is unit by construction rather than by a per-pair denominator as in [`SmythBroby0`](@ref) and [`SmythBroby1`](@ref). It is not the [`SmythBroby0`](@ref) ratio renormalised: the two agree only where ``p + q`` is constant across pairs. The source defines no such normalisation, so this tag is the library's own reduction, on the shape [`Gerber2`](@ref) sets.
+The denominator comes from the diagonal of the whole matrix, not from the sums of the pair alone. [`SmythBroby0`](@ref) and [`SmythBroby1`](@ref) divide by the sums of the pair. The diagonal of the result is therefore one by construction. The result is not the ratio of [`SmythBroby0`](@ref) after a second division. The two are equal only where ``p + q`` is the same for every pair. The source defines no such denominator, so this marker is a reduction of the library, as [`Gerber2`](@ref) is for the Gerber statistic.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref), of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref), of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this marker selects runs these steps.
 
- 1. Read `(pos, neg, nn)` from the pair accumulator, giving the scores `(p, q, u)`.
- 2. Return the net score `p - q` for every pair. This branch applies no denominator of its own.
- 3. Divide the assembled matrix by the outer product of the square roots of its own diagonal. The roots are clamped from below by `sqrt(eps(eltype(rho)))`, so an asset that admits no observation gives a zero row rather than a division by zero.
+ 1. Read the contribution sums `(pos, neg, nn)` from the pair accumulator as the scores `(p, q, u)`.
+ 2. Return the net score `p - q` for every pair, with no denominator.
+ 3. Divide the assembled matrix by the outer product of the square roots of its own diagonal. [`standardise_comovement!`](@ref) clamps each root from below at `sqrt(eps(eltype(rho)))`, so an asset that admits no observation gives a zero row and no division by zero.
 
 # Constructors
 
@@ -221,14 +223,16 @@ Where:
   - $(math_dict[:poscount_sb])
   - $(math_dict[:rho_ij])
 
-The weighting reintroduces the Gerber vote count that [`SmythBroby0`](@ref) discards, so a pair that co-moves often scores above one that co-moves rarely but sharply. Section 5 of [smyth2022enhanced](@cite) suggests keeping a count in parallel with the sum, and scaling the total contribution to match the total count so that the split between concordant, discordant and neutral contributions is preserved. It states no formula. One factor that rescales all three sums leaves the ratio of Equation 5 unchanged, so weighting each sum by its own count, as above, is the library's reading and does not follow from that sentence. The neutral term is dropped here, as in [`SmythBroby0`](@ref).
+The counts are the Gerber co-movement counts that [`SmythBroby0`](@ref) does not read. A pair that moves together often therefore scores above a pair that moves together rarely but by large amounts. This marker removes the neutral term, as [`SmythBroby0`](@ref) does.
+
+Section 5 of [smyth2022enhanced](@cite) suggests a count beside each sum, and a scale on the total contribution to match the total count. The scale keeps the split between the concordant, discordant and neutral contributions. Section 5 states no formula. One factor on all three sums does not change the ratio of Equation 5. The product of each sum with its own count is therefore a choice of the library, and it does not follow from Section 5.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this marker selects runs these steps.
 
- 1. Multiply each of `pos`, `neg` and `nn` by its own count `cpos`, `cneg` and `cnn`, giving the scores `(p, q, u)`.
- 2. Return `(p - q) / (p + q)`, or `zero(T)` when the denominator vanishes.
+ 1. Multiply each of `pos`, `neg` and `nn` by its own count `cpos`, `cneg` and `cnn`. The products are the scores `(p, q, u)`.
+ 2. Return `(p - q) / (p + q)`, or `zero(T)` when the denominator is zero.
 
 # Constructors
 
@@ -274,14 +278,14 @@ Where:
   - $(math_dict[:poscount_sb])
   - $(math_dict[:rho_ij])
 
-The neutral term carries its own count as well, so all three terms of the denominator are scaled alike. This is the estimator's default algorithm. It composes the source's own statistic, [`SmythBroby1`](@ref), with the count the source's conclusion suggests keeping beside the sum; the source states no formula for that product.
+The neutral sum also gets its own count, so each of the three terms of the denominator is a product of a sum and a count. This is the default algorithm of the estimator. It applies the count that Section 5 of the source suggests to the statistic of the source, [`SmythBroby1`](@ref). The source states no formula for that product.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this marker selects runs these steps.
 
- 1. Multiply each of `pos`, `neg` and `nn` by its own count `cpos`, `cneg` and `cnn`, giving the scores `(p, q, u)`.
- 2. Return `(p - q) / (p + q + u)`, or `zero(T)` when the denominator vanishes.
+ 1. Multiply each of `pos`, `neg` and `nn` by its own count `cpos`, `cneg` and `cnn`. The products are the scores `(p, q, u)`.
+ 2. Return `(p - q) / (p + q + u)`, or `zero(T)` when the denominator is zero.
 
 # Constructors
 
@@ -328,15 +332,15 @@ Where:
   - $(math_dict[:h_ij_sb])
   - $(math_dict[:rho_ij])
 
-The normalisation is a property of the whole matrix and not of one pair, as in [`SmythBroby2`](@ref). The source defines no such normalisation, so this tag is the library's own reduction, on the shape [`Gerber2`](@ref) sets.
+The denominator comes from the diagonal of the whole matrix, as in [`SmythBroby2`](@ref). The source defines no such denominator, so this marker is a reduction of the library, as [`Gerber2`](@ref) is for the Gerber statistic.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref), of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref), of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this marker selects runs these steps.
 
- 1. Multiply each of `pos`, `neg` and `nn` by its own count `cpos`, `cneg` and `cnn`, giving the scores `(p, q, u)`.
- 2. Return the net score `p - q` for every pair. This branch applies no denominator of its own.
- 3. Divide the assembled matrix by the outer product of the square roots of its own diagonal. The roots are clamped from below by `sqrt(eps(eltype(rho)))`, so an asset that admits no observation gives a zero row rather than a division by zero.
+ 1. Multiply each of `pos`, `neg` and `nn` by its own count `cpos`, `cneg` and `cnn`. The products are the scores `(p, q, u)`.
+ 2. Return the net score `p - q` for every pair, with no denominator.
+ 3. Divide the assembled matrix by the outer product of the square roots of its own diagonal. [`standardise_comovement!`](@ref) clamps each root from below at `sqrt(eps(eltype(rho)))`, so an asset that admits no observation gives a zero row and no division by zero.
 
 # Constructors
 
@@ -381,14 +385,14 @@ Where:
   - $(math_dict[:poscount_sb])
   - $(math_dict[:rho_ij])
 
-Dropping [`sb_delta`](@ref) recovers a Gerber statistic evaluated on the Smyth-Broby admission rule rather than on the Gerber threshold, so this tag reduces exactly to [`Gerber0`](@ref) when the confusion zone is switched off, the outer cut-off is lifted, and the centre is zero. The source counts no votes — its whole argument is that a contribution sum carries more information than a count — so the count family is the library's own construction and not a formulation of the source.
+Without [`sb_delta`](@ref), the statistic is a Gerber statistic on the zones of Smyth-Broby, not on the Gerber threshold. This marker gives the same matrix as [`Gerber0`](@ref) when `c1` is zero, `c2` is the Gerber threshold `t`, `c3` is above every return, and the mean of each asset is zero. Equation 5 of the source adds contributions and keeps no count, because the source argues that a contribution sum holds more information than a count. The count family is therefore a construction of the library, not a formulation of the source.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this marker selects runs these steps.
 
- 1. Read `(cpos, cneg, cnn)` from the pair accumulator, giving the scores `(p, q, u)`. The contribution sums are discarded, and [`sb_delta`](@ref) is never evaluated.
- 2. Return `(p - q) / (p + q)`, or `zero(T)` when the denominator vanishes.
+ 1. Read the counts `(cpos, cneg, cnn)` from the pair accumulator as the scores `(p, q, u)`. The contribution sums are not read, and [`sb_delta`](@ref) is not evaluated.
+ 2. Return `(p - q) / (p + q)`, or `zero(T)` when the denominator is zero.
 
 # Constructors
 
@@ -433,14 +437,14 @@ Where:
   - $(math_dict[:poscount_sb])
   - $(math_dict[:rho_ij])
 
-Dropping [`sb_delta`](@ref) recovers a Gerber statistic evaluated on the Smyth-Broby admission rule rather than on the Gerber threshold, so this tag reduces exactly to [`Gerber1`](@ref) when the confusion zone is switched off, the outer cut-off is lifted, and the centre is zero. The source counts no votes, so the count family is the library's own construction and not a formulation of the source.
+Without [`sb_delta`](@ref), the statistic is a Gerber statistic on the zones of Smyth-Broby, not on the Gerber threshold. This marker gives the same matrix as [`Gerber1`](@ref) when `c1` is zero, `c2` is the Gerber threshold `t`, `c3` is above every return, and the mean of each asset is zero. Equation 5 of the source keeps no count, so the count family is a construction of the library, not a formulation of the source.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref) and of [`comovement_ratio`](@ref) that this marker selects runs these steps.
 
- 1. Read `(cpos, cneg, cnn)` from the pair accumulator, giving the scores `(p, q, u)`. The contribution sums are discarded, and [`sb_delta`](@ref) is never evaluated.
- 2. Return `(p - q) / (p + q + u)`, or `zero(T)` when the denominator vanishes.
+ 1. Read the counts `(cpos, cneg, cnn)` from the pair accumulator as the scores `(p, q, u)`. The contribution sums are not read, and [`sb_delta`](@ref) is not evaluated.
+ 2. Return `(p - q) / (p + q + u)`, or `zero(T)` when the denominator is zero.
 
 # Constructors
 
@@ -486,15 +490,15 @@ Where:
   - $(math_dict[:h_ij_sb])
   - $(math_dict[:rho_ij])
 
-The normalisation is a property of the whole matrix and not of one pair, as in [`SmythBroby2`](@ref). This tag reduces exactly to [`Gerber2`](@ref) when the confusion zone is switched off, the outer cut-off is lifted, and the centre is zero. The source counts no votes and defines no such normalisation, so this tag is the library's own construction.
+The denominator comes from the diagonal of the whole matrix, as in [`SmythBroby2`](@ref). This marker gives the same matrix as [`Gerber2`](@ref) when `c1` is zero, `c2` is the Gerber threshold `t`, `c3` is above every return, and the mean of each asset is zero. The source keeps no count and defines no such denominator, so this marker is a construction of the library.
 
 # Algorithm
 
-The branch of [`sb_pair_scores`](@ref), of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this tag selects runs these steps.
+The branch of [`sb_pair_scores`](@ref), of [`comovement_ratio`](@ref) and of [`standardise_comovement!`](@ref) that this marker selects runs these steps.
 
- 1. Read `(cpos, cneg, cnn)` from the pair accumulator, giving the scores `(p, q, u)`. The contribution sums are discarded, and [`sb_delta`](@ref) is never evaluated.
- 2. Return the net score `p - q` for every pair. This branch applies no denominator of its own.
- 3. Divide the assembled matrix by the outer product of the square roots of its own diagonal. The roots are clamped from below by `sqrt(eps(eltype(rho)))`, so an asset that admits no observation gives a zero row rather than a division by zero.
+ 1. Read the counts `(cpos, cneg, cnn)` from the pair accumulator as the scores `(p, q, u)`. The contribution sums are not read, and [`sb_delta`](@ref) is not evaluated.
+ 2. Return the net score `p - q` for every pair, with no denominator.
+ 3. Divide the assembled matrix by the outer product of the square roots of its own diagonal. [`standardise_comovement!`](@ref) clamps each root from below at `sqrt(eps(eltype(rho)))`, so an asset that admits no observation gives a zero row and no division by zero.
 
 # Constructors
 
@@ -522,9 +526,9 @@ struct SmythBrobyCount2 <: SmythBrobyCovarianceAlgorithm end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Configures and applies Smyth-Broby covariance estimators.
+Estimates a covariance matrix from the co-movements of each pair of assets outside a confusion zone and an indecision zone.
 
-`SmythBrobyCovariance` encapsulates all components required for Smyth-Broby-based covariance or correlation estimation, including the expected returns estimator, variance estimator, positive definite matrix estimator, algorithm parameters, and the specific Smyth-Broby algorithm variant. A Smyth-Broby matrix is a matrix of pairwise contribution ratios and is not positive definite in general, so `pdm` projects the result onto the nearest positive definite matrix; `pdm = nothing` returns the raw statistic instead. **Of the nine algorithm tags the source defines one**, [`SmythBroby1`](@ref); each of the other eight names which part of it is the library's own, and [`smythbroby`](@ref) states the shared statistic once.
+Each entry of a Smyth-Broby matrix is a separate ratio of one pair, so the matrix is not positive definite in general. The `pdm` field projects the result onto the nearest positive definite matrix, and `pdm = nothing` returns the statistic with no repair. Of the nine markers, the source defines only [`SmythBroby1`](@ref). The docstring of each other marker states what the library adds to the source. [`smythbroby`](@ref) states the shared statistic once.
 
 # Fields
 
@@ -554,7 +558,7 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:c3])
   - $(val_dict[:c3c2])
   - $(val_dict[:sbn])
-  - `c1`, `c2` and `c3` are validated with [`assert_nonempty_nonneg_finite_val`](@ref), so `Inf` and `NaN` are rejected. `n` is validated with [`assert_nonneg`](@ref), which rejects a negative `n` and `NaN` and admits `Inf`. The three thresholds are read on the scale of the data, where `Inf` admits no observation at all; `n` is an exponent whose infinite limit is a hard divergence gate, so it is kept. A negative `n` inverts the severity penalty of [`sb_delta`](@ref): a pair whose two magnitudes agree would then contribute nothing, and the diagonal would be zero rather than one.
+  - [`assert_nonempty_nonneg_finite_val`](@ref) checks `c1`, `c2` and `c3`, so it refuses `Inf` and `NaN`. [`assert_nonneg`](@ref) checks `n`. It refuses a negative `n` and `NaN`, and it accepts `Inf`. At `n = Inf`, [`sb_delta`](@ref) gives zero to each observation whose two magnitudes differ by more than one. A negative `n` reverses the penalty of [`sb_delta`](@ref). An observation with two equal magnitudes then contributes zero, so the diagonal is zero, not one.
 
 ## Propagated parameters
 
@@ -615,7 +619,7 @@ SmythBrobyCovariance
   - [`SmythBrobyCount1`](@ref)
   - [`SmythBrobyCount2`](@ref)
   - [`smythbroby`](@ref)
-  - [`GerberCovariance`](@ref): the statistic this family extends. Its zoning is the threshold rule the confusion zone and the indecision zone replace.
+  - [`GerberCovariance`](@ref): the statistic that this family extends. The confusion zone and the indecision zone replace its threshold.
   - [`FLoops.Transducers.Executor`](https://juliafolds2.github.io/FLoops.jl/dev/tutorials/parallel/#tutorials-ex)
   - [`factory`](@ref)
   - [`port_opt_view`](@ref)
@@ -630,7 +634,7 @@ SmythBrobyCovariance
     """
     @fprop @vprop ve
     """
-    $(field_dict[:me]) Used for optionally centering the returns.
+    $(field_dict[:me]) Its mean centres the returns before the indecision-zone test and the outer cut-off.
     """
     @fprop @vprop me
     """
@@ -699,7 +703,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Renders every field of a [`SmythBrobyCovariance`](@ref) except `cache`.
 
-The state a `cache` holds is the running detail of an incremental fit, not the configuration a reader looks the type up for, and it prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SmythBrobyCovariance, true)` to render it.
+A `cache` holds the state of an incremental fit, not a part of the configuration. Without this method, that state prints under the estimator at every site that renders one. Set `set_show_nothing_fields!(:SmythBrobyCovariance, true)` to render it.
 
 # Arguments
 
@@ -721,7 +725,7 @@ show_fields(::SmythBrobyCovariance) = (:ve, :me, :pdm, :c1, :c2, :c3, :n, :alg, 
 
 Contribution of one admitted observation to a Smyth-Broby pair score.
 
-This is the quantity that replaces the Gerber vote: an observation contributes a finite real number rather than a count of one, so a co-movement of four standard deviations weighs more than one of a single standard deviation. **Both arguments are already absolute**, and the caller has already centred and standardised them.
+An observation adds this real number to the score of the pair, where the Gerber statistic adds a count of one. A co-movement of four standard deviations therefore adds more than a co-movement of one standard deviation. Both arguments are absolute values, and the caller centres and standardises the returns before it takes them.
 
 # Mathematical definition
 
@@ -741,14 +745,14 @@ Where:
   - $(math_dict[:delta_sb])
   - $(math_dict[:n_sb])
 
-``\\kappa`` rewards magnitude and ``\\gamma^{n}`` penalises a pair whose two magnitudes disagree, so the contribution is largest when both assets move far and move by the same amount. ``\\gamma`` is the absolute difference of the two **magnitudes**, not of the two signed returns; the sign has already been read by the caller, which is what put the observation in the concordant or the discordant set.
+``\\kappa`` increases with the two magnitudes, and ``\\gamma^{n}`` decreases the contribution when the two magnitudes differ. The contribution is therefore largest when both assets move far and by the same amount. ``\\gamma`` is the absolute difference of the two magnitudes, not of the two signed returns. The caller reads the signs first, and the signs put the observation in the concordant or the discordant set.
 
-Equations 1 to 3 of [smyth2022enhanced](@cite) define the contribution for a general severity ``n``, and Equation 4 writes it out for ``n = 2``, the value that Section 2 of the source adopts without tuning. The formula above agrees with a direct evaluation of Equation 1 to machine precision, and the default `n = 2` is the source's.
+Equations 1 to 3 of [smyth2022enhanced](@cite) define the contribution for a general severity ``n``. Equation 4 writes it out for ``n = 2``, the value that Section 2 of the source uses. The default `n = 2` of the estimator is that value. The formula above agrees with a direct evaluation of Equation 1 to machine precision.
 
 # Algorithm
 
- 1. Multiply the two gross magnitudes `1 + ri` and `1 + rj` and take the square root, giving the amplitude `kappa`.
- 2. Take the absolute difference of `ri` and `rj`, giving the divergence `gamma`.
+ 1. Multiply the two gross magnitudes `1 + ri` and `1 + rj`, and take the square root. The result is the amplitude `kappa`.
+ 2. Take the absolute difference of `ri` and `rj`. The result is the divergence `gamma`.
  3. Return `kappa / (1 + gamma^n)`.
 
 # Arguments
@@ -781,9 +785,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Union of the Gerber-family markers whose pairwise statistic divides the net score by the sum of the concordant and the discordant score, guarded to zero when the denominator vanishes.
+Union of the Gerber-family markers that divide the net score of a pair by the sum of its concordant and discordant scores.
 
-The group exists because the trailing `0` means the same thing in all four families of the Gerber lineage, and one method of [`comovement_ratio`](@ref) serves them all. A family adds a member to this union rather than adding a branch to that method.
+The statistic is zero when that sum is zero. The trailing `0` has the same meaning in all four families of the Gerber lineage, so one method of [`comovement_ratio`](@ref) serves all four. A new family adds a member to this union, not a new method.
 
 # Related
 
@@ -800,9 +804,9 @@ const GerberComovementZero = Union{<:Gerber0, <:SmythBroby0, <:SmythBrobyGerber0
 """
 $(DocStringExtensions.TYPEDEF)
 
-Union of the Gerber-family markers whose pairwise statistic divides the net score by the sum of all three scores, the neutral one included, guarded to zero when the denominator vanishes.
+Union of the Gerber-family markers that divide the net score of a pair by the sum of its three scores, the neutral score included.
 
-The group exists because the trailing `1` means the same thing in all four families of the Gerber lineage, and one method of [`comovement_ratio`](@ref) serves them all. The neutral term is what keeps the statistic positive semidefinite, so this is the canonical member of each family.
+The statistic is zero when that sum is zero. The trailing `1` has the same meaning in all four families of the Gerber lineage, so one method of [`comovement_ratio`](@ref) serves all four. [`Gerber1`](@ref) is the statistic of [gerber](@cite), and [`SmythBroby1`](@ref) is the statistic of [smyth2022enhanced](@cite). Section 2 of [smyth2022enhanced](@cite) states, with no proof, that the neutral term keeps the matrix positive semidefinite. The claim is false for [`SmythBroby1`](@ref) and [`SmythBrobyGerber1`](@ref).
 
 # Related
 
@@ -811,7 +815,7 @@ The group exists because the trailing `1` means the same thing in all four famil
   - [`SmythBrobyGerber1`](@ref)
   - [`SmythBrobyCount1`](@ref)
   - [`comovement_ratio`](@ref): the method that dispatches on this alias.
-  - [`sb_add_neutral`](@ref): the accumulator that fills the neutral score, and which only these markers reach.
+  - [`sb_add_neutral`](@ref): the accumulator that fills the neutral score. Only the three Smyth-Broby members of this union reach its acting methods.
   - [`GerberComovementZero`](@ref)
   - [`GerberComovementTwo`](@ref)
 """
@@ -820,9 +824,9 @@ const GerberComovementOne = Union{<:Gerber1, <:SmythBroby1, <:SmythBrobyGerber1,
 """
 $(DocStringExtensions.TYPEDEF)
 
-Union of the Gerber-family markers whose pairwise statistic is the net score itself, with the assembled matrix normalised afterwards by the geometric mean of its own diagonal.
+Union of the Gerber-family markers that keep the net score of each pair and divide the matrix by the geometric mean of its diagonal.
 
-The group exists because the trailing `2` means the same thing in all four families of the Gerber lineage. It is the one variant whose normalisation is a property of the whole matrix rather than of one pair, so it is also the only one that reaches the acting method of [`standardise_comovement!`](@ref).
+The trailing `2` has the same meaning in all four families of the Gerber lineage. Only this denominator comes from the whole matrix, not from the scores of one pair. These markers are therefore the only ones that reach the acting method of [`standardise_comovement!`](@ref).
 
 # Related
 
@@ -840,9 +844,9 @@ const GerberComovementTwo = Union{<:Gerber2, <:SmythBroby2, <:SmythBrobyGerber2,
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reduce a pair's accumulated positive, negative, and neutral co-movement scores to the pairwise correlation entry.
+Reduce the concordant, discordant and neutral scores of a pair to the correlation entry of the pair.
 
-The variant marker selects the denominator policy. **`n` here is the discordant score, not the severity exponent of [`sb_delta`](@ref)**; the two share a glyph and nothing else.
+The marker selects the denominator. Here `n` is the discordant score, not the severity exponent of [`sb_delta`](@ref). The two have the same name and no other relation.
 
 # Algorithm
 
@@ -852,13 +856,13 @@ The marker selects one of three branches.
  2. [`GerberComovementOne`](@ref): return `(p - n) / (p + n + nn)`, or `zero(T)` when `p + n + nn` is zero. This is the only branch that reads `nn`.
  3. [`GerberComovementTwo`](@ref): return `p - n`, and apply no denominator. [`standardise_comovement!`](@ref) normalises the assembled matrix afterwards.
 
-A zero denominator means that the pair qualified no observation, and the guarded zero is the right answer for an **off-diagonal** entry. It is the wrong answer on the **diagonal**, where a correlation is one by definition. This function cannot separate the two cases, because it does not know whether the pair is `(i, i)`. [`comovement_unit_diagonal!`](@ref) writes the diagonal after the matrix is assembled.
+A zero denominator means that the pair admits no observation. Zero is then the correct value for an off-diagonal entry. It is the wrong value on the diagonal, where a correlation is one by definition. This function does not know whether the pair is `(i, i)`, so it cannot tell the two cases apart. [`comovement_unit_diagonal!`](@ref) writes the diagonal after the matrix is assembled.
 
 # Arguments
 
   - `alg`: Co-movement algorithm marker.
   - `p`, `n`, `nn`: Accumulated concordant, discordant and neutral scores of one pair.
-  - `T`: Element type used for the guarded zero.
+  - `T`: Element type of the zero that a zero denominator gives.
 
 # Returns
 
@@ -869,7 +873,7 @@ A zero denominator means that the pair qualified no observation, and the guarded
   - [`gerber_comovement!`](@ref)
   - [`comovement_finalise`](@ref): the caller that reaches this function once per pair.
   - [`standardise_comovement!`](@ref)
-  - [`comovement_unit_diagonal!`](@ref): the function that corrects the guarded zero on the diagonal.
+  - [`comovement_unit_diagonal!`](@ref): the function that writes one over a zero on the diagonal.
   - [`GerberComovementZero`](@ref)
   - [`GerberComovementOne`](@ref)
   - [`GerberComovementTwo`](@ref)
@@ -893,20 +897,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Normalise a net co-movement matrix in place by the geometric mean of its own diagonal.
 
-Only the [`GerberComovementTwo`](@ref) markers reach the acting method; the fall-through method is a no-op, so every caller may call this unconditionally. **It writes into `rho` and into nothing else**, so the marker it is handed and the estimator that owns the marker are unchanged afterwards.
+Only the [`GerberComovementTwo`](@ref) markers reach the acting method. The fall-through method does nothing, so a caller can call this function for every marker. It writes into `rho` and into nothing else. The marker and the estimator that holds the marker do not change.
 
-**The Gerber IQ family does not call this function.** Its thresholds move with the pair whenever `sc` is not pair-separable, so an asset's magnitude class off the diagonal is not the class the assembled diagonal records, and the ratio leaves `[-1, 1]`. [`gerber_IQ`](@ref) divides by the pair's own two diagonal projections instead, which [`iq_add_diagonal`](@ref) accumulates. The other three families threshold each asset in its own units, so the assembled diagonal is the same number and this function stands.
+The Gerber IQ family does not call this function. When `sc` is not pair-separable, the thresholds of an asset change from one pair to the next. The magnitude class of an asset in a pair is then not the class that the diagonal records, and the ratio can leave `[-1, 1]`. [`gerber_IQ`](@ref) divides by the two diagonal projections of the pair instead, which [`iq_add_diagonal`](@ref) accumulates. The other three families compare each asset with a threshold in its own units. The diagonal entry of an asset is then correct for every pair, so this function gives the correct result.
 
 # Algorithm
 
 The acting method runs these steps. The fall-through method runs none of them.
 
- 1. Take the square roots of the diagonal of `rho`, clamped from below by `sqrt(eps(eltype(rho)))`, giving `h`. The clamp is what keeps an asset that admits no observation from a division by zero.
- 2. Divide `rho` element-wise by the outer product `h * transpose(h)`, and write the upper triangle back symmetrically.
+ 1. Take the square roots of the diagonal of `rho`, and clamp them from below at `sqrt(eps(eltype(rho)))`. The result is `h`. The clamp prevents a division by zero for an asset that admits no observation.
+ 2. Divide `rho` element-wise by the outer product `h * transpose(h)`, and copy the upper triangle into the lower triangle.
 
 # Arguments
 
-  - `alg`: Co-movement algorithm marker. It selects the acting method or the no-op.
+  - `alg`: Co-movement algorithm marker. It selects the acting method or the method that does nothing.
   - `rho`: `N × N` co-movement matrix, overwritten.
 
 # Returns
@@ -916,7 +920,7 @@ The acting method runs these steps. The fall-through method runs none of them.
 # Related
 
   - [`comovement_ratio`](@ref): the reduction whose [`GerberComovementTwo`](@ref) branch leaves the net score for this function to normalise.
-  - [`comovement_unit_diagonal!`](@ref): the repair of the diagonal that runs immediately after this function.
+  - [`comovement_unit_diagonal!`](@ref): the repair of the diagonal that runs after this function.
   - [`gerber_comovement!`](@ref)
   - [`GerberComovementTwo`](@ref)
 """
@@ -933,9 +937,9 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Write one onto a zero diagonal entry of an assembled co-movement matrix, in place.
 
-The correlation of an asset with itself is one by definition, whatever the sample holds. Every reduction of [`comovement_ratio`](@ref) already returns one there when the asset crosses its threshold at least once, so only the degenerate case is left. An asset that crosses no threshold gives a zero denominator for every pair it belongs to, takes the guarded `zero(T)` over its whole row, and takes it on its diagonal entry too. **It writes into `rho` and into nothing else**, so every other entry is unchanged afterwards.
+The correlation of an asset with itself is one by definition, for every sample. Each reduction of [`comovement_ratio`](@ref) returns one on the diagonal when the asset crosses its threshold at least once. This function corrects the other case. An asset that never crosses its threshold gives a zero denominator for every pair that contains it. Its whole row is then `zero(T)`, and its diagonal entry is `zero(T)` too. The function writes into `rho` and into nothing else, and it changes no other entry.
 
-**The write is guarded by `iszero`, and does not restate a diagonal that is already one.** A `2` marker divides the diagonal by its own square root twice, so its diagonal entry is one to within a unit in the last place rather than exactly one. [`posdef!`](@ref) reads its diagonal with an exact `isone` test to decide whether it holds a correlation matrix or a covariance matrix, and the two branches answer differently. Writing an exact one over an entry that already reads as one moves that branch, and with it the answer of a sample that carries no degenerate asset. The guard keeps this function to the defect it fixes.
+The function writes only where `iszero` holds, so it does not write over a diagonal entry that is near one. A `2` marker divides the diagonal by its own square root twice. Its diagonal entry is then within a unit in the last place of one, but not always exactly one. [`posdef!`](@ref) tests its diagonal with an exact `isone` to decide whether it holds a correlation matrix or a covariance matrix, and the two branches give different results. An exact one written over such an entry changes the branch, and so changes the result for a sample with no degenerate asset. The `iszero` test limits this function to the defect that it corrects.
 
 # Algorithm
 
@@ -951,10 +955,10 @@ The correlation of an asset with itself is one by definition, whatever the sampl
 
 # Related
 
-  - [`comovement_ratio`](@ref): the reduction whose guarded zero reaches the diagonal.
-  - [`standardise_comovement!`](@ref): the normalisation that runs immediately before this function.
+  - [`comovement_ratio`](@ref): the reduction that gives zero on the diagonal when the denominator is zero.
+  - [`standardise_comovement!`](@ref): the division by the diagonal that runs before this function.
   - [`gerber_comovement!`](@ref)
-  - [`posdef!`](@ref): the repair that runs immediately after this function, and that a zero diagonal turns into a `NaN`.
+  - [`posdef!`](@ref): the repair that runs after this function. It keeps a zero diagonal entry and its zero row, so it does not write the one.
 """
 function comovement_unit_diagonal!(rho::AbstractMatrix)
     o = one(eltype(rho))
@@ -968,23 +972,23 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fill the symmetric co-movement matrix `rho` by running the shared Gerber-family pairwise kernel.
+Fill the symmetric co-movement matrix `rho` with the pairwise loop that the Gerber-family policies share.
 
-The policy object `pol` (for example [`SmythBrobyKernel`](@ref) or [`GerberIQKernel`](@ref)) owns the thresholding, the classification and the weighting of a single observation, and the reduction of a pair's accumulator. The loop skeleton lives here once. **It writes into `rho` and into nothing else**, so `X` and `pol` are unchanged afterwards.
+The policy object `pol` is a [`SmythBrobyKernel`](@ref) or a [`GerberIQKernel`](@ref). The policy tests one observation against the thresholds, gives it a class and a weight, and reduces the accumulator of a pair. This function holds the loop over the pairs and the observations. It writes into `rho` and into nothing else, so `X` and `pol` do not change.
 
 # Algorithm
 
  1. Read the observation count `T` from the first dimension of `X`.
- 2. For every asset pair `(i, j)` with `i` at most `j`, run steps 3 to 6. The outer index is parallelised over the executor `ex`.
+ 2. For every asset pair `(i, j)` with `i` at most `j`, run steps 3 to 6. The executor `ex` runs the outer index in parallel.
  3. Build the pair state `st` with [`comovement_pair_state`](@ref).
- 4. Open the accumulator `acc` as the named tuple `(pos, neg, nn, cpos, cneg, cnn, di, dj)`, with the five scores at zero of `eltype(X)` and the three counts at integer zero. A policy reads the slots its marker needs and leaves the rest at zero. `di` and `dj` carry the two diagonal projections that the Gerber IQ `2` marker divides by; [`iq_add_diagonal`](@ref) is their only writer.
- 5. Fold every observation `k` of the pair through [`comovement_step`](@ref) into `acc`.
- 6. Reduce `acc` with [`comovement_finalise`](@ref) and write the result into `rho[i, j]` and `rho[j, i]`.
+ 4. Open the accumulator `acc` as the named tuple `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. The five scores start at zero of `eltype(X)`, and the three counts start at integer zero. A policy reads the slots that its marker needs, and the other slots stay at zero. `di` and `dj` hold the two diagonal projections that the Gerber IQ `2` marker divides by. Only [`iq_add_diagonal`](@ref) writes them.
+ 5. Add each observation `k` of the pair into `acc` with [`comovement_step`](@ref).
+ 6. Reduce `acc` with [`comovement_finalise`](@ref), and write the result into `rho[i, j]` and `rho[j, i]`.
 
 # Arguments
 
   - `rho::AbstractMatrix`: `N × N` output matrix, overwritten.
-  - `ex`: `FLoops` executor parallelising over the outer asset index.
+  - `ex`: `FLoops` executor that runs the outer asset index in parallel.
   - $(arg_dict[:X])
   - `pol`: Co-movement policy object.
 
@@ -1018,11 +1022,19 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Co-movement policy for [`gerber_comovement!`](@ref) implementing the Smyth-Broby family.
+Co-movement policy of the Smyth-Broby family for the shared pairwise loop.
 
-The confusion zone thresholds the raw, uncentred return by `c1 * sigma`. Observations that pass it are centred and standardised per asset, restricted to the significance zone by `c2` through [`sb_crossed`](@ref) and by `c3`, and classified by the sign of the product of the standardised returns. The `alg` marker selects the accumulation family ([`sb_add_pos`](@ref)) and the denominator policy ([`comovement_ratio`](@ref)). This type is configuration handed to [`gerber_comovement!`](@ref); it holds no result and it is never mutated.
+[`gerber_comovement!`](@ref) takes this policy. The confusion zone compares the raw, uncentred return with `c1 * sigma`. The policy centres and standardises each observation that passes the confusion zone. The indecision zone of `c2`, through [`sb_crossed`](@ref), and the outer cut-off at `c3` then admit or reject the observation. The sign of the product of the standardised returns gives the class of an admitted observation.
 
-The three zones are those of Section 2 of [smyth2022enhanced](@cite): the confusion zone of half-width ``c_1`` standard deviations, the indecision zone of half-width ``c_2``, and the outer cut-off at ``c_3``, which the source sets to 4. Section 3 of the source uses ``c_1 = c_2 = 0.5``, and those are the defaults. The source keeps a magnitude strictly below the cut-off. The library rejects only a magnitude above `c3`, so a magnitude equal to it stays.
+The `alg` marker selects the accumulation through [`sb_add_pos`](@ref) and the denominator through [`comovement_ratio`](@ref). This type is configuration. It holds no result, and nothing changes it.
+
+Section 2 of [smyth2022enhanced](@cite) defines the three zones:
+
+  - The confusion zone, of half-width ``c_1`` standard deviations.
+  - The indecision zone, of half-width ``c_2``.
+  - The outer cut-off at ``c_3``, which the source sets to 4.
+
+Section 3 of the source uses ``c_1 = c_2 = 0.5``, and these values are the defaults. The source keeps a magnitude strictly below the cut-off. The library rejects only a magnitude above `c3`, so it keeps a magnitude equal to `c3`.
 
 # Fields
 
@@ -1065,16 +1077,16 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Build the per-pair state consumed by [`comovement_step`](@ref).
+Build the state of a pair that [`comovement_step`](@ref) reads.
 
-The state holds every quantity that depends on the pair but not on the observation, so the inner loop reads it rather than recomputing it. The Gerber IQ method returns the pair's threshold scaling factors and scaled thresholds instead.
+The state holds each quantity that depends on the pair but not on the observation, so the inner loop does not compute it again. The Gerber IQ method returns the threshold scale factors and the scaled thresholds of the pair instead.
 
 # Algorithm
 
 The Smyth-Broby method runs these steps.
 
- 1. Read the two standard deviations `pol.sd[i]` and `pol.sd[j]`, giving `sigmai` and `sigmaj`.
- 2. Multiply each by `pol.c1`, giving the two confusion-zone thresholds `c1i` and `c1j`.
+ 1. Read the two standard deviations `pol.sd[i]` and `pol.sd[j]` as `sigmai` and `sigmaj`.
+ 2. Multiply each by `pol.c1`. The products are the two confusion-zone thresholds `c1i` and `c1j`.
  3. Return the named tuple `(mui, muj, sigmai, sigmaj, c1i, c1j)`, with the two means read from `pol.mu`.
 
 # Arguments
@@ -1089,7 +1101,7 @@ The Smyth-Broby method runs these steps.
 # Related
 
   - [`gerber_comovement!`](@ref)
-  - [`comovement_step`](@ref): the consumer of this state.
+  - [`comovement_step`](@ref): the function that reads this state.
   - [`SmythBrobyKernel`](@ref)
 """
 @inline function comovement_pair_state(pol::SmythBrobyKernel, i::Integer, j::Integer)
@@ -1101,9 +1113,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Union of the Smyth-Broby markers that accumulate the [`sb_delta`](@ref) contributions only, and discard the counts.
+Union of the Smyth-Broby markers that accumulate only the [`sb_delta`](@ref) contributions, and not the counts.
 
-The group exists because the marker **prefix** selects the score triple while the trailing digit selects the denominator, and the two choices are independent. This is the prefix the source itself defines: it sums contributions and counts no votes.
+The prefix of a marker selects the score triple, and the trailing digit selects the denominator. The two choices are independent, so each prefix has its own union. This prefix is the one that the source defines. It adds contributions and keeps no count.
 
 # Related
 
@@ -1121,7 +1133,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Union of the Smyth-Broby markers that accumulate both the [`sb_delta`](@ref) contributions and the co-movement counts, and score a pair by their product.
 
-The group exists because the marker **prefix** selects the score triple while the trailing digit selects the denominator, and the two choices are independent. The source's conclusion suggests keeping a count beside the sum and states no formula for it, so the product is the library's reading of that sentence.
+The prefix of a marker selects the score triple, and the trailing digit selects the denominator. The two choices are independent, so each prefix has its own union. Section 5 of the source suggests a count beside each sum and states no formula. The product is a choice of the library.
 
 # Related
 
@@ -1140,7 +1152,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Union of the Smyth-Broby markers that accumulate the co-movement counts only, and never evaluate [`sb_delta`](@ref).
 
-The group exists because the marker **prefix** selects the score triple while the trailing digit selects the denominator, and the two choices are independent. This prefix recovers a Gerber statistic evaluated on the Smyth-Broby zoning, so it is the library's own construction: the source counts no votes.
+The prefix of a marker selects the score triple, and the trailing digit selects the denominator. The two choices are independent, so each prefix has its own union. This prefix gives a Gerber statistic on the zones of Smyth-Broby. The source keeps no count, so this prefix is a construction of the library.
 
 # Related
 
@@ -1149,7 +1161,7 @@ The group exists because the marker **prefix** selects the score triple while th
   - [`SmythBrobyCount2`](@ref)
   - [`sb_add_pos`](@ref): the accumulator that dispatches on this alias.
   - [`sb_pair_scores`](@ref): the selector that dispatches on this alias.
-  - [`GerberCovariance`](@ref): the statistic this prefix recovers when the confusion zone is switched off, the outer cut-off is lifted, and the centre is zero.
+  - [`GerberCovariance`](@ref): the statistic that this prefix gives when `c1` is zero, `c2` is the Gerber threshold `t`, `c3` is above every return, and the mean of each asset is zero.
   - [`SmythBrobyDeltaAlg`](@ref)
   - [`SmythBrobyGerberAlg`](@ref)
 """
@@ -1157,22 +1169,22 @@ const SmythBrobyCountAlg = Union{<:SmythBrobyCount0, <:SmythBrobyCount1, <:Smyth
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Accumulate a concordant observation into the pair accumulator, according to the Smyth-Broby family of `alg`.
+Add a concordant observation to the pair accumulator, as the prefix of `alg` selects.
 
-The accumulator is a named tuple and every method returns a new one, so nothing is mutated.
+The accumulator is a named tuple. Each method returns a new accumulator and changes no argument.
 
 # Algorithm
 
 The marker prefix selects one of three branches.
 
- 1. [`SmythBrobyDeltaAlg`](@ref): add [`sb_delta`](@ref) to `acc.pos`, and leave `acc.cpos` alone.
+ 1. [`SmythBrobyDeltaAlg`](@ref): add [`sb_delta`](@ref) to `acc.pos`, and do not change `acc.cpos`.
  2. [`SmythBrobyGerberAlg`](@ref): add [`sb_delta`](@ref) to `acc.pos`, and add one to `acc.cpos`.
- 3. [`SmythBrobyCountAlg`](@ref): add one to `acc.cpos`, and never evaluate [`sb_delta`](@ref).
+ 3. [`SmythBrobyCountAlg`](@ref): add one to `acc.cpos`, and do not evaluate [`sb_delta`](@ref).
 
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
   - `ari`, `arj`: Absolute centred standardised returns of the two assets at the observation.
   - $(arg_dict[:sbn])
 
@@ -1199,22 +1211,22 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Accumulate a discordant observation into the pair accumulator, according to the Smyth-Broby family of `alg`.
+Add a discordant observation to the pair accumulator, as the prefix of `alg` selects.
 
-It mirrors [`sb_add_pos`](@ref) on the discordant score and count, branch for branch.
+It has the same three branches as [`sb_add_pos`](@ref), on the discordant score and count.
 
 # Algorithm
 
 The marker prefix selects one of three branches.
 
- 1. [`SmythBrobyDeltaAlg`](@ref): add [`sb_delta`](@ref) to `acc.neg`, and leave `acc.cneg` alone.
+ 1. [`SmythBrobyDeltaAlg`](@ref): add [`sb_delta`](@ref) to `acc.neg`, and do not change `acc.cneg`.
  2. [`SmythBrobyGerberAlg`](@ref): add [`sb_delta`](@ref) to `acc.neg`, and add one to `acc.cneg`.
- 3. [`SmythBrobyCountAlg`](@ref): add one to `acc.cneg`, and never evaluate [`sb_delta`](@ref).
+ 3. [`SmythBrobyCountAlg`](@ref): add one to `acc.cneg`, and do not evaluate [`sb_delta`](@ref).
 
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
   - `ari`, `arj`: Absolute centred standardised returns of the two assets at the observation.
   - $(arg_dict[:sbn])
 
@@ -1241,9 +1253,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Accumulate a neutral observation into the pair accumulator. An observation is neutral when exactly one of the two assets left the indecision zone, which [`sb_crossed`](@ref) decides.
+Add a neutral observation to the pair accumulator. An observation is neutral when exactly one of the two assets leaves the indecision zone, and [`sb_crossed`](@ref) decides which assets leave it.
 
-Only the [`GerberComovementOne`](@ref) markers reach an acting method, because they are the only ones whose denominator carries a neutral term. The fall-through method returns the accumulator unchanged, so the neutral score of every other marker stays at zero and is read by no reduction.
+Only the [`GerberComovementOne`](@ref) markers reach an acting method, because only their denominator has a neutral term. The fall-through method returns the accumulator unchanged. The neutral score of every other marker therefore stays at zero, and no reduction reads it.
 
 # Algorithm
 
@@ -1251,13 +1263,13 @@ The marker selects one of four branches.
 
  1. [`SmythBroby1`](@ref): add [`sb_delta`](@ref) to `acc.nn`.
  2. [`SmythBrobyGerber1`](@ref): add [`sb_delta`](@ref) to `acc.nn`, and add one to `acc.cnn`.
- 3. [`SmythBrobyCount1`](@ref): add one to `acc.cnn`, and never evaluate [`sb_delta`](@ref).
+ 3. [`SmythBrobyCount1`](@ref): add one to `acc.cnn`, and do not evaluate [`sb_delta`](@ref).
  4. Any other [`SmythBrobyCovarianceAlgorithm`](@ref): return `acc` unchanged.
 
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
   - `ari`, `arj`: Absolute centred standardised returns of the two assets at the observation. The fall-through method reads neither.
   - $(arg_dict[:sbn])
 
@@ -1291,13 +1303,13 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Decide whether one asset left the indecision zone at one observation.
+Decide whether one asset leaves the indecision zone at one observation.
 
-An asset leaves the indecision zone when the magnitude of its centred, standardised return reaches `c2` **and** that return is not exactly zero. The sign test is redundant for a positive threshold, because `ar >= c > 0` already implies that `r` is not zero. It binds only at `c2 = 0`, where the closed comparison `ar >= 0` holds for every return, including one that is exactly zero. A return of exactly zero never crosses, and this is that rule for the Smyth-Broby family.
+An asset leaves the indecision zone when the magnitude of its centred, standardised return is at least `c2`, and that return is not exactly zero. For a positive threshold, the second test changes nothing, because `ar >= c > 0` already implies that `r` is not zero. The second test matters only at `c2 = 0`. There, `ar >= 0` holds for every return, a return of exactly zero included. With the second test, a return of exactly zero never crosses.
 
-The rule is what keeps the diagonal of the statistic at one. The pair `(i, i)` either crosses on both axes or on neither, so it never reaches the neutral accumulator that a [`GerberComovementOne`](@ref) marker divides by. Without the sign test a zero return crossed on both axes but carried no sign, so it fell through to that accumulator and pulled the diagonal below one.
+This rule keeps the diagonal of the statistic at one. The pair `(i, i)` crosses on both axes or on neither, so it never reaches the neutral accumulator, which a [`GerberComovementOne`](@ref) marker divides by. Without the second test, at `c2 = 0`, a return of exactly zero crosses on both axes but has no sign. [`comovement_step`](@ref) then adds it to the neutral accumulator, and the diagonal falls below one.
 
-**The rule binds on this gate and not on the confusion zone.** The two gates read different quantities. Here the quantity is centred, so an exactly zero return is an asset that did not move away from its own mean, and it has no sign to classify. The confusion zone reads the **raw, uncentred** return, whose zero is an arbitrary point of the scale of the data: an asset whose raw return is zero moved by ``-\\mu`` against its mean, which is a deviation with a sign. That gate also only rejects and never classifies, so it produces no wrong count of its own.
+The rule applies to the indecision zone and not to the confusion zone, because the two zones test different quantities. The indecision zone tests the centred return. A centred return of exactly zero is an asset at its own mean, and it has no sign to classify. The confusion zone tests the raw, uncentred return, and the zero of that return is an arbitrary point on the scale of the data. A raw return of zero is a deviation of ``-\\mu`` from the mean, and that deviation has a sign. The confusion zone also only rejects observations and never classifies them, so it cannot give a wrong count.
 
 # Arguments
 
@@ -1321,26 +1333,26 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Fold one observation of a pair into the co-movement accumulator.
+Add one observation of a pair to the co-movement accumulator.
 
-**The confusion zone reads the raw, uncentred return and the indecision zone reads the centred, standardised one.** That mix is the source's, not an oversight, and centring the confusion zone as well moves the statistic. The mix also decides which gate carries the rule that a return of exactly zero never crosses: [`sb_crossed`](@ref) keeps a return of exactly zero inside the indecision zone, and the confusion zone takes no such test, because the zero of a raw return is an arbitrary point of the scale of the data. The Gerber IQ method thresholds absolute returns against the pair's scaled thresholds with [`iq_crossed`](@ref), and weights observations by the IQ template and temporal decay via [`gerber_IQ_delta`](@ref).
+The confusion zone tests the raw, uncentred return, and the indecision zone tests the centred, standardised return. Section 2 of [smyth2022enhanced](@cite) defines the two zones this way, and a confusion zone on the centred return changes the statistic. Because the two zones test different quantities, only the indecision zone has the rule that a return of exactly zero never crosses. [`sb_crossed`](@ref) states that rule. The Gerber IQ method compares absolute returns with the scaled thresholds of the pair through [`iq_crossed`](@ref). It weights each observation by the IQ template and by the temporal decay through [`gerber_IQ_delta`](@ref).
 
 # Algorithm
 
-The Smyth-Broby method runs these steps. It reads `T` and `k` in neither, because the family applies no temporal decay.
+The Smyth-Broby method runs these steps. It does not read `T` or `k`, because the family applies no temporal decay.
 
- 1. Return `acc` unchanged when `abs(xi)` is below `st.c1i` **and** `abs(xj)` is below `st.c1j`. This is the confusion zone, read on the raw return.
- 2. Centre and standardise both returns with the pair state, giving `ri` and `rj`, and take their magnitudes `ari` and `arj`.
- 3. Decide with [`sb_crossed`](@ref) whether each asset left the indecision zone of `pol.c2`.
- 4. Return `acc` unchanged when either magnitude exceeds `pol.c3`, or when neither asset left the indecision zone. The first is the outer cut-off and the second is the indecision zone itself.
- 5. Accumulate through [`sb_add_pos`](@ref) when both assets crossed and the product `ri * rj` is positive.
- 6. Accumulate through [`sb_add_neg`](@ref) when both assets crossed and the product is negative.
- 7. Accumulate through [`sb_add_neutral`](@ref) otherwise, which is the case where exactly one asset crossed. Two crossings give a product that is not zero, so the three branches are exhaustive.
+ 1. Return `acc` unchanged when `abs(xi)` is below `st.c1i` and `abs(xj)` is below `st.c1j`. This is the confusion zone, on the raw return.
+ 2. Centre and standardise both returns with the pair state. The results are `ri` and `rj`, and their magnitudes are `ari` and `arj`.
+ 3. Decide with [`sb_crossed`](@ref) whether each asset leaves the indecision zone of `pol.c2`.
+ 4. Return `acc` unchanged when either magnitude is above `pol.c3`, or when neither asset leaves the indecision zone. The first case is the outer cut-off, and the second case is the indecision zone.
+ 5. Accumulate through [`sb_add_pos`](@ref) when both assets cross and the product `ri * rj` is positive.
+ 6. Accumulate through [`sb_add_neg`](@ref) when both assets cross and the product is negative.
+ 7. In all other cases, accumulate through [`sb_add_neutral`](@ref). This is the case where exactly one asset crosses. When both assets cross, the product is not zero, so the three branches cover every admitted observation.
 
 # Arguments
 
   - `pol`: Co-movement policy object.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
   - `st`: Pair state from [`comovement_pair_state`](@ref).
   - `xi`, `xj`: Returns of assets `i` and `j` at observation `k`.
   - `T`: Number of observations.
@@ -1382,9 +1394,9 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Select the pair's concordant, discordant and neutral scores from the accumulator, according to the Smyth-Broby family of `alg`.
+Return the concordant, discordant and neutral scores of a pair from the accumulator, as the prefix of `alg` selects.
 
-This is the half of the marker that the **prefix** owns. [`comovement_ratio`](@ref) owns the other half, which the trailing digit selects.
+This function dispatches on the prefix of the marker. [`comovement_ratio`](@ref) dispatches on its trailing digit.
 
 # Algorithm
 
@@ -1397,7 +1409,7 @@ The marker prefix selects one of three branches.
 # Arguments
 
   - `alg`: Smyth-Broby algorithm marker.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
 
 # Returns
 
@@ -1423,20 +1435,20 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Reduce a pair's accumulator to the pairwise co-movement statistic.
+Reduce the accumulator of a pair to the co-movement statistic of the pair.
 
-It joins the two halves of the marker: the prefix chooses the scores and the trailing digit chooses the denominator.
+It applies both parts of the marker. The prefix selects the scores, and the trailing digit selects the denominator.
 
 # Algorithm
 
- 1. Select the score triple `(p, n, nn)` from `acc` with [`sb_pair_scores`](@ref), which the marker prefix dispatches.
- 2. Reduce the triple with [`comovement_ratio`](@ref), which the trailing digit dispatches, and return the result.
+ 1. Select the score triple `(p, n, nn)` from `acc` with [`sb_pair_scores`](@ref), which dispatches on the marker prefix.
+ 2. Reduce the triple with [`comovement_ratio`](@ref), which dispatches on the trailing digit, and return the result.
 
 # Arguments
 
   - `pol`: Co-movement policy object.
-  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn)`.
-  - `T`: Element type used for the guarded zero.
+  - `acc`: Pair accumulator `(pos, neg, nn, cpos, cneg, cnn, di, dj)`. This family does not read `di` and `dj`.
+  - `T`: Element type of the zero that a zero denominator gives.
 
 # Returns
 
@@ -1456,13 +1468,13 @@ end
 """
     smythbroby(ce::SmythBrobyCovariance, X::MatNum, mu::ArrNum, sd::ArrNum)
 
-Compute the Smyth-Broby co-movement correlation matrix for the algorithm marker in `ce.alg`.
+Compute the Smyth-Broby correlation matrix with the marker in `ce.alg`.
 
-All nine variants share the pairwise kernel [`gerber_comovement!`](@ref) through a [`SmythBrobyKernel`](@ref) policy: observations are noise-gated by `c1 * sigma`, standardised, restricted to the `[c2, c3]` significance zone by [`sb_crossed`](@ref), and classified as concordant, discordant, or neutral by the sign of the product of standardised returns. The marker selects the accumulation family and denominator policy.
+All nine markers share the pairwise loop of [`gerber_comovement!`](@ref) through a [`SmythBrobyKernel`](@ref) policy. The marker selects the scores and the denominator.
 
 # Mathematical definition
 
-For each pair ``(i, j)`` an observation ``t`` passes two admission tests. The **noise gate** compares the **raw, uncentred** return against ``c_1 \\sigma``, and rejects ``t`` only when both assets fall inside it:
+For each pair ``(i, j)``, an observation ``t`` must pass two tests. The confusion zone compares the raw, uncentred return with ``c_1 \\sigma``. It rejects ``t`` only when both assets are inside it:
 
 ```math
 \\begin{align}
@@ -1470,7 +1482,7 @@ For each pair ``(i, j)`` an observation ``t`` passes two admission tests. The **
 \\end{align}
 ```
 
-The **significance zone** compares the **centred, standardised** return ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i``. Asset ``i`` crosses at ``t`` when
+The indecision zone compares the centred, standardised return ``\\tilde{r}_{ti} = (x_{ti} - \\mu_i) / \\sigma_i`` with ``c_2``. Asset ``i`` crosses at ``t`` when
 
 ```math
 \\begin{align}
@@ -1478,9 +1490,9 @@ The **significance zone** compares the **centred, standardised** return ``\\tild
 \\end{align}
 ```
 
-and the zone rejects ``t`` when either asset exceeds ``c_3`` or neither asset crosses. The second test of the crossing binds only at ``c_2 = 0``, because ``|\\tilde{r}| \\geq c_2 > 0`` already excludes a zero return. A return of exactly zero never crosses for this family, and [`sb_crossed`](@ref) is where the code states it. The gate reads the uncentred return and the zone reads the centred one; this mix is the source's, not an oversight. Centering the gate as well moves the statistic, and the rule binds on the centred quantity alone.
+and the indecision zone rejects ``t`` when neither asset crosses. The outer cut-off rejects ``t`` when either asset is above ``c_3``. The second condition matters only at ``c_2 = 0``, because ``|\\tilde{r}| \\geq c_2 > 0`` already excludes a zero return. [`sb_crossed`](@ref) holds this rule. Section 2 of [smyth2022enhanced](@cite) puts the confusion zone on the uncentred return and the indecision zone on the centred return. A confusion zone on the centred return changes the statistic.
 
-An admitted observation is concordant when both assets cross and ``\\tilde{r}_{ti} \\tilde{r}_{tj} > 0``, discordant when both cross and the product is negative, and neutral otherwise, which is the case where exactly one asset crosses. Accumulate the kernel and the count of each class over the admitted observations:
+An admitted observation is concordant when both assets cross and ``\\tilde{r}_{ti} \\tilde{r}_{tj} > 0``. It is discordant when both assets cross and the product is negative. It is neutral when exactly one asset crosses. The sums and the counts of each class over the admitted observations are:
 
 ```math
 \\begin{align}
@@ -1503,13 +1515,13 @@ Where:
   - $(math_dict[:poscount_sb])
   - $(math_dict[:pqu_sb])
 
-with ``\\delta_t = \\delta(|\\tilde{r}_{t,\\,i}|, |\\tilde{r}_{t,\\,j}|, n)`` the [`sb_delta`](@ref) contribution. The marker prefix selects the three scores ``(p, q, u)``:
+Here ``\\delta_t = \\delta(|\\tilde{r}_{t,\\,i}|, |\\tilde{r}_{t,\\,j}|, n)`` is the [`sb_delta`](@ref) contribution. The marker prefix selects the three scores ``(p, q, u)``:
 
   - `SmythBroby*`: ``(\\text{pos},\\, \\text{neg},\\, \\text{nn})``.
-  - `SmythBrobyGerber*`: ``(\\text{pos} \\, c^{+},\\, \\text{neg} \\, c^{-},\\, \\text{nn} \\, c^{0})``. Every term carries its own count, the neutral one included.
+  - `SmythBrobyGerber*`: ``(\\text{pos} \\, c^{+},\\, \\text{neg} \\, c^{-},\\, \\text{nn} \\, c^{0})``. Each sum has its own count, the neutral sum included.
   - `SmythBrobyCount*`: ``(c^{+},\\, c^{-},\\, c^{0})``.
 
-The variant number selects the reduction, with ``h_{ij} = p - q`` the raw difference:
+The trailing digit selects the reduction, where ``h_{ij} = p - q`` is the net score:
 
 ```math
 \\begin{align}
@@ -1521,18 +1533,18 @@ h_{ij} / \\sqrt{h_{ii} \\, h_{jj}} & 2
 \\end{align}
 ```
 
-Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides the **net** score matrix by the geometric mean of its own diagonal, with the roots clamped below at ``\\sqrt{\\varepsilon}``. It does **not** normalise the variant 0 ratio: the two agree only where ``p + q`` is constant across pairs.
+The digits `0` and `1` give zero when the denominator is zero. The digit `2` divides the matrix of net scores by the geometric mean of its diagonal, and clamps each root from below at ``\\sqrt{\\varepsilon}``. The result is not the ratio of the digit `0` after a second division. The two are equal only where ``p + q`` is the same for every pair.
 
-**Only the `SmythBroby1` composition is the source's own.** It is equation (5) of the source, and the source defines no other statistic. The trailing `0` and `2` are the library's reductions, on the shape [`Gerber0`](@ref) and [`Gerber2`](@ref) set. The `SmythBrobyGerber*` prefix reads one sentence of the source's conclusion, which suggests keeping a count beside the sum and states no formula. The `SmythBrobyCount*` prefix is the library's own: the source counts no votes, and that prefix recovers the Gerber statistic on the Smyth-Broby zoning.
+Of the nine markers, only `SmythBroby1` is a statistic of the source. It is Equation 5 of the source, and the source defines no other statistic. The trailing digits `0` and `2` are reductions of the library, as [`Gerber0`](@ref) and [`Gerber2`](@ref) are for the Gerber statistic. The `SmythBrobyGerber*` prefix is how the library reads Section 5 of the source. Section 5 suggests a count beside each sum and states no formula. The `SmythBrobyCount*` prefix is a construction of the library, because the source keeps no count.
 
 # Algorithm
 
- 1. Read the asset count `N` from the second dimension of `X`, and open the `N × N` output `rho`.
+ 1. Read the asset count `N` from the second dimension of `X`, and allocate the `N × N` output `rho`.
  2. Build the policy `pol` as a [`SmythBrobyKernel`](@ref) from `ce.alg`, `mu`, `sd`, `ce.c1`, `ce.c2`, `ce.c3` and `ce.n`.
- 3. Fill `rho` with [`gerber_comovement!`](@ref), over the executor `ce.ex`.
- 4. Normalise `rho` in place with [`standardise_comovement!`](@ref). Only a `2` marker changes it.
- 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that qualifies no observation reduces to a zero diagonal entry, and that entry is one by definition.
- 6. Repair `rho` with [`posdef!`](@ref) and the estimator's `pdm`. A Smyth-Broby matrix is a matrix of pairwise scores and is not positive definite in general.
+ 3. Fill `rho` with [`gerber_comovement!`](@ref) on the executor `ce.ex`.
+ 4. Divide `rho` in place by the geometric mean of its diagonal with [`standardise_comovement!`](@ref). Only a `2` marker changes `rho`.
+ 5. Write one onto a zero diagonal entry of `rho` with [`comovement_unit_diagonal!`](@ref). An asset that admits no observation has a zero diagonal entry, and that entry is one by definition.
+ 6. Repair `rho` with [`posdef!`](@ref) and the `pdm` field of the estimator, because a Smyth-Broby matrix is not positive definite in general. It does nothing when `ce.pdm` is `nothing`.
 
 # Arguments
 
@@ -1543,7 +1555,7 @@ Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides 
 
 # Returns
 
-  - `rho::Matrix{<:Number}`: The Smyth-Broby correlation matrix, projected to be positive definite using the estimator's `pdm` field.
+  - `rho::Matrix{<:Number}`: The Smyth-Broby correlation matrix, after the repair of the `pdm` field of the estimator.
 
 # Related
 
@@ -1554,7 +1566,7 @@ Variants 0 and 1 return zero when their denominator vanishes. Variant 2 divides 
   - [`comovement_unit_diagonal!`](@ref)
   - [`sb_delta`](@ref)
   - [`posdef!`](@ref)
-  - [`GerberCovariance`](@ref): the statistic this family extends. Its matrix form is stated there and is not repeated here.
+  - [`GerberCovariance`](@ref): the statistic that this family extends. Its docstring states the matrix form, and this docstring does not repeat it.
 
 # References
 
@@ -1575,13 +1587,13 @@ end
 
 Compute the Smyth-Broby correlation matrix.
 
-The mean and the standard deviation are computed by the estimator's own `me` and `ve`, so the centre and the scale that the zoning reads are the estimator's choice and not this method's.
+The `me` and `ve` fields of the estimator compute the mean and the standard deviation. The estimator, not this method, therefore sets the centre and the scale of the zones.
 
 # Algorithm
 
  1. Orient `X` to observations × assets with [`dims_oriented`](@ref).
- 2. Compute the standard deviation of each column with `ce.ve`, giving `sd`, and clamp it from below by `eps(eltype(sd))`. The clamp keeps a constant column from dividing by zero.
- 3. Compute the mean of each column with `ce.me`, giving `mu`.
+ 2. Compute the standard deviation `sd` of each column with `ce.ve`, and clamp it from below at `eps(eltype(sd))`. The clamp prevents a division by zero for a constant column.
+ 3. Compute the mean `mu` of each column with `ce.me`.
  4. Return the matrix that [`smythbroby`](@ref) builds from `X`, `mu` and `sd`.
 
 # Arguments
@@ -1589,7 +1601,7 @@ The mean and the standard deviation are computed by the estimator's own `me` and
   - `ce`: Smyth-Broby covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
+  - `kwargs...`: Keyword arguments for the mean estimator and for the standard deviation estimator.
 
 # Validation
 
@@ -1619,22 +1631,22 @@ end
 
 Compute the Smyth-Broby covariance matrix.
 
-The correlation matrix is rescaled by the same `sd` the zoning read, so the covariance is exactly the correlation times the outer product of `sd`, and its diagonal is exactly `sd .^ 2`.
+The method scales the correlation matrix by the same `sd` that the zones use. The covariance is therefore exactly the correlation times the outer product of `sd`, and its diagonal is exactly `sd .^ 2`.
 
 # Algorithm
 
  1. Orient `X` to observations × assets with [`dims_oriented`](@ref).
- 2. Compute the standard deviation of each column with `ce.ve`, giving `sd`, and clamp it from below by `eps(eltype(sd))`.
- 3. Compute the mean of each column with `ce.me`, giving `mu`.
+ 2. Compute the standard deviation `sd` of each column with `ce.ve`, and clamp it from below at `eps(eltype(sd))`.
+ 3. Compute the mean `mu` of each column with `ce.me`.
  4. Build the correlation matrix `sigma` with [`smythbroby`](@ref) from `X`, `mu` and `sd`.
- 5. Rescale `sigma` in place with `StatsBase.cor2cov!` and `sd`, and return it.
+ 5. Scale `sigma` in place to a covariance matrix with `StatsBase.cor2cov!` and `sd`, and return it.
 
 # Arguments
 
   - `ce`: Smyth-Broby covariance estimator.
   - $(arg_dict[:X])
   - $(arg_dict[:dims])
-  - `kwargs...`: Additional keyword arguments passed to the mean and standard deviation estimators.
+  - `kwargs...`: Keyword arguments for the mean estimator and for the standard deviation estimator.
 
 # Validation
 

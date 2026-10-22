@@ -2301,6 +2301,11 @@ end
         # visible one level down. This is the behaviour the constructor now keeps out.
         @test PO.sb_delta(1.5, 1.5, -2) == 0.0
         @test PO.sb_delta(1.5, 0.5, -2) > 0.9
+        # At `n = Inf` an observation whose two magnitudes differ by more than one gives
+        # zero, and one whose magnitudes differ by less than one gives `kappa`, as the
+        # `## Validation` of `SmythBrobyCovariance` states.
+        @test PO.sb_delta(2.5, 1.0, Inf) == 0.0
+        @test PO.sb_delta(1.5, 1.0, Inf) == sqrt(2.5 * 2.0)
         # Every `n` the guard admits gives a unit diagonal and a finite matrix.
         for n in (0, 0.5, 2, Inf)
             r = cor(SmythBrobyCovariance(; n = n, alg = SmythBroby1(), pdm = nothing), X)
@@ -2348,6 +2353,36 @@ end
         fixed = cor(SmythBrobyCovariance(; alg = SmythBroby0()), X)
         @test minimum(eigvals(Symmetric(fixed))) >= -sqrt(eps(Float64))
         @test !isapprox(raw, fixed)
+    end
+
+    @testset "the neutral term does not keep the matrix positive semidefinite" begin
+        #=
+        Section 2 of the source states, with no proof (its footnote 2), that the neutral
+        sum keeps the covariance matrix positive semidefinite. The docstrings of
+        `SmythBroby1` and `GerberComovementOne` used to repeat the claim as a fact. On 30
+        standard normal observations of 20 assets the two contribution markers of the `1`
+        digit are indefinite, while `Gerber1` and `SmythBrobyCount1` are not.
+        =#
+        X = randn(StableRNG(21), 30, 20)
+        lmin(ce) = minimum(eigvals(Symmetric(cor(ce, X))))
+        @test lmin(SmythBrobyCovariance(; alg = SmythBroby1(), pdm = nothing)) < -0.05
+        @test lmin(SmythBrobyCovariance(; alg = SmythBrobyGerber1(), pdm = nothing)) < -0.3
+        @test lmin(SmythBrobyCovariance(; alg = SmythBrobyCount1(), pdm = nothing)) > 0
+        @test lmin(GerberCovariance(; alg = Gerber1(), pdm = nothing)) > 0
+        # `pdm` repairs both.
+        for a in (SmythBroby1(), SmythBrobyGerber1())
+            @test lmin(SmythBrobyCovariance(; alg = a)) >= -sqrt(eps(Float64))
+        end
+    end
+
+    @testset "posdef! keeps a zero diagonal entry, so the unit diagonal is written first" begin
+        # `comovement_unit_diagonal!` runs before `posdef!` because the repair keeps a zero
+        # variance and its zero row and column. It never writes the one itself.
+        A = [0.0 0.0 0.0; 0.0 1.0 0.5; 0.0 0.5 1.0]
+        PO.posdef!(Posdef(), A)
+        @test A[1, 1] == 0.0
+        @test all(iszero, A[1, :])
+        @test all(isfinite, A)
     end
 end
 

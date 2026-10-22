@@ -101,18 +101,18 @@ unique_key_dict!(math_dict, :math_dict,
                  # The Smyth-Broby family. `02_SmythBrobyCovariance.jl` states the
                  # statistic, and it shares the Gerber symbols above.
                  :r_tilde_sb => "``\\tilde{r}_{t,\\,i} = (x_{t,\\,i} - \\mu_i) / \\sigma_i``: Centred, standardised return of asset ``i`` at observation ``t``.",#
-                 :c1_sb => "``c_1``: Confusion-zone threshold. It is read against the **raw, uncentred** return, and it rejects an observation only when both assets fall inside it.",#
-                 :c2_sb => "``c_2``: Indecision-zone threshold. It is read against the **centred, standardised** return, and it rejects an observation when both assets fall inside it. A centred return of exactly zero is inside it at every ``c_2``.",#
-                 :c3_sb => "``c_3``: Outer cut-off. It is read against the centred, standardised return, and it rejects an observation when either asset exceeds it.",#
+                 :c1_sb => "``c_1``: Confusion-zone threshold on the raw, uncentred return. The confusion zone rejects an observation only when both assets are inside it.",#
+                 :c2_sb => "``c_2``: Indecision-zone threshold on the centred, standardised return. The indecision zone rejects an observation when both assets are inside it. A centred return of exactly zero is inside the zone at every ``c_2``.",#
+                 :c3_sb => "``c_3``: Outer cut-off on the centred, standardised return. The cut-off rejects an observation when either asset is above it.",#
                  :kappa_sb => "``\\kappa``: Amplitude kernel of a pair, the geometric mean of the two gross standardised magnitudes.",#
                  :gamma_sb => "``\\gamma``: Divergence of a pair, the absolute difference of the two standardised magnitudes.",#
-                 :n_sb => "``n``: Severity exponent. It sets how hard the divergence of a pair is penalised.",#
-                 :delta_sb => "``\\delta``: Smyth-Broby contribution of one admitted observation, in place of the Gerber vote.",#
+                 :n_sb => "``n``: Severity exponent. The denominator of ``\\delta`` is ``1 + \\gamma^{n}``, so a larger ``n`` gives a larger penalty to a divergence above one.",#
+                 :delta_sb => "``\\delta``: Smyth-Broby contribution of one admitted observation, in place of the Gerber count of one.",#
                  :CDN_sb => "``C``, ``D``, ``N``: Concordant, discordant and neutral observation sets of a pair, over the admitted observations.",#
                  :possum_sb => "``\\mathrm{pos}``, ``\\mathrm{neg}``, ``\\mathrm{nn}``: Contribution sums of a pair over ``C``, ``D`` and ``N``.",#
                  :poscount_sb => "``c^{+}``, ``c^{-}``, ``c^{0}``: Observation counts of a pair over ``C``, ``D`` and ``N``.",#
-                 :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair, chosen from the sums and the counts by the marker prefix.",#
-                 :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any normalisation.",#
+                 :pqu_sb => "``p``, ``q``, ``u``: Concordant, discordant and neutral scores of a pair. The marker prefix selects them from the sums and the counts.",#
+                 :h_ij_sb => "``h_{i,\\,j} = p - q``: Net score of the pair, before any division.",#
                  # The higher comoments. `18_Coskewness.jl` and `19_Cokurtosis.jl`
                  # build both matrices from one deviation matrix and one pairwise
                  # expansion of it, so the two files share these four symbols.
