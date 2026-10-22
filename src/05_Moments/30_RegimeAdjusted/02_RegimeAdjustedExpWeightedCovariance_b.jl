@@ -1561,7 +1561,7 @@ end
 
 Answer `NaN`, so a gapped sample reaches the recursion with its gaps intact.
 
-The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill would both decay a frozen block and move the regime it is weighted by. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
+The recursion updates only the sub-block of the assets that are valid at each observation, and the regime weight is taken from that sub-block alone, so a fill decays a frozen block and moves the regime that the block weighs. The consumer therefore hands the sample as it stands, together with the active mask that explains the gap.
 
 # Arguments
 
@@ -1989,7 +1989,8 @@ Refuses a pair of regime-adjusted covariance states, because this family does no
 
 A block fitted from a cold start is not what the same block contributes after another one. The
 regime statistic scores each observation against the state that stands before it, so a cold
-block loses every comparison its first `min_obs` observations would have made, and a correlation
+block does not score its first `min_obs` observations, which the same block after another one
+scores. A correlation
 state that is normalised by a running variance carries that variance with it.
 
 Fold the second block into the first with [`partial_fit!`](@ref) instead. A sequential fit is

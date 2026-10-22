@@ -258,4 +258,11 @@ unique_key_dict!(math_dict, :math_dict,
                  :F_fam_att => "``\\mathcal{F}``: Raw factors of one family.",#
                  :Q_t_att => "``\\mathbf{Q}_{t}``: Regression weight matrix of observation ``t``, diagonal, holding the cross-sectional weight of each asset.",#
                  :Omega_t_att => "``\\boldsymbol{\\Omega}_{t}``: Idiosyncratic variance matrix of observation ``t``, diagonal, holding the idiosyncratic variance of each asset.",#
-                 :V_t_att => "``\\mathbf{V}_{t}``: Sandwich covariance of the factor returns the cross-sectional fit estimates at observation ``t``, ``K \\times K``.")
+                 :V_t_att => "``\\mathbf{V}_{t}``: Sandwich covariance of the factor returns the cross-sectional fit estimates at observation ``t``, ``K \\times K``.",#
+                 # The regime adjustment of an exponentially weighted moment.
+                 :g_t_regime => "``g_{t}``: Regime statistic of observation ``t``, which the regime state smooths.",#
+                 :A_t_regime => "``\\mathcal{A}_{t}``, ``n_{t}``: Scored assets of observation ``t``, the assets whose returns the regime statistic reads, and their count.",#
+                 :z2_it_regime => "``z_{i,t}^{2}``: Standardised squared return of asset ``i`` at observation ``t``, the squared deviation over the variance that the estimate before ``t`` predicts.",#
+                 :s_t_regime => "``s_{t}``: Smoothed regime state after observation ``t``.",#
+                 :lambda_r_regime => "``\\lambda_{r}``: Decay of the regime state, the `regime_decay` field.",#
+                 :mult_regime => "``\\mathrm{mult}(s)``: Volatility multiplier of a regime state ``s``. The estimator scales its variance or its covariance by the square of the multiplier.")

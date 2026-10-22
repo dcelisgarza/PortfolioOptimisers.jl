@@ -61,11 +61,11 @@ unique_key_dict!(val_dict, :val_dict, :oow => "If `w` is not `nothing`, `!isempt
                  :katz_alpha => "`alpha > 0`.",#
                  :min_obs => "`min_obs > 0`.",#
                  :hac_lags => "If `hac_lags` is not `nothing`, `hac_lags > 0`.",#
+                 :regime_decay => "`0 < regime_decay < 1`.",#
                  :regime_min_obs => "`regime_min_obs > 0`.",#
                  :regime_lohi_mult => "If `regime_lohi_mult` is not `nothing`, `0 < regime_lohi_mult[1] < regime_lohi_mult[2]`.",#
-                 :ra_x => "`x` is valid",#
-                 :ra_y => "`y` is valid",#
-                 :ra_norm_x => "`x` is valid",#
+                 :ra_x => "`x > 0`, and `x` is finite.",#
+                 :ra_y => "`y > 0`, and `y` is finite.",#
                  :relax => "The encoding is not exact: the entries below bound the quantity instead of reproducing it, and the bound is tight only under the condition stated here.")
 unique_key_dict!(ret_dict, :ret_dict,
                  :mu => "`mu::ArrNum`: Expected returns vector `assets x 1` if the `dims` keyword does not exist or `dims = 2`, `1 x assets` if `dims = 1`.",#

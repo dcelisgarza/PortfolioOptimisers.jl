@@ -1,41 +1,76 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Abstract supertype for all regime adjustment methods.
+Names how a regime statistic of standardised squared returns becomes the multiplier of a volatility.
 
-All concrete subtypes should subtype `RegimeAdjustedMethod` and implement the
-[`regime_multiplier`](@ref) interface.
+The estimator scores each observation against the variance that stands before it, the method
+turns the scores into one statistic, the regime state smooths that statistic, and the method turns
+the state into a volatility multiplier. This is the Volatility Regime Adjustment of
+[menchero2011](@cite), and [`RootMeanSquaredAdjusted`](@ref) is its statistic. The other methods
+replace the mean square with a statistic that one outlier moves less.
 
 # Interfaces
 
-In order to implement a new regime adjustment method that works seamlessly with the library,
-subtype `RegimeAdjustedMethod` and implement the following method:
+To implement a new regime adjustment method, subtype `RegimeAdjustedMethod` and implement the
+methods below. [`RegimeAdjustedExpWeightedVariance`](@ref) calls `regime_multiplier` and the first
+form of `get_regime_state`, and [`RegimeAdjustedExpWeightedCovariance`](@ref) calls
+`regime_multiplier` and the second form.
 
-## `regime_multiplier` interface
+A new method takes `debias = RawStatistic()`. [`ExactDebias`](@ref) and [`LawDebias`](@ref)
+divide the statistic by the bias of the moment that the method reads, and the library computes
+that bias for its own three methods alone, so the two constructors refuse a new method under
+either rule.
 
-  - `regime_multiplier(method::RegimeAdjustedMethod, regime_state::Number) -> Number`:
-    Computes the variance scaling multiplier from the smoothed regime state.
+## `regime_multiplier`
 
-### Arguments
+  - `regime_multiplier(method::MyRegimeMethod, regime_state::Number) -> Number`: Turns the
+    smoothed regime state into the volatility multiplier. The estimator scales its variance or its
+    covariance by the square of the multiplier.
 
-  - `method`: The concrete regime adjustment method instance.
-  - `regime_state::Number`: The current smoothed regime state value.
+## `get_regime_state`
 
-### Returns
-
-  - `mult::Number`: The multiplicative scaling factor applied to the variance.
+  - `get_regime_state(method::MyRegimeMethod, z2::VecNum, min_val::Number) -> Number`: Turns the
+    standardised squared returns of the scored assets of one observation into the statistic that
+    the regime state smooths.
+  - `get_regime_state(method::MyRegimeMethod, target::RegimeAdjustedTarget, stats::VecNum, n::Integer, min_val::Number) -> VecNum`:
+    Turns each statistic of the target, over `n` scored assets, into the value that the regime
+    state smooths. The estimator smooths the mean of the values.
 
 ### Examples
 
 ```jldoctest
 julia> struct MyRegimeMethod <: PortfolioOptimisers.RegimeAdjustedMethod end
 
-julia> function PortfolioOptimisers.regime_multiplier(::MyRegimeMethod, s::Number)
-           return abs(s)
-       end
+julia> PortfolioOptimisers.regime_multiplier(::MyRegimeMethod, s::Number) = sqrt(max(s, 0));
 
-julia> PortfolioOptimisers.regime_multiplier(MyRegimeMethod(), -1.5)
-1.5
+julia> function PortfolioOptimisers.get_regime_state(::MyRegimeMethod, z2::AbstractVector,
+                                                     ::Number)
+           return sum(z2) / length(z2)
+       end;
+
+julia> function PortfolioOptimisers.get_regime_state(::MyRegimeMethod,
+                                                     ::PortfolioOptimisers.RegimeAdjustedTarget,
+                                                     stats::AbstractVector, n::Integer, ::Number)
+           return stats ./ n
+       end;
+
+julia> X = [0.01 -0.02; -0.015 0.03; 0.02 -0.01; -0.005 0.012; 0.008 -0.02; -0.02 0.03];
+
+julia> kw = (; decay = 0.9, min_obs = 2, regime_min_obs = 1, debias = RawStatistic());
+
+julia> var(RegimeAdjustedExpWeightedVariance(; regime_method = MyRegimeMethod(), kw...), X) ≈
+       var(RegimeAdjustedExpWeightedVariance(; regime_method = RootMeanSquaredAdjusted(), kw...),
+           X)
+true
+
+julia> cov(RegimeAdjustedExpWeightedCovariance(; regime_method = MyRegimeMethod(), kw...), X) ≈
+       cov(RegimeAdjustedExpWeightedCovariance(; regime_method = RootMeanSquaredAdjusted(), kw...),
+           X)
+true
+
+julia> RegimeAdjustedExpWeightedVariance(; regime_method = MyRegimeMethod())
+ERROR: ArgumentError: `RegimeAdjustedExpWeightedVariance.regime_method` is a `MyRegimeMethod`, and `RegimeAdjustedExpWeightedVariance.debias` is `ExactDebias()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = RawStatistic()` for this method.
+[...]
 ```
 
 # Related
@@ -44,38 +79,50 @@ julia> PortfolioOptimisers.regime_multiplier(MyRegimeMethod(), -1.5)
   - [`FirstMomentRegimeAdjusted`](@ref)
   - [`RootMeanSquaredAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 4.3.
 """
 abstract type RegimeAdjustedMethod <: AbstractEstimator end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regime adjustment method that scales variance exponentially with the smoothed log-deviation
-of standardised squared returns from its expected value under stationarity.
+Scales the volatility by the exponential of half the smoothed mean log of the standardised squared returns.
+
+The log compresses a large square, so one outlier moves this multiplier less than it moves the
+multiplier of [`RootMeanSquaredAdjusted`](@ref). The constant ``\\kappa`` is the expectation of
+``\\ln z^{2}`` when ``z^{2}`` is a ``\\mathrm{Gamma}(x, y)`` variate. The defaults ``x = 1/2`` and
+``y = 2`` make ``z^{2}`` a ``\\chi^{2}(1)`` variate, the square of a standard normal return. The
+regime state is then a log variance ratio for every law, so the volatility multiplier is the
+exponential of half the state.
 
 # Mathematical definition
-
-The regime state ``s`` is defined as ``\\bar{s} = \\frac{1}{T}\\sum_t \\ln\\max(z_t^2, \\varepsilon) - \\kappa``, where
-``\\kappa = \\psi(x) + \\ln y`` (``\\psi`` = digamma) is the stationary expectation of ``\\ln z^2`` under a
-``\\chi^2(1)`` distribution scaled by ``y``, and ``\\varepsilon`` is a small positive threshold.
 
 ```math
 \\begin{align}
 \\kappa &= \\psi(x) + \\ln y\\,, \\\\
-s &= \\frac{1}{T}\\sum_{t} \\ln\\!\\max(z_t^2, \\varepsilon) - \\kappa\\,, \\\\
-\\mathrm{mult} &= \\exp(x \\cdot s)\\,.
+g_{t} &= \\frac{1}{n_{t}} \\sum_{i \\in \\mathcal{A}_{t}} \\ln \\max(z_{i,t}^{2}, \\varepsilon) - \\kappa\\,, \\\\
+\\mathrm{mult}(s) &= \\exp(s / 2)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\kappa``: Stationary expectation of ``\\ln z^2`` under the specified distribution.
+  - ``\\kappa``: Expectation of ``\\ln z^{2}`` for a ``\\mathrm{Gamma}(x, y)`` variate.
   - ``\\psi``: Digamma function.
-  - ``x``, ``y``: Parameters of [`LogRegimeAdjusted`](@ref).
-  - ``s``: Smoothed log-deviation regime state.
-  - $(math_dict[:T])
-  - ``z_t^2``: Standardised squared return at time ``t``.
-  - ``\\varepsilon``: Small positive threshold for numerical stability.
-  - ``\\mathrm{mult}``: Variance scaling multiplier.
+  - ``x``, ``y``: Shape and scale of the law of ``z^{2}``, the fields of the same names.
+  - $(math_dict[:g_t_regime])
+  - $(math_dict[:A_t_regime])
+  - $(math_dict[:z2_it_regime])
+  - ``\\varepsilon``: The `min_val` field of the estimator.
+  - $(math_dict[:mult_regime])
+
+[`RegimeAdjustedExpWeightedVariance`](@ref) states ``\\mathcal{A}_{t}``, ``z_{i,t}^{2}`` and the
+smoothing of ``g_{t}``. [`RegimeAdjustedExpWeightedCovariance`](@ref) replaces the mean over the
+assets with the log of the statistic of its [`RegimeAdjustedTarget`](@ref), and ``\\kappa`` with
+the expectation of that log.
 
 # Fields
 
@@ -93,8 +140,8 @@ and cannot be set directly.
 
 ## Validation
 
-  - $(val_dict[:ra_x]) (i.e., `x >= 0`, finite, and non-empty).
-  - $(val_dict[:ra_y]) (i.e., `y >= 0`, finite, and non-empty).
+  - $(val_dict[:ra_x])
+  - $(val_dict[:ra_y])
 
 # Examples
 
@@ -127,8 +174,8 @@ LogRegimeAdjusted
     """
     kappa
     function LogRegimeAdjusted(x::Number, y::Number)
-        assert_nonempty_nonneg_finite_val(x, :x)
-        assert_nonempty_nonneg_finite_val(y, :y)
+        assert_nonempty_gt0_finite_val(x, :x)
+        assert_nonempty_gt0_finite_val(y, :y)
         kappa = SpecialFunctions.digamma(x) + log(y)
         return new{typeof(x), typeof(y), typeof(kappa)}(x, y, kappa)
     end
@@ -139,27 +186,34 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regime adjustment method that scales variance by the ratio of the mean absolute deviation
-of standardised returns to the first-moment normalisation constant `x`.
+Scales the volatility by the smoothed mean absolute standardised return over its expectation `x`.
+
+The absolute value grows linearly in a return, so one outlier moves this multiplier less than it
+moves the multiplier of [`RootMeanSquaredAdjusted`](@ref) and more than it moves the multiplier of
+[`LogRegimeAdjusted`](@ref). The default ``x = \\sqrt{2/\\pi}`` is the expectation of ``|z|`` for a
+standard normal ``z``.
 
 # Mathematical definition
 
-The regime state ``s`` and multiplier are:
-
 ```math
 \\begin{align}
-s &= \\frac{1}{x} \\cdot \\frac{1}{T}\\sum_t \\sqrt{\\max(z_t^2, 0)}\\,, \\\\
-\\mathrm{mult} &= s\\,.
+g_{t} &= \\frac{1}{x\\, n_{t}} \\sum_{i \\in \\mathcal{A}_{t}} \\sqrt{z_{i,t}^{2}}\\,, \\\\
+\\mathrm{mult}(s) &= s\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``s``: Regime state (ratio of mean absolute deviation to normalisation constant ``x``).
-  - ``x = \\sqrt{2/\\pi}``: Expected value of ``|z|`` for a standard normal ``z``.
-  - $(math_dict[:T])
-  - ``z_t``: Standardised return at time ``t``.
-  - ``\\mathrm{mult}``: Variance scaling multiplier.
+  - ``x``: Expectation of ``|z|`` under correct calibration, the field of the same name.
+  - $(math_dict[:g_t_regime])
+  - $(math_dict[:A_t_regime])
+  - $(math_dict[:z2_it_regime])
+  - $(math_dict[:mult_regime])
+
+[`RegimeAdjustedExpWeightedVariance`](@ref) states ``\\mathcal{A}_{t}``, ``z_{i,t}^{2}`` and the
+smoothing of ``g_{t}``. [`RegimeAdjustedExpWeightedCovariance`](@ref) replaces the mean over the
+assets with the root of the statistic of its [`RegimeAdjustedTarget`](@ref), and ``x`` with the
+expectation of that root.
 
 # Fields
 
@@ -175,7 +229,7 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - $(val_dict[:ra_norm_x]) (i.e., `x >= 0`, finite, and non-empty).
+  - $(val_dict[:ra_x])
 
 # Examples
 
@@ -198,7 +252,7 @@ FirstMomentRegimeAdjusted
     """
     x
     function FirstMomentRegimeAdjusted(x::Number)
-        assert_nonempty_nonneg_finite_val(x, :x)
+        assert_nonempty_gt0_finite_val(x, :x)
         return new{typeof(x)}(x)
     end
 end
@@ -209,24 +263,35 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Regime adjustment method that scales variance by the square root of the mean of the
-standardised squared returns.
+Scales the volatility by the root of the smoothed mean of the standardised squared returns.
+
+This is the Volatility Regime Adjustment of [menchero2011](@cite). The statistic of one
+observation is the square of the cross-sectional bias statistic of Equation 4.3, and the
+multiplier is the root of its exponentially weighted mean, Equation 4.4. The specific-risk form,
+Equations 5.10 and 5.11, weighs each asset by its capitalisation, and this method weighs each
+asset equally. The recursion of the regime state starts at the first statistic. The square
+grows fastest in a return, so one outlier moves this multiplier more than it moves the multipliers
+of [`FirstMomentRegimeAdjusted`](@ref) and [`LogRegimeAdjusted`](@ref).
 
 # Mathematical definition
 
 ```math
 \\begin{align}
-s &= \\frac{1}{T}\\sum_t z_t^2\\,, \\\\
-\\mathrm{mult} &= \\sqrt{\\max(s, 0)}\\,.
+g_{t} &= \\frac{1}{n_{t}} \\sum_{i \\in \\mathcal{A}_{t}} z_{i,t}^{2}\\,, \\\\
+\\mathrm{mult}(s) &= \\sqrt{\\max(s, 0)}\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``s``: Mean of standardised squared returns.
-  - $(math_dict[:T])
-  - ``z_t``: Standardised return at time ``t``.
-  - ``\\mathrm{mult}``: Variance scaling multiplier.
+  - $(math_dict[:g_t_regime])
+  - $(math_dict[:A_t_regime])
+  - $(math_dict[:z2_it_regime])
+  - $(math_dict[:mult_regime])
+
+[`RegimeAdjustedExpWeightedVariance`](@ref) states ``\\mathcal{A}_{t}``, ``z_{i,t}^{2}`` and the
+smoothing of ``g_{t}``. [`RegimeAdjustedExpWeightedCovariance`](@ref) replaces ``g_{t}`` with the
+statistic of its [`RegimeAdjustedTarget`](@ref) over the count of the assets.
 
 # Related
 
@@ -234,34 +299,42 @@ Where:
   - [`LogRegimeAdjusted`](@ref)
   - [`FirstMomentRegimeAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 4.3, Equations 4.3 to 4.5, and Section 5.3, Equations 5.10 to 5.12.
 """
 struct RootMeanSquaredAdjusted <: RegimeAdjustedMethod end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the variance scaling multiplier for the log regime adjustment method.
+Computes the volatility multiplier of the log regime adjustment method.
+
+The regime state is a log variance ratio for every law of the squares, so the multiplier takes
+half of it. The estimator scales the variance by the square of the multiplier.
 
 # Arguments
 
-  - `method::LogRegimeAdjusted`: Log regime adjustment method.
+  - `::LogRegimeAdjusted`: Log regime adjustment method (unused).
   - `regime_state::Number`: Current smoothed regime state.
 
 # Returns
 
-  - `mult::Number`: Variance scaling multiplier `exp(method.x * regime_state)`.
+  - `mult::Number`: Volatility multiplier `exp(regime_state / 2)`.
 
 # Related
 
   - [`LogRegimeAdjusted`](@ref)
   - [`RegimeAdjustedExpWeightedVariance`](@ref)
 """
-function regime_multiplier(method::LogRegimeAdjusted, regime_state::Number)
-    return exp(method.x * regime_state)
+function regime_multiplier(::LogRegimeAdjusted, regime_state::Number)
+    # The state is a log variance ratio whatever the law, so the volatility takes half of it.
+    return exp(regime_state / 2)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the variance scaling multiplier for the first-moment regime adjustment method.
+Computes the volatility multiplier of the first-moment regime adjustment method.
 
 # Arguments
 
@@ -270,7 +343,7 @@ Computes the variance scaling multiplier for the first-moment regime adjustment 
 
 # Returns
 
-  - `mult::Number`: Variance scaling multiplier equal to `regime_state` directly.
+  - `mult::Number`: Volatility multiplier, equal to `regime_state`.
 
 # Related
 
@@ -283,7 +356,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Computes the variance scaling multiplier for the root-mean-squared regime adjustment method.
+Computes the volatility multiplier of the root-mean-squared regime adjustment method.
 
 # Arguments
 
@@ -292,7 +365,7 @@ Computes the variance scaling multiplier for the root-mean-squared regime adjust
 
 # Returns
 
-  - `mult::Number`: Variance scaling multiplier `sqrt(max(regime_state, 0))`.
+  - `mult::Number`: Volatility multiplier `sqrt(max(regime_state, 0))`.
 
 # Related
 
@@ -301,6 +374,47 @@ Computes the variance scaling multiplier for the root-mean-squared regime adjust
 """
 function regime_multiplier(::RootMeanSquaredAdjusted, regime_state::Number)
     return sqrt(max(regime_state, zero(regime_state)))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Checks that the bias correction of `debias` can read the moment of `regime_method`.
+
+[`ExactDebias`](@ref) and [`LawDebias`](@ref) divide the regime statistic by the bias of the
+moment that the method reads, and the library computes that bias for its own three methods
+alone. A regime method that a caller defines therefore takes [`RawStatistic`](@ref). The library
+methods, and a `regime_method` of `nothing`, take every rule.
+
+# Arguments
+
+  - `regime_method::Option{<:RegimeAdjustedMethod}`: Regime adjustment method of the estimator.
+  - `debias::AbstractRegimeDebias`: Bias correction of the estimator.
+  - `name::Symbol`: Name of the estimator, for the message.
+
+# Validation
+
+  - Where `regime_method` is not a library method, `debias` corrects no bias. An
+    `ArgumentError` is thrown otherwise.
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`RegimeAdjustedMethod`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+"""
+function assert_regime_debias(regime_method::Option{<:RegimeAdjustedMethod},
+                              debias::AbstractRegimeDebias, name::Symbol)
+    @argcheck(isnothing(regime_method) ||
+              isa(regime_method,
+                  Union{<:RootMeanSquaredAdjusted, <:FirstMomentRegimeAdjusted,
+                        <:LogRegimeAdjusted}) ||
+              !debiases(debias),
+              ArgumentError("`$name.regime_method` is a `$(nameof(typeof(regime_method)))`, and `$name.debias` is `$(nameof(typeof(debias)))()`. That rule divides the regime statistic by the bias of the moment that the method reads, and the library computes that bias for `RootMeanSquaredAdjusted`, `FirstMomentRegimeAdjusted` and `LogRegimeAdjusted` alone. Set `debias = RawStatistic()` for this method."))
+    return nothing
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -335,69 +449,80 @@ the fitting prior's own `fill_limit` field, a share of that asset's own observat
 above it, and refuses any fill under `strict`; `fill_limit` defaults to `nothing`, and this
 family carries no `CoveragePolicy` to derive a limit from, so every fill is named.
 
+The estimator is the Volatility Regime Adjustment of specific risk of [menchero2011](@cite), on
+an exponentially weighted variance. The HAC adjustment is the estimator of
+[neweywest1987](@cite), applied to each term of the recursion.
+
 # Mathematical definition
 
-EWM variance update (decay ``\\lambda``):
+The variance of each asset steps on the observations where its return is valid:
 
 ```math
 \\begin{align}
-v_t &= \\lambda v_{t-1} + (1 - \\lambda)(r_t - \\bar{r})^2\\,.
+q_{i,t} &= u_{i,t}^{2} + 2 \\sum_{j=1}^{L} \\left(1 - \\frac{j}{L + 1}\\right) u_{i,t}\\, u_{i,t-j}\\,, \\\\
+v_{i,t} &= \\lambda v_{i,t-1} + (1 - \\lambda)\\, q_{i,t}\\,.
 \\end{align}
 ```
 
-Standardised innovation, against the bias-corrected variance that stands before the observation:
+Each observation scores the assets of ``\\mathcal{A}_{t}`` against the variance that stands before
+it, and the regime state smooths the statistic of the method:
 
 ```math
 \\begin{align}
-z_t^2 &= \\frac{(r_t - \\bar{r})^2}{\\beta(K_t)\\, v_{t-1} / (1 - \\lambda^{K_t})}\\,.
+z_{i,t}^{2} &= \\frac{u_{i,t}^{2}}{\\beta(K_{i,t})\\, v_{i,t-1} / (1 - \\lambda^{K_{i,t}})}\\,, \\\\
+s_{t} &= \\lambda_{r} s_{t-1} + (1 - \\lambda_{r})\\, g_{t}\\,, \\quad s_{t_{0}} = g_{t_{0}}\\,.
 \\end{align}
 ```
 
-Regime state smoothed with `regime_decay` ``\\lambda_r`` (``g`` defined by [`RegimeAdjustedMethod`](@ref)):
+The report divides each variance by the weight that its zero seed leaves, and scales it by the
+square of the multiplier:
 
 ```math
 \\begin{align}
-s_t &= \\lambda_r s_{t-1} + (1 - \\lambda_r) \\cdot g(z_t^2)\\,.
+\\hat{\\sigma}_{i}^{2} &= m^{2}\\, \\frac{\\max(v_{i,T}, 0)}{1 - \\lambda^{K_{i,T}}}\\,, \\quad
+m = \\mathrm{clamp}(\\mathrm{mult}(s_{T}), l, h)\\,.
 \\end{align}
 ```
-
-Final variance:
-
-```math
-\\begin{align}
-\\hat{\\sigma}^2 &= \\mathrm{mult}(s_T)^2 \\cdot v_T\\,.
-\\end{align}
-```
-
-When `regime_lohi_mult` is not `nothing`, `mult(s_T)` is clamped to the `(lo, hi)` range that field
-gives before the square is taken.
 
 Where:
 
-  - ``v_t``: Exponentially weighted variance at time ``t``.
-  - ``\\lambda``: EWM decay parameter (`decay` field).
-  - ``r_t``: Return at time ``t``.
-  - ``\\bar{r}``: The location of the returns before ``t`` under [`EstimatedCentring`](@ref), or
-    zero under [`PreCentred`](@ref). Under `EstimatedCentring` the first return gives no term,
-    and each square, in the variance and in ``z_t^2``, is divided by its exact factor, as
-    [`ExpWeightedVariance`](@ref) states.
-  - ``z_t^2``: Standardised squared innovation.
-  - ``K_t``: Count of the terms in ``v_{t-1}``.
-  - ``\\beta(K_t)``: Bias factor of [`regime_bias_table`](@ref) for the moment that the method
+  - ``u_{i,t}``: Deviation of the return of asset ``i`` at observation ``t``. Under
+    [`EstimatedCentring`](@ref) it is taken from the location of the returns before ``t``, the
+    first return gives no term, and each square, in ``q_{i,t}`` and in ``z_{i,t}^{2}``, is divided
+    by its exact factor, as [`ExpWeightedVariance`](@ref) states. Under [`PreCentred`](@ref) it is
+    the return.
+  - ``q_{i,t}``: Term of the recursion. Where `hac_lags` is `nothing`, ``L = 0`` and the term is
+    ``u_{i,t}^{2}``. A lag that reaches before the first observation of the asset gives no term.
+  - ``L``: `hac_lags`.
+  - ``v_{i,t}``: Raw exponentially weighted variance of asset ``i``, seeded at zero.
+  - ``\\lambda``: `decay`.
+  - $(math_dict[:A_t_regime]) An asset is scored where its return is valid, where it is in the
+    estimation mask, where ``K_{i,t}`` is at least `min_obs`, and where ``v_{i,t-1}`` is at least
+    `min_val`.
+  - $(math_dict[:z2_it_regime])
+  - ``K_{i,t}``: Count of the terms in ``v_{i,t-1}``.
+  - ``\\beta(K)``: Bias factor of [`regime_bias_table`](@ref) for the moment that the method
     reads, or one under [`RawStatistic`](@ref). The inverse of an estimated variance is too large
-    on average (Jensen's inequality), so without it the mean of ``z_t^2`` is 1.07 at a half-life
-    of 10 and 1.017 at a half-life of 40. The factor is exact for this statistic. Under
+    on average (Jensen's inequality), so without it the mean of ``z_{i,t}^{2}`` is 1.07 at a
+    half-life of 10 and 1.017 at a half-life of 40. The factor is exact for this statistic. Under
     [`ExactDebias`](@ref) an estimate of four terms or fewer is not scored, because the variance
-    of ``z_t^2`` is not finite. A HAC estimate is a quadratic form with a banded weight matrix, and
-    the table reads the spectrum of that matrix, so the factor is exact for it too; an estimate
-    with too few effective observations is not scored. At two lags and a half-life of 10 the
-    squared multiplier of `RootMeanSquaredAdjusted` is 1.002 over 8 seeds with the factor and 1.150
-    without it.
-  - ``s_t``: Smoothed regime state at time ``t``.
-  - ``\\lambda_r``: Regime decay parameter (`regime_decay` field).
-  - ``g(\\cdot)``: Regime state transformation (see [`RegimeAdjustedMethod`](@ref)).
-  - ``\\hat{\\sigma}^2``: Final regime-adjusted variance.
-  - ``\\mathrm{mult}(s_T)``: Variance scaling multiplier (see [`RegimeAdjustedMethod`](@ref)).
+    of ``z_{i,t}^{2}`` is not finite. A HAC estimate is a quadratic form with a banded weight
+    matrix, and the table reads the spectrum of that matrix, so the factor is exact for it too. An
+    estimate with too few effective observations is not scored. At two lags and a half-life of
+    10 the squared multiplier of `RootMeanSquaredAdjusted` is 1.002 over 8 seeds with the factor
+    and 1.150 without it.
+  - $(math_dict[:g_t_regime]) The [`RegimeAdjustedMethod`](@ref) states it from the
+    ``z_{i,t}^{2}`` of ``\\mathcal{A}_{t}``. An observation that scores no asset leaves the
+    state as it is.
+  - $(math_dict[:s_t_regime]) ``t_{0}`` is the first observation that scores an asset.
+  - $(math_dict[:lambda_r_regime])
+  - ``\\hat{\\sigma}_{i}^{2}``: Regime-adjusted variance of asset ``i``. It is `NaN` where
+    ``K_{i,T}`` is below `min_obs`, or where the asset is not active.
+  - ``m``: Multiplier of the report. It is one while fewer than `regime_min_obs` observations
+    have scored an asset, and where `regime_method` is `nothing`.
+  - $(math_dict[:mult_regime])
+  - ``l``, ``h``: The two bounds of `regime_lohi_mult`. Where that field is `nothing`, no clamp
+    runs.
   - $(math_dict[:T])
 
 # Fields
@@ -428,6 +553,7 @@ Keywords correspond to the struct's fields.
   - $(val_dict[:decay])
   - $(val_dict[:min_obs])
   - $(val_dict[:hac_lags])
+  - $(val_dict[:regime_decay])
   - $(val_dict[:regime_min_obs])
   - $(val_dict[:regime_lohi_mult])
 
@@ -453,6 +579,11 @@ julia> ce.min_obs
   - [`partial_fit!`](@ref)
   - [`scenario_fill`](@ref)
   - [`EmpiricalPrior`](@ref)
+
+# References
+
+  - $(ref_dict[:menchero2011]) Section 5.3, Equations 5.10 to 5.12.
+  - $(ref_dict[:neweywest1987]) Equation 5.
 """
 @concrete struct RegimeAdjustedExpWeightedVariance <: AbstractVarianceEstimator
     """
@@ -515,6 +646,8 @@ julia> ce.min_obs
                                                debias::AbstractRegimeDebias,
                                                cache::Option{<:AbstractPartialFitState})
         assert_unit_interval(decay, :decay)
+        assert_unit_interval(regime_decay, :regime_decay)
+        assert_regime_debias(regime_method, debias, :RegimeAdjustedExpWeightedVariance)
         assert_nonempty_gt0_finite_val(min_obs, :min_obs)
         assert_nonempty_gt0_finite_val(regime_min_obs, :regime_min_obs)
         if !isnothing(regime_lohi_mult)
@@ -562,9 +695,12 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Internal mutable cache for the online variance update in [`RegimeAdjustedExpWeightedVariance`](@ref).
+Holds the running state of an incremental fit of a [`RegimeAdjustedExpWeightedVariance`](@ref).
 
-This type is an implementation detail and is not intended for direct use.
+[`partial_fit!`](@ref) builds it and keeps it in the `cache` field of the estimator, and
+`var(ce, state)` reads it. A caller can hold a state outside the estimator, but only the forward
+pass of the estimator writes it. The fold mutates the arrays in place, and it replaces the two
+scalar fields, `regime_state` and `n_regime_obs`, with `Accessors.@reset`.
 
 # Fields
 
@@ -2126,7 +2262,7 @@ end
 
 Take the whole window, and read the two universe masks of the Asset Panel.
 
-[`RegimeAdjustedExpWeightedVariance`](@ref) is **mask-aware**, so it overrides the reduce-and-expand root of its verb. It knows its own warm-up, its freeze on a holiday and its reset on an inactive period, so it emits its own frame over the whole window rather than taking a clean block from [`coverage_reduction`](@ref). An asset outside the Coverage Universe therefore keeps a number here, where a plain estimator would carry `NaN`.
+[`RegimeAdjustedExpWeightedVariance`](@ref) is **mask-aware**, so it overrides the reduce-and-expand root of its verb. It knows its own warm-up, its freeze on a holiday and its reset on an inactive period, so it emits its own frame over the whole window rather than taking a clean block from [`coverage_reduction`](@ref). An asset outside the Coverage Universe therefore keeps a number here, where a plain estimator carries `NaN`.
 
 The panel travels as the third positional argument, and this method unpacks it onto the `active_mask` and `estimation_mask` keywords the estimator already has. No panel, and a static panel, both give the unmasked path.
 
@@ -2181,4 +2317,4 @@ function variance_count(ve::RegimeAdjustedExpWeightedVariance, X::MatNum)
 end
 export LogRegimeAdjusted, FirstMomentRegimeAdjusted, RootMeanSquaredAdjusted,
        RegimeAdjustedExpWeightedVariance
-public RegimeAdjustedMethod, regime_multiplier
+public RegimeAdjustedMethod, regime_multiplier, get_regime_state

@@ -290,4 +290,6 @@ unique_key_dict!(ref_dict, :ref_dict,
                  :demetrescu2026robust => "[demetrescu2026robust](@cite) M. Demetrescu, C. Hanck and R. Kruse-Becher. *Robust fixed-b inference in the presence of time-varying volatility*. Econometrics and Statistics 37, 154–173 (2026).",
                  :golubwelsch1969 => "[golubwelsch1969](@cite) G. H. Golub and J. H. Welsch. *Calculation of Gauss quadrature rules*. Mathematics of Computation 23, 221–230 (1969).",
                  :trefethen2019 => "[trefethen2019](@cite) L. N. Trefethen. *Approximation Theory and Approximation Practice, Extended Edition*. SIAM (2019). Theorem 19.3.",#
-                 :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).")
+                 :estrada2002 => "[estrada2002](@cite) J. Estrada. *Systematic risk in emerging markets: the D-CAPM*. Emerging Markets Review 3, 365–379 (2002).",#
+                 :menchero2011 => "[menchero2011](@cite) J. Menchero, D. J. Orr and J. Wang. *The Barra US Equity Model (USE4): Methodology Notes*. Model Insight, MSCI (2011).",#
+                 :engle2002 => "[engle2002](@cite) R. Engle. *Dynamic conditional correlation: A simple class of multivariate generalized autoregressive conditional heteroskedasticity models*. Journal of Business & Economic Statistics 20, 339–350 (2002).")
