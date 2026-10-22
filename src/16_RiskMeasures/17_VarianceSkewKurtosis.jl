@@ -708,7 +708,7 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Create an instance of [`VarianceSkewKurtosis`](@ref) by fanning `pe` out over its three children, then threading `pr` into each of them.
 
-The container holds no quantity of its own, so [`@fprop`](@ref) alone would reach the children and leave `pe` standing — the measure would say one thing and compute another. This method resolves first, which is the same order the [`JuMP`](https://github.com/jump-dev/JuMP.jl) path already uses in [`set_risk_constraints!`](@ref).
+The container holds no quantity of its own, so [`@fprop`](@ref) alone would reach the children and leave `pe` standing — the measure would say one thing and compute another. This method resolves first, which is the same order the [`JuMP`](https://jump.dev/JuMP.jl/stable/) path already uses in [`set_risk_constraints!`](@ref).
 
 # Related
 

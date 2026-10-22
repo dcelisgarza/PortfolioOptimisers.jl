@@ -51,7 +51,7 @@ One matrix multiplication replaces ``N^{2}`` scalar calls, and it is the faster 
   - [`AngularSimilarity`](@ref)
   - [`FeatureDistance`](@ref)
   - [`default_similarity`](@ref)
-  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
+  - [`Distances.jl`](https://docs.juliahub.com/General/Distances/stable/)
 
 # References
 

@@ -441,23 +441,23 @@ Denoise
     """
     alg
     """
-    The positional arguments of the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+    The positional arguments of the univariate [Optim.optimize](https://julianlsolvers.github.io/Optim.jl/stable/user/minimization/#Minimizing-a-univariate-function-on-a-bounded-interval).
     """
     args
     """
-    The keyword arguments of the univariate [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+    The keyword arguments of the univariate [Optim.optimize](https://julianlsolvers.github.io/Optim.jl/stable/user/minimization/#Minimizing-a-univariate-function-on-a-bounded-interval).
     """
     kwargs
     """
-    The kernel function of [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+    The kernel function of [AverageShiftedHistograms.ash](https://joshday.github.io/AverageShiftedHistograms.jl/stable/).
     """
     kernel
     """
-    The number of adjacent histograms that [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) smooths over.
+    The number of adjacent histograms that [AverageShiftedHistograms.ash](https://joshday.github.io/AverageShiftedHistograms.jl/stable/) smooths over.
     """
     m
     """
-    The number of points in the range of eigenvalues at which [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl) estimates the density.
+    The number of points in the range of eigenvalues at which [AverageShiftedHistograms.ash](https://joshday.github.io/AverageShiftedHistograms.jl/stable/) estimates the density.
     """
     n
     function Denoise(pdm::Option{<:AbstractPosdefEstimator}, alg::AbstractDenoiseAlgorithm,
@@ -664,11 +664,11 @@ The density is the unnumbered display of Example 1 of Section 1 of [mpdist](@cit
 
   - `vals`: The observed eigenvalues. [`denoise!`](@ref) passes them in ascending order.
   - `q`: The effective sample ratio `observations / assets`.
-  - `kernel`: The kernel function of [AverageShiftedHistograms.ash](https://github.com/joshday/AverageShiftedHistograms.jl).
+  - `kernel`: The kernel function of [AverageShiftedHistograms.ash](https://joshday.github.io/AverageShiftedHistograms.jl/stable/).
   - `m`: The number of adjacent histograms to smooth over.
   - `n`: The number of points in the range of eigenvalues for the density estimate.
-  - `args`: The positional arguments of [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
-  - `kwargs`: The keyword arguments of [Optim.optimize](https://github.com/JuliaNLSolvers/Optim.jl).
+  - `args`: The positional arguments of [Optim.optimize](https://julianlsolvers.github.io/Optim.jl/stable/user/minimization/#Minimizing-a-univariate-function-on-a-bounded-interval).
+  - `kwargs`: The keyword arguments of [Optim.optimize](https://julianlsolvers.github.io/Optim.jl/stable/user/minimization/#Minimizing-a-univariate-function-on-a-bounded-interval).
 
 # Returns
 

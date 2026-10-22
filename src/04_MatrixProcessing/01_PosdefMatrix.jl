@@ -258,7 +258,7 @@ Posdef
   - [`ClippedNearestCorrelation`](@ref)
   - [`posdef!`](@ref)
   - [`posdef`](@ref)
-  - [`NearestCorrelationMatrix.jl`](https://github.com/adknudson/NearestCorrelationMatrix.jl)
+  - [`NearestCorrelationMatrix.jl`](https://docs.juliahub.com/General/NearestCorrelationMatrix/stable/)
 
 # References
 

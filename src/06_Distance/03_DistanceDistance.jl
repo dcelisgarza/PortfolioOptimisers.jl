@@ -3,7 +3,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures how differently two assets relate to the whole universe, by a metric over the columns of a distance matrix.
 
-Two assets are close under this estimator when their columns of the base distance matrix are close. Then the two assets have similar distances to every other asset. Thus the estimator can separate two assets that have the same distance under [`Distance`](@ref) but different positions in the universe. It applies a metric of [`Distances.jl`](https://github.com/JuliaStats/Distances.jl) to the matrix of a base [`Distance`](@ref), which it makes from `power` and `alg`.
+Two assets are close under this estimator when their columns of the base distance matrix are close. Then the two assets have similar distances to every other asset. Thus the estimator can separate two assets that have the same distance under [`Distance`](@ref) but different positions in the universe. It applies a metric of [`Distances.jl`](https://docs.juliahub.com/General/Distances/stable/) to the matrix of a base [`Distance`](@ref), which it makes from `power` and `alg`.
 
 !!! note
 
@@ -70,7 +70,7 @@ DistanceDistance
   - [`distance`](@ref)
   - [`cor_and_dist`](@ref)
   - [`assert_similarity_domain`](@ref)
-  - [`Distances.jl`](https://github.com/JuliaStats/Distances.jl)
+  - [`Distances.jl`](https://docs.juliahub.com/General/Distances/stable/)
 
 # References
 

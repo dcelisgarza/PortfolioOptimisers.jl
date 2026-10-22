@@ -1355,7 +1355,7 @@ EntropicValueatRiskView
     """
     alg
     """
-    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) call these views make: the sample EVaR of [`ep_evar`](@ref), and the centre of the grid of [`ep_evar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
+    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/) call these views make: the sample EVaR of [`ep_evar`](@ref), and the centre of the grid of [`ep_evar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
     """
     args
     """
@@ -1467,7 +1467,7 @@ RelativisticValueatRiskView
     """
     alg
     """
-    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) call these views make: the two searches of [`ep_rlvar`](@ref), the shift of [`ep_rlvar_shift`](@ref), and the centre of the grid of [`ep_rlvar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
+    $(field_dict[:optargs]) It reaches every [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/) call these views make: the two searches of [`ep_rlvar`](@ref), the shift of [`ep_rlvar_shift`](@ref), and the centre of the grid of [`ep_rlvar_anchor`](@ref). Each is a bracketed scalar minimisation, so left empty it takes `Optim.Brent()`.
     """
     args
     """

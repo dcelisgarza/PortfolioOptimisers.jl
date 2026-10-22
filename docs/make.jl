@@ -34,7 +34,7 @@ DocMeta.setdocmeta!(PortfolioOptimisers, :DocTestSetup,
                     PortfolioOptimisers.set_compact_show!(false);
                     PortfolioOptimisers.set_show_nothing_fields!(true)); recursive = true)
 
-# utility function from https://github.com/JuliaOpt/Convex.jl/blob/master/docs/make.jl
+# utility function from `docs/make.jl` of the Convex.jl repository
 function pre_process_content_md(content)
     return replace(content, r"\$\$(.*?)\$\$"s => s"```math\1```",
                    r"^#note # (.*)$"m => s"""

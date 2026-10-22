@@ -86,7 +86,7 @@ pretty_table(DataFrame("Asset" => rd.nx, "Target" => res.w,
 
 [`DiscreteAllocation`](@ref) optimises all the share counts together, where the greedy method
 takes one asset at a time. It needs a mixed-integer solver, and we use
-[HiGHS](https://github.com/jump-dev/HiGHS.jl). The table compares the cash left over and the
+[HiGHS](https://jump.dev/JuMP.jl/stable/packages/HiGHS/). The table compares the cash left over and the
 rounding error of the two methods.
 =#
 

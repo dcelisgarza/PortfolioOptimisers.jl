@@ -168,7 +168,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Root-finds the value at risk level that meets a single conditional value-at-risk view.
 
-The recursive route of [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint. It hunts the level instead: for each candidate it rebuilds the positive-part rows, re-solves the whole entropy pooling problem, and reads the tail mass off the posterior. This type holds the arguments of the [`Roots.jl`](https://github.com/JuliaMath/Roots.jl) call that drives the hunt. Where a group carries more than one view, [`OptimEntropyPooling`](@ref) takes over through the `dm_opt` field.
+The recursive route of [`MeucciEntropyPoolingPrior`](@ref) writes no CVaR constraint. It hunts the level instead: for each candidate it rebuilds the positive-part rows, re-solves the whole entropy pooling problem, and reads the tail mass off the posterior. This type holds the arguments of the [`Roots.jl`](https://juliamath.github.io/Roots.jl/stable/) call that drives the hunt. Where a group carries more than one view, [`OptimEntropyPooling`](@ref) takes over through the `dm_opt` field.
 
 # Fields
 
@@ -198,7 +198,7 @@ ConditionalValueatRiskEntropyPooling
   - [`OptimEntropyPooling`](@ref)
   - [`JuMPEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
-  - [`Roots.jl`](https://github.com/JuliaMath/Roots.jl)
+  - [`Roots.jl`](https://juliamath.github.io/Roots.jl/stable/)
 
 # References
 
@@ -226,7 +226,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the dual of the entropy pooling problem with Optim.jl.
 
-The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl) and takes either optimisation algorithm. [meucci2008](@citet) maximises the dual function. The library minimises the negative of it, and it adds the box on the dual variables of the fixed equality rows, which [meucci2008](@citet) does not have.
+The dual has one variable per constraint rather than one per observation, and it is box constrained, so it is the cheaper route wherever the views reduce to rows of the constraint set. It has no room for an auxiliary variable, so it cannot express a tail view: use [`JuMPEntropyPooling`](@ref) there. It drives [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/) and takes either optimisation algorithm. [meucci2008](@citet) maximises the dual function. The library minimises the negative of it, and it adds the box on the dual variables of the fixed equality rows, which [meucci2008](@citet) does not have.
 
 This route does not raise on an infeasible view set. [`entropy_pooling`](@ref) states the mechanism and the three signs that name that answer.
 
@@ -292,7 +292,7 @@ OptimEntropyPooling
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
-  - [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl)
+  - [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/)
   - [`NormError`](@ref)
 
 # References
@@ -344,7 +344,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Solves the primal of the entropy pooling problem with JuMP.jl.
 
-The primal carries one variable per observation and writes the divergence as a relative entropy cone. It is the only route that expresses a tail view, because a tail view needs auxiliary variables that the dual has no room for. It drives [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl) and takes either optimisation algorithm. [meucci2008](@citet) states this primal and solves its dual. The library solves the primal with a conic solver, and it adds the slack that relaxes the fixed equality rows.
+The primal carries one variable per observation and writes the divergence as a relative entropy cone. It is the only route that expresses a tail view, because a tail view needs auxiliary variables that the dual has no room for. It drives [`JuMP.jl`](https://jump.dev/JuMP.jl/stable/) and takes either optimisation algorithm. [meucci2008](@citet) states this primal and solves its dual. The library solves the primal with a conic solver, and it adds the slack that relaxes the fixed equality rows.
 
 # Fields
 
@@ -395,7 +395,7 @@ JuMPEntropyPooling
   - [`ConditionalValueatRiskEntropyPooling`](@ref)
   - [`MeucciEntropyPoolingPrior`](@ref)
   - [`EntropyPoolingPrior`](@ref)
-  - [`JuMP.jl`](https://github.com/jump-dev/JuMP.jl)
+  - [`JuMP.jl`](https://jump.dev/JuMP.jl/stable/)
 
 # References
 

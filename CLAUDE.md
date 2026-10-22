@@ -147,6 +147,11 @@ child map's *Not yet specified* section, and take steps 3 and 4 when the design 
 ## Repo etiquette
 
 - Never link to or post in repositories outside `dcelisgarza`'s — name external sources in prose.
+  One exception holds (#1794): a page or a docstring can link the published docs site of an
+  external package, never its repository. Link a package that has no docs site of its own at its
+  JuliaHub page, `https://docs.juliahub.com/General/<Package>/stable/`. A comment that cites a
+  source file of another repository names the package, the commit and the path in prose.
+  `test/test_64_docs_page_metadata_census.jl` fails on a link to an external repository.
 - Branch before committing if you are on the default branch.
 - **A session that works an issue commits without being asked.** It commits, rebases and pushes
   `dev` as § *Parallel sessions* states. Any other session commits only when asked.

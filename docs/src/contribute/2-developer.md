@@ -36,7 +36,7 @@ Install a plugin on your editor to use [EditorConfig](https://editorconfig.org).
 This will ensure that your editor is configured with important formatting settings.
 
 We use [https://pre-commit.com](https://pre-commit.com) to run the linters and formatters.
-In particular, the Julia code is formatted using [JuliaFormatter.jl](https://github.com/domluna/JuliaFormatter.jl), so please install it globally first:
+In particular, the Julia code is formatted using [JuliaFormatter.jl](https://docs.juliahub.com/General/JuliaFormatter/stable/), so please install it globally first:
 
 ```julia-repl
 julia> # Press ]

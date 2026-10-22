@@ -4,7 +4,7 @@
 
 Compute the sample entropic value at risk of a loss series and the dual variable that attains it.
 
-`ep_evar` minimises the scalar convex objective of the sample EVaR formula with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl). It is used by the entropy pooling view machinery, which needs both the value (to compare a view against its prior) and the minimiser (to centre the grid of [`GridEntropicValueatRiskView`](@ref)). [EPTail](@citet) states the formula and says that the grid is built around the optimum `z`. It does not state how to find that optimum, so the bracket and the search are the library's own.
+`ep_evar` minimises the scalar convex objective of the sample EVaR formula with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). It is used by the entropy pooling view machinery, which needs both the value (to compare a view against its prior) and the minimiser (to centre the grid of [`GridEntropicValueatRiskView`](@ref)). [EPTail](@citet) states the formula and says that the grid is built around the optimum `z`. It does not state how to find that optimum, so the bracket and the search are the library's own.
 
 # Mathematical definition
 
@@ -16,7 +16,7 @@ Compute the sample entropic value at risk of a loss series and the dual variable
 
  1. Normalise the observation probabilities in the logarithmic domain, giving `lw`.
  2. Bracket the dual variable. The upper end `hi` is `(maximum(x) - dot(w, x)) / log(inv(alpha))`, replaced by `eps` of its own type where that is not positive, and the lower end is `hi * zlo_frac`.
- 3. Minimise the objective over the bracket with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl). Each evaluation goes through `LogExpFunctions.logsumexp`, so a small `z` does not overflow.
+ 3. Minimise the objective over the bracket with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/). Each evaluation goes through `LogExpFunctions.logsumexp`, so a small `z` does not overflow.
  4. Return the minimum as `evar`, and the minimiser as `z`.
 
 # Arguments
@@ -217,7 +217,7 @@ Where:
 # Algorithm
 
  1. Bracket the shift by the loss range widened by `tspan` of its spans on each side. The minimising shift sits near the largest loss, so the bracket holds it with a wide margin.
- 2. Minimise the objective over the bracket with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl).
+ 2. Minimise the objective over the bracket with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/).
 
 # Related
 
@@ -300,7 +300,7 @@ Where:
 
 # Algorithm
 
- 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://github.com/JuliaNLSolvers/Optim.jl), over a bracket running from `exp(log_zlo)` to `exp(log_zhi)` times the loss range, which is about `2e-9` to about `2e4` under the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
+ 1. Minimise over the logarithm of the dual variable with [`Optim.jl`](https://julianlsolvers.github.io/Optim.jl/stable/), over a bracket running from `exp(log_zlo)` to `exp(log_zhi)` times the loss range, which is about `2e-9` to about `2e4` under the default bracket. The objective is convex in the pair, so the partial minimum over the shift is convex in the dual variable, and the logarithm is increasing, so the outer minimisation sees a unimodal function.
  2. Minimise over the shift at each candidate dual variable with [`ep_rlvar_shift`](@ref).
  3. Re-run the inner minimisation at the minimising dual variable, so the shift returned is the one that attains the value.
 

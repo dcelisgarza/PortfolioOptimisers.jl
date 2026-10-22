@@ -103,6 +103,48 @@ function relative_md_links(text::AbstractString)
     return [m.captures[1] for m in eachmatch(r"\]\(([^():\s]*\.md(?:#[^)]*)?)\)", text)]
 end
 
+#=
+Every URL of a GitHub repository that `dcelisgarza` does not own (#1794). `CLAUDE.md` § *Repo
+etiquette* lets a page or a docstring link the published docs site of an external package,
+never its repository. A host other than `github.com`, such as the `raw.githubusercontent.com`
+of a badge image, is not a repository link.
+=#
+function external_repository_links(text::AbstractString)
+    return [m.match
+            for m in
+                eachmatch(r"https?://(?:www\.)?github\.com/(?!dcelisgarza\b)[^\s)>\"'`]+",
+                          text)]
+end
+
+#=
+The tracked text that the docs site and the repository publish: the library and its extensions,
+whose docstrings the site renders, the docs tree with its generators and ADRs, the Literate
+sources and the README. The generated pages are untracked, so the walk skips them (ADR 0151).
+=#
+function published_text_files(repo::AbstractString)
+    docs_src = joinpath(repo, "docs", "src")
+    generated = (joinpath(repo, "docs", "build"), joinpath(docs_src, "examples"),
+                 joinpath(docs_src, "user_guide"))
+    generated_pages = (joinpath(docs_src, "capability_catalogue.md"),
+                       joinpath(docs_src, "TypeHierarchy.md"))
+    files = [joinpath(repo, "README.md")]
+    for section in ("src", "ext", "docs", "examples", "user_guide")
+        for (dir, _, names) in walkdir(joinpath(repo, section))
+            if any(g -> dir == g || startswith(dir, joinpath(g, "")), generated)
+                continue
+            end
+            for name in names
+                path = joinpath(dir, name)
+                if (endswith(name, ".jl") || endswith(name, ".md")) &&
+                   path ∉ generated_pages
+                    push!(files, path)
+                end
+            end
+        end
+    end
+    return files
+end
+
 @testset "Docs page metadata census" begin
     @testset "The derivation" begin
         # A page title is the H1's text, with an `@id` wrapper unwrapped.
@@ -381,6 +423,31 @@ end
         end
         if !isempty(linked)
             @warn "Pages that link a page by a relative `.md` path. Give the target's H1 an `(@id label)` and link `(@ref label)`:\n  $(join(linked, "\n  "))"
+        end
+        @test linked == String[]
+    end
+
+    @testset "a page links the docs of an external package, never its repository" begin
+        @test external_repository_links("[a](https://github.com/x/A.jl) [b](https://x.github.io/A.jl/stable/)") ==
+              ["https://github.com/x/A.jl"]
+        @test external_repository_links("<https://www.github.com/x/A.jl>") ==
+              ["https://www.github.com/x/A.jl"]
+        @test isempty(external_repository_links("[c](https://github.com/dcelisgarza/A.jl/issues/1)"))
+        @test isempty(external_repository_links("![d](https://raw.githubusercontent.com/x/A.jl/main/b.json)"))
+        files = published_text_files(REPO_ROOT)
+        @test joinpath(REPO_ROOT, "README.md") in files
+        @test count(f -> startswith(relpath(f, REPO_ROOT), "src"), files) >= 300
+        @test count(f -> startswith(relpath(f, REPO_ROOT), "examples"), files) >= 60
+        @test count(f -> startswith(relpath(f, REPO_ROOT), joinpath("docs", "adr")),
+                    files) >= 100
+        linked = String[]
+        for path in sort(files)
+            for url in external_repository_links(read(path, String))
+                push!(linked, "$(relpath(path, REPO_ROOT)) -> $url")
+            end
+        end
+        if !isempty(linked)
+            @warn "Links to a GitHub repository outside `dcelisgarza`'s. Link the published docs site of the package instead, or name the source in prose (`CLAUDE.md` § Repo etiquette):\n  $(join(linked, "\n  "))"
         end
         @test linked == String[]
     end
