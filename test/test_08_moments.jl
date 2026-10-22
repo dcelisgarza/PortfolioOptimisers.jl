@@ -3071,6 +3071,26 @@ end
             @test collect(PortfolioOptimisers.target_mean(MeanSquaredError(), mu460,
                                                           sigma460; T = T460)) ==
                   fill(tr(sigma460) / T460, N460)
+            # Only `VolatilityWeighted` inverts the covariance matrix, so a singular matrix
+            # raises there and the other two targets stay finite.
+            sing460 = [1.0 1.0 0.0; 1.0 1.0 0.0; 0.0 0.0 1.0]
+            mus460 = [0.1, 0.2, 0.3]
+            @test_throws LinearAlgebra.SingularException PortfolioOptimisers.target_mean(VolatilityWeighted(),
+                                                                                         mus460,
+                                                                                         sing460)
+            @test all(isfinite,
+                      PortfolioOptimisers.target_mean(GrandMean(), mus460, sing460))
+            @test all(isfinite,
+                      PortfolioOptimisers.target_mean(MeanSquaredError(), mus460, sing460;
+                                                      T = 10))
+            # A shift of every mean by one constant moves `GrandMean` and
+            # `VolatilityWeighted` by that constant, and leaves `MeanSquaredError` as it is.
+            for tgt in tgts460
+                b0 = PortfolioOptimisers.target_mean(tgt, mu460, sigma460; T = T460)
+                b1 = PortfolioOptimisers.target_mean(tgt, mu460 .+ 0.5, sigma460; T = T460)
+                shift = tgt isa MeanSquaredError ? 0.0 : 0.5
+                @test isapprox(collect(b1), collect(b0) .+ shift)
+            end
         end
 
         @testset "each intensity against its own closed form" begin
