@@ -566,6 +566,38 @@ using Accessors: Accessors
         @test_throws DimensionMismatch PO.set_idiosyncratic_covariance(re, [1.0, 2.0, 3.0],
                                                                        [1, 2], nothing)
     end
+    @testset "Statements the /unslop pass corrected (#463)" begin
+        # `orthogonality_weights` refuses a variance that is not finite, and not only a
+        # variance that is not positive.
+        M = [1.0 2.0; 3.0 4.0]
+        metric = PO.InverseIdiosyncraticVarianceMetric()
+        @test PO.orthogonality_weights(metric,
+                                       PO.Regression(; M = M, esigma = [0.5, 0.25])) ==
+              [2.0, 4.0]
+        @test_throws DomainError PO.orthogonality_weights(metric,
+                                                          PO.Regression(; M = M,
+                                                                        esigma = [0.5, Inf]))
+        @test_throws DomainError PO.orthogonality_weights(metric,
+                                                          PO.Regression(; M = M,
+                                                                        esigma = [0.5, 0.0]))
+        # `LinearModel()` is the default of each estimator that takes a regression target,
+        # and the cross-sectional linear regression takes none.
+        @test isa(PO.StepwiseRegression().tgt, PO.LinearModel)
+        @test isa(PO.DimensionReductionRegression().retgt, PO.LinearModel)
+        @test isa(PO.CrossSectionalTargetRegression().tgt, PO.LinearModel)
+        @test isa(PO.ImpliedVolatilityRegression().re, PO.LinearModel)
+        @test !hasfield(typeof(PO.CrossSectionalLinearRegression()), :tgt)
+        # `set_row_key` has two callers beside `FactorPrior`, and both keep an unset `L` unset.
+        rr = PO.Regression(; M = [1.0 2.0; 3.0 4.0; 5.0 6.0], idx = [3, 5, 7],
+                           ts = PO.Dates.Date(2020, 1, 1) .+ PO.Dates.Day.(0:2))
+        rf = PO.forget_row_positions(rr)
+        @test isnothing(rf.idx)
+        @test rf.ts == rr.ts
+        @test isnothing(getfield(rf, :L))
+        rm = PO.map_row_positions(rr, [10, 11, 12, 13, 14, 15, 16])
+        @test rm.idx == [12, 14, 16]
+        @test isnothing(getfield(rm, :L))
+    end
 end
 
 #=

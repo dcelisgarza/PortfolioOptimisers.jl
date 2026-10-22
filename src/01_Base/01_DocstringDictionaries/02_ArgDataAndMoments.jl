@@ -46,8 +46,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :t => "`t`: Threshold value.",#
                  :oiv => "`iv`: Optional implied volatility matrix. Used if any internal covariance estimator is an instance of [`ImpliedVolatility`](@ref).",#
                  ## Regression
-                 :M => "`M`: Main coefficient (loadings) matrix `assets × factors`.",#
-                 :L => "`L`: Reduced dimensionality coefficient (loadings) matrix `assets × reduced_dimensions`.",#
+                 :M => "`M`: Loadings matrix `assets × factors`.",#
+                 :L => "`L`: Loadings matrix `assets × reduced_dimensions` in the reduced basis of a dimension reduction.",#
                  :b => "`b`: Regression intercept vector.",#
                  :esigma => "`esigma`: Idiosyncratic covariance. A vector holds the variances alone, and a matrix holds the full covariance.",#
                  :edof => "`edof`: Degrees of freedom of each residual series, one entry per asset. It is the effective count of the observations that measure the variance of the asset, less the parameters that the fit spent on the asset. A regression estimator writes it over equally weighted observations, and a prior that writes `esigma` restates it in the count of its variance estimator.",#
