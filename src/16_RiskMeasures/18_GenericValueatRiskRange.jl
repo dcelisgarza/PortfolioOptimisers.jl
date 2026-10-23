@@ -155,6 +155,25 @@ calibration_slots(r::GenericValueatRiskRange) = (; loss = r.loss, gain = r.gain)
 # than derived: the caller states both measures, and the constructor has already stripped
 # their risk-expression contribution. Their `ub` is *kept*, so a caller can bound one tail.
 range_tails(r::GenericValueatRiskRange) = (; loss = r.loss, gain = r.gain)
+# A tail keeps its `ub`, so a copy without bounds must clear the bound of each tail as well as
+# the bound of the container. The method for a `RiskMeasure` rebuilds `settings` alone, so the
+# corner solves of `NearOptimalCentering` would keep a tail bound. The tails keep `rke` and
+# `scale`, as `no_bounds_risk_measure` states.
+function no_bounds_risk_measure(r::GenericValueatRiskRange, flag::Any = nothing)
+    return GenericValueatRiskRange(;
+                                   settings = RiskMeasureSettings(; rke = r.settings.rke,
+                                                                  scale = r.settings.scale),
+                                   loss = no_bounds_risk_measure(r.loss, flag),
+                                   gain = no_bounds_risk_measure(r.gain, flag))
+end
+function no_bounds_no_risk_expr_risk_measure(r::GenericValueatRiskRange,
+                                             flag::Any = nothing)
+    return GenericValueatRiskRange(;
+                                   settings = RiskMeasureSettings(; rke = false,
+                                                                  scale = one(r.settings.scale)),
+                                   loss = no_bounds_risk_measure(r.loss, flag),
+                                   gain = no_bounds_risk_measure(r.gain, flag))
+end
 function (r::GenericValueatRiskRange)(x::VecNum)
     loss = r.loss(x)
     gain = r.gain(-x)

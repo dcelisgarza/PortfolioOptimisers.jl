@@ -79,6 +79,9 @@ unique_key_dict!(math_dict, :math_dict,
                  :B_i_kt => "``\\mathbf{B}_i``: ``N \\times N`` matrix of eigenpair ``i`` of the block vectorisation of ``\\mathbf{K}``, the reshaped ``\\sqrt{\\lambda_i}\\, \\boldsymbol{q}_i``. [`cokurtosis_spectrum`](@ref) gives the eigenvalue ``\\lambda_i``, clamped at zero, and the unit eigenvector ``\\boldsymbol{q}_i``. The index ``i`` counts down from the largest eigenvalue.",#
                  :g_kt_epi => "``g``: Epigraph variable of the square root of the kurtosis, ``g \\geq \\lVert \\boldsymbol{x}_{kt} \\rVert_{2}``.",#
                  :x_kt => "``\\boldsymbol{x}_{kt}``: Vector whose squared norm is the kurtosis expression. The exact formulation states ``\\mathbf{G}_{kt} \\mathbf{L}_2 \\mathrm{vec}(\\mathbf{W})``, and the approximate formulation states entry ``j`` as ``\\mathrm{Tr}(\\mathbf{B}_j \\mathbf{W})``.",#
+                 # The third moment of the portfolio, read off the coskewness matrix.
+                 :M3_cosk => "``\\mathbf{M}_3``: Coskewness matrix of the risk measure, ``N \\times N^2``. It is the measure's own `sk` when the measure states one, and the prior's otherwise.",#
+                 :m3_port => "``m_3(\\boldsymbol{w}) = \\boldsymbol{w}^\\intercal \\mathbf{M}_3 (\\boldsymbol{w} \\otimes \\boldsymbol{w})``: Third central moment of the portfolio returns, with ``\\otimes`` the Kronecker product.",#
                  # The cones of a norm, and the diversification floor a norm ceiling states.
                  :K_q_norm => "``\\mathcal{K}_{q} = \\{(t, \\boldsymbol{x}) : t \\geq \\lVert \\boldsymbol{x} \\rVert_{q}\\}``: Norm cone of order ``q``. ``\\mathcal{K}_{2}`` is the second-order cone.",#
                  :P_alpha_power => "``\\mathcal{P}_{\\alpha} = \\{(x, y, z) : x^{\\alpha} y^{1 - \\alpha} \\geq \\lvert z \\rvert,\\ x \\geq 0,\\ y \\geq 0\\}``: Power cone of exponent ``\\alpha \\in (0, 1)``, in the argument order of `MOI.PowerCone`.",#

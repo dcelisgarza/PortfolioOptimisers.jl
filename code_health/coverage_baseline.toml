@@ -261,7 +261,7 @@ commit = "8610300"
 "src/16_RiskMeasures/01_Base_RiskMeasures.jl" = { lines = 220, misses = 0 }
 "src/16_RiskMeasures/02_Variance.jl" = { lines = 117, misses = 0 }
 "src/16_RiskMeasures/03_MomentRiskMeasures.jl" = { lines = 139, misses = 2 }
-"src/16_RiskMeasures/04_Kurtosis.jl" = { lines = 89, misses = 10 }
+"src/16_RiskMeasures/04_Kurtosis.jl" = { lines = 89, misses = 0 }
 "src/16_RiskMeasures/05_NegativeSkewness.jl" = { lines = 42, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/01_XatRisk.jl" = { lines = 215, misses = 0 }
 "src/16_RiskMeasures/06_XatRisk/02_ConditionalXatRisk.jl" = { lines = 224, misses = 0 }
@@ -279,7 +279,7 @@ commit = "8610300"
 "src/16_RiskMeasures/14_Range.jl" = { lines = 6, misses = 0 }
 "src/16_RiskMeasures/15_TurnoverRiskMeasure.jl" = { lines = 13, misses = 2 }
 "src/16_RiskMeasures/16_TrackingRiskMeasure.jl" = { lines = 56, misses = 0 }
-"src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { lines = 92, misses = 11 }
+"src/16_RiskMeasures/17_VarianceSkewKurtosis.jl" = { lines = 92, misses = 0 }
 "src/16_RiskMeasures/18_GenericValueatRiskRange.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/19_RatioRiskMeasure.jl" = { lines = 13, misses = 0 }
 "src/16_RiskMeasures/20_EqualRiskMeasure.jl" = { lines = 5, misses = 0 }

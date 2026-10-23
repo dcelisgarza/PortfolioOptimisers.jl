@@ -125,7 +125,8 @@
             with ONE documented exception. `GenericValueatRiskRange` is the range whose
             tails are GIVEN rather than derived: the caller states both measures, and the
             constructor keeps their `ub` on purpose, "so a caller can bound one tail"
-            (`18_GenericValueatRiskRange.jl:151`). Its default tails carry no bound, so the
+            (the comment on `range_tails` in `18_GenericValueatRiskRange.jl`). Its default
+            tails carry no bound, so the
             assertion below still bites on the shipped value; what it must not do is forbid
             a bound the design admits.
             =#
