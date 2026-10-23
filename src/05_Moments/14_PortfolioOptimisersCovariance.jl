@@ -343,9 +343,9 @@ end
                               measure::Num_VecToScaM = MeanValue(),
                               scores::Option{<:VecNum} = nothing)
 
-Find the indices of a maximally uncorrelated subset of the assets of a data matrix.
+Find the indices of a subset of the assets of a data matrix in which no pair has a correlation of `t` or more.
 
-The function finds a subset of the columns of `X` in which no pair of assets has a correlation of `t` or more. If `absolute` is `true`, it compares the absolute value of the correlation. When two assets are too correlated, the function removes the asset with the higher drop score. It returns the indices of the assets that remain.
+The function compares each pair of columns of `X`. If `absolute` is `true`, it compares the absolute value of the correlation. When two assets are too correlated, the function removes the asset with the higher drop score. It returns the indices of the assets that remain.
 
 By default, the drop score of an asset is the summary of its column of the correlation matrix, so the asset that is redundant with the largest part of the universe goes first. The `scores` keyword replaces that criterion, and a higher score removes an asset first. [`RedundancySelector`](@ref) uses `scores` to keep, from each correlated pair, the asset with the better score under a risk measure.
 
@@ -361,7 +361,9 @@ This function is internal. A caller uses [`RedundancySelector`](@ref) with a [`P
  6. Return the indices that step 5 did not remove, in ascending order.
 
 Step 5 skips a pair in which one asset or both assets are already removed. Thus the result depends
-on the order that step 4 sets.
+on the order that step 4 sets. The greedy pass does not return a removed asset to the subset, so
+the result is not always the largest such subset. A tie can also remove an asset that the subset
+could keep.
 
 # Arguments
 
@@ -378,7 +380,7 @@ on the order that step 4 sets.
 
 # Returns
 
-  - `idx::Vector{Int}`: The indices of the assets that form a maximally uncorrelated subset.
+  - `idx::Vector{Int}`: The indices of the assets that remain, in ascending order. No pair of these assets has a correlation of `t` or more.
 
 # Related
 
