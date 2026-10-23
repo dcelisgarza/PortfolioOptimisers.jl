@@ -1667,6 +1667,47 @@ stored type and the two policies.
         @test_throws InexactError panel_field_values(rp, "r"; inactive = NaN)
         @test panel_field_values(rp, "r"; inactive = 0) == [1//2 0//1; 1//4 1//5]
         @test eltype(panel_field_values(rp, "r"; inactive = 0)) === Rational{Int}
+        # An integer policy keeps the integer type, so the type must hold the value.
+        up = AssetPanel(; pf = [NumericPanelField(; name = "u", vals = UInt[1 2; 3 4])],
+                        amsk = [true false; true true], emsk = [true false; true true])
+        @test_throws InexactError panel_field_values(up, "u"; inactive = -1,
+                                                     unobserved = nothing)
+        @test eltype(panel_field_values(up, "u"; inactive = 0, unobserved = nothing)) ===
+              UInt
+        # A float type converts every integer, and one past its range reads as an infinity.
+        hp = AssetPanel(; pf = [NumericPanelField(; name = "h", vals = Float16[1 2; 3 4])],
+                        amsk = [true false; true true], emsk = [true false; true true])
+        @test isequal(panel_field_values(hp, "h"; inactive = 100000, unobserved = nothing),
+                      Float16[1 Inf; 3 4])
+    end
+    @testset "A placeholder is unobserved, so the unobserved policy writes it" begin
+        # Asset 1 has a leading blank, which the forward fill resolves to its placeholder.
+        pp = asset_panel([NumericPanelInput(; name = "m",
+                                            vals = [NaN 2.0; 3.0 NaN; 5.0 6.0],
+                                            alg = ForwardPanelFill(; val = -7.0))])
+        f = panel_field(pp, "m")
+        @test f.pmsk == [true false; false false; false false]
+        @test isequal(panel_field_values(pp, "m"), [NaN 2.0; 3.0 NaN; 5.0 6.0])
+        @test panel_field_values(pp, "m"; unobserved = nothing) ==
+              [-7.0 2.0; 3.0 2.0; 5.0 6.0]
+    end
+    @testset "The type comes from the policies, not from the cells they write" begin
+        # The sector field holds no blank, and the default NaN policy still floats its codes.
+        @test isnothing(panel_field(pnl, "sector").omsk)
+        @test eltype(panel_field_values(pnl, "sector")) === Float64
+        @test panel_field_values(pnl, "sector") == [1.0 2.0; 2.0 2.0; 1.0 1.0]
+    end
+    @testset "A tensor field takes the unobserved policy on one label" begin
+        om = trues(3, 2, 2)
+        om[3, 1, 2] = false
+        tp = AssetPanel(;
+                        pf = [TensorPanelField(; name = "b", axis = "factor",
+                                               labels = ["x", "y"],
+                                               vals = reshape(collect(1.0:12.0), 3, 2, 2),
+                                               omsk = om)], amsk = amsk, emsk = amsk)
+        B = panel_field_values(tp, "b"; inactive = 0)
+        @test B[:, :, 1] == [1.0 0.0; 2.0 5.0; 3.0 6.0]
+        @test isequal(B[:, :, 2], [7.0 0.0; 8.0 11.0; NaN 12.0])
     end
 end
 
