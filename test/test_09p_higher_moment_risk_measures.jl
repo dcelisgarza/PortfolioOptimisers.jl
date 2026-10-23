@@ -123,6 +123,12 @@ end
         @test JuMP.value(hs.model[:risk]) ≈ sqrt(_m4_599(prs, hs.w)) rtol = 1e-5
         @test !isapprox(JuMP.value(hs.model[:risk]),
                         factory(Kurtosis(; alg1 = SemiMoment()), prs)(hs.w, X); rtol = 1e-2)
+        # A deferred semi-cokurtosis in `kt` fits the same tensor against the default prior,
+        # so it gives the model of the semi prior (#1818).
+        ds = _solve599(Kurtosis(; alg1 = SemiMoment(),
+                                kt = Cokurtosis(; alg = SemiMoment())))
+        @test ds.w ≈ hs.w rtol = 1e-5
+        @test JuMP.value(ds.model[:risk]) ≈ JuMP.value(hs.model[:risk]) rtol = 1e-6
     end
     @testset "The views agree with a refit on the subset" begin
         idx = [1, 3]

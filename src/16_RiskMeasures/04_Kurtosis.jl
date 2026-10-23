@@ -3,13 +3,13 @@ $(DocStringExtensions.TYPEDEF)
 
 Measures the fourth central moment of the portfolio returns, or its square root.
 
-The moment has the divisor ``T``. It is not divided by the square of the variance, so it is not the kurtosis coefficient, and it is not an excess kurtosis. `alg2` selects the quantity that the measure reports: [`SOCRiskExpr`](@ref) reports ``\\sqrt{m_4}``, and each of the [`QuadSecondMomentFormulations`](@ref) reports ``m_4``. `alg1` selects the full moment or the lower semi-moment.
+The moment has the divisor ``T``. It is not divided by the square of the variance, so it is not the kurtosis coefficient, and it is not an excess kurtosis. `alg2` selects the quantity that the measure reports: [`SOCRiskExpr`](@ref) reports ``\\sqrt{m_4}``, and each of the [`QuadSecondMomentFormulations`](@ref) reports ``m_4``. `alg1` selects the full moment or the lower semi-moment of the functor.
 
 [`set_risk_constraints!`](@ref) states the model, and neither model is exact. When `N` is `nothing`, the model is problem 13 of [pkurt](@cite), which replaces ``\\boldsymbol{w} \\boldsymbol{w}^\\intercal`` with a lifted matrix and drops the condition that the lift has rank one. When `N` is an integer, the model is the sum of squared quadratic forms of [pkurtapprox](@cite), and a larger `N` is more accurate and more expensive. The library calls the first model the exact formulation and the second the approximate formulation, because only the second truncates the cokurtosis. The `## Relaxation` of each method states the gap.
 
 !!! warning
 
-    The model reads `kt` and does not read `alg1`. Under [`SemiMoment`](@ref) the functor reports the lower semi-moment of the portfolio, but a full cokurtosis in `kt`, or in the prior, makes the model minimise the full moment. A lower semi-cokurtosis in `kt`, such as `Cokurtosis(; alg = SemiMoment())`, gives the heuristic of Section 3.1 of [pkurt](@cite). That model clips the deviations of each asset, not the deviations of the portfolio, so its value is not the semi-moment that the functor reports.
+    `alg1` acts on the functor alone. The functor gets only the weights and the returns, so it has no cokurtosis to read, and `alg1` tells it which moment to take. The model reads `kt`, or the cokurtosis of the prior, and does not read `alg1`. So under [`SemiMoment`](@ref) with a full cokurtosis, the functor reports the lower semi-moment and the model minimises the full moment. To give the model a semi-moment, name a **Deferred Quantity** in `kt`, such as `kt = Cokurtosis(; alg = SemiMoment())`. [`resolve_deferred_quantities`](@ref) fits it against the prior of the optimisation, as it fits a full `Cokurtosis()` or any other cokurtosis estimator. A lower semi-cokurtosis gives the heuristic of Section 3.1 of [pkurt](@cite). That model clips the deviations of each asset, not the deviations of the portfolio, so its value is not the semi-moment that the functor reports.
 
 # Mathematical definition
 
