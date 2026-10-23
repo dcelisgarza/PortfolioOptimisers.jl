@@ -560,6 +560,24 @@ nothing raises `@error "File exists but no references were collected"` in
         unlisted = sort!([string(b) for b in keys(Base.Docs.meta(PO)) if !(b.var in listed)])
         @test unlisted == String[]
     end
+
+    #=
+    Julia attaches a docstring to the definition that follows it. The docstring of
+    `ep_refine_tail_view(::AbstractSequentialTailViewConstraint, ::VecNum)` sat above a method
+    of `ep_refine_iters`, so the binding `ep_refine_tail_view` held one docstring only. Its
+    page entry found no exact docstring and rendered the docstring of the supertype method by
+    a `<:` match, so the page showed that text twice and no gate failed (#540). A docstring
+    whose signature line names a function holds the binding of that function.
+    =#
+    @testset "every docstring names the binding that holds it" begin
+        misplaced = String[]
+        for (b, md) in Base.Docs.meta(PO), (sig, ds) in md.docs
+            m = match(r"^\s{4}([A-Za-z_][A-Za-z0-9_!]*)\(", join(string.(ds.text)))
+            (isnothing(m) || m.captures[1] == string(b.var)) && continue
+            push!(misplaced, "$(m.captures[1]) is held by $(b.var) at $sig")
+        end
+        @test sort!(misplaced) == String[]
+    end
 end
 
 #=
