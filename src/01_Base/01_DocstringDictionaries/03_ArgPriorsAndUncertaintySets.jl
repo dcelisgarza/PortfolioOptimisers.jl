@@ -52,18 +52,18 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :op_w_pe => "`w`: Opinion probabilities, one for each estimator in `pes`, each in `[0, 1]` and with a sum of at most one, or `nothing` to give every opinion the same probability. A uniform prior over the observations takes the remainder `1 - sum(w)`.",#
                  :p_pool => "`p`: Penalty of robust opinion pooling, above zero, or `nothing` to pool the opinion weights as given. A larger value moves more weight to the opinions nearest the consensus.",#
                  # Entropy pooling.
-                 :mu_views => "`mu_views`: Expected returns views estimator or result.",#
-                 :var_views => "`var_views`: Value-at-risk views estimator or result.",#
-                 :cvar_views => "`cvar_views`: Conditional value-at-risk views estimator or result.",#
-                 :sigma_views => "`sigma_views`: Variance views estimator or result.",#
-                 :sk_views => "`sk_views`: Skewness views estimator or result.",#
-                 :kt_views => "`kt_views`: Kurtosis views estimator or result.",#
-                 :cov_views => "`cov_views`: Covariance views estimator or result.",#
-                 :rho_views => "`rho_views`: Correlation views estimator or result.",#
-                 :ds_opt => "`ds_opt`: Thin wrapper for arguments and keyword arguments used in `Roots.findzero` for use with a single conditional value-at-risk view.",#
-                 :dm_opt => "`dm_opt`: Optimiser for multiple conditional value at risk views.",#
-                 :opt_ep => "`opt`: Entropy pooling optimisation estimator.",#
-                 :evar_views => "`evar_views`: Entropic value-at-risk views estimator or result.",#
+                 :mu_views => "`mu_views`: Mean views, or `nothing` for no mean view.",#
+                 :var_views => "`var_views`: Value at risk views, as one view group or a vector of groups, or `nothing` for no value at risk view.",#
+                 :cvar_views => "`cvar_views`: Conditional value at risk views, as one view group or a vector of groups, or `nothing` for no conditional value at risk view.",#
+                 :sigma_views => "`sigma_views`: Variance views, or `nothing` for no variance view.",#
+                 :sk_views => "`sk_views`: Skewness views, or `nothing` for no skewness view.",#
+                 :kt_views => "`kt_views`: Kurtosis views, or `nothing` for no kurtosis view.",#
+                 :cov_views => "`cov_views`: Covariance views, or `nothing` for no covariance view.",#
+                 :rho_views => "`rho_views`: Correlation views, or `nothing` for no correlation view.",#
+                 :ds_opt => "`ds_opt`: Root search for one conditional value at risk view, which holds the arguments and the keyword arguments of `Roots.find_zero`. If `nothing`, the search uses a default [`ConditionalValueatRiskEntropyPooling`](@ref).",#
+                 :dm_opt => "`dm_opt`: Optimiser of the search for more than one conditional value at risk view. If `nothing`, the search uses a default [`OptimEntropyPooling`](@ref) over `Optim.Fminbox`.",#
+                 :opt_ep => "`opt`: Optimiser of each entropy pooling solve.",#
+                 :evar_views => "`evar_views`: Entropic value at risk views, as one view group or a vector of groups, or `nothing` for no entropic value at risk view.",#
                  :sbar => "`sbar`: Number of largest losses that the integer conditional value-at-risk formulation reads. An `Integer` is a count, and a fraction in `(0, 1)` is a fraction of the observations. `nothing` applies the rule `max(2 * s, ceil(Int, 2 * alpha * T))`, capped at `T`. Here `s` is the number of positions, counted from the largest loss, at which the prior probabilities first reach `alpha`. The rule is from the reference, which observes that a view above the prior CVaR needs about `s` positions and that a view below it needs more. `sbar = T` is always exact. A smaller `sbar` admits only the posteriors that put at least `alpha` of their mass on the `sbar` largest losses, so it makes the solve faster and less exact. Increase it when the solve reports infeasibility, or when `entropy_pooling` warns that the window binds.",#
                  :zpct => "`pct`: Half-width of the grid of entropic value-at-risk dual variables, as a fraction of its centre. A lower-bound view uses the value that attains the prior entropic value at risk as the centre. An upper-bound or equality view uses the value that [`ep_evar_anchor`](@ref) finds as the centre, so the width covers only the movement that the other views of the model cause.",#
                  :zK => "`K`: Number of points of the grid of entropic value-at-risk dual variables. It must be odd, so that the centre is a point of the grid. It sets only the resolution of the grid, and the points are evenly spaced from `zc * (1 - pct)` to `zc * (1 + pct)` for a grid with the centre `zc`. Each point is one more binary variable of the mixed-integer program that an upper-bound or equality view builds, so increase `K` together with `pct`, and not on its own.",#
@@ -79,7 +79,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :ep_view_op => "`op`: Comparison operator of the view, one of `:eq`, `:geq` and `:leq`.",#
                  :ep_view_rhs => "`rhs`: Target value of the view.",#
                  :ep_zgrid => "`z`: Grid of entropic value-at-risk dual variables.",#
-                 :rlvar_views => "`rlvar_views`: Relativistic value-at-risk views estimator or result.",#
+                 :rlvar_views => "`rlvar_views`: Relativistic value at risk views, as one view group or a vector of groups, or `nothing` for no relativistic value at risk view.",#
                  :ep_tv_kappa => "`kappa`: Deformation parameter the views this estimator holds are read under.",#
                  :ep_tv_bracket => "`bracket`: The spans of the two scalar searches of this estimator, or `nothing` for the default spans of [`RelativisticValueatRiskViewBracket`](@ref).",#
                  :ep_tv_evar_zlo_frac => "`zlo_frac`: Lower end of the bracket of the dual variable, as a fraction of the upper end, or `nothing` to take the span [`ep_evar`](@ref) states. The upper end is a proof, so it is not a knob and only the lower one is.",#
@@ -144,8 +144,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Entropy pooling.
                  :sc1 => "`sc1`: Scale of the dual objective.",#
                  :sc2 => "`sc2`: Weight of the norm of the slack of the fixed equality rows in the objective.",#
-                 :epalg => "`alg`: Entropy pooling algorithm.",#
+                 :epalg => "`alg`: Entropy pooling algorithm, which applies the views in one solve or in stages.",#
                  :epoptalg => "`alg`: Algorithm that evaluates the entropy pooling objective.",#
-                 :ep_w => "`w`: Prior observation probability weights, on the observations the wrapped estimator **answers**, which a wrapped estimator that drops rows makes fewer than the observations it is given. If `nothing`, the wrapped result's own `w` is used, and the uniform weights where it carries none. The posterior probabilities take the kind of these weights, `StatsBase.AnalyticWeights` or `StatsBase.ProbabilityWeights`, and the kind fixes the bias correction of the posterior covariance. Without a caller's `w`, the kind is the one of the wrapped result's `w` when it is one of the two, and `StatsBase.AnalyticWeights` otherwise. See [`ScenarioProbabilities`](@ref).",#
+                 :ep_w => "`w`: Prior observation probability weights, on the observations that the wrapped estimator returns. A wrapped estimator that drops rows returns fewer observations than it gets. If `nothing`, the fit uses the `w` of the wrapped result, or the uniform weights when that result has none. The posterior probabilities take the kind of these weights, `StatsBase.AnalyticWeights` or `StatsBase.ProbabilityWeights`, and the kind fixes the bias correction of the posterior covariance. Without a `w` from the caller, the kind is the kind of the `w` of the wrapped result when it is one of the two, and `StatsBase.AnalyticWeights` otherwise. [`ScenarioProbabilities`](@ref) states the rule.",#
                  # Opinion pooling.
                  :opalg => "`alg`: The rule that pools the scenario weights of the opinions, see [`OpinionPoolingAlgorithm`](@ref).")
