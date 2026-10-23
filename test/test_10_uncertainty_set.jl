@@ -907,6 +907,17 @@ end
             @test all(lb .<= ub)
             @test all(lb .<= sum(sims) / length(sims) .<= ub)
         end
+        @testset "A skewed sample puts its mean outside both quantile bounds" begin
+            # Ninety-nine zeros and one outlier: both quantiles are zero and the mean is ten,
+            # so the two builders bracket the mean of a near-normal sample only.
+            s = [zeros(99); 1000.0]
+            lb, ub = PortfolioOptimisers.vec_quantile_bounds(reshape(s, 1, 100), 0.025, (;))
+            @test lb == ub == [0.0]
+            @test Statistics.mean(s) == 10.0
+            blb, bub = PortfolioOptimisers.box_quantile_bounds(Float64, (i, j) -> s, 1,
+                                                               0.025, (;))
+            @test blb == bub == fill(0.0, 1, 1)
+        end
         @testset "A view carries k through, so it is not the subset's own fit" begin
             # The restricted shape matrix equals the one fitted on the subset alone, but
             # the radius does not: only the general route, which reads neither the data nor

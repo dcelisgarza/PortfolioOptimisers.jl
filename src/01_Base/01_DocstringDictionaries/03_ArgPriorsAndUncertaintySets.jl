@@ -119,11 +119,11 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :dmu => "`dmu`: Uncertainty bound for expected returns.",#
                  :dsigma => "`dsigma`: Uncertainty bound for covariance.",#
                  :dist => "`dist`: Probability distribution.",#
-                 :k_ucs => "`k`: Uncertainty set scaling parameter.",#
-                 :class_ucs => "`class`: Uncertainty set class.",#
-                 :val_ucs => "`val`: Quantity the set is a neighbourhood of — a characteristic vector on the mean axis, a covariance matrix on the covariance axis. `nothing` defers to the consumer's own quantity. When it is set, it takes precedence over the returns estimator's field and over the prior.",#
-                 :method_ucs => "`method`: Ellipsoidal uncertainty set estimation method.",#
-                 :diagonal => "`diagonal`: Whether to use only the diagonal of the covariance matrix.",#
+                 :k_ucs => "`k`: Radius of the ellipsoid. It must be positive.",#
+                 :class_ucs => "`class`: Axis tag of the set, which sets the row count of the shape matrix or of the geometry map.",#
+                 :val_ucs => "`val`: Quantity that the set is a neighbourhood of. It is a vector on the mean axis and a covariance matrix on the covariance axis. `nothing` lets the consumer use its own quantity. A value has priority over the field of the returns estimator and over the prior.",#
+                 :method_ucs => "`method`: Radius algorithm of the set, or the radius as a `Number`.",#
+                 :diagonal => "`diagonal`: Whether the shape matrix keeps only its diagonal, which removes the correlation between the estimation errors of different entries.",#
                  :dc_ucs => "`dc`: Construction of the diagonal covariance shape. It is read only when `alg` is an [`EllipsoidalUncertaintySetAlgorithm`](@ref) or a [`NormBallUncertaintySetAlgorithm`](@ref) with `diagonal = true`. [`DiagonalOfShape`](@ref) takes the diagonal of the full shape, and [`ShapeOfDiagonal`](@ref) builds the shape from the variances alone.",#
                  :eps_ucs => "`eps`: Radius of the ``\\ell_1`` uncertainty set on the characteristic vector. Larger values admit more estimation error, and therefore activate more assets.",#
                  :ep_ucs => "`ep`: Radius of the positive-error side of the signed ``\\ell_1`` uncertainty set.",#
