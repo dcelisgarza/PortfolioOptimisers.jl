@@ -533,10 +533,10 @@ end
     S4 = cov(randn(StableRNG(5), 300, 4) * [1 0.5 0.3 0.2; 0 1 0.4 0.1; 0 0 1 0.3; 0 0 0 1])
     A4, B4, D4 = S4[1:2, 1:2], S4[1:2, 3:4], S4[3:4, 3:4]
     a4 = PO.schur_augmentation(A4, B4, D4, 0.6)
-    # Measured maxabs 0.
+    # Measured maxabs 0 locally, and 1.33e-15 on one of the two kinds of CI host over 29 runs.
     @test parity_compare(vec(a4),
                          [1.1053754436644576, 0.5353025295713506, 0.5353025295713506,
-                          1.0072426334532807]; rtol = 0.0, atol = 1e-15,
+                          1.0072426334532807]; rtol = 0.0, atol = 1e-14,
                          name = "Schur block 1785").ok
     b4 = 1 .- 0.6 * B4 * (D4 \ ones(2))
     @test maximum(abs, a4 - (A4 - 0.6 * B4 * (D4 \ B4')) ./ (b4 * b4')) > 0.4

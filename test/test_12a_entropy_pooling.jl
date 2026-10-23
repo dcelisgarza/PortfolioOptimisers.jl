@@ -1698,9 +1698,10 @@ the row names no asset.
     @test_logs (:warn,) match_mode = :any prior(EntropyPoolingPrior(; sets = nsets,
                                                                     mu_views = lce("1 == 0.004")),
                                                 rd)
-    @test_throws ArgumentError prior(EntropyPoolingPrior(; sets = nsets,
-                                                         mu_views = lce("1 == 0.004")), rd;
-                                     strict = true)
+    # #1797: strict raises IsZeroError at the drop of an all-zero row.
+    @test_throws IsZeroError prior(EntropyPoolingPrior(; sets = nsets,
+                                                       mu_views = lce("1 == 0.004")), rd;
+                                   strict = true)
 end
 
 @testset "An entropy pooling prior over a factor prior meets its views (#1649)" begin

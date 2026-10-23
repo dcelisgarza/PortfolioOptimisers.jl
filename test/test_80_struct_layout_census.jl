@@ -22,10 +22,17 @@
     =#
     PO = PortfolioOptimisers
 
-    # The size and the alignment of one field slot of a concrete struct.
+    #=
+    The size and the alignment of one field slot of a concrete struct. Julia stores an isbits
+    union, such as the `Union{Nothing, Int}` fields of `LogLimits`, inline: the widest member,
+    then one selector byte. Each such field of `LogLimits` takes 16 bytes, and no order saves one.
+    =#
     function slot(ft)
         if isconcretetype(ft) && Base.allocatedinline(ft)
             return (sizeof(ft), Base.datatype_alignment(ft))
+        elseif Base.isbitsunion(ft)
+            us = Base.uniontypes(ft)
+            return (maximum(sizeof, us) + 1, maximum(Base.datatype_alignment, us))
         else
             return (sizeof(Ptr{Cvoid}), Base.datatype_alignment(Ptr{Cvoid}))
         end
@@ -103,6 +110,8 @@
     @test length(audited) > 200
     @test typeof(HindsightSplit()) in audited
     @test sizeof(HindsightSplit()) == 16
+    @test slot(Union{Nothing, Int}) == (9, 8)
+    @test PO.LogLimits in audited
     for T in (JuMPOptimiser, FactorBlackLittermanPrior, TargetReturnForecast)
         @test any(S -> S <: T, audited)
     end
