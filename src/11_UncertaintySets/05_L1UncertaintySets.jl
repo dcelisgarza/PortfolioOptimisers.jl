@@ -1000,7 +1000,7 @@ SignedL1UncertaintySet
 function mu_ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return mu_ucs(Accessors.@set(ue.pe = nothing), pr)
+    return mu_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 function mu_ucs(ue::CharacteristicUncertaintySet{Nothing, <:L1UncertaintySetAlgorithm},
                 pr::AbstractPriorResult; rd = nothing, kwargs...)

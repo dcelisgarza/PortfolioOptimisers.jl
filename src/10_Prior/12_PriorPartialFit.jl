@@ -170,10 +170,10 @@ The method forwards to the fold of the buffer, with its keyword arguments. So a 
   - [`partial_fit!`](@ref)
 """
 function partial_fit!(state::PriorCarryState, x::VecNum; kwargs...)
-    return Accessors.@reset state.buf = partial_fit!(state.buf, x; kwargs...)
+    return PriorCarryState(partial_fit!(state.buf, x; kwargs...), state.named)
 end
 function partial_fit!(state::PriorCarryState, X::MatNum; dims::Int = 1, kwargs...)
-    return Accessors.@reset state.buf = partial_fit!(state.buf, X; dims = dims, kwargs...)
+    return PriorCarryState(partial_fit!(state.buf, X; dims = dims, kwargs...), state.named)
 end
 """
     fold_carry(cache::Option{<:PriorCarryState}, x::VecNum; kwargs...)
@@ -858,7 +858,7 @@ function partial_fit!(pe::AbstractPriorEstimator, X::VecNum_MatNum,
         partial_fit!(state, X, F; active_mask = active_mask,
                      estimation_mask = estimation_mask)
     end
-    return pin_buffer_choice(Accessors.@set(pe.cache = state))
+    return pin_buffer_choice(rebuild_estimator(pe, (; cache = state)))
 end
 """
     partial_fit!(pe::AbstractPriorEstimator, rd::ReturnsResult)
@@ -1478,8 +1478,8 @@ Each step of the carry folds `pe.me` and `pe.ce` on the same observations, so th
 """
 function fold_carry_members(pe::EmpiricalPrior, X::VecNum_MatNum; kwargs...)
     assert_cold_carry_entry(pe, pe.cache, "EmpiricalPrior")
-    pe = Accessors.@reset pe.me = fold_member(pe.me, X; kwargs...)
-    return Accessors.@reset pe.ce = fold_member(pe.ce, X; kwargs...)
+    pe = rebuild_estimator(pe, (; me = fold_member(pe.me, X; kwargs...)))
+    return rebuild_estimator(pe, (; ce = fold_member(pe.ce, X; kwargs...)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1581,8 +1581,8 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                       ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = fold_carry_members(pe, x; kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
-                                                  kwargs...)
+    cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
@@ -1592,16 +1592,16 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, Nothing, <:Any, <:Any,
     X, iv = dims_oriented(dims, X, iv)
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
     pe = fold_carry_members(pe, Xm; dims = 1, kw...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
-                                                  ivpa = ivpa, gaps = gaps, kwargs...)
+    cache = fold_carry(pe.cache, X; dims = 1, iv = iv, ivpa = ivpa, gaps = gaps, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, x::VecNum,
                       ::Option{<:VecNum_MatNum} = nothing; iv::Option{<:VecNum} = nothing,
                       ivpa::Option{<:Num_VecNum} = nothing, kwargs...)
     pe = fold_carry_members(pe, log1p.(x); kwargs...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa,
-                                                  kwargs...)
+    cache = fold_carry(pe.cache, x; iv = iv, ivpa = ivpa, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
                                          <:Option{<:PriorCarryState}}, X::MatNum,
@@ -1611,8 +1611,8 @@ function partial_fit!(pe::EmpiricalPrior{<:Any, <:Any, <:Number, <:Any, <:Any,
     X, iv = dims_oriented(dims, X, iv)
     Xm, kw = shared_series_member_rows(X, gaps; kwargs...)
     pe = fold_carry_members(pe, log1p.(Xm); dims = 1, kw...)
-    return Accessors.@reset pe.cache = fold_carry(pe.cache, X; dims = 1, iv = iv,
-                                                  ivpa = ivpa, gaps = gaps, kwargs...)
+    cache = fold_carry(pe.cache, X; dims = 1, iv = iv, ivpa = ivpa, gaps = gaps, kwargs...)
+    return rebuild_estimator(pe, (; cache = cache))
 end
 """
     fold_prior_step(pe::EmpiricalPrior{<:Any, <:Any, <:Any, <:Any, <:Any,

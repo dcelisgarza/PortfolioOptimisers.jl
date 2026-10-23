@@ -756,8 +756,9 @@ Holds the running state of an incremental fit of a [`RegimeAdjustedExpWeightedCo
 
 [`partial_fit!`](@ref) builds it and keeps it in the `cache` field of the estimator, and
 `cov(ce, state)` reads it. A caller can hold a state outside the estimator, but only the forward
-pass of the estimator writes it. The fold mutates the arrays in place, and it replaces the two
-scalar fields, `regime_state` and `n_regime_obs`, with `Accessors.@reset`.
+pass of the estimator writes it. The fold mutates the arrays in place, and it builds a new state
+with the two new scalar fields, `regime_state` and `n_regime_obs`, through the positional
+constructor.
 
 The three fields that carry the separate correlation recursion are `nothing` where `cor_decay`
 is `nothing`, because one decay then carries the whole matrix and no correlation state exists.
@@ -1423,8 +1424,8 @@ is scored against a block at its zero seed. A `regime_method` of `nothing` advan
 # Returns
 
   - `cache::RegimeAdjustedCovarianceState`: The cache to read on and to pass to the next
-    observation. `regime_state` and `n_regime_obs` are immutable fields that `Accessors.@reset`
-    replaces, so the caller must rebind the cache to this return value.
+    observation. `regime_state` and `n_regime_obs` are immutable fields that a new state holds,
+    so the caller must rebind the cache to this return value.
 
 # Related
 
@@ -1456,17 +1457,13 @@ function update_regime!(cache::RegimeAdjustedCovarianceState,
     end
     transformed = Statistics.mean(get_regime_state(ce.regime_method, ce.regime_target,
                                                    stats, n, ce.min_val))
-
-    Accessors.@reset cache.regime_state = if isnothing(cache.regime_state)
-        transformed
-    else
-        ce.regime_decay * cache.regime_state +
-        (one(ce.regime_decay) - ce.regime_decay) * transformed
-    end
-
-    Accessors.@reset cache.n_regime_obs += 1
-
-    return cache
+    c = cache
+    rs = blend_regime_state(c.regime_state, transformed, ce.regime_decay)
+    return RegimeAdjustedCovarianceState(c.ret_buffer, c.covariance, c.weight, c.variance,
+                                         c.cor_state, c.cor_weight, c.XXt, c.Xi, c.X_old_i,
+                                         c.location, c.obs_count, c.active, rs,
+                                         c.n_regime_obs + 1, c.bias, c.overlap,
+                                         c.lag_records)
 end
 function update_regime!(cache::RegimeAdjustedCovarianceState,
                         ::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:Any, <:Any,

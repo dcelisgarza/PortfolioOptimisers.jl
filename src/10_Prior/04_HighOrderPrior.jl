@@ -1122,7 +1122,7 @@ The estimator always passes the fold to `pe.pe`, because that member holds the r
  1. At the first step, when `pe.pe` holds no state, refuse a member that holds one, with [`assert_cold_carry_entry`](@ref).
  2. Fold the observations and `F` into `pe.pe` with [`partial_fit!`](@ref).
  3. Fold the observations into `pe.kte` and `pe.ske` with [`fold_member`](@ref).
- 4. Rebuild the estimator with the three folded members, with `Accessors.setproperties`, and return it.
+ 4. Rebuild the estimator with the three folded members through [`rebuild_estimator`](@ref), and return it.
 
 # Arguments
 
@@ -1151,10 +1151,10 @@ The estimator always passes the fold to `pe.pe`, because that member holds the r
 function partial_fit!(pe::HighOrderPriorEstimator, X::VecNum_MatNum,
                       F::Option{<:VecNum_MatNum} = nothing; kwargs...)
     assert_cold_carry_entry(pe, online_entry_state(pe.pe), "HighOrderPriorEstimator")
-    return Accessors.setproperties(pe,
-                                   (; pe = partial_fit!(pe.pe, X, F; kwargs...),
-                                    kte = fold_member(pe.kte, X; kwargs...),
-                                    ske = fold_member(pe.ske, X; kwargs...)))
+    return rebuild_estimator(pe,
+                             (; pe = partial_fit!(pe.pe, X, F; kwargs...),
+                              kte = fold_member(pe.kte, X; kwargs...),
+                              ske = fold_member(pe.ske, X; kwargs...)))
 end
 """
     fold_prior_step(pe::HighOrderPriorEstimator, rd::ReturnsResult,

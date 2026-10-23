@@ -946,11 +946,13 @@ Rebuilds an estimator with its keyword constructor, with the fields in `repl` re
 
 The other fields keep their values. The keyword constructor checks every rule of construction again.
 
+The function reads each field in one tuple expression, and it does not `merge` the fields with `repl`. A field with a declared `Union` type, such as the gap marks of a [`SampleBufferState`](@ref), makes the type of a merged `NamedTuple` abstract. The call to the constructor then dispatches at run time and allocates, and an online step calls this function on every fold.
+
 # Algorithm
 
- 1. Read every field of `x` into a `NamedTuple` keyed by the field names.
- 2. Merge `repl` into it, so a name in `repl` replaces the value of that field.
- 3. Call the keyword constructor of the type of `x` with the merged tuple.
+ 1. Read each field of `x` into one tuple, in the order of the fields. Take the value in `repl` when `repl` names the field.
+ 2. Keep the names of `repl` that are not fields of `x`.
+ 3. Call the keyword constructor of the type of `x` with the fields and the kept names.
 
 # Related
 
@@ -958,9 +960,12 @@ The other fields keep their values. The keyword constructor checks every rule of
   - [`reset_time_dependent_fields`](@ref)
 """
 function rebuild_estimator(x, repl::NamedTuple)
-    fns = fieldnames(typeof(x))
-    nt = NamedTuple{fns}(map(f -> getfield(x, f), fns))
-    return (typeof(x).name.wrapper)(; merge(nt, repl)...)
+    T = typeof(x)
+    fns = fieldnames(T)
+    vals = ntuple(i -> haskey(repl, fns[i]) ? getfield(repl, fns[i]) : getfield(x, i),
+                  Val(fieldcount(T)))
+    return (T.name.wrapper)(; NamedTuple{fns}(vals)...,
+                            Base.structdiff(repl, NamedTuple{fns})...)
 end
 """
     is_time_dependent(opt)

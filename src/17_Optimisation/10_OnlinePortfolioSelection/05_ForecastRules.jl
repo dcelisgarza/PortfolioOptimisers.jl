@@ -47,7 +47,7 @@ The first method copies the `cache` field through the [`Base.copy`](@ref) of the
 """
 function copy_forecaster(me::AbstractExpectedReturnsEstimator)
     if hasfield(typeof(me), :cache) && !isnothing(getfield(me, :cache))
-        return Accessors.@set me.cache = copy(me.cache)
+        return rebuild_estimator(me, (; cache = copy(me.cache)))
     end
     return me
 end
@@ -67,7 +67,7 @@ Copies a folded prior, so that its state shares no array with the original.
 """
 function copy_forecaster_prior(pe::AbstractPriorEstimator)
     if hasfield(typeof(pe), :cache) && !isnothing(getfield(pe, :cache))
-        return Accessors.@set pe.cache = copy(pe.cache)
+        return rebuild_estimator(pe, (; cache = copy(pe.cache)))
     end
     return pe
 end

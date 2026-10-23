@@ -1494,10 +1494,9 @@ function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
     prev = isnothing(state) ? cold : ifelse.(active .& .!iszero.(nu), state.stat, cold)
     stat = fold_active(me.alg, prev, hist, xr, active)
     n = isnothing(state) ? 0 : state.n
-    return Accessors.@reset me.cache = PriceLevelForecastState(n + 1,
-                                                               ifelse.(active, nu .+ valid,
-                                                                       zero(eltype(nu))),
-                                                               stat, hist)
+    state = PriceLevelForecastState(n + 1, ifelse.(active, nu .+ valid, zero(eltype(nu))),
+                                    stat, hist)
+    return rebuild_estimator(me, (; cache = state))
 end
 function partial_fit!(me::PriceLevelExpectedReturns{<:Any,
                                                     <:Option{<:PriceLevelForecastState}},

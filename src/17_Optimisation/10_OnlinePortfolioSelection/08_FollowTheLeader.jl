@@ -1186,7 +1186,7 @@ function leader_allocation(opt::JuMPOptimisationEstimator, rd::ReturnsResult,
                            X::Option{<:ReturnsResult})
     opt = factory(opt, w)
     ccnt = append_custom_constraint(opt.opt.ccnt, AllocationSetConstraint(set, w, X))
-    opt = Accessors.@set opt.opt.ccnt = ccnt
+    opt = rebuild_estimator(opt, (; opt = rebuild_estimator(opt.opt, (; ccnt = ccnt))))
     res = optimise(opt, rd)
     if isa(res.retcode, OptimisationSuccess)
         return res.w

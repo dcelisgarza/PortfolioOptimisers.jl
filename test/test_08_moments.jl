@@ -2786,7 +2786,7 @@ end
         @test filter(x -> !isa(x, String), dv.args) == Any[:(ret_dict[:stdnum])]
         # The summary names the generic, not the type's noun: `std` on a windowed variance
         # estimator computes a standard deviation.
-        @test occursin("Compute `Statistics.std` over a rolling or indexed observation window",
+        @test occursin("Compute `Statistics.std` over a rolling or indexed window of observations",
                        join(filter(x -> isa(x, String), dv.args)))
         # Siblings cross-link, and a method never links to itself.
         @test occursin("[`sibling`](@ref)", join(filter(x -> isa(x, String), dm.args)))
@@ -2992,7 +2992,7 @@ end
         # Docstrings are generated too, with the dictionary lookups kept live rather than
         # hand-copied, so an `arg_dict`/`ret_dict` edit reaches them.
         tdoc = string(@doc WindowedEstimatorProbe.ProbeWindowedVariance)
-        @test occursin("Variance estimator that restricts computation to a rolling or indexed observation window",
+        @test occursin("Fits an inner variance estimator on a rolling or indexed window of observations",
                        tdoc)
         @test occursin(PortfolioOptimisers.val_dict[:oow], tdoc)
         @test occursin("julia> 1 + 1", tdoc)
@@ -3010,7 +3010,7 @@ end
         # keeps them in sync (ADR 0039).
         for T in (WindowedExpectedReturns, WindowedCovariance, WindowedVariance,
                   WindowedCoskewness, WindowedCokurtosis)
-            @test occursin("estimator that restricts computation to a rolling or indexed observation window",
+            @test occursin("estimator on a rolling or indexed window of observations",
                            string(Base.Docs.doc(T)))
         end
     end

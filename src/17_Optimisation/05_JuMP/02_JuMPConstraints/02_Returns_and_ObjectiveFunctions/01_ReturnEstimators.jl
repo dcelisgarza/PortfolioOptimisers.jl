@@ -458,15 +458,12 @@ own expression, and the term still charges the same fees. This is the return-sid
 function unit_scale_returns_estimator(r::JuMPReturnsEstimator)
     settings = r.settings
     scale = settings.scale
-    return if isone(scale)
-        r
-    else
-        Accessors.@set r.settings = JuMPReturnsSettings(; scale = one(scale),
-                                                        lb = settings.lb,
-                                                        rte = settings.rte,
-                                                        fee = settings.fee,
-                                                        mic = settings.mic)
+    if isone(scale)
+        return r
     end
+    s = JuMPReturnsSettings(; scale = one(scale), lb = settings.lb, rte = settings.rte,
+                            fee = settings.fee, mic = settings.mic)
+    return rebuild_estimator(r, (; settings = s))
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -681,7 +678,12 @@ whether one number has the same meaning for all of the terms.
   - [`LogarithmicReturn`](@ref)
 """
 function bounds_returns_estimator(r::JuMPReturnsEstimator, lb::Option{<:RkRtBounds})
-    return Accessors.@set r.settings.lb = lb
+    settings = r.settings
+    return if lb === settings.lb
+        r
+    else
+        rebuild_estimator(r, (; settings = rebuild_estimator(settings, (; lb = lb))))
+    end
 end
 function bounds_returns_estimator(r::VecJRE, lb::Nothing)
     return [bounds_returns_estimator(ri, nothing) for ri in r]

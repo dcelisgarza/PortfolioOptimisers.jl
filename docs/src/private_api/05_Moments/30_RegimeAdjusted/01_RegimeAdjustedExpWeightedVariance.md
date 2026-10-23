@@ -20,6 +20,7 @@ regime_log_variance
 regime_bias!
 regime_bias_open
 hac_squared_returns!
+blend_regime_state
 process_observation!(cache::RegimeAdjustedVarianceState, ce::RegimeAdjustedExpWeightedVariance, X::VecNum, estimation_mask::Option{<:AbstractVector{<:Bool}}, active_mask::Option{<:AbstractVector{<:Bool}})
 regime_adjusted_variance_pass!
 regime_adjusted_variance

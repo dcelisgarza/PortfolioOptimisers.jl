@@ -950,7 +950,7 @@ The last line reads ``\\boldsymbol{\\mu}`` after the third line changed it, but 
  3. Take the deviation `d` of the observation from the mean before the fold.
  4. Add `d`, divided by the new count, to `mu` in place.
  5. Add `d` times the deviation from the mean after the fold to `M`, in place.
- 6. Rebind the count with `Accessors.@reset`, and return the state.
+ 6. Build the state with the new count through its positional constructor, and return it.
 """
 function partial_fit!(state::SimpleVarianceState, x::VecNum)
     @argcheck(length(x) == length(state.mu),
@@ -959,7 +959,7 @@ function partial_fit!(state::SimpleVarianceState, x::VecNum)
     d = x .- state.mu
     state.mu .+= d ./ n
     state.M .+= d .* (x .- state.mu)
-    return Accessors.@reset state.n = n
+    return SimpleVarianceState(n, state.mu, state.M, state.cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1050,7 +1050,7 @@ function partial_fit!(state::SimpleVarianceState, x::VecNum, cvg::CoveragePolicy
         end
     end
     coverage_step!(counts, valid, active_mask)
-    return Accessors.@reset state.n = state.n + 1
+    return SimpleVarianceState(state.n + 1, state.mu, state.M, counts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1130,14 +1130,14 @@ The [`SimpleVariance`](@ref) method of [`partial_fit!`](@ref) folds one observat
  1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
  2. Seed a [`SimpleVarianceState`](@ref) of zeros over `length(x)` assets when `ve.cache` holds `nothing`, with [`variance_state_seed`](@ref).
  3. Fold `x` into the state, with the policy `ve.cvg` and the active mask.
- 4. Rebind `ve.cache` with `Accessors.@reset`, and return the estimator.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(ve::SimpleVariance{<:Any, <:Any, <:Any, <:Any,
                                          <:Option{<:SimpleVarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(ve.me, ve.w, "SimpleVariance")
     state = variance_state_seed(ve.cache, x, ve.cvg)
-    return Accessors.@reset ve.cache = partial_fit!(state, x, ve.cvg, active_mask)
+    return rebuild_estimator(ve, (; cache = partial_fit!(state, x, ve.cvg, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1165,11 +1165,15 @@ function variance_state_seed(cache::Option{<:SimpleVarianceState}, x::VecNum,
                              cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    return if isnothing(cache)
-        SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
-                            coverage_counts_seed(cvg, nothing, N, Tf, false))
+    if isnothing(cache)
+        return SimpleVarianceState(0, zeros(Tf, N), zeros(Tf, N),
+                                   coverage_counts_seed(cvg, nothing, N, Tf, false))
+    end
+    counts = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+    return if counts === cache.cvg
+        cache
     else
-        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+        SimpleVarianceState(cache.n, cache.mu, cache.M, counts)
     end
 end
 """

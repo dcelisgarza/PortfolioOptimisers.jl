@@ -480,14 +480,14 @@ Where:
  1. Refuse an observation whose length is not the number of assets that the state describes.
  2. Add one to the count.
  3. Add the deviation, divided by the new count, to `mu` in place.
- 4. Rebind the count with `Accessors.@reset`, and return the state.
+ 4. Build the state with the new count through its positional constructor, and return it.
 """
 function partial_fit!(state::SimpleExpectedReturnsState, x::VecNum)
     @argcheck(length(x) == length(state.mu),
               DimensionMismatch("the observation must have one entry per asset, but the state describes $(length(state.mu)) assets and `x` has $(length(x)) entries."))
     n = state.n + 1
     state.mu .+= (x .- state.mu) ./ n
-    return Accessors.@reset state.n = n
+    return SimpleExpectedReturnsState(n, state.mu, state.cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -573,7 +573,7 @@ function partial_fit!(state::SimpleExpectedReturnsState, x::VecNum, cvg::Coverag
         end
     end
     coverage_step!(counts, valid, active_mask)
-    return Accessors.@reset state.n = state.n + 1
+    return SimpleExpectedReturnsState(state.n + 1, state.mu, counts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -652,14 +652,14 @@ The [`SimpleExpectedReturns`](@ref) method of [`partial_fit!`](@ref) folds one o
  1. Refuse a configuration that no incremental fit can reproduce, with [`assert_partial_fittable`](@ref).
  2. Seed a [`SimpleExpectedReturnsState`](@ref) of zeros over `length(x)` assets when `me.cache` holds `nothing`, with [`expected_returns_state_seed`](@ref).
  3. Fold `x` into the state, with the policy `me.cvg` and the active mask.
- 4. Rebind `me.cache` with `Accessors.@reset`, and return the estimator.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(me::SimpleExpectedReturns{<:Any, <:Any,
                                                 <:Option{<:SimpleExpectedReturnsState}},
                       x::VecNum; active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     assert_partial_fittable(me, me.w, "SimpleExpectedReturns")
     state = expected_returns_state_seed(me.cache, x, me.cvg)
-    return Accessors.@reset me.cache = partial_fit!(state, x, me.cvg, active_mask)
+    return rebuild_estimator(me, (; cache = partial_fit!(state, x, me.cvg, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -689,11 +689,15 @@ function expected_returns_state_seed(cache::Option{<:SimpleExpectedReturnsState}
                                      cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    return if isnothing(cache)
-        SimpleExpectedReturnsState(0, zeros(Tf, N),
-                                   coverage_counts_seed(cvg, nothing, N, Tf, false))
+    if isnothing(cache)
+        return SimpleExpectedReturnsState(0, zeros(Tf, N),
+                                          coverage_counts_seed(cvg, nothing, N, Tf, false))
+    end
+    counts = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+    return if counts === cache.cvg
+        cache
     else
-        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, false)
+        SimpleExpectedReturnsState(cache.n, cache.mu, counts)
     end
 end
 """

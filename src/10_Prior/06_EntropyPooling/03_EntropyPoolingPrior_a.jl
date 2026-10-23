@@ -1104,8 +1104,9 @@ $(DocStringExtensions.FIELDS)
 # Constructors
 
     SequentialConditionalValueatRiskViewConstraint(xd, cd, xp, cp, c, b, alpha, rhs, iters, tol)
+    SequentialConditionalValueatRiskViewConstraint(; xd, cd, xp, cp, c, b, alpha, rhs, iters, tol)
 
-Arguments correspond to the fields above.
+Arguments and keywords correspond to the fields above.
 
 # Related
 
@@ -1176,8 +1177,10 @@ $(DocStringExtensions.FIELDS)
 
     SequentialEntropicValueatRiskViewConstraint(xd, cd, xp, cp, c, b, alpha, rhs, iters, tol,
                                                 args, kwargs, zlo_frac)
+    SequentialEntropicValueatRiskViewConstraint(; xd, cd, xp, cp, c, b, alpha, rhs, iters, tol,
+                                                args, kwargs, zlo_frac)
 
-Arguments correspond to the fields above.
+Arguments and keywords correspond to the fields above.
 
 # Related
 
@@ -1262,8 +1265,10 @@ $(DocStringExtensions.FIELDS)
 
     SequentialRelativisticValueatRiskViewConstraint(xd, cd, xp, cp, c, b, alpha, kappa, rhs,
                                                     iters, tol, args, kwargs, bracket)
+    SequentialRelativisticValueatRiskViewConstraint(; xd, cd, xp, cp, c, b, alpha, kappa, rhs,
+                                                    iters, tol, args, kwargs, bracket)
 
-Arguments correspond to the fields above.
+Arguments and keywords correspond to the fields above.
 
 # Related
 
@@ -1675,7 +1680,7 @@ function ep_refine_tail_view(tv::AbstractSequentialTailViewConstraint, w::VecNum
         scale = max(scale, maximum(abs, x))
     end
     gap = abs((LinearAlgebra.dot(cn, wi) + bn) - (LinearAlgebra.dot(c, wi) + b))
-    return Accessors.setproperties(tv, (; c = cn, b = bn)), gap <= tol * scale
+    return rebuild_estimator(tv, (; c = cn, b = bn)), gap <= tol * scale
 end
 """
     ep_sequential_start(tv::AbstractSequentialTailViewConstraint, w::VecNum)

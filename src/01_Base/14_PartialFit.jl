@@ -7,7 +7,7 @@ An incremental fit reads each observation once and keeps what it needs in an [`A
 
 Reading the sample once is the advertised benefit; **numerical accuracy is the real one**. Every state accumulates by Welford's recursion at the observation and by the merge of [chan1983](@cite) at the block, and both centre each increment on the running mean rather than differencing two large sums. On a sample whose mean dwarfs its spread — prices rather than returns — a textbook accumulator of squares loses most of its significant digits to cancellation, while these recursions hold machine precision. `test/test_08p_regime_partial_fit.jl` pins that on a sample of mean 1000 and unit spread, so a later simplification to the textbook formula fails loudly instead of quietly returning a worse answer.
 
-This is the method each family writes, and it is the family's cheapest exact fold. It writes into the array fields of the state where it can, and it rebinds the scalar fields with `Accessors.@reset`. So it returns a **new** estimator, and the caller must rebind it.
+This is the method each family writes, and it is the family's cheapest exact fold. It writes into the array fields of the state where it can, and it builds a new state with the new scalar fields through the positional constructor of the state. So it returns a **new** estimator, and the caller must rebind it.
 
 The verb promises **nothing** about an estimator the caller kept from before the call, and that is what the `!` in the name says. Three pitfalls follow from it. [`partial_fit`](@ref) is the verb that has none of them, because it folds a copy of the state.
 

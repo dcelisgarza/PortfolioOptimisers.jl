@@ -1163,11 +1163,15 @@ function covariance_state_seed(cache::Option{<:CovarianceState}, x::VecNum,
                                cvg::Option{<:CoveragePolicy} = nothing)
     N = length(x)
     Tf = float_if_integer(eltype(x))
-    return if isnothing(cache)
-        CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
-                        coverage_counts_seed(cvg, nothing, N, Tf, true))
+    if isnothing(cache)
+        return CovarianceState(0, zeros(Tf, N), zeros(Tf, N, N),
+                               coverage_counts_seed(cvg, nothing, N, Tf, true))
+    end
+    counts = coverage_counts_seed(cvg, cache.cvg, N, Tf, true)
+    return if counts === cache.cvg
+        cache
     else
-        Accessors.@reset cache.cvg = coverage_counts_seed(cvg, cache.cvg, N, Tf, true)
+        CovarianceState(cache.n, cache.mu, cache.M, counts)
     end
 end
 """
@@ -1203,7 +1207,7 @@ The last line reads ``\\boldsymbol{\\mu}`` after the third line changed it, but 
  3. Take the deviation `d` of the observation from the mean before the fold.
  4. Add `d`, divided by the new count, to `mu` in place.
  5. Add the outer product of `d` and the deviation from the mean after the fold to `M`, in place.
- 6. Rebind the count with `Accessors.@reset`, and return the state.
+ 6. Build the state with the new count through its positional constructor, and return it.
 """
 function partial_fit!(state::CovarianceState, x::VecNum)
     @argcheck(length(x) == length(state.mu),
@@ -1212,7 +1216,7 @@ function partial_fit!(state::CovarianceState, x::VecNum)
     d = x .- state.mu
     state.mu .+= d ./ n
     state.M .+= d .* transpose(x .- state.mu)
-    return Accessors.@reset state.n = n
+    return CovarianceState(n, state.mu, state.M, state.cvg)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1319,7 +1323,7 @@ function partial_fit!(state::CovarianceState, x::VecNum, cvg::CoveragePolicy,
         end
     end
     coverage_step!(counts, valid, active_mask)
-    return Accessors.@reset state.n = state.n + 1
+    return CovarianceState(state.n + 1, state.mu, M, counts)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1388,12 +1392,14 @@ The [`GeneralCovariance`](@ref) method of [`partial_fit!`](@ref) folds one obser
  1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
  3. Fold `x` into the state.
- 4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(ce::GeneralCovariance{<:Any, <:Any, <:Option{<:CovarianceState}},
                       x::VecNum)
     partial_fit_corrected(ce)
-    return Accessors.@reset ce.cache = partial_fit!(covariance_state_seed(ce.cache, x), x)
+    return rebuild_estimator(ce,
+                             (;
+                              cache = partial_fit!(covariance_state_seed(ce.cache, x), x)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1453,14 +1459,14 @@ The `Covariance{<:Any, <:Any, <:FullMoment}` method of [`partial_fit!`](@ref) fo
  1. Refuse an estimator that an incremental fit cannot reproduce, with [`partial_fit_corrected`](@ref).
  2. Seed a [`CovarianceState`](@ref) of zeros over `length(x)` assets when `ce.cache` holds `nothing`, with [`covariance_state_seed`](@ref).
  3. Fold `x` into the state, with the policy `ce.cvg` and the active mask.
- 4. Rebind `ce.cache` with `Accessors.@reset`, and return the estimator.
+ 4. Rebuild the estimator with the new state in `cache` through [`rebuild_estimator`](@ref), and return it.
 """
 function partial_fit!(ce::Covariance{<:Any, <:Any, <:FullMoment, <:Any, <:Any,
                                      <:Option{<:CovarianceState}}, x::VecNum;
                       active_mask::Option{<:AbstractVector{<:Bool}} = nothing)
     partial_fit_corrected(ce)
     state = covariance_state_seed(ce.cache, x, ce.cvg)
-    return Accessors.@reset ce.cache = partial_fit!(state, x, ce.cvg, active_mask)
+    return rebuild_estimator(ce, (; cache = partial_fit!(state, x, ce.cvg, active_mask)))
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)

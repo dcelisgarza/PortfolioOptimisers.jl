@@ -258,8 +258,19 @@ An **alias** is the case to check first. Its docstring carries a different set o
   of a search names the field at run time, `parse_lens` turns the key into a lens, and
   `Accessors.set(opt, lens, val)` applies it. A lens whose field a type parameter names,
   `PropertyLens{target}()` in the pipe routing, is the same case.
-- The sites in `src/` that predate this rule (#1806) are listed on #1807, which converts them. A new
-  site follows the rule.
+- The fold of a Partial Fit State is the one exception. It builds the new state through the
+  positional constructor of the state, called by name, as `merge_states` and the seed functions
+  do. The fold runs on every step, and the keyword constructor costs it three things (#1807):
+  - It checks values that a fold writes by design. A fold under no Coverage Policy writes `NaN`
+    into the cell of an inactive asset, and `assert_partial_fit_state` refuses it.
+  - It reads every entry of the state. For a covariance state of 100 assets, it added 64 % to the
+    cost of one step.
+  - A field with a declared `Union` type, such as the gap marks of a `SampleBufferState`, puts a
+    `Union` value into the `NamedTuple` of `rebuild_estimator`. The type of that `NamedTuple` is
+    then abstract, and the step dispatches at run time. A positional call splits the `Union` at
+    the call site, so it stays concrete.
+
+  The estimator that holds the state still takes `rebuild_estimator`.
 
 - Functions must be as pure as possible. Avoid side effects and global state.
 

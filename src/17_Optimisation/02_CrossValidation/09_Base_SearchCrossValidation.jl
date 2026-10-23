@@ -680,7 +680,12 @@ A search splits its data once and scores every candidate against the same folds,
   - [`resolve_rng`](@ref)
 """
 function pin_draw(cv::MultipleRandomised)
-    return isnothing(cv.seed) ? Accessors.@set(cv.seed = rand(cv.rng, UInt32)) : cv
+    if !isnothing(cv.seed)
+        return cv
+    end
+    return MultipleRandomised(cv.cv; subset_size = cv.subset_size, n_subsets = cv.n_subsets,
+                              max_comb = cv.max_comb, window_size = cv.window_size,
+                              rng = cv.rng, seed = rand(cv.rng, UInt32))
 end
 function pin_draw(cv)
     return cv

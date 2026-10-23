@@ -509,8 +509,7 @@ function pipe_route(cfg::JuMPOptimiser, ::Val{:mu_ucs}, v)
                             else
                                 "cannot route a mean uncertainty set into a $(Base.typename(typeof(cfg.ret)).wrapper); expected returns uncertainty requires an ArithmeticReturn return estimator"
                             end))
-    return Accessors.set(cfg, Accessors.PropertyLens{:ret}(),
-                         Accessors.set(cfg.ret, Accessors.PropertyLens{:ucs}(), v))
+    return rebuild_estimator(cfg, (; ret = rebuild_estimator(cfg.ret, (; ucs = v))))
 end
 pipe_accepts(::JuMPOptimiser, ::Val{:mu_ucs})::Bool = true
 """

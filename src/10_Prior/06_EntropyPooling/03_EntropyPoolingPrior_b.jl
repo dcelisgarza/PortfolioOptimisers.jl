@@ -1,3 +1,23 @@
+# The keyword constructors of the sequential tail view constraints, which `ep_refine_tail_view`
+# calls through `rebuild_estimator`. They are here and not beside their types, because the file
+# of the types is at its limit of code lines.
+function SequentialConditionalValueatRiskViewConstraint(; xd, cd, xp, cp, c, b, alpha, rhs,
+                                                        iters, tol)
+    return SequentialConditionalValueatRiskViewConstraint(xd, cd, xp, cp, c, b, alpha, rhs,
+                                                          iters, tol)
+end
+function SequentialEntropicValueatRiskViewConstraint(; xd, cd, xp, cp, c, b, alpha, rhs,
+                                                     iters, tol, args, kwargs, zlo_frac)
+    return SequentialEntropicValueatRiskViewConstraint(xd, cd, xp, cp, c, b, alpha, rhs,
+                                                       iters, tol, args, kwargs, zlo_frac)
+end
+function SequentialRelativisticValueatRiskViewConstraint(; xd, cd, xp, cp, c, b, alpha,
+                                                         kappa, rhs, iters, tol, args,
+                                                         kwargs, bracket)
+    return SequentialRelativisticValueatRiskViewConstraint(xd, cd, xp, cp, c, b, alpha,
+                                                           kappa, rhs, iters, tol, args,
+                                                           kwargs, bracket)
+end
 """
     ep_check_tail_window(tv::IntegerConditionalValueatRiskViewConstraint, w::VecNum)
 

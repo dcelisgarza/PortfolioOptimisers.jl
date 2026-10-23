@@ -914,7 +914,7 @@ The method takes an estimator whose `cache` holds `nothing`. An estimator whose 
 
 # Algorithm
 
- 1. Build a copy of `ce` whose `ce.ce` is the estimator that [`partial_fit!`](@ref) returns, with `Accessors.@reset`.
+ 1. Rebuild `ce` with the estimator that [`partial_fit!`](@ref) returns in `ce.ce`, through [`rebuild_estimator`](@ref).
 
 # Arguments
 
@@ -935,11 +935,13 @@ The method takes an estimator whose `cache` holds `nothing`. An estimator whose 
 """
 function partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
                       X::MatNum; dims::Int = 1, kwargs...)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    inner = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 function partial_fit!(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing},
                       x::VecNum; kwargs...)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, x; kwargs...)
+    inner = partial_fit!(ce.ce, x; kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 """
     Statistics.cov(ce::GeodesicShrinkageCovariance{<:Any, <:Any, <:Any, <:Any, Nothing};

@@ -697,7 +697,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 function descriptor_step(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity},
                          rd::ReturnsResult)
     (; st, D) = lag_descriptor_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return (; de = rebuild_estimator(de, (; cache = st)), D = D)
 end
 """
     partial_fit!(de::Union{GrowthRate, ChangeToScale, ChangeInIntensity}, rd::ReturnsResult)

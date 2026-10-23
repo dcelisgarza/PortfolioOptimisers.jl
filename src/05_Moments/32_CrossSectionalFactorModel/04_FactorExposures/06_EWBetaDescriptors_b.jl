@@ -1120,7 +1120,7 @@ The Descriptor of an observation equals the one of the batch call [`descriptor`]
 function descriptor_step(de::Union{EWBeta, EWMacroSensitivity, EWDownsideBeta},
                          rd::ReturnsResult)
     (; st, D) = ew_beta_fold(de, rd, de.cache)
-    return (; de = Accessors.@set(de.cache = st), D = D)
+    return (; de = rebuild_estimator(de, (; cache = st)), D = D)
 end
 """
     partial_fit!(de::Union{EWBeta, EWMacroSensitivity, EWDownsideBeta}, rd::ReturnsResult)

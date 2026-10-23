@@ -441,7 +441,7 @@ The step costs what the step of the inner estimator costs, which is `O(N²)`. Th
 # Algorithm
 
  1. Refuse an `mp` that does not run from the shape of the sample, with [`assert_shape_only_matrix_processing`](@ref).
- 2. Rebind `ce.ce` to the estimator that [`partial_fit!`](@ref) returns, with `Accessors.@reset`.
+ 2. Rebuild `ce` with the estimator that [`partial_fit!`](@ref) returns in `ce.ce`, through [`rebuild_estimator`](@ref).
 
 # Arguments
 
@@ -470,12 +470,14 @@ The step costs what the step of the inner estimator costs, which is `O(N²)`. Th
 function partial_fit!(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}, X::MatNum;
                       dims::Int = 1, kwargs...)
     assert_shape_only_matrix_processing(ce.mp)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    inner = partial_fit!(ce.ce, X; dims = dims, kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 function partial_fit!(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}, x::VecNum;
                       kwargs...)
     assert_shape_only_matrix_processing(ce.mp)
-    return Accessors.@reset ce.ce = partial_fit!(ce.ce, x; kwargs...)
+    inner = partial_fit!(ce.ce, x; kwargs...)
+    return inner === ce.ce ? ce : rebuild_estimator(ce, (; ce = inner))
 end
 """
     Statistics.cov(ce::PortfolioOptimisersCovariance{<:Any, <:Any, Nothing}; kwargs...)

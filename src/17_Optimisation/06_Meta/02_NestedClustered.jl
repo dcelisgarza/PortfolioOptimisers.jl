@@ -870,13 +870,16 @@ function _update_asset_sets(nco::NestedClustered, rdo::ReturnsResult)
                get(nco.opto.opt.sets.dict, nco.opto.opt.sets.xkey, nothing) !== rdo.nx)
         ndict = copy(nco.opto.opt.sets.dict)
         ndict[nco.opto.opt.sets.xkey] = rdo.nx
-        Accessors.@reset nco.opto.opt.sets.dict = ndict
+        sets = rebuild_estimator(nco.opto.opt.sets, (; dict = ndict))
+        opt = rebuild_estimator(nco.opto.opt, (; sets = sets))
+        rebuild_estimator(nco, (; opto = rebuild_estimator(nco.opto, (; opt = opt))))
     elseif (hasproperty(nco.opto, :sets) &&
             !isnothing(nco.opto.sets) &&
             get(nco.opto.sets.dict, nco.opto.sets.xkey, nothing) !== rdo.nx)
         ndict = copy(nco.opto.sets.dict)
         ndict[nco.opto.sets.xkey] = rdo.nx
-        Accessors.@reset nco.opto.sets.dict = ndict
+        sets = rebuild_estimator(nco.opto.sets, (; dict = ndict))
+        rebuild_estimator(nco, (; opto = rebuild_estimator(nco.opto, (; sets = sets))))
     else
         nco
     end

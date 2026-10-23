@@ -865,17 +865,17 @@ These are the returns-data arms of the three verbs, and they are one method each
 function ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
              dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return ucs(Accessors.@set(ue.pe = nothing), pr)
+    return ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 function mu_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                 dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return mu_ucs(Accessors.@set(ue.pe = nothing), pr)
+    return mu_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 function sigma_ucs(ue::NormalUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing;
                    dims::Int = 1, kwargs...)
     pr = ucs_prior(ue.pe, X, F; dims = dims, kwargs...)
-    return sigma_ucs(Accessors.@set(ue.pe = nothing), pr)
+    return sigma_ucs(rebuild_estimator(ue, (; pe = nothing)), pr)
 end
 """
     ucs(ue::NormalUncertaintySet{Nothing, <:BoxUncertaintySetAlgorithm, <:Any, <:Any, <:Any},

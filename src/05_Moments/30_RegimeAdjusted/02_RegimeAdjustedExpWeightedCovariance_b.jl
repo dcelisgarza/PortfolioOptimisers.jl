@@ -1715,9 +1715,7 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedCovariance{<:Any, <:Any, <:An
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_covariance_pass!(ce, X, dims, estimation_mask, active_mask,
                                              ce.cache)
-    Accessors.@reset ce.cache = cache
-
-    return ce
+    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
 end
 """
     partial_fit!(

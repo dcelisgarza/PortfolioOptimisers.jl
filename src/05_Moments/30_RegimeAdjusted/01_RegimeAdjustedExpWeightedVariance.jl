@@ -699,8 +699,9 @@ Holds the running state of an incremental fit of a [`RegimeAdjustedExpWeightedVa
 
 [`partial_fit!`](@ref) builds it and keeps it in the `cache` field of the estimator, and
 `var(ce, state)` reads it. A caller can hold a state outside the estimator, but only the forward
-pass of the estimator writes it. The fold mutates the arrays in place, and it replaces the two
-scalar fields, `regime_state` and `n_regime_obs`, with `Accessors.@reset`.
+pass of the estimator writes it. The fold mutates the arrays in place, and it builds a new state
+with the two new scalar fields, `regime_state` and `n_regime_obs`, through the positional
+constructor.
 
 # Fields
 
@@ -837,6 +838,34 @@ function get_regime_state(method::LogRegimeAdjusted, z2_valid::VecNum,
                           min_val::Number = sqrt(eps(eltype(z2_valid))))
     log_z2 = log.(max.(z2_valid, min_val))
     return Statistics.mean(log_z2) - method.kappa
+end
+"""
+    blend_regime_state(prev::Nothing, new::Number, decay::Number) -> Number
+    blend_regime_state(prev::Number, new::Number, decay::Number) -> Number
+
+Blends the regime state of the last step with the regime state of one new observation.
+
+[`process_observation!`](@ref) and the regime update of [`RegimeAdjustedExpWeightedCovariance`](@ref) call it. The first step that advances the regime has no state before it, so `prev` is `nothing`, and the function returns `new`. A later step weights `prev` by `decay` and `new` by one minus `decay`.
+
+# Arguments
+
+  - `prev`: The regime state of the last step, or `nothing` before the first step.
+  - `new`: The regime state of the new observation.
+  - `decay`: The decay of the regime state, the `regime_decay` of the estimator.
+
+# Returns
+
+  - `s::Number`: The blended regime state.
+
+# Related
+
+  - [`get_regime_state`](@ref)
+  - [`RegimeAdjustedExpWeightedVariance`](@ref)
+  - [`RegimeAdjustedExpWeightedCovariance`](@ref)
+"""
+blend_regime_state(::Nothing, new::Number, ::Number) = new
+function blend_regime_state(prev::Number, new::Number, decay::Number)
+    return decay * prev + (one(decay) - decay) * new
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1361,7 +1390,7 @@ counts observations whatever the assets hold.
 
   - `cache::RegimeAdjustedVarianceState`: The cache to read on and to pass to the next observation.
     The arrays are mutated in place, but `regime_state` and `n_regime_obs` are immutable fields that
-    `Accessors.@reset` replaces, so the caller must rebind the cache to this return value. A caller
+    a new state holds, so the caller must rebind the cache to this return value. A caller
     that discards it freezes the regime state at its initial value.
 
 # Related
@@ -1441,18 +1470,12 @@ function process_observation!(cache::RegimeAdjustedVarianceState,
         return cache
     end
 
+    c = cache
     regime_state = get_regime_state(ce.regime_method, z2_valid, ce.min_val)
-
-    Accessors.@reset cache.regime_state = if isnothing(cache.regime_state)
-        regime_state
-    else
-        ce.regime_decay * cache.regime_state +
-        (one(eltype(ce.regime_decay)) - ce.regime_decay) * regime_state
-    end
-
-    Accessors.@reset cache.n_regime_obs += 1
-
-    return cache
+    rs = blend_regime_state(c.regime_state, regime_state, ce.regime_decay)
+    return RegimeAdjustedVarianceState(c.ret_buffer, c.variance, c.X2, c.X_old_i, c.z2,
+                                       c.location, c.obs_count, c.old_obs_count, c.active,
+                                       rs, c.n_regime_obs + 1, c.bias, c.lag_records)
 end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
@@ -1775,7 +1798,7 @@ Fold every observation of `X` into the estimator's own online variance state.
 
 The state is the cache the forward pass already builds, kept on the estimator instead of dropped, so a second call continues the recursion where the first stopped. A call on an estimator whose `cache` field holds `nothing` builds the cold cache, so one call over a whole sample gives the state that `var(ce, X)` reads and throws away.
 
-The arrays of the state are mutated in place and its scalar fields are rebound with `Accessors.@reset`, so the caller must rebind the estimator to the return value. Two estimators returned by successive calls share one state object, which is what the `!` in the name says.
+The arrays of the state are mutated in place, and a new state holds its new scalar fields, so the caller must rebind the estimator to the return value. Two estimators returned by successive calls share one state object, which is what the `!` in the name says.
 
 # Arguments
 
@@ -1833,8 +1856,7 @@ function partial_fit!(ce::RegimeAdjustedExpWeightedVariance{<:Any, <:Any, <:Any,
                       active_mask::Option{<:AbstractMatrix{<:Bool}} = nothing, kwargs...)
     cache = regime_adjusted_variance_pass!(ce, X, dims, estimation_mask, active_mask,
                                            ce.cache)
-    Accessors.@reset ce.cache = cache
-    return ce
+    return cache === ce.cache ? ce : rebuild_estimator(ce, (; cache = cache))
 end
 """
     partial_fit!(
