@@ -566,14 +566,14 @@ Where:
 
   - $(math_dict[:D_ij_dist])
   - ``D_{t,\\,i,\\,j}``: Distance of assets ``i`` and ``j`` at observation ``t``.
-  - ``a_{t,\\,i}``: Entry of the active mask, `1` when asset ``i`` is active at observation ``t`` and `0` otherwise.
+  - $(math_dict[:a_ti_window])
   - $(math_dict[:w_t_obs])
   - $(math_dict[:T])
 
 # Algorithm
 
  1. Resolve `w` against `Z` with [`collapse_weights`](@ref) to get a weight vector with one entry per observation, or `nothing`.
- 2. Allocate the accumulator `D` and the buffer `Dt` for one observation, both `assets × assets`, and set the weight total `sw` to zero.
+ 2. Allocate the accumulator `D` and the buffer `Dt` for one observation, both `assets × assets`, and set the weight total `sw` to zero. Their element type `T` is the result type of the metric, promoted with the type of the weights and passed through [`float_if_integer`](@ref). So a metric with an integer result on a window of integers, such as `Distances.Cityblock`, gives a matrix of floating point numbers, and a `Rational` window gives an exact one.
  3. For each observation `t`, measure that slice of `Z` into `Dt`, and apply the convention for a zero feature vector to `Dt`. Then add `wt .* Dt` to `D`, and add `wt` to `sw`. The weight `wt` of the observation is `one(T)` when `w` is `nothing`.
  4. Divide `D` by `sw`. The result is the convex combination of the distance matrices of the observations.
 
@@ -1285,7 +1285,9 @@ function feature_distance(de::FeatureDistance{<:Any, <:AggregateDistances}, Z::A
                           dims::Integer)
     w = collapse_weights(de.alg.w, Z)
     metric = de.metric
-    T = Distances.result_type(metric, eltype(Z), eltype(Z))
+    #! The result is a weighted mean, so an integer distance or weight needs a float type.
+    Td = Distances.result_type(metric, eltype(Z), eltype(Z))
+    T = float_if_integer(isnothing(w) ? Td : promote_type(Td, eltype(w)))
     N = size(Z, dims == 1 ? 2 : 3)
     D = zeros(T, N, N)
     Dt = Matrix{T}(undef, N, N)

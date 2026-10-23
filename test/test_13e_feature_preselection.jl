@@ -298,7 +298,8 @@ using PortfolioOptimisers.Distances: Euclidean, Cityblock, SqEuclidean, Minkowsk
                                      CosineDist, Chebyshev, WeightedSqEuclidean,
                                      WeightedMinkowski, TotalVariation, BrayCurtis, Jaccard,
                                      CorrDist, MeanAbsDeviation, MeanSqDeviation,
-                                     RMSDeviation
+                                     RMSDeviation, WeightedHamming, PeriodicEuclidean,
+                                     Mahalanobis, SqMahalanobis
 
 const PO = PortfolioOptimisers
 
@@ -639,6 +640,50 @@ hand_distance(de, rd) = distance(de, nothing, rd.X; rd = rd)
         ag = PO.obs_weights_view(AggregateFeatures(; w = StatsBase.pweights(1.0:10.0)),
                                  [1, 3])
         @test ag.w isa StatsBase.ProbabilityWeights && ag.w == [1.0, 3.0]
+    end
+    @testset "An integer window holds a fraction, and a metric with parameters per coordinate refuses by name (#1459)" begin
+        # Cityblock measures the pair at 4, 6 and 9 on the three rows. The mean is 19 / 3,
+        # and the mean over rows 1 and 3 is 13 / 2. An `Int` matrix raised an InexactError.
+        Z = reshape([1, 2, 4, 0, 3, 1, 5, 5, 2, 2, 0, 8], 3, 2, 2)
+        A = Bool[1 1; 1 0; 1 1]
+        de = fdist(AggregateDistances(); metric = Cityblock())
+        @test distance(de, Z) == [0 19 / 3; 19 / 3 0]
+        @test distance(de, Z; amsk = A) == [0 6.5; 6.5 0]
+        # A weight of 0.5 was cut to an integer: (0.5 * 4 + 6 + 9) / 2.5.
+        dw = fdist(AggregateDistances(; w = StatsBase.pweights([0.5, 1, 1]));
+                   metric = Cityblock())
+        @test distance(dw, Z) ≈ [0 6.8; 6.8 0] rtol = 1e-15
+        # A `Rational` window stays exact.
+        @test distance(de, Rational{Int}.(Z)) == [0 19//3; 19//3 0]
+        @test distance(de, Rational{Int}.(Z); amsk = A) == [0 13//2; 13//2 0]
+        # The fallback of an empty pair, and the rescale of a pair that shares two of three
+        # rows, each give a fraction too. `a` holds (1, 0) and (2, 1) on rows 1 and 2, `b`
+        # holds (1, 0) on row 3, and `c` holds (2, 1), (3, 2) and (4, 3).
+        Z3 = reshape(collect(1:18), 3, 3, 2) .% 5
+        Ae = Bool[1 0 1; 1 0 1; 0 1 1]
+        fb = fdist(AggregateDistances(; pair = FeatureFallback()); metric = Cityblock())
+        # The fallback: `a` collapses to (1.5, 0.5) against (1, 0).
+        @test distance(fb, Z3; amsk = Ae) == [0 1 2; 1 0 6; 2 6 0]
+        # (a, b) shares rows 1 and 2 at 6 and 5, so 11 * 6 / 4. (a, c) gives 4 * 6 / 4.
+        Ap = Bool[1 1 1; 1 1 1; 0 1 1]
+        ds = fdist(StackObservations(); metric = Cityblock())
+        @test distance(ds, Z3; amsk = Ap) == [0 16.5 6; 16.5 0 15; 6 15 0]
+        # A metric whose parameters hold one entry per coordinate keeps the entries of the
+        # shared coordinates. It then reaches the refusal that names the method to add, where
+        # it raised a DimensionMismatch.
+        I6 = Matrix(1.0I, 6, 6)
+        for m in
+            (WeightedHamming(ones(6)), PeriodicEuclidean(fill(10.0, 6)), Mahalanobis(I6),
+             SqMahalanobis(I6))
+            msg = "Add a method `PortfolioOptimisers.stack_rescale(metric::$(nameof(typeof(m))), d, idx, len)`"
+            @test_throws msg distance(fdist(StackObservations(); metric = m), float.(Z3);
+                                      amsk = Ap)
+        end
+        Q = [2.0 1 0; 1 3 0; 0 0 4]
+        @test PO.stack_metric(Mahalanobis(Q), [1, 3]).qmat == [2.0 0; 0 4]
+        @test PO.stack_metric(SqMahalanobis(Q), [1, 3]).qmat == [2.0 0; 0 4]
+        @test PO.stack_metric(WeightedHamming([1.0, 2, 3]), [1, 3]).weights == [1.0, 3]
+        @test PO.stack_metric(PeriodicEuclidean([1.0, 2, 3]), [2]).periods == [2.0]
     end
 end
 

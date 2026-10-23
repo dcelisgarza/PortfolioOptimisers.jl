@@ -63,6 +63,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :z_i_feature => "``\\boldsymbol{z}_{i}``: Feature vector of asset ``i``, its row of the feature matrix.",#
                  :z_tik_feature => "``z_{t,\\,i,\\,k}``: Value of feature ``k`` of asset ``i`` at observation ``t``, one entry of the feature window.",#
                  :zbar_ik_feature => "``\\bar{z}_{i,\\,k}``: Collapsed feature ``k`` of asset ``i``, the aggregate of ``z_{t,\\,i,\\,k}`` over the observation axis.",#
+                 :a_ti_window => "``a_{t,\\,i}``: Window activity of asset ``i`` at observation ``t``, `1` when the active mask of the feature window marks the asset active and `0` otherwise.",#
                  # Spectral denoising: the Marcenko-Pastur split of a spectrum.
                  :lambda_i_eig => "``\\lambda_i``: ``i``-th eigenvalue of the input matrix.",#
                  :lambda_plus_mp => "``\\lambda_+``: Marčenko-Pastur upper bound of the noise band. An eigenvalue is noise when ``\\lambda_i \\leq \\lambda_+``, and signal when ``\\lambda_i > \\lambda_+``.",#
