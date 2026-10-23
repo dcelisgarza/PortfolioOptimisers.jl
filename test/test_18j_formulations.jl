@@ -755,3 +755,62 @@ end
                obj = MaximumReturn())
     @test sqrt(m4(res.w)) > 0.5
 end
+@testset "Brownian distance variance: every formulation reaches the bound, and the bound covers the statistic" begin
+    # Issue #597.
+    Xb = randn(StableRNG(7), 30, 4) .* 0.01 .+ 0.001
+    rdb = ReturnsResult(; nx = string.(1:4), X = Xb)
+    prb = prior(EmpiricalPrior(), rdb)
+    slvb = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                  settings = Dict("verbose" => false))
+    function bdv(r; obj = MinimumRisk())
+        return optimise(MeanRisk(; r = r, obj = obj,
+                                 opt = JuMPOptimiser(; pe = prb, slv = slvb)), rdb)
+    end
+    bdvar = BrownianDistanceVariance()
+    algs = [(a1, a2) for a1 in (QuadRiskExpr(), RSOCRiskExpr())
+            for a2 in
+                (NormOneConeBrownianDistanceVariance(), IneqBrownianDistanceVariance())]
+    # The functor is the bound of equation 9 of the paper. It equals twice the variance plus
+    # the squared mean distance, and it exceeds the distance variance of Székely et al. by
+    # 2 |D 1|^2 / T^3, which is zero for a constant series only.
+    x = randn(StableRNG(42), 50) .* 0.01
+    T = length(x)
+    D = abs.(x .- x')
+    C = I - fill(1 / T, T, T)
+    dvar = sum(abs2, C * D * C) / T^2
+    @test isapprox(dvar, sum(abs2, D) / T^2 + (sum(D) / T^2)^2 - 2 * sum(D * D) / T^3;
+                   rtol = 1e-12)
+    @test isapprox(bdvar(x), 2 * sum(abs2, x .- mean(x)) / T + mean(D)^2; rtol = 1e-12)
+    @test isapprox(bdvar(x) - dvar, 2 * sum(abs2, D * ones(T)) / T^3; rtol = 1e-10)
+    @test 6.8 < bdvar(x) / dvar < 7
+    @test iszero(bdvar(fill(0.01, 5)))
+    # At the minimum every formulation gives the same weights. The model reports the functor,
+    # and the distance matrix is the true one, because the risk increases in each distance.
+    # The bound is flat at its minimum, and the conic objective of RSOCRiskExpr reaches it to
+    # the tolerance of the solver only: 8.4e-5 in the weights, 1.2e-5 in the risk.
+    ref = bdv(bdvar)
+    for (a1, a2) in algs
+        res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, ref.w; atol = 2e-4)
+        xw = Xb * res.w
+        @test isapprox(JuMP.value(res.model[:bdvariance_risk]), bdvar(xw); rtol = 5e-5)
+        @test isapprox(JuMP.value(res.model[:risk]), bdvar(xw); rtol = 5e-5)
+        @test maximum(abs, JuMP.value.(res.model[:Dt]) .- abs.(xw .- xw')) < 1e-6
+    end
+    # A bound holds the functor under an objective that does not minimise the risk. The rotated
+    # cone left a rank-one square in the risk expression, and Clarabel refused the bound.
+    ub = 1.5 * bdvar(Xb * ref.w)
+    for (a1, a2) in algs
+        res = bdv(BrownianDistanceVariance(; alg1 = a1, alg2 = a2,
+                                           settings = RiskMeasureSettings(; ub = ub));
+                  obj = MaximumReturn())
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(bdvar(Xb * res.w), ub; rtol = 1e-4)
+        @test bdvar(Xb * res.w) <= ub * (1 + 1e-8)
+    end
+    res = bdv(BrownianDistanceVariance(; alg1 = RSOCRiskExpr()))
+    @test haskey(res.model, :tsum_Dt) && haskey(res.model, :rsoc_sum_Dt)
+    @test isapprox(JuMP.value(res.model[:tsum_Dt]),
+                   (sum(JuMP.value.(res.model[:Dt])) / size(Xb, 1))^2; rtol = 1e-5)
+end
