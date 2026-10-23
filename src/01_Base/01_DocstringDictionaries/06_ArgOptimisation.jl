@@ -264,19 +264,21 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Portfolio summary statistics.
                  :ps_n_periods => "`n_periods`: Number of observations in the return series.",#
                  :ps_ppy => "`ppy`: Periods per year, the annualisation factor. 252 for daily, 52 for weekly, 12 for monthly returns, and 1 states each figure per period.",#
-                 :ps_alpha => "`alpha`: Tail probability used for the CVaR, ``\\alpha \\in (0, 1)``.",#
-                 :ps_compound => "`compound`: Whether the wealth path behind the drawdown statistics was compounded.",#
+                 :ps_alpha => "`alpha`: Tail probability of the CVaR, ``\\alpha \\in (0, 1)``.",#
+                 :ps_compound => "`compound`: `true` when the drawdown statistics read a compounded wealth path, and `false` when they read the cumulative sum of the returns.",#
                  :ps_ann_return => "`ann_return`: Annualised arithmetic mean return.",#
                  :ps_ann_volatility => "`ann_volatility`: Annualised sample standard deviation.",#
-                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. `NaN` if the volatility is zero.",#
-                 :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`, corrected for the skewness and excess kurtosis of the returns, and **not** for their serial dependence. A series scored under a Weight Drift is serially dependent through the weights it held, so this figure understates the true standard error of such a series.",#
-                 :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. `NaN` if the downside deviation is zero.",#
-                 :ps_calmar => "`calmar`: Annualised return divided by the absolute maximum drawdown. `NaN` if there is no drawdown.",#
-                 :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is non-positive.",#
+                 :ps_sharpe => "`sharpe`: Annualised Sharpe ratio at a zero risk-free rate. It is `NaN` when the volatility is zero.",#
+                 :ps_sharpe_stderr => "`sharpe_stderr`: Standard error of `sharpe`. It corrects for the skewness and the excess kurtosis of the returns, and **not** for their serial dependence. A series scored under a Weight Drift is serially dependent through the weights that it held, so on such a series this figure is less than the true standard error.",#
+                 :ps_sortino => "`sortino`: Annualised Sortino ratio, at a zero minimum acceptable return. It is `NaN` when the downside deviation is zero.",#
+                 :ps_calmar => "`calmar`: Annualised return divided by the absolute value of the maximum drawdown. It is `NaN` when the series has no drawdown.",#
+                 :ps_max_drawdown => "`max_drawdown`: Maximum drawdown, in return space, so it is not positive.",#
                  :ps_cvar => "`cvar`: Conditional Value-at-Risk at `alpha`, in return space, so a tail loss is negative.",#
                  # Inference on the Sharpe ratio of a return series.
                  :sr_x => "`x`: Periodic return series, or a matrix with one return series in each column. A `NaN` entry is an observation that is not available, and the function drops it.",#
                  :bsr => "`bsr`: Benchmark Sharpe ratio per period, in the frequency of `x`.",#
+                 # The value-level verbs that reduce a prior to the Investable Mask.
+                 :strict_inv => "`strict`: If `true`, weights that hold an asset outside the Investable Mask raise an `ArgumentError` that names the assets. If `false`, a warning names the assets, and the function drops their weights.",#
                  # The fold context of the online step.
                  :cache_opt => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. The returns themselves are carried by the prior, which owns the rows once; this holds every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.",#
                  :cache_rows => "`cache`: Optional [`ReturnsBufferState`](@ref), the fold context of the online step. It is `nothing` until [`partial_fit!`](@ref) writes one, and `optimise(opt)` with no returns reads it. This head holds no prior, so it is the bottom of the chain and its state carries the returns themselves, beside every other column of the returns data and the context pinned at the first step. [`factory`](@ref) carries it unchanged and [`port_opt_view`](@ref) slices it to the selected assets.")

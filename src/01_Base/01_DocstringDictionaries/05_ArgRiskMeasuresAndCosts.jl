@@ -119,7 +119,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :err => "`err`: Tracking error tolerance.",#
                  :tralg => "`alg`: Tracking formulation algorithm.",#
                  # The risk measures of a ratio, and the scalarisers that combine them.
-                 :rt => "`rt`: Returns estimator, or a vector of them. A vector is summed at its terms' `settings.scale` weights, skipping any term whose `settings.rte` is `false`. There is no scalariser on the return axis.",#
+                 :rt => "`rt`: Return estimator, or a vector of them. The measure sums a vector at the `settings.scale` weights of its terms, and it skips a term whose `settings.rte` is `false`. The return axis has no scalariser.",#
                  :rk => "`rk`: Risk measure for ratio computation, or a vector of them scalarised by `sca`.",#
                  :r1 => "`r1`: First risk measure.",#
                  :r2 => "`r2`: Second risk measure.",#
