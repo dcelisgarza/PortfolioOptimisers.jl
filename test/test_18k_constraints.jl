@@ -1179,8 +1179,7 @@ end
     sets = UniverseSets(; xkey = "nx", dict = Dict("nx" => ["A", "B", "C", "D"]))
     @test UniformValues <: PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm
     @test UniformValues <: PortfolioOptimisers.AbstractEstimatorValueAlgorithm
-    @test UniformValues <:
-          PortfolioOptimisers.EstValType{<:PortfolioOptimisers.VectorAbstractEstimatorValueAlgorithm}
+    @test UniformValues <: PortfolioOptimisers.VectorEstValType
     @test !(UniformValues <: PortfolioOptimisers.EqnType)
     # The keyword route names the slot that refused the value; the positional route has no
     # method for it.
@@ -1202,4 +1201,33 @@ end
     # `PortfolioTarget`'s `w` was such a slot. It now names the pair of shapes the
     # regime-adjusted fit can honour, so it refuses the algorithm at the keyword.
     @test_throws TypeError PortfolioOptimisers.PortfolioTarget(; w = UniformValues())
+end
+@testset "A slot over the universe refuses a matrix at the keyword (issue #1804)" begin
+    #=
+    `EstValType{T}` accepts a `MatNum` for every `T`, so each slot bound by
+    `EstValType{<:VectorAbstractEstimatorValueAlgorithm}` accepted a matrix, and its
+    resolver raised a `TypeError` later, because the result holds a `Num_VecNum` only.
+    `VectorEstValType` leaves the matrix out, so the keyword constructor refuses it. The
+    positional route goes through the generic constructor of `@concrete`, which #264 owns.
+    =#
+    M = [0.1 0.2 0.3; 0.3 0.4 0.5; 0.1 0.1 0.1]
+    @test !(M isa PortfolioOptimisers.VectorEstValType)
+    @test M isa PortfolioOptimisers.EstValType
+    for v in
+        (0.1, [0.1, 0.2, 0.3], "A" => 0.1, Dict("A" => 0.1), ["A" => 0.1], UniformValues())
+        @test v isa PortfolioOptimisers.VectorEstValType
+    end
+    @test_throws TypeError TurnoverEstimator(; w = [0.2, 0.3, 0.5], val = M)
+    @test_throws TypeError RiskBudgetEstimator(; val = M)
+    @test_throws TypeError ThresholdEstimator(; val = M)
+    @test_throws TypeError WeightBoundsEstimator(; lb = M, ub = 1.0)
+    @test_throws TypeError WeightBoundsEstimator(; lb = 0.0, ub = M)
+    @test_throws TypeError FeesEstimator(; l = M)
+    @test_throws TypeError FeesEstimator(; s = M)
+    @test_throws TypeError FeesEstimator(; fl = M)
+    @test_throws TypeError FeesEstimator(; fs = M)
+    # `risk_budget_constraints` resolves a plain value through the same bound, so it has no
+    # method for a matrix.
+    sets = UniverseSets(; dict = Dict("nx" => ["A", "B", "C"]))
+    @test_throws MethodError risk_budget_constraints(M, sets)
 end

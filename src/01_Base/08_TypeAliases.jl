@@ -284,7 +284,7 @@ Abstract supertype for all estimator value algorithm types.
 
 A subtype of `AbstractEstimatorValueAlgorithm` computes the value of a constraint or a bound over the universe, from the asset sets. An estimator slot that accepts a value can hold such an algorithm in the place of the value.
 
-The family has branches by the shape of the value that the algorithm returns, because a slot accepts one shape and refuses the others. [`VectorAbstractEstimatorValueAlgorithm`](@ref) is the branch that returns a `Num_VecNum`, and [`EstValType`](@ref) takes the branch that a slot accepts as its type parameter. A slot that parses equations, such as the `val` of [`LinearConstraintEstimator`](@ref), takes an [`EqnType`](@ref), and no branch of this family is an `EqnType`.
+The family has branches by the shape of the value that the algorithm returns, because a slot accepts one shape and refuses the others. [`VectorAbstractEstimatorValueAlgorithm`](@ref) is the branch that returns a `Num_VecNum`, and [`VectorEstValType`](@ref) is the bound of a slot that accepts that branch. [`EstValType`](@ref) takes the branch as its type parameter. A slot that parses equations, such as the `val` of [`LinearConstraintEstimator`](@ref), takes an [`EqnType`](@ref), and no branch of this family is an `EqnType`.
 
 # Interfaces
 
@@ -343,6 +343,7 @@ julia> estimator_to_val(MyIncreasingValue(), sets)
 # Related
 
   - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`EstValType`](@ref)
   - [`estimator_to_val`](@ref)
 """
@@ -352,7 +353,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Abstract supertype for the estimator value algorithms that return a numeric or a vector of numeric value.
 
-A slot that holds a number, or a vector of numbers, over the universe accepts this branch of [`AbstractEstimatorValueAlgorithm`](@ref) and no other. The slot writes that bound as `EstValType{<:VectorAbstractEstimatorValueAlgorithm}`. The branch that a slot accepts is thus part of the type of the slot, and not a check at the time when the library resolves the value.
+A slot that holds a number, or a vector of numbers, over the universe accepts this branch of [`AbstractEstimatorValueAlgorithm`](@ref) and no other. The slot writes that bound as [`VectorEstValType`](@ref), which also refuses a matrix. The branch and the shape that a slot accepts are thus part of the type of the slot, and not a check at the time when the library resolves the value.
 
 # Interfaces
 
@@ -361,7 +362,7 @@ Subtype `VectorAbstractEstimatorValueAlgorithm`, and implement the `estimator_to
 # Related
 
   - [`AbstractEstimatorValueAlgorithm`](@ref)
-  - [`EstValType`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`estimator_to_val`](@ref)
   - [`UniformValues`](@ref)
 """
@@ -373,19 +374,41 @@ abstract type VectorAbstractEstimatorValueAlgorithm <: AbstractEstimatorValueAlg
 
 Alias for a union of a number, a vector of numbers, a matrix of numbers, a string-number pair, a multi-estimator value, and the branch `T` of [`AbstractEstimatorValueAlgorithm`](@ref) that computes such a value.
 
-`T` names the branch that the slot accepts, so the type of a slot states which algorithms the slot can resolve. A slot that holds a number, or a vector of numbers, writes `EstValType{<:VectorAbstractEstimatorValueAlgorithm}`. The alias with no parameter accepts every branch, and it is the widest bound of the family.
+`T` names the branch that the slot accepts, so the type of a slot states which algorithms the slot can resolve. The alias with no parameter accepts every branch, and it is the widest bound of the family.
+
+`T` does not change the shape of the plain value: every `EstValType` accepts a matrix. A slot that holds a number, or a vector of numbers, over the universe resolves no matrix, so it writes [`VectorEstValType`](@ref) instead.
 
 # Related
 
   - [`Num_VecNum`](@ref)
+  - [`MatNum`](@ref)
   - [`PairStrNum`](@ref)
   - [`MultiEstValType`](@ref)
+  - [`VectorEstValType`](@ref)
   - [`AbstractEstimatorValueAlgorithm`](@ref)
   - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
 """
 const EstValType{T <: AbstractEstimatorValueAlgorithm} = Union{<:Num_VecNum, <:MatNum,
                                                                <:PairStrNum,
                                                                <:MultiEstValType, T}
+"""
+    const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                                   <:VectorAbstractEstimatorValueAlgorithm}
+
+Alias for a union of a number, a vector of numbers, a string-number pair, a multi-estimator value, and a [`VectorAbstractEstimatorValueAlgorithm`](@ref).
+
+A slot that holds a number, or a vector of numbers, over the universe takes this alias as its bound. Each shape that the alias accepts resolves to a `Num_VecNum` through [`estimator_to_val`](@ref). The alias refuses a matrix, which [`EstValType`](@ref) accepts, because the result of such a slot holds a `Num_VecNum` only. The constructor of the estimator thus refuses a matrix, and not the resolver.
+
+# Related
+
+  - [`Num_VecNum`](@ref)
+  - [`PairStrNum`](@ref)
+  - [`MultiEstValType`](@ref)
+  - [`EstValType`](@ref)
+  - [`VectorAbstractEstimatorValueAlgorithm`](@ref)
+"""
+const VectorEstValType = Union{<:Num_VecNum, <:PairStrNum, <:MultiEstValType,
+                               <:VectorAbstractEstimatorValueAlgorithm}
 """
     const Str_Expr = Union{<:AbstractString, Expr}
 
