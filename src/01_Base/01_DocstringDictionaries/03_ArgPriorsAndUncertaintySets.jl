@@ -136,9 +136,9 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :scaled_ucs => "`scaled`: Whether to scale the uncertainty set by the estimated standard deviations. `false` assumes every characteristic suffers the same estimation error; `true` assumes assets with larger variance suffer larger estimation error, which yields inverse-volatility weights.",#
                  :active_ucs => "`active`: Target number of active assets on the *unconstrained* problem, as a count (integer `>= 1`) or a fraction of the universe (float in `(0, 1)`). This is a radius calibration, not a cardinality constraint: it selects the radius that would activate this many assets subject only to the budget and sign constraints. Any further constraint may change the realised count. Use `card` for a hard cardinality constraint.",#
                  :n_sim => "`n_sim`: Number of simulation samples.",#
-                 :block_size => "`block_size`: Block size for bootstrap sampling.",#
-                 :q_bs => "`q`: Confidence level that sizes the uncertainty set (`0 < q < 1`). A *smaller* `q` is more demanding and yields a *larger, more conservative* set (wider box intervals / larger ellipsoid radius); a larger `q` gives a tighter set closer to the point estimate.",#
-                 :bootstrap => "`bootstrap`: Bootstrap algorithm.",#
+                 :block_size => "`block_size`: Block length of the bootstrap. For `StationaryBootstrap`, it is the mean block length.",#
+                 :q_bs => "`q`: Significance level that sets the size of the uncertainty set, with `0 < q < 1`. A smaller `q` gives a larger set, with wider box intervals or a larger radius. A larger `q` gives a smaller set, nearer to the point estimate.",#
+                 :bootstrap => "`bootstrap`: Block bootstrap scheme, which selects how the estimator draws the blocks.",#
                  :ucs => "`ucs`: Uncertainty set.",#
                  :ucsa => "`alg`: Uncertainty set algorithm.",#
                  # Entropy pooling.

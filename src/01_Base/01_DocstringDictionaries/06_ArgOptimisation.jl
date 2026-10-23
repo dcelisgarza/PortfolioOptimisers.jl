@@ -222,7 +222,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :w_max_noc => "`w_max`: Maximum return portfolio weights.",#
                  :ucs_flag => "`ucs_flag`: Whether to use the uncertainty set.",#
                  # Optimiser config.
-                 :kwargs => "`kwargs`: Additional keyword arguments.",#
+                 :kwargs => "`kwargs`: More keyword arguments.",#
                  # Near optimal centering result fields.
                  :attrs_noc => "`attrs`: Processed JuMP optimiser attributes for the model-assembly pipeline.",#
                  :w_opt => "`w_opt`: Optimal portfolio weights (vector or vector of vectors).",#
