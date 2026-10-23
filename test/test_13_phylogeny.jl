@@ -443,6 +443,38 @@
             @test AngularDist() isa DS.Metric
             @test DS.result_type(AngularDist(), Int, Int) === Float64
         end
+        @testset "AngularDist keeps the float type of its input (#1808)" begin
+            #=
+            The metric took its type from `promote_type(..., Float64)`, so a `Float32`
+            feature matrix gave a `Float64` distance matrix under every collapse of the
+            default `FeatureDistance`. The type now comes from `acos`, which widens an
+            `Integer` or a `Rational` and keeps every float type.
+            =#
+            for (Ti, To) in ((Int, Float64), (Rational{Int}, Float64), (Float32, Float32),
+                             (BigFloat, BigFloat))
+                @test DS.result_type(AngularDist(), Ti, Ti) === To
+                a = Ti[1, 2, 0]
+                b = Ti[2, 1, 1]
+                @test typeof(AngularDist()(a, b)) === To
+                @test typeof(AngularDist()(zeros(Ti, 3), b)) === To
+                @test typeof(AngularDist()(zeros(Ti, 3), zeros(Ti, 3))) === To
+                @test eltype(DS.pairwise(AngularDist(), Ti[1 2; 2 1; 3 3; 0 0]; dims = 1)) ===
+                      To
+            end
+            # A mixed pair promotes first, and the wider float type wins.
+            @test DS.result_type(AngularDist(), Float32, Float64) === Float64
+            @test typeof(AngularDist()(Float32[1, 2], Int[2, 1])) === Float32
+            # The value does not change with the type, up to the precision of the type.
+            Z = randn(rng, 6, 4)
+            @test isapprox(DS.pairwise(AngularDist(), Float32.(Z); dims = 1),
+                           DS.pairwise(AngularDist(), Z; dims = 1); atol = 1e-5)
+            Z3 = rand(rng, Float32, 5, 4, 3)
+            @test eltype(distance(FeatureDistance(), Z3[end, :, :])) === Float32
+            for alg in (LastObservation(), AggregateFeatures(), AggregateDistances(),
+                        StackObservations(), AggregateFeatures(; alg = MedianCollapse()))
+                @test eltype(distance(FeatureDistance(; alg = alg), Z3)) === Float32
+            end
+        end
         @testset "2-D feature matrices" begin
             Z = [1.0 0.0; 0.0 1.0; 1.0 1.0]
             de = FeatureDistance()

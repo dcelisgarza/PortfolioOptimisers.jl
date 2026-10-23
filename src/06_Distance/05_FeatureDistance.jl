@@ -26,7 +26,7 @@ The metric has two paths, and both are part of its contract. The elementwise met
 
 The elementwise method, `AngularDist()(a, b)`:
 
- 1. Promote the element types of `a` and `b` with `Float64` to get `T`.
+ 1. Promote the element types of `a` and `b`, and take `T` as the type of ``\\arccos`` of `one` of that type. ``\\arccos`` changes an integer or a rational type to a float type, so an `Int` or a `Rational{Int}` input gives `Float64`. Every float type keeps its own type. `Distances.result_type` gives the same `T`, so a matrix of the distances has the element type `T` too.
  2. Take the norm `na` of `a` and the norm `nb` of `b`.
  3. Return `zero(T)` when both norms are zero, and `one(T)` when exactly one of them is zero. This is the convention for a zero feature vector above.
  4. Divide the dot product of `a` and `b` by `na * nb` to get the cosine.
@@ -60,7 +60,7 @@ One matrix multiplication replaces ``N^{2}`` scalar calls, and it is the faster 
 """
 struct AngularDist <: Distances.Metric end
 function (::AngularDist)(a, b)
-    T = promote_type(eltype(a), eltype(b), Float64)
+    T = Distances.result_type(AngularDist(), eltype(a), eltype(b))
     na = LinearAlgebra.norm(a)
     nb = LinearAlgebra.norm(b)
     if iszero(na) && iszero(nb)
@@ -70,7 +70,9 @@ function (::AngularDist)(a, b)
     end
     return acos(clamp(T(LinearAlgebra.dot(a, b) / (na * nb)), -one(T), one(T))) / T(pi)
 end
-Distances.result_type(::AngularDist, a::Type, b::Type) = promote_type(a, b, Float64)
+function Distances.result_type(::AngularDist, a::Type, b::Type)
+    return typeof(acos(one(promote_type(a, b))))
+end
 # The `AngularDist` docstring's `# Algorithm` section states both paths, the measurement that
 # separates them on the diagonal, and why only one matrix path exists.
 function Distances._pairwise!(::AngularDist, r::AbstractMatrix, a::AbstractMatrix)
