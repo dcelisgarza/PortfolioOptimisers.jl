@@ -107,6 +107,10 @@ Keywords correspond to the struct's fields.
 
     `kt` also admits a [`CokurtosisEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref), and `mu` an [`AbstractExpectedReturnsEstimator`](@ref) or an [`AbstractPriorEstimator`](@ref). Either is resolved against the optimisation's own prior — see [`resolve_deferred_quantities`](@ref). A cokurtosis estimator in `kt` also supplies `mu` from its own `me`, so that the tensor and the centre it was taken about come out of **one** object. A deferred slot wins over `pe`.
 
+!!! warning
+
+    A `Number` or a `VecScalar` `mu` beside a [`CokurtosisEstimator`](@ref) in `kt` gives the target of the measure only when the weights sum to one. The estimator takes the tensor about the per-asset centre that [`centring_target`](@ref) makes, and a scalar part ``s`` is spread to every asset. So the tensor centres the portfolio return on ``s \\sum_i w_i``, and the functor centres it on ``s``. Under any other budget, the `JuMP` model and the functor disagree. A budget of 0.5, a leveraged budget and a market-neutral budget are examples. A vector `mu`, or `mu = nothing`, agrees under every budget.
+
 # `JuMP` Formulations
 
 ## Exact
