@@ -110,8 +110,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # algorithms over one correlation matrix, and two selection
                  # rules over one taken set, so each of the five descriptions
                  # below is shared by two fields of that file.
-                 :pre_ce_corr => "`ce`: Covariance estimator supplying the correlation matrix.",#
-                 :pre_t_corr => "`t`: Correlation at or above which two assets are redundant.",#
-                 :pre_absolute => "`absolute`: Whether to compare the absolute value of the correlation.",#
-                 :pre_action => "`action`: `:keep` retains the taken assets, `:drop` retains everything else.",#
-                 :pre_measure => "`measure`: Reducer producing the fallback drop score from each column of the correlation matrix; ignored when the selector carries a `score`.")
+                 :pre_ce_corr => "`ce`: The covariance estimator that gives the correlation matrix.",#
+                 :pre_t_corr => "`t`: The correlation at or above which two assets are redundant.",#
+                 :pre_absolute => "`absolute`: If `true`, the algorithm compares the absolute value of the correlation with `t`.",#
+                 :pre_action => "`action`: `:keep` keeps the assets that the rule takes, and `:drop` keeps all the other assets.",#
+                 :pre_measure => "`measure`: The measure that collapses each column of the correlation matrix into the fallback drop score. The algorithm ignores it when the selector has a `score`.")

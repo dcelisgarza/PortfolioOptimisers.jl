@@ -2001,6 +2001,10 @@ struct UnimplementedRedundancy <: PortfolioOptimisers.AbstractRedundancyAlgorith
         end
         @test occursin("does not implement redundancy_keep", e2.msg)
         @test occursin("requires_score", e2.msg)
+        # the generic `requires_score` already answers `true`, so an implementer adds it
+        # only to answer `false`, and the message says that (#550)
+        @test occursin("returning false when it can pick a survivor without a score",
+                       e2.msg)
     end
 
     @testset "correlation_components partitions the universe" begin

@@ -57,10 +57,10 @@ unique_key_dict!(math_dict, :math_dict,
                  # Preselection. `20_AssetSelection.jl` states the admitted set of every
                  # selection rule and of every redundancy algorithm, so the four
                  # symbols below are each shared by two or more Units of that file.
-                 :s_i_score => "``s_{i}``: Score of asset ``i``, the risk measure evaluated on that asset's own return series.",#
-                 :K_keep_set => "``\\mathcal{K}``: Set of the assets a selector keeps.",#
-                 :k_tail_count => "``k``: Number of assets taken from one end of the score ordering.",#
-                 :t_corr_threshold => "``t``: Correlation at or above which two assets are redundant.",#
+                 :s_i_score => "``s_{i}``: The score of asset ``i``. It is the value of the risk measure on the return series of asset ``i`` alone.",#
+                 :K_keep_set => "``\\mathcal{K}``: The set of the assets that a selector keeps.",#
+                 :k_tail_count => "``k``: The number of assets that a rule takes from one end of the order of the scores.",#
+                 :t_corr_threshold => "``t``: The correlation at or above which two assets are redundant.",#
                  # The online step of the prior family. `12_PriorPartialFit.jl` states the
                  # result of `prior(pe)` with no data as the batch prior of the rows that
                  # `pe` folded.
