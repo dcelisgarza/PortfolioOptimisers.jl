@@ -89,8 +89,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :w_tn => "`w`: Reference portfolio weight vector. The deviation of each asset is the difference between the candidate weight and this weight. It is never the candidate weight vector that an optimiser solves for.",#
                  :val_tn => "`val`: Turnover bound. A number is one bound for every asset, and a vector holds one bound per asset. A [`TurnoverEstimator`](@ref) can also name the bounds by asset or by group, and [`turnover_constraints`](@ref) resolves the names to one bound per asset. A [`Fees`](@ref) reads the `val` of its [`Turnover`](@ref) as a fee rate per asset, not as a bound.",#
                  :w_ref => "`w`: Reference portfolio weights vector.",#
-                 :w_bm_ret => "`w`: Benchmark portfolio returns vector. It holds `T` returns, one per observation, and **not** `N` weights, so its length must match the number of rows of the return matrix the model is built on.",#
-                 :B_data_tr => "`B`: Benchmark returns of the rows that a reader holds, the `B` field of their [`ReturnsResult`](@ref). A vector `T × 1` is the benchmark series. A matrix `T × N` holds one benchmark per asset, and its series is `B * w`. Every reader that holds the returns data replaces it with the `B` of its own rows through [`bind_data_benchmark`](@ref). It is `nothing` until a reader binds it.",#
+                 :w_bm_ret => "`w`: Benchmark return series. It holds `T` returns, one for each observation, not `N` weights. Its length must equal the number of rows of the return matrix of the model.",#
+                 :B_data_tr => "`B`: Benchmark returns of the rows that a reader holds, from the `B` field of the [`ReturnsResult`](@ref) of the reader. A vector `T × 1` is the benchmark series. A matrix `T × N` holds one benchmark for each asset, and its series is `B * w`. Every reader that holds the returns data replaces it with the `B` of its own rows through [`bind_data_benchmark`](@ref). It is `nothing` until a reader binds it.",#
                  :fixed => "`fixed`: If `true`, [`factory`](@ref) keeps the reference weights `w` and ignores the new weights. If `false`, `factory` replaces `w` with the new weights.",#
                  # Tracking specification.
                  :tr_spec => "`tr`: Benchmark tracking specification.",#
@@ -131,7 +131,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Risk measure.
                  :r => "`r`: Risk measure or vector of risk measures.",#
                  # Tracking.
-                 :tr => "`tr`: Tracking error constraint estimator.",#
+                 :tr => "`tr`: Tracking algorithm that gives the benchmark return series.",#
                  # Fees.
                  :fees => "`fees`: Fees estimator or result.",#
                  :fees_res => "`fees`: The resolved [`Fees`](@ref) the head was charged with, on the universe it solved on, or `nothing`. A walk-forward fold charges it through [`extract_fees`](@ref).",#
