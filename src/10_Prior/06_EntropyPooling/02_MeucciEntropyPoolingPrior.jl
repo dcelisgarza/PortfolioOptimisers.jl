@@ -403,7 +403,8 @@ end
     ep_cvar_views_setup(cvar_views::CVV_VecCVV, pr::AbstractPriorResult,
                         sets::UniverseSets, w::ScenarioProbabilities,
                         ds_opt::Option{<:ConditionalValueatRiskEntropyPooling},
-                        dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false)
+                        dm_opt::Option{<:OptimEntropyPooling}; strict::Bool = false,
+                        ledger::Option{<:AbstractVector} = nothing)
 
 Resolve the conditional value at risk views once, into the data of one search.
 
@@ -432,6 +433,7 @@ The staged route of [`ep_prior`](@ref) searches up to three times, once for each
   - `ds_opt`: Search for one CVaR view, or `nothing` for the default.
   - `dm_opt`: Optimiser for more than one CVaR view, or `nothing` for the default.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Validation
 

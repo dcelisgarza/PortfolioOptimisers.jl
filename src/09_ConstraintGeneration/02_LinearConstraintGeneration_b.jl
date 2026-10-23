@@ -329,7 +329,7 @@ The two lines are different operations. The first repeats the coefficient on eve
   - `bl_flag`: Selects which of the two expansions above runs. `false` takes the first, which constrains the sum over the group. `true` takes the second, the Black-Litterman-style expansion, which constrains the mean.
   - `ep_flag`: If `true`, the function expands `prior(...)` expressions, for entropy pooling.
   - `rho_flag`: If `true`, the function expands correlation views `(A, B)`, for entropy pooling.
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting. A shed group is recorded into it through [`record_group_shed!`](@ref).
+  - $(arg_dict[:ledger]) A shed group is recorded into it through [`record_group_shed!`](@ref).
 
 # Validation
 
@@ -662,7 +662,7 @@ The function drops whole rows and never single terms. A row is one statement ove
   - `datatype`: Numeric type for coefficients and right-hand side.
   - `strict`: If `true`, a variable name that the universe does not hold throws. If `false`, it warns.
   - `rr`: Loadings to re-base through, or `nothing` for an ordinary asset-space constraint. Callers do not pass it directly, and [`ExposureConstraintEstimator`](@ref) passes it.
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting. A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
+  - $(arg_dict[:ledger]) A row dropped for a name on the counterpart axis is recorded into it through [`record_non_investable_drop!`](@ref).
 
 # Validation
 

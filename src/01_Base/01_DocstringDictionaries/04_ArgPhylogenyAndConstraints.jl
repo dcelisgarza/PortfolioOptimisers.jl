@@ -55,6 +55,7 @@ unique_key_dict!(arg_dict, :arg_dict,
                  :hedge_frb => "`hedge`: Whether the off-factor weights hedge the factor exposures at minimum variance. When `true` and `flag = true`, the model adds the rows ``\\mathbf{B}_2^\\intercal \\mathbf{\\Sigma} \\boldsymbol{w} = \\boldsymbol{0}``, so the off-factor weights take no risk contribution. Ignored when `flag = false`.",#
                  :datatype => "`datatype`: Data type of the result when `val` is `nothing`.",#
                  :strict => "`strict`: Whether to throw an error if `sets` does not contain the desired value in `sets.dict[key]`.",#
+                 :ledger => "`ledger`: The Departure Ledger of the entry of the fit, or `nothing` when no caller collects the drops.",#
                  # Constraints
                  :A => "`A`: Linear constraint coefficient matrix.",#
                  :B => "`B`: Linear constraint response vector.",#

@@ -211,7 +211,8 @@ function scenario_residual_variances(rr::Regression, sigma::VecNum)
 end
 """
     ep_sigma_views!(sigma_views::LinearConstraintEstimator, epc::AbstractDict,
-                    pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                    pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                    ledger::Option{<:AbstractVector} = nothing)
 
 Add the variance views of a group to the entropy pooling constraint dictionary.
 
@@ -260,6 +261,7 @@ Where:
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Returns
 
@@ -376,7 +378,7 @@ function fix_sigma!(epc::AbstractDict, fixed::AbstractVector, to_fix::BitVector,
 end
 """
     replace_coprior_views(res::ParsingResult, pr::AbstractPriorResult, sets::UniverseSets, key::Symbol;
-                          strict::Bool = false)
+                          strict::Bool = false, ledger::Option{<:AbstractVector} = nothing)
 
 Replace the prior references of a parsed correlation or covariance view with their prior values.
 
@@ -419,6 +421,7 @@ Where:
   - `sets`: Universe sets that map the asset names to indices.
   - `key`: Tag of the statistic, `:rho` for a correlation view or `:cov` for a covariance view.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) The function records in it each row that it drops for a name on the counterpart axis, through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
@@ -648,7 +651,8 @@ function get_pr_value(pr::AbstractPriorResult, i::VecInt, j::VecInt, ::Val{:cov}
 end
 """
     ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
 
 Add the covariance views of a group to the entropy pooling constraint dictionary.
 
@@ -707,6 +711,7 @@ The identity holds only while the posterior means of assets ``i`` and ``j`` equa
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`replace_coprior_views`](@ref) fill it.
 
 # Validation
 
@@ -766,7 +771,8 @@ function ep_cov_views!(cov_views::LinearConstraintEstimator, epc::AbstractDict,
 end
 """
     ep_rho_views!(rho_views::LinearConstraintEstimator, epc::AbstractDict,
-                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                  pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
 
 Add the correlation views of a group to the entropy pooling constraint dictionary.
 
@@ -829,6 +835,7 @@ The identity holds only while the posterior means and variances of assets ``i`` 
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`replace_coprior_views`](@ref) fill it.
 
 # Validation
 
@@ -927,7 +934,8 @@ end
 """
     ep_sk_views!(skew_views::LinearConstraintEstimator, epc::AbstractDict,
                  pr::AbstractPriorResult, sets::UniverseSets,
-                 w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                 ledger::Option{<:AbstractVector} = nothing)
 
 Add the skewness views of a group to the entropy pooling constraint dictionary.
 
@@ -985,6 +993,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - `sets`: Universe sets that map the asset names to indices.
   - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the skewness under them.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Returns
 
@@ -1071,7 +1080,8 @@ end
 """
     ep_kt_views!(kurtosis_views::LinearConstraintEstimator, epc::AbstractDict,
                  pr::AbstractPriorResult, sets::UniverseSets,
-                 w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                 w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                 ledger::Option{<:AbstractVector} = nothing)
 
 Add the kurtosis views of a group to the entropy pooling constraint dictionary.
 
@@ -1128,6 +1138,7 @@ The identity holds only while the posterior mean and variance of asset ``i`` equ
   - `sets`: Universe sets that map the asset names to indices.
   - `w`: The weights of `pr`, or `nothing` for uniform weights. A `prior(...)` reference reads the kurtosis under them.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Returns
 

@@ -892,7 +892,7 @@ A `nothing` ledger collects nothing, and it is the default everywhere. A caller 
 
 # Arguments
 
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
+  - $(arg_dict[:ledger])
   - `what`: A noun phrase naming what was dropped, for example ``"the view row `a + c == 0.05`"``.
 
 # Returns
@@ -927,7 +927,7 @@ A shed of nothing records nothing, so the all-investable path costs one comparis
 
 # Arguments
 
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
+  - $(arg_dict[:ledger])
   - `group`: The group name as the caller wrote it, or the pair `"(a, b)"` for a correlation view.
   - `shed`: How many members the group lost.
   - `kept`: How many members survived.
@@ -1158,7 +1158,7 @@ The record is written here and not at the four call sites, so each branch of [`r
 
   - `members` / `members1`, `members2`: The group's member names, as `sets.dict` holds them.
   - `other`: The counterpart axis, read with [`counterpart_axis_names`](@ref). Usually the Non-Investable Axis.
-  - `ledger`: The Departure Ledger of the entry of the fit, or `nothing` when nobody is collecting.
+  - $(arg_dict[:ledger])
   - `group`: The group name as the caller wrote it, for the ledger.
   - `eqn`: The row the group appears in, for the ledger.
 

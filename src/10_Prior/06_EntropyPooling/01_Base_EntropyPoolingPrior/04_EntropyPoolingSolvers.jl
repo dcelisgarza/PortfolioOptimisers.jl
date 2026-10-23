@@ -26,10 +26,12 @@ end
 """
     ep_var_views!(var_views::ValueatRiskView, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets,
-                  w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
     ep_var_views!(var_views::LinearConstraintEstimator, epc::AbstractDict,
                   pr::AbstractPriorResult, sets::UniverseSets, alpha::Number,
-                  w::Option{<:ObsWeights} = nothing; strict::Bool = false)
+                  w::Option{<:ObsWeights} = nothing; strict::Bool = false,
+                  ledger::Option{<:AbstractVector} = nothing)
 
 Add the value at risk views of a group to the entropy pooling constraint dictionary.
 
@@ -86,6 +88,7 @@ Where:
   - `alpha`: Significance level of the value at risk.
   - $(arg_dict[:oow])
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Validation
 

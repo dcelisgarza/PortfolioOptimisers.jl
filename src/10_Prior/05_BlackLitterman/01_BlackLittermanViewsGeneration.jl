@@ -154,7 +154,7 @@ The cause of the failure decides only whether the function reports the drop. [`c
   - $(arg_dict[:ekey])
   - `datatype`: The numeric type of the coefficients and of the view returns.
   - `strict`: If `true`, a name that resolves against neither axis raises an `ArgumentError`, and a row whose coefficients cancel raises an [`IsZeroError`](@ref). If `false`, both warn.
-  - `ledger`: The Departure Ledger of the caller that derives the Investable Mask, or `nothing` when no caller collects the drops. The function records in it each row that it drops for a name on the counterpart axis, through [`record_non_investable_drop!`](@ref).
+  - $(arg_dict[:ledger]) The function records in it each row that it drops for a name on the counterpart axis, through [`record_non_investable_drop!`](@ref).
 
 # Validation
 
@@ -301,7 +301,7 @@ The two routes give the same pair. When a caller passes back the [`BlackLitterma
 
   - `strict`: Passed to [`get_black_litterman_views`](@ref), which states what it raises.
 
-  - `ledger`: The Departure Ledger of the caller that derives the Investable Mask, or `nothing` when no caller collects the drops. The method passes it to [`replace_group_by_assets`](@ref) and to [`get_black_litterman_views`](@ref), so the ledger records a group that loses members and a row that the assembly drops.
+  - $(arg_dict[:ledger]) The method passes it to [`replace_group_by_assets`](@ref) and to [`get_black_litterman_views`](@ref), so the ledger records a group that loses members and a row that the assembly drops.
 
 # Returns
 

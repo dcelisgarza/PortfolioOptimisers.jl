@@ -300,7 +300,8 @@ function ep_mu_views!(mu_views::Nothing, args...; kwargs...)
 end
 """
     ep_mu_views!(mu_views::LinearConstraintEstimator, epc::AbstractDict,
-                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false)
+                 pr::AbstractPriorResult, sets::UniverseSets; strict::Bool = false,
+                 ledger::Option{<:AbstractVector} = nothing)
 
 Add the mean views of a group to the entropy pooling constraint dictionary.
 
@@ -346,6 +347,7 @@ Where:
   - `pr`: Prior result that holds the asset returns.
   - `sets`: Universe sets that map the asset names to indices.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
+  - $(arg_dict[:ledger]) [`replace_group_by_assets`](@ref) and [`get_linear_constraints`](@ref) fill it.
 
 # Returns
 

@@ -304,7 +304,7 @@ The returned `omega` includes ``\\tau``, so a caller passes it to [`vanilla_post
   - $(arg_dict[:datatype])
   - $(arg_dict[:strict])
   - $(arg_dict[:bl_axis])
-  - `ledger`: The Departure Ledger of the caller that derives the Investable Mask, or `nothing` when no caller collects the drops. The function passes it to [`black_litterman_views`](@ref). The ledger tells a set of views that a departure emptied from a set that another cause emptied. Only the *report* uses this difference, and the result does not.
+  - $(arg_dict[:ledger]) The function passes it to [`black_litterman_views`](@ref). The ledger tells a set of views that a departure emptied from a set that another cause emptied. Only the *report* uses this difference, and the result does not.
 
 # Returns
 

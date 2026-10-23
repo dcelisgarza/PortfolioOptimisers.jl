@@ -174,7 +174,7 @@ Resolve one parsed tail view into the assets that it names, their coefficients, 
   - `sets`: The universe sets that map the asset names to indices.
   - `X`: The asset returns matrix. The function reads only its element type.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
-  - `ledger`: The Departure Ledger of the fit, or `nothing`. [`get_linear_constraints`](@ref) fills it.
+  - $(arg_dict[:ledger]) [`get_linear_constraints`](@ref) fills it.
 
 # Returns
 
@@ -1277,7 +1277,7 @@ These two functions hold every difference between the conditional, the entropic 
   - `sets`: The universe sets that map the asset names to indices.
   - `w`: The prior probability weights.
   - `strict`: If `true`, raise an error for an asset that the universe does not hold. If `false`, warn.
-  - `ledger`: The Departure Ledger of the fit, or `nothing`. The group expansion and [`ep_view_terms`](@ref) fill it.
+  - $(arg_dict[:ledger]) The group expansion and [`ep_view_terms`](@ref) fill it.
 
 # Returns
 
