@@ -133,6 +133,9 @@ The norm forms used as constraints, as risk-measure targets, and in entropy pool
 **FullMoment vs SemiMoment**
 The Algorithm distinction that runs through all of moment estimation. `FullMoment` includes all deviations, and `SemiMoment` includes only those below a target. It is the basis of the split between symmetric and downside measures.
 
+**Moment Target**
+The value from which a moment risk measure measures the deviations of the net portfolio returns. `calc_moment_target` selects it from the `mu` slot of the measure: the mean of the returns, weighted by the observation weights when the measure holds them, when `mu` is `nothing`. It is the expected portfolio return net of the mean fee per period when `mu` holds expected asset returns, and the number itself when `mu` is a number. A number is a minimum acceptable return, so it takes no fee.
+
 ## 2. Data
 
 **ReturnsResult**

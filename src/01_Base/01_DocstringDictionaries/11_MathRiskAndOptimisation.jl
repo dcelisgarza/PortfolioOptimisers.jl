@@ -114,6 +114,14 @@ unique_key_dict!(math_dict, :math_dict,
                  :R_i_riskvec => "``\\mathcal{R}_i``: Entry ``i`` of `risk_vec`, the risk expression of the ``i``-th risk measure times the `scale` of the measure.",#
                  :rhat_t_net => "``\\hat{r}_t``: Net portfolio return at observation ``t``, ``\\boldsymbol{x}_t^\\intercal \\boldsymbol{w}`` less the fees charged at ``t``.",#
                  :rhat_net_vec => "``\\hat{\\boldsymbol{r}}``: The net portfolio returns, ``T \\times 1``, with entries ``\\hat{r}_t``.",#
+                 # The moment risk measures: the target, the deviations, the mean over the
+                 # observations and the divisor of the variance estimator.
+                 :tau_moment => "``\\tau``: Moment Target, the value from which the measure measures the deviations. It is ``\\mathbb{E}[\\hat{\\boldsymbol{r}}]`` when `mu` is `nothing`, ``\\boldsymbol{\\mu}^\\intercal \\boldsymbol{w} - \\bar{F}(\\boldsymbol{w})`` when `mu` is a vector ``\\boldsymbol{\\mu}``, ``\\boldsymbol{v}^\\intercal \\boldsymbol{w} + s - \\bar{F}(\\boldsymbol{w})`` when `mu` is a [`VecScalar`](@ref) with fields ``\\boldsymbol{v}`` and ``s``, and `mu` itself when it is a number.",#
+                 :Fbar_fee_mean => "``\\bar{F}(\\boldsymbol{w})``: Mean fee per period of the portfolio, zero when `fees` is `nothing`. See [`moment_target_fees`](@ref).",#
+                 :d_t_moment => "``d_t = \\hat{r}_t - \\tau``: Moment deviation of observation ``t``.",#
+                 :d_t_lower => "``d_t^{-} = \\min(d_t, 0)``: Lower part of the moment deviation of observation ``t``.",#
+                 :E_obs_mean => "``\\mathbb{E}[z] = \\sum_{t=1}^{T} w_t z_t / \\sum_{t=1}^{T} w_t``: Observation mean of a series ``z_t``, with ``w_t = 1`` for every ``t`` when the measure holds no observation weights.",#
+                 :f_ve_div => "``f``: Variance divisor of the estimator `ve`, `StatsBase.varcorrection` of ``T``, or of the observation weights when the measure holds them, at `ve.corrected`. With no observation weights it is ``1/(T-1)`` when `ve.corrected` is `true` and ``1/T`` otherwise.",#
                  # The two fee expressions of a JuMP model, and the clock of the second.
                  :f_r_fee => "``f_r``: Per period fee, the model's `:fees` expression. Each observation of the net return series pays it in full.",#
                  :f_o_fee => "``f_o``: One-off fee, the model's `:one_time_fees` expression. The holding period pays it one time.",#
