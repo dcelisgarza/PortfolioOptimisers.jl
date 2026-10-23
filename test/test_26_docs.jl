@@ -643,9 +643,13 @@ they are of two kinds and only one kind can red a file that no child map has swe
   A PRESENCE check says "the file must state X". It reds a file the moment its scope reaches
   it. `ext/` carries ZERO docstrings, so a presence check widened unconditionally would red
   the build on the day it landed. It reads the sweep manifest instead: a file marked
-  `swept = true` must satisfy it, and an unswept file is exempt. The `ext/` row is
-  `swept = false` today, so the testset below asserts the exemption and nothing else. Child
-  map 13 sweeps the file and flips the flag.
+  `swept = true` must satisfy it, and an unswept file is exempt. Child map 13 sweeps the
+  files of `ext/` one ticket at a time, and each ticket flips the flag of its own file.
+
+The manifest is per file and an extension is one module over many files. So the presence
+check below is per file too. A swept file answers for the names that it declares at its top
+level, and an unswept file of the same module stays exempt (#1449). A check per module armed
+on the first swept file, and it demanded the docstrings of every unswept sibling.
 
 --------------------------------------------------- what an extension file has to document
 
@@ -653,18 +657,18 @@ An extension is a module of its own, so `Base.undocumented_names` -- the instrum
 first testset in this file already uses -- answers for it directly. It also answers the
 right question rather than a widened one, and what the one file holds is why:
 
-  - `ext/PortfolioOptimisersPlotsExt/` defines 171 methods of 34 functions, and every one
-    of the 34 is declared as a bare `function ... end` stub in `src/22_Plotting.jl`, which
-    carries its docstring. Beyond those methods it declares four module-local `const`s
-    holding error-message text, and nothing else.
+  - `ext/PortfolioOptimisersPlotsExt/` defines the methods of the `plot_*` functions, and
+    every one of those functions is declared as a bare `function ... end` stub in
+    `src/22_Plotting.jl`, which carries its docstring. Beyond those methods it declares
+    module-local `const`s and the private helper functions that the methods call.
 
-A method binds in the module that declares the FUNCTION, so none of those 171 methods
-reaches `names(ext; all = true)` and the census asks for a docstring on none of them. That
-is the right demand: 171 docstrings restating 34 would be 137 copies free to drift, which is
-what `ref_dict` and `field_dict` exist to stop. What the census does ask for is the four
-`const`s and the extension module's own docstring -- the names the extension declares
-itself. The main module carries a docstring under exactly that rule, so this is one rule and
-not two.
+A method binds in the module that declares the FUNCTION, so no `plot_*` method reaches
+`names(ext; all = true)` and the census asks for a docstring on none of them. That is the
+right demand: one docstring per method would restate the stub many times, and each copy
+could drift, which is what `ref_dict` and `field_dict` exist to stop. What the census does
+ask for is each `const`, each helper function and the extension module's own docstring --
+the names the extension declares itself. Every private name of `src/` carries a docstring
+under exactly that rule, so this is one rule and not two.
 
 #409's three questions are answered by that one rule.
 
@@ -740,10 +744,23 @@ not two.
             return Base.get_extension(PortfolioOptimisers, Symbol(name))
         end
 
+        # The names that one top-level expression of a file declares. The module file of an
+        # extension wraps its body in `module`, so the walk descends into that body.
+        CH = DocsCensusHealth.CodeHealth
+        function declared_names(e)
+            d = CH.unwrap(e)
+            Meta.isexpr(d, :module) || return [CH.unit_name(d)]
+            return vcat(CH.unit_name(d),
+                        mapreduce(declared_names, vcat, d.args[3].args; init = String[]))
+        end
+
         undocumented, unloadable = String[], String[]
         for (name, triggers) in extensions
-            files = filter(f -> belongs_to(name, f), ext_rows)
-            any(f -> rows[f]["swept"], files) || continue
+            files = filter(f -> belongs_to(name, f) && rows[f]["swept"], ext_rows)
+            isempty(files) && continue
+            declared = Set{String}(n for f in files
+                                   for e in CH.parse_file(joinpath(ROOT, f)).args
+                                   for n in declared_names(e))
             trigger_list = isa(triggers, AbstractString) ? [triggers] : triggers
             mod = load_extension(name, trigger_list)
             if isnothing(mod)
@@ -754,7 +771,7 @@ not two.
                 push!(unloadable, string(name, "  triggers: ", join(trigger_list, ", ")))
             else
                 for n in Base.undocumented_names(mod; private = true)
-                    push!(undocumented, string(name, ".", n))
+                    string(n) in declared && push!(undocumented, string(name, ".", n))
                 end
             end
         end
