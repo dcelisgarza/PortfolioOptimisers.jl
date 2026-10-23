@@ -2135,3 +2135,56 @@ end
                                                        panel_manifest(static; nx,
                                                                       decode = false))
 end
+@testset "The docstrings of 22_PanelRoundTrip.jl against numbers" begin
+    PO = PortfolioOptimisers
+    amsk = Bool[1 0; 1 1; 0 1]
+    pnl = AssetPanel(;
+                     pf = [NumericPanelField(; name = "mcap",
+                                             vals = [1.0 2.0; 3.0 4.0; 5.0 6.0]),
+                           CategoricalPanelField(; name = "sector", levels = ["T", "E"],
+                                                 codes = [1 2; 1 2; 2 2])], amsk = amsk,
+                     emsk = amsk)
+    df = panel_dataframe(pnl; layout = :long)
+    mf = panel_manifest(pnl)
+    p2 = asset_panel(df, mf)
+    # A read that masks the cells outside the universe agrees across a long round trip, and the
+    # default read, which keeps them, does not.
+    @test isequal(panel_field_values(pnl, "mcap"; inactive = NaN),
+                  panel_field_values(p2, "mcap"; inactive = NaN))
+    @test panel_field_values(pnl, "mcap") == [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    @test panel_field_values(p2, "mcap") == [1.0 0.0; 3.0 4.0; 0.0 6.0]
+    # The linear index of each long row, in an `observations × assets` array.
+    @test PO.panel_long_cells(df, PO.panel_manifest_axes(mf)) == [1, 2, 5, 6]
+    # A categorical entry holds one empty group per level, and a numeric entry holds none.
+    specs = PO.panel_manifest_fields(mf)
+    @test specs[1].labels == String[] && specs[1].groups == String[]
+    @test specs[2].labels == ["T", "E"] && specs[2].groups == ["", ""]
+    @test specs[2].axis == "" && !specs[2].grouped && specs[2].decode
+    # A static panel has no observation axis, so its labels are the positions of its assets.
+    sp = AssetPanel(; pf = [NumericPanelField(; name = "m", vals = [1.0, 2.0, 3.0])])
+    @test PO.panel_frame_axes(sp, nothing, nothing) == (["1", "2", "3"], 1:3)
+    @test PO.panel_long_cells(panel_dataframe(sp),
+                              PO.panel_manifest_axes(panel_manifest(sp))) == [1, 2, 3]
+    @test DataFrames.nrow(panel_dataframe(sp; layout = :wide)) == 1
+    # An integer column and a floating-point column of one tensor field give the float type.
+    tab = (; df = DataFrame("b=u" => [1, 2], "b=v" => [1.5, 2.0]), nx = ["A", "B"])
+    @test PO.panel_table_eltype([1, 2], tab, ["b=u", "b=v"]) === Float64
+    # A cell outside the universe of a long table comes back with a false placeholder mask.
+    fp = asset_panel([NumericPanelInput(; name = "m", vals = [NaN 1.0; 2.0 NaN; 3.0 4.0],
+                                        alg = ForwardPanelFill())];
+                     amsk = Bool[1 1; 1 0; 1 1])
+    @test panel_field(fp, "m").pmsk == Bool[1 0; 0 1; 0 0]
+    fp2 = asset_panel(panel_dataframe(fp; layout = :long), panel_manifest(fp))
+    @test panel_field(fp2, "m").pmsk == Bool[1 0; 0 0; 0 0]
+    @test panel_field(fp2, "m").omsk == Bool[0 1; 1 0; 1 1]
+    # A Panel Field holds a finite value in every cell, so a table cell is never NaN.
+    @test_throws PO.IsNonFiniteError NumericPanelField(; name = "x", vals = [NaN, 1.0])
+    # The selections refuse a repeated asset, an unknown asset, and a code that `T` cannot hold.
+    @test_throws ArgumentError panel_manifest(sp; assets = ["1", "1"])
+    @test_throws KeyError panel_manifest(sp; assets = ["9"])
+    @test_throws ArgumentError PO.panel_code_reader((; name = "c", decode = false,
+                                                     labels = ["a", "b"]), Int8)("300")
+    # An entry of `fields` can be a `Symbol`.
+    @test [f.name for f in asset_panel(df, mf; fields = [:sector, "mcap"]).pf] ==
+          ["sector", "mcap"]
+end
