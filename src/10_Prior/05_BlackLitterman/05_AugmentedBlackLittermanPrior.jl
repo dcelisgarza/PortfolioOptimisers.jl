@@ -156,20 +156,20 @@ The constructor does not check the **length** of `w`. The length is a property o
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `a_pe`: Recursively updated via [`factory`](@ref).
-  - `f_pe`: Recursively updated via [`factory`](@ref).
-  - `re`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `a_pe`: Recursively updated through [`factory`](@ref).
+  - `f_pe`: Recursively updated through [`factory`](@ref).
+  - `re`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `a_pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `re`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `a_pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `re`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

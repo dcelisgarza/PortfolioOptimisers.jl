@@ -171,19 +171,19 @@ Keywords correspond to the struct's fields. All arguments are validated for type
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pes`: Recursively updated via [`factory`](@ref).
-  - `pe1`: Recursively updated via [`factory`](@ref).
-  - `pe2`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `pes`: Recursively updated through [`factory`](@ref).
+  - `pe1`: Recursively updated through [`factory`](@ref).
+  - `pe2`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pes`: Recursively viewed via [`port_opt_view`](@ref).
-  - `pe1`: Recursively viewed via [`port_opt_view`](@ref).
-  - `pe2`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `pes`: Recursively viewed through [`port_opt_view`](@ref).
+  - `pe1`: Recursively viewed through [`port_opt_view`](@ref).
+  - `pe2`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

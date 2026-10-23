@@ -125,9 +125,9 @@ Keywords correspond to the struct's fields. Fields typed [`TD`](@ref), [`TD_Opti
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `r`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `r`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 

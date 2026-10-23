@@ -164,8 +164,8 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `rt`: Recursively updated via [`factory`](@ref).
-  - `rk`: Recursively updated via [`factory`](@ref).
+  - `rt`: Recursively updated through [`factory`](@ref).
+  - `rk`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -349,7 +349,7 @@ Computes the third central moment of the portfolio returns.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `mu`: A stated value is sliced to the selected indices via [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
+  - `mu`: A stated value is sliced to the selected indices through [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
 
 # Examples
 

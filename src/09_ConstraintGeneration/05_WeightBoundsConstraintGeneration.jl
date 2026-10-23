@@ -144,8 +144,8 @@ The constructor calls [`validate_bounds`](@ref) on the pair. The types of the pa
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `lb`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `ub`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 [`weight_bounds_constraints`](@ref) can expand a field to a constant `range`. [`port_opt_view`](@ref) slices that field like any other vector, and the slice is a view of the range.
 
@@ -226,8 +226,8 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `lb`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `ub`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `lb`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `ub`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 [`port_opt_view`](@ref) slices only a vector bound. A scalar, a `Dict`, a `Pair` or an algorithmic rule has no index by asset. The view keeps such a bound unchanged, and the bound resolves against the universe of the view when the estimator runs.
 

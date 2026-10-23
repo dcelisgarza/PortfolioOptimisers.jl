@@ -617,13 +617,13 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 
@@ -817,13 +817,13 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 

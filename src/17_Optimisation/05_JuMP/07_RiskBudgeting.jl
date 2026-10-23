@@ -301,9 +301,9 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `rkb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `alg`: Recursively viewed via [`port_opt_view`](@ref).
+  - `rkb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `alg`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Related
 
@@ -377,8 +377,8 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `re`: Loadings sliced to the selected assets via [`port_opt_view`](@ref).
-  - `sets`: Sliced via [`port_opt_view`](@ref), which subsets the **asset** axis and leaves the factor entries untouched. The field participates in views because it may carry both axes; `rkb` does not, because a factor budget has no asset index to slice by.
+  - `re`: Loadings sliced to the selected assets through [`port_opt_view`](@ref).
+  - `sets`: Sliced through [`port_opt_view`](@ref), which subsets the **asset** axis and leaves the factor entries untouched. The field participates in views because it may carry both axes; `rkb` does not, because a factor budget has no asset index to slice by.
 
 # Related
 
@@ -573,9 +573,9 @@ Where:
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `r`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `r`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 

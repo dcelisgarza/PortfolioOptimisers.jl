@@ -89,8 +89,8 @@ Keywords correspond to the struct's fields. `set`, `fees` and `fb` can hold a [`
 
 [`factory`](@ref) passes its arguments on to these fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref), which threads the previous weights into a turnover fee.
-  - `fb`: Recursively updated via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref), which threads the previous weights into a turnover fee.
+  - `fb`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 

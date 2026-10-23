@@ -56,7 +56,7 @@ The penalty carries no [`Fees`](@ref) of its own, so fee amortisation cannot rea
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 

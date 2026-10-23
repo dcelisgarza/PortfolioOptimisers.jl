@@ -315,11 +315,11 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `opti`: Recursively updated via [`factory`](@ref).
-  - `opto`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `opti`: Recursively updated through [`factory`](@ref).
+  - `opto`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 

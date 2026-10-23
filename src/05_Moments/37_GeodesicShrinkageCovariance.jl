@@ -418,8 +418,8 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
@@ -427,7 +427,7 @@ Keywords correspond to the struct's fields.
 
   - `ce` recurses through [`port_opt_view`](@ref) with every argument.
   - The view slices a matrix `tgt` on both axes, because it is an asset-by-asset matrix. It keeps a target rule unchanged, because [`shrinkage_target`](@ref) builds the target of a rule from the viewed matrix.
-  - `cache` is sliced to the selected assets via [`port_opt_view`](@ref).
+  - `cache` is sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

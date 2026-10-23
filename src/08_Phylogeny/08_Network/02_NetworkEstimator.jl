@@ -90,8 +90,8 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `de`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `de`: Recursively updated through [`factory`](@ref).
 
 # The separation lives here, not on the consumer
 
@@ -222,7 +222,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `nte`: Recursively updated via [`factory`](@ref).
+  - `nte`: Recursively updated through [`factory`](@ref).
 
 Both [`clusterise`](@ref) methods index their sums of powers by `nte.sep.n`. The separation budget comes from the network estimator, and this estimator does not state it again. For the same reason, `nte.sep` must be a [`HopCount`](@ref). The constructor accepts a [`PathLength`](@ref), but no [`clusterise`](@ref) method takes it.
 

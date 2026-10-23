@@ -26,13 +26,13 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `me`: Recursively updated via [`factory`](@ref).
+  - `me`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `me`: Recursively viewed via [`port_opt_view`](@ref).
+  - `me`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 

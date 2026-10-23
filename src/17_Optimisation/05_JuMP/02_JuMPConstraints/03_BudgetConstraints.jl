@@ -275,11 +275,11 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 
@@ -455,11 +455,11 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vp`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `vn`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `up`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `un`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vp`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `vn`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `up`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `un`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Related
 

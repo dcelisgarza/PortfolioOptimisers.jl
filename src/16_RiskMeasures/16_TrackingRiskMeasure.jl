@@ -265,7 +265,7 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
+  - `tr`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 

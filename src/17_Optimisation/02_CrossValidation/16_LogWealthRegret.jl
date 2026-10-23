@@ -790,8 +790,8 @@ Keywords correspond to the struct's fields. `L` and `slv` are required: a budget
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `wb`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `wb`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 

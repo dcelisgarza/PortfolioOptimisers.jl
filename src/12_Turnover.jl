@@ -41,8 +41,8 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -287,8 +287,8 @@ The constructor checks the rules in the order of this list, so its error names t
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 

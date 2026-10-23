@@ -121,7 +121,7 @@ Computes the median absolute deviation of the portfolio returns series.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `mu`: A stated value is sliced to the selected indices via [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
+  - `mu`: A stated value is sliced to the selected indices through [`port_opt_view`](@ref). A **Deferred Quantity** passes through unsliced, and then fits on the subset.
 
 # Examples
 

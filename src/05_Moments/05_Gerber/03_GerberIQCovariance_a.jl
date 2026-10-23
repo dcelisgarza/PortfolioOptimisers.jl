@@ -2030,19 +2030,19 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ve`: Recursively updated via [`factory`](@ref).
-  - `me`: Recursively updated via [`factory`](@ref).
-  - `decay`: Recursively updated via [`factory`](@ref).
-  - `alg`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
+  - `me`: Recursively updated through [`factory`](@ref).
+  - `decay`: Recursively updated through [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ve`: Recursively viewed via [`port_opt_view`](@ref).
-  - `me`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ve`: Recursively viewed through [`port_opt_view`](@ref).
+  - `me`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

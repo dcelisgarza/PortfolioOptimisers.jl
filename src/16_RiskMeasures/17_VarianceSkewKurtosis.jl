@@ -472,17 +472,17 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `vr`: Recursively updated via [`factory`](@ref).
-  - `sk`: Recursively updated via [`factory`](@ref).
-  - `kt`: Recursively updated via [`factory`](@ref).
+  - `vr`: Recursively updated through [`factory`](@ref).
+  - `sk`: Recursively updated through [`factory`](@ref).
+  - `kt`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `vr`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sk`: Recursively viewed via [`port_opt_view`](@ref).
-  - `kt`: Recursively viewed via [`port_opt_view`](@ref).
+  - `vr`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sk`: Recursively viewed through [`port_opt_view`](@ref).
+  - `kt`: Recursively viewed through [`port_opt_view`](@ref).
 
 # `JuMP` Formulation
 

@@ -113,7 +113,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ve`: Recursively updated via [`factory`](@ref).
+  - `ve`: Recursively updated through [`factory`](@ref).
 
 # Examples
 

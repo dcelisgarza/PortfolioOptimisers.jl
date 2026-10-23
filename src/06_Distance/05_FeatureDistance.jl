@@ -364,7 +364,7 @@ Keywords correspond to the struct's fields.
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -506,7 +506,7 @@ Keywords correspond to the struct's fields.
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -603,14 +603,14 @@ Keywords correspond to the struct's fields.
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
-  - `pair`: Recursively updated via [`factory`](@ref).
+  - `pair`: Recursively updated through [`factory`](@ref).
 
 ## Observation weight parameters
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
-  - `pair`: Recursively indexed via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
+  - `pair`: Recursively indexed through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -717,7 +717,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pair`: Recursively updated via [`factory`](@ref).
+  - `pair`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -828,8 +828,8 @@ Keywords correspond to the struct's fields. The constructor sets `sim` to [`defa
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
-  - `ape`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
+  - `ape`: Recursively updated through [`factory`](@ref).
 
 # Examples
 

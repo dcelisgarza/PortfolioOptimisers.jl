@@ -22,15 +22,15 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `ce`: Recursively viewed via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `ce`: Recursively viewed through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 # Examples
 

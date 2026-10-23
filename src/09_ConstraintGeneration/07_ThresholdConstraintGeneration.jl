@@ -32,7 +32,7 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 [`port_opt_view`](@ref) slices only a vector `val`. A scalar, a `Dict`, a `Pair` or an algorithmic rule has no asset index. The view keeps such a `val` unchanged, and the estimator resolves it against the universe of the view.
 
@@ -175,7 +175,7 @@ Both constructors run the same check, because the positional form is the inner c
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 

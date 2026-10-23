@@ -62,24 +62,24 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `pe`: Recursively updated via [`factory`](@ref).
+  - `pe`: Recursively updated through [`factory`](@ref).
   - `w`: Replaced with the incoming [`ObsWeights`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `pe`: Recursively viewed via [`port_opt_view`](@ref).
-  - `sets`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `cache`: Sliced to the selected assets via [`port_opt_view`](@ref).
+  - `pe`: Recursively viewed through [`port_opt_view`](@ref).
+  - `sets`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `cache`: Sliced to the selected assets through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `pe`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `pe`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # View comparison operators
 

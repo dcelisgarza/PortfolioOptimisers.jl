@@ -616,7 +616,7 @@ The type gains **no** scalariser: the return axis sums and never scalarises.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `rt`: Recursively updated via [`factory`](@ref).
+  - `rt`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -758,8 +758,8 @@ The field beats a caller's `sca` keyword. A `sca` passed at the call site flows 
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `rt`: Recursively updated via [`factory`](@ref).
-  - `rk`: Recursively updated via [`factory`](@ref).
+  - `rt`: Recursively updated through [`factory`](@ref).
+  - `rk`: Recursively updated through [`factory`](@ref).
 
 # Examples
 

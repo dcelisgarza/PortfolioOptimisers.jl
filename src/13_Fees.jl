@@ -126,15 +126,15 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `tn`: Recursively updated via [`factory`](@ref).
-  - `lq`: Recursively updated via [`factory`](@ref).
-  - `flq`: Recursively updated via [`factory`](@ref).
+  - `tn`: Recursively updated through [`factory`](@ref).
+  - `lq`: Recursively updated through [`factory`](@ref).
+  - `flq`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 This type spans two axes, so this file defines [`port_opt_view`](@ref) for it by hand rather than generating the method from `@vprop` tags, and no field carries such a tag. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so the view slices them to the selected indices. `lq` and `flq` price the positions the portfolio must sell, so the view slices them to the complement of those indices. The verb derives that complement from the width of the unreduced returns matrix it receives:
 
-  - `tn`: Recursively viewed at the selected indices via [`port_opt_view`](@ref).
+  - `tn`: Recursively viewed at the selected indices through [`port_opt_view`](@ref).
   - `l`: Sliced to the selected indices.
   - `s`: Sliced to the selected indices.
   - `fl`: Sliced to the selected indices.
@@ -433,15 +433,15 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `tn`: Recursively updated via [`factory`](@ref).
-  - `lq`: Recursively updated via [`factory`](@ref).
-  - `flq`: Recursively updated via [`factory`](@ref).
+  - `tn`: Recursively updated through [`factory`](@ref).
+  - `lq`: Recursively updated through [`factory`](@ref).
+  - `flq`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 This type spans two axes, so this file defines [`port_opt_view`](@ref) for it by hand rather than generating the method from `@vprop` tags, and no field carries such a tag. `tn`, `l`, `s`, `fl` and `fs` price the positions the portfolio holds, so the view slices them to the selected indices. `lq` and `flq` price the positions the portfolio must sell, so the view slices them to the complement of those indices. The verb derives that complement from the width of the unreduced returns matrix it receives:
 
-  - `tn`: Recursively viewed at the selected indices via [`port_opt_view`](@ref).
+  - `tn`: Recursively viewed at the selected indices through [`port_opt_view`](@ref).
   - `l`: Sliced to the selected indices.
   - `s`: Sliced to the selected indices.
   - `fl`: Sliced to the selected indices.

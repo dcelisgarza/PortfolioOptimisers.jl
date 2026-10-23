@@ -64,12 +64,12 @@ Keywords correspond to the struct's fields. The default is the empty seed that [
 
 [`port_opt_view`](@ref) takes the view of its fields at the selected assets:
 
-  - `X`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `A`: Sliced to the selected indices via [`port_opt_view`](@ref).
-  - `M`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `X`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `A`: Sliced to the selected indices through [`port_opt_view`](@ref).
+  - `M`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `F`: Copied unchanged, because the selection indexes assets and this backing describes factors.
   - `ne`, `E`: Copied unchanged, because the selection indexes assets and the Exogenous Series belongs to no asset.
-  - `iv`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `iv`: Sliced to the selected indices through [`port_opt_view`](@ref).
   - `ivpa`: Sliced to the selected indices when it is a vector, and kept when it is one number or `nothing`.
   - `P`: Each Panel Field viewed over the selected assets with [`panel_fields_view`](@ref).
   - `G`: Copied unchanged, because the selection indexes assets and a Shared Series gap belongs to the observation.

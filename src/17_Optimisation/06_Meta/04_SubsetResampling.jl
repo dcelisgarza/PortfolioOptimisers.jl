@@ -331,10 +331,10 @@ The loop inside `SubsetResampling` is over asset subsets, not over time folds. N
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `fees`: Recursively updated via [`factory`](@ref).
-  - `opt`: Recursively updated via [`factory`](@ref).
-  - `fb`: Recursively updated via [`factory`](@ref).
-  - `cache`: Carried unchanged via [`factory`](@ref).
+  - `fees`: Recursively updated through [`factory`](@ref).
+  - `opt`: Recursively updated through [`factory`](@ref).
+  - `fb`: Recursively updated through [`factory`](@ref).
+  - `cache`: Carried unchanged through [`factory`](@ref).
 
 ## View parameters
 

@@ -59,15 +59,15 @@ outer `settings`-controlled expression.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `loss`: Recursively updated via [`factory`](@ref).
-  - `gain`: Recursively updated via [`factory`](@ref).
+  - `loss`: Recursively updated through [`factory`](@ref).
+  - `gain`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `loss`: Recursively viewed via [`port_opt_view`](@ref).
-  - `gain`: Recursively viewed via [`port_opt_view`](@ref).
+  - `loss`: Recursively viewed through [`port_opt_view`](@ref).
+  - `gain`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Functor
 

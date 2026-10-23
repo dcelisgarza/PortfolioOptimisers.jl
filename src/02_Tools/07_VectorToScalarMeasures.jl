@@ -142,7 +142,7 @@ Keywords correspond to the struct's fields.
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -223,7 +223,7 @@ Keywords correspond to the struct's fields.
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -342,7 +342,7 @@ Keywords correspond to the struct's fields.
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 
@@ -437,7 +437,7 @@ Keywords correspond to the struct's fields.
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `w`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `w`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 

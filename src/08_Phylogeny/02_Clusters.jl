@@ -322,7 +322,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -434,7 +434,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -514,7 +514,7 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `alg`: Recursively updated via [`factory`](@ref).
+  - `alg`: Recursively updated through [`factory`](@ref).
 
 # Examples
 
@@ -677,8 +677,8 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `ce`: Recursively updated via [`factory`](@ref).
-  - `de`: Recursively updated via [`factory`](@ref).
+  - `ce`: Recursively updated through [`factory`](@ref).
+  - `de`: Recursively updated through [`factory`](@ref).
 
 # Examples
 

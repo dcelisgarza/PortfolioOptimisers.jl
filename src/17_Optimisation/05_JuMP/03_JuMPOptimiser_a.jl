@@ -923,7 +923,7 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
-Return a copy of `opt` with all weight-tracking estimator fields updated via `factory` for the new weights `w`.
+Return a copy of `opt` with all weight-tracking estimator fields updated through `factory` for the new weights `w`.
 
 Updates turnover, fees, tracking error, custom constraint, and custom objective fields;
 all other fields are carried through unchanged.

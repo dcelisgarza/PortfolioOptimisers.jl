@@ -68,7 +68,7 @@ A scalar `val` is a valid input. A scalar [`RiskBudgetEstimator`](@ref) resolves
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `val`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `val`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 

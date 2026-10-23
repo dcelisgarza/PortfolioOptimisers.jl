@@ -401,16 +401,16 @@ A field may carry any combination (`@fprop @vprop field`, in either order) — t
 `## Propagated parameters` — the **factory** channel, gated on `@fprop` and `@wprop`. Lists each field and how it is propagated:
 
 - **Observation-weight fields** (`@wprop`; type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
-- **Estimator, algorithm, or result fields** (`@fprop`; subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated via [`factory`](@ref). ``
-- **The partial-fit state** (`@fprop cache`; `Option{<:AbstractPartialFitState}`): write `` `cache`: Carried unchanged via [`factory`](@ref). ``
+- **Estimator, algorithm, or result fields** (`@fprop`; subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated through [`factory`](@ref). ``
+- **The partial-fit state** (`@fprop cache`; `Option{<:AbstractPartialFitState}`): write `` `cache`: Carried unchanged through [`factory`](@ref). ``
 
 `## View parameters` — the **view** channel. Write it when the type has a [`port_opt_view`](@ref) method, whether [`@propagatable`](@ref) generates that method from a `@vprop` tag or the file defines one by hand. The two cases carry different content.
 
 **A generated method** — at least one field carries `@vprop`. List each tagged field and how it is viewed:
 
-- **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed via [`port_opt_view`](@ref). ``
-- **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices via [`port_opt_view`](@ref). ``
-- **The partial-fit state** (`@vprop cache`): write `` `cache`: Sliced to the selected assets via [`port_opt_view`](@ref). ``
+- **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed through [`port_opt_view`](@ref). ``
+- **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices through [`port_opt_view`](@ref). ``
+- **The partial-fit state** (`@vprop cache`): write `` `cache`: Sliced to the selected assets through [`port_opt_view`](@ref). ``
 
 **A hand-written method** — no field carries `@vprop`, and the file defines `port_opt_view(x::MyType, i, args...)`. A field list misdescribes such a method: it reads arguments no tag can name, and it applies rules no tag can encode. Open the subsection with
 
@@ -428,8 +428,8 @@ Describe the method, do not transcribe it. A field carried through with nothing 
 
 `## Observation weight parameters` — the **observation** channel, gated on `@wprop` alone. A type with no `@wprop` field never gains this subsection, whatever else it carries. Lists each field and how it is indexed:
 
-- **Observation-weight fields** (`@wprop`): write `` `fieldname`: Indexed to the selected observations via [`obs_weights_view`](@ref). ``
-- **Estimator, algorithm, or result fields** (`@fprop`): write `` `fieldname`: Recursively indexed via [`obs_weights_view`](@ref). ``
+- **Observation-weight fields** (`@wprop`): write `` `fieldname`: Indexed to the selected observations through [`obs_weights_view`](@ref). ``
+- **Estimator, algorithm, or result fields** (`@fprop`): write `` `fieldname`: Recursively indexed through [`obs_weights_view`](@ref). ``
 
 > **The same field appears in two subsections, saying two different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. That is not a duplication to collapse: it is the one place a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling appears in both too, and recurses in both.
 
@@ -465,21 +465,21 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `nested_est`: Recursively updated via [`factory`](@ref).
+  - `nested_est`: Recursively updated through [`factory`](@ref).
   - `weight_field`: Replaced with the incoming [`ObsWeights`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `nested_est`: Recursively viewed via [`port_opt_view`](@ref).
+  - `nested_est`: Recursively viewed through [`port_opt_view`](@ref).
 
 ## Observation weight parameters
 
 [`obs_weights_view`](@ref) indexes these fields to the selected observations:
 
-  - `nested_est`: Recursively indexed via [`obs_weights_view`](@ref).
-  - `weight_field`: Indexed to the selected observations via [`obs_weights_view`](@ref).
+  - `nested_est`: Recursively indexed through [`obs_weights_view`](@ref).
+  - `weight_field`: Indexed to the selected observations through [`obs_weights_view`](@ref).
 
 # Examples
 

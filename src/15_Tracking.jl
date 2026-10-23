@@ -247,8 +247,8 @@ Keywords correspond to the struct's fields.
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `fees`: Recursively viewed via [`port_opt_view`](@ref).
-  - `w`: Sliced to the selected indices via [`port_opt_view`](@ref).
+  - `fees`: Recursively viewed through [`port_opt_view`](@ref).
+  - `w`: Sliced to the selected indices through [`port_opt_view`](@ref).
 
 # Examples
 
@@ -888,13 +888,13 @@ Keywords correspond to the struct's fields.
 
 [`factory`](@ref) passes its arguments on to these `@fprop` fields:
 
-  - `tr`: Recursively updated via [`factory`](@ref).
+  - `tr`: Recursively updated through [`factory`](@ref).
 
 ## View parameters
 
 [`port_opt_view`](@ref) takes the view of these `@vprop` fields at the selected indices:
 
-  - `tr`: Recursively viewed via [`port_opt_view`](@ref).
+  - `tr`: Recursively viewed through [`port_opt_view`](@ref).
 
 # Examples
 
