@@ -690,3 +690,68 @@ end
                             opt = JuMPOptimiser(; pe = pr, slv = slv)); save = true)
     @test !haskey(res.model, :lift_W)
 end
+@testset "Kurtosis: every formulation reaches the fourth moment, and each bound holds" begin
+    # Issue #1465. The returns are of unit size: at the size of a daily return the fourth
+    # moment is about 1e-9, below the tolerance of the solver, and the lift stays far from
+    # rank one.
+    Xk = randn(StableRNG(123), 200, 4) .+ 0.05
+    rdk = ReturnsResult(; nx = string.(1:4), X = Xk)
+    prk = prior(HighOrderPriorEstimator(), rdk)
+    slvk = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                  check_sol = (; allow_local = true, allow_almost = true),
+                  settings = Dict("verbose" => false))
+    m4(w) = mean(((Xk .- mean(Xk; dims = 1)) * w) .^ 4)
+    function kurt(r; obj = MinimumRisk(), pe = prk)
+        return optimise(MeanRisk(; r = r, obj = obj,
+                                 opt = JuMPOptimiser(; pe = pe, slv = slvk)), rdk)
+    end
+    # The spectrum is real, and its forms sum to the cokurtosis matrix and to the moment.
+    vals, vecs = PortfolioOptimisers.cokurtosis_spectrum(prk.kt, 4)
+    @test eltype(vals) <: Real && all(>=(0), vals)
+    Bs = [reshape(sqrt(vals[i]) * vecs[:, i], 4, 4) for i in eachindex(vals)]
+    @test isapprox(sum(B -> kron(B, B), Bs), prk.kt; rtol = 1e-12)
+    wt = fill(0.25, 4)
+    @test isapprox(sum(B -> (wt' * B * wt)^2, Bs), m4(wt); rtol = 1e-12)
+    # At the minimum every formulation gives the same weights. The risk is the square root of
+    # the fourth moment under SOCRiskExpr, and the fourth moment under the other three. The
+    # moment is flat at its minimum, so the weights agree to the solver's tolerance only.
+    ref = kurt(Kurtosis())
+    for N in (nothing, 4),
+        alg2 in (SOCRiskExpr(), SquaredSOCRiskExpr(), QuadRiskExpr(), RSOCRiskExpr())
+
+        res = kurt(Kurtosis(; N = N, alg2 = alg2))
+        @test isa(res.retcode, OptimisationSuccess)
+        @test isapprox(res.w, ref.w; atol = 1e-4)
+        rk = isa(alg2, SOCRiskExpr) ? sqrt(m4(res.w)) : m4(res.w)
+        @test isapprox(JuMP.objective_value(res.model), rk; rtol = 1e-6)
+    end
+    # The rotated cone registers its epigraph variable, and the risk expression is that
+    # variable, not the cone row.
+    res = kurt(Kurtosis(; alg2 = RSOCRiskExpr()))
+    @test haskey(res.model, :tkurtosis_risk_1) && haskey(res.model, :ckurtosis_rsoc_1)
+    @test isapprox(JuMP.value(res.model[:tkurtosis_risk_1]), m4(res.w); rtol = 1e-6)
+    # The approximate formulation adds real rows only.
+    res = kurt(Kurtosis(; N = 2))
+    @test eltype(res.model[:vals_Akt]) <: Real
+    @test all(T -> T[2] != JuMP.MOI.EqualTo{ComplexF64},
+              JuMP.list_of_constraint_types(res.model))
+    # A measure's own matrix builds the same programme under a low-order prior.
+    res = kurt(Kurtosis(; N = 4, kt = prk.kt); pe = EmpiricalPrior())
+    @test isapprox(res.w, ref.w; atol = 1e-4)
+    # The bound acts on the square root of the fourth moment under SOCRiskExpr, and on the
+    # fourth moment under the other three. It is exact under both objectives.
+    for obj in (MaximumReturn(), MaximumRatio()), N in (nothing, 4),
+        (alg2, ub) in
+        ((SOCRiskExpr(), 0.4), (SquaredSOCRiskExpr(), 0.16), (QuadRiskExpr(), 0.16),
+         (RSOCRiskExpr(), 0.16))
+
+        res = kurt(Kurtosis(; N = N, alg2 = alg2,
+                            settings = RiskMeasureSettings(; ub = ub)); obj = obj)
+        @test isapprox(sqrt(m4(res.w)), 0.4; rtol = 1e-6)
+    end
+    # With fewer forms than the rank of the matrix, the bound holds the truncated sum, and the
+    # fourth moment of the weights exceeds it.
+    res = kurt(Kurtosis(; N = 1, settings = RiskMeasureSettings(; ub = 0.4));
+               obj = MaximumReturn())
+    @test sqrt(m4(res.w)) > 0.5
+end

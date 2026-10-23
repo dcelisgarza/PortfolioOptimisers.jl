@@ -10,3 +10,10 @@ The methods below are public. The other names of this topic are private, and the
 set_risk_constraints!(model::JuMP.Model, i::Any, r::Kurtosis{<:Any, <:Any, <:Any, <:Any, <:Integer, <:Any, <:Any}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 set_risk_constraints!(model::JuMP.Model, i::Any, r::Kurtosis{<:Any, <:Any, <:Any, <:Any, Nothing, <:Any, <:Any}, opt::RiskConstraintOwner, pr::AbstractPriorResult, args...; kwargs...)
 ```
+
+## References
+
+```@bibliography
+Pages = [@__FILE__]
+Canonical = false
+```
