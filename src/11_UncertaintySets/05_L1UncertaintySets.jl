@@ -1,9 +1,9 @@
 """
 $(DocStringExtensions.TYPEDEF)
 
-Calibrates the ``\\ell_1`` uncertainty radius to a target number of active assets.
+Calibrates the radius of an ``\\ell_1`` uncertainty set to a target number of active assets.
 
-The radius ``\\epsilon`` of an ``\\ell_1`` uncertainty set has no natural scale — it is a sum of characteristic differences, so on daily returns it is of order ``10^{-3}``, and on annualised returns roughly ``250`` times larger. This algorithm converts the quantity a caller *can* reason about (how many assets should the portfolio hold?) into the radius that produces it, by inverting the closed forms of [quintile](@cite). The inversion is exact, and **only for the bare problem** those closed forms assume: the budget and sign constraints, and nothing else.
+The radius ``\\epsilon`` of an ``\\ell_1`` uncertainty set has no natural scale. It is a sum of differences of the characteristic. On daily returns it is of order ``10^{-3}``, and on annualised returns it is about ``250`` times larger. A caller can state a number of assets to hold more easily than a radius. This algorithm finds the radius that activates that number of assets, from the inverse of the closed forms of [quintile](@cite). The inverse is exact only for the problem of those closed forms, which has the budget and sign constraints and no other constraint.
 
 # Fields
 
@@ -22,7 +22,7 @@ Keywords correspond to the struct's fields.
   - If `active` is an `Integer`: `active >= 1`.
   - If `active` is an `AbstractFloat`: `0 < active < 1`.
 
-The type of `active` decides which rule applies, so the boundary is sharp: `active = 1` is a count of one asset and is accepted, while `active = 1.0` is the whole universe as a fraction and is rejected.
+The type of `active` selects the rule. The constructor accepts `active = 1`, a count of one asset. It throws a `DomainError` on `active = 1.0`, a fraction equal to the whole universe.
 
 # Examples
 
@@ -39,7 +39,7 @@ ActiveAssetsUncertaintyAlgorithm
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`CharacteristicUncertaintySet`](@ref)
   - [`l1_resolve_eps`](@ref): the function that reads this algorithm and returns the radius.
-  - [`JuMPOptimiser`](@ref): its `card` field bounds the number of holdings outright. Adding weight bounds, cardinality or linear constraints may move the realised count away from the one calibrated here, and this algorithm neither knows nor checks.
+  - [`JuMPOptimiser`](@ref): its `card` field sets a hard limit on the number of assets held. A weight bound, a cardinality constraint or a linear constraint can make the number of active assets differ from the target of this algorithm. This algorithm does not check the number.
 
 # References
 
@@ -69,13 +69,13 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-``\\ell_1`` (cross-polytope) uncertainty set on the characteristic vector.
+``\\ell_1`` uncertainty set on the characteristic vector, a cross-polytope around the estimate.
 
-The set is ``\\mathcal{S} = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\lVert \\boldsymbol{e} \\oslash \\boldsymbol{\\sigma} \\rVert_1 \\leq \\epsilon\\}``, with a single error budget shared across every asset and both signs. Produced by [`CharacteristicUncertaintySet`](@ref) and consumed by [`ArithmeticReturn`](@ref). It bounds a *mean/characteristic* vector alone, and has no covariance analogue.
+The set is ``\\mathcal{S} = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\lVert \\boldsymbol{e} \\oslash \\boldsymbol{\\sigma} \\rVert_1 \\leq \\epsilon\\}``. One error budget covers every asset and both signs. [`CharacteristicUncertaintySet`](@ref) fits the set, and [`ArithmeticReturn`](@ref) reads it. The set bounds a characteristic vector, such as the mean, and it has no covariance analogue.
 
 # Mathematical definition
 
-The worst case of a linear characteristic over the set collapses to a scaled infinity norm (Lemmas 1 and 8 of [quintile](@cite)):
+The worst case of a linear characteristic over the set is the estimate less a scaled infinity norm. Lemmas 1 and 8 of [quintile](@cite) state it:
 
 ```math
 \\underset{\\boldsymbol{\\mu} \\in \\mathcal{S}}{\\min}\\, \\boldsymbol{\\mu}^{\\intercal} \\boldsymbol{w} = \\hat{\\boldsymbol{\\mu}}^{\\intercal} \\boldsymbol{w} - \\epsilon \\lVert \\boldsymbol{\\sigma} \\odot \\boldsymbol{w} \\rVert_{\\infty}\\,.
@@ -85,10 +85,10 @@ Where:
 
   - ``\\hat{\\boldsymbol{\\mu}}``: Estimated characteristic vector.
   - ``\\epsilon``: Radius of the set.
-  - ``\\boldsymbol{\\sigma}``: Per-asset scaling (`sd`); ``\\boldsymbol{1}`` when `sd` is `nothing`.
+  - ``\\boldsymbol{\\sigma}``: Scaling of each asset, the `sd` field. It is ``\\boldsymbol{1}`` when `sd` is `nothing`.
   - ``\\odot``, ``\\oslash``: Element-wise product and division.
 
-Because the right-hand side is concave and positively homogeneous, this is an LP once the infinity norm is epigraphed — no conic solver is needed.
+The right-hand side is concave in ``\\boldsymbol{w}``. With an epigraph variable for the infinity norm, the worst case is a set of linear constraints, and the problem needs no conic solver.
 
 # Fields
 
@@ -107,9 +107,9 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `isfinite(eps)` and `eps >= 0`.
-  - If `sd` is provided: `!isempty(sd)` and `all(sd .> 0)`.
-  - If `mu` is provided: `!isempty(mu)` and `all(isfinite, mu)`.
-  - If both `sd` and `mu` are provided: `length(mu) == length(sd)`.
+  - If `sd` is not `nothing`: `!isempty(sd)` and `all(sd .> 0)`.
+  - If `mu` is not `nothing`: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If `sd` and `mu` are not `nothing`: `length(mu) == length(sd)`.
 
 # Examples
 
@@ -124,10 +124,10 @@ L1UncertaintySet
 # Related
 
   - [`SignedL1UncertaintySet`](@ref)
-  - [`CharacteristicUncertaintySet`](@ref): the estimator that fits this set. It is mean-only, so [`sigma_ucs`](@ref) is not defined for it.
+  - [`CharacteristicUncertaintySet`](@ref): the estimator that fits this set. It fits a set on the mean only, and [`sigma_ucs`](@ref) throws an `ArgumentError` on it.
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`AbstractUncertaintySetResult`](@ref)
-  - [`mu_ucs`](@ref): a set it builds carries in `mu` the characteristic vector its radius was calibrated on, so the consumer bounds that vector and not an unrelated one.
+  - [`mu_ucs`](@ref): a set that it fits holds, in `mu`, the characteristic vector that the Radius Calibration read. The consumer then bounds that vector and no other.
   - [`port_opt_view`](@ref)
 
 # References
@@ -179,19 +179,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of an [`L1UncertaintySet`](@ref) restricted to the asset indices `i`.
 
-The radius is a scalar budget shared across the universe, so it passes through unchanged; the per-asset scaling and the carried characteristic are sliced. The slice preserves the order of `i`, so the restricted set indexes the assets in the order the optimiser hands it.
+The radius is one scalar budget for the universe, and the view keeps it unchanged. The view takes the entries of `sd` and `mu` at `i`, in the order of `i`. The restricted set then indexes the assets in the order that the optimiser gives.
 
 # Algorithm
 
- 1. Take `nothing_scalar_array_view(risk_ucs.sd, i)`, the per-asset scaling restricted to the selected assets, which passes a `nothing` through unchanged.
- 2. Take `nothing_scalar_array_view(risk_ucs.mu, i)`, the carried characteristic restricted to the same assets, which passes a `nothing` through unchanged.
- 3. Build an [`L1UncertaintySet`](@ref) from `risk_ucs.eps` and the two views. The radius is not rescaled, because it budgets the total error across whichever assets the set covers.
+ 1. Take `nothing_scalar_array_view(risk_ucs.sd, i)`, the scaling of the selected assets. A `nothing` stays `nothing`.
+ 2. Take `nothing_scalar_array_view(risk_ucs.mu, i)`, the characteristic vector of the same assets. A `nothing` stays `nothing`.
+ 3. Build an [`L1UncertaintySet`](@ref) from `risk_ucs.eps` and the two views. The step does not rescale the radius, because the radius is the budget for the total error over the assets that the set covers.
 
 # Arguments
 
   - `risk_ucs`: ``\\ell_1`` uncertainty set.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional positional arguments (ignored).
+  - `i`: Index of the cluster or of the assets.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -224,7 +224,7 @@ $(DocStringExtensions.TYPEDEF)
 
 Signed ``\\ell_1`` uncertainty set on the characteristic vector, with a separate error budget per sign.
 
-The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a *mean/characteristic* vector alone, and has no covariance analogue. [quintile](@cite) introduces it in order to *decouple* the long-short problem into two independent problems, Equations 27 and 28 of [quintile](@cite). Remark 12 of [quintile](@cite) then recombines them only when the two legs happen to have disjoint support. The worst case below models the coupled problem directly, so that caveat does not arise.
+The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a characteristic vector, such as the mean, and it has no covariance analogue. [quintile](@cite) uses the set to split the long-short problem into two independent problems, its Equations 27 and 28. Its Remark 12 joins the two solutions only when the two legs have disjoint supports. The worst case below keeps the long-short problem as one problem, so it needs no condition on the supports.
 
 # Mathematical definition
 
@@ -234,12 +234,12 @@ The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \
 
 Where:
 
-  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive- and negative-error sides (`ep`, `en`).
+  - ``\\epsilon_{+}``, ``\\epsilon_{-}``: Radii of the positive-error and the negative-error sides, the `ep` and `en` fields.
   - ``[\\cdot]_{+}``, ``[\\cdot]_{-}``: Element-wise positive and negative parts.
 
-Still concave and LP-representable, with one epigraph variable per sign.
+The worst case is concave. With one epigraph variable for each sign, it is a set of linear constraints.
 
-Setting ``\\epsilon_{+} = \\epsilon_{-}`` does not recover ``\\mathcal{S}``: the joint set shares one budget across both signs, giving ``\\max(t_{+}, t_{-})``, whereas this one spends a budget per sign, giving ``\\epsilon_{+} t_{+} + \\epsilon_{-} t_{-}``. The two worst cases agree only when ``\\boldsymbol{w}`` is single-signed.
+With ``\\epsilon_{+} = \\epsilon_{-} = \\epsilon``, this set is not ``\\mathcal{S}``. Let ``t_{+}`` and ``t_{-}`` be the two positive parts above. The joint set has one budget for both signs, and its penalty is ``\\epsilon \\max(t_{+}, t_{-})``. This set has one budget for each sign, and its penalty is ``\\epsilon_{+} t_{+} + \\epsilon_{-} t_{-}``. The two worst cases agree only when all the entries of ``\\boldsymbol{w}`` have the same sign.
 
 # Fields
 
@@ -260,9 +260,9 @@ Keywords correspond to the struct's fields.
 
   - `isfinite(ep)` and `ep >= 0`.
   - `isfinite(en)` and `en >= 0`.
-  - If `sd` is provided: `!isempty(sd)` and `all(sd .> 0)`.
-  - If `mu` is provided: `!isempty(mu)` and `all(isfinite, mu)`.
-  - If both `sd` and `mu` are provided: `length(mu) == length(sd)`.
+  - If `sd` is not `nothing`: `!isempty(sd)` and `all(sd .> 0)`.
+  - If `mu` is not `nothing`: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If `sd` and `mu` are not `nothing`: `length(mu) == length(sd)`.
 
 # Examples
 
@@ -277,10 +277,10 @@ SignedL1UncertaintySet
 
 # Related
 
-  - [`L1UncertaintySet`](@ref): the joint set. Under a long-only budget the weights are single-signed, the two worst cases coincide, and the joint set is the simpler choice.
+  - [`L1UncertaintySet`](@ref): the joint set. Under a long-only budget all the weights have the same sign, and the two worst cases agree. The joint set is then the simpler choice.
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
-  - [`CharacteristicUncertaintySet`](@ref): the estimator that fits this set. It is mean-only, so [`sigma_ucs`](@ref) is not defined for it.
-  - [`mu_ucs`](@ref): a set it builds carries in `mu` the characteristic vector its radii were calibrated on, so the consumer bounds that vector and not an unrelated one.
+  - [`CharacteristicUncertaintySet`](@ref): the estimator that fits this set. It fits a set on the mean only, and [`sigma_ucs`](@ref) throws an `ArgumentError` on it.
+  - [`mu_ucs`](@ref): a set that it fits holds, in `mu`, the characteristic vector that the Radius Calibration of the two radii read. The consumer then bounds that vector and no other.
   - [`AbstractUncertaintySetResult`](@ref)
   - [`port_opt_view`](@ref)
 
@@ -341,19 +341,19 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Return a view of a [`SignedL1UncertaintySet`](@ref) restricted to the asset indices `i`.
 
-Both radii are scalar budgets shared across the universe, so they pass through unchanged; the per-asset scaling and the carried characteristic are sliced. The slice preserves the order of `i`, so the restricted set indexes the assets in the order the optimiser hands it.
+The two radii are scalar budgets for the universe, and the view keeps them unchanged. The view takes the entries of `sd` and `mu` at `i`, in the order of `i`. The restricted set then indexes the assets in the order that the optimiser gives.
 
 # Algorithm
 
- 1. Take `nothing_scalar_array_view(risk_ucs.sd, i)`, the per-asset scaling restricted to the selected assets, which passes a `nothing` through unchanged.
- 2. Take `nothing_scalar_array_view(risk_ucs.mu, i)`, the carried characteristic restricted to the same assets, which passes a `nothing` through unchanged.
- 3. Build a [`SignedL1UncertaintySet`](@ref) from `risk_ucs.ep`, `risk_ucs.en` and the two views. Neither radius is rescaled, because each budgets the total error of its own sign across whichever assets the set covers.
+ 1. Take `nothing_scalar_array_view(risk_ucs.sd, i)`, the scaling of the selected assets. A `nothing` stays `nothing`.
+ 2. Take `nothing_scalar_array_view(risk_ucs.mu, i)`, the characteristic vector of the same assets. A `nothing` stays `nothing`.
+ 3. Build a [`SignedL1UncertaintySet`](@ref) from `risk_ucs.ep`, `risk_ucs.en` and the two views. The step rescales neither radius, because each radius is the budget for the total error of its sign over the assets that the set covers.
 
 # Arguments
 
   - `risk_ucs`: Signed ``\\ell_1`` uncertainty set.
-  - `i`: Cluster or asset index.
-  - `args...`: Additional positional arguments (ignored).
+  - `i`: Index of the cluster or of the assets.
+  - `args...`: More positional arguments, which the method ignores.
 
 # Returns
 
@@ -386,9 +386,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shape algorithm selecting a joint ``\\ell_1`` uncertainty set.
+Shape algorithm that selects the joint ``\\ell_1`` uncertainty set.
 
-`scaled` picks between the two sets of [quintile](@cite). `false` gives ``\\mathcal{S}`` of Equation 5 of [quintile](@cite), and `true` gives ``\\mathcal{A}_1`` of Equation 18 of [quintile](@cite). It defaults to `false` because ``\\mathcal{S}`` is the base construction of [quintile](@cite), the one whose closed forms give the ``1/N`` and quintile portfolios. [`SignedL1UncertaintySetAlgorithm`](@ref) defaults the other way, because [quintile](@cite) defines its set only in the scaled form.
+`scaled` selects one of two sets of [quintile](@cite). `false` gives ``\\mathcal{S}``, Equation 5 of [quintile](@cite), and `true` gives ``\\mathcal{A}_1``, its Equation 18. The default is `false`, because ``\\mathcal{S}`` is the base set of [quintile](@cite). Its closed forms give the ``1/N`` portfolio and the quintile portfolio. The default of [`SignedL1UncertaintySetAlgorithm`](@ref) is `true`, because [quintile](@cite) defines the signed set only in the scaled form.
 
 # Fields
 
@@ -442,7 +442,7 @@ L1UncertaintySetAlgorithm
     """
     scaled
     """
-    `paired`: Which closed form calibrates the radius when `method` is an [`AbstractUncertaintyEpsAlgorithm`](@ref). The number of assets a radius activates depends on the sign structure of the problem it is used in, which an uncertainty set cannot observe, so the caller must say. `false` takes the long-only ladder, for a problem with `w >= 0` and `bgt = 1` (Corollaries 4 and 11 of [quintile](@cite)). `true` takes the paired ladder, for a dollar-neutral problem with `bgt = 0` and `sbgt = 1/2`, where assets activate in long/short pairs (Corollary 7). Using the wrong one mis-calibrates the radius; it does not make the optimisation incorrect. Inert when `method` is a number.
+    `paired`: Selects the closed form that calibrates the radius when `method` is an [`AbstractUncertaintyEpsAlgorithm`](@ref). The number of assets that a radius activates depends on the signs that the problem lets the weights take. An uncertainty set cannot read the problem, so the caller must state it. `false` selects the long-only ladder, for a problem with `w >= 0` and `bgt = 1`, as in Corollaries 4 and 11 of [quintile](@cite). `true` selects the paired ladder, for a dollar-neutral problem with `bgt = 0` and `sbgt = 1/2`. In that problem the assets become active in pairs of one long asset and one short asset, as in Corollary 7. The wrong value gives a wrong radius, but the optimisation stays correct. `paired` has no effect when `method` is a number.
     """
     paired
     function L1UncertaintySetAlgorithm(method::Num_UcSEps, scaled::Bool, paired::Bool)
@@ -462,9 +462,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Shape algorithm selecting a signed ``\\ell_1`` uncertainty set.
+Shape algorithm that selects the signed ``\\ell_1`` uncertainty set.
 
-The two ladders are fixed by the construction of [quintile](@cite) and need no `paired` flag: ``\\epsilon_{-}`` governs the long leg and is calibrated against the top of the ranking, ``\\epsilon_{+}`` governs the short leg and is calibrated against the bottom, as Corollary 13 of [quintile](@cite) states. `scaled` defaults to `true` because [quintile](@cite) defines ``\\mathcal{A}_2`` only in the volatility-scaled form, and states Corollary 13 in that form alone. [`L1UncertaintySetAlgorithm`](@ref) defaults the other way, because its base set carries no scaling.
+The construction of [quintile](@cite) sets the two ladders, so this algorithm has no `paired` field. ``\\epsilon_{-}`` is the radius for the long leg, and its calibration reads the top of the ranking. ``\\epsilon_{+}`` is the radius for the short leg, and its calibration reads the bottom of the ranking. Corollary 13 of [quintile](@cite) states this. The default of `scaled` is `true`, because [quintile](@cite) defines ``\\mathcal{A}_2`` and states Corollary 13 only in the form scaled by volatility. The default of [`L1UncertaintySetAlgorithm`](@ref) is `false`, because its base set has no scaling.
 
 # Fields
 
@@ -482,7 +482,8 @@ Keywords correspond to the struct's fields.
 
 ## Validation
 
-  - If `mp`/`mm` is a `Number`: `isfinite` and `>= 0`.
+  - If `mp` is a `Number`: `isfinite(mp)` and `mp >= 0`.
+  - If `mm` is a `Number`: `isfinite(mm)` and `mm >= 0`.
 
 # Examples
 
@@ -543,9 +544,9 @@ end
 """
 $(DocStringExtensions.TYPEDEF)
 
-Fits an ``\\ell_1`` uncertainty set on the characteristic vector, mean-only and with a calibrated radius.
+Fits an ``\\ell_1`` uncertainty set with a calibrated radius on the characteristic vector, for the mean only.
 
-`pe` supplies both the characteristic vector ``\\hat{\\boldsymbol{\\mu}}`` and, when the shape algorithm is `scaled`, the per-asset scaling ``\\hat{\\boldsymbol{\\sigma}} = \\sqrt{\\mathrm{diag}(\\hat{\\mathbf{\\Sigma}})}``. The sets are the robust best-characteristic sets of [quintile](@cite). Maximising the worst-case characteristic over one of them recovers the heuristic ``1/N``, quintile, and inverse-volatility portfolios as *exact solutions of a robust optimisation problem*, with the radius controlling how many assets are held — which is why this library ships no dedicated quintile optimiser. Compose the set with [`MeanRisk`](@ref) instead:
+`pe` gives the characteristic vector ``\\hat{\\boldsymbol{\\mu}}``. When the shape algorithm is `scaled`, it also gives the scaling of each asset, ``\\hat{\\boldsymbol{\\sigma}} = \\sqrt{\\mathrm{diag}(\\hat{\\mathbf{\\Sigma}})}``. The sets are the robust sets of [quintile](@cite) for the best characteristic. The maximum of the worst-case characteristic over one of these sets is a robust optimisation problem. Its exact solutions are the ``1/N`` portfolio, the quintile portfolio and the inverse-volatility portfolio, and the radius sets the number of assets held. For this reason the library has no separate quintile optimiser. Use the set in [`MeanRisk`](@ref):
 
 ```julia
 MeanRisk(; r = NoRisk(), obj = MaximumReturn(),
@@ -569,11 +570,11 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `alg` must be an [`L1UncertaintySetAlgorithm`](@ref) or a [`SignedL1UncertaintySetAlgorithm`](@ref).
-  - [`ucs`](@ref) and [`sigma_ucs`](@ref) always throw an `ArgumentError` on this estimator. The ``\\ell_1`` ball bounds a characteristic vector, [quintile](@cite) defines no covariance analogue, and there is therefore no covariance set for either to return.
+  - [`ucs`](@ref) and [`sigma_ucs`](@ref) always throw an `ArgumentError` on this estimator. The ``\\ell_1`` ball bounds a characteristic vector, and [quintile](@cite) defines no covariance analogue. So neither function has a covariance set to return.
 
 # Examples
 
-The radius is calibrated, not given. Three assets whose sample means are ``0.125``, ``0.0625`` and ``0.03125`` give the activation ladder ``[0, 0.0625, 0.125]``, and the default `active` of `0.2` targets one active asset, so the radius is the midpoint of the first rung and the second:
+The estimator calibrates the radius. Three assets with the sample means ``0.125``, ``0.0625`` and ``0.03125`` give the Activation Ladder ``[0, 0.0625, 0.125]``. The default `active` of `0.2` gives a target of one active asset, so the radius is the midpoint of the first and second rungs:
 
 ```jldoctest
 julia> X = [0.1875 0.09375 0.0625
@@ -593,8 +594,8 @@ L1UncertaintySet
   - [`L1UncertaintySetAlgorithm`](@ref)
   - [`SignedL1UncertaintySetAlgorithm`](@ref)
   - [`ActiveAssetsUncertaintyAlgorithm`](@ref)
-  - [`mu_ucs`](@ref): the only fitting verb this estimator answers.
-  - [`StandardDeviationExpectedReturns`](@ref): the characteristic need not be an expected return. A prior built on this estimator ranks on volatility, with the highest volatility first. Section VI-C of [quintile](@cite) ranks the lowest volatility first, the Low Volatility factor of its Table III, so that ranking needs the negated volatility as the characteristic.
+  - [`mu_ucs`](@ref): the only verb of the ucs Triple that returns a set for this estimator.
+  - [`StandardDeviationExpectedReturns`](@ref): the characteristic does not have to be an expected return. A prior that uses this estimator ranks the assets by volatility, with the highest volatility first. Section VI-C of [quintile](@cite) puts the lowest volatility first, for the Low Volatility factor of its Table III. That ranking needs the negative of the volatility as the characteristic.
   - [`AbstractUncertaintySetEstimator`](@ref)
 
 # References
@@ -607,7 +608,7 @@ L1UncertaintySet
     """
     pe
     """
-    `alg`: Shape algorithm — [`L1UncertaintySetAlgorithm`](@ref) or [`SignedL1UncertaintySetAlgorithm`](@ref).
+    `alg`: Shape algorithm, an [`L1UncertaintySetAlgorithm`](@ref) or a [`SignedL1UncertaintySetAlgorithm`](@ref).
     """
     alg
     function CharacteristicUncertaintySet(pe::Option{<:AbstractLowOrderPriorEstimator},
@@ -628,7 +629,7 @@ end
 
 Return the vector `g` whose `k`-th entry is the radius at which the `k`-th asset becomes active in the long-only problem.
 
-`mu` must be sorted in non-increasing order, with `sd` (when given) under the same permutation.
+`mu` must be sorted in non-increasing order. If `sd` is a vector, it must have the same permutation.
 
 # Mathematical definition
 
@@ -645,23 +646,25 @@ Where:
   - $(math_dict[:sigma_i_ucs])
   - $(math_dict[:N])
 
-This is the threshold of Lemma 2 (``\\sigma_i = 1``) and of Lemma 9 (scaled) of [quintile](@cite). Both lemmas state that the number of active assets is the largest ``k`` with ``L_k < \\epsilon``, so a radius in the open interval ``(L_q,\\, L_{q+1})`` activates exactly ``q`` assets, and the active weights are equal (Lemma 2) or inverse-volatility (Lemma 9). Corollaries 4 and 11 of [quintile](@cite) read this off at the quintile.
+``L_k`` is the threshold of Lemma 2 of [quintile](@cite) when ``\\sigma_i = 1``, and of its Lemma 9 when the ladder is scaled. Both lemmas state that the number of active assets is the largest ``k`` with ``L_k < \\epsilon``. So a radius in the open interval ``(L_q,\\, L_{q+1})`` activates exactly ``q`` assets. The active weights are equal under Lemma 2, and they are inverse-volatility weights under Lemma 9. Corollaries 4 and 11 of [quintile](@cite) apply this result at the quintile.
 
-Two consequences bound the sequence. Every summand of ``L_1`` is zero, so ``L_1 = 0``: a strictly positive radius always activates at least one asset. And ``L_{k+1} - L_k = \\sum_{i=1}^{k} (\\hat{\\mu}_k - \\hat{\\mu}_{k+1}) / \\sigma_i \\geq 0`` because the ranking is non-increasing, so the sequence is non-decreasing and its rungs bracket. The summand ``i = k+1`` of ``L_{k+1}`` is zero, which is why the sum stops at ``k``. Equality holds exactly when ``\\hat{\\mu}_k = \\hat{\\mu}_{k+1}``. [quintile](@cite) admits such a tie, and its Assumption 1 excludes only a radius equal to a rung, so that the count of active assets is unique.
+The sequence has two properties. Every summand of ``L_1`` is zero, so ``L_1 = 0``, and a radius above zero always activates at least one asset. The difference of two adjacent rungs is ``L_{k+1} - L_k = \\sum_{i=1}^{k} (\\hat{\\mu}_k - \\hat{\\mu}_{k+1}) / \\sigma_i \\geq 0``, because the ranking is non-increasing. The sum stops at ``k`` because the summand ``i = k+1`` of ``L_{k+1}`` is zero. So the sequence is non-decreasing, and two adjacent rungs bracket each count.
+
+Two adjacent rungs are equal exactly when ``\\hat{\\mu}_k = \\hat{\\mu}_{k+1}``. [quintile](@cite) admits such a tie. Its Assumption 1 excludes only a radius equal to a rung, so that the number of active assets is unique.
 
 # Algorithm
 
  1. Read `N = length(mu)`, the number of rungs to build.
- 2. For each `k` in `1:N`, sum ``(\\hat{\\mu}_i - \\hat{\\mu}_k) / \\sigma_i`` over `i` in `1:k`, taking ``\\sigma_i = 1`` when `sd` is `nothing`, giving the `k`-th rung.
+ 2. For each `k` in `1:N`, sum ``(\\hat{\\mu}_i - \\hat{\\mu}_k) / \\sigma_i`` over `i` in `1:k`. Use ``\\sigma_i = 1`` when `sd` is `nothing`. The sum is the `k`-th rung.
 
 # Arguments
 
   - `mu`: Characteristic vector, sorted in non-increasing order.
-  - `sd`: Per-asset scaling under the same permutation, or `nothing` for an unscaled ladder.
+  - `sd`: Scaling of each asset in the same permutation, or `nothing` for a ladder with no scaling.
 
 # Returns
 
-  - `g::Vector{<:Number}`: The activation ladder, one rung per asset.
+  - `g::Vector{<:Number}`: The Activation Ladder, with one rung for each asset.
 
 # Examples
 
@@ -698,19 +701,19 @@ end
 """
     l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
 
-Convert an `active` target — a count or a fraction of the universe — into an asset count in `1:N`.
+Convert an `active` target, a count or a fraction of the universe, to a number of assets in `1:N`.
 
-The type of `active` selects the rule, and the clamp makes a target outside the universe usable rather than an error: a count above `N` becomes `N`, and a fraction that rounds to zero becomes `1`.
+The type of `active` selects the rule. The function clamps a target outside `1:N`, and it does not throw an error. A count above `N` becomes `N`, and a fraction that rounds to zero becomes `1`.
 
 # Algorithm
 
- 1. When `active` is an `Integer`, take it as the count itself, giving `q`.
- 2. Otherwise take `round(Int, active * N)`, the fraction of the universe rounded to the nearest asset, giving `q`.
- 3. Return `clamp(q, 1, N)`, so the count names an asset of the ranking.
+ 1. If `active` is an `Integer`, use it as the count `q`.
+ 2. Else, take `q = round(Int, active * N)`, the fraction of the universe rounded to the nearest asset.
+ 3. Return `clamp(q, 1, N)`, a count that the ranking can give.
 
 # Arguments
 
-  - `active`: Target number of active assets, as a count (`Integer`) or a fraction of the universe (`AbstractFloat`).
+  - `active`: Target number of active assets. An `Integer` is a count, and an `AbstractFloat` is a fraction of the universe.
   - `N`: Number of assets in the universe.
 
 # Returns
@@ -744,36 +747,36 @@ function l1_active_count(active::Union{<:Integer, <:AbstractFloat}, N::Int)
     return clamp(q, 1, N)
 end
 """
-    l1_eps_from_ladder(method, ladder::VecNum, N::Int)
+    l1_eps_from_ladder(method, ladder::VecNum, q::Int)
 
-Resolve a radius from a [`Num_UcSEps`](@ref) against an activation ladder.
+Find the radius of a [`Num_UcSEps`](@ref) on an Activation Ladder.
 
-The method that takes a `Number` is a passthrough: it returns the radius the caller gave, runs no procedure, and carries neither an `# Algorithm` nor a `# Validation` section. The method that takes an [`ActiveAssetsUncertaintyAlgorithm`](@ref) returns the midpoint of the open interval ``(L_q,\\, L_{q+1})`` that the closed forms of [quintile](@cite) require for exactly `q` active entries.
+The method that takes a `Number` returns the radius that the caller gave. It has no procedure, so the `# Algorithm` and `# Validation` sections are not about it. The method that takes an [`ActiveAssetsUncertaintyAlgorithm`](@ref) returns the midpoint of the open interval ``(L_q,\\, L_{q+1})``. The closed forms of [quintile](@cite) need a radius in that interval for exactly `q` active entries.
 
-Above the last rung any radius activates every entry, so the top of the ladder has no interval to bisect and the method continues the final increment by a half step instead. A ladder of one rung has no increment either, and the method returns `one(eltype(ladder))`. That radius is inert rather than calibrated: a one-rung ladder is a one-asset universe, where the budget pins the single weight and every radius gives the same portfolio.
+Every radius above the last rung activates every entry. So the top of the ladder has no interval with a midpoint, and the method adds half of the last increment to the last rung. A ladder of one rung has no increment, and the method returns `one(eltype(ladder))`. That radius has no effect. A ladder of one rung belongs to a universe of one asset, where the budget sets the single weight. Every radius then gives the same portfolio.
 
 # Algorithm
 
  1. Read `L = length(ladder)`, the number of rungs.
- 2. Clamp `q` to `1:L`, so the target names a rung.
- 3. When `q < L`, read the bracketing rungs `lo, hi = ladder[q], ladder[q+1]` and return their midpoint, a radius strictly inside the open interval.
- 4. Otherwise `q == L`: return `ladder[L] + (ladder[L] - ladder[L-1]) / 2`, half a final increment above the last rung, or `one(eltype(ladder))` when `L == 1` and there is no increment to continue.
+ 2. Clamp `q` to `1:L`, so that the target is a rung of the ladder.
+ 3. If `q < L`, read `lo, hi = ladder[q], ladder[q+1]`, the two rungs on each side of the target. Return their midpoint, a radius inside the open interval.
+ 4. Else, `q == L`. If `L == 1`, return `one(eltype(ladder))`, because the ladder has no increment. Else, return `ladder[L] + (ladder[L] - ladder[L-1]) / 2`, half of the last increment above the last rung.
 
 # Arguments
 
-  - `method`: A radius (`Number`) or an [`ActiveAssetsUncertaintyAlgorithm`](@ref).
-  - `ladder`: Activation ladder, as [`l1_activation_ladder`](@ref) returns it.
+  - `method`: A radius as a `Number`, or an [`ActiveAssetsUncertaintyAlgorithm`](@ref).
+  - `ladder`: Activation Ladder, as [`l1_activation_ladder`](@ref) returns it.
   - `q`: Target number of active entries.
-  - `args...`: Additional positional arguments (ignored by the `Number` method).
+  - `args...`: More positional arguments, which the `Number` method ignores.
 
 # Validation
 
-  - `length(ladder) >= 1`, otherwise an `IsEmptyError` is thrown.
-  - `ladder[q+1] > ladder[q]` when `q < L`, otherwise a `DomainError` is thrown. The rungs coincide when the characteristic has ties across the cut, the interval the closed form needs is empty, and no radius delivers the requested count. [quintile](@cite) admits ties, and its Assumption 1 excludes only a radius equal to a rung. The midpoint needs a strict ladder, so the message names the two fixes: break the tie, or pass an explicit radius.
+  - `length(ladder) >= 1`. Else, the method throws an `IsEmptyError`.
+  - `ladder[q+1] > ladder[q]` when `q < L`. Else, the method throws a `DomainError`. The two rungs are equal when the `q`-th and the `(q+1)`-th entries of the ranking are equal. The interval that the closed form needs is then empty, and no radius gives the target count. [quintile](@cite) admits ties, and its Assumption 1 excludes only a radius equal to a rung. The midpoint needs a strictly increasing ladder, so the message names two fixes. The caller can break the tie, or give a radius.
 
 # Returns
 
-  - `eps::Number`: The resolved radius.
+  - `eps::Number`: The radius.
 
 # Examples
 
@@ -824,13 +827,13 @@ end
 """
     l1_resolve_eps(method, mus::VecNum, sds::Option{<:VecNum}, paired::Bool)
 
-Resolve a radius from a [`Num_UcSEps`](@ref) against the characteristic vector.
+Find the radius of a [`Num_UcSEps`](@ref) on the characteristic vector.
 
-`mus` must be sorted in non-increasing order, with `sds` under the same permutation. The method that takes a `Number` is a passthrough: it returns the radius the caller gave, runs no procedure, and carries neither an `# Algorithm` nor a `# Validation` section. The method that takes an [`ActiveAssetsUncertaintyAlgorithm`](@ref) calibrates against the long-only ladder when `paired` is `false`, and against the paired ladder when it is `true`.
+`mus` must be sorted in non-increasing order, and `sds` must have the same permutation. The method that takes a `Number` returns the radius that the caller gave. It has no procedure, so the `# Algorithm` and `# Validation` sections are not about it. The method that takes an [`ActiveAssetsUncertaintyAlgorithm`](@ref) calibrates the radius on the long-only ladder when `paired` is `false`, and on the paired ladder when `paired` is `true`.
 
 # Mathematical definition
 
-The paired ladder adds the ladder of the ranking to the ladder of the reversed, negated ranking. With ``\\sigma_i = 1`` it is the threshold of Lemma 6 of [quintile](@cite). The scaled form adds the two scaled ladders of Corollary 13 of [quintile](@cite), which that work states for two radii on ``\\mathcal{A}_2``. That work states no lemma for one radius on the scaled set, so the scaled form is this library's extension, and it serves as a calibration aid:
+The paired ladder is the sum of the ladder of the ranking and the ladder of the reversed, negated ranking. With ``\\sigma_i = 1`` it is the threshold of Lemma 6 of [quintile](@cite). The scaled form adds the two scaled ladders of Corollary 13 of [quintile](@cite), which states them for two radii on ``\\mathcal{A}_2``. [quintile](@cite) states no lemma for one radius on the scaled set. So the scaled form is an extension of this library, and no lemma proves the number of active assets that it gives:
 
 ```math
 \\begin{align}
@@ -842,36 +845,36 @@ F_m &= \\sum_{i=1}^{m} \\frac{\\hat{\\mu}_i - \\hat{\\mu}_m}{\\sigma_i}
 
 Where:
 
-  - ``F_m``: Activation threshold of the ``m``-th long/short pair.
+  - ``F_m``: Activation threshold of the ``m``-th pair of one long asset and one short asset.
   - $(math_dict[:mu_hat_i_rank])
   - $(math_dict[:sigma_i_ucs])
   - $(math_dict[:N])
 
-A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom ``q`` short, so it activates ``2q`` assets (Corollary 7, which states it with ``\\sigma_i = 1``). Lemma 5 gives the reason the ladder stops at ``\\lfloor N/2 \\rfloor``, and it too is stated with ``\\sigma_i = 1``: an optimal dollar-neutral solution satisfies ``w_i = -w_{N+1-i}``, so with an odd ``N`` the middle asset pairs with itself, its weight solves ``w = -w``, and it is never active. The largest count the paired branch can reach is therefore ``2 \\lfloor N/2 \\rfloor``, which is ``N-1`` when ``N`` is odd.
+A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom ``q`` assets short, so it activates ``2q`` assets. Corollary 7 states this with ``\\sigma_i = 1``. Lemma 5, also with ``\\sigma_i = 1``, gives the reason that the ladder stops at ``\\lfloor N/2 \\rfloor``. An optimal dollar-neutral solution satisfies ``w_i = -w_{N+1-i}``. With an odd ``N``, the middle asset is its own pair, so its weight satisfies ``w = -w`` and the asset is never active. The largest count that the paired branch can reach is ``2 \\lfloor N/2 \\rfloor``, which is ``N-1`` when ``N`` is odd.
 
 # Algorithm
 
  1. Read `N = length(mus)`, the size of the universe.
- 2. When `paired` is `false`, build the long-only ladder with [`l1_activation_ladder`](@ref), convert `method.active` to a count with [`l1_active_count`](@ref), and return the radius [`l1_eps_from_ladder`](@ref) resolves against them.
- 3. Otherwise read `half = N ÷ 2`, the number of pairs the universe admits.
- 4. Add the ladder of `mus` to the ladder of the reversed, negated ranking and keep the first `half` entries, giving `ladder`, the paired ladder.
- 5. Halve the target: an `Integer` `active` counts assets and gives `max(active ÷ 2, 1)` pairs; an `AbstractFloat` `active` is a fraction of the universe and gives `clamp(round(Int, active * N / 2), 1, half)` pairs. Both name pairs, so a count and the matching fraction agree whenever the count is even. An odd count truncates while the matching fraction rounds to nearest, so the two can differ by one pair: `active = 7` gives three pairs and `active = 7/N` gives four.
- 6. Return the radius [`l1_eps_from_ladder`](@ref) resolves against `ladder` and the pair count.
+ 2. If `paired` is `false`, build the long-only ladder with [`l1_activation_ladder`](@ref), and convert `method.active` to a count with [`l1_active_count`](@ref). Return the radius that [`l1_eps_from_ladder`](@ref) finds from the ladder and the count.
+ 3. Else, read `half = N ÷ 2`, the number of pairs that the universe has.
+ 4. Add the ladder of `mus` to the ladder of the reversed, negated ranking. Keep the first `half` entries as `ladder`, the paired ladder.
+ 5. Convert the target to a number of pairs. An `Integer` `active` is a count of assets, and it gives `max(active ÷ 2, 1)` pairs. An `AbstractFloat` `active` is a fraction of the universe, and it gives `clamp(round(Int, active * N / 2), 1, half)` pairs. A count and the equal fraction give the same number of pairs when the count is even. For an odd count, the integer division rounds down and the fraction rounds to the nearest integer. So the two can differ by one pair. For example, with `N = 10`, `active = 7` gives three pairs, and `active = 0.7` gives four.
+ 6. Return the radius that [`l1_eps_from_ladder`](@ref) finds from `ladder` and the number of pairs.
 
 # Arguments
 
-  - `method`: A radius (`Number`) or an [`ActiveAssetsUncertaintyAlgorithm`](@ref).
+  - `method`: A radius as a `Number`, or an [`ActiveAssetsUncertaintyAlgorithm`](@ref).
   - `mus`: Characteristic vector, sorted in non-increasing order.
-  - `sds`: Per-asset scaling under the same permutation, or `nothing`.
-  - `paired`: Whether to calibrate against the paired ladder rather than the long-only one.
+  - `sds`: Scaling of each asset in the same permutation, or `nothing`.
+  - `paired`: If `true`, the calibration reads the paired ladder. If `false`, it reads the long-only ladder.
 
 # Validation
 
-  - `N ÷ 2 >= 1` when `paired` is `true`, otherwise an `ArgumentError` is thrown. A single asset admits no long/short pair, so no paired ladder exists to calibrate against.
+  - `N ÷ 2 >= 1` when `paired` is `true`. Else, the method throws an `ArgumentError`. One asset cannot make a pair of a long asset and a short asset, so it has no paired ladder.
 
 # Returns
 
-  - `eps::Number`: The resolved radius.
+  - `eps::Number`: The radius.
 
 # Examples
 
@@ -934,35 +937,37 @@ end
            F::Option{<:MatNum} = nothing; dims::Int = 1, kwargs...)
     mu_ucs(ue::CharacteristicUncertaintySet{Nothing}, pr::AbstractPriorResult; rd = nothing, kwargs...)
 
-Construct an ``\\ell_1`` uncertainty set on the characteristic vector, from the set's own prior fitted on returns data or from a prior result the set is handed.
+Fits an ``\\ell_1`` uncertainty set on the characteristic vector, from returns data or from a Prior Result.
 
-The two signatures are the two routes a set with a `pe` field takes and share one tail. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref), which refuses a `pe` of `nothing` by name, and hands the result to the prior-result method of the same set with its `pe` set to `nothing`, which is where the two shapes are dispatched. The prior-result method is defined only for a set whose `pe` is `nothing`: inside an optimiser `pr` is the prior the optimiser is solving on, so the characteristic vector the radius is calibrated on is the objective's own `mu`.
+The two signatures are the two routes of a set with a `pe` field, and the two routes end in the same steps. The returns-data method fits `ue.pe` once through [`ucs_prior`](@ref), which throws an `ArgumentError` when `ue.pe` is `nothing`. The method then gives the Prior Result to the prior-result method of the same set with `pe = nothing`. That method selects the shape of the set by dispatch on `alg`.
 
-The calibration runs on the ranking, and the set is returned in the universe's own order: `mu` and `sd` carry one entry per asset in the order the prior produced them, which is the order the optimiser indexes and the order [`port_opt_view`](@ref) slices. Only the ladders see the sorted vector, and a ladder needs no asset identity. The set carries ``\\hat{\\boldsymbol{\\mu}}`` in its `mu` field, so the consumer bounds the characteristic vector the radius was calibrated on.
+The prior-result method has a definition only for a set whose `pe` is `nothing`. Inside an optimiser, `pr` is the prior that the optimiser solves on. So the Radius Calibration reads the same `mu` as the objective.
+
+The calibration reads the ranking, but the set keeps the order of the universe. `mu` and `sd` have one entry for each asset, in the order of the prior. The optimiser indexes the assets in that order, and [`port_opt_view`](@ref) takes its view in that order. Only the ladders read the sorted vector. A ladder is a list of radii, and it holds no index of an asset. The set holds ``\\hat{\\boldsymbol{\\mu}}`` in its `mu` field, so the consumer bounds the characteristic vector that the calibration read.
 
 # Algorithm
 
-The returns-data method runs step 1 and forwards; the two prior-result methods share steps 2 to 4 and differ in the fifth.
+The returns-data method does step 1, and then it calls the prior-result method. The two prior-result methods do steps 2 to 4 in the same way, and they do step 5 differently.
 
- 1. Fit the prior with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`, giving `pr`, and forward to the prior-result method of the set with `pe = nothing`.
+ 1. Fit the prior `pr` with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`. Call the prior-result method of the set with `pe = nothing`.
  2. Read `alg = ue.alg`, the shape algorithm.
- 3. When `alg.scaled`, take `sd = sqrt.(diag(pr.sigma))`, the per-asset scaling; otherwise take `nothing`.
- 4. Take `idx = sortperm(pr.mu; rev = true)`, the ranking that sorts the characteristic non-increasing, and apply it to `pr.mu` and to `sd`.
- 5. Resolve the radii with [`l1_resolve_eps`](@ref) against the sorted vectors, and build the set from them with `mu = pr.mu` and `sd` in the universe's order.
+ 3. If `alg.scaled` is `true`, take `sd = sqrt.(diag(pr.sigma))`, the scaling of each asset. Else, take `sd = nothing`.
+ 4. Take `idx = sortperm(pr.mu; rev = true)`, the ranking that sorts the characteristic in non-increasing order. Apply it to `pr.mu` and to `sd`.
+ 5. Find the radii with [`l1_resolve_eps`](@ref) on the sorted vectors. Build the set from the radii, with `mu = pr.mu` and `sd` in the order of the universe.
 
-For an [`L1UncertaintySetAlgorithm`](@ref) step 5 resolves the single radius `eps` from `alg.method`, passing `alg.paired`, and builds an [`L1UncertaintySet`](@ref).
+For an [`L1UncertaintySetAlgorithm`](@ref), step 5 finds the radius `eps` from `alg.method` and `alg.paired`, and builds an [`L1UncertaintySet`](@ref).
 
-For a [`SignedL1UncertaintySetAlgorithm`](@ref) step 5 resolves two radii against two ladders and builds a [`SignedL1UncertaintySet`](@ref). `en` comes from `alg.mm` on the sorted ranking, and `ep` from `alg.mp` on the reversed, negated ranking, which is the same ladder read from the other end (Corollary 13 of [quintile](@cite)). Neither call passes `paired`, because the construction fixes both ladders. The consumer spends `en` against ``\\max_i (\\sigma_i w_i)`` and `ep` against ``\\max_i (-\\sigma_i w_i)``, so `en` prices the long leg and `ep` the short one, matching the end each was calibrated against.
+For a [`SignedL1UncertaintySetAlgorithm`](@ref), step 5 finds two radii on two ladders, and builds a [`SignedL1UncertaintySet`](@ref). `en` comes from `alg.mm` on the sorted ranking. `ep` comes from `alg.mp` on the reversed, negated ranking, which is the bottom of the same ranking. Corollary 13 of [quintile](@cite) states this construction. Both calls pass `paired = false`, because the construction sets both ladders. The consumer multiplies `en` by ``[\\max_i (\\sigma_i w_i)]_{+}``, and `ep` by ``[\\max_i (-\\sigma_i w_i)]_{+}``. So `en` is the radius for the long leg and `ep` is the radius for the short leg, and each leg matches the end of the ranking that its calibration read.
 
 # Arguments
 
   - `ue`: Characteristic uncertainty set estimator.
-  - `X`: Data matrix (e.g. returns).
-  - `F`: Optional factor matrix. Used by the prior estimator.
+  - `X`: Data matrix, such as the returns.
+  - `F`: Factor matrix, or `nothing`. The prior estimator reads it.
   - $(arg_dict[:dims])
-  - `pr`: Fitted prior result the set is calibrated on. `pr.mu` is read, and `pr.sigma` when `alg.scaled`.
-  - `rd`: Returns result the three-argument form passes beside the prior. Not read.
-  - `kwargs...`: Additional keyword arguments passed to the prior estimator.
+  - `pr`: Prior Result for the calibration. The method reads `pr.mu`, and `pr.sigma` when `alg.scaled` is `true`.
+  - `rd`: Returns Result that the three-argument form gives with the prior. The method does not read it.
+  - `kwargs...`: More keyword arguments, which the returns-data method gives to the prior estimator. The prior-result method ignores them.
 
 # Returns
 
@@ -1031,25 +1036,25 @@ end
     ucs(ue::CharacteristicUncertaintySet{Nothing}, pr::AbstractPriorResult; kwargs...)
     sigma_ucs(ue::CharacteristicUncertaintySet{Nothing}, pr::AbstractPriorResult; kwargs...)
 
-Always throw. [`CharacteristicUncertaintySet`](@ref) is mean-only.
+Always throw an `ArgumentError`. [`CharacteristicUncertaintySet`](@ref) fits a set on the mean only.
 
-All four methods are refusals rather than procedures, so none carries an `# Algorithm` section. The returns-data pair takes the same `(X, F)` signature as the rest of the family rather than a catch-all, so that the [`ReturnsResult`](@ref) forwarders in the base reach them without ambiguity, and the prior-result pair takes the signature the family's prior-result arm shares, so that the three-argument routing of a set with no prior of its own reaches the same refusal.
+The four methods have no procedure, so they have no `# Algorithm` section. The returns-data pair has the same `(X, F)` signature as the other families, not a catch-all signature. So the [`ReturnsResult`](@ref) methods of the base reach these methods with no ambiguity. The prior-result pair has the prior-result signature of the other families. So a set with no prior of its own reaches the same error through the three-argument route.
 
 # Arguments
 
   - `ue`: Characteristic uncertainty set estimator.
-  - `X`: Data matrix (e.g. returns).
-  - `F`: Optional factor matrix.
-  - `pr`: Fitted prior result (ignored).
-  - `kwargs...`: Additional keyword arguments (ignored).
+  - `X`: Data matrix, such as the returns. The methods ignore it.
+  - `F`: Factor matrix, or `nothing`. The methods ignore it.
+  - `pr`: Prior Result, which the methods ignore.
+  - `kwargs...`: More keyword arguments, which the methods ignore.
 
 # Validation
 
-  - Both methods always throw an `ArgumentError`. The ``\\ell_1`` set bounds a characteristic (mean) vector, [quintile](@cite) defines no covariance analogue, and there is therefore no covariance set to return. Each message names the fix: [`mu_ucs`](@ref) for the mean set, and [`NormalUncertaintySet`](@ref), [`DeltaUncertaintySet`](@ref) or [`ARCHUncertaintySet`](@ref) for a covariance set.
+  - All four methods always throw an `ArgumentError`. The ``\\ell_1`` set bounds a characteristic vector, such as the mean, and [quintile](@cite) defines no covariance analogue. So the methods have no covariance set to return. Each message names [`NormalUncertaintySet`](@ref), [`DeltaUncertaintySet`](@ref) and [`ARCHUncertaintySet`](@ref) for a covariance set. The message of `ucs` also names [`mu_ucs`](@ref) for the mean set.
 
 # Returns
 
-  - Neither method returns. Both throw.
+  - No method returns. Each method throws.
 
 # Related
 

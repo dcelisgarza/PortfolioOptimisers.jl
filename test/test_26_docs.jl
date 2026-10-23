@@ -1540,9 +1540,9 @@ in the sense of `CODING_STANDARDS.md`.
                     "cross-sectional weight" => [:q_k_pair, :u_ti_cs],
                     # As `cross-sectional weight`, for ``y_{ti}`` and ``b_{k}``.
                     "forward target" => [:b_k_pair, :y_ti_fwd],
-                    # Ten counts of ten different things.
-                    "number" => [:K, :N, :T, :k_subset, :k_tail_count, :n_network, :n_pool,
-                                 :n_trials, :sigma_st_i_paths, :sigma_st_paths],
+                    # Nine counts of nine different things.
+                    "number" => [:K, :N, :T, :k_subset, :n_network, :n_pool, :n_trials,
+                                 :sigma_st_i_paths, :sigma_st_paths],
                     # As `constraint scale`, and the same merge candidate.
                     "objective scale" => [:ep_so, :so_scale],
                     # The weights an optimisation produced, against the weights themselves.

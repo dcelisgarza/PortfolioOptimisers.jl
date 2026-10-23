@@ -90,7 +90,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :t_threshold => "``t``: Threshold parameter, when ``t`` is a symbol that stands alone. A subscript ``t`` is the observation index. An asset crosses at an observation when its return is at least ``t`` of its own standard deviations away from zero. A return of exactly zero never crosses.",#
                  :sigma_i_asset => "``\\sigma_i``: Standard deviation of asset ``i``.",#
                  :mu_hat_i_rank => "``\\hat{\\mu}_i``: ``i``-th entry of the characteristic vector, sorted non-increasing.",#
-                 :sigma_i_ucs => "``\\sigma_i``: Per-asset scaling of the ``i``-th entry of the characteristic vector; ``1`` when the set is unscaled.",#
+                 :sigma_i_ucs => "``\\sigma_i``: Scale factor of the ``i``-th entry of the characteristic vector. It is ``1`` when the set has no scaling.",#
                  :oslash => "``\\oslash``: Element-wise division.",#
                  :U_gerber => "``\\mathbf{U} \\in \\{0,1\\}^{T \\times N}``: Up indicator matrix, ``U_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\geq t \\, \\sigma_i \\land x_{t,\\,i} > 0]``.",#
                  :D_gerber => "``\\mathbf{D} \\in \\{0,1\\}^{T \\times N}``: Down indicator matrix, ``D_{t,\\,i} = \\mathbf{1}[x_{t,\\,i} \\leq -t \\, \\sigma_i \\land x_{t,\\,i} < 0]``.",#
