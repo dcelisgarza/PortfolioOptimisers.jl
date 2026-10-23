@@ -348,6 +348,8 @@ Where:
 
 The range is the Value-at-Risk of the returns plus the Value-at-Risk of the negated returns, and the two mean terms cancel.
 
+The two estimands agree only when the returns follow `dist`. On a large sample drawn from `dist`, the parametric quantile of the sample moments is close to the empirical quantile. On a sample whose loss tail is heavier than that of `dist`, the parametric quantile at a small ``\\alpha`` is below the empirical quantile, so it understates the loss. On a sample whose loss tail is lighter, it is above the empirical quantile. At a larger ``\\alpha`` the order can reverse.
+
 Sections 1.2 and 4.5.2.2 of [morgan1996](@cite) state the Value-at-Risk of normal returns. Section 2.6 of [lobo1998](@cite) states its bound as a second-order cone for a confidence of at least one half, which is the condition ``\\alpha \\leq 1/2`` above. Equation 11.5 of [cajas2025](@cite) states the quantiles of the Student-t law, scaled to unit variance, and of the Laplace law. No copy of the work that first states those two forms was found. Equation 7.52 of [cajas2025](@cite) calls ``z_{\\alpha}`` the ``\\alpha`` quantile of the normal law, but the definition needs the ``1 - \\alpha`` quantile, which its Equation 11.5 states.
 
 # Fields
@@ -778,6 +780,8 @@ Where:
 $(math_dict[:negated_upper_tail])
 
 The two tails select their order statistics with the same slack ``s``. The gain tail is the ``k``-th largest return, with ``k`` the index of [`ValueatRisk`](@ref) at ``\\beta``.
+
+Let ``k_{\\alpha}`` be the index of the loss tail and ``k_{\\beta}`` the index of the gain tail, so that the range is ``x_{(T + 1 - k_{\\beta})} - x_{(k_{\\alpha})}``. The range is not negative when ``k_{\\alpha} + k_{\\beta} \\leq T + 1``. Without observation weights this holds when ``\\lfloor (\\alpha + s) T \\rfloor + \\lfloor (\\beta + s) T \\rfloor \\leq T - 1``, which is about ``\\alpha + \\beta < 1``. When the two levels overlap past that point, the loss order statistic is above the gain order statistic, and the range is zero or negative. For example, at ``T = 10`` and ``\\alpha = \\beta = 0.5`` the range is ``x_{(5)} - x_{(6)}``. The constructor does not refuse such levels, and the model and the functor report the same number.
 
 Section 7.2.3 of [cajas2025](@cite) defines the ranges of the Conditional Value-at-Risk and of other tail measures, and names [owa1](@cite) as their source. No copy of that work was found. [cajas2025](@cite) defines no range of the Value-at-Risk, so this measure is the library's analogue of that family.
 
