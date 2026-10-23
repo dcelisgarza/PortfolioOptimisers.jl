@@ -71,7 +71,9 @@ $(DocStringExtensions.TYPEDEF)
 
 ``\\ell_1`` uncertainty set on the characteristic vector, a cross-polytope around the estimate.
 
-The set is ``\\mathcal{S} = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\lVert \\boldsymbol{e} \\oslash \\boldsymbol{\\sigma} \\rVert_1 \\leq \\epsilon\\}``. One error budget covers every asset and both signs. [`CharacteristicUncertaintySet`](@ref) fits the set, and [`ArithmeticReturn`](@ref) reads it. The set bounds a characteristic vector, such as the mean, and it has no covariance analogue.
+The set is ``\\mathcal{S} = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{\\sigma} \\odot \\boldsymbol{u} : \\lVert \\boldsymbol{u} \\rVert_1 \\leq \\epsilon\\}``. One error budget covers every asset and both signs. [`CharacteristicUncertaintySet`](@ref) fits the set, and [`ArithmeticReturn`](@ref) reads it. The set bounds a characteristic vector, such as the mean, and it has no covariance analogue.
+
+When every ``\\sigma_i > 0``, the set is ``\\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\lVert \\boldsymbol{e} \\oslash \\boldsymbol{\\sigma} \\rVert_1 \\leq \\epsilon\\}``, the form of [quintile](@cite). The form above also admits ``\\sigma_i = 0``, which fixes the entry ``i`` at its estimate. It is the [`NormBallUncertaintySet`](@ref) with the map ``\\mathrm{diag}(\\boldsymbol{\\sigma})``, the order ``p = 1`` and the radius ``\\epsilon``. A zero scale is the zero row of that map, and [`expand_investable_ucs`](@ref) writes it outside the Investable Mask.
 
 # Mathematical definition
 
@@ -86,9 +88,10 @@ Where:
   - ``\\hat{\\boldsymbol{\\mu}}``: Estimated characteristic vector.
   - ``\\epsilon``: Radius of the set.
   - ``\\boldsymbol{\\sigma}``: Scaling of each asset, the `sd` field. It is ``\\boldsymbol{1}`` when `sd` is `nothing`.
+  - ``\\boldsymbol{u}``: Scaled estimation error.
   - ``\\odot``, ``\\oslash``: Element-wise product and division.
 
-The right-hand side is concave in ``\\boldsymbol{w}``. With an epigraph variable for the infinity norm, the worst case is a set of linear constraints, and the problem needs no conic solver.
+The right-hand side is concave in ``\\boldsymbol{w}``. With an epigraph variable for the infinity norm, the worst case is a set of linear constraints, and the problem needs no conic solver. The equality holds for every ``\\boldsymbol{\\sigma} \\geq \\boldsymbol{0}``, because the minimum of ``\\boldsymbol{u}^{\\intercal} (\\boldsymbol{\\sigma} \\odot \\boldsymbol{w})`` over the ``\\ell_1`` ball of radius ``\\epsilon`` is ``-\\epsilon \\lVert \\boldsymbol{\\sigma} \\odot \\boldsymbol{w} \\rVert_{\\infty}``.
 
 # Fields
 
@@ -107,8 +110,8 @@ Keywords correspond to the struct's fields.
 ## Validation
 
   - `isfinite(eps)` and `eps >= 0`.
-  - If `sd` is not `nothing`: `!isempty(sd)` and `all(sd .> 0)`.
-  - If `mu` is not `nothing`: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If `sd` is not `nothing`: `!isempty(sd)`, `all(isfinite, sd)` and `all(sd .>= 0)`. A zero scale fixes its entry at the estimate.
+  - If `mu` is not `nothing`: `!isempty(mu)` and `!any(isinf, mu)`. A `NaN` marks an asset outside the Investable Mask, as in the centre `val` of the other sets.
   - If `sd` and `mu` are not `nothing`: `length(mu) == length(sd)`.
 
 # Examples
@@ -152,13 +155,15 @@ L1UncertaintySet
                   DomainError(eps, "eps must be finite and >= 0"))
         if isa(sd, VecNum)
             @argcheck(!isempty(sd), IsEmptyError("sd cannot be empty"))
-            @argcheck(all(x -> x > zero(x), sd),
-                      DomainError(sd, "all entries of sd must be > 0"))
+            @argcheck(all(isfinite, sd),
+                      IsNonFiniteError("all entries of sd must be finite"))
+            @argcheck(all(x -> x >= zero(x), sd),
+                      DomainError(sd, "all entries of sd must be >= 0"))
         end
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
-            @argcheck(all(isfinite, mu),
-                      IsNonFiniteError("all elements of mu must be finite"))
+            @argcheck(!any(isinf, mu),
+                      IsNonFiniteError("mu must not have an infinite entry. A NaN marks an asset outside the Investable Mask and is accepted."))
             if isa(sd, VecNum)
                 @argcheck(length(mu) == length(sd),
                           DimensionMismatch("mu ($(length(mu))) must match sd ($(length(sd)))"))
@@ -220,11 +225,52 @@ function port_opt_view(risk_ucs::L1UncertaintySet, i, args...)::L1UncertaintySet
                             mu = nothing_scalar_array_view(risk_ucs.mu, i))
 end
 """
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Writes an [`L1UncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref). The view slices `sd` and `mu` by the asset index, and keeps the radius. So the view removes all of the frame outside the mask, and it gives back the fitted set. The radius is one budget for the total error over the assets that the set covers, so it passes through.
+
+The scale `sd` is geometry. The set is the norm ball with the map ``\\mathrm{diag}(\\boldsymbol{\\sigma})``, so the frame is zero and not `NaN`, as the zero row of the map of a [`NormBallUncertaintySet`](@ref). A zero scale fixes the entry at its estimate, so the set moves nothing on an asset that the prior did not estimate. The worst case ``\\epsilon \\lVert \\boldsymbol{\\sigma} \\odot \\boldsymbol{w} \\rVert_{\\infty}`` then reads only the assets inside the mask. A `sd` of `nothing` holds no entry for an asset, so it passes through, and the view gives back `nothing`. The centre `mu` is the full `pr.mu`, with its `NaN` entries, as the centre `val` of the other sets.
+
+# Algorithm
+
+ 1. If `set.sd` is `nothing`, keep `nothing`. Else, make a zero frame of `length(imsk)` entries, and write `set.sd` at the entries that the mask keeps.
+ 2. Build an [`L1UncertaintySet`](@ref) from `set.eps` and the frame, with `pr.mu` as `mu`.
+
+# Arguments
+
+  - `set`: ``\\ell_1`` uncertainty set, fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::L1UncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`L1UncertaintySet`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::L1UncertaintySet, imsk::BitVector,
+                               pr::AbstractPriorResult)::L1UncertaintySet
+    sd = if isnothing(set.sd)
+        nothing
+    else
+        frame = zeros(eltype(set.sd), length(imsk))
+        frame[imsk] = set.sd
+        frame
+    end
+    return L1UncertaintySet(; eps = set.eps, sd = sd, mu = pr.mu)
+end
+"""
 $(DocStringExtensions.TYPEDEF)
 
 Signed ``\\ell_1`` uncertainty set on the characteristic vector, with a separate error budget per sign.
 
-The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{e} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}]_{-} \\leq \\epsilon_{-}\\}``. It bounds a characteristic vector, such as the mean, and it has no covariance analogue. [quintile](@cite) uses the set to split the long-short problem into two independent problems, its Equations 27 and 28. Its Remark 12 joins the two solutions only when the two legs have disjoint supports. The worst case below keeps the long-short problem as one problem, so it needs no condition on the supports.
+The set is ``\\mathcal{A}_2 = \\{\\hat{\\boldsymbol{\\mu}} + \\boldsymbol{\\sigma} \\odot \\boldsymbol{u} : \\boldsymbol{1}^{\\intercal} [\\boldsymbol{u}]_{+} \\leq \\epsilon_{+},\\, -\\boldsymbol{1}^{\\intercal} [\\boldsymbol{u}]_{-} \\leq \\epsilon_{-}\\}``. When every ``\\sigma_i > 0``, ``\\boldsymbol{u} = \\boldsymbol{e} \\oslash \\boldsymbol{\\sigma}``, and the set is the set of [quintile](@cite). A zero scale fixes its entry at the estimate, as in [`L1UncertaintySet`](@ref), and the worst case below holds for every ``\\boldsymbol{\\sigma} \\geq \\boldsymbol{0}``. It bounds a characteristic vector, such as the mean, and it has no covariance analogue. [quintile](@cite) uses the set to split the long-short problem into two independent problems, its Equations 27 and 28. Its Remark 12 joins the two solutions only when the two legs have disjoint supports. The worst case below keeps the long-short problem as one problem, so it needs no condition on the supports.
 
 # Mathematical definition
 
@@ -260,8 +306,8 @@ Keywords correspond to the struct's fields.
 
   - `isfinite(ep)` and `ep >= 0`.
   - `isfinite(en)` and `en >= 0`.
-  - If `sd` is not `nothing`: `!isempty(sd)` and `all(sd .> 0)`.
-  - If `mu` is not `nothing`: `!isempty(mu)` and `all(isfinite, mu)`.
+  - If `sd` is not `nothing`: `!isempty(sd)`, `all(isfinite, sd)` and `all(sd .>= 0)`. A zero scale fixes its entry at the estimate.
+  - If `mu` is not `nothing`: `!isempty(mu)` and `!any(isinf, mu)`. A `NaN` marks an asset outside the Investable Mask, as in the centre `val` of the other sets.
   - If `sd` and `mu` are not `nothing`: `length(mu) == length(sd)`.
 
 # Examples
@@ -313,13 +359,15 @@ SignedL1UncertaintySet
                   DomainError(en, "en must be finite and >= 0"))
         if isa(sd, VecNum)
             @argcheck(!isempty(sd), IsEmptyError("sd cannot be empty"))
-            @argcheck(all(x -> x > zero(x), sd),
-                      DomainError(sd, "all entries of sd must be > 0"))
+            @argcheck(all(isfinite, sd),
+                      IsNonFiniteError("all entries of sd must be finite"))
+            @argcheck(all(x -> x >= zero(x), sd),
+                      DomainError(sd, "all entries of sd must be >= 0"))
         end
         if isa(mu, VecNum)
             @argcheck(!isempty(mu), IsEmptyError("mu cannot be empty"))
-            @argcheck(all(isfinite, mu),
-                      IsNonFiniteError("all elements of mu must be finite"))
+            @argcheck(!any(isinf, mu),
+                      IsNonFiniteError("mu must not have an infinite entry. A NaN marks an asset outside the Investable Mask and is accepted."))
             if isa(sd, VecNum)
                 @argcheck(length(mu) == length(sd),
                           DimensionMismatch("mu ($(length(mu))) must match sd ($(length(sd)))"))
@@ -382,6 +430,45 @@ function port_opt_view(risk_ucs::SignedL1UncertaintySet, i, args...)::SignedL1Un
     return SignedL1UncertaintySet(; ep = risk_ucs.ep, en = risk_ucs.en,
                                   sd = nothing_scalar_array_view(risk_ucs.sd, i),
                                   mu = nothing_scalar_array_view(risk_ucs.mu, i))
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
+Writes a [`SignedL1UncertaintySet`](@ref) fitted on the Investable Mask back onto the full asset universe.
+
+The expansion is the inverse of [`port_opt_view`](@ref), and it writes the same frame as the [`L1UncertaintySet`](@ref) method. The two radii are budgets for the total error of each sign over the assets that the set covers, so they pass through. The scale `sd` is geometry, so its frame is zero. A zero scale fixes the entry at its estimate, and the two positive parts of the worst case then read only the assets inside the mask. A `sd` of `nothing` passes through. The centre `mu` is the full `pr.mu`, with its `NaN` entries.
+
+# Algorithm
+
+ 1. If `set.sd` is `nothing`, keep `nothing`. Else, make a zero frame of `length(imsk)` entries, and write `set.sd` at the entries that the mask keeps.
+ 2. Build a [`SignedL1UncertaintySet`](@ref) from `set.ep`, `set.en` and the frame, with `pr.mu` as `mu`.
+
+# Arguments
+
+  - `set`: Signed ``\\ell_1`` uncertainty set, fitted on the reduced prior.
+  - `imsk`: The Investable Mask of the full prior.
+  - $(arg_dict[:pr])
+
+# Returns
+
+  - `set::SignedL1UncertaintySet`: The set on the full asset universe.
+
+# Related
+
+  - [`SignedL1UncertaintySet`](@ref)
+  - [`investable_ucs_reduction`](@ref)
+  - [`port_opt_view`](@ref)
+"""
+function expand_investable_ucs(set::SignedL1UncertaintySet, imsk::BitVector,
+                               pr::AbstractPriorResult)::SignedL1UncertaintySet
+    sd = if isnothing(set.sd)
+        nothing
+    else
+        frame = zeros(eltype(set.sd), length(imsk))
+        frame[imsk] = set.sd
+        frame
+    end
+    return SignedL1UncertaintySet(; ep = set.ep, en = set.en, sd = sd, mu = pr.mu)
 end
 """
 $(DocStringExtensions.TYPEDEF)
@@ -854,12 +941,13 @@ A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom
 
 # Algorithm
 
- 1. Read `N = length(mus)`, the size of the universe.
- 2. If `paired` is `false`, build the long-only ladder with [`l1_activation_ladder`](@ref), and convert `method.active` to a count with [`l1_active_count`](@ref). Return the radius that [`l1_eps_from_ladder`](@ref) finds from the ladder and the count.
- 3. Else, read `half = N ÷ 2`, the number of pairs that the universe has.
- 4. Add the ladder of `mus` to the ladder of the reversed, negated ranking. Keep the first `half` entries as `ladder`, the paired ladder.
- 5. Convert the target to a number of pairs. An `Integer` `active` is a count of assets, and it gives `max(active ÷ 2, 1)` pairs. An `AbstractFloat` `active` is a fraction of the universe, and it gives `clamp(round(Int, active * N / 2), 1, half)` pairs. A count and the equal fraction give the same number of pairs when the count is even. For an odd count, the integer division rounds down and the fraction rounds to the nearest integer. So the two can differ by one pair. For example, with `N = 10`, `active = 7` gives three pairs, and `active = 0.7` gives four.
- 6. Return the radius that [`l1_eps_from_ladder`](@ref) finds from `ladder` and the number of pairs.
+ 1. Check `mus` and `sds`, as `# Validation` states.
+ 2. Read `N = length(mus)`, the size of the universe.
+ 3. If `paired` is `false`, build the long-only ladder with [`l1_activation_ladder`](@ref), and convert `method.active` to a count with [`l1_active_count`](@ref). Return the radius that [`l1_eps_from_ladder`](@ref) finds from the ladder and the count.
+ 4. Else, read `half = N ÷ 2`, the number of pairs that the universe has.
+ 5. Add the ladder of `mus` to the ladder of the reversed, negated ranking. Keep the first `half` entries as `ladder`, the paired ladder.
+ 6. Convert the target to a number of pairs. An `Integer` `active` is a count of assets, and it gives `max(active ÷ 2, 1)` pairs. An `AbstractFloat` `active` is a fraction of the universe, and it gives `clamp(round(Int, active * N / 2), 1, half)` pairs. A count and the equal fraction give the same number of pairs when the count is even. For an odd count, the integer division rounds down and the fraction rounds to the nearest integer. So the two can differ by one pair. For example, with `N = 10`, `active = 7` gives three pairs, and `active = 0.7` gives four.
+ 7. Return the radius that [`l1_eps_from_ladder`](@ref) finds from `ladder` and the number of pairs.
 
 # Arguments
 
@@ -870,6 +958,8 @@ A radius in ``(F_q,\\, F_{q+1})`` makes the top ``q`` assets long and the bottom
 
 # Validation
 
+  - `all(isfinite, mus)`. Else, the method throws an `IsNonFiniteError`. A `NaN` entry makes every rung that reads it `NaN`, and the tie check of [`l1_eps_from_ladder`](@ref) then names the wrong cause. A prior fitted on a point-in-time Asset Panel has `NaN` outside its Investable Mask, and [`mu_ucs`](@ref) reduces it to the mask before the calibration.
+  - If `sds` is not `nothing`: every entry is finite and `> 0`. Else, the method throws a `DomainError`. The ladder divides by each entry. A set can hold a zero scale, but the closed form of the radius cannot read one.
   - `N ÷ 2 >= 1` when `paired` is `true`. Else, the method throws an `ArgumentError`. One asset cannot make a pair of a long asset and a short asset, so it has no paired ladder.
 
 # Returns
@@ -910,6 +1000,12 @@ function l1_resolve_eps(method::Number, args...)
 end
 function l1_resolve_eps(method::ActiveAssetsUncertaintyAlgorithm, mus::VecNum,
                         sds::Option{<:VecNum}, paired::Bool)
+    @argcheck(all(isfinite, mus),
+              IsNonFiniteError("cannot calibrate a radius on a characteristic with a non-finite entry: a NaN makes every rung of the activation ladder that reads it NaN. Reduce the prior to its Investable Mask, or pass an explicit radius."))
+    # `nothing` is the unit scale, so it has no entry to refuse.
+    @argcheck(all(x -> isfinite(x) && x > zero(x), something(sds, ())),
+              DomainError(sds,
+                          "cannot calibrate a radius on a scale with an entry that is not finite and > 0: the activation ladder divides by each entry. Pass an explicit radius, or set scaled = false."))
     N = length(mus)
     if !paired
         return l1_eps_from_ladder(method, l1_activation_ladder(mus, sds),
@@ -947,17 +1043,19 @@ The calibration reads the ranking, but the set keeps the order of the universe. 
 
 # Algorithm
 
-The returns-data method does step 1, and then it calls the prior-result method. The two prior-result methods do steps 2 to 4 in the same way, and they do step 5 differently.
+The returns-data method does step 1, and then it calls the prior-result method. The two prior-result methods do steps 2 to 5 and step 7 in the same way, and they do step 6 differently.
 
  1. Fit the prior `pr` with [`ucs_prior`](@ref) on `ue.pe`, `X` and `F`. Call the prior-result method of the set with `pe = nothing`.
- 2. Read `alg = ue.alg`, the shape algorithm.
- 3. If `alg.scaled` is `true`, take `sd = sqrt.(diag(pr.sigma))`, the scaling of each asset. Else, take `sd = nothing`.
- 4. Take `idx = sortperm(pr.mu; rev = true)`, the ranking that sorts the characteristic in non-increasing order. Apply it to `pr.mu` and to `sd`.
- 5. Find the radii with [`l1_resolve_eps`](@ref) on the sorted vectors. Build the set from the radii, with `mu = pr.mu` and `sd` in the order of the universe.
+ 2. Reduce the Prior Result `pr` to the Investable Mask with [`investable_ucs_reduction`](@ref) to get `prr`. Inside an optimiser, `pr` is already reduced, and the step changes nothing. Outside an optimiser, on a prior fitted on a point-in-time Asset Panel, the step makes the reduction that an optimiser makes. The ranking then reads no `NaN`.
+ 3. Read `alg = ue.alg`, the shape algorithm.
+ 4. If `alg.scaled` is `true`, take `sd = sqrt.(diag(prr.sigma))`, the scaling of each asset. Else, take `sd = nothing`.
+ 5. Take `idx = sortperm(prr.mu; rev = true)`, the ranking that sorts the characteristic in non-increasing order. Apply it to `prr.mu` and to `sd`.
+ 6. Find the radii with [`l1_resolve_eps`](@ref) on the sorted vectors. Build the set from the radii, with `mu = prr.mu` and `sd` in the order of the universe.
+ 7. Write the set back onto the full universe with [`expand_investable_ucs`](@ref), and return it. A set fitted outside an optimiser then covers the same assets as the prior. A view of the set at the mask gives the reduced fit again.
 
-For an [`L1UncertaintySetAlgorithm`](@ref), step 5 finds the radius `eps` from `alg.method` and `alg.paired`, and builds an [`L1UncertaintySet`](@ref).
+For an [`L1UncertaintySetAlgorithm`](@ref), step 6 finds the radius `eps` from `alg.method` and `alg.paired`, and builds an [`L1UncertaintySet`](@ref).
 
-For a [`SignedL1UncertaintySetAlgorithm`](@ref), step 5 finds two radii on two ladders, and builds a [`SignedL1UncertaintySet`](@ref). `en` comes from `alg.mm` on the sorted ranking. `ep` comes from `alg.mp` on the reversed, negated ranking, which is the bottom of the same ranking. Corollary 13 of [quintile](@cite) states this construction. Both calls pass `paired = false`, because the construction sets both ladders. The consumer multiplies `en` by ``[\\max_i (\\sigma_i w_i)]_{+}``, and `ep` by ``[\\max_i (-\\sigma_i w_i)]_{+}``. So `en` is the radius for the long leg and `ep` is the radius for the short leg, and each leg matches the end of the ranking that its calibration read.
+For a [`SignedL1UncertaintySetAlgorithm`](@ref), step 6 finds two radii on two ladders, and builds a [`SignedL1UncertaintySet`](@ref). `en` comes from `alg.mm` on the sorted ranking. `ep` comes from `alg.mp` on the reversed, negated ranking, which is the bottom of the same ranking. Corollary 13 of [quintile](@cite) states this construction. Both calls pass `paired = false`, because the construction sets both ladders. The consumer multiplies `en` by ``[\\max_i (\\sigma_i w_i)]_{+}``, and `ep` by ``[\\max_i (-\\sigma_i w_i)]_{+}``. So `en` is the radius for the long leg and `ep` is the radius for the short leg, and each leg matches the end of the ranking that its calibration read.
 
 # Arguments
 
@@ -965,13 +1063,13 @@ For a [`SignedL1UncertaintySetAlgorithm`](@ref), step 5 finds two radii on two l
   - `X`: Data matrix, such as the returns.
   - `F`: Factor matrix, or `nothing`. The prior estimator reads it.
   - $(arg_dict[:dims])
-  - `pr`: Prior Result for the calibration. The method reads `pr.mu`, and `pr.sigma` when `alg.scaled` is `true`.
-  - `rd`: Returns Result that the three-argument form gives with the prior. The method does not read it.
+  - `pr`: Prior Result for the calibration. The method reads `pr.mu` at the Investable Mask, and `pr.sigma` there when `alg.scaled` is `true`.
+  - `rd`: Returns Result that the three-argument form gives with the prior. The method reduces it with the prior, and does not read it.
   - `kwargs...`: More keyword arguments, which the returns-data method gives to the prior estimator. The prior-result method ignores them.
 
 # Returns
 
-  - `mu_ucs::Union{<:L1UncertaintySet, <:SignedL1UncertaintySet}`: The uncertainty set.
+  - `mu_ucs::Union{<:L1UncertaintySet, <:SignedL1UncertaintySet}`: The uncertainty set, on the full asset universe of `pr`.
 
 # Examples
 
@@ -1009,26 +1107,31 @@ function mu_ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum}
 end
 function mu_ucs(ue::CharacteristicUncertaintySet{Nothing, <:L1UncertaintySetAlgorithm},
                 pr::AbstractPriorResult; rd = nothing, kwargs...)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
     alg = ue.alg
-    sd = alg.scaled ? sqrt.(LinearAlgebra.diag(pr.sigma)) : nothing
-    idx = sortperm(pr.mu; rev = true)
-    eps = l1_resolve_eps(alg.method, pr.mu[idx], alg.scaled ? sd[idx] : nothing, alg.paired)
-    return L1UncertaintySet(; eps = eps, sd = sd, mu = pr.mu)
+    sd = alg.scaled ? sqrt.(LinearAlgebra.diag(prr.sigma)) : nothing
+    idx = sortperm(prr.mu; rev = true)
+    eps = l1_resolve_eps(alg.method, prr.mu[idx], alg.scaled ? sd[idx] : nothing,
+                         alg.paired)
+    return expand_investable_ucs(L1UncertaintySet(; eps = eps, sd = sd, mu = prr.mu), imsk,
+                                 pr)
 end
 function mu_ucs(ue::CharacteristicUncertaintySet{Nothing,
                                                  <:SignedL1UncertaintySetAlgorithm},
                 pr::AbstractPriorResult; rd = nothing, kwargs...)
+    imsk, prr, _ = investable_ucs_reduction(pr, rd)
     alg = ue.alg
-    sd = alg.scaled ? sqrt.(LinearAlgebra.diag(pr.sigma)) : nothing
-    idx = sortperm(pr.mu; rev = true)
-    mus = pr.mu[idx]
+    sd = alg.scaled ? sqrt.(LinearAlgebra.diag(prr.sigma)) : nothing
+    idx = sortperm(prr.mu; rev = true)
+    mus = prr.mu[idx]
     sds = isnothing(sd) ? nothing : sd[idx]
     # en governs the long leg, calibrated against the top of the ranking; ep governs the
     # short leg, calibrated against the bottom — i.e. the top of the reversed, negated
     # ranking, which is the same ladder read from the other end (Corollary 13).
     en = l1_resolve_eps(alg.mm, mus, sds, false)
     ep = l1_resolve_eps(alg.mp, reverse(-mus), alg.scaled ? reverse(sds) : nothing, false)
-    return SignedL1UncertaintySet(; ep = ep, en = en, sd = sd, mu = pr.mu)
+    return expand_investable_ucs(SignedL1UncertaintySet(; ep = ep, en = en, sd = sd,
+                                                        mu = prr.mu), imsk, pr)
 end
 """
     ucs(ue::CharacteristicUncertaintySet, X::MatNum, F::Option{<:MatNum} = nothing; kwargs...)
