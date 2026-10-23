@@ -1,12 +1,12 @@
 ---
 name: sweep-conform
-description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit — the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach — then land the branch in the order that survives a busy dev. Use after adding or changing any file under src/ or ext/, before committing, and before pushing to dev."
+description: "Make an addition under src/ or ext/ conform to the sweep of #404 before the commit: the manifest row, the unit count, the child map, the coverage entry, the include line, the gate baseline rows, the size headroom, and the two tracker steps no Julia test can reach. Then land the branch in the order that survives a busy dev. Use after adding or changing any file under src/ or ext/, before committing, and before pushing to dev."
 ---
 
 # Conforming to the sweep
 
 Run this before you commit an addition under `src/` or `ext/`, and again right after the first
-edit to a file you will grow: it prints the room left under the size ceiling. It reports every duty
+edit to a file you will grow. It prints the room left under the size ceiling. It reports every duty
 the sweep places on the files your branch touches, and it prints the exact line to paste for each
 one.
 
@@ -15,8 +15,8 @@ julia --project=code_health code_health/sweep_check.jl --fetch
 ```
 
 Without `--fetch` it reads no tracker, which is faster and works offline, but it then cannot check
-steps 3 and 4. It never reads a dump an earlier run left behind: a stale answer about an open issue
-is worse than no answer. Other forms:
+steps 3 and 4. It never reads a dump that an earlier run left behind. A stale answer about an open
+issue is worse than no answer. Other forms:
 
 | Command | What it checks |
 | --- | --- |
@@ -29,10 +29,10 @@ is worse than no answer. Other forms:
 It measures and writes nothing. A `[fail]` line exits the run non-zero. A `[note]` line is a duty
 the check cannot settle by itself, and it never fails the run.
 
-`--all` is a survey, and there one level changes: a missing sub-issue is a note rather than a
-failure. Most unswept files in the manifest are the standing backlog of an open child map, which
-the sweeper files as the map progresses. A file your branch touched is a different thing, and there
-the missing sub-issue is a failure.
+`--all` is a survey, and one level changes there. A missing sub-issue is a note, not a failure.
+Most unswept files in the manifest are the backlog of an open child map, and the sweeper files
+their sub-issues as the map moves forward. A file that your branch touched is different. For that
+file, the missing sub-issue is a failure.
 
 ## The four steps it checks
 
@@ -41,7 +41,7 @@ They are `CLAUDE.md` § *Functionality you add*, and ADR 0084 is the decision be
 1. **The manifest row.** Every tracked `.jl` file under `src/` and `ext/` carries one row in
    `code_health/sweep_manifest.toml`. A new file needs a new row with `swept = false`. A file that gained a
    documented unit needs its `units` corrected, and a swept file whose unit set changed needs its
-   `bindings` list corrected too. `test/test_45_sweep_census.jl` reds the build on all three.
+   `bindings` list corrected too. `test/test_45_sweep_census.jl` fails the build on all three.
 2. **Coverage.** A new file enters with every line covered, or with a named Coverage Exemption in
    `code_health/rulings.toml`. ADR 0082 owns that rule.
 3. **Reopen the child map** that owns the file, and reopen the umbrella, issue #404.
@@ -54,18 +54,17 @@ Steps 3 and 4 write to the tracker. The `sweep-file-issues` skill does them.
 **`no row in code_health/sweep_manifest.toml`.** Paste the line the check printed, and choose `map` yourself.
 **`map` is not always derivable from a path.** When the file's directory uses one child map, the
 check names it outright. When the directory uses several, as the top level of `src/` and
-`src/17_Optimisation/` do, the numeric prefix does not rescue the lookup: the blocks are not
-contiguous. The check prints the candidates and you choose by subject.
+`src/17_Optimisation/` do, the numeric prefix does not help, because the blocks are not
+contiguous. The check prints the candidates, and you choose by subject.
 
-**`the unit count moved`.** A documented unit joined the file. This is the case the rule is really
-aimed at — a type or a function added to an *existing* file, which already has a row — so record
-the new count. On an unswept row, take steps 3 and 4 for that file too. On a swept row, sweep the
+**`the unit count moved`.** A documented unit joined the file. This is the main case of the rule.
+A type or a function joined an *existing* file, which already has a row, so record the new count. On an unswept row, take steps 3 and 4 for that file too. On a swept row, sweep the
 new unit in the same commit instead, as the next paragraph says. A unit is a docstring that attaches to a
 binding. A field docstring inside a struct body is not one.
 
-**`the unit set moved under a swept row`.** The count held and the names did not: a unit was
-replaced one for one, which is the case of ADR 0148. The sweep passed a text the file no longer
-holds, so paste the printed line — it carries the new `bindings` list and keeps `swept = true`.
+**`the unit set moved under a swept row`.** The count stayed the same and the names changed. A unit
+was replaced one for one, which is the case of ADR 0148. The sweep passed a text that the file no
+longer holds. Paste the printed line. It carries the new `bindings` list and keeps `swept = true`.
 
 **A swept row owes no step 3 or 4** (ADR 0148 § Amendment, issue #1310). The commit that adds or
 rewrites a unit in a swept file sweeps that unit itself: the swept standard below, the three
@@ -83,11 +82,12 @@ order the file needs. `test/test_47_alias_and_module_census.jl` demands exactly 
 **`no open sweep issue names this path`.** Step 4 is outstanding. The same skill does it.
 
 **`no row in the … baseline(s)`.** A new file owes a row in the size, complexity, perf and JET
-baselines, and each gate fails without it. Stage the file first: a gate measures only what
+baselines, and each gate fails without it. Stage the file first, because a gate measures only what
 `git ls-files` names. Then run the printed `refresh --files <path>` commands, JET last.
 
 **`size: N code lines, over the ceiling`.** The size ratchet will fail. Split the file now. A
-`[note]` with less than 50 lines to spare means: plan the split before you add the units.
+`[note]` with less than 50 lines to spare means that you must plan the split before you add the
+units.
 
 ## Two things the check reports as notes, and you must still do
 
@@ -95,7 +95,7 @@ baselines, and each gate fails without it. Stage the file first: a gate measures
 `# Algorithm` section where the docstring standard demands one, no `# Details` section, a `Where:`
 bullet that interpolates `math_dict` rather than copying it, `# Related` on a dispatch alias, and
 prose that passes `/unslop`.
-`test/test_26_docs.jl` holds the first four and no gate holds the pass, which holds by review. The
+`test/test_26_docs.jl` holds the first four. No gate holds the pass, so review holds it. The
 test also holds the row's `algorithm` count as a floor. Raise
 that count in the same commit when the new unit carries the section. The check measures the count
 with `CodeHealth.algorithm_sections`, the function the test calls, and every row it prints carries
@@ -117,7 +117,7 @@ the tree you will push:
 2. Run `sweep_check.jl --fetch`. Then run the fast gates scoped to your files, one call for each
    gate: `julia --project=code_health code_health/<gate>.jl check --against origin/dev` for size,
    complexity, perf and expansion. A scoped run names the foreign rows and does not fail on them.
-   A foreign row that is red on `dev` is a defect: file it once.
+   A foreign row that is red on `dev` is a defect. File it once.
 3. **A new file enters JET at 0** (`code_health/rulings.toml`), and the fix of a report edits
    `src/`. So run `julia --project=code_health code_health/jet.jl refresh --files <new file>` as
    soon as the new file compiles. Do not keep JET for the end when a file is new.
@@ -155,13 +155,13 @@ the push in two cases, and the refusal names what to do:
 - The push changes a `.jl` file under `src/` or `ext/`, and no stamp records a gate that the
   change reaches: `size`, `complexity` and `perf` always, and `jet`, `doctest` or
   `doctest-files` as `gate_stamp.sh reach` names them. Run the gate. If it cannot apply, record
-  why: `code_health/gate_stamp.sh waive <gate> <reason>`.
+  the reason with `code_health/gate_stamp.sh waive <gate> <reason>`.
 
 `code_health/gate_stamp.sh list` shows the stamps and the waivers.
 
 ## Where the rules live
 
-The check is a convenience, never an Authority. Each rule it reports is owned elsewhere:
+The check is a convenience, never an Authority. Another file owns each rule that it reports:
 
 | Duty | Authority | Gate |
 | --- | --- | --- |

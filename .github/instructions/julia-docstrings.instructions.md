@@ -6,12 +6,12 @@ applyTo: 'src/**/*.jl, ext/**/*.jl, docs/**/*.md'
 
 ## How to read this file
 
-This file is the Authority for docstrings, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). It carries the rules, and it names where to read a real docstring. It holds no worked docstring of its own: a copy inside a standards file drifts away from the code, and a pointer cannot.
+This file is the Authority for docstrings, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). It carries the rules, and it names where to read a real docstring. It holds no worked docstring of its own. A copy inside a standards file drifts away from the code, and a pointer cannot drift.
 
 Three kinds of block appear below.
 
 - **A rule** is prose or a bullet list. It is normative.
-- **A template** is a fenced block marked `**Template.**`. Its section names, its order and its shape are normative. The identifiers inside it are invented, and they are not.
+- **A template** is a fenced block marked `**Template.**`. Its section names, its order and its shape are normative. The identifiers inside it are invented, and they are not normative.
 - **An example** is a fenced block marked `**Example.**`. It illustrates the rule beside it, and it is not normative.
 
 A fenced block inside a bullet belongs to that bullet.
@@ -20,46 +20,46 @@ To read a complete docstring, open a Unit that [Reference docstrings](#reference
 
 ## Vocabulary
 
-Five words are used precisely in this file.
+This file gives five words a precise meaning.
 
-- **Unit** — one documented name: a module, a type, a function, a macro or a constant. [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) records the unit count of every file under `src/` and `ext/`, and `test/test_45_sweep_census.jl` fails when a file's count leaves its row.
-- **Family** — a leaf abstract supertype, together with the concrete types that subtype it. Leaf-most means that no abstract type subtypes it, so a generic root such as `RiskMeasure` or `AbstractResult` is not a Family: its members span many files and share no notation. Most families sit inside one file, so a rule about a Family is local to one sweep ticket. [Notation is fixed by symbol and by family](#notation-is-fixed-by-symbol-and-by-family) is such a rule.
-- **Reference docstring** — a docstring that the [Reference docstrings](#reference-docstrings) table names. Its file is marked `swept = true` in the sweep manifest, so a Gate holds it. Read one in place of a worked example.
-- **Capability Catalogue** — the user-facing inventory of everything the package offers, built by [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl) under ADR 0040. It extracts the first sentence of a type's summary paragraph verbatim.
-- **Coverage Exemption** — a named ruling in [`code_health/rulings.toml`](../../code_health/rulings.toml) that excuses a stated number of uncovered lines in one file. [ADR 0082](../../docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) owns it.
+- **Unit.** One documented name: a module, a type, a function, a macro or a constant. [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) records the unit count of every file under `src/` and `ext/`, and `test/test_45_sweep_census.jl` fails when the count of a file leaves its row.
+- **Family.** A leaf abstract supertype, together with the concrete types that subtype it. Leaf-most means that no abstract type subtypes it. So a generic root such as `RiskMeasure` or `AbstractResult` is not a Family, because its members are in many files and share no notation. Most families are inside one file, so a rule about a Family is local to one sweep ticket. [Notation is fixed by symbol and by family](#notation-is-fixed-by-symbol-and-by-family) is such a rule.
+- **Reference docstring.** A docstring that the [Reference docstrings](#reference-docstrings) table names. The sweep manifest marks its file `swept = true`, so a Gate holds it. Read one in place of a worked example.
+- **Capability Catalogue.** The user-facing inventory of everything the package offers. [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl) builds it under ADR 0040. It extracts the first sentence of the summary paragraph of a type verbatim.
+- **Coverage Exemption.** A named ruling in [`code_health/rulings.toml`](../../code_health/rulings.toml) that excuses a stated number of uncovered lines in one file. [ADR 0082](../../docs/adr/0082-the-coverage-terminal-condition-is-a-per-file-ratchet-and-a-named-exemption.md) owns it.
 
 ## General Guidelines
 
-- Look at how other docstrings are implemented and follow similar patterns.
-- Write clear and concise documentation.
-- Use consistent terminology and style.
-- Include code examples where applicable.
+- Read the docstrings of other units, and follow their patterns.
+- Write short, clear sentences.
+- Use one word for one concept, in the same style as the other docstrings.
+- Give a code example where the unit has one.
 - **All public types, functions, and macros must have docstrings.**
-- **Scope**: `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md`. A package extension in `ext/` is documented on the same terms as `src/`.
-- **An extension documents the names it declares itself, and nothing else.** An extension implements a seam that `src/` declares, and the declaration carries the docstring, the `# References` section and the API-page entry. So a method of a function declared in `src/` gets no docstring of its own in `ext/`, and the extension's own module, constants, types and macros each get one. Write a citation in the `src/` declaration, where the API page that renders it carries the bibliography block; an extension needs neither an API page nor a bibliography block of its own. `test/test_26_docs.jl` gates this per file, through the `swept` flag in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml).
+- **Scope.** The rules cover `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md`. A package extension in `ext/` follows the same rules as `src/`.
+- **An extension documents the names it declares itself, and nothing else.** An extension adds methods to a name that `src/` declares, and the declaration carries the docstring, the `# References` section and the API-page entry. So a method of a function declared in `src/` gets no docstring of its own in `ext/`. The module, constants, types and macros of the extension each get one. Write a citation in the `src/` declaration, because the API page that renders the declaration carries the bibliography block. An extension needs neither an API page nor a bibliography block of its own. `test/test_26_docs.jl` gates this per file, through the `swept` flag in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml).
 
-## The summary sentence (load-bearing — read this before writing a type docstring)
+## The summary sentence
 
-Every type docstring opens with `$(DocStringExtensions.TYPEDEF)`, a blank line, then a **summary paragraph**. The **first sentence of that paragraph is extracted verbatim** and rendered as the type's one-line description in the [Capability Catalogue](../../docs/capability_catalogue.jl) (ADR 0040), which is the user-facing inventory of everything the package can do.
+Read this section before you write a type docstring. The Capability Catalogue reads the summary sentence, so a defect in it reaches a page. Every type docstring opens with `$(DocStringExtensions.TYPEDEF)`, a blank line, and then a **summary paragraph**. The [Capability Catalogue](../../docs/capability_catalogue.jl) (ADR 0040) **extracts the first sentence of that paragraph verbatim** and renders it as the one-line description of the type. The catalogue is the user-facing inventory of everything the package can do.
 
-This is a real contract, not a convention that merely happens to hold. It is what lets the catalogue carry prose without keeping a second, drifting copy of every description. If a docstring loses its summary paragraph, the docs build fails with an error naming the type.
+The docs build enforces this contract. Because of it, the catalogue carries prose and keeps no second copy of a description that can drift. If a docstring loses its summary paragraph, the docs build fails with an error that names the type.
 
-Write the first sentence so it stands alone in a bullet list:
+Write the first sentence so that it reads correctly alone as an entry of a bullet list:
 
-- **Lead with what it does**, in the active voice. `Sets the smallest \`num_factors\` eigenvalues to zero to denoise the matrix.` — not `A denoising algorithm that sets...`.
-- **Keep it under ~120 characters.** If the idea needs more, put a crisp first sentence and move the detail into a *second* sentence, which still renders on the API page but not in the catalogue. Do not compress by deleting information.
-- **Avoid filler openers**: `A flexible container type for...`, `A concrete estimator type for...`. They cost a line and say nothing.
+- **Lead with what it does**, in the active voice. Write `Sets the smallest \`num_factors\` eigenvalues to zero to denoise the matrix.`, not`A denoising algorithm that sets...`.
+- **Keep it under ~120 characters.** If the idea needs more, write a short first sentence and move the detail into a *second* sentence. The API page renders the second sentence, and the catalogue does not. Do not delete information to make the sentence short.
+- **Do not open with filler**, such as `A flexible container type for...` or `A concrete estimator type for...`. Such an opener costs a line and says nothing.
 - **Do not append `in \`PortfolioOptimisers.jl\``.** Every docstring in the package is in`PortfolioOptimisers.jl`.
-- **Do not put `@ref` links in the first sentence.** The catalogue appends the type's own links after the description, so a link in the summary renders twice. Put cross-references in a second sentence or in `# Related`.
-- **Do not open with a display formula.** Inline maths is fine; a full `$...$` equation belongs in `# Mathematical definition`.
-- **Never leave a bare `_` outside a code span.** Markdown reads `_` as emphasis and will pair it with the underscore inside a neighbouring `` `snake_case` `` link, eating both and destroying the link. `(f_μ vector)` sitting next to `` [`plot_factor_mu`](@ref) `` rendered as ``(fμ vector … [`plotfactor_`` — a dead link that Documenter cannot resolve and the site builder reports only as a single anonymous `./@ref`. Write `` `f_mu` `` instead.
-- **Siblings should not all share a prefix.** If every algorithm in a family starts `Centrality algorithm type for ...`, the catalogue shows that boilerplate eight times over. Say what distinguishes each one.
+- **Do not put `@ref` links in the first sentence.** The catalogue appends the links of the type after the description, so a link in the summary renders twice. Put cross-references in a second sentence or in `# Related`.
+- **Do not open with a display formula.** Inline maths is permitted. A full `$...$` equation belongs in `# Mathematical definition`.
+- **Never leave a bare `_` outside a code span.** Markdown reads `_` as emphasis. It pairs the bare `_` with the underscore inside a neighbouring `` `snake_case` `` link, removes both, and breaks the link. In one docstring, `(f_μ vector)` next to `` [`plot_factor_mu`](@ref) `` rendered as ``(fμ vector … [`plotfactor_``. Documenter cannot resolve that dead link, and the site builder reports it only as one anonymous `./@ref`. Write `` `f_mu` `` instead.
+- **Do not give every sibling the same prefix.** If every algorithm in a family starts `Centrality algorithm type for ...`, the catalogue shows that text eight times. State what makes each one different.
 
 ## The prose follows ASD-STE100
 
 The prose of a docstring follows ASD-STE100, Simplified Technical English, as the current issue of the specification states it. **The specification is the Authority for the words and the grammar.** This section states the Scope, the exception for the domain vocabulary, and the rules that a docstring adds to the specification.
 
-**Scope.** The Scope of [The prose passes `/unslop`](#the-prose-passes-unslop): the docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. The rule reads the prose alone. It does not read a code span, an identifier, a `jldoctest` block, a LaTeX expression, a heading that a template of this file fixes, or a `# References` bullet.
+**Scope.** The Scope is that of [The prose passes `/unslop`](#the-prose-passes-unslop). It holds the docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. The rule reads the prose alone. It does not read a code span, an identifier, a `jldoctest` block, a LaTeX expression, a heading that a template of this file fixes, or a `# References` bullet.
 
 **The words of `GLOSSARY.md` are approved.** A term that [`GLOSSARY.md`](../../GLOSSARY.md) defines is an approved technical name, and a verb that it defines is an approved technical verb. The exception holds when the dictionary of the specification does not contain the word, and when the dictionary gives the word a different meaning or a different part of speech.
 
@@ -88,7 +88,7 @@ The prose of a docstring follows ASD-STE100, Simplified Technical English, as th
 **Where this rule meets the other rules of this file.**
 
 - A template of this file fixes the shape of a section. The specification applies to the sentences inside it. A `# Fields` bullet, a `Where:` bullet and a `# Related` entry stay list entries.
-- The rules of [The summary sentence](#the-summary-sentence-load-bearing--read-this-before-writing-a-type-docstring) and the specification both apply to the first sentence.
+- The rules of [The summary sentence](#the-summary-sentence) and the specification both apply to the first sentence.
 - The `/unslop` pass and this rule both apply to the same prose. One rewrite can satisfy both.
 - A dictionary value is one text with many users. Rewrite it once, in its dictionary.
 
@@ -105,34 +105,34 @@ The prose of a docstring follows ASD-STE100, Simplified Technical English, as th
 
 ## DocStringExtensions.jl Macros
 
-Always use `DocStringExtensions.jl` macros where applicable rather than writing boilerplate manually:
+Where a macro of `DocStringExtensions.jl` applies, always use it in place of hand-written boilerplate:
 
 | Macro | Use for |
 | --- | --- |
 | `$(DocStringExtensions.TYPEDEF)` | Docstring header for any `abstract type` or `struct` |
-| `$(DocStringExtensions.TYPEDSIGNATURES)` | Docstring header for internal/private functions (auto-generates signature) |
-| `$(DocStringExtensions.FIELDS)` | `# Fields` section body — auto-generates field list from inline field docstrings |
-| `$(DocStringExtensions.README)` | Module-level docstring (top of main module file) |
+| `$(DocStringExtensions.TYPEDSIGNATURES)` | Docstring header for an internal or private function. It writes the signature. |
+| `$(DocStringExtensions.FIELDS)` | Body of the `# Fields` section. It writes the field list from the inline field docstrings. |
+| `$(DocStringExtensions.README)` | Module-level docstring, at the top of the main module file |
 
-Public functions use a **manually written signature** in the docstring header (not `TYPEDSIGNATURES`), because the manual form allows showing default values and grouping overloads clearly.
+A public function has a **hand-written signature** in its docstring header, not `TYPEDSIGNATURES`. The hand-written form can show the default values and group the overloads.
 
 ---
 
 ## Documentation Dictionaries
 
-Five dictionaries in `src/01_Base/01_DocstringDictionaries/` provide standardised, consistent descriptions. **Always interpolate from them** instead of writing ad-hoc text.
+Five dictionaries in `src/01_Base/01_DocstringDictionaries/` hold the standard descriptions. **Always interpolate from them**, and do not write new text in their place.
 
-- `arg_dict` — argument descriptions. Use as `$(arg_dict[:key])` in `# Arguments` sections.
-- `field_dict` — field descriptions (derived from `arg_dict`). Use as `"$(field_dict[:key])"` in inline field docstrings inside structs.
-- `val_dict` — validation rule descriptions. Use as `$(val_dict[:key])` in `## Validation` sections.
-- `ret_dict` — return value descriptions. Use as `$(ret_dict[:key])` in `# Returns` sections.
-- `math_dict` — LaTeX mathematical notation. Use as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
+- `arg_dict` holds the argument descriptions. Use it as `$(arg_dict[:key])` in `# Arguments` sections.
+- `field_dict` holds the field descriptions, which it derives from `arg_dict`. Use it as `"$(field_dict[:key])"` in inline field docstrings inside structs.
+- `val_dict` holds the descriptions of validation rules. Use it as `$(val_dict[:key])` in `## Validation` sections.
+- `ret_dict` holds the descriptions of return values. Use it as `$(ret_dict[:key])` in `# Returns` sections.
+- `math_dict` holds the LaTeX notation. Use it as `$(math_dict[:key])` in the `Where:` list of a `# Mathematical definition` or `# JuMP formulation` section.
 
 If a needed key is missing, add it to the appropriate dictionary, in the file of `src/01_Base/01_DocstringDictionaries/` that holds its subject, before writing the docstring.
 
 ### Inline field docstrings
 
-Fields in `@concrete` structs are documented inline using `field_dict`:
+Document the fields of a `@concrete` struct inline, with `field_dict`:
 
 **Example.**
 
@@ -150,13 +150,13 @@ end
 
 ### When a field description may be prose
 
-The dictionary exists to stop two copies of one sentence drifting apart. One copy cannot drift, so the rule is keyed on the number of users:
+The dictionary exists to stop two copies of one sentence drifting apart. One copy cannot drift, so the rule depends on the number of users:
 
 - A description used by **more than one field must interpolate** `field_dict`.
 - A description used by **exactly one field may be written as prose** in the struct body.
 - When a prose description gains a second user, move it into `arg_dict` and replace both copies with the interpolation.
 
-`field_dict` is derived from `arg_dict` by stripping everything up to and including the first `:`, so a new field description is added to `arg_dict`. Editing a value already in `arg_dict` moves every docstring that interpolates the key, so **add a new key rather than rewriting one that is in use**.
+The package derives `field_dict` from `arg_dict`. It removes the text up to and including the first `:`. So add a new field description to `arg_dict`. An edit to a value already in `arg_dict` changes every docstring that interpolates the key. So **add a new key, and do not rewrite a key that is in use**.
 
 **Example.**
 
@@ -179,11 +179,11 @@ A docstring has one home for each kind of fact. Put a sentence where its **subje
 
 | Section | Holds | Does not hold |
 | --- | --- | --- |
-| summary paragraph | what the unit is, in the first sentence; a trap that applies to the unit as a whole, in a later sentence | a formula, a step, or a fact about one field |
+| summary paragraph | what the unit is, in the first sentence, and a trap that applies to the whole unit, in a later sentence | a formula, a step, or a fact about one field |
 | `# Mathematical definition` | the closed form that defines the unit, and a consequence of that form | an identifier from the body, an order of operations, or a choice the implementation made |
 | `# Algorithm` | the numbered steps the body runs, each naming the quantity it produces | a closed form restated as a step |
 | `# JuMP formulation` | the model the code builds: the variables, expressions and rows it registers, the objective it sets, and the relaxation when the encoding is not exact | an entry the body does not register |
-| `# Interfaces` | on an abstract type, the methods a concrete subtype must implement, one subsection per method; a `## \`verb\`` heading names a function the package defines, and a `- \`verb(args...) -> Ret\`` bullet names that verb and only types that exist, with a `My`-prefixed name as the placeholder for the reader's own subtype (`test/test_61_interfaces_section_census.jl`) | a method the family does not dispatch on, or a name the package no longer defines |
+| `# Interfaces` | on an abstract type, the methods that a concrete subtype must implement, one subsection per method. A `## \`verb\`` heading names a function that the package defines. A `- \`verb(args...) -> Ret\`` bullet names that verb and only types that exist, with a `My`-prefixed name as the placeholder for the subtype of the reader (`test/test_61_interfaces_section_census.jl`) | a method the family does not dispatch on, or a name the package no longer defines |
 | `# Fields` | one description per field, written where the field is declared | a fact about the type as a whole |
 | `# Constructors` | the signature, `## Validation`, and the propagation subsections | a rule the constructor does not enforce |
 | `# Arguments` | the contract of each argument | the shape of the result |
@@ -195,7 +195,7 @@ A docstring has one home for each kind of fact. Put a sentence where its **subje
 
 ### `# Details` is abolished
 
-**There is no `# Details` section.** It held facts that the sections above already own, and it held them because nothing said where they belonged. Write no new one, and move an existing one by the **subject** of each fact it carries.
+**There is no `# Details` section.** It held facts that the sections above already own, and it held them because nothing said where they belonged. Write no new one. To remove an existing one, move each fact that it carries by the **subject** of the fact.
 
 | The fact is about… | It goes to |
 | --- | --- |
@@ -206,7 +206,7 @@ A docstring has one home for each kind of fact. Put a sentence where its **subje
 
 A mis-filed step goes to `# Algorithm`, an argument contract to `# Arguments`, the shape of a result to `# Returns`, and a model entry to `# JuMP formulation`.
 
-The Capability Catalogue extracts the **first sentence only** of the summary paragraph, so a later sentence of that paragraph is a safe home for a trap that applies to the whole unit.
+The Capability Catalogue extracts the **first sentence only** of the summary paragraph. So a later sentence of that paragraph is a safe place for a trap that applies to the whole unit.
 
 `test/test_26_docs.jl` gates the abolition twice. A file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries **zero** `# Details` sections, and the library-wide count of the section **may not rise**. The second check retires when that count reaches zero. [ADR 0085](../../docs/adr/0085-the-docstring-standard-is-rules-and-pointers.md) records the decision.
 
@@ -214,14 +214,14 @@ The Capability Catalogue extracts the **first sentence only** of the summary par
 
 ## A docstring cites no process
 
-A docstring documents the released unit, not the discussion that produced it. **It never names a GitHub issue, a pull request, an ADR, or an unpublished numerical experiment**, in any section, including an admonition (`!!! note`, `!!! warning`) — an admonition renders on the API page exactly like the paragraph beside it, so it is not an exception.
+A docstring documents the released unit, not the discussion that produced it. **It never names a GitHub issue, a pull request, an ADR, or an unpublished numerical experiment**, in any section. This includes an admonition (`!!! note`, `!!! warning`). An admonition renders on the API page like the paragraph beside it, so it is not an exception.
 
-The rule's Scope is every page a library user reaches without opening `docs/adr/`, not `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md` alone: the same clause governs the `Prose` text in [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl), and the rendered prose and admonitions of the Literate sources that build the example and user-guide pages, `examples/**/*.jl` and `user_guide/*.jl`. It also governs error text: the message of a `throw`, an `error`, an error constructor such as `ArgumentError(…)`, an `@argcheck` or an `@assert` under `src/` and `ext/`, and a `const` remedy string whose name ends in `_remedy` or `_message`. An error message reaches the user through the REPL, so it is as user-facing as a page. ADRs are written for a contributor deciding what to build next, not for someone calling the finished function — an ADR number means nothing to that reader and sends them looking for a file that is not part of the package.
+The Scope of the rule is every page that a library user reaches without opening `docs/adr/`. It is wider than `src/**/*.jl`, `ext/**/*.jl` and `docs/**/*.md`. The same clause governs the `Prose` text in [`docs/capability_catalogue.jl`](../../docs/capability_catalogue.jl). It governs the rendered prose and admonitions of the Literate sources that build the example and user-guide pages, `examples/**/*.jl` and `user_guide/*.jl`. It also governs error text. That is the message of a `throw`, an `error`, an error constructor such as `ArgumentError(…)`, an `@argcheck` or an `@assert` under `src/` and `ext/`, and a `const` remedy string whose name ends in `_remedy` or `_message`. An error message reaches the user through the REPL, so it is as user-facing as a page. A contributor reads an ADR to decide what to build next. A caller of the finished function is a different reader. An ADR number means nothing to that reader, and it sends them to look for a file that is not part of the package.
 
-- **State the fact, not its provenance.** Write the rule, the bound, or the defect the way a reader with no repository access needs it — what holds, what fails, and why — instead of pointing at the ticket that established it. `The clamp is a necessary and sufficient condition on the template.` stands on its own; `This closes #494 and #500.` sends the reader to a page the docstring does not need.
-- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `CODING_STANDARDS.md`, or from `GLOSSARY.md` — never from a docstring, an example, a user-guide page or the Capability Catalogue.
-- **`# References` cites only a published external source**, through `ref_dict`. A GitHub issue or pull request is neither published nor external in that sense, and gets no bullet there either.
-- **The contributor guide is the exception.** `docs/src/contribute/` and `docs/adr/` are written for a contributor, not a library user, and may cite an ADR, an issue or a PR freely.
+- **State the fact, not its provenance.** Write the rule, the bound or the defect as a reader with no access to the repository needs it. State what holds, what fails, and why. Do not point at the ticket that set the rule. `The clamp is a necessary and sufficient condition on the template.` is complete alone. `This closes #494 and #500.` sends the reader to a page that the docstring does not need.
+- **A decision belongs in `docs/adr/`.** Link an ADR from another ADR, from `CODING_STANDARDS.md`, or from `GLOSSARY.md`. Never link one from a docstring, an example, a user-guide page or the Capability Catalogue.
+- **`# References` cites only a published external source**, through `ref_dict`. A GitHub issue or pull request is neither published nor external in that sense, so it gets no bullet there either.
+- **The contributor guide is the exception.** `docs/src/contribute/` and `docs/adr/` are written for a contributor, not a library user. They can cite an ADR, an issue or a PR.
 
 ---
 
@@ -235,8 +235,8 @@ A reader who meets a source in a docstring must be able to open that source. So 
 - **Do not write an author list or a year in place of a citation.** `Györfi and Schäfer (2003)` and `Damian et al. 2023` link to nothing. Write `[gyorfischafer2003](@citet)`.
 - **Do not refer to a work as "the paper", "the article", "the source paper" or "the authors".** Repeat the citation. Put a locator before the citation: `Equation 27 of [key](@cite)`.
 - **State what the library takes from the work, and then what it adds.** First say which part of the work the unit makes: `Each rule makes one target of [schaferstrimmer2005](@cite).` Then state a generalisation or a new method in a different sentence.
-- **Tell an implementer what to supply, not where it comes from.** Write ``subtype it with the parameters of the rule and a `proj` field``. Do not write `with the paper's parameters`: the reader of an abstract type has no paper.
-- **Define each word that an argument or a field description uses.** Use a word of [`GLOSSARY.md`](../../GLOSSARY.md) or a word that the docstring defines. A private name for a value, such as "the carrier of the rule", tells the reader nothing about the value. The words for the mechanism of the code that [`julia-prose.instructions.md`](julia-prose.instructions.md) lists, such as "carrier", "seam", "host", "read-out" and "door", never appear. Name the argument, the type or the function instead: "`rd`", "the [`ReturnsResult`](@ref)", "`optimise(opt)` with no data", "[`investable_fees_view`](@ref)". The rule holds on an error message too.
+- **Tell an implementer what to supply, not where it comes from.** Write ``subtype it with the parameters of the rule and a `proj` field``. Do not write `with the paper's parameters`. The reader of an abstract type has no paper.
+- **Define each word that an argument or a field description uses.** Use a word of [`GLOSSARY.md`](../../GLOSSARY.md) or a word that the docstring defines. A private name for a value, such as "the carrier of the rule", tells the reader nothing about the value. Never use the words for the mechanism of the code that [`julia-prose.instructions.md`](julia-prose.instructions.md) lists, such as "carrier", "seam", "host", "read-out" and "door". Name the argument, the type or the function instead: "`rd`", "the [`ReturnsResult`](@ref)", "`optimise(opt)` with no data", "[`investable_fees_view`](@ref)". The rule holds on an error message too.
 - **Do not cite in the first sentence of a type docstring.** The Capability Catalogue copies that sentence to a page that has no bibliography. Name the method in the first sentence, and cite its source in the second sentence.
 - **Every work that the prose cites has a bullet in `# References` of the same docstring.** A private unit can cite. Its page under `docs/src/private_api/` then carries the bibliography block that [The `# References` Section](#the--references-section) states.
 
@@ -246,7 +246,7 @@ A method that has the name of a person, such as the Weiszfeld iteration or Welfo
 
 ### The original source
 
-A formulation is checked against its **original source**: the work that first states the formulation that the code builds. A book, a survey, a software manual or another library that restates the formulation is a **secondary source** of it. A check against a secondary source cannot find an error that the secondary source carries.
+A reviewer checks a formulation against its **original source**. The original source is the work that first states the formulation that the code builds. A book, a survey, a software manual or another library that restates the formulation is a **secondary source** of it. A check against a secondary source cannot find an error that the secondary source carries.
 
 A work is secondary for one formulation, not by its kind. A book is the original source of a formulation that it states first. An article is a secondary source of a formulation that it takes from an earlier work.
 
@@ -254,26 +254,26 @@ A work is secondary for one formulation, not by its kind. A book is the original
 - **Check the code against the original, and cite the original.** Cite a secondary source too only where it adds something, such as a generalisation or a conic encoding. The sentence that cites it says what it adds.
 - **When the original cannot be found, write the standard note.** It closes the `# References` bullet of the secondary source that the docstring follows. [The `# References` Section](#the--references-section) states its form.
 
-So a `# References` bullet with no note states that every formulation the docstring takes from that work was checked against its original source.
+So a `# References` bullet with no note states that a reviewer checked every formulation that the docstring takes from that work against its original source.
 
 ---
 
 ## The prose passes `/unslop`
 
-The prose of a docstring reads as a person wrote it for a reader. The `unslop` skill states the patterns that mark generated text, and every rule of the skill holds on the prose in this section's Scope. **The skill is the Authority for the patterns.** This section cites it by name, copies none of its rules, and names a rule of the skill by the number the skill gives it.
+The prose of a docstring reads as a person wrote it for a reader. The `unslop` skill states the patterns that mark generated text. Every rule of the skill applies to the prose in the Scope of this section. **The skill is the Authority for the patterns.** This section cites it by name, copies none of its rules, and names a rule of the skill by the number the skill gives it.
 
 **Scope.** The docstrings of `src/**/*.jl` and `ext/**/*.jl`, and the dictionary values of [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/) that they interpolate. Every text a user reads as a page is outside this section: the hand-written Markdown pages under `docs/src/`, `README.md`, the `Prose` text of the Capability Catalogue, and the Literate sources of the examples and the user guide. [`.github/instructions/julia-prose.instructions.md`](julia-prose.instructions.md) owns them all.
 
-**What the pass reads.** The prose alone: the summary paragraph, the sentences of every section, the text of every bullet and of every admonition. It does not read a code span, a `jldoctest` block, a LaTeX expression, a heading a template of this file fixes, or a `# References` bullet, which `ref_dict` writes.
+**What the pass reads.** The pass reads the prose alone. That is the summary paragraph, the sentences of every section, and the text of every bullet and of every admonition. It does not read a code span, a `jldoctest` block, a LaTeX expression, a heading that a template of this file fixes, or a `# References` bullet, which `ref_dict` writes.
 
 **Where this file and the skill meet.**
 
-- A template of this file fixes the shape of a section, and the skill's rules apply to the sentences inside it. A `# Fields` bullet, a `Where:` bullet and a `# Related` entry are list entries by template. Rule 33 asks each to carry its articles and its verb, and it does not ask it to become a paragraph.
-- A dictionary value is one text with many users. It is rewritten once, in its dictionary, and every docstring that interpolates it changes with it.
+- A template of this file fixes the shape of a section, and the rules of the skill apply to the sentences inside it. A `# Fields` bullet, a `Where:` bullet and a `# Related` entry are list entries by template. Rule 33 asks each to carry its articles and its verb. It does not ask each to become a paragraph.
+- A dictionary value is one text with many users. Rewrite it once, in its dictionary. Every docstring that interpolates it then changes with it.
 - Rules 20 and 22 describe a chat reply. They never arise in a docstring.
 - Every other rule applies as written.
 
-**How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit, "What makes this obviously AI generated?". A pass changes prose alone: a line of code, a `jldoctest` block and its output, a LaTeX expression and an interpolated key stay as they are.
+**How to apply it.** Invoke `/unslop` on the file. When the skill cannot be invoked, read its rules and apply them by hand. Rewrite the prose, keep the meaning, and end with the skill's self-audit, "What makes this obviously AI generated?". A pass changes prose alone. A line of code, a `jldoctest` block and its output, a LaTeX expression and an interpolated key stay as they are.
 
 **The Gate.** None. The rules that matter most, such as rules 27, 28 and 32, are judgements that no parser reads, so the rule holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). A file whose sweep-manifest row reads `swept = true` owes the pass, and the file's sweep ticket carries it.
 
@@ -386,37 +386,37 @@ end
 
 ### `@propagatable` concrete struct types
 
-When a struct is decorated with `@propagatable`, its fields carry stackable tags inside the struct body. Three of them drive a generated method whose behaviour a reader of the type needs to know:
+When `@propagatable` decorates a struct, its fields carry stackable tags inside the struct body. Each of three tags controls a generated method, and a reader of the type needs to know what that method does:
 
-- `@fprop` — **factory propagation**: [`factory`](@ref) on the enclosing struct passes its arguments on to the field (see `factory_child` for dispatch rules).
-- `@vprop` — **view propagation**: [`port_opt_view`](@ref) on the enclosing struct takes the view of the field along the **asset** axis. It recurses into composed children and slices data arrays.
-- `@wprop` — **observation weights**: the field holds the weights themselves. It drives **two** channels, and they do different things to it: [`factory`](@ref) **replaces** it with an incoming [`ObsWeights`](@ref) value, and [`obs_weights_view`](@ref) **indexes** the value already there, along the **observation** axis.
+- `@fprop` selects **factory propagation**. [`factory`](@ref) on the enclosing struct passes its arguments on to the field. `factory_child` states the dispatch rules.
+- `@vprop` selects **view propagation**. [`port_opt_view`](@ref) on the enclosing struct takes the view of the field along the **asset** axis. It recurses into composed children and slices data arrays.
+- `@wprop` marks the **observation weights**. The field holds the weights. The tag controls **two** channels, and they do different things to the field. [`factory`](@ref) **replaces** it with an incoming [`ObsWeights`](@ref) value, and [`obs_weights_view`](@ref) **indexes** the value that is already there, along the **observation** axis.
 
-(`@pprop` and `@cprop` drive prior selection. They are documented on the prior families, not here.)
+`@pprop` and `@cprop` control the selection of the prior. The docstrings of the prior families document them, and this file does not.
 
-A field may carry any combination (`@fprop @vprop field`, in either order) — the field sets of the channels genuinely diverge, so a field can be factory-propagated but view-passthrough, or vice versa. **Document each channel in its own subsection inside `# Constructors`**, placed **after** `## Validation` (or directly after "Keywords correspond to the struct's fields." when there is no `## Validation`), in the order below.
+A field can carry any combination of tags, such as `@fprop @vprop field`, in either order. The channels read different field sets. So the factory channel can propagate a field that the view channel passes through unchanged, and the reverse is also possible. **Document each channel in its own subsection inside `# Constructors`**, in the order below. Put the subsections **after** `## Validation`. When there is no `## Validation`, put them directly after "Keywords correspond to the struct's fields.".
 
-**A subsection documents a channel, not a tag.** A channel is gated on more than one tag, so the field list of a subsection is the union of the tags that channel reads. Write a subsection when at least one field carries a tag that gates it, and omit it otherwise. The view channel carries one more trigger: a hand-written [`port_opt_view`](@ref) method earns the subsection even when no field carries `@vprop`.
+**A subsection documents a channel, not a tag.** More than one tag can open a channel, so the field list of a subsection is the union of the tags that the channel reads. Write a subsection when at least one field carries a tag that opens its channel, and omit it otherwise. The view channel has one more trigger. A hand-written [`port_opt_view`](@ref) method needs the subsection even when no field carries `@vprop`.
 
-`## Propagated parameters` — the **factory** channel, gated on `@fprop` and `@wprop`. Lists each field and how it is propagated:
+`## Propagated parameters` documents the **factory** channel, which `@fprop` and `@wprop` open. It lists each field and how the channel propagates it:
 
-- **Observation-weight fields** (`@wprop`; type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`): write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
-- **Estimator, algorithm, or result fields** (`@fprop`; subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively updated through [`factory`](@ref). ``
-- **The partial-fit state** (`@fprop cache`; `Option{<:AbstractPartialFitState}`): write `` `cache`: Carried unchanged through [`factory`](@ref). ``
+- For an **observation-weight field**, which carries `@wprop` and has the type `ObsWeights`, `Nothing`, or `Option{<:ObsWeights}`, write `` `fieldname`: Replaced with the incoming [`ObsWeights`](@ref). ``
+- For an **estimator, algorithm, or result field**, which carries `@fprop` and is a subtype of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`, write `` `fieldname`: Recursively updated through [`factory`](@ref). ``
+- For **the partial-fit state**, `@fprop cache` of the type `Option{<:AbstractPartialFitState}`, write `` `cache`: Carried unchanged through [`factory`](@ref). ``
 
-`## View parameters` — the **view** channel. Write it when the type has a [`port_opt_view`](@ref) method, whether [`@propagatable`](@ref) generates that method from a `@vprop` tag or the file defines one by hand. The two cases carry different content.
+`## View parameters` documents the **view** channel. Write it when the type has a [`port_opt_view`](@ref) method. [`@propagatable`](@ref) can generate that method from a `@vprop` tag, or the file can define one by hand. The two cases need different content.
 
-**A generated method** — at least one field carries `@vprop`. List each tagged field and how it is viewed:
+**A generated method.** At least one field carries `@vprop`. List each tagged field and how the method takes its view:
 
-- **Estimator, algorithm, or result fields** (subtypes of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`): write `` `fieldname`: Recursively viewed through [`port_opt_view`](@ref). ``
-- **Data fields** (arrays, scalars, or `Option` thereof): write `` `fieldname`: Sliced to the selected indices through [`port_opt_view`](@ref). ``
-- **The partial-fit state** (`@vprop cache`): write `` `cache`: Sliced to the selected assets through [`port_opt_view`](@ref). ``
+- For an **estimator, algorithm, or result field**, a subtype of `AbstractEstimator`, `AbstractAlgorithm`, or `AbstractResult`, write `` `fieldname`: Recursively viewed through [`port_opt_view`](@ref). ``
+- For a **data field**, an array, a scalar, or an `Option` of one, write `` `fieldname`: Sliced to the selected indices through [`port_opt_view`](@ref). ``
+- For **the partial-fit state**, `@vprop cache`, write `` `cache`: Sliced to the selected assets through [`port_opt_view`](@ref). ``
 
-**A hand-written method** — no field carries `@vprop`, and the file defines `port_opt_view(x::MyType, i, args...)`. A field list misdescribes such a method: it reads arguments no tag can name, and it applies rules no tag can encode. Open the subsection with
+**A hand-written method.** No field carries `@vprop`, and the file defines `port_opt_view(x::MyType, i, args...)`. A field list gives a wrong description of such a method. The method reads arguments that no tag can name, and it applies rules that no tag can encode. Open the subsection with
 
 > `MyType` defines its own [`port_opt_view`](@ref) method rather than deriving one from field tags.
 
-and follow that with a bullet list of high-level details. Cover these points, in this order, and only where the method has something to say:
+Then write a bullet list of high-level details. Cover these points, in this order, and only where the method has something to state:
 
 - Which arguments beyond `i` the method reads, and what it does with them.
 - Which fields recurse through [`port_opt_view`](@ref), and with which arguments.
@@ -424,16 +424,16 @@ and follow that with a bullet list of high-level details. Cover these points, in
 - Which fields pass through unchanged, where a reader would expect otherwise.
 - Any rule the method enforces or preserves that a field list cannot show.
 
-Describe the method, do not transcribe it. A field carried through with nothing to say about it needs no bullet.
+Describe the method. Do not copy its code into prose. A field that the method passes through, with nothing to state about it, needs no bullet.
 
-`## Observation weight parameters` — the **observation** channel, gated on `@wprop` alone. A type with no `@wprop` field never gains this subsection, whatever else it carries. Lists each field and how it is indexed:
+`## Observation weight parameters` documents the **observation** channel, which `@wprop` alone opens. A type with no `@wprop` field never has this subsection, whatever other tags it carries. The subsection lists each field and how the channel indexes it:
 
-- **Observation-weight fields** (`@wprop`): write `` `fieldname`: Indexed to the selected observations through [`obs_weights_view`](@ref). ``
-- **Estimator, algorithm, or result fields** (`@fprop`): write `` `fieldname`: Recursively indexed through [`obs_weights_view`](@ref). ``
+- For an **observation-weight field**, which carries `@wprop`, write `` `fieldname`: Indexed to the selected observations through [`obs_weights_view`](@ref). ``
+- For an **estimator, algorithm, or result field**, which carries `@fprop`, write `` `fieldname`: Recursively indexed through [`obs_weights_view`](@ref). ``
 
-> **The same field appears in two subsections, saying two different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. That is not a duplication to collapse: it is the one place a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling appears in both too, and recurses in both.
+> **The same field appears in two subsections, and the two state different things.** A `@wprop` field is *replaced* under `## Propagated parameters` and *indexed* under `## Observation weight parameters`. Do not merge the two. This is the one place where a reader learns that `factory` and `obs_weights_view` treat the field differently. A `@fprop` sibling also appears in both, and it recurses in both.
 
-List fields in the same order they appear in the struct body, and add [`factory`](@ref), [`port_opt_view`](@ref) and/or [`obs_weights_view`](@ref) to `# Related` to match the subsections present. `test/test_83_propagation_list_census.jl` holds the two lists of the `factory` and `view` channels: each names exactly the fields its channel reads, in body order.
+List the fields in the order of the struct body. Add [`factory`](@ref), [`port_opt_view`](@ref) or [`obs_weights_view`](@ref) to `# Related`, one for each subsection that is present. `test/test_83_propagation_list_census.jl` checks the two lists of the `factory` and `view` channels. Each list must name exactly the fields that its channel reads, in the order of the body.
 
 **Template.**
 
@@ -570,13 +570,13 @@ function function_name(arg1::Type1, arg2::Type2; kwarg1::Type3 = default)
 end
 ````
 
-Internal/private functions may use `$(DocStringExtensions.TYPEDSIGNATURES)` as the header instead of a manually written signature.
+An internal or private function can use `$(DocStringExtensions.TYPEDSIGNATURES)` as the header in place of a hand-written signature.
 
 ---
 
 ## Section Structure for Aliases
 
-An **alias** is a second name for something another docstring already documents. Its docstring routes the reader to that documentation. It restates none of it, because a second copy drifts away from the first — the argument that put the field descriptions into `field_dict`.
+An **alias** is a second name for something another docstring already documents. Its docstring sends the reader to that documentation, and it restates none of it. A second copy drifts away from the first. The same argument put the field descriptions into `field_dict`.
 
 Three kinds of alias exist, and the sections differ by kind.
 
@@ -586,19 +586,19 @@ Three kinds of alias exist, and the sections differ by kind.
 | **Factory alias** | `MAD(; kwargs...)::LowOrderMoment` | `src/23_Aliases.jl` only | the signature, ending `-> T` | `# Validation`, and only when its own body raises |
 | **Dispatch alias** | `const RhoDistanceAlgorithm = Union{...}` | any file under `src/` | the declaration, `const NAME = <type expression>` | `# Related`, and `# References` when the grouping itself is published |
 
-A **dispatch alias** is a `const` bound to a type expression rather than to a bare name. A `Union`, a container such as `AbstractVector{<:LinearConstraint}`, and a parametrised form such as `const RMCVaR{T} = Union{...}` are all one kind, because a caller meets all three the same way: as the type a method signature dispatches on.
+A **dispatch alias** is a `const` bound to a type expression rather than to a bare name. A `Union`, a container such as `AbstractVector{<:LinearConstraint}`, and a parametrised form such as `const RMCVaR{T} = Union{...}` are all one kind. A caller meets all three the same way, as the type that a method signature dispatches on.
 
 ### The summary paragraph
 
 - An **acronym alias** carries exactly one sentence, `Alias for [`Canonical`](@ref).` and nothing more. The alias and its target are the same object, so a second sentence describes the target and belongs on the target.
-- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted, and only for a choice the composition fixes that a reader would otherwise get wrong. Read `ZeroVarianceFilter` in [`src/23_Aliases.jl`](../../src/23_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
-- A **dispatch alias** carries what the alias groups and why the group exists. The *why* is the load-bearing half: a reader who sees only the member list learns nothing the declaration did not already show.
+- A **factory alias** carries one sentence naming what it builds. That sentence `@ref`s every type the factory composes. A later sentence is permitted only for a choice that the composition fixes and that a reader can otherwise get wrong. Read `ZeroVarianceFilter` in [`src/23_Aliases.jl`](../../src/23_Aliases.jl), which states why it scores with `SCM()` and not with `Variance`.
+- A **dispatch alias** carries what the alias groups and why the group exists. The *why* is the important half. A reader who sees only the member list learns nothing that the declaration does not already show.
 
 ### Why an alias carries so little
 
-- **No `# Fields`, no `# Constructors`, no `# Arguments`, no `# Returns`, no `# Examples`, on any kind.** The canonical unit owns each of them, and the summary sentence puts it one click away. A copy on the alias is a second text to maintain and the one a reader reaches first when it goes stale.
-- **No `# Related` on an acronym alias or on a factory alias.** Its summary sentence already `@ref`s every canonical name, and `## What each section holds` states that `# Related` does not hold a copy of the related unit's own text. One link, once.
-- **`# Related` on a dispatch alias**, one bullet per grouped member. A group of members is a list, and a summary sentence must not be one. A function that dispatches on the alias may take a bullet of its own.
+- **No `# Fields`, no `# Constructors`, no `# Arguments`, no `# Returns`, no `# Examples`, on any kind.** The canonical unit has each of them, and the summary sentence links to that unit. A copy on the alias is a second text to maintain. When the copy becomes stale, it is still the text that a reader finds first.
+- **No `# Related` on an acronym alias or on a factory alias.** Its summary sentence already `@ref`s every canonical name. `## What each section holds` states that `# Related` does not hold a copy of the text of the related unit. Write each link once.
+- **`# Related` on a dispatch alias** has one bullet for each grouped member. A group of members is a list, and a summary sentence must not be one. A function that dispatches on the alias may take a bullet of its own.
 - **`# Algorithm`, `# Mathematical definition` and `# JuMP formulation` reach no alias.** An alias runs no steps and registers no model entry. A factory alias composes types and takes no branch worth numbering.
 
 The Capability Catalogue lists an alias in `NOT_A_FEATURE` with the reason `:alias`, under [`.github/instructions/julia-source-code.instructions.md`](julia-source-code.instructions.md), so it never reads an alias summary sentence.
@@ -607,11 +607,11 @@ The Capability Catalogue lists an alias in `NOT_A_FEATURE` with the reason `:ali
 
 `test/test_26_docs.jl` gates the rule with three checks, in the shape [ADR 0086](../../docs/adr/0086-an-alias-docstring-links-its-canonical-unit-and-restates-nothing.md) records.
 
- 1. **Library-wide, absolute.** No alias carries a section outside its kind's row of the table above. A new breach is the only way this check can red.
+ 1. **Library-wide, absolute.** No alias carries a section outside the row of its kind in the table above. Only a new breach can make this check fail.
  2. **A swept file, presence.** A dispatch alias in a file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries `# Related`.
- 3. **Library-wide, a ratchet.** The count of dispatch aliases carrying no `# Related` may not rise. The check retires when that count reaches zero.
+ 3. **Library-wide, a count that may not rise.** The count of dispatch aliases carrying no `# Related` may not rise. The check retires when that count reaches zero.
 
-Check 2 reads the `swept` flag because it demands a section, and a presence demand may not red a file that no child map of issue #404 has swept. Check 1 forbids a section instead, so it needs no flag.
+Check 2 reads the `swept` flag because it demands a section. A demand for a section must not fail a file that no child map of issue #404 swept. Check 1 forbids a section instead, so it needs no flag.
 
 ---
 
@@ -619,7 +619,7 @@ Check 2 reads the `swept` flag because it demands a section, and a presence dema
 
 - Include a `## Validation` sub-section in struct docstrings and a `# Validation` section in function docstrings whenever the function or constructor enforces preconditions.
 - Use `val_dict` entries for common validation rules.
-- For custom validation, describe the condition clearly: `` `x > 0` ``.
+- For custom validation, state the condition as code, such as `` `x > 0` ``.
 
 ---
 
@@ -646,7 +646,7 @@ A docstring that rests on a published source names it. The section is **last**, 
 
   The note is one key of `ref_dict`, `no_original_source`, so its wording cannot drift and a search for the key lists every formulation that is still open. Its text is "The original source of this formulation was not found. The formulation follows this work and is not checked against the original." It is the one key of `ref_dict` that is not a key of `docs/src/References.bib`. The locator is mandatory, because a later search starts from it. A docstring that follows a secondary source for one formulation and an original source for another carries the note on the bullet of the secondary source alone, and the locator names the formulation.
 
-  The note is the honest result of a search, so no ratchet counts the notes. A note leaves when a later search finds the original: the docstring then cites the original, and the code is checked against it.
+  The note records the result of a search, so no test limits the number of notes. Remove a note when a later search finds the original. The docstring then cites the original, and a reviewer checks the code against it.
 - **If the work has no key**, add the BibTeX entry to `docs/src/References.bib`, then add the matching `ref_dict` entry. The `ref_dict` value is the citation marker followed by the reference formatted as `DocumenterCitations` renders it in the bibliography.
 - **If the type has no source**, write no section. A `ref_dict` entry with no user is a test failure, and so is a citation whose key is not in `References.bib`.
 - **Add the page's bibliography block.** An API page whose prose or whose included docstrings cite anything carries this block, and a page that cites nothing must not:
@@ -660,33 +660,34 @@ A docstring that rests on a published source names it. The section is **last**, 
   ```
   ````
 
-  `Canonical = false` is load-bearing. `docs/src/99_references.md` holds the one canonical block; a second canonical block silently skips every entry the first claimed. A `Pages` block on a page that cites nothing is a docs-**build error**, not a warning.
-- An inline citation in prose — `as described in [DBHTs](@cite)` — needs no bullet of its own, but the work still needs a `# References` bullet on the type that owns it.
+  `Canonical = false` is necessary. `docs/src/99_references.md` holds the one canonical block. A second canonical block skips every entry that the first block claimed, and it gives no warning. A `Pages` block on a page that cites nothing is a docs-**build error**, not a warning.
+- An inline citation in prose, such as `as described in [DBHTs](@cite)`, needs no bullet of its own. The work still needs a `# References` bullet on the type that owns it.
 
-The rules above are checked by the `"References"` testset in `test/test_26_docs.jl`. It checks the form of the note: the note closes a `# References` bullet, a locator comes before it, and it appears nowhere else. The check of a formulation against its original source holds by review.
+The `"References"` testset in `test/test_26_docs.jl` checks the rules above. It also checks the form of the note. The note closes a `# References` bullet, a locator comes before it, and it appears nowhere else. The check of a formulation against its original source holds by review.
 
 ---
 
 ## `jldoctest` Examples
 
-- All examples in docstrings must use `jldoctest` blocks so they are testable via `julia --doctest`.
+- All examples in docstrings must use `jldoctest` blocks, so that `julia --doctest` can test them.
 - Output of pretty-printed structs must match exactly what `@define_pretty_show` produces.
 - For abstract types with an `# Interfaces` section, the `jldoctest` must demonstrate a complete working implementation of the interface.
-- Keep examples minimal but complete enough to be useful.
+- Keep an example small, but complete enough to be useful.
 
 ---
 
 ## `docs/src/public_api/` and `docs/src/private_api/` Markdown Files
 
 Each source file `src/SomeFeature.jl` has a corresponding page on both mirror trees:
-`docs/src/public_api/SomeFeature.md` and `docs/src/private_api/SomeFeature.md`. A symbol lands
-on exactly one of the two — public when it is `export`ed, `public`-declared, or extends a
-foreign generic such as `Base.iterate` or `StatsAPI.fit`; private otherwise — per
-`docs/api_classification.jl`'s `classify_binding` (ADR 0128). A side with nothing on it still
-gets its page, holding a one-line note that the file has no public (or no private) names.
+`docs/src/public_api/SomeFeature.md` and `docs/src/private_api/SomeFeature.md`.
+`classify_binding` in `docs/api_classification.jl` puts a symbol on exactly one of the two
+(ADR 0128). A symbol is public when it is `export`ed, `public`-declared, or extends a foreign
+generic such as `Base.iterate` or `StatsAPI.fit`. Every other symbol is private. A side with no
+symbol still gets its page. That page holds a one-line note that the file has no public names, or
+no private names.
 
-List the symbol under an appropriate heading using the Documenter.jl `@docs` block, on whichever
-mirror its classification puts it:
+List the symbol in a Documenter.jl `@docs` block under a suitable heading, on the mirror that its
+classification names:
 
 **Template.**
 
@@ -700,20 +701,20 @@ MyAbstractType
 ```
 ````
 
-When adding a new symbol, also add it to the corresponding mirror page.
-`test/test_65_docs_public_private_placement_census.jl` gates that every `@docs` entry sits on
-the side its classification names.
+When you add a new symbol, add it to its mirror page too.
+`test/test_65_docs_public_private_placement_census.jl` checks that every `@docs` entry is on the
+side that its classification names.
 
 **The H1 names the file of the page.** The H1 is the name of the page's file, without the numeric
 prefix and the extension, with its words separated. Split the words at each underscore and at each
 change of case: `01_Base_OnlinePortfolioSelection.md` takes `# Base Online Portfolio Selection`,
 and `03_GerberIQCovariance_a.md` takes `# Gerber IQ covariance (a)`. The case, the spaces and the
-punctuation are free, so `01_XatRisk.md` can take `# X at risk`. A word cannot change: do not
+punctuation are free, so `01_XatRisk.md` can take `# X at risk`. A word cannot change. Do not
 expand `Exp` to `Exponentially`, and do not write `ℓ1` for `L1`. The H1 does not describe the page.
 Put the description in the first paragraph under the H1. The private mirror adds `: private API`
 to the same text. Documenter shows the H1 as the label of the page in the navigation, and a
-description there hides the file that the page documents. The `Description` line of the page is
-derived from the H1, so a change to the H1 changes that line: take the new line from
+description there hides the file that the page documents. The `Description` line of the page
+comes from the H1, so a change to the H1 changes that line. Take the new line from
 `mirror_description` in `docs/page_metadata.jl`. If the H1 carries an `@id` label, the label is
 `api-` or `private-api-` followed by the H1 in lower case with hyphens between the words. Change
 every `@ref` to the label in the same commit. `names_its_file` in `docs/page_metadata.jl` states
@@ -729,16 +730,16 @@ When a type or function has a mathematical formulation, include a `# Mathematica
 
 The section states the mathematics and nothing else. It **names no identifier from the body, states no order of operations, and states no property that the implementation chose rather than the mathematics.** A consequence of the definition stays, because a consequence is mathematics.
 
-`# Algorithm` carries the reverse rule — *do not restate a closed form as a step*. The two rules bound one border from opposite sides, so a fact that fails this rule usually already stands as a step, and the fix is to delete it here rather than to move it.
+`# Algorithm` has the reverse rule, *do not restate a closed form as a step*. The two rules mark one border from its two sides. So a fact that fails this rule is usually already a step, and the fix is to delete it here, not to move it.
 
-**Example.** Read against `ShrunkDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl):
+**Example.** Compare these sentences with `ShrunkDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl):
 
-- CUT — *the eigenvalues sorted ascending*. The sort is the body's choice, and it is already an `# Algorithm` step.
-- CUT — *the diagonal is pinned to one afterwards to shed the eigendecomposition round-off*. That is an `# Algorithm` step too.
-- CUT — `vals`, `vecs`, `corr0`. Each names a local of the body.
-- KEEP — *the two `alpha` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic*. That is a consequence of the definition, and it holds whatever the body does.
+- Cut *the eigenvalues sorted ascending*. The sort is a choice of the body, and it is already an `# Algorithm` step.
+- Cut *the diagonal is pinned to one afterwards to shed the eigendecomposition round-off*. That is an `# Algorithm` step too.
+- Cut `vals`, `vecs`, `corr0`. Each names a local of the body.
+- Keep *the two `alpha` weights sum to one on the diagonal, so the reconstruction preserves it in exact arithmetic*. That is a consequence of the definition, and it holds whatever the body does.
 
-An implementation fact is not a token, so no parser finds one. This rule is **unenforced**: it holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). That is a known state and not a hidden one.
+An implementation fact is not a token, so no parser finds one. This rule is **unenforced**. It holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). That state is known, and it is not hidden.
 
 ### LaTeX conventions
 
@@ -753,7 +754,7 @@ An implementation fact is not a token, so no parser finds one. This rule is **un
 
 ### `\begin{align}` environment
 
-All math blocks use `\begin{align}...\end{align}` with `&` alignment markers and `\\` line breaks. Each separate equation goes on its own line. Use `\quad` for in-equation spacing only; split distinct equations onto separate lines (never `\qquad` between two equations in the same block).
+All math blocks use `\begin{align}...\end{align}` with `&` alignment markers and `\\` line breaks. Put each equation on its own line. Use `\quad` only for spacing inside one equation. Put two equations on two lines, and never put `\qquad` between two equations in the same block.
 
 **Example.**
 
@@ -779,7 +780,7 @@ All math blocks use `\begin{align}...\end{align}` with `&` alignment markers and
 
 ### `Where:` section
 
-Immediately after each math block (or after the **last** math block when multiple consecutive blocks belong to the same docstring), add a `Where:` bullet list defining every symbol. Use `$(math_dict[:key])` for common variables.
+Directly after each math block, add a `Where:` bullet list that defines every symbol. When many consecutive blocks belong to the same docstring, add the list after the **last** math block. Use `$(math_dict[:key])` for common variables.
 
 **Template.**
 
@@ -807,10 +808,10 @@ Where:
 
 Key rules:
 
-- One comprehensive `Where:` after the last block is acceptable when multiple blocks appear in the same docstring.
-- Every symbol that appears in any block must be defined.
+- When many blocks are in the same docstring, one complete `Where:` list after the last block is acceptable.
+- The list must define every symbol that appears in any block.
 - Interpolate `$(math_dict[:key])` for standardised variables (``T``, ``\boldsymbol{x}_t``, ``\alpha``, etc.).
-- If a key is missing from `math_dict`, add it to the `*_Math*.jl` file of `src/01_Base/01_DocstringDictionaries/` that holds its subject first.
+- If a key is missing from `math_dict`, first add it to the `*_Math*.jl` file of `src/01_Base/01_DocstringDictionaries/` that holds its subject.
 
 ---
 
@@ -818,29 +819,29 @@ Key rules:
 
 The rules above fix the glyphs. The two below fix the content, so that two docstrings that state one quantity state it once and state it alike.
 
-**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose): one copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
+**A shared symbol becomes a `math_dict` key.** A symbol that appears in the docstrings of two or more Units gets a key in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/), and every site interpolates it. A symbol that exactly one Unit uses may stay inline, on the reasoning of [When a field description may be prose](#when-a-field-description-may-be-prose). One copy cannot drift. When a second Unit needs it, move it into `math_dict` and replace both copies with the interpolation.
 
-A new description is a **new** key. Editing a value already in `math_dict` moves every docstring that interpolates it, which is the reason [ADR 0081](../../docs/adr/0081-the-docstring-standard-states-the-model-it-builds.md) gives for `arg_dict`.
+A new description is a **new** key. An edit to a value already in `math_dict` changes every docstring that interpolates it. [ADR 0081](../../docs/adr/0081-the-docstring-standard-states-the-model-it-builds.md) gives the same reason for `arg_dict`.
 
-**A key owns a definition, not a glyph.** One glyph carries different quantities in different families: ``\boldsymbol{w}`` is the portfolio weights vector in a risk measure and the observation weights in a moment estimator. A key is therefore claimed by the whole definition — the symbol together with the sentence that defines it — and a second quantity on the same glyph takes its own key under its own symbol. It never takes a second meaning on the first.
+**A key owns a definition, not a glyph.** One glyph carries different quantities in different families. ``\boldsymbol{w}`` is the portfolio weights vector in a risk measure and the observation weights in a moment estimator. So the whole definition claims a key. The definition is the symbol together with the sentence that defines it. A second quantity on the same glyph takes its own key under its own symbol. It never adds a second meaning to the first key.
 
-**One quantity takes one key.** The converse of the rule above. Two keys that define one quantity are drift inside the table that exists to stop drift, and the docstrings that read them state one thing in two spellings. `:w_t_moment`, `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, under ``w_t``, ``w_{t}`` and ``w_{i}``, and as "observation ``t``" against "period ``i``". They are one key, `:w_t_obs`. A new key states a quantity the table does not already carry; a new *description* of a quantity it does carry is a change to the key that owns it, under the rule above.
+**One quantity takes one key.** This is the converse of the rule above. Two keys that define one quantity are drift inside the table that exists to stop drift. The docstrings that read them state one thing in two spellings. `:w_t_moment`, `:w_t_obsweight` and `:cal_w_i` each defined the observation weight, under ``w_t``, ``w_{t}`` and ``w_{i}``, and as "observation ``t``" against "period ``i``". They are one key, `:w_t_obs`. A new key states a quantity that the table does not already carry. A new *description* of a quantity that the table carries is a change to the key that owns it, under the rule above.
 
-**Gate.** Two checks in `test/test_26_docs.jl`, one for each direction. The first reds when a `Where:` bullet copies a `math_dict` value instead of interpolating it. It matches the whole bullet against the whole value, so it fires on a copy and never on a glyph that two families share. A file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain migrate file by file, inside each file's own sweep ticket of issue #404.
+**Gate.** Two checks in `test/test_26_docs.jl`, one for each direction. The first fails when a `Where:` bullet copies a `math_dict` value and does not interpolate it. It matches the whole bullet against the whole value. So it finds a copy, and it never fires on a glyph that two families share. A file marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) carries no such copy, and the library-wide count may not rise. The copies that remain move file by file, inside the sweep ticket of each file under issue #404.
 
-The second reads the table itself, and reds when two keys open with one definition head — the noun phrase before the first punctuation mark and the first function word. A head that several keys share is recorded in that testset with the reason the keys are not one, so a new key may not restate a definition the table already carries. A head is a coarse instrument: two keys worded differently do not match, and the per-file sweep ticket reads that pair by hand.
+The second check reads the table itself. It fails when two keys open with one definition head. The head is the noun phrase before the first punctuation mark and the first function word. That testset records each head that several keys share, with the reason that the keys are not one. So a new key may not restate a definition that the table already carries. A head is a coarse check. Two keys with different words do not match, and the sweep ticket of the file reads that pair by hand.
 
-**Siblings of one Family state a shared quantity in the same form.** Not the same symbol alone — the same shape of equation. A condition that one sibling writes in a parenthesis, the second in set notation and the third in its `Where:` list is one fact written three ways, and the three do not read as one Family. Take the shape from the sibling that states it most completely, and write the others to match it.
+**Siblings of one Family state a shared quantity in the same form.** They use the same symbol and the same shape of equation. A condition that one sibling writes in a parenthesis, the second in set notation and the third in its `Where:` list is one fact written three ways, and the three do not read as one Family. Take the shape from the sibling that states it most completely, and write the others to match it.
 
 The Family is the leaf-most abstract supertype, never a generic root. `RiskMeasure` and `AbstractResult` span many files and their members share no notation, so neither is a Family in this sense.
 
-An equation's form is not a token, so no parser finds a breach. This rule is **unenforced**: it holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). That is a known state and not a hidden one.
+The form of an equation is not a token, so no parser finds a breach. This rule is **unenforced**. It holds by review, in the sense of [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md). That state is known, and it is not hidden.
 
 ---
 
 ## The `# Algorithm` Section
 
-A **procedure** is documented in `# Algorithm`. A **closed form** stays in `# Mathematical definition`. A docstring may carry both sections, and a marker type carries neither.
+Document a **procedure** in `# Algorithm`. A **closed form** stays in `# Mathematical definition`. A docstring can carry both sections, and a marker type carries neither.
 
 `# Algorithm` sits immediately after `# Mathematical definition`, and before `# Fields` (for structs) or before `# Arguments` (for functions).
 
@@ -849,7 +850,7 @@ Rules:
 - Write **numbered steps, one step per operation**. Each step names the quantity that the operation produces.
 - Name each quantity by the name that the body gives it, so a reader can follow the steps in the code.
 - Do not restate a closed form as a step. The formula belongs in `# Mathematical definition`, and the step that applies it names it.
-- A **selector tag** — a type whose only job is to name the branch that a caller takes — is never *forced* to carry either section. Its summary sentence states which branch it selects, and a tag that names nothing further stops there. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type. A tag whose branch *is* a closed form does state it: the form under `# Mathematical definition`, and the steps of that branch under `# Algorithm`. `SpectralDenoise` is the reference for that shape, and the row below points at it.
+- A **selector tag** is a type whose only job is to name the branch that a caller takes. The rule never *forces* a selector tag to carry either section. Its summary sentence states which branch it selects, and a tag that names nothing more stops there. Most subtypes of `AbstractAlgorithm` are selector tags, so the rule must never force numbered steps onto a marker type. A tag whose branch *is* a closed form states that form. The form goes under `# Mathematical definition`, and the steps of that branch go under `# Algorithm`. `SpectralDenoise` is the reference for that shape, and a row of the table in [Reference docstrings](#reference-docstrings) names it.
 
 **Example.** The following is the algorithm of `denoise!(dn::Denoise, X::MatNum, q::Number)` in `src/04_MatrixProcessing/02_Denoise.jl`:
 
@@ -872,9 +873,9 @@ Rules:
 
 ## The `# JuMP formulation` Section
 
-Any code that **builds part of a `JuMP.Model`** carries this section. It states the model that the code builds, which the mathematics alone does not: a model entry carries a name, a caller reads the entry back by that name, and the encoding is not always exact.
+Any code that **builds part of a `JuMP.Model`** carries this section. It states the model that the code builds, and the mathematics alone does not state the model. A model entry has a name, a caller reads the entry back by that name, and the encoding is not always exact.
 
-The trigger is mechanical. The body calls `JuMP.@variable`, `JuMP.@variables`, `JuMP.@expression`, `JuMP.@expressions`, `JuMP.@constraint`, `JuMP.@constraints` or `JuMP.@objective`. **A row is not the only public entry.** `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` are registered as a variable or as an expression, and each is read back by name across the library. `set_model_scales!` registers `sc` and `so` for every builder that scales a row or an objective.
+The trigger is mechanical. The section is necessary when the body calls `JuMP.@variable`, `JuMP.@variables`, `JuMP.@expression`, `JuMP.@expressions`, `JuMP.@constraint`, `JuMP.@constraints` or `JuMP.@objective`. **A row is not the only public entry.** The code registers `model[:sc]`, `model[:w]`, `model[:ret]` and `model[:risk]` as a variable or as an expression, and the library reads each one back by name. `set_model_scales!` registers `sc` and `so` for every builder that scales a row or an objective.
 
 `# JuMP formulation` sits after `# Mathematical definition` and after `# Algorithm`, and before `# Fields` (for structs) or before `# Arguments` (for functions).
 
@@ -886,7 +887,7 @@ It has five subsections, in this order. Each of the first four is present whenev
 | `## Expressions` | `JuMP.@expression`, `JuMP.@expressions` | the expressions the code registers |
 | `## Constraints` | `JuMP.@constraint`, `JuMP.@constraints` | the rows the code registers |
 | `## Objective` | `JuMP.@objective` | the sense and the expression the code sets |
-| `## Relaxation` | — | the bound, when the encoding is not exact |
+| `## Relaxation` | no macro | the bound, when the encoding is not exact |
 
 `## Variables` is also permitted when the body only **reads** a variable. A formulation that reads `w` and never names it is unreadable.
 
@@ -894,23 +895,23 @@ The **last** of the first four subsections that is present closes with a `Where:
 
 ### `## Variables`
 
-One bullet per model variable that the code creates, and one per model variable that it reads. Name each variable by its model key, and say whether the code reads it or creates it. A variable that the macro creates under no key is named by the symbol the body binds it to.
+Write one bullet for each model variable that the code creates, and one for each model variable that it reads. Name each variable by its model key, and state whether the code reads it or creates it. Name a variable that the macro creates under no key by the symbol that the body binds it to.
 
 ### `## Expressions`
 
-One bullet per expression that the code registers, in the order in which the body registers them. Each bullet carries **the expression's model key** and the mathematics of the expression. An expression that the macro does not name carries the key it is stored under. An expression that the function only returns is named by the returned value.
+Write one bullet for each expression that the code registers, in the order in which the body registers them. Each bullet carries **the model key of the expression** and the mathematics of the expression. An expression that the macro does not name carries the key that the code stores it under. Name an expression that the function only returns by the returned value.
 
 ### `## Constraints`
 
-**One bullet per row that the code registers**, in the order in which the body registers them. Each bullet carries **the row's JuMP name** and the mathematics of the row. The name is the one written in the `JuMP.@constraint` call, because that is the key with which a caller reads the row back out of the model.
+Write **one bullet for each row that the code registers**, in the order in which the body registers them. Each bullet carries **the JuMP name of the row** and the mathematics of the row. The name is the one written in the `JuMP.@constraint` call, because that is the key with which a caller reads the row back out of the model.
 
 ### `## Objective`
 
-One bullet: the sense that the code sets, `Min` or `Max`, and the expression that it minimises or maximises, named by its model key. Two methods of one function can differ in nothing but the objective, and then this bullet is the only text that tells them apart.
+Write one bullet. It states the sense that the code sets, `Min` or `Max`, and the expression that the code minimises or maximises, named by its model key. Two methods of one function can differ in nothing but the objective, and then this bullet is the only text that tells them apart.
 
 ### `## Relaxation`
 
-Present **only when the encoding is not exact**. An exact encoding carries no `## Relaxation` subsection at all.
+Write this subsection **only when the encoding is not exact**. An exact encoding carries no `## Relaxation` subsection at all.
 
 Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift from one docstring to the next. Then state three things:
 
@@ -918,7 +919,7 @@ Open the subsection with `$(val_dict[:relax])`, so that the opening cannot drift
  2. The **quantity** that is bounded, named by its model key.
  3. The **condition** under which the bound is tight.
 
-**A bound does not have to sit in a row.** `BrownianDistanceVariance` relaxes inside an expression, and the `Max` and log-sum-exp scalarisers put an upper bound in `model[:risk]` that is tight only while a minimising objective pulls on it.
+**A bound does not have to sit in a row.** `BrownianDistanceVariance` relaxes inside an expression, and the `Max` and log-sum-exp scalarisers put an upper bound in `model[:risk]` that is tight only while the objective minimises it.
 
 **Example.** The following is the formulation of `set_gross_budget_constraints!` in `src/17_Optimisation/05_JuMP/02_JuMPConstraints/03_BudgetConstraints.jl`:
 
@@ -966,7 +967,7 @@ Where:
 
 ## Reference docstrings
 
-Read a real docstring, not a copy of one. Each row names a Unit whose file is marked `swept = true` in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml), so a Gate holds the target and the pointer cannot drift.
+Read a real docstring, not a copy of one. Each row names a Unit whose file [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) marks `swept = true`. So a Gate holds the target, and the pointer cannot drift.
 
 | Kind | Unit | File |
 | --- | --- | --- |

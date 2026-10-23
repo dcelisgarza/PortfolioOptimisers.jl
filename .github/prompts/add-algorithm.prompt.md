@@ -3,23 +3,23 @@ agent: ask
 description: Step-by-step workflow for adding a new algorithm to PortfolioOptimisers.jl.
 ---
 
-Follow these steps to add a new algorithm to PortfolioOptimisers.jl. Read the referenced files before starting.
+Follow these steps to add a new algorithm to PortfolioOptimisers.jl. Read the files that this prompt links before you start.
 
 ## Before you begin
 
-This prompt carries the **order of the work**, and no rule of its own. Every rule it needs lives in a standards file, and each step links to the section that owns it. Read these first:
+This prompt carries the **order of the work**, and no rule of its own. Every rule it needs is in a standards file, and each step links to the section that owns it. Read these first:
 
-- [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md) — which file owns which rule, and which check holds it.
-- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) — type roles, constructors, validation, dispatch, exports.
-- [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) — the Authority for every docstring section named below.
-- [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) — when to annotate a return type.
-- A similar existing algorithm definition in `src/` as a reference.
+- [`CODING_STANDARDS.md`](../../CODING_STANDARDS.md) says which file owns each rule, and which check holds it.
+- [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) owns the type roles, the constructors, validation, dispatch and exports.
+- [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) is the Authority for every docstring section that the steps below name.
+- [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md) says when to annotate a return type.
+- Read a similar algorithm definition in `src/` as a reference.
 
 ## Key rule: algorithms are not user-facing
 
-Algorithms are internal dispatch mechanisms. They must never appear in high-level, user-facing API signatures as required arguments. They always live as a field inside an estimator. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Estimator, Algorithm, and Result Roles* owns the three roles.
+An algorithm selects a dispatch branch inside the library. It must never appear as a required argument in the signature of a high-level, user-facing function. It is always a field of an estimator. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Estimator, Algorithm, and Result Roles* owns the three roles.
 
-## Step 1 — Identify the correct abstract supertype
+## Step 1. Identify the correct abstract supertype
 
 Decide which abstract algorithm type this algorithm belongs to:
 
@@ -35,36 +35,36 @@ An abstract type is **not exported** unless the maintainer says so. [`CLAUDE.md`
 
 Read `AbstractDenoiseAlgorithm` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for a real abstract-type docstring. The § *Reference docstrings* table names it, and a Gate holds it.
 
-## Step 2 — Define the algorithm struct
+## Step 2. Define the algorithm struct
 
 An algorithm is often a parameterless selector tag, and sometimes it carries parameters.
 
 - A **selector tag** is a bare `struct MyAlgorithm <: AbstractMyAlgorithm end`. Read `SpectralDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
 - A **parameterised algorithm** is a `@concrete struct` with an inner constructor that validates and an outer keyword constructor that carries the defaults. [`.github/instructions/julia-source-code.instructions.md`](../instructions/julia-source-code.instructions.md) § *Constructor Pattern* owns the shape, and § *Input Validation* owns the checks. Read `ShrunkDenoise` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for its docstring.
 
-Both kinds are documented as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Concrete struct types* states, and each field carries an inline description as § *Inline field docstrings* states.
+Document both kinds as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Concrete struct types* states. Give each field an inline description, as § *Inline field docstrings* states.
 
-## Step 3 — Implement the dispatch and interface methods
+## Step 3. Implement the dispatch and interface methods
 
 Write the method that the estimator calls internally when it holds this algorithm, and document it as [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Section Structure for Functions* states. Read `denoise!` and `_denoise!` in [`src/04_MatrixProcessing/02_Denoise.jl`](../../src/04_MatrixProcessing/02_Denoise.jl) for a public and a private function docstring.
 
-An algorithm that propagates observation weights, a prior or a view also needs `factory` and `port_opt_view`. Do not write them by hand. Declare it `@propagatable @concrete struct` and tag its fields: the macro (`src/02_Tools/05_Propagatable.jl`) always makes `factory`, and makes `port_opt_view` when a field is tagged `@vprop`. The docstring then follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`@propagatable` concrete struct types*. Write a method by hand only for a rule the tags cannot express, as `factory(re::LinearModel, w::ObsWeights)::LinearModel` in [`src/05_Moments/20_Base_Regression.jl`](../../src/05_Moments/20_Base_Regression.jl) does.
+An algorithm that propagates observation weights, a prior or a view also needs `factory` and `port_opt_view`. Do not write them by hand. Declare it `@propagatable @concrete struct` and tag its fields. The macro, in `src/02_Tools/05_Propagatable.jl`, always makes `factory`, and it makes `port_opt_view` when a field carries the `@vprop` tag. The docstring then follows [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`@propagatable` concrete struct types*. Write a method by hand only for a rule the tags cannot express, as `factory(re::LinearModel, w::ObsWeights)::LinearModel` in [`src/05_Moments/20_Base_Regression.jl`](../../src/05_Moments/20_Base_Regression.jl) does.
 
-## Step 4 — Add return type annotations
+## Step 4. Add return type annotations
 
 Follow [`.github/instructions/julia-return-types.instructions.md`](../instructions/julia-return-types.instructions.md). Annotate the dispatch method with `::ReturnType` when it always returns the same concrete type.
 
-## Step 5 — Add `*_dict` entries if needed
+## Step 5. Add `*_dict` entries if needed
 
 Add any missing entries to the dictionaries in [`src/01_Base/01_DocstringDictionaries/`](../../src/01_Base/01_DocstringDictionaries/). [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *Documentation Dictionaries* states which text a dictionary owns and when prose is permitted instead.
 
-## Step 6 — Export
+## Step 6. Export
 
 Add the new algorithm type and any new public functions to the `export` statement at the bottom of the source file.
 
-## Step 7 — Add to API docs
+## Step 7. Add to API docs
 
-Add the symbol to the corresponding `docs/src/public_api/*.md` or `docs/src/private_api/*.md` file, whichever side its classification puts it on:
+Add the symbol to the corresponding `docs/src/public_api/*.md` or `docs/src/private_api/*.md` file, on the side that its classification gives it:
 
 ````markdown
 ```@docs
@@ -74,18 +74,18 @@ MyAlgorithm
 
 [`.github/instructions/julia-docstrings.instructions.md`](../instructions/julia-docstrings.instructions.md) § *`docs/src/public_api/` and `docs/src/private_api/` Markdown Files* owns the layout of that page, including when the page carries a bibliography block.
 
-## Step 8 — Write tests
+## Step 8. Write tests
 
-Create or extend a `test/test_*.jl` file following [`.github/instructions/julia-test-writing.instructions.md`](../instructions/julia-test-writing.instructions.md):
+Create or extend a `test/test_*.jl` file, as [`.github/instructions/julia-test-writing.instructions.md`](../instructions/julia-test-writing.instructions.md) states:
 
-1. If the algorithm has parameters, test constructor validation.
+1. If the algorithm has parameters, test the validation of its constructor.
 2. Test the dispatch method with valid inputs.
-3. Test that the algorithm integrates correctly when composed inside its target estimator.
+3. Test the algorithm inside the estimator that holds it, and check the result of that estimator.
 
-## Step 9 — Wire the file into the sweep
+## Step 9. Wire the file into the sweep
 
 If the addition creates a new file under `src/`, give it a row in [`code_health/sweep_manifest.toml`](../../code_health/sweep_manifest.toml) and open its sweep ticket in the same change. [`CLAUDE.md`](../../CLAUDE.md) § *Functionality you add* owns the four steps, and `test/test_45_sweep_census.jl` holds them.
 
-## Step 10 — Final checks
+## Step 10. Final checks
 
 Run the pre-commit checks, the tests for the area you changed, and the doctests, in the order [`.github/prompts/pre-commit-and-test.prompt.md`](pre-commit-and-test.prompt.md) gives.
