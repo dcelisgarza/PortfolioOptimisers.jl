@@ -417,6 +417,34 @@ function worst_positive_weight_loss(x::VecNum, w::VecNum)
     return -minimum(x[t] for t in axes(x, 1) if zero(w[t]) < w[t])
 end
 """
+    positive_weight_rows(::Nothing, T::Integer) -> Base.OneTo
+    positive_weight_rows(w::VecNum, T::Integer) -> Vector{Int}
+
+Return the indices of the observations with positive weight.
+
+A programme with one row for each observation builds its rows on these indices. An observation with zero weight has no probability, so its row does not change the optimum. But the row of a large loss makes a cone programme harder to solve, and an exponential cone row can stop the solver far from the optimum. [`ERM`](@ref), [`RRM`](@ref) and the JuMP constraint layer of their measures read it.
+
+# Arguments
+
+  - `w`: Resolved observation weights from [`checked_observation_weights`](@ref), or `nothing`.
+  - `T`: Number of observations.
+
+# Returns
+
+  - The indices `1:T` when `w` is `nothing`. Otherwise, the indices `t` with `w[t] > 0`.
+
+# Related
+
+  - [`worst_positive_weight_loss`](@ref)
+  - [`checked_observation_weights`](@ref)
+"""
+function positive_weight_rows(::Nothing, T::Integer)
+    return Base.OneTo(T)
+end
+function positive_weight_rows(w::VecNum, ::Integer)
+    return findall(v -> zero(v) < v, w)::Vector{Int}
+end
+"""
     supports_precomputed_returns(r::AbstractBaseRiskMeasure) -> Bool
     supports_precomputed_returns(rk::RiskInputKind, r::AbstractBaseRiskMeasure) -> Bool
 

@@ -35,9 +35,15 @@ unique_key_dict!(math_dict, :math_dict,
                  # The primal power-cone programme of `RelativisticValueatRisk`, which
                  # `RRM` builds and solves. The measure states it and `RRM` registers it.
                  :K_pow => "``\\mathcal{K}_{\\mathrm{pow}}(p) = \\{(a,b,c) : a^{p} b^{1-p} \\geq |c|,\\, a \\geq 0,\\, b \\geq 0\\}``: Power cone.",#
+                 # The exponential cone programme of `EntropicValueatRisk`, which `ERM`
+                 # and the JuMP constraint layer build.
+                 :K_exp => "``\\mathcal{K}_{\\exp} = \\mathrm{cl}\\,\\{(a,b,c) : b\\, e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.",#
                  :rlvar_z_ge => "``z \\geq 0``: Scale variable of the primal power-cone programme.",#
                  :rlvar_aux => "``\\psi_i``, ``\\theta_i``, ``\\epsilon_i``, ``\\omega_i``: Auxiliary variables of observation ``i`` in the primal power-cone programme.",#
                  :p_i_obs => "``p_i``: Probability of observation ``i``. It is ``1/T`` without observation weights, and the ``i``-th observation weight divided by the sum of the weights with them.",#
+                 # The observations whose rows the entropic and relativistic programmes
+                 # hold. A row of zero weight does not change the optimum.
+                 :I_pos_obs => "``\\mathcal{I}``: Set of the observations of positive weight. Without observation weights, it holds all ``T`` observations.",#
                  # Absolute drawdown series.
                  :ct => "``c_t``: Cumulative simple portfolio return at period ``t``.",#
                  :dtdd => "``d_t \\leq 0``: Absolute drawdown at period ``t``.",#

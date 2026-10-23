@@ -27,7 +27,7 @@ Where:
   - ``\\hat{r}_j``: Portfolio return at observation ``j``, so ``-\\hat{r}_j`` is its loss.
   - ``t``, ``z``: Scalar variables of the programme.
   - ``u_j``: Auxiliary exponential cone variables.
-  - ``\\mathcal{K}_{\\exp} = \\{(a,b,c) : b e^{a/b} \\leq c,\\, b > 0\\}``: Exponential cone.
+  - $(math_dict[:K_exp])
   - $(math_dict[:alpha_rm])
   - $(math_dict[:T])
 
@@ -73,6 +73,10 @@ This is the shared body of `EntropicValueatRisk` and `EntropicDrawdownatRisk`. T
 one exponential cone programme over different series, so [`risk_series`](@ref) chooses the
 series and this function writes the cone once.
 
+The variable `u` and the cone rows cover the observations of positive weight only. An
+observation of weight zero does not change the measure, but the cone row of a large loss can
+stop the solver far from the optimum.
+
 # Arguments
 
   - $(arg_dict[:model])
@@ -109,10 +113,12 @@ function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasur
                                             bound = keys.cone); prefix = prefix)
     end
     sc = get_constraint_scale(model)
+    rows = positive_weight_rows(wi, T)
+    N = length(rows)
     t, z, u = JuMP.@variables(model, begin
                                   ()
                                   (), (lower_bound = 0)
-                                  [1:T]
+                                  [1:N]
                               end)
     state_set!(model, prefix, keys.t, i, t)
     state_set!(model, prefix, keys.z, i, z)
@@ -123,12 +129,13 @@ function set_entropic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMeasur
         r.alpha * T
     else
         state_set!(model, prefix, keys.budget, i,
-                   JuMP.@constraint(model, sc * (LinearAlgebra.dot(wi, u) - z) <= 0))
+                   JuMP.@constraint(model,
+                                    sc * (LinearAlgebra.dot(view(wi, rows), u) - z) <= 0))
         r.alpha * sum(wi)
     end
     state_set!(model, prefix, keys.cone, i,
-               JuMP.@constraint(model, [i = 1:T],
-                                [sc * (-series[i] - t), sc * z, sc * u[i]] in
+               JuMP.@constraint(model, [k = 1:N],
+                                [sc * (-series[rows[k]] - t), sc * z, sc * u[k]] in
                                 JuMP.MOI.ExponentialCone()))
     risk = state_set!(model, prefix, keys.risk, i, JuMP.@expression(model, t - z * log(at)))
     set_risk_bounds_and_expression!(model, opt, risk, r.settings, keys.risk, i;

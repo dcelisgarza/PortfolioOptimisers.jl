@@ -89,19 +89,20 @@ $(DocStringExtensions.TYPEDSIGNATURES)
 
 Builds the relativistic tail programme of `series` in `model`, and returns its risk expression.
 
-The RLVaR and the RLDaR are one programme over two series. [`risk_series`](@ref) gives the series of each measure, and the keys in `keys` keep the entries of the two measures apart.
+The RLVaR and the RLDaR are one programme over two series. [`risk_series`](@ref) gives the series of each measure, and the keys in `keys` keep the entries of the two measures apart. The variables and the rows cover the observations of positive weight only. An observation of weight zero does not change the measure, but its rows make the programme harder to solve.
 
 # Algorithm
 
  1. Read `sc`, the constraint scale.
  2. Compute `opk`, `omk`, `ik`, `ik2`, `iopk` and `iomk`, the constants of the cones, from `kappa`.
- 3. Create `t`, `z`, `omega`, `psi`, `theta` and `epsilon`, and register each under its key.
- 4. Read `wi`, the observation weights of `r`, else those of `pr`. Check them against `pr.X`.
- 5. Compute `lnk`, the Kaniadakis logarithm of ``1/(\\alpha T)``, with [`kappa_log`](@ref).
- 6. Build `risk`, and register it under `keys.risk`. When `wi` is stated, divide it by its sum first.
- 7. Register the three rows below under their keys.
- 8. Bound `risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
- 9. Return `risk`.
+ 3. Read `wi`, the observation weights of `r`, else those of `pr`. Check them against `pr.X`.
+ 4. Find `rows`, the indices of the observations of positive weight, and `N`, their number. Without `wi`, `rows` holds every observation.
+ 5. Create `t`, `z`, `omega`, `psi`, `theta` and `epsilon`, and register each under its key.
+ 6. Compute `lnk`, the Kaniadakis logarithm of ``1/(\\alpha T)``, with [`kappa_log`](@ref).
+ 7. Build `risk`, and register it under `keys.risk`. When `wi` is stated, divide its entries in `rows` by the sum of `wi` first, giving `wp`.
+ 8. Register the three rows below under their keys, over the entries of `series` in `rows`.
+ 9. Bound `risk` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
+10. Return `risk`.
 
 # JuMP formulation
 
@@ -109,19 +110,19 @@ The RLVaR and the RLDaR are one programme over two series. [`risk_series`](@ref)
 
   - `keys.t`: created, the free scalar ``t``. The RLVaR key is `t_rlvar_`, and the RLDaR key is `t_rldar_`.
   - `keys.z`: created, the scalar ``z``, bounded below by zero. The keys are `z_rlvar_` and `z_rldar_`.
-  - `keys.psi`, `keys.theta`, `keys.epsilon`, `keys.omega`: created, the free ``T \\times 1`` vectors ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\theta}``, ``\\boldsymbol{\\epsilon}`` and ``\\boldsymbol{\\omega}``. The keys are `psi_rlvar_`, `theta_rlvar_`, `epsilon_rlvar_` and `omega_rlvar_`, or the same names with `rldar_`.
+  - `keys.psi`, `keys.theta`, `keys.epsilon`, `keys.omega`: created, the free ``N \\times 1`` vectors ``\\boldsymbol{\\psi}``, ``\\boldsymbol{\\theta}``, ``\\boldsymbol{\\epsilon}`` and ``\\boldsymbol{\\omega}``, with one entry for each observation in ``\\mathcal{I}``. The keys are `psi_rlvar_`, `theta_rlvar_`, `epsilon_rlvar_` and `omega_rlvar_`, or the same names with `rldar_`.
 
 The rows read `series`, an expression of the weights that [`risk_series`](@ref) returns.
 
 ## Expressions
 
-  - `keys.risk`: ``t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i=1}^{T} p_i (\\psi_i + \\theta_i)``. The keys are `rlvar_risk_` and `rldar_risk_`.
+  - `keys.risk`: ``t + \\ln_{\\kappa}\\!\\left(\\tfrac{1}{\\alpha T}\\right) z + T \\sum_{i \\in \\mathcal{I}} p_i (\\psi_i + \\theta_i)``. The keys are `rlvar_risk_` and `rldar_risk_`.
 
 ## Constraints
 
-  - `keys.pcone_a`: ``s_c \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, ``\\forall\\, i = 1,\\ldots,T``. The keys are `crlvar_pcone_a_` and `crldar_pcone_a_`.
-  - `keys.pcone_b`: ``s_c \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, ``\\forall\\, i = 1,\\ldots,T``. The keys are `crlvar_pcone_b_` and `crldar_pcone_b_`.
-  - `keys.exceedance`: ``s_c \\left(\\epsilon_i + \\omega_i - s_i - t\\right) \\leq 0``, ``\\forall\\, i = 1,\\ldots,T``. The keys are `crlvar_` and `crldar_`.
+  - `keys.pcone_a`: ``s_c \\left(\\tfrac{z(1+\\kappa)}{2\\kappa},\\, \\tfrac{\\psi_i(1+\\kappa)}{\\kappa},\\, \\epsilon_i\\right) \\in \\mathcal{K}_{\\mathrm{pow}}\\!\\left(\\tfrac{1}{1+\\kappa}\\right)``, ``\\forall\\, i \\in \\mathcal{I}``. The keys are `crlvar_pcone_a_` and `crldar_pcone_a_`.
+  - `keys.pcone_b`: ``s_c \\left(\\tfrac{\\omega_i}{1-\\kappa},\\, \\tfrac{\\theta_i}{\\kappa},\\, -\\tfrac{z}{2\\kappa}\\right) \\in \\mathcal{K}_{\\mathrm{pow}}(1-\\kappa)``, ``\\forall\\, i \\in \\mathcal{I}``. The keys are `crlvar_pcone_b_` and `crldar_pcone_b_`.
+  - `keys.exceedance`: ``s_c \\left(\\epsilon_i + \\omega_i - s_i - t\\right) \\leq 0``, ``\\forall\\, i \\in \\mathcal{I}``. The keys are `crlvar_` and `crldar_`.
 
 Each key is a Model State key. A caller reads the entry back under `prefix`, the key and `i`, for example `rlvar_risk_1`.
 
@@ -129,6 +130,7 @@ Where:
 
   - $(math_dict[:sc_scale])
   - ``s_i``: Entry ``i`` of `series`. It carries the sign of a return, so ``-s_i`` is the loss at observation ``i``.
+  - $(math_dict[:I_pos_obs])
   - $(math_dict[:p_i_obs])
   - $(math_dict[:rlvar_t])
   - $(math_dict[:rlvar_z_ge])
@@ -196,13 +198,17 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     ik = inv(kappa)
     iopk = inv(opk)
     iomk = inv(omk)
+    wi = nothing_scalar_array_selector(r.w, pr.w)
+    wi = checked_observation_weights(wi, pr.X)
+    rows = positive_weight_rows(wi, T)
+    N = length(rows)
     t, z, omega, psi, theta, epsilon = JuMP.@variables(model, begin
                                                            ()
                                                            (), (lower_bound = 0)
-                                                           [1:T]
-                                                           [1:T]
-                                                           [1:T]
-                                                           [1:T]
+                                                           [1:N]
+                                                           [1:N]
+                                                           [1:N]
+                                                           [1:N]
                                                        end)
     state_set!(model, prefix, keys.t, i, t)
     state_set!(model, prefix, keys.z, i, z)
@@ -210,31 +216,29 @@ function set_relativistic_risk_constraints!(model::JuMP.Model, i::Any, r::RiskMe
     state_set!(model, prefix, keys.psi, i, psi)
     state_set!(model, prefix, keys.theta, i, theta)
     state_set!(model, prefix, keys.epsilon, i, epsilon)
-    wi = nothing_scalar_array_selector(r.w, pr.w)
-    wi = checked_observation_weights(wi, pr.X)
     lnk = kappa_log(inv(alpha * T), kappa)
     risk = if isnothing(wi)
         JuMP.@expression(model, t + lnk * z + sum(psi + theta))
     else
-        wi /= sum(wi)
-        JuMP.@expression(model, t + lnk * z + T * LinearAlgebra.dot(wi, psi + theta))
+        wp = view(wi, rows) / sum(wi)
+        JuMP.@expression(model, t + lnk * z + T * LinearAlgebra.dot(wp, psi + theta))
     end
     state_set!(model, prefix, keys.risk, i, risk)
+    sr = view(series, rows)
     pcone_a, pcone_b, exceedance = JuMP.@constraints(model,
                                                      begin
-                                                         [i = 1:T],
+                                                         [k = 1:N],
                                                          [sc * z * opk * ik2,
-                                                          sc * psi[i] * opk * ik,
-                                                          sc * epsilon[i]] in
+                                                          sc * psi[k] * opk * ik,
+                                                          sc * epsilon[k]] in
                                                          JuMP.MOI.PowerCone(iopk)
-                                                         [i = 1:T],
-                                                         [sc * omega[i] * iomk,
-                                                          sc * theta[i] * ik,
+                                                         [k = 1:N],
+                                                         [sc * omega[k] * iomk,
+                                                          sc * theta[k] * ik,
                                                           -sc * z * ik2] in
                                                          JuMP.MOI.PowerCone(omk)
                                                          sc *
-                                                         ((epsilon + omega - series) .- t) <=
-                                                         0
+                                                         ((epsilon + omega - sr) .- t) <= 0
                                                      end)
     state_set!(model, prefix, keys.pcone_a, i, pcone_a)
     state_set!(model, prefix, keys.pcone_b, i, pcone_b)

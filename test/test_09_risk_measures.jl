@@ -1812,12 +1812,14 @@ function rl_eta(L, c, k, lam)
 end
 # sup_q q'L subject to sum(q) = 1 and sum(q ln_k(q / (p T))) <= ln_k(1 / (alpha T)). The
 # multiplier `lam` of the ball is found by bisection on its logarithm, because the
-# divergence of the maximiser falls as `lam` rises.
+# divergence of the maximiser falls as `lam` rises. An observation of weight zero has
+# q = 0 and adds nothing to either sum, so it is dropped, and T keeps every observation.
 function rl_reference(x, alpha, k, w = nothing)
     T = length(x)
-    L = -x
     p = isnothing(w) ? fill(1 / T, T) : w ./ sum(w)
-    c = p .* T
+    keep = p .> 0
+    L = -x[keep]
+    c = p[keep] .* T
     r = rl_lnk(1 / (alpha * T), k)
     divergence(lam) = (q = rl_q(L, c, k, lam, rl_eta(L, c, k, lam));
                        sum(q .* rl_lnk.(q ./ c, k)))
@@ -1918,6 +1920,122 @@ end
                         ConditionalDrawdownatRisk(; alpha = a)(x),
                         EntropicDrawdownatRisk(; alpha = a, slv = slv)(x), rldar,
                         MaximumDrawdown()(x)])
+    end
+
+    @testset "A zero-weight loss does not stall RRM" begin
+        # The worst loss sits on an observation of weight zero. Its rows have no effect on
+        # the optimum, but a solver stalled on them, 3e-4 away from it.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(199)]
+        for (a, k) in ((0.2, 0.3), (0.05, 0.7))
+            @test isapprox(PortfolioOptimisers.RRM(xz, slv, a, k, pweights(wz)),
+                           rl_reference(xz, a, k, wz); rtol = 1e-5)
+        end
+    end
+end
+
+# The entropic risk measures of `src/16_RiskMeasures/06_XatRisk/03_EntropicXatRisk.jl`,
+# checked against the definition their docstrings state. The reference minimises
+# z ln(sum(p .* exp.(L ./ z)) / alpha) over z by a golden-section search on ln z, so it
+# shares no code with the exponential cone programme of `ERM`.
+function ev_reference(x, alpha, w = nothing)
+    p = isnothing(w) ? fill(1 / length(x), length(x)) : w ./ sum(w)
+    keep = p .> 0
+    L = -x[keep]
+    lp = log.(p[keep])
+    function f(z)
+        v = L ./ z .+ lp
+        m = maximum(v)
+        return z * (m + log(sum(exp.(v .- m))) - log(alpha))
+    end
+    lo, hi = -25.0, 10.0
+    g = (sqrt(5) - 1) / 2
+    for _ in 1:300
+        c = hi - g * (hi - lo)
+        d = lo + g * (hi - lo)
+        f(exp(c)) < f(exp(d)) ? (hi = d) : (lo = c)
+    end
+    # The infimum at z -> 0 is the largest loss.
+    return min(f(exp((lo + hi) / 2)), maximum(L))
+end
+
+@testset "Entropic risk measures" begin
+    rng = StableRNG(123)
+    x = 0.01 .* randn(rng, 200) .+ 0.0005
+    wt = rand(rng, 200) .+ 0.5
+    W = pweights(wt)
+    slv = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                 settings = Dict("verbose" => false),
+                 check_sol = (; allow_local = true, allow_almost = true))
+    dead = Solver(; name = :dead, solver = () -> error("no solver"))
+    erm(args...) = PortfolioOptimisers.ERM(args...)
+
+    @testset "ERM solves the Chernoff bound" begin
+        for a in (0.01, 0.05, 0.2, 0.5, 0.9)
+            @test isapprox(erm(x, slv, a), ev_reference(x, a); rtol = 1e-5)
+            @test isapprox(erm(x, slv, a, W), ev_reference(x, a, wt); rtol = 2e-5)
+        end
+        # Equal weights are the unweighted measure.
+        @test isapprox(erm(x, slv, 0.2, pweights(fill(3.0, 200))), erm(x, slv, 0.2);
+                       rtol = 1e-5)
+        # A zero-weight loss sets no risk. Before its rows were dropped, the solver stopped
+        # 48 % above the optimum.
+        xz = copy(x)
+        xz[1] = -0.5
+        wz = [0.0; ones(199)]
+        @test isapprox(erm(xz, slv, 0.2, pweights(wz)), ev_reference(xz, 0.2, wz);
+                       rtol = 1e-5)
+        @test isapprox(erm(xz, slv, 0.2, pweights(wz)), erm(xz[2:end], slv, 0.2);
+                       rtol = 1e-5)
+    end
+
+    @testset "The ends of the significance level" begin
+        # With equal weights and alpha T <= 1, the EVaR is the largest loss.
+        @test isapprox(erm(x, slv, 1 / 200), -minimum(x); rtol = 1e-5)
+        @test isapprox(erm(x, slv, 1e-3), -minimum(x); rtol = 1e-5)
+        # Level zero is the largest loss too, and builds no model.
+        @test erm(x, dead, 0) == -minimum(x)
+        # As alpha rises to one the EVaR falls to the mean loss, which it never reaches.
+        evs = [erm(x, slv, a) for a in (0.01, 0.05, 0.2, 0.5, 0.9, 0.999, 0.9999)]
+        @test issorted(evs; rev = true)
+        @test evs[end] > -mean(x)
+        @test isapprox(evs[end], -mean(x); atol = 2e-4)
+        @test_throws DomainError EntropicValueatRisk(; alpha = 1)
+    end
+
+    @testset "EVaR bounds the conditional value at risk" begin
+        a = 0.05
+        @test issorted([ValueatRisk(; alpha = a)(x), ConditionalValueatRisk(; alpha = a)(x),
+                        EntropicValueatRisk(; alpha = a, slv = slv)(x), -minimum(x)])
+    end
+
+    @testset "ERM tries each solver, and returns NaN when none solves" begin
+        @test isnan(erm(x, dead, 0.05))
+        @test isnan(erm(x, dead, 0.05, W))
+        @test isnan(erm(x, [dead, dead], 0.05))
+        @test isapprox(erm(x, [dead, slv], 0.05), ev_reference(x, 0.05); rtol = 1e-5)
+        @test_throws IsEmptyError erm(x, Solver[], 0.05)
+        @test_throws DimensionMismatch erm(x, slv, 0.05, pweights(ones(10)))
+        for T in (EntropicValueatRisk, EntropicValueatRiskRange, EntropicDrawdownatRisk,
+                  RelativeEntropicDrawdownatRisk)
+            @test_throws IsEmptyError T(; slv = Solver[])
+        end
+        # The functor needs a solver, and `factory` fills it.
+        @test_throws MethodError EntropicValueatRisk()(x)
+        pr = prior(EmpiricalPrior(), hcat(x, 0.01 .* randn(StableRNG(7), 200)))
+        @test factory(EntropicValueatRisk(), pr, slv).slv === slv
+    end
+
+    @testset "The range and the drawdown measures read their series" begin
+        r = EntropicValueatRiskRange(; slv = slv, alpha = 0.2, beta = 0.1)
+        @test isapprox(r(x), ev_reference(x, 0.2) + ev_reference(-x, 0.1); rtol = 1e-5)
+        dd = cumsum(x) .- accumulate(max, cumsum(x); init = 0.0)
+        rdd = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = 1.0) .- 1
+        @test isapprox(EntropicDrawdownatRisk(; slv = slv, alpha = 0.2)(x),
+                       ev_reference(dd, 0.2); rtol = 1e-5)
+        @test isapprox(RelativeEntropicDrawdownatRisk(; slv = slv, alpha = 0.2)(x),
+                       ev_reference(rdd, 0.2); rtol = 1e-5)
     end
 end
 
@@ -2784,6 +2902,19 @@ end
         @test solved_risk(ConditionalValueatRisk(; alpha = 0))[1] ≈ 0.2 atol = 1e-6
         @test solved_risk(ConditionalValueatRisk(; alpha = 0, w = wo0))[1] < 0.1
         @test solved_risk(EntropicValueatRisk(; alpha = 0, w = wo0))[1] < 0.1
+        # At a positive level the zero-weight loss sets no risk either. Its cone rows have no
+        # effect on the optimum, but the solver stalled on them before they were dropped.
+        for r in (EntropicValueatRisk(; alpha = 0.2, w = wo0),
+                  EntropicDrawdownatRisk(; alpha = 0.2, w = wo0),
+                  RelativisticValueatRisk(; alpha = 0.2, w = wo0),
+                  RelativisticDrawdownatRisk(; alpha = 0.2, w = wo0))
+            model_risk, functor_risk = solved_risk(r)
+            @test isapprox(model_risk, functor_risk; rtol = 1e-5)
+        end
+        res = optimise(MeanRisk(; r = EntropicValueatRisk(; alpha = 0.2, w = wo0),
+                                obj = MinimumRisk(), opt = opt), rd)
+        @test isapprox(JuMP.value(res.model[:risk]),
+                       PortfolioOptimisers.ERM(X[2:end, :] * res.w, slv, 0.2); rtol = 1e-5)
         # Two Ulcer Index measures with different weights build two expressions.
         res = optimise(MeanRisk(;
                                 r = [UlcerIndex(; w = wo),
