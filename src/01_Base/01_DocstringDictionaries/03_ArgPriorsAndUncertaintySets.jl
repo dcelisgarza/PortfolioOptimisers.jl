@@ -5,7 +5,7 @@
 unique_key_dict!(arg_dict, :arg_dict,
                  # Priors.
                  :pe => "`pe`: Prior estimator.",#
-                 :pe_ucs => "`pe`: Prior estimator the set fits on the returns it is handed, or `nothing`. With `nothing` the set holds no prior of its own and is calibrated on the prior result it is handed — inside an optimiser, the prior the optimiser is solving on, so its centre is the objective's own — through the prior-result arm of the ucs triple; the returns-data form then refuses by name. The default, `EmpiricalPrior()`, fits an empirical prior on the returns.",#
+                 :pe_ucs => "`pe`: Prior estimator that the set fits on the returns data, or `nothing`. With `nothing`, the set holds no prior of its own, and it fits on the Prior Result that the caller gives, through the prior-result method of the ucs Triple. Inside an optimiser, that result is the prior that the optimiser solves on, so the set and the objective have the same centre. With `nothing`, the returns-data method raises an `ArgumentError`. The default, `EmpiricalPrior()`, fits an empirical prior on the returns.",#
                  :pr => "`pr`: Prior result.",#
                  :per => "`pr`: Prior estimator or result.",#
                  :pr_rr => "`pr`: Prior result or returns result. Both carry the asset returns matrix `X`, so either can supply it.",#
@@ -116,8 +116,8 @@ unique_key_dict!(arg_dict, :arg_dict,
                  # Uncertainty sets.
                  :lb => "`lb`: Lower bound.",#
                  :ub => "`ub`: Upper bound.",#
-                 :dmu => "`dmu`: Uncertainty bound for expected returns.",#
-                 :dsigma => "`dsigma`: Uncertainty bound for covariance.",#
+                 :dmu => "`dmu`: Fraction of the absolute value of each expected return that sets the half-width of the mean box.",#
+                 :dsigma => "`dsigma`: Fraction of the absolute value of each covariance entry that sets the half-width of the covariance box.",#
                  :dist => "`dist`: Probability distribution.",#
                  :k_ucs => "`k`: Radius of the ellipsoid. It must be positive.",#
                  :class_ucs => "`class`: Axis tag of the set, which sets the row count of the shape matrix or of the geometry map.",#
