@@ -1253,6 +1253,15 @@ const PO = PortfolioOptimisers
     B = [1.0 1.0; 1.0 1.0 - 5e-11]
     @test isnothing(PO.ridge_cholesky(RidgeCholeskySquareRoot(; tries = 2), B))
     @test !isnothing(PO.ridge_cholesky(RidgeCholeskySquareRoot(; tries = 3), B))
+    # The ridge takes the type of the plain factor (#1442). A `Float64` ridge widened a `Float32`
+    # matrix to a `Float64` factor, and `eps` of a `Rational` threw a MethodError.
+    L = matrix_square_root(RidgeCholeskySquareRoot(), Float32.(sigma))
+    @test L isa LowerTriangular{Float32}
+    # The first ridge, 1e-12, is below the floor `eps s` of `Float32`.
+    @test maximum(abs, L * L' - sigma - eps(Float32) * I) <= 2 * eps(Float32)
+    @test matrix_square_root(RidgeCholeskySquareRoot(), Rational.(sigma)) ==
+          matrix_square_root(RidgeCholeskySquareRoot(), sigma)
+    @test PO.safe_regime_cholesky(Float32.(sigma), 0.0f0) isa Cholesky{Float32}
     @test RidgeCholeskySquareRoot(; ridge = 0) == RidgeCholeskySquareRoot(0, 3)
     @test_throws DomainError RidgeCholeskySquareRoot(; ridge = -1e-12)
     @test_throws DomainError RidgeCholeskySquareRoot(; ridge = Inf)
