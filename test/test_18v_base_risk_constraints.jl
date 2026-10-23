@@ -871,3 +871,63 @@ end
         @test value_rl(res, key) >= f(X_rl * res.w) * (1 - 1e-6)
     end
 end
+
+# #1810: a measure that the builder does not index takes effect once in a model. A second
+# measure of the same type logs a warning, and only the settings of the first take effect.
+X_ui = randn(StableRNG(7), 30, 4) .* 0.01 .+ 0.001
+rd_ui = ReturnsResult(; nx = string.(1:4), X = X_ui)
+pr_ui = prior(EmpiricalPrior(), rd_ui)
+slv_ui = Solver(; name = :clarabel, solver = Clarabel.Optimizer,
+                settings = Dict("verbose" => false))
+function solve_ui(r)
+    return optimise(MeanRisk(; r = r, obj = MaximumReturn(),
+                             opt = JuMPOptimiser(; pe = pr_ui, slv = slv_ui)), rd_ui)
+end
+# The risk at the minimum risk weights and at the maximum return weights.
+function risk_span_ui(T)
+    lo = optimise(MeanRisk(; r = T(), opt = JuMPOptimiser(; pe = pr_ui, slv = slv_ui)),
+                  rd_ui)
+    return T()(X_ui * lo.w), T()(X_ui * solve_ui(T()).w)
+end
+
+@testset "A second unindexed measure logs a warning and changes nothing" begin
+    for T in (MaximumDrawdown, WorstRealisation, Range, BrownianDistanceVariance, NoRisk)
+        bounded = T(; settings = RiskMeasureSettings(; ub = 1.0))
+        msg = Regex("`$(nameof(T))` takes effect once in a model")
+        res = @test_logs((:warn, msg), match_mode = :any, solve_ui([T(), bounded]))
+        @test isa(res.retcode, OptimisationSuccess)
+        # The first measure alone adds a risk term.
+        @test length(res.model[:risk_vec]) == 1
+        # A second measure with the default settings loses its risk term, and warns too.
+        @test_logs((:warn, msg), match_mode = :any, solve_ui([T(), T()]))
+        # One measure, and a second one that changes nothing, log no warning.
+        quiet = T(; settings = RiskMeasureSettings(; rke = false))
+        @test_logs(min_level = Logging.Warn, solve_ui(T()))
+        @test_logs(min_level = Logging.Warn, solve_ui([T(), quiet]))
+    end
+    # The bound of the second measure is not in the model, so the weights are those of one
+    # measure with no bound.
+    lo, hi = risk_span_ui(MaximumDrawdown)
+    ub = (lo + hi) / 2
+    res = solve_ui([MaximumDrawdown(),
+                    MaximumDrawdown(; settings = RiskMeasureSettings(; ub = ub))])
+    @test !haskey(res.model, :mdd_risk_ub)
+    @test isapprox(MaximumDrawdown()(X_ui * res.w), hi; rtol = 1e-5)
+end
+
+@testset "WorstRealisation after Range keeps its bound" begin
+    # `Range` registers `wr_risk`, the memo key that `WorstRealisation` used. The bound of the
+    # first `WorstRealisation` was lost, with no warning.
+    ub = sum(risk_span_ui(WorstRealisation)) / 2
+    wr = WorstRealisation(; settings = RiskMeasureSettings(; ub = ub))
+    res = @test_logs(min_level = Logging.Warn, solve_ui([Range(), wr]))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test haskey(res.model, :wr_risk_ub)
+    @test WorstRealisation()(X_ui * res.w) <= ub * (1 + 1e-6)
+    @test length(res.model[:risk_vec]) == 2
+    # A tail of a range measure with no bound does not take the place of the measure.
+    gr = GenericValueatRiskRange(; loss = WorstRealisation())
+    res = @test_logs(min_level = Logging.Warn, solve_ui([gr, wr]))
+    @test isa(res.retcode, OptimisationSuccess)
+    @test WorstRealisation()(X_ui * res.w) <= ub * (1 + 1e-6)
+end

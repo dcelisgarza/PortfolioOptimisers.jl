@@ -179,16 +179,16 @@ Add the [`BrownianDistanceVariance`](@ref) bound of the net portfolio returns to
 
 `r.alg1` selects the risk expression, and `r.alg2` selects the rows that tie the distance matrix to the returns. When the objective minimises the risk, `bdvariance_risk` equals the functor of the measure at the solved weights.
 
-The build is keyed on `prefix` alone, with no measure index. A second call with the same `prefix` returns the registered expression and builds nothing, so a second [`BrownianDistanceVariance`](@ref) in one risk vector adds neither its bound nor its scale.
+The build is keyed on `prefix` alone, with no measure index. A second call with the same `prefix` uses the registered expression and builds no rows. The settings of the first [`BrownianDistanceVariance`](@ref) take effect, and a second measure logs a warning, because its bound and its scale have no effect.
 
 # Algorithm
 
- 1. When `bdvariance_risk` is registered under `prefix`, return it.
+ 1. When `bdvariance_risk` is registered under `prefix`, go to step 6.
  2. Read the net portfolio return series `net_X` with [`set_net_portfolio_returns!`](@ref), and its length `T`.
  3. Create `Dt`, and register `Dx`, the matrix of the pairwise differences of `net_X`.
  4. Register the risk expression of `r.alg1` with [`set_brownian_distance_risk_constraint!`](@ref).
  5. Add the rows of `r.alg2` with [`set_brownian_distance_variance_constraints!`](@ref).
- 6. Add the bound in `r.settings` and the risk expression with [`set_risk_bounds_and_expression!`](@ref), and return the risk expression.
+ 6. Add the bound in `r.settings` and the risk expression with [`set_unindexed_risk_bounds_and_expression!`](@ref), and return the risk expression.
 
 # JuMP formulation
 
@@ -237,14 +237,12 @@ $(val_dict[:relax])
 
   - [`set_brownian_distance_variance_constraints!`](@ref)
   - [`set_brownian_distance_risk_constraint!`](@ref)
-  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`set_unindexed_risk_bounds_and_expression!`](@ref)
 """
 function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVariance,
                                opt::RiskConstraintOwner, pr::AbstractPriorResult, args...;
                                prefix::Symbol = Symbol(""), kwargs...)
-    # The memo carries no measure index, so a second measure of this type loses its settings
-    # (#1810).
-    return state_build!(model, prefix, :bdvariance_risk) do
+    bdvariance_risk = state_build!(model, prefix, :bdvariance_risk) do
         X = pr.X
         net_X = set_net_portfolio_returns!(model, X; prefix = prefix)
         T = length(net_X)
@@ -259,8 +257,9 @@ function set_risk_constraints!(model::JuMP.Model, ::Any, r::BrownianDistanceVari
         bdvariance_risk = set_brownian_distance_risk_constraint!(model, r.alg1, Dt, iT2;
                                                                  prefix = prefix)
         set_brownian_distance_variance_constraints!(model, r.alg2, Dt, Dx; prefix = prefix)
-        set_risk_bounds_and_expression!(model, opt, bdvariance_risk, r.settings,
-                                        :bdvariance_risk; prefix = prefix)
         return bdvariance_risk
     end
+    set_unindexed_risk_bounds_and_expression!(model, opt, bdvariance_risk, r,
+                                              :bdvariance_risk; prefix = prefix)
+    return bdvariance_risk
 end

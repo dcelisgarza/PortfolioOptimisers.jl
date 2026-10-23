@@ -693,6 +693,71 @@ end
 """
 $(DocStringExtensions.TYPEDSIGNATURES)
 
+Bounds the risk expression of a measure that has no index, and adds it to the risk that the objective reads. Only the first measure of the type under `prefix` takes effect.
+
+The builders of [`MaximumDrawdown`](@ref), [`WorstRealisation`](@ref), [`NoRisk`](@ref), [`Range`](@ref) and [`BrownianDistanceVariance`](@ref) do not read the index of the measure. A measure of these types has no parameter that sets two instances apart, so its builder registers the risk expression once, under `name`. The bound row takes the name `<name>_ub`, and a second bound cannot have the same name. So the settings of the first measure take effect. The settings of a later measure have no effect, and the function logs a warning that says so.
+
+A measure whose settings hold no bound and set `rke` to `false` changes nothing, and the function returns at once. A tail of a range measure is such a measure when it has no bound, so it does not take the place of a later measure.
+
+# Algorithm
+
+ 1. When `settings.ub` is `nothing` and `settings.rke` is `false`, return.
+ 2. When the presence flag `<name>_settings` is registered under `prefix`, log a warning that names the type of `r` and its settings, and return.
+ 3. Register the presence flag with [`mark_state!`](@ref).
+ 4. Bound `r_expr` and add it to `risk_vec` with [`set_risk_bounds_and_expression!`](@ref), from `r.settings`.
+
+# JuMP formulation
+
+## Expressions
+
+  - `<name>_settings`: the presence flag, `true` after the first measure applies its settings. The name carries the namespace `prefix`.
+
+# Arguments
+
+  - $(arg_dict[:model])
+  - `opt`: The owner of the constraint, a [`RiskConstraintOwner`](@ref).
+  - `r_expr::JuMP.AbstractJuMPScalar`: The risk expression.
+  - `r::RiskMeasure`: The measure, read for `settings` and for the name of its type.
+  - `name::Symbol`: The Model State name of the risk expression.
+
+# Keyword arguments
+
+  - `prefix::Symbol`: Model State namespace for `name` (default: empty, i.e. the bare key).
+
+# Returns
+
+  - `nothing`.
+
+# Related
+
+  - [`set_risk_bounds_and_expression!`](@ref)
+  - [`mark_state!`](@ref)
+  - [`state_has`](@ref)
+"""
+function set_unindexed_risk_bounds_and_expression!(model::JuMP.Model,
+                                                   opt::RiskConstraintOwner,
+                                                   r_expr::JuMP.AbstractJuMPScalar,
+                                                   r::RiskMeasure, name::Symbol;
+                                                   prefix::Symbol = Symbol(""))
+    settings = r.settings
+    if isnothing(settings.ub) && !settings.rke
+        return nothing
+    end
+    flag_name = Symbol(name, :_settings)
+    if state_has(model, prefix, flag_name)
+        key = state_key(prefix, name)
+        T = nameof(typeof(r))
+        @warn("`$T` takes effect once in a model. A measure of this type has no parameter that sets two instances apart, so the model builds its risk once, as `$key`, and applies the settings of the first instance only. The settings of this instance (`ub = $(settings.ub)`, `scale = $(settings.scale)`, `rke = $(settings.rke)`) have no effect. Use one `$T`, and give it the bound and the scale that you need.",
+              maxlog = log_limit(:warn), _id = @log_id(key, T))
+        return nothing
+    end
+    mark_state!(model, prefix, flag_name)
+    set_risk_bounds_and_expression!(model, opt, r_expr, settings, name; prefix = prefix)
+    return nothing
+end
+"""
+$(DocStringExtensions.TYPEDSIGNATURES)
+
 Adds the drawdown variables of the portfolio to `model`, and returns them.
 
 The function builds the variables once for each `prefix`. A second call returns the variables that the first call registered.
