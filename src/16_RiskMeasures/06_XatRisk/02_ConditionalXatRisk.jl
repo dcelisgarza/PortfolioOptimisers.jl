@@ -174,6 +174,8 @@ The loss is the larger of two affine pieces ``b_{i} \\tau + a_{i} \\boldsymbol{w
 
 This is Equation 27 of [drcvar](@cite). Corollary 5.1 of [drcvar](@cite) gives it for the support ``C \\boldsymbol{\\xi} \\leq \\boldsymbol{d}`` with ``C = -I`` and ``\\boldsymbol{d} = \\boldsymbol{1}``. The infinity norm is the dual of the 1-norm of the transport cost. That work puts the weight ``1/T`` on each scenario, so the observation weights ``w_{t} / W_{T}`` are the library's extension. The CVaR inside the loss is the minimum of Theorem 1 of [cvar](@cite).
 
+The radius ``r`` is in the units of the returns. A distribution ``\\mathbb{Q}`` is in the ball when it moves the scenarios of ``\\hat{\\mathbb{P}}`` by a mean 1-norm distance of at most ``r``. The 1-norm adds the moves of the ``N`` assets. For example, the default ``r = 0.02`` lets the worst case move one asset by 0.02 in every scenario, or each of the ``N`` assets by ``0.02 / N``. The scale of a radius rule is in the same units.
+
 Where:
 
   - ``\\mathrm{DR\\text{-}CVaR}_{\\alpha, l, r}(\\boldsymbol{w})``: Distributionally Robust CVaR.
@@ -570,6 +572,8 @@ Where:
   - ``\\mathrm{DR\\text{-}CVaR}_{\\beta, l_b, r_b}(\\boldsymbol{w};\\, -\\boldsymbol{\\xi})``: Upper-tail DR-CVaR on the negated scenarios ``-\\boldsymbol{\\xi}_{t}``. Its support ``-\\boldsymbol{\\xi} \\geq -\\boldsymbol{1}`` says that no asset gains more than all of its value.
 
 $(math_dict[:negated_upper_tail]) The two tails have separate Wasserstein balls, and both read the same observation weights.
+
+Each radius is in the units of the returns, as the radius of [`DistributionallyRobustConditionalValueatRisk`](@ref) is. ``r_a`` bounds the mean 1-norm move of the scenarios that the lower tail reads, and ``r_b`` bounds the move of the negated scenarios that the upper tail reads.
 
 As both radii go to zero, the two mean terms cancel, and the measure goes to ``l_a \\, \\mathrm{CVaR}_{\\alpha}(\\boldsymbol{x}) + l_b \\, \\mathrm{CVaR}_{\\beta}(-\\boldsymbol{x})``, with ``\\boldsymbol{x}`` the portfolio returns of the scenarios.
 
@@ -1007,6 +1011,8 @@ The measure ``\\mathrm{DR\\text{-}CDaR}_{\\alpha, l, r}(\\boldsymbol{w})`` is th
 
   - The rows read the portfolio drawdown, so ``-d_{t}(\\boldsymbol{w})`` takes the place of ``\\boldsymbol{w}^{\\intercal} \\boldsymbol{\\xi}_{t}``.
   - The transport cost reads the asset drawdowns, so ``\\mathbf{D}_{t}`` takes the place of ``\\boldsymbol{\\xi}_{t}``, so the support constraint is ``\\mathbf{D} \\geq -\\boldsymbol{1}``.
+
+The radius ``r`` is in the units of the uncompounded drawdowns, which are cumulative returns. The ball moves the asset drawdowns ``\\mathbf{D}_{t}`` by a mean 1-norm distance of at most ``r``, and the 1-norm adds the moves of the ``N`` assets. A drawdown adds many returns, so it is often larger than one return, and a radius that suits the returns can be small for the drawdowns.
 
 Where:
 

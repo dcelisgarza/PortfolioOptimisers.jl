@@ -2141,6 +2141,58 @@ end
             @test PortfolioOptimisers.resolve_deferred_quantities(r, pr) === r
         end
     end
+
+    @testset "The radius is in the units of the series (#601)" begin
+        # Scale the scenarios and every radius by c. While the support constraint is slack,
+        # the dual program scales tau, s and the risk by c and keeps lambda and the weights, so
+        # a radius read in any other units breaks the identity. At c = 10 the support binds on
+        # this sample and the identity fails, because the support is in absolute returns.
+        risk_w(X, r) = (sol = optimise(MeanRisk(; r = r, obj = MinimumRisk(),
+                                                opt = JuMPOptimiser(;
+                                                                    pe = prior(EmpiricalPrior(),
+                                                                               X),
+                                                                    slv = slv)));
+                        (JuMP.value(sol.model[:risk]), sol.w))
+        for c in (0.5, 2.0), (alpha, l, r) in ((0.05, 1.0, 1e-4), (0.05, 1.0, 0.02))
+            for R in
+                (rd -> DistributionallyRobustConditionalValueatRisk(; alpha = alpha, l = l,
+                                                                    r = rd),
+                 rd -> DistributionallyRobustConditionalDrawdownatRisk(; alpha = alpha,
+                                                                       l = l, r = rd),
+                 rd -> DistributionallyRobustConditionalValueatRiskRange(; alpha = alpha,
+                                                                         l_a = l, r_a = rd,
+                                                                         beta = 0.1,
+                                                                         l_b = 2.0,
+                                                                         r_b = 2 * rd))
+                v, w = risk_w(X, R(r))
+                vc, wc = risk_w(c .* X, R(c * r))
+                @test isapprox(vc, c * v; rtol = 1e-6)
+                @test isapprox(wc, w; atol = 1e-6)
+            end
+        end
+        # A drawdown adds many returns, so on this sample the mean absolute drawdown of every
+        # asset is larger than its mean absolute return.
+        D = PortfolioOptimisers.absolute_drawdown_arr(X)
+        @test all(vec(mean(abs, D; dims = 1)) .> vec(mean(abs, X; dims = 1)))
+    end
+
+    @testset "The tail means by hand at a fractional alpha T (#601)" begin
+        # T = 10. At alpha = 0.2 the two largest losses, 0.04 and 0.03, form the tail. At
+        # alpha = 0.25, alpha T = 2.5, so the third largest loss, 0.02, enters at half weight.
+        x = [0.03, -0.01, 0.02, -0.04, 0.05, 0.0, -0.02, 0.01, -0.03, 0.04]
+        @test ConditionalValueatRisk(; alpha = 0.2)(x) ≈ (0.04 + 0.03) / 2
+        @test ConditionalValueatRisk(; alpha = 0.25)(x) ≈ (0.04 + 0.03 + 0.5 * 0.02) / 2.5
+        # The path of the exact drawdown test of #600: the absolute drawdowns are
+        # (0, 1/5, 3/20, 1/20, 3/20) and the relative ones (0, 1/5, 4/25, 19/250, 421/2500).
+        # The deepest drawdown is 1/5 on both paths, and the second deepest differs.
+        y = [0.1, -0.2, 0.05, 0.1, -0.1]
+        for (alpha, cd, rcd) in
+            ((0.2, 0.2, 0.2), (0.4, (0.2 + 0.15) / 2, (0.2 + 0.1684) / 2),
+             (0.3, (0.2 + 0.5 * 0.15) / 1.5, (0.2 + 0.5 * 0.1684) / 1.5))
+            @test ConditionalDrawdownatRisk(; alpha = alpha)(y) ≈ cd
+            @test RelativeConditionalDrawdownatRisk(; alpha = alpha)(y) ≈ rcd
+        end
+    end
 end
 
 # A per-asset moment target centres a net series on its net mean (#1320). The series a moment

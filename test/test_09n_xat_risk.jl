@@ -121,6 +121,13 @@ rel_dd(x) = cumprod(1 .+ x) ./ accumulate(max, cumprod(1 .+ x); init = one(eltyp
             vd = DrawdownatRisk(; alpha = alpha)(x)
             @test ConditionalDrawdownatRisk(; alpha = alpha)(x) ≈
                   vd + sum(max.(-abs_dd(x) .- vd, 0)) / (alpha * T)
+            # The mean excess is never negative, so the tail mean is never below the
+            # quantile at the same level (#601).
+            @test v <= ConditionalValueatRisk(; alpha = alpha)(x)
+            @test vw <= ConditionalValueatRisk(; alpha = alpha, w = pw)(x)
+            @test vd <= ConditionalDrawdownatRisk(; alpha = alpha)(x)
+            @test RelativeDrawdownatRisk(; alpha = alpha)(x) <=
+                  RelativeConditionalDrawdownatRisk(; alpha = alpha)(x)
             if isinteger(round(alpha * T; digits = 8))
                 @test ConditionalValueatRisk(; alpha = alpha)(x) ≈ mean(-x[-x .> v])
             end
