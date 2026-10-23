@@ -629,6 +629,12 @@ include(joinpath(@__DIR__, "asset_panel_fixture.jl"))
         @test_throws DimensionMismatch PricesResult(; X = X, ivpa = [1.0, 1.0])
         @test_throws DimensionMismatch PricesResult(; X = X, B = B[:bA, :bB])
         @test_throws DimensionMismatch PricesResult(; X = X, span = trues(5, 2))
+        # A repeated timestamp is refused, because a window of `port_opt_view` finds each
+        # row by its timestamp, and it would take the first of the two rows.
+        tsd = [ts[1], ts[1], ts[2], ts[3], ts[3]]
+        Xd = TimeArray(tsd, values(X), colnames(X))
+        @test_throws "Got 2 repeated timestamp(s), and the first is $(ts[1])" PricesResult(;
+                                                                                           X = Xd)
     end
 
     @testset "the preprocessing interface refuses a half-implemented estimator" begin
@@ -3026,6 +3032,20 @@ end
              AssetPanel(; pf = [PO.panel_field_lift(t, 1)], amsk = PO.AllTrueMask(1, 3),
                         emsk = PO.AllTrueMask(1, 3)))
     @test isa(d.pf[1].vals, PO.RepeatedLeading)
+    # Equal lifts of two element types stay lazy, and the element types promote as `vcat`
+    # promotes them.
+    lift(v, n) = AssetPanel(;
+                            pf = [PO.panel_field_lift(NumericPanelField(; name = "size",
+                                                                        vals = v), n)],
+                            amsk = PO.AllTrueMask(n, 3), emsk = PO.AllTrueMask(n, 3))
+    for (x, y) in ((Float32[1, 2, 3], [1.0, 2.0, 3.0]), ([1, 2, 3], Float32[1, 2, 3]))
+        for (p, q) in ((x, y), (y, x))
+            f = only(vcat(lift(p, 2), lift(q, 1)).pf).vals
+            @test isa(f, PO.RepeatedLeading)
+            @test eltype(f) === eltype(vcat(repeat(p', 2), q'))
+            @test f == repeat([1.0 2.0 3.0], 3)
+        end
+    end
     # A lift of another array makes the field time-varying, and a mask with a false cell
     # makes the mask dense.
     u = NumericPanelField(; name = "size", vals = [4.0, 5.0, 6.0])

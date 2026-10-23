@@ -3,19 +3,20 @@
 
 Concatenates Asset Panels of one universe along the observation axis, `a` first.
 
-Each part holds the same Panel Fields, and the function joins the values, the observed mask and the placeholder mask of each field, the active mask and the estimation mask. It refuses a part whose schema differs from the schema of `a`. A static panel has no observation axis and states the same values at each observation, so the concatenation of equal static panels is `a`.
+Each part holds the same Panel Fields. The function joins the values, the observed mask and the placeholder mask of each field, and it joins the active mask and the estimation mask. It refuses a part whose schema differs from the schema of `a`. A static panel has no observation axis and states the same values at each observation, so the concatenation of equal static panels is `a`.
 
-The panel holds no asset names and no timestamps. The [`ReturnsResult`](@ref) or the [`PricesResult`](@ref) that holds the panel holds them, and each of the two refuses a repeated timestamp. To join two blocks of returns data, concatenate `X`, `ts` and each other series with `vcat`, concatenate the panels with this function, and make a new `ReturnsResult`.
+The panel holds no asset names and no timestamps. The [`ReturnsResult`](@ref) or the [`PricesResult`](@ref) that holds the panel holds them, and each of the two refuses a repeated timestamp. To join two blocks of returns data, concatenate `X`, `ts` and each other series with `vcat`. Then concatenate the panels with this function, and make a new `ReturnsResult`.
 
-The element types promote as `vcat` promotes them: a `Float32` part and a `Float64` part give a `Float64` field. A field that each part lifts from the same static array stays a lazy [`RepeatedLeading`](@ref) array, and masks that are true everywhere stay an [`AllTrueMask`](@ref).
+The element types promote as `vcat` promotes them, so a `Float32` part and a `Float64` part give a `Float64` field. A field that each part lifts from an equal static array stays a lazy [`RepeatedLeading`](@ref) array, and masks that are true everywhere stay an [`AllTrueMask`](@ref).
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. Check each part `b` against `a` with [`assert_panel_concat`](@ref): the shape, the asset count, the Panel Field names in their order, and the schema of each field.
- 2. `a` is static: check that each Panel Field of each part holds the data of its field in `a`, with [`panel_field_isequal`](@ref). A field with no observed mask equals a field whose observed mask is `true` everywhere, and a field with no placeholder mask equals a field whose placeholder mask is `false` everywhere, as in step 3. Return `a`.
- 3. `a` is time-varying: concatenate the parts of each Panel Field with [`panel_field_vcat`](@ref), and the parts of each mask with [`panel_mask_vcat`](@ref). Make the `AssetPanel` of the results.
+ 2. `a` is static: check that each Panel Field of each part holds the data of its field in `a`, with [`panel_field_isequal`](@ref). A field with no observed mask equals a field whose observed mask is `true` everywhere. A field with no placeholder mask equals a field whose placeholder mask is `false` everywhere, as in step 3. Return `a`.
+ 3. `a` is time-varying: concatenate the parts of each Panel Field with [`panel_field_vcat`](@ref), and the parts of each mask with [`panel_mask_vcat`](@ref).
+ 4. Make the `AssetPanel` of the joined Panel Fields and the two joined masks.
 
 # Arguments
 
@@ -111,6 +112,7 @@ Refuses a part of a concatenation of Asset Panels whose schema differs from the 
   - `panel_is_static(a) == panel_is_static(b)`. An `ArgumentError` is thrown otherwise.
   - The two asset counts are equal. A `DimensionMismatch` is thrown otherwise.
   - The two lists of Panel Field names are equal. An `ArgumentError` is thrown otherwise.
+  - The rules of [`assert_panel_field_concat`](@ref) for each pair of fields.
 
 # Returns
 
@@ -148,7 +150,7 @@ Refuses a Panel Field of a later part of a concatenation of Asset Panels whose s
 
 The method that Julia selects is the algorithm.
 
- 1. Two fields of different kinds: throw. Two numeric fields, or two fields of one kind that the library does not define, have no more schema to check.
+ 1. Any other two fields: check that the two fields are of one kind, by the name of their type. Two numeric fields, and two fields of a kind that the library does not define, have no more schema to check.
  2. Two categorical fields: check that the levels are equal. A code indexes the levels of its own part, so a code over other levels names another category.
  3. Two tensor fields: check that the axis names, the labels and the groups are equal.
 
@@ -201,11 +203,16 @@ end
 
 Concatenates the parts of one time-varying Panel Field along the observation axis.
 
-[`assert_panel_field_concat`](@ref) checked the schema of each part before the call, so the result takes the name, the levels, the axis name, the labels and the groups of `f`.
+[`assert_panel_field_concat`](@ref) checks the schema of each part before the call, so the result takes the name, the levels, the axis name, the labels and the groups of `f`.
 
 # Algorithm
 
-The method that Julia selects is the algorithm. Each kind concatenates the value arrays of its parts with [`panel_values_vcat`](@ref), their observed masks with [`panel_omsk_vcat`](@ref), and their placeholder masks with [`panel_pmsk_vcat`](@ref).
+Each method takes the same steps for its kind of field.
+
+ 1. Concatenate the value arrays of the parts with [`panel_values_vcat`](@ref). For a categorical field, the value arrays are the codes.
+ 2. Concatenate the observed masks of the parts with [`panel_omsk_vcat`](@ref), which reads the value array of a part for the size of a missing mask.
+ 3. Concatenate the placeholder masks of the parts with [`panel_pmsk_vcat`](@ref) in the same way.
+ 4. Make a Panel Field of the kind of `f` from the results, with the name of `f` and the rest of its schema.
 
 # Arguments
 
@@ -249,11 +256,16 @@ end
 
 Concatenates the value arrays of the parts of one Panel Field along the observation axis.
 
+The element type of the result is the element type that `vcat` of the parts gives. A lift of `Float32` values and an equal lift of `Float64` values give a lazy lift of `Float64` values.
+
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
- 1. Every part is a [`RepeatedLeading`](@ref) array, and every part lifts an array equal to the one of the first part: return one lazy lift of that array over the observations of every part. Otherwise concatenate the parts with `vcat`.
+ 1. Every part is a [`RepeatedLeading`](@ref) array:
+     1. Read the lifted array `p` of the first part. When a part lifts an array that `isequal` does not find equal to `p`, go to step 2.
+     2. Find the element type `T` with `promote_type` over the element types of the parts.
+     3. Return one lazy lift of `p`, converted to `T`, over the observations of every part.
  2. Any other parts: concatenate them with `vcat`.
 
 # Arguments
@@ -272,7 +284,10 @@ The method that Julia selects is the algorithm.
 function panel_values_vcat(vs::AbstractVector{<:RepeatedLeading})
     p = first(vs).parent
     return if all(v -> isequal(v.parent, p), vs)
-        RepeatedLeading(p, sum(v -> v.n, vs))
+        #! `isequal` holds across element types, as for `[1, 2]` and `[1.0, 2.0]`, so the lift
+        #! takes the element type that `vcat` of the parts gives.
+        T = mapreduce(eltype, promote_type, vs)
+        RepeatedLeading(convert(AbstractArray{T}, p), sum(v -> v.n, vs))
     else
         reduce(vcat, vs)
     end
@@ -286,14 +301,15 @@ end
 
 Concatenates the observed masks of the parts of one Panel Field along the observation axis.
 
-A part with no observed mask cannot blank, so each of its cells was observed.
+A part with no observed mask cannot blank, so each of its cells is observed.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. No part has an observed mask: return `nothing`.
- 2. Otherwise: write an array of `true` values of the size of its values for each part with no mask, and concatenate the masks with `vcat`.
+ 2. Any other parts: put an array of `true` values, of the size of the values of the part, in place of each missing mask.
+ 3. Concatenate the masks with `vcat`.
 
 # Arguments
 
@@ -328,7 +344,8 @@ A part with no placeholder mask holds no placeholder, so each of its cells holds
 The method that Julia selects is the algorithm.
 
  1. No part has a placeholder mask: return `nothing`.
- 2. Otherwise: write an array of `false` values of the size of its values for each part with no mask, and concatenate the masks with `vcat`.
+ 2. Any other parts: put an array of `false` values, of the size of the values of the part, in place of each missing mask.
+ 3. Concatenate the masks with `vcat`.
 
 # Arguments
 
@@ -356,7 +373,7 @@ end
 
 Tests whether two Panel Fields of one schema hold the same data: the same stored cells, the same observed mask and the same placeholder mask.
 
-A missing mask is read as the concatenation along the observation axis reads it. A field with no observed mask holds data in each cell, as a mask that is `true` everywhere states, and a field with no placeholder mask holds no placeholder, as a mask that is `false` everywhere states. [`assert_panel_concat`](@ref) checked the schema before the call: the kind, the levels, the axis name, the labels and the groups.
+The function reads a missing mask as the concatenation along the observation axis reads it. A field with no observed mask holds data in each cell, as a mask that is `true` everywhere states. A field with no placeholder mask holds no placeholder, as a mask that is `false` everywhere states. [`assert_panel_concat`](@ref) checks the schema before the call, which is the kind, the levels, the axis name, the labels and the groups.
 
 # Algorithm
 
@@ -392,7 +409,7 @@ end
 
 Tests whether two masks of one Panel Field are equal, with `fill` in each cell of a missing mask.
 
-The caller compared the stored arrays of the two fields first, so a mask has the shape of the values, and a missing mask needs no array to compare.
+The caller compares the stored arrays of the two fields first. So a mask has the shape of the values, and a missing mask needs no array to compare.
 
 # Algorithm
 
@@ -466,12 +483,14 @@ end
 
 Makes the time-varying Asset Panel that carries the Panel Fields of a sample buffer, so that the checks and the `vcat` of an [`AssetPanel`](@ref) apply to them.
 
-A [`SampleBufferState`](@ref) keeps its masks in `A` and `E`, and the Panel Fields alone in `P`. The masks of this panel are two [`AllTrueMask`](@ref) arrays, which store no cell. They are not the masks of the buffer, and no caller reads them. The constructor of the panel checks that the Panel Fields share one observation axis and one asset axis, and that their names are unique.
+A [`SampleBufferState`](@ref) keeps its active mask in `A`, its estimation mask in `M`, and the Panel Fields alone in `P`. The masks of this panel are two [`AllTrueMask`](@ref) arrays, which store no cell. They are not the masks of the buffer, and no caller reads them. The constructor of the panel checks that the Panel Fields share one observation axis and one asset axis, and that their names are unique.
 
 # Algorithm
 
- 1. Refuse an empty vector, and a vector whose first Panel Field is static.
- 2. Make the `AssetPanel` of the Panel Fields and of two `AllTrueMask` arrays over their axes.
+ 1. Refuse an empty vector.
+ 2. Refuse a vector whose first Panel Field is static. The constructor of the panel refuses a later static field, because its axes differ from the axes of the first field.
+ 3. Read the observation count `T` and the asset count `N` from the stored array of the first Panel Field.
+ 4. Make the `AssetPanel` of the Panel Fields and of two `AllTrueMask` arrays of size `(T, N)`.
 
 # Arguments
 
@@ -522,8 +541,8 @@ The method that Julia selects is the algorithm.
 
 # Arguments
 
-  - `X`: Backing matrix of the buffer.
-  - `n`: Number of observations in the valid region.
+  - `X`: The backing matrix of the buffer.
+  - `n`: The number of observations in the valid region.
   - `P`: The Panel Fields of the buffer, or `nothing`.
 
 # Validation
@@ -556,7 +575,7 @@ end
 
 Refuses Panel Fields that do not make a time-varying Asset Panel over a block of a sample buffer.
 
-The block arm of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref) calls it before it records a row. The Panel Fields of a block and the masks of the block are one time-varying [`AssetPanel`](@ref), so they need both masks, and they share the observations and the assets of the block.
+The method of [`partial_fit!`](@ref) for a block and a [`SampleBufferState`](@ref) calls it before it records a row. The Panel Fields of a block and the masks of the block are one time-varying [`AssetPanel`](@ref). So the Panel Fields need both masks, and they share the observations and the assets of the block.
 
 # Algorithm
 
@@ -605,15 +624,22 @@ end
     panel_fields_view(P::Nothing, i, j) -> nothing
     panel_fields_view(P::AbstractVector{<:AbstractPanelField}, i, j) -> Vector{AbstractPanelField}
 
-Views each Panel Field of a sample buffer over the observations `i` and the assets `j`, and passes Panel Fields that are not there through.
+Views each Panel Field of a sample buffer over the observations `i` and the assets `j`, or gives `nothing` for a buffer that records no Panel Field.
 
-The block arm of [`partial_fit!`](@ref) for a [`SampleBufferState`](@ref) takes the rows that a cap keeps with it, and [`port_opt_view`](@ref) of the buffer takes the selected assets with it. It passes no asset names to [`panel_field_view`](@ref), so a tensor Panel Field keeps its whole label axis.
+The method of [`partial_fit!`](@ref) for a block and a [`SampleBufferState`](@ref) takes the rows that a cap keeps with it. [`port_opt_view`](@ref) of the buffer takes the selected assets with it. The function passes no asset names to [`panel_field_view`](@ref), so a tensor Panel Field keeps its whole label axis.
+
+# Algorithm
+
+The method that Julia selects is the algorithm.
+
+ 1. `P` is `nothing`: return `nothing`.
+ 2. Any other `P`: view each Panel Field over `i` and `j` with [`panel_field_view`](@ref), and collect the views in a `Vector{AbstractPanelField}`.
 
 # Arguments
 
   - `P`: The Panel Fields, or `nothing`.
-  - `i`: Observation index.
-  - `j`: Asset index.
+  - `i`: The observation index.
+  - `j`: The asset index.
 
 # Returns
 
@@ -636,17 +662,18 @@ end
 
 Joins the Panel Fields of a sample buffer to the Panel Fields of a block, and keeps the last `n` rows.
 
-The block arm of [`partial_fit!`](@ref) and [`merge_states`](@ref) for a [`SampleBufferState`](@ref) call it. `n` is the number of observations of the buffer after the append, so the cap has already set it. The rows of `Po` are always kept, because a cap truncates a block before the append. `vcat` of two Asset Panels joins the rows, so it checks that the two lists hold the same Panel Fields.
+The method of [`partial_fit!`](@ref) for a block and a [`SampleBufferState`](@ref) calls it, and so does [`merge_states`](@ref) for two buffers. `n` is the number of observations of the buffer after the append, and the cap sets it before the call. The function keeps every row of `Po`, because a cap truncates a block before the append. `vcat` of two Asset Panels joins the rows, so it checks that the two lists hold the same Panel Fields.
 
 # Algorithm
 
 The method that Julia selects is the algorithm.
 
  1. `P` and `Po` are `nothing`: return `nothing`.
- 2. Make the panel of each list with [`panel_fields_panel`](@ref), and check that the two can join with [`assert_panel_concat`](@ref).
- 3. Set `keep = n - tₒ`, where `tₒ` is the number of rows of `Po`. Return `Po` when `keep` is zero.
- 4. When `keep` is less than the number of rows of `P`, view the last `keep` rows of `P`.
- 5. Join the kept rows and `Po` with `vcat`, and return the Panel Fields of the result.
+ 2. Make the panel `b` of `Po` with [`panel_fields_panel`](@ref).
+ 3. Check that the panel of `P` and `b` can join, with [`assert_panel_concat`](@ref).
+ 4. Set `keep = n - tₒ`, where `tₒ` is the number of rows of `Po`. Return `Po` when `keep` is zero.
+ 5. When `keep` is less than the number of rows `tₚ` of `P`, view the last `keep` rows of `P` with [`panel_fields_view`](@ref). Otherwise keep all of `P`.
+ 6. Join the kept rows of `P` and `b` with `vcat`, and return the Panel Fields of the joined panel.
 
 # Arguments
 
@@ -686,14 +713,16 @@ end
 """
     sample_buffer_panel(state::SampleBufferState) -> Option{<:AssetPanel}
 
-Rebuilds the time-varying Asset Panel of the observations a sample buffer holds, or gives `nothing` when the buffer records no Panel Field.
+Rebuilds the time-varying Asset Panel of the observations that a sample buffer holds, or gives `nothing` when the buffer records no Panel Field.
 
-The call with no data of a refit prior and [`returns_result`](@ref) call it. A buffer that records Panel Fields records both masks too, so the panel has its Panel Fields and both of its masks. The masks are copies of the valid region, because a later fold writes into the backing masks. The Panel Fields are the Panel Fields of the buffer, because nothing writes into them.
+A fit over the rows of a buffer reads it, for example the call with no data of a refit prior, and the Choice Rule of an online step in [`pin_buffer_choice`](@ref). [`buffer_asset_panel`](@ref) reads it for a buffer that records Panel Fields. A buffer that records Panel Fields records both masks too, so the panel has its Panel Fields and both of its masks. The masks are copies of the valid region, because a later fold writes into the backing masks. The Panel Fields are the Panel Fields of the buffer, because nothing writes into them.
 
 # Algorithm
 
- 1. Return `nothing` when `state.P` is `nothing`.
- 2. Copy the masks `A` and `M` over the valid region into two `Matrix{Bool}`.
+The method that Julia selects is the algorithm.
+
+ 1. `state.P` is `nothing`: return `nothing`.
+ 2. Any other `state.P`: copy the active mask `A` and the estimation mask `M` over the valid region into two `Matrix{Bool}`.
  3. Make the `AssetPanel` of `state.P` and the two masks.
 
 # Arguments
@@ -767,9 +796,11 @@ end
 """
     buffer_asset_panel(state::SampleBufferState) -> Option{<:AssetPanel}
 
-Rebuilds the Asset Panel of the observations a sample buffer holds, from every part of a panel that the buffer records, or gives `nothing` when the buffer records no active mask.
+Rebuilds the Asset Panel of the observations that a sample buffer holds, from every part of a panel that the buffer records, or gives `nothing` when the buffer records no active mask.
 
-A buffer that records Panel Fields gives the panel of [`sample_buffer_panel`](@ref). A buffer that records an active mask and no Panel Field gives a panel with no Panel Field. Its estimation mask is the one that the buffer records or, when the buffer records none, a copy of the active mask. The carry of [`EmpiricalPrior`](@ref) records the active mask alone, so its call with no data gives a member that it refits this panel, as the batch fit gives the member `rd.pnl`. [`returns_result`](@ref) rebuilds the panel of a `ReturnsResult` with it. The masks are copies of the valid region, because a later fold writes into the backing masks.
+A buffer that records Panel Fields gives the panel of [`sample_buffer_panel`](@ref). A buffer that records an active mask and no Panel Field gives a panel with no Panel Field. Its estimation mask is the estimation mask of the buffer. When the buffer records no estimation mask, it is a copy of the active mask.
+
+The carry of [`EmpiricalPrior`](@ref) can record the active mask alone. Its call with no data refits a member on the rows of the buffer and this panel, as the batch fit refits the member on `rd.pnl`. [`returns_result`](@ref) rebuilds the panel of a `ReturnsResult` with it. The masks are copies of the valid region, because a later fold writes into the backing masks.
 
 # Algorithm
 
