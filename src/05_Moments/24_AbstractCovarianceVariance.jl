@@ -226,14 +226,14 @@ This method is the fallback that gives a series to each [`AbstractCovarianceEsti
 
 ```math
 \\begin{align}
-\\mathbf{V}_{ti} &= \\hat{\\sigma}_i^2\\left(\\mathbf{X}_{1:t}\\right)\\,.
+\\mathbf{V}_{tj} &= \\hat{\\sigma}^2_j\\left(\\mathbf{X}_{1:t}\\right)\\,.
 \\end{align}
 ```
 
 Where:
 
-  - ``\\mathbf{V}_{ti}``: The variance of asset ``i`` after observation ``t``.
-  - ``\\hat{\\sigma}_i^2``: The variance of asset ``i``, as `ce` estimates it.
+  - $(math_dict[:V_tj_series])
+  - $(math_dict[:sigma2_hat_j]) Here `ce` estimates it.
   - ``\\mathbf{X}_{1:t}``: The first ``t`` observations of the data matrix.
   - $(math_dict[:T])
 

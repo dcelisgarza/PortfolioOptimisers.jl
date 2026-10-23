@@ -22,6 +22,7 @@ unique_key_dict!(math_dict, :math_dict,
                  :r_tj => "``r_{tj}``: Return of asset ``j`` at time ``t``.",#
                  :mu_hat_j => "``\\hat{\\mu}_j``: Estimated mean of asset ``j``.",#
                  :sigma2_hat_j => "``\\hat{\\sigma}^2_j``: Estimated variance of asset ``j``.",#
+                 :V_tj_series => "``\\mathbf{V}_{tj}``: Point-in-time variance of asset ``j`` at observation ``t``. No observation after ``t`` enters it.",#
                  :sigma_hat_i => "``\\hat{\\sigma}_i``: Estimated standard deviation of asset ``i``.",#
                  :sigma_rv_hat_i => "``\\hat{\\sigma}^{\\mathrm{rv}}_i``: Predicted realised volatility of asset ``i`` for the period that follows the sample.",#
                  :Sigma_hat => "``\\hat{\\mathbf{\\Sigma}}``: Estimated covariance matrix.",#

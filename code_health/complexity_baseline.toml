@@ -122,7 +122,7 @@ commit = "ec0805d376"
 "src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { cyc = 1, cog = 1, arg = 5, cyc_sum = 3, cog_sum = 1, arg_sum = 11, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { cyc = 0, cog = 0, arg = 0, cyc_sum = 0, cog_sum = 0, arg_sum = 0, macros = ["@windowed_estimator"] }
-"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { cyc = 4, cog = 6, arg = 7, cyc_sum = 30, cog_sum = 18, arg_sum = 74, macros = [] }
+"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { cyc = 5, cog = 7, arg = 7, cyc_sum = 31, cog_sum = 19, arg_sum = 74, macros = [] }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 5, cog_sum = 2, arg_sum = 9, macros = ["@propagatable"] }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { cyc = 2, cog = 1, arg = 4, cyc_sum = 8, cog_sum = 2, arg_sum = 13, macros = [] }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { cyc = 5, cog = 7, arg = 6, cyc_sum = 26, cog_sum = 20, arg_sum = 48, macros = [] }

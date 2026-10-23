@@ -171,7 +171,7 @@
 "src/05_Moments/26_Windowed/03_WindowedVariance.jl" = { map = 3, units = 2, algorithm = 0, swept = true, bindings = ["variance_series", "variance_series"] }
 "src/05_Moments/26_Windowed/04_WindowedCoskewness.jl" = { map = 3, units = 0, algorithm = 0, swept = true, bindings = [] }
 "src/05_Moments/26_Windowed/05_WindowedCokurtosis.jl" = { map = 3, units = 0, algorithm = 0, swept = true, bindings = [] }
-"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { map = 3, units = 18, swept = false }
+"src/05_Moments/26_Windowed/06_WindowedPreamble.jl" = { map = 3, units = 18, algorithm = 9, swept = true, bindings = ["SeedWindowed", "cokurtosis", "coskewness", "cov", "mean", "partial_fit!", "seed_window_path", "show_fields", "supports_partial_fit", "var", "windowed_keywords", "windowed_panel", "windowed_preamble", "windowed_preamble", "windowed_rows", "windowed_series_row", "windowed_series_rows", "windowed_variance_series"] }
 "src/05_Moments/27_MedianExpectedReturns.jl" = { map = 3, units = 3, algorithm = 1, swept = true, bindings = ["MedianExpectedReturns", "mean", "mean"] }
 "src/05_Moments/28_CustomValueExpectedReturns.jl" = { map = 3, units = 8, algorithm = 2, swept = true, bindings = ["CER_Func_Num_VecNum", "CustomExpectedReturnsValueAlgorithm", "CustomValueExpectedReturns", "assert_custom_expected_returns_val", "mean", "mean", "mean", "port_opt_view"] }
 "src/05_Moments/29_ExpWeighted/01_ExpWeightedExpectedReturns.jl" = { map = 3, units = 15, algorithm = 4, swept = true, bindings = ["ExpWeightedExpectedReturns", "ExpWeightedExpectedReturnsState", "copy", "decay_half_life", "exp_weighted_moment", "exp_weighted_pass!", "exp_weighted_pass!", "mean", "mean", "mean", "mean", "merge_states", "partial_fit!", "partial_fit!", "process_observation!"] }
