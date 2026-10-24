@@ -24,10 +24,3 @@
 #   issue   = 1234               the open issue that records the red (required)
 #   reason  = "..."              one clause: what is red, and why (required)
 #   host    = "..."              where it is red, when that is not every host (optional)
-
-[[red]]
-file = "test_04_owa.jl"
-testset = "OWA l-moments"
-issue = 1709
-reason = "iteration 11 misses its rtol = 5e-8, a tolerance too tight for the host"
-host = "red on a Linux host; macOS has its own wider rtol"

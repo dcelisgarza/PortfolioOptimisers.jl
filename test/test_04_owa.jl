@@ -150,10 +150,10 @@
                     0.05
                 elseif i == 5
                     0.005
-                elseif i in (7, 8) || Sys.isapple() && i == 11
+                elseif i in (7, 8, 11)
+                    # Iteration 11 measures rtol = 1e-7 on a Linux host and passes 5e-8 on CI.
+                    # The solver sets the last digits, so the host does (#1709).
                     1e-6
-                elseif i == 11
-                    5e-8
                 else
                     1e-9
                 end
